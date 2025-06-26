@@ -13,17 +13,39 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.wesplit.app",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "phantom",
+          "solflare",
+          "slope",
+          "metamask",
+          "trust",
+          "rainbow",
+          "uniswap"
+        ]
+      }
     },
     "android": {
+      "package": "com.wesplit.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "jsEngine": "jsc"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "./queries.js"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2eca5921-d3a4-4104-a70a-67e826a73491"
+      }
     }
   }
 }
