@@ -15,7 +15,9 @@
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
     "@react-navigation/stack": "^7.0.0",
-    "@reown/appkit-adapter-solana": "^1.7.10",
+    "@reown/appkit-common": "^1.7.11",
+    "@reown/appkit-controllers": "^1.7.11",
+    "@reown/appkit-polyfills": "^1.7.11",
     "@reown/appkit-react-native": "^0.0.1",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
@@ -52,12 +54,6 @@
     "typescript": "~5.8.3"
   },
   "overrides": {
-    "@reown/appkit": "1.7.11",
-    "@reown/appkit-utils": "1.7.11",
-    "@reown/appkit-common": "1.7.11",
-    "@reown/appkit-controllers": "1.7.11",
-    "@reown/appkit-polyfills": "1.7.11",
-    "@reown/appkit-wallet": "1.7.11",
     "@reown/appkit-scaffold-ui": "1.7.11",
     "@reown/appkit-ui": "1.7.11",
     "@reown/appkit-pay": "1.7.11"

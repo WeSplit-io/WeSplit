@@ -2,41 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-// Temporarily comment out AppKit imports to prevent Super expression error
-// import { createAppKit, AppKit } from '@reown/appkit-react-native';
-// import { SolanaAdapter } from '@reown/appkit-adapter-solana';
-// import { solana, solanaTestnet, solanaDevnet } from '@reown/appkit-react-native';
-import { WalletProvider } from './context/WalletContext';
-import WelcomeScreen from './screens/WelcomeScreen';
-import CreatePoolScreen from './screens/CreatePoolScreen';
-import ViewPoolScreen from './screens/ViewPoolScreen';
-import TransactionConfirmationScreen from './screens/TransactionConfirmationScreen';
+import { WalletProvider } from './src/context/WalletContext';
+import { AppProvider } from './src/context/AppContext';
+import WelcomeScreen from './src/screens/WelcomeScreen';
+import CreatePoolScreen from './src/screens/CreatePoolScreen';
+import ViewPoolScreen from './src/screens/ViewPoolScreen';
+import TransactionConfirmationScreen from './src/screens/TransactionConfirmationScreen';
 import { Text, View, StyleSheet } from 'react-native';
 
-// Try to import DashboardScreen with error handling
-let DashboardScreen: React.ComponentType<any> | null = null;
-try {
-  DashboardScreen = require('./screens/DashboardScreen').default;
-} catch (error) {
-  console.log('DashboardScreen import failed, using fallback');
-  DashboardScreen = null;
-}
+// Import all new screens
+import DashboardScreen from './src/screens/DashboardScreen';
+import AuthScreen from './src/screens/AuthScreen';
+import AddExpenseScreen from './src/screens/AddExpenseScreen';
+import CreateGroupScreen from './src/screens/CreateGroupScreen';
+import AddMembersScreen from './src/screens/AddMembersScreen';
+import BalanceScreen from './src/screens/BalanceScreen';
+import GroupDetailsScreen from './src/screens/GroupDetailsScreen';
+import SettleUpModal from './src/screens/SettleUpModal';
+import GroupSettingsScreen from './src/screens/GroupSettingsScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import ScreensMenu from './src/screens/ScreensMenu';
 
 const Stack = createStackNavigator();
 const queryClient = new QueryClient();
-
-// Your Reown project ID
-const projectId = '75640aea520dc7e11470b5bd4695d1d5';
-
-const metadata = {
-  name: 'WeSplit',
-  description: 'Web3 Expense Sharing App on Solana',
-  url: 'https://wesplit.app',
-  icons: ['https://wesplit.app/icon.png'],
-};
-
-// Temporarily disable AppKit initialization
-// const solanaAdapter = new SolanaAdapter();
 
 // Loading Component
 const LoadingScreen = () => (
@@ -45,23 +33,24 @@ const LoadingScreen = () => (
   </View>
 );
 
-console.log('App.tsx loaded - minimal version');
+console.log('App.tsx loaded - initializing Solana wallet system');
 
 export default function App() {
   const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        console.log('Initializing app...');
+        console.log('Initializing app with Solana wallet system...');
         
-        // Simple initialization without AppKit
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        console.log('App initialized successfully');
+        // Initialize Solana wallet system
+        console.log('Solana wallet system initialized successfully');
         setIsInitialized(true);
       } catch (error) {
         console.error('Failed to initialize app:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        setError(errorMessage);
         setIsInitialized(true);
       }
     };
@@ -69,29 +58,52 @@ export default function App() {
     initializeApp();
   }, []);
 
-  console.log('App component rendered, initialized:', isInitialized);
+  console.log('App component rendered, initialized:', isInitialized, 'error:', error);
 
   if (!isInitialized) {
     return <LoadingScreen />;
   }
 
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Failed to initialize: {error}</Text>
+        <Text style={styles.errorSubtext}>
+          This might be due to network connectivity issues.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
-      <WalletProvider appKitInstance={null}>
-        <NavigationContainer>
-          <Stack.Navigator 
-            initialRouteName="Welcome"
-            screenOptions={{
-              headerShown: false,
-            }}
-          >
-            <Stack.Screen name="Welcome" component={WelcomeScreen} />
-            {DashboardScreen && <Stack.Screen name="Dashboard" component={DashboardScreen} />}
-            <Stack.Screen name="CreatePool" component={CreatePoolScreen} />
-            <Stack.Screen name="ViewPool" component={ViewPoolScreen} />
-            <Stack.Screen name="TransactionConfirmation" component={TransactionConfirmationScreen} />
-          </Stack.Navigator>
-        </NavigationContainer>
+      <WalletProvider>
+        <AppProvider>
+          <NavigationContainer>
+            <Stack.Navigator 
+              initialRouteName="Auth"
+              screenOptions={{
+                headerShown: false,
+              }}
+            >
+              <Stack.Screen name="Auth" component={AuthScreen} />
+              <Stack.Screen name="ScreensMenu" component={ScreensMenu} />
+              <Stack.Screen name="Welcome" component={WelcomeScreen} />
+              <Stack.Screen name="Dashboard" component={DashboardScreen} />
+              <Stack.Screen name="CreatePool" component={CreatePoolScreen} />
+              <Stack.Screen name="ViewPool" component={ViewPoolScreen} />
+              <Stack.Screen name="TransactionConfirmation" component={TransactionConfirmationScreen} />
+              <Stack.Screen name="AddExpense" component={AddExpenseScreen} />
+              <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
+              <Stack.Screen name="AddMembers" component={AddMembersScreen} />
+              <Stack.Screen name="Balance" component={BalanceScreen} />
+              <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
+              <Stack.Screen name="SettleUpModal" component={SettleUpModal} />
+              <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} />
+              <Stack.Screen name="Profile" component={ProfileScreen} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </AppProvider>
       </WalletProvider>
     </QueryClientProvider>
   );
@@ -102,10 +114,28 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f5f5f5',
   },
   loadingText: {
     fontSize: 18,
+    color: '#333',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#d32f2f',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  errorSubtext: {
+    fontSize: 14,
     color: '#666',
+    textAlign: 'center',
   },
 });
