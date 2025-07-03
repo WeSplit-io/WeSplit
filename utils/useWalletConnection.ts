@@ -9,7 +9,8 @@ export const useWalletConnection = () => {
     connectWallet, 
     disconnectWallet, 
     isLoading, 
-    chainId 
+    chainId,
+    walletName
   } = useWallet();
 
   const handleConnect = useCallback(async () => {
@@ -43,6 +44,7 @@ export const useWalletConnection = () => {
     address,
     isLoading,
     chainId,
+    walletName,
     
     // Actions
     connectWallet: handleConnect,

@@ -1,358 +1,422 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Alert, SafeAreaView, ActivityIndicator, Share, Linking } from 'react-native';
 import { colors, fontSizes, fontWeights, spacing, radii } from '../lib/theme';
 import Icon from '../components/Icon';
 import { useApp } from '../context/AppContext';
+import { getGroupMembers } from '../services/groupService';
 
 const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
-  const { state, getGroupById, dispatch } = useApp();
+  const { state } = useApp();
   const { currentUser } = state;
   const groupId = route.params?.groupId;
 
-  const group = getGroupById(groupId);
-  const [newMemberEmail, setNewMemberEmail] = useState('');
-  const [newMemberName, setNewMemberName] = useState('');
+  const [group, setGroup] = useState<any>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showQRCode, setShowQRCode] = useState(false);
 
-  if (!group) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Group Members</Text>
-          <View style={styles.placeholder} />
-        </View>
+  useEffect(() => {
+    const fetchGroupData = async () => {
+      if (!groupId) {
+        setError('No group ID provided');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
         
-        <View style={styles.emptyState}>
-          <Icon name="alert-circle" size={64} color={colors.gray} />
-          <Text style={styles.emptyStateText}>Group not found</Text>
-          <Text style={styles.emptyStateSubtext}>The group you're looking for doesn't exist</Text>
-          <TouchableOpacity 
-            style={styles.emptyStateButton} 
-            onPress={() => navigation.navigate('Dashboard')}
-          >
-            <Text style={styles.emptyStateButtonText}>Go to Dashboard</Text>
-          </TouchableOpacity>
+        // Get group members
+        const groupMembers = await getGroupMembers(groupId);
+        setMembers(groupMembers);
+        
+        // For now, we'll use a simple group object
+        setGroup({
+          id: groupId,
+          name: 'Group',
+          member_count: groupMembers.length
+        });
+        
+      } catch (err) {
+        console.error('Error fetching group data:', err);
+        setError('Failed to load group data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGroupData();
+  }, [groupId]);
+
+  const generateInviteLink = () => {
+    return `https://wesplit.app/join/${groupId}`;
+  };
+
+  const handleShareViaWhatsApp = async () => {
+    const inviteLink = generateInviteLink();
+    const message = `Join my WeSplit group! Click here to join: ${inviteLink}`;
+    
+    try {
+      const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(message)}`;
+      const canOpen = await Linking.canOpenURL(whatsappUrl);
+      
+      if (canOpen) {
+        await Linking.openURL(whatsappUrl);
+      } else {
+        // Fallback to general share
+        await Share.share({
+          message: message,
+          url: inviteLink,
+        });
+  }
+    } catch (error) {
+      console.error('Error sharing via WhatsApp:', error);
+      Alert.alert('Error', 'Failed to share via WhatsApp');
+    }
+  };
+
+  const handleShareViaTelegram = async () => {
+    const inviteLink = generateInviteLink();
+    const message = `Join my WeSplit group! Click here to join: ${inviteLink}`;
+    
+    try {
+      const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent('Join my WeSplit group!')}`;
+      await Linking.openURL(telegramUrl);
+    } catch (error) {
+      console.error('Error sharing via Telegram:', error);
+      Alert.alert('Error', 'Failed to share via Telegram');
+    }
+  };
+
+  const handleShareLink = async () => {
+    const inviteLink = generateInviteLink();
+    
+    try {
+      await Share.share({
+        message: `Join my WeSplit group! Click here to join: ${inviteLink}`,
+        url: inviteLink,
+      });
+    } catch (error) {
+      console.error('Error sharing link:', error);
+      Alert.alert('Error', 'Failed to share link');
+    }
+  };
+
+  const handleShowQRCode = () => {
+    setShowQRCode(!showQRCode);
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#A5EA15" />
+          <Text style={styles.loadingText}>Loading group members...</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
-  const handleAddMember = () => {
-    if (!newMemberEmail.trim() || !newMemberName.trim()) {
-      Alert.alert('Error', 'Please enter both name and email');
-      return;
-    }
-
-    // Actually add the member to the group in context
-    const newMember = {
-      id: Date.now().toString(),
-      name: newMemberName,
-      email: newMemberEmail,
-      avatar: 'https://randomuser.me/api/portraits/lego/1.jpg',
-      walletAddress: '',
-    };
-    const updatedGroup = {
-      ...group,
-      members: [...group.members, newMember],
-    };
-    dispatch({ type: 'UPDATE_GROUP', payload: updatedGroup });
-    setNewMemberEmail('');
-    setNewMemberName('');
-    Alert.alert(
-      'Member Added',
-      `${newMemberName} has been added to ${group.name}`,
-      [
-        { text: 'Add Another' },
-        { text: 'Done', onPress: () => navigation.navigate('GroupDetails', { groupId: group.id }) }
-      ]
+  if (error || !group) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error || 'Group not found'}</Text>
+        </View>
+      </SafeAreaView>
     );
-  };
+  }
 
-  const handleRemoveMember = (memberId: string) => {
-    if (memberId === currentUser?.id) {
-      Alert.alert('Cannot Remove', 'You cannot remove yourself from the group');
-      return;
-    }
-    Alert.alert(
-      'Remove Member',
-      'Are you sure you want to remove this member?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => {
-          // Actually remove the member from the group in context
-          const updatedGroup = {
-            ...group,
-            members: group.members.filter(m => m.id !== memberId),
-          };
-          dispatch({ type: 'UPDATE_GROUP', payload: updatedGroup });
-          Alert.alert('Member Removed', 'Member has been removed from the group');
-        }}
-      ]
-    );
-  };
 
-  const handleBackToGroup = () => {
-    navigation.navigate('GroupDetails', { groupId: group.id });
-  };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.headerContainer}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color={colors.text} />
+          <Icon name="arrow-left" size={24} color="#FFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{group.name} - Members</Text>
+        <Text style={styles.headerTitle}>Add Members</Text>
         <View style={styles.placeholder} />
       </View>
 
+      <ScrollView style={styles.scrollContent} contentContainerStyle={styles.content}>
       {/* Group Info */}
       <View style={styles.groupInfo}>
         <Text style={styles.groupName}>{group.name}</Text>
-        <Text style={styles.memberCount}>{group.members.length} members</Text>
+          <Text style={styles.memberCount}>{members.length} members</Text>
       </View>
 
       {/* Current Members */}
       <Text style={styles.sectionTitle}>Current Members</Text>
       <View style={styles.membersList}>
-        {group.members.map((member, idx) => (
-          <View key={member.id + idx} style={styles.memberRow}>
-            <Image source={{ uri: member.avatar }} style={styles.memberAvatar} />
+          {members.map((member, idx) => (
+            <View key={member.id + '-' + idx} style={styles.memberRow}>
+              <View style={styles.memberAvatar}>
+                <Text style={styles.avatarText}>
+                  {member.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
             <View style={styles.memberInfo}>
               <Text style={styles.memberName}>{member.name}</Text>
               <Text style={styles.memberEmail}>{member.email}</Text>
             </View>
-            {member.id !== currentUser?.id && (
+              {member.id.toString() !== currentUser?.id && (
               <TouchableOpacity 
                 style={styles.removeButton}
-                onPress={() => handleRemoveMember(member.id)}
+                  onPress={() => Alert.alert('Remove Member', 'This feature will be implemented soon')}
               >
-                <Icon name="x" size={16} color={colors.red} />
+                  <Icon name="x" size={16} color="#FF6B6B" />
               </TouchableOpacity>
             )}
-            {member.id === currentUser?.id && (
+              {member.id.toString() === currentUser?.id && (
               <Text style={styles.youLabel}>You</Text>
             )}
           </View>
         ))}
       </View>
 
-      {/* Add New Member */}
-      <Text style={styles.sectionTitle}>Add New Member</Text>
-      <View style={styles.addMemberForm}>
-        <TextInput
-          style={styles.input}
-          value={newMemberName}
-          onChangeText={setNewMemberName}
-          placeholder="Member name"
-          placeholderTextColor={colors.gray}
-        />
-        <TextInput
-          style={styles.input}
-          value={newMemberEmail}
-          onChangeText={setNewMemberEmail}
-          placeholder="Member email"
-          placeholderTextColor={colors.gray}
-          keyboardType="email-address"
-        />
-        <TouchableOpacity style={styles.addButton} onPress={handleAddMember}>
-          <Text style={styles.addButtonText}>Add Member</Text>
+        {/* Invite Options */}
+        <Text style={styles.sectionTitle}>Invite New Members</Text>
+        
+        {/* Share Options */}
+        <View style={styles.shareOptions}>
+          <TouchableOpacity style={styles.shareOption} onPress={handleShareViaWhatsApp}>
+            <Icon name="message-circle" size={24} color="#25D366" />
+            <Text style={styles.shareOptionText}>Share via WhatsApp</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.shareOption} onPress={handleShareViaTelegram}>
+            <Icon name="send" size={24} color="#0088CC" />
+            <Text style={styles.shareOptionText}>Share via Telegram</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.shareOption} onPress={handleShareLink}>
+            <Icon name="link" size={24} color="#A5EA15" />
+            <Text style={styles.shareOptionText}>Share Link</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.shareOption} onPress={handleShowQRCode}>
+            <Icon name="smartphone" size={24} color="#A5EA15" />
+            <Text style={styles.shareOptionText}>Show QR Code</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Navigation Buttons */}
-      <View style={styles.navigationButtons}>
-        <TouchableOpacity style={styles.backToGroupButton} onPress={handleBackToGroup}>
-          <Icon name="arrow-left" size={20} color={colors.background} />
+        {/* QR Code Section */}
+        {showQRCode && (
+          <View style={styles.qrCodeSection}>
+            <Text style={styles.qrCodeTitle}>Scan to Join</Text>
+            <View style={styles.qrCodeContainer}>
+              <Text style={styles.qrCodePlaceholder}>QR Code will be implemented</Text>
+              <Text style={styles.qrCodeText}>{generateInviteLink()}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Back to Group Button */}
+        <TouchableOpacity 
+          style={styles.backToGroupButton} 
+          onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
+        >
+          <Icon name="arrow-left" size={20} color="#212121" />
           <Text style={styles.backToGroupButtonText}>Back to Group</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.backToDashboardButton} 
-          onPress={() => navigation.navigate('Dashboard')}
-        >
-          <Icon name="home" size={20} color={colors.background} />
-          <Text style={styles.backToDashboardButtonText}>Back to Dashboard</Text>
-        </TouchableOpacity>
-      </View>
     </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.secondary,
-    padding: spacing.xl,
+    backgroundColor: '#212121',
   },
-  header: {
+  headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.xl,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
+    backgroundColor: '#212121',
   },
   backButton: {
-    padding: spacing.sm,
+    padding: 8,
   },
   headerTitle: {
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold as any,
-    color: colors.text,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFF',
   },
   placeholder: {
     width: 40,
   },
-  groupInfo: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
+  scrollContent: {
+    flex: 1,
+  },
+  content: {
+    padding: 24,
+    paddingBottom: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#212121',
+  },
+  loadingText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#212121',
+  },
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  groupInfo: {
+    backgroundColor: '#212121',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#FFF',
   },
   groupName: {
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold as any,
-    color: colors.text,
-    marginBottom: spacing.sm,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginBottom: 4,
   },
   memberCount: {
-    fontSize: fontSizes.md,
-    color: colors.gray,
+    fontSize: 14,
+    color: '#A89B9B',
   },
   sectionTitle: {
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold as any,
-    color: colors.text,
-    marginBottom: spacing.md,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFF',
+    marginBottom: 16,
   },
   membersList: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    marginBottom: spacing.xl,
-    overflow: 'hidden',
+    marginBottom: 24,
   },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: '#212121',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FFF',
   },
   memberAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: spacing.md,
+    backgroundColor: '#A5EA15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  avatarText: {
+    color: '#212121',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   memberInfo: {
     flex: 1,
   },
   memberName: {
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium as any,
-    color: colors.text,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFF',
   },
   memberEmail: {
-    fontSize: fontSizes.sm,
-    color: colors.gray,
+    fontSize: 12,
+    color: '#A89B9B',
     marginTop: 2,
   },
   removeButton: {
-    padding: spacing.sm,
+    padding: 8,
   },
   youLabel: {
-    fontSize: fontSizes.sm,
-    color: colors.primary,
-    fontWeight: fontWeights.medium as any,
+    fontSize: 12,
+    color: '#A5EA15',
+    fontWeight: '500',
   },
-  addMemberForm: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
+  shareOptions: {
+    marginBottom: 24,
   },
-  input: {
-    backgroundColor: colors.secondary,
-    borderRadius: radii.input,
-    padding: spacing.md,
-    fontSize: fontSizes.md,
-    color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
-  },
-  addButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radii.input,
-    padding: spacing.md,
+  shareOption: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#212121',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FFF',
   },
-  addButtonText: {
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.semibold as any,
-    color: colors.background,
+  shareOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFF',
+    marginLeft: 12,
   },
-  navigationButtons: {
-    gap: spacing.md,
+  qrCodeSection: {
+    marginBottom: 24,
+  },
+  qrCodeTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFF',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  qrCodeContainer: {
+    backgroundColor: '#212121',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFF',
+  },
+  qrCodePlaceholder: {
+    fontSize: 14,
+    color: '#A89B9B',
+    marginBottom: 12,
+  },
+  qrCodeText: {
+    fontSize: 12,
+    color: '#A5EA15',
+    textAlign: 'center',
   },
   backToGroupButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: radii.input,
-    padding: spacing.md,
+    backgroundColor: '#A5EA15',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
   backToGroupButtonText: {
-    color: colors.background,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.semibold as any,
-    marginLeft: spacing.sm,
-  },
-  backToDashboardButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.gray,
-    borderRadius: radii.input,
-    padding: spacing.md,
-  },
-  backToDashboardButtonText: {
-    color: colors.background,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.semibold as any,
-    marginLeft: spacing.sm,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: spacing.xl * 2,
-  },
-  emptyStateText: {
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold as any,
-    color: colors.text,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  emptyStateSubtext: {
-    fontSize: fontSizes.md,
-    color: colors.gray,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  emptyStateButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: 12,
-  },
-  emptyStateButtonText: {
-    color: colors.background,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.semibold as any,
+    color: '#212121',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 

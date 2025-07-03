@@ -8,6 +8,11 @@ export interface User {
   email: string;
   avatar: string;
   walletAddress: string;
+  // Database field names (for compatibility)
+  wallet_address?: string;
+  wallet_public_key?: string;
+  wallet_secret_key?: string;
+  created_at?: string;
 }
 
 export interface Group {
@@ -69,13 +74,7 @@ type AppAction =
 
 // Initial State
 const initialState: AppState = {
-  currentUser: {
-    id: '1',
-    name: 'Ari Colon',
-    email: 'ari.colon@gmail.com',
-    avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-    walletAddress: '0x1234...5678',
-  },
+  currentUser: null,
   groups: [
     {
       id: '1',
@@ -369,6 +368,7 @@ interface AppContextType {
   clearError: () => void;
   // Authentication methods
   authenticateUser: (user: User, method: 'wallet' | 'email' | 'guest') => void;
+  updateUser: (user: Partial<User>) => void;
   logoutUser: () => void;
 }
 
@@ -529,6 +529,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch({ type: 'AUTHENTICATE_USER', payload: { user, method } });
   };
 
+  const updateUser = (userData: Partial<User>) => {
+    if (state.currentUser) {
+      const updatedUser = { ...state.currentUser, ...userData };
+      dispatch({ type: 'SET_CURRENT_USER', payload: updatedUser });
+    }
+  };
+
   const logoutUser = () => {
     dispatch({ type: 'LOGOUT_USER' });
   };
@@ -547,6 +554,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     selectGroup,
     clearError,
     authenticateUser,
+    updateUser,
     logoutUser,
   };
 

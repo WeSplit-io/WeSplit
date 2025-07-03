@@ -1,3 +1,4 @@
+import 'react-native-get-random-values';
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -22,6 +23,18 @@ import SettleUpModal from './src/screens/SettleUpModal';
 import GroupSettingsScreen from './src/screens/GroupSettingsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import ScreensMenu from './src/screens/ScreensMenu';
+import SplashScreen from './src/screens/SplashScreen';
+import GetStartedScreen from './src/screens/GetStartedScreen';
+import AuthMethodsScreen from './src/screens/AuthMethodsScreen';
+import VerificationScreen from './src/screens/VerificationScreen';
+import CreateProfileScreen from './src/screens/CreateProfileScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
+import EditExpenseScreen from './src/screens/EditExpenseScreen';
+import DepositScreen from './src/screens/DepositScreen';
+import AccountSettingsScreen from './src/screens/AccountSettingsScreen';
+import PremiumScreen from './src/screens/PremiumScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
+import LanguageScreen from './src/screens/LanguageScreen';
 
 const Stack = createStackNavigator();
 const queryClient = new QueryClient();
@@ -81,11 +94,17 @@ export default function App() {
         <AppProvider>
           <NavigationContainer>
             <Stack.Navigator 
-              initialRouteName="Auth"
+              initialRouteName="Splash"
               screenOptions={{
                 headerShown: false,
               }}
             >
+              <Stack.Screen name="Splash" component={SplashScreen} />
+              <Stack.Screen name="GetStarted" component={GetStartedScreen} />
+              <Stack.Screen name="AuthMethods" component={AuthMethodsScreen} />
+              <Stack.Screen name="Verification" component={VerificationScreen} />
+              <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
+              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
               <Stack.Screen name="Auth" component={AuthScreen} />
               <Stack.Screen name="ScreensMenu" component={ScreensMenu} />
               <Stack.Screen name="Welcome" component={WelcomeScreen} />
@@ -98,9 +117,15 @@ export default function App() {
               <Stack.Screen name="AddMembers" component={AddMembersScreen} />
               <Stack.Screen name="Balance" component={BalanceScreen} />
               <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
+              <Stack.Screen name="EditExpense" component={EditExpenseScreen} />
               <Stack.Screen name="SettleUpModal" component={SettleUpModal} />
               <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} />
               <Stack.Screen name="Profile" component={ProfileScreen} />
+              <Stack.Screen name="Deposit" component={DepositScreen} />
+              <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+              <Stack.Screen name="Premium" component={PremiumScreen} />
+              <Stack.Screen name="Notifications" component={NotificationsScreen} />
+              <Stack.Screen name="Language" component={LanguageScreen} />
             </Stack.Navigator>
           </NavigationContainer>
         </AppProvider>

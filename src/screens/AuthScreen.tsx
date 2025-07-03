@@ -15,6 +15,7 @@ import { colors, fontSizes, fontWeights, spacing, radii } from '../lib/theme';
 import Icon from '../components/Icon';
 import { useWallet } from '../context/WalletContext';
 import { useApp } from '../context/AppContext';
+import { loginUser } from '../services/userService';
 
 const AuthScreen: React.FC<any> = ({ navigation }) => {
   const { connectWallet, isLoading } = useWallet();
@@ -56,30 +57,31 @@ const AuthScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const handleEmailAuth = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both email and password');
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email address');
       return;
     }
 
     try {
       setIsConnecting(true);
       
-      // For email auth, we can still use AppKit modal or fallback to traditional auth
-      // For now, using a simple timeout to simulate the process
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Attempting to login user with email:', email);
+      const userData = await loginUser(email);
+      console.log('User logged in successfully:', userData);
       
-      const userData = {
-        id: '1',
-        name: 'Ari Colon',
-        email: email,
-        avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-        walletAddress: null,
+      const user = {
+        id: userData.id.toString(),
+        name: userData.name,
+        email: userData.email,
+        avatar: 'https://randomuser.me/api/portraits/men/32.jpg', // Default avatar
+        walletAddress: userData.walletAddress,
         authMethod: 'email',
       };
       
-      handleAuthSuccess(userData);
+      handleAuthSuccess(user);
     } catch (error) {
-      Alert.alert('Authentication Failed', 'Invalid email or password. Please try again.');
+      console.error('Login failed:', error);
+      Alert.alert('Authentication Failed', (error as any).message || 'Invalid email. Please try again.');
     } finally {
       setIsConnecting(false);
     }
@@ -126,14 +128,7 @@ const AuthScreen: React.FC<any> = ({ navigation }) => {
               autoCapitalize="none"
             />
             
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor={colors.gray}
-              secureTextEntry
-            />
+
             
             <TouchableOpacity 
               style={[styles.authButton, isConnecting && styles.authButtonDisabled]}

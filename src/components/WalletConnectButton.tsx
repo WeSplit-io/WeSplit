@@ -1,23 +1,35 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { useWalletConnection } from '../utils/useWalletConnection';
+import { TouchableOpacity, Text, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { useWalletConnection } from '../../utils/useWalletConnection';
 
 interface WalletConnectButtonProps {
-  style?: any;
-  textStyle?: any;
   onConnect?: () => void;
   onDisconnect?: () => void;
+  style?: any;
+  textStyle?: any;
+  showWalletName?: boolean;
 }
 
 export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({
-  style,
-  textStyle,
   onConnect,
   onDisconnect,
+  style,
+  textStyle,
+  showWalletName = true,
 }) => {
-  const { isConnected, connectWallet, disconnectWallet, isLoading, shortAddress } = useWalletConnection();
+  const {
+    isConnected,
+    address,
+    shortAddress,
+    walletName,
+    isLoading,
+    connectWallet,
+    disconnectWallet,
+  } = useWalletConnection();
 
   const handlePress = async () => {
+    if (isLoading) return;
+
     try {
       if (isConnected) {
         await disconnectWallet();
@@ -27,7 +39,7 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({
         onConnect?.();
       }
     } catch (error) {
-      console.error('Wallet button action failed:', error);
+      console.error('Wallet button error:', error);
     }
   };
 
@@ -37,25 +49,53 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({
     }
     
     if (isConnected) {
-      return `Disconnect (${shortAddress})`;
+      return showWalletName && walletName 
+        ? `${walletName} (${shortAddress})`
+        : shortAddress;
     }
     
     return 'Connect Wallet';
   };
 
+  const getButtonStyle = () => {
+    if (isLoading) {
+      return [styles.button, styles.buttonLoading, style];
+    }
+    
+    if (isConnected) {
+      return [styles.button, styles.buttonConnected, style];
+    }
+    
+    return [styles.button, styles.buttonDisconnected, style];
+  };
+
+  const getTextStyle = () => {
+    if (isLoading) {
+      return [styles.text, styles.textLoading, textStyle];
+    }
+    
+    if (isConnected) {
+      return [styles.text, styles.textConnected, textStyle];
+    }
+    
+    return [styles.text, styles.textDisconnected, textStyle];
+  };
+
   return (
     <TouchableOpacity
-      style={[
-        styles.button,
-        isConnected ? styles.connectedButton : styles.connectButton,
-        isLoading && styles.disabledButton,
-        style,
-      ]}
+      style={getButtonStyle()}
       onPress={handlePress}
       disabled={isLoading}
+      activeOpacity={0.8}
     >
-      {isLoading && <ActivityIndicator size="small" color="white" style={styles.loader} />}
-      <Text style={[styles.text, textStyle]}>
+      {isLoading && (
+        <ActivityIndicator 
+          size="small" 
+          color={isConnected ? "#ffffff" : "#007AFF"} 
+          style={styles.loader}
+        />
+      )}
+      <Text style={getTextStyle()}>
         {getButtonText()}
       </Text>
     </TouchableOpacity>
@@ -70,21 +110,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
-    minWidth: 150,
+    minHeight: 48,
+    minWidth: 140,
   },
-  connectButton: {
+  buttonDisconnected: {
     backgroundColor: '#007AFF',
+    borderWidth: 1,
+    borderColor: '#007AFF',
   },
-  connectedButton: {
-    backgroundColor: '#28a745',
+  buttonConnected: {
+    backgroundColor: '#34C759',
+    borderWidth: 1,
+    borderColor: '#34C759',
   },
-  disabledButton: {
-    backgroundColor: '#ccc',
+  buttonLoading: {
+    backgroundColor: '#E5E5EA',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
   text: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  textDisconnected: {
+    color: '#FFFFFF',
+  },
+  textConnected: {
+    color: '#FFFFFF',
+  },
+  textLoading: {
+    color: '#8E8E93',
   },
   loader: {
     marginRight: 8,

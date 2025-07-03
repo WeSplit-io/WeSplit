@@ -1,32 +1,25 @@
-const { getDefaultConfig } = require('expo/metro-config');
+const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 
-const config = getDefaultConfig(__dirname);
+const defaultConfig = getDefaultConfig(__dirname);
 
-// Simplified configuration to prevent module resolution issues
-config.resolver = {
-  ...config.resolver,
-  resolverMainFields: ['react-native', 'browser', 'main'],
-  platforms: ['ios', 'android', 'native', 'web'],
-  // Remove complex alias configuration that might cause issues
-  sourceExts: [...config.resolver.sourceExts, 'mjs', 'cjs'],
-  
-  // Add alias to help resolve the problematic import
-  alias: {
-    '@reown/appkit-wallet/utils': '@reown/appkit-wallet/dist/esm/exports/utils.js',
-  },
-};
-
-config.transformer = {
-  ...config.transformer,
-  minifierConfig: {
-    ...config.transformer.minifierConfig,
-    mangle: {
-      ...config.transformer.minifierConfig?.mangle,
-      keep_fnames: true,
+module.exports = mergeConfig(defaultConfig, {
+  resolver: {
+    resolverMainFields: ['react-native', 'browser', 'main'],
+    platforms: ['ios', 'android', 'native', 'web'],
+    sourceExts: [...defaultConfig.resolver.sourceExts, 'mjs', 'cjs'],
+    alias: {
+      '@reown/appkit-wallet/utils': '@reown/appkit-wallet/dist/esm/exports/utils.js',
     },
   },
-  experimentalImportSupport: false,
-  inlineRequires: true,
-};
-
-module.exports = config;
+  transformer: {
+    minifierConfig: {
+      ...defaultConfig.transformer.minifierConfig,
+      mangle: {
+        ...defaultConfig.transformer.minifierConfig?.mangle,
+        keep_fnames: true,
+      },
+    },
+    experimentalImportSupport: false,
+    inlineRequires: true,
+  },
+});

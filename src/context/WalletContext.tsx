@@ -1,16 +1,27 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Alert } from 'react-native';
-import { connectWallet, disconnectWallet, getWalletInfo, WalletInfo } from '../../utils/walletService';
+import { connectWallet, disconnectWallet, getWalletInfo, WalletInfo, getCurrentWalletName } from '../../utils/walletService';
+
+interface TransactionParams {
+  to: string;
+  amount: number;
+  currency: string;
+  memo?: string;
+  groupId?: string;
+}
 
 interface WalletContextType {
   isConnected: boolean;
   address: string | null;
   connectWallet: () => void;
   disconnectWallet: () => void;
+  sendTransaction: (params: TransactionParams) => Promise<{ signature: string; txId: string }>;
   isLoading: boolean;
   chainId: string | null;
   balance: number | null;
   walletInfo: WalletInfo | null;
+  walletName: string | null;
+  secretKey: string | null;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -25,7 +36,6 @@ export const useWallet = () => {
 
 interface WalletProviderProps {
   children: ReactNode;
-  appKitInstance?: any; // Keep for backward compatibility
 }
 
 export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
@@ -35,11 +45,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [chainId, setChainId] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
+  const [walletName, setWalletName] = useState<string | null>(null);
+  const [secretKey, setSecretKey] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('WalletProvider mounted successfully');
-    console.log('Current wallet state:', { address, isConnected, chainId, balance });
-  }, [address, isConnected, chainId, balance]);
+    console.log('Current wallet state:', { address, isConnected, chainId, balance, walletName });
+  }, [address, isConnected, chainId, balance, walletName]);
 
   // Check initial wallet connection status
   useEffect(() => {
@@ -51,8 +63,15 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           setAddress(info.address);
           setBalance(info.balance || null);
           setWalletInfo(info);
+          setWalletName(info.walletName || null);
           setChainId('solana:devnet');
-          console.log('Found existing wallet connection:', info.address);
+          // Expose secret key if available
+          if (info && (info as any).secretKey) {
+            setSecretKey((info as any).secretKey);
+          } else {
+            setSecretKey(null);
+          }
+          console.log('Found existing wallet connection:', info.address, 'using', info.walletName);
         }
       } catch (error) {
         console.error('Error checking initial connection:', error);
@@ -74,8 +93,15 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setAddress(walletInfo.address);
       setBalance(walletInfo.balance || null);
       setWalletInfo(walletInfo);
+      setWalletName(walletInfo.walletName || null);
       setChainId('solana:devnet');
-      console.log('Solana wallet connected successfully:', walletInfo.address);
+      // Expose secret key if available
+      if (walletInfo && (walletInfo as any).secretKey) {
+        setSecretKey((walletInfo as any).secretKey);
+      } else {
+        setSecretKey(null);
+      }
+      console.log('Solana wallet connected successfully:', walletInfo.address, 'using', walletInfo.walletName);
       
     } catch (error) {
       console.error('Error in connectWallet:', error);
@@ -83,7 +109,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       const errorMessage = error instanceof Error ? error.message : 'Failed to connect wallet';
       
       // Don't show alert for user cancellation
-      if (!errorMessage.includes('cancelled')) {
+      if (!errorMessage.includes('cancelled') && !errorMessage.includes('user rejected')) {
         Alert.alert('Connection Error', errorMessage);
       }
     } finally {
@@ -104,6 +130,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setChainId(null);
       setBalance(null);
       setWalletInfo(null);
+      setWalletName(null);
       console.log('Wallet disconnected successfully');
       
     } catch (error) {
@@ -119,21 +146,49 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     console.log('WalletProvider: Setting up event listeners');
     
     if (isConnected && address) {
-      console.log('Wallet connected:', { address, chainId, balance });
+      console.log('Wallet connected:', { address, chainId, balance, walletName });
     } else if (!isConnected) {
       console.log('Wallet disconnected');
     }
-  }, [isConnected, address, chainId, balance]);
+  }, [isConnected, address, chainId, balance, walletName]);
+
+  const handleSendTransaction = async (params: TransactionParams): Promise<{ signature: string; txId: string }> => {
+    try {
+      if (!isConnected || !address) {
+        throw new Error('Wallet not connected');
+      }
+
+      console.log('Sending transaction:', params);
+      
+      // Simulate transaction processing for now
+      // In a real implementation, this would create and send a Solana transaction
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Generate a mock transaction signature
+      const signature = `mock_tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const txId = signature;
+      
+      console.log('Transaction sent successfully:', { signature, txId });
+      
+      return { signature, txId };
+    } catch (error) {
+      console.error('Transaction failed:', error);
+      throw error;
+    }
+  };
 
   const value: WalletContextType = {
     isConnected: isConnected || false,
     address: address || null,
     connectWallet: handleConnectWallet,
     disconnectWallet: handleDisconnectWallet,
+    sendTransaction: handleSendTransaction,
     isLoading,
     chainId: chainId || null,
     balance: balance || null,
     walletInfo: walletInfo || null,
+    walletName: walletName || null,
+    secretKey,
   };
 
   return (

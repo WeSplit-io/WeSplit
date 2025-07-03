@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert 
 import { colors, fontSizes, fontWeights, spacing, radii } from '../lib/theme';
 import Icon from '../components/Icon';
 import { useApp } from '../context/AppContext';
+import { createGroup, joinGroupViaInvite } from '../services/groupService';
 
 const categories = [
   { name: 'Travel', icon: 'map-pin', color: '#A5A6F6' },
@@ -13,8 +14,6 @@ const categories = [
   { name: 'Other', icon: 'more-horizontal', color: '#95A5A6' },
 ];
 
-const currencies = ['USD', 'EUR', 'GBP', 'INR', 'CAD', 'AUD'];
-
 const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
   const { state, addGroup } = useApp();
   const { currentUser } = state;
@@ -22,10 +21,11 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
   const [selectedCat, setSelectedCat] = useState(0);
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
-  const [currency, setCurrency] = useState('USD');
-  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [showInviteOptions, setShowInviteOptions] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
 
-  const handleDone = () => {
+  const handleDone = async () => {
     if (!title.trim()) {
       Alert.alert('Error', 'Please enter a group title');
       return;
@@ -36,16 +36,22 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
       return;
     }
 
-    const newGroup = {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User not found. Please login again.');
+      return;
+    }
+
+    try {
+      const groupData = {
       name: title.trim(),
       description: desc.trim(),
       category: categories[selectedCat].name.toLowerCase(),
-      currency,
-      members: currentUser ? [currentUser] : [],
-      expenses: [],
+        currency: 'USDC',
+        createdBy: currentUser.id,
+        members: [],
     };
 
-    addGroup(newGroup);
+      const createdGroup = await createGroup(groupData);
     
     Alert.alert(
       'Group Created!',
@@ -58,7 +64,7 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
         },
         {
           text: 'Add Members',
-          onPress: () => navigation.navigate('AddMembers', { groupId: Date.now().toString() }),
+            onPress: () => navigation.navigate('AddMembers', { groupId: createdGroup.id.toString() }),
         },
         {
           text: 'Add First Expense',
@@ -66,6 +72,10 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
         },
       ]
     );
+    } catch (error) {
+      console.error('Error creating group:', error);
+      Alert.alert('Error', 'Failed to create group. Please try again.');
+    }
   };
 
   const handleAddMembers = () => {
@@ -80,11 +90,54 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
     Alert.alert('Invite Link', 'Share this link with your friends to invite them to the group:\n\nhttps://wesplit.app/join/group123');
   };
 
+  const handleInviteTelegram = () => {
+    Alert.alert('Telegram Invite', 'Share this group on Telegram:\n\nhttps://t.me/share/url?url=https://wesplit.app/join/group123');
+  };
+
+  const handleInviteWhatsApp = () => {
+    Alert.alert('WhatsApp Invite', 'Share this group on WhatsApp:\n\nhttps://wa.me/?text=Join%20my%20WeSplit%20group:%20https://wesplit.app/join/group123');
+  };
+
+  const handleJoinByCode = async () => {
+    if (!inviteCode.trim()) {
+      Alert.alert('Error', 'Please enter an invite code');
+      return;
+    }
+
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User not found. Please login again.');
+      return;
+    }
+
+    try {
+      const result = await joinGroupViaInvite(inviteCode.trim(), String(currentUser.id));
+      
+      Alert.alert(
+        'Success!',
+        `You have successfully joined "${result.groupName}"!`,
+        [
+          {
+            text: 'Go to Group',
+            onPress: () => navigation.navigate('GroupDetails', { groupId: result.groupId }),
+          },
+          {
+            text: 'Back to Dashboard',
+            onPress: () => navigation.navigate('Dashboard'),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error joining group:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to join group. Please check the invite code and try again.';
+      Alert.alert('Error', errorMessage);
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color={colors.text} />
+          <Icon name="arrow-left" size={24} color="#FFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Add New Group</Text>
         <View style={styles.placeholder} />
@@ -110,7 +163,7 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
         value={title}
         onChangeText={setTitle}
         placeholder="Group name"
-        placeholderTextColor={colors.gray}
+        placeholderTextColor="#A89B9B"
       />
       
       <Text style={styles.label}>Description</Text>
@@ -119,46 +172,64 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
         value={desc}
         onChangeText={setDesc}
         placeholder="Description"
-        placeholderTextColor={colors.gray}
+        placeholderTextColor="#A89B9B"
         multiline
       />
       
-      <Text style={styles.label}>Currency</Text>
-      <TouchableOpacity 
-        style={styles.selectInput}
-        onPress={() => setShowCurrencyPicker(!showCurrencyPicker)}
-      >
-        <Text style={styles.selectInputText}>{currency}</Text>
-        <Icon name="chevron-down" size={20} color={colors.gray} />
+      <Text style={styles.label}>Join Group by Code</Text>
+      
+      <View style={styles.inviteOptions}>
+        <TextInput
+          style={styles.input}
+          value={inviteCode}
+          onChangeText={setInviteCode}
+          placeholder="Enter invite code"
+          placeholderTextColor="#A89B9B"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <TouchableOpacity style={styles.addPhoneBtn} onPress={handleJoinByCode}>
+          <Text style={styles.addPhoneBtnText}>Join Group</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.label}>Invite Members</Text>
+      
+      <TouchableOpacity style={styles.linkRow} onPress={() => setShowInviteOptions(!showInviteOptions)}>
+        <Icon name="user-plus" size={20} color="#A5EA15" />
+        <Text style={styles.linkText}>Add members by phone number</Text>
+        <Icon name="chevron-down" size={20} color="#A89B9B" />
       </TouchableOpacity>
 
-      {showCurrencyPicker && (
-        <View style={styles.currencyPicker}>
-          {currencies.map((curr) => (
-            <TouchableOpacity
-              key={curr}
-              style={[styles.currencyOption, currency === curr && styles.currencyOptionSelected]}
-              onPress={() => {
-                setCurrency(curr);
-                setShowCurrencyPicker(false);
-              }}
-            >
-              <Text style={[styles.currencyOptionText, currency === curr && styles.currencyOptionTextSelected]}>
-                {curr}
-              </Text>
+      {showInviteOptions && (
+        <View style={styles.inviteOptions}>
+          <TextInput
+            style={styles.input}
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
+            placeholder="Enter phone number"
+            placeholderTextColor="#A89B9B"
+            keyboardType="phone-pad"
+          />
+          <TouchableOpacity style={styles.addPhoneBtn} onPress={handleAddMembers}>
+            <Text style={styles.addPhoneBtnText}>Add Member</Text>
             </TouchableOpacity>
-          ))}
         </View>
       )}
       
-      <TouchableOpacity style={styles.linkRow} onPress={handleAddMembers}>
-        <Icon name="user-plus" size={20} color={colors.primary} />
-        <Text style={styles.linkText}>Add new members</Text>
+      <TouchableOpacity style={styles.linkRow} onPress={handleInviteLink}>
+        <Icon name="link" size={20} color="#A5EA15" />
+        <Text style={styles.linkText}>Invite via link</Text>
       </TouchableOpacity>
       
-      <TouchableOpacity style={styles.linkRow} onPress={handleInviteLink}>
-        <Icon name="link" size={20} color={colors.primary} />
-        <Text style={styles.linkText}>Invite via link</Text>
+      <TouchableOpacity style={styles.linkRow} onPress={handleInviteTelegram}>
+        <Icon name="message-circle" size={20} color="#A5EA15" />
+        <Text style={styles.linkText}>Invite via Telegram</Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity style={styles.linkRow} onPress={handleInviteWhatsApp}>
+        <Icon name="message-circle" size={20} color="#A5EA15" />
+        <Text style={styles.linkText}>Invite via WhatsApp</Text>
       </TouchableOpacity>
       
       <TouchableOpacity style={styles.doneBtn} onPress={handleDone}>
@@ -171,7 +242,7 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.secondary,
+    backgroundColor: '#212121',
     padding: spacing.xl,
   },
   header: {
@@ -186,14 +257,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: fontSizes.lg,
     fontWeight: fontWeights.bold as any,
-    color: colors.text,
+    color: '#FFF',
   },
   placeholder: {
     width: 40,
   },
   label: {
     fontSize: fontSizes.sm,
-    color: colors.gray,
+    color: '#A89B9B',
     marginTop: spacing.md,
     marginBottom: 4,
     fontWeight: fontWeights.medium as any,
@@ -209,83 +280,87 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     padding: spacing.sm,
     borderRadius: 10,
-    backgroundColor: colors.card,
+    backgroundColor: '#212121',
+    borderWidth: 1,
+    borderColor: '#FFF',
     width: '30%',
   },
   catIconSelected: {
     borderWidth: 2,
-    borderColor: colors.primary,
-    backgroundColor: colors.background,
+    borderColor: '#A5EA15',
+    backgroundColor: '#212121',
   },
   catIconLabel: {
     fontSize: fontSizes.xs,
-    color: colors.gray,
+    color: '#A89B9B',
     marginTop: 2,
   },
   input: {
-    backgroundColor: colors.background,
+    backgroundColor: '#212121',
     borderRadius: radii.input,
     padding: spacing.md,
     fontSize: fontSizes.md,
-    color: colors.text,
+    color: '#FFF',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#FFF',
     marginBottom: spacing.md,
   },
   selectInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: '#212121',
     borderRadius: radii.input,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#FFF',
     marginBottom: spacing.md,
     justifyContent: 'space-between',
   },
   selectInputText: {
     fontSize: fontSizes.md,
-    color: colors.text,
+    color: '#FFF',
   },
   currencyPicker: {
-    backgroundColor: colors.background,
+    backgroundColor: '#212121',
     borderRadius: radii.input,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#FFF',
     marginBottom: spacing.md,
     overflow: 'hidden',
   },
   currencyOption: {
     padding: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#FFF',
   },
   currencyOptionSelected: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#A5EA15',
   },
   currencyOptionText: {
     fontSize: fontSizes.md,
-    color: colors.text,
+    color: '#FFF',
   },
   currencyOptionTextSelected: {
-    color: colors.background,
+    color: '#212121',
     fontWeight: fontWeights.semibold as any,
   },
   linkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: '#212121',
     borderRadius: radii.input,
     padding: spacing.md,
     marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#FFF',
   },
   linkText: {
     fontSize: fontSizes.md,
-    color: colors.text,
+    color: '#FFF',
     marginLeft: spacing.md,
   },
   doneBtn: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#A5EA15',
     borderRadius: radii.input,
     padding: spacing.md,
     alignItems: 'center',
@@ -294,7 +369,22 @@ const styles = StyleSheet.create({
   doneBtnText: {
     fontSize: fontSizes.md,
     fontWeight: fontWeights.semibold as any,
-    color: colors.background,
+    color: '#212121',
+  },
+  inviteOptions: {
+    marginBottom: spacing.md,
+  },
+  addPhoneBtn: {
+    backgroundColor: '#A5EA15',
+    borderRadius: radii.input,
+    padding: spacing.sm,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  addPhoneBtnText: {
+    fontSize: fontSizes.md,
+    fontWeight: fontWeights.semibold as any,
+    color: '#212121',
   },
 });
 

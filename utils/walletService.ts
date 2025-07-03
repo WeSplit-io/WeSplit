@@ -1,7 +1,14 @@
-// Solana Wallet Service using @solana/web3.js
-// This provides real wallet functionality for React Native
+// Simplified Solana Wallet Service for React Native
+// This provides basic wallet functionality without web-specific adapters
 
-import { Connection, PublicKey, Transaction, clusterApiUrl } from '@solana/web3.js';
+import { 
+  Connection, 
+  PublicKey, 
+  Transaction, 
+  clusterApiUrl, 
+  Keypair,
+  LAMPORTS_PER_SOL
+} from '@solana/web3.js';
 
 // Your Solana network configuration
 const SOLANA_NETWORK = 'devnet'; // or 'mainnet-beta'
@@ -16,52 +23,75 @@ export interface WalletInfo {
   address: string;
   isConnected: boolean;
   balance?: number;
+  walletName?: string;
+  secretKey?: string; // hex string
 }
 
-// Mock wallet for development (can be replaced with real wallet adapters)
-class SolanaWalletAdapter {
-  private publicKey: PublicKey | null = null;
+// Simple wallet manager for React Native
+class SolanaWalletManager {
+  private keypair: Keypair | null = null;
   private isConnected = false;
-  // Use a valid Solana public key format for mock
-  private mockAddress = '11111111111111111111111111111112'; // System Program ID as mock
+  private publicKey: PublicKey | null = null;
 
-  async connect(): Promise<WalletInfo> {
+  // Generate a new wallet
+  async generateWallet(): Promise<WalletInfo> {
     try {
-      console.log('Connecting to Solana wallet...');
+      console.log('Generating new Solana wallet...');
       
-      // Create a mock public key using a valid Solana address
-      this.publicKey = new PublicKey(this.mockAddress);
+      this.keypair = Keypair.generate();
+      this.publicKey = this.keypair.publicKey;
       this.isConnected = true;
       
-      // Get balance (this will work with the real Solana network)
-      let balance = 0;
-      try {
-        balance = await connection.getBalance(this.publicKey);
-        console.log('Retrieved balance:', balance, 'lamports');
-      } catch (balanceError) {
-        console.log('Could not retrieve balance, using mock balance');
-        balance = 1000000000; // 1 SOL in lamports
-      }
-      
-      console.log('Solana wallet connected successfully');
+      console.log('Wallet generated successfully');
       
       return {
         publicKey: this.publicKey,
         address: this.publicKey.toString(),
         isConnected: true,
-        balance: balance / 1e9 // Convert lamports to SOL
+        balance: 0,
+        walletName: 'Generated Wallet',
+        secretKey: Buffer.from(this.keypair.secretKey).toString('hex'),
       };
     } catch (error) {
-      console.error('Failed to connect wallet:', error);
-      throw new Error('Failed to connect wallet. Please try again.');
+      console.error('Failed to generate wallet:', error);
+      throw new Error('Failed to generate wallet');
+    }
+  }
+
+  // Import wallet from secret key
+  async importWallet(secretKey: string): Promise<WalletInfo> {
+    try {
+      console.log('Importing wallet from secret key...');
+      
+      const secretKeyBytes = new Uint8Array(Buffer.from(secretKey, 'hex'));
+      this.keypair = Keypair.fromSecretKey(secretKeyBytes);
+      this.publicKey = this.keypair.publicKey;
+      this.isConnected = true;
+      
+      console.log('Wallet imported successfully');
+      
+      return {
+        publicKey: this.publicKey,
+        address: this.publicKey.toString(),
+        isConnected: true,
+        balance: 0,
+        walletName: 'Imported Wallet',
+        secretKey: Buffer.from(this.keypair.secretKey).toString('hex'),
+      };
+    } catch (error) {
+      console.error('Failed to import wallet:', error);
+      throw new Error('Failed to import wallet');
     }
   }
 
   async disconnect(): Promise<void> {
     try {
       console.log('Disconnecting Solana wallet...');
+      
+      this.keypair = null;
       this.publicKey = null;
       this.isConnected = false;
+      
       console.log('Solana wallet disconnected successfully');
     } catch (error) {
       console.error('Failed to disconnect wallet:', error);
@@ -70,7 +100,7 @@ class SolanaWalletAdapter {
   }
 
   async getWalletInfo(): Promise<WalletInfo | null> {
-    if (!this.publicKey || !this.isConnected) {
+    if (!this.publicKey || !this.isConnected || !this.keypair) {
       return null;
     }
 
@@ -79,15 +109,16 @@ class SolanaWalletAdapter {
       try {
         balance = await connection.getBalance(this.publicKey);
       } catch (balanceError) {
-        console.log('Could not retrieve balance, using mock balance');
-        balance = 1000000000; // 1 SOL in lamports
+        console.log('Could not retrieve balance, using 0');
+        balance = 0;
       }
       
       return {
         publicKey: this.publicKey,
         address: this.publicKey.toString(),
         isConnected: true,
-        balance: balance / 1e9
+        balance: balance / LAMPORTS_PER_SOL,
+        walletName: 'Generated Wallet'
       };
     } catch (error) {
       console.error('Failed to get wallet info:', error);
@@ -96,14 +127,13 @@ class SolanaWalletAdapter {
   }
 
   async signTransaction(transaction: Transaction): Promise<Transaction> {
-    if (!this.publicKey || !this.isConnected) {
+    if (!this.publicKey || !this.isConnected || !this.keypair) {
       throw new Error('Wallet not connected');
     }
 
     try {
       console.log('Signing transaction...');
-      // In production, this would use the actual wallet to sign
-      // For now, we'll simulate signing
+      transaction.sign(this.keypair);
       console.log('Transaction signed successfully');
       return transaction;
     } catch (error) {
@@ -112,25 +142,8 @@ class SolanaWalletAdapter {
     }
   }
 
-  async signMessage(message: Uint8Array): Promise<Uint8Array> {
-    if (!this.publicKey || !this.isConnected) {
-      throw new Error('Wallet not connected');
-    }
-
-    try {
-      console.log('Signing message...');
-      // In production, this would use the actual wallet to sign
-      // For now, we'll return a mock signature
-      console.log('Message signed successfully');
-      return new Uint8Array(64); // Mock signature
-    } catch (error) {
-      console.error('Failed to sign message:', error);
-      throw new Error('Failed to sign message');
-    }
-  }
-
   async sendTransaction(transaction: Transaction): Promise<string> {
-    if (!this.publicKey || !this.isConnected) {
+    if (!this.publicKey || !this.isConnected || !this.keypair) {
       throw new Error('Wallet not connected');
     }
 
@@ -150,34 +163,43 @@ class SolanaWalletAdapter {
       throw new Error('Failed to send transaction');
     }
   }
+
+  // Get current wallet name
+  getCurrentWalletName(): string {
+    return this.isConnected ? 'Generated Wallet' : '';
+  }
 }
 
-// Create wallet adapter instance
-const walletAdapter = new SolanaWalletAdapter();
+// Create wallet manager instance
+const walletManager = new SolanaWalletManager();
 
 // Export wallet functions
-export const connectWallet = async (): Promise<WalletInfo> => {
-  return await walletAdapter.connect();
+export const generateWallet = async (): Promise<WalletInfo> => {
+  return await walletManager.generateWallet();
+};
+
+export const importWallet = async (secretKey: string): Promise<WalletInfo> => {
+  return await walletManager.importWallet(secretKey);
 };
 
 export const disconnectWallet = async (): Promise<void> => {
-  return await walletAdapter.disconnect();
+  return await walletManager.disconnect();
 };
 
 export const getWalletInfo = async (): Promise<WalletInfo | null> => {
-  return await walletAdapter.getWalletInfo();
+  return await walletManager.getWalletInfo();
 };
 
 export const signTransaction = async (transaction: Transaction): Promise<Transaction> => {
-  return await walletAdapter.signTransaction(transaction);
-};
-
-export const signMessage = async (message: Uint8Array): Promise<Uint8Array> => {
-  return await walletAdapter.signMessage(message);
+  return await walletManager.signTransaction(transaction);
 };
 
 export const sendTransaction = async (transaction: Transaction): Promise<string> => {
-  return await walletAdapter.sendTransaction(transaction);
+  return await walletManager.sendTransaction(transaction);
+};
+
+export const getCurrentWalletName = (): string => {
+  return walletManager.getCurrentWalletName();
 };
 
 // Export connection for other modules
@@ -189,30 +211,20 @@ export const WALLET_CONFIG = {
   rpcUrl: SOLANA_RPC_URL,
 };
 
-// TODO: Real Wallet Integration
-// To integrate with real wallets, you can:
-// 1. Use @solana/wallet-adapter-react for React components
-// 2. Use @solana/wallet-adapter-wallets for specific wallet support
-// 3. Use @solana/wallet-adapter-base for custom wallet implementations
-// 4. Integrate with Privy, Dynamic, or other embedded wallet providers
-
-/*
-Example real wallet integration:
-
-import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
-import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
-
-const wallets = [
-  new PhantomWalletAdapter(),
-  // Add other wallet adapters
-];
-
-const walletContextState = useWallet();
-const { publicKey, sendTransaction } = walletContextState;
-
-// Use real wallet functions
-const handleSendTransaction = async (transaction: Transaction) => {
-  const signature = await sendTransaction(transaction, connection);
-  return signature;
+// Legacy function for backward compatibility
+export const connectWallet = async (): Promise<WalletInfo> => {
+  return await generateWallet();
 };
-*/ 
+
+export const connectToSpecificWallet = async (walletName: string): Promise<WalletInfo> => {
+  console.warn('connectToSpecificWallet is deprecated, using generateWallet instead');
+  return await generateWallet();
+};
+
+export const getAvailableWallets = () => {
+  return [{ name: 'Generated Wallet', url: '', icon: '', readyState: 'Installed' }];
+};
+
+export const isWalletAvailable = (walletName: string): boolean => {
+  return walletName.toLowerCase() === 'generated wallet';
+}; 
