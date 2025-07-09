@@ -49,6 +49,7 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CR
           wallet_address TEXT NOT NULL,
           wallet_public_key TEXT NOT NULL,
           wallet_secret_key TEXT,
+          avatar TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `, (err) => {
@@ -56,6 +57,15 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CR
           console.error('Error creating users table:', err.message);
         } else {
           console.log('Users table ready');
+          
+          // Add avatar column to existing table if it doesn't exist
+          db.run(`
+            ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT NULL
+          `, (err) => {
+            if (err && !err.message.includes('duplicate column name')) {
+              console.error('Error adding avatar column:', err.message);
+            }
+          });
         }
       });
 
@@ -77,6 +87,144 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CR
           console.error('Error creating groups table:', err.message);
         } else {
           console.log('Groups table ready');
+          
+          // Check if migration is needed (check if icon and color columns exist)
+          db.all('PRAGMA table_info(groups)', (pragmaErr, columns) => {
+            if (pragmaErr) {
+              console.error('Error checking groups table structure:', pragmaErr.message);
+              return;
+            }
+            
+            const hasIcon = columns.some(col => col.name === 'icon');
+            const hasColor = columns.some(col => col.name === 'color');
+            
+            if (!hasIcon || !hasColor) {
+              console.log('Migrating groups table to add icon and color fields...');
+              
+              // Clean up any leftover migration tables first
+              db.run(`DROP TABLE IF EXISTS groups_new`, (cleanupErr) => {
+                if (cleanupErr) {
+                  console.error('Error cleaning up migration table:', cleanupErr.message);
+                  return;
+                }
+                
+                // Disable foreign keys first, outside of transaction
+                db.run('PRAGMA foreign_keys = OFF', (fkOffErr) => {
+                  if (fkOffErr) {
+                    console.error('Error disabling foreign keys:', fkOffErr.message);
+                    return;
+                  }
+                  
+                  console.log('Foreign keys disabled for migration');
+                  
+                  // Start transaction for safe migration
+                  db.run('BEGIN TRANSACTION', (beginErr) => {
+                    if (beginErr) {
+                      console.error('Error starting transaction:', beginErr.message);
+                      // Re-enable foreign keys before returning
+                      db.run('PRAGMA foreign_keys = ON');
+                      return;
+                    }
+                    
+                    console.log('Transaction started');
+                    
+                    // Create new table with icon and color fields
+                    db.run(`
+                      CREATE TABLE groups_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        category TEXT DEFAULT 'general',
+                        currency TEXT DEFAULT 'USDC',
+                        icon TEXT DEFAULT 'people',
+                        color TEXT DEFAULT '#A5EA15',
+                        created_by INTEGER NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (created_by) REFERENCES users (id)
+                      )
+                    `, (createErr) => {
+                      if (createErr) {
+                        console.error('Error creating new groups table:', createErr.message);
+                        db.run('ROLLBACK');
+                        db.run('PRAGMA foreign_keys = ON');
+                        return;
+                      }
+                      
+                      console.log('New groups table created');
+                      
+                      // Copy existing data with default values for new fields
+                      db.run(`
+                        INSERT INTO groups_new (id, name, description, category, currency, icon, color, created_by, created_at, updated_at)
+                        SELECT id, name, description, 
+                               COALESCE(category, 'general') as category,
+                               COALESCE(currency, 'USDC') as currency,
+                               'people' as icon,
+                               '#A5EA15' as color,
+                               created_by, created_at, updated_at
+                        FROM groups
+                      `, (copyErr) => {
+                        if (copyErr) {
+                          console.error('Error copying groups data:', copyErr.message);
+                          db.run('ROLLBACK');
+                          db.run('PRAGMA foreign_keys = ON');
+                          return;
+                        }
+                        
+                        console.log('Data copied to new groups table');
+                        
+                        // Drop old table
+                        db.run(`DROP TABLE groups`, (dropErr) => {
+                          if (dropErr) {
+                            console.error('Error dropping old groups table:', dropErr.message);
+                            db.run('ROLLBACK');
+                            db.run('PRAGMA foreign_keys = ON');
+                            return;
+                          }
+                          
+                          console.log('Old groups table dropped');
+                          
+                          // Rename new table
+                          db.run(`ALTER TABLE groups_new RENAME TO groups`, (renameErr) => {
+                            if (renameErr) {
+                              console.error('Error renaming groups table:', renameErr.message);
+                              db.run('ROLLBACK');
+                              db.run('PRAGMA foreign_keys = ON');
+                              return;
+                            }
+                            
+                            console.log('New groups table renamed');
+                            
+                            // Commit transaction
+                            db.run('COMMIT', (commitErr) => {
+                              if (commitErr) {
+                                console.error('Error committing transaction:', commitErr.message);
+                                db.run('ROLLBACK');
+                              } else {
+                                console.log('Transaction committed successfully');
+                              }
+                              
+                              // Re-enable foreign key constraints
+                              db.run('PRAGMA foreign_keys = ON', (fkOnErr) => {
+                                if (fkOnErr) {
+                                  console.error('Error re-enabling foreign keys:', fkOnErr.message);
+                                } else {
+                                  console.log('Foreign keys re-enabled');
+                                  console.log('Groups table successfully migrated with icon and color fields');
+                                }
+                              });
+                            });
+                          });
+                        });
+                      });
+                    });
+                  });
+                });
+              });
+            } else {
+              console.log('Groups table already has icon and color fields');
+            }
+          });
         }
       });
 
@@ -198,7 +346,7 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CR
           user_id INTEGER NOT NULL,
           title TEXT NOT NULL,
           message TEXT NOT NULL,
-          type TEXT NOT NULL CHECK (type IN ('settlement_request', 'settlement_notification', 'funding_notification', 'payment_request', 'general')),
+          type TEXT NOT NULL CHECK (type IN ('settlement_request', 'settlement_notification', 'funding_notification', 'payment_request', 'payment_reminder', 'general')),
           data TEXT DEFAULT '{}',
           read INTEGER DEFAULT 0 CHECK (read IN (0, 1)),
           created_at TEXT NOT NULL,
@@ -209,6 +357,83 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CR
           console.error('Error creating notifications table:', err.message);
         } else {
           console.log('Notifications table ready');
+          
+          // Check if payment_reminder type migration is needed
+          db.all('PRAGMA table_info(notifications)', (pragmaErr, columns) => {
+            if (pragmaErr) {
+              console.error('Error checking notifications table structure:', pragmaErr.message);
+              return;
+            }
+            
+            // Check the CHECK constraint on type column
+            db.all(`SELECT sql FROM sqlite_master WHERE type='table' AND name='notifications'`, (schemaErr, schema) => {
+              if (schemaErr) {
+                console.error('Error checking notifications schema:', schemaErr.message);
+                return;
+              }
+              
+              const tableSchema = schema[0]?.sql || '';
+              const hasPaymentReminder = tableSchema.includes('payment_reminder');
+              
+              if (!hasPaymentReminder) {
+                console.log('Adding payment_reminder type to notifications table...');
+                
+                // Clean up any leftover migration tables first
+                db.run(`DROP TABLE IF EXISTS notifications_new`, (cleanupErr) => {
+                  if (cleanupErr) {
+                    console.error('Error cleaning up notifications migration table:', cleanupErr.message);
+                    return;
+                  }
+                  
+                  // Migration to add payment_reminder type to existing table
+                  db.run(`
+                    CREATE TABLE notifications_new (
+                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      user_id INTEGER NOT NULL,
+                      title TEXT NOT NULL,
+                      message TEXT NOT NULL,
+                      type TEXT NOT NULL CHECK (type IN ('settlement_request', 'settlement_notification', 'funding_notification', 'payment_request', 'payment_reminder', 'general')),
+                      data TEXT DEFAULT '{}',
+                      read INTEGER DEFAULT 0 CHECK (read IN (0, 1)),
+                      created_at TEXT NOT NULL,
+                      FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+                    )
+                  `, (migrationErr) => {
+                    if (migrationErr) {
+                      console.error('Error creating new notifications table:', migrationErr.message);
+                      return;
+                    }
+                    
+                    // Copy existing data
+                    db.run(`INSERT INTO notifications_new SELECT * FROM notifications`, (copyErr) => {
+                      if (copyErr) {
+                        console.error('Error copying notifications data:', copyErr.message);
+                        return;
+                      }
+                      
+                      // Drop old table and rename new one
+                      db.run(`DROP TABLE notifications`, (dropErr) => {
+                        if (dropErr) {
+                          console.error('Error dropping old notifications table:', dropErr.message);
+                          return;
+                        }
+                        
+                        db.run(`ALTER TABLE notifications_new RENAME TO notifications`, (renameErr) => {
+                          if (renameErr) {
+                            console.error('Error renaming notifications table:', renameErr.message);
+                          } else {
+                            console.log('Notifications table updated with payment_reminder type');
+                          }
+                        });
+                      });
+                    });
+                  });
+                });
+              } else {
+                console.log('Notifications table already supports payment_reminder type');
+              }
+            });
+          });
         }
       });
     });

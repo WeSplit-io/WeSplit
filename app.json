@@ -24,7 +24,9 @@
           "trust",
           "rainbow",
           "uniswap"
-        ]
+        ],
+        "NSCameraUsageDescription": "This app uses the camera to take profile pictures.",
+        "NSPhotoLibraryUsageDescription": "This app accesses the photo library to let you select profile pictures."
       }
     },
     "android": {
@@ -34,7 +36,12 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "jsEngine": "jsc"
+      "jsEngine": "jsc",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

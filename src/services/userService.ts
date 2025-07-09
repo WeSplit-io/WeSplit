@@ -19,6 +19,7 @@ export async function createUser(userData: {
   walletAddress: string;
   walletPublicKey: string;
   walletSecretKey?: string;
+  avatar?: string;
 }) {
   try {
     const response = await fetch(`${BACKEND_URL}/api/users/create`, {
@@ -99,6 +100,28 @@ export async function updateUserWallet(userId: string, walletAddress: string, wa
     }
   } catch (e) {
     console.error('Error updating wallet:', e);
+    throw e;
+  }
+}
+
+export async function updateUserAvatar(userId: string, avatar: string) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/users/${userId}/avatar`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ avatar }),
+    });
+
+    if (response.ok) {
+      return await response.json();
+    } else {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update avatar');
+    }
+  } catch (e) {
+    console.error('Error updating avatar:', e);
     throw e;
   }
 } 

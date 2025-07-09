@@ -19,7 +19,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, navigation }) => {
         <Text style={styles.subtitle}>Please sign in to access this feature</Text>
         <TouchableOpacity 
           style={styles.button}
-          onPress={() => navigation.replace('Auth')}
+          onPress={() => navigation.replace('AuthMethods')}
         >
           <Text style={styles.buttonText}>Go to Sign In</Text>
         </TouchableOpacity>

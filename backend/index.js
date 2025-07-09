@@ -10,18 +10,119 @@ app.use(express.json());
 // Migration to add splitData column to expenses table
 const runMigrations = async () => {
   try {
-    // Check if splitData column exists, if not, add it
-    await pool.run(`
-      ALTER TABLE expenses ADD COLUMN splitData TEXT DEFAULT NULL
-    `).catch((err) => {
-      // Ignore error if column already exists
-      if (!err.message.includes('duplicate column')) {
-        console.error('Migration error:', err);
-      }
-    });
+    // Check if splitData column exists in expenses table
+    const tableInfo = await pool.query('PRAGMA table_info(expenses)');
+    const hasColumn = tableInfo.rows.some(col => col.name === 'splitData');
+    
+    if (!hasColumn) {
+      await pool.run(`
+        ALTER TABLE expenses ADD COLUMN splitData TEXT DEFAULT NULL
+      `);
+      console.log('Added splitData column to expenses table');
+    } else {
+      console.log('splitData column already exists in expenses table');
+    }
+    
     console.log('Database migrations completed');
+    
+    // Create sample data if database is empty
+    await createSampleDataIfEmpty();
   } catch (error) {
     console.error('Error running migrations:', error);
+  }
+};
+
+// Create sample data if database is empty
+const createSampleDataIfEmpty = async () => {
+  try {
+    // Check if there are any users
+    const userCount = await pool.query('SELECT COUNT(*) as count FROM users');
+    const groupCount = await pool.query('SELECT COUNT(*) as count FROM groups');
+    
+    if (userCount.rows[0].count === 0) {
+      console.log('Creating sample data...');
+      
+      // Create sample users
+      const user1 = await pool.run(
+        'INSERT INTO users (email, name, wallet_address, wallet_public_key, avatar) VALUES (?, ?, ?, ?, ?)',
+        ['john@example.com', 'John Doe', 'wallet1address', 'publickey1', 'user.png']
+      );
+      
+      const user2 = await pool.run(
+        'INSERT INTO users (email, name, wallet_address, wallet_public_key, avatar) VALUES (?, ?, ?, ?, ?)',
+        ['jane@example.com', 'Jane Smith', 'wallet2address', 'publickey2', 'user.png']
+      );
+      
+      const user3 = await pool.run(
+        'INSERT INTO users (email, name, wallet_address, wallet_public_key, avatar) VALUES (?, ?, ?, ?, ?)',
+        ['bob@example.com', 'Bob Johnson', 'wallet3address', 'publickey3', 'user.png']
+      );
+      
+      const userId1 = user1.rows[0].id;
+      const userId2 = user2.rows[0].id;
+      const userId3 = user3.rows[0].id;
+      
+      console.log('Created sample users:', { userId1, userId2, userId3 });
+      
+      // Create sample groups
+      const group1 = await pool.run(
+        'INSERT INTO groups (name, description, category, currency, created_by) VALUES (?, ?, ?, ?, ?)',
+        ['Weekend Trip', 'Our amazing weekend getaway', 'travel', 'USDC', userId1]
+      );
+      
+      const group2 = await pool.run(
+        'INSERT INTO groups (name, description, category, currency, created_by) VALUES (?, ?, ?, ?, ?)',
+        ['Dinner Group', 'Weekly dinner expenses', 'food', 'USDC', userId2]
+      );
+      
+      const groupId1 = group1.rows[0].id;
+      const groupId2 = group2.rows[0].id;
+      
+      console.log('Created sample groups:', { groupId1, groupId2 });
+      
+      // Add members to groups
+      await pool.run('INSERT INTO group_members (group_id, user_id) VALUES (?, ?)', [groupId1, userId1]);
+      await pool.run('INSERT INTO group_members (group_id, user_id) VALUES (?, ?)', [groupId1, userId2]);
+      await pool.run('INSERT INTO group_members (group_id, user_id) VALUES (?, ?)', [groupId1, userId3]);
+      
+      await pool.run('INSERT INTO group_members (group_id, user_id) VALUES (?, ?)', [groupId2, userId1]);
+      await pool.run('INSERT INTO group_members (group_id, user_id) VALUES (?, ?)', [groupId2, userId2]);
+      
+      console.log('Added group members');
+      
+      // Create sample expenses
+      await pool.run(
+        'INSERT INTO expenses (group_id, description, amount, currency, paid_by, category) VALUES (?, ?, ?, ?, ?, ?)',
+        [groupId1, 'Hotel accommodation', 120.50, 'USDC', userId1, 'accommodation']
+      );
+      
+      await pool.run(
+        'INSERT INTO expenses (group_id, description, amount, currency, paid_by, category) VALUES (?, ?, ?, ?, ?, ?)',
+        [groupId1, 'Gas for the trip', 45.20, 'USDC', userId2, 'transport']
+      );
+      
+      await pool.run(
+        'INSERT INTO expenses (group_id, description, amount, currency, paid_by, category) VALUES (?, ?, ?, ?, ?, ?)',
+        [groupId1, 'Groceries for breakfast', 28.75, 'USDC', userId3, 'food']
+      );
+      
+      await pool.run(
+        'INSERT INTO expenses (group_id, description, amount, currency, paid_by, category) VALUES (?, ?, ?, ?, ?, ?)',
+        [groupId2, 'Pizza dinner', 42.00, 'USDC', userId1, 'food']
+      );
+      
+      await pool.run(
+        'INSERT INTO expenses (group_id, description, amount, currency, paid_by, category) VALUES (?, ?, ?, ?, ?, ?)',
+        [groupId2, 'Thai food delivery', 38.50, 'USDC', userId2, 'food']
+      );
+      
+      console.log('Created sample expenses');
+      console.log('Sample data creation completed!');
+    } else {
+      console.log('Database already has data, skipping sample data creation');
+    }
+  } catch (error) {
+    console.error('Error creating sample data:', error);
   }
 };
 
@@ -31,6 +132,59 @@ runMigrations();
 // Test endpoint
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend is running!', timestamp: new Date().toISOString() });
+});
+
+// Test endpoint for groups data
+app.get('/api/test/groups/:userId', async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    console.log(`Testing groups fetch for user ${userId}`);
+    
+    // Get groups with all aggregated data (same as main endpoint)
+    const result = await pool.query(`
+      SELECT g.*, 
+             COUNT(DISTINCT gm.user_id) as member_count,
+             COUNT(DISTINCT e.id) as expense_count
+      FROM groups g
+      LEFT JOIN group_members gm ON g.id = gm.group_id
+      LEFT JOIN expenses e ON g.id = e.group_id
+      WHERE g.created_by = ? OR gm.user_id = ?
+      GROUP BY g.id
+      ORDER BY g.updated_at DESC
+    `, [userId, userId]);
+    
+    console.log(`Found ${result.rows.length} groups for user ${userId}`);
+    
+    // For each group, get expenses grouped by currency
+    const groupsWithExpenses = await Promise.all(result.rows.map(async (group) => {
+      const expensesResult = await pool.query(`
+        SELECT currency, SUM(amount) as total_amount
+        FROM expenses 
+        WHERE group_id = ?
+        GROUP BY currency
+      `, [group.id]);
+      
+      console.log(`Group ${group.name} has ${expensesResult.rows.length} expense currencies`);
+      
+      return {
+        ...group,
+        expenses_by_currency: expensesResult.rows
+      };
+    }));
+    
+    console.log('Groups with expenses:', JSON.stringify(groupsWithExpenses, null, 2));
+    
+    res.json({
+      message: 'Groups test successful',
+      userId: userId,
+      groupCount: groupsWithExpenses.length,
+      groups: groupsWithExpenses
+    });
+  } catch (err) {
+    console.error('Error in groups test:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
 });
 
 app.get('/api/users/findByEmail', async (req, res) => {
@@ -49,7 +203,7 @@ app.get('/api/users/findByEmail', async (req, res) => {
 });
 
 app.post('/api/users/create', async (req, res) => {
-  const { email, name, walletAddress, walletPublicKey, walletSecretKey } = req.body;
+  const { email, name, walletAddress, walletPublicKey, walletSecretKey, avatar } = req.body;
   
   if (!email || !name || !walletAddress || !walletPublicKey) {
     return res.status(400).json({ error: 'Email, name, wallet address, and wallet public key are required' });
@@ -67,8 +221,8 @@ app.post('/api/users/create', async (req, res) => {
 
     // Create new user
     const result = await pool.run(
-      'INSERT INTO users (email, name, wallet_address, wallet_public_key, wallet_secret_key) VALUES (?, ?, ?, ?, ?)',
-      [email, name, walletAddress, walletPublicKey, walletSecretKey || null]
+      'INSERT INTO users (email, name, wallet_address, wallet_public_key, wallet_secret_key, avatar) VALUES (?, ?, ?, ?, ?, ?)',
+      [email, name, walletAddress, walletPublicKey, walletSecretKey || null, avatar || null]
     );
 
     // Get the created user
@@ -83,6 +237,7 @@ app.post('/api/users/create', async (req, res) => {
       name: newUser.name,
       walletAddress: newUser.wallet_address,
       walletPublicKey: newUser.wallet_public_key,
+      avatar: newUser.avatar,
       createdAt: newUser.created_at
     });
   } catch (err) {
@@ -114,6 +269,7 @@ app.post('/api/users/login', async (req, res) => {
         name: user.name,
         walletAddress: user.wallet_address,
         walletPublicKey: user.wallet_public_key,
+        avatar: user.avatar,
         createdAt: user.created_at
       });
     } else {
@@ -121,6 +277,44 @@ app.post('/api/users/login', async (req, res) => {
     }
   } catch (err) {
     console.error('Error during login:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+// Update user avatar endpoint
+app.put('/api/users/:userId/avatar', async (req, res) => {
+  const { userId } = req.params;
+  const { avatar } = req.body;
+  
+  if (!avatar) {
+    return res.status(400).json({ error: 'Avatar is required' });
+  }
+
+  try {
+    const result = await pool.run(
+      'UPDATE users SET avatar = ? WHERE id = ?',
+      [avatar, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get the updated user
+    const userResult = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+    const user = userResult.rows[0];
+    
+    res.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      walletAddress: user.wallet_address,
+      walletPublicKey: user.wallet_public_key,
+      avatar: user.avatar,
+      createdAt: user.created_at
+    });
+  } catch (err) {
+    console.error('Error updating user avatar:', err);
     res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
@@ -246,6 +440,32 @@ app.get('/api/groups/:groupId/members', async (req, res) => {
     res.json(membersResult.rows);
   } catch (err) {
     console.error('Error getting group members:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+// Get all contacts a user has met in groups
+app.get('/api/users/:userId/contacts', async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    // Get all unique users that the current user has met in groups
+    const contactsResult = await pool.query(`
+      SELECT DISTINCT u.id, u.name, u.email, u.wallet_address, 
+             MIN(gm.joined_at) as first_met_at,
+             COUNT(DISTINCT g.id) as mutual_groups_count
+      FROM group_members gm1
+      JOIN groups g ON gm1.group_id = g.id
+      JOIN group_members gm ON g.id = gm.group_id
+      JOIN users u ON gm.user_id = u.id
+      WHERE gm1.user_id = ? AND gm.user_id != ?
+      GROUP BY u.id, u.name, u.email, u.wallet_address
+      ORDER BY mutual_groups_count DESC, u.name ASC
+    `, [userId, userId]);
+    
+    res.json(contactsResult.rows);
+  } catch (err) {
+    console.error('Error getting user contacts:', err);
     res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
@@ -614,6 +834,104 @@ app.post('/api/groups/:groupId/leave', async (req, res) => {
   }
 });
 
+// Get group details endpoint
+app.get('/api/groups/details/:groupId', async (req, res) => {
+  const { groupId } = req.params;
+  
+  try {
+    const result = await pool.query('SELECT * FROM groups WHERE id = ?', [groupId]);
+    
+    if (result.rows.length > 0) {
+      res.json(result.rows[0]);
+    } else {
+      res.status(404).json({ error: 'Group not found' });
+    }
+  } catch (err) {
+    console.error('Error fetching group details:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+// Update group endpoint
+app.put('/api/groups/:groupId', async (req, res) => {
+  const { groupId } = req.params;
+  const { userId, name, description, category, currency, icon, color } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required' });
+  }
+
+  if (!name && !description && !category && !currency && !icon && !color) {
+    return res.status(400).json({ error: 'At least one field to update is required' });
+  }
+
+  try {
+    // Check if group exists and user is a member (or creator)
+    const groupResult = await pool.query('SELECT * FROM groups WHERE id = ?', [groupId]);
+    if (groupResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Group not found' });
+    }
+
+    // Check if user is a member of the group
+    const memberResult = await pool.query(
+      'SELECT * FROM group_members WHERE group_id = ? AND user_id = ?',
+      [groupId, userId]
+    );
+    
+    if (memberResult.rows.length === 0) {
+      return res.status(403).json({ error: 'User is not a member of this group' });
+    }
+
+    // Build update query dynamically
+    const updates = [];
+    const values = [];
+    
+    if (name) {
+      updates.push('name = ?');
+      values.push(name);
+    }
+    if (description !== undefined) {
+      updates.push('description = ?');
+      values.push(description);
+    }
+    if (category) {
+      updates.push('category = ?');
+      values.push(category);
+    }
+    if (currency) {
+      updates.push('currency = ?');
+      values.push(currency);
+    }
+    if (icon) {
+      updates.push('icon = ?');
+      values.push(icon);
+    }
+    if (color) {
+      updates.push('color = ?');
+      values.push(color);
+    }
+    
+    updates.push('updated_at = datetime("now")');
+    values.push(groupId);
+
+    const updateQuery = `UPDATE groups SET ${updates.join(', ')} WHERE id = ?`;
+    
+    await pool.run(updateQuery, values);
+
+    // Fetch and return the updated group
+    const updatedGroupResult = await pool.query('SELECT * FROM groups WHERE id = ?', [groupId]);
+    const updatedGroup = updatedGroupResult.rows[0];
+
+    res.json({
+      message: 'Group updated successfully',
+      group: updatedGroup
+    });
+  } catch (err) {
+    console.error('Error updating group:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
 // Delete group endpoint
 app.delete('/api/groups/:groupId', async (req, res) => {
   const { groupId } = req.params;
@@ -864,16 +1182,16 @@ app.post('/api/groups/:groupId/settle', async (req, res) => {
   const { userId, settlementType = 'individual' } = req.body;
   
   try {
-    // Get group wallet
-    const walletResult = await pool.query(`
-      SELECT * FROM group_wallets WHERE group_id = ?
-    `, [groupId]);
+    // Get user information
+    const userResult = await pool.query(`
+      SELECT * FROM users WHERE id = ?
+    `, [userId]);
     
-    if (walletResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Group wallet not found' });
+    if (userResult.rows.length === 0) {
+      return res.status(400).json({ error: 'User not found' });
     }
     
-    const groupWallet = walletResult.rows[0];
+    const user = userResult.rows[0];
     
     // Get all group members
     const membersResult = await pool.query(`
@@ -1000,21 +1318,8 @@ app.post('/api/groups/:groupId/settle', async (req, res) => {
           
           const paymentAmount = Math.min(remainingDebt, creditor.amount);
           
-          // Create settlement transaction
-          await pool.run(`
-            INSERT INTO group_wallet_transactions (
-              group_wallet_id, to_address, amount, currency,
-              transaction_type, user_id, memo, status, created_at
-            ) VALUES (?, ?, ?, ?, 'settlement', ?, ?, 'completed', datetime("now"))
-          `, [
-            groupWallet.id, 
-            creditor.member.wallet_address, 
-            paymentAmount, 
-            currency, // Use original currency
-            parseInt(userId),
-            `Settlement payment to ${creditor.member.name} (${currency})`
-          ]);
-          
+          // Track the settlement payment (no actual group wallet transaction)
+          // This represents that the user will pay this amount from their personal wallet
           settlements.push({
             userId: creditor.id,
             amount: paymentAmount,
@@ -1027,19 +1332,51 @@ app.post('/api/groups/:groupId/settle', async (req, res) => {
         }
       }
       
-      // Check if group wallet has sufficient funds (simplified check)
-      if (groupWallet.balance < totalDebtInGroupWalletCurrency) {
-        return res.status(400).json({ 
-          error: `Insufficient group wallet balance. Need ${totalDebtInGroupWalletCurrency} but only have ${groupWallet.balance}` 
-        });
+      // Create settlement record in a personal settlements table (we'll create this if it doesn't exist)
+      // This tracks that the user has made a settlement payment from their personal wallet
+      try {
+        await pool.run(`
+          INSERT INTO personal_settlements (
+            group_id, user_id, amount, currency, settlement_type, 
+            creditors_data, status, created_at
+          ) VALUES (?, ?, ?, 'USDC', 'individual', ?, 'completed', datetime("now"))
+        `, [
+          groupId, 
+          userId, 
+          totalDebtInGroupWalletCurrency,
+          JSON.stringify(settlements)
+        ]);
+      } catch (tableError) {
+        // If table doesn't exist, create it first
+        await pool.run(`
+          CREATE TABLE IF NOT EXISTS personal_settlements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            currency TEXT DEFAULT 'USDC',
+            settlement_type TEXT DEFAULT 'individual',
+            creditors_data TEXT,
+            status TEXT DEFAULT 'completed',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (group_id) REFERENCES groups(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+          )
+        `);
+        
+        // Now insert the settlement record
+        await pool.run(`
+          INSERT INTO personal_settlements (
+            group_id, user_id, amount, currency, settlement_type, 
+            creditors_data, status, created_at
+          ) VALUES (?, ?, ?, 'USDC', 'individual', ?, 'completed', datetime("now"))
+        `, [
+          groupId, 
+          userId, 
+          totalDebtInGroupWalletCurrency,
+          JSON.stringify(settlements)
+        ]);
       }
-      
-      // Update wallet balance (simplified - in reality you'd need currency-specific balances)
-      await pool.run(`
-        UPDATE group_wallets 
-        SET balance = balance - ?, updated_at = datetime("now")
-        WHERE id = ?
-      `, [totalDebtInGroupWalletCurrency, groupWallet.id]);
       
       res.json({
         message: 'Individual settlement completed successfully',
@@ -1048,7 +1385,7 @@ app.post('/api/groups/:groupId/settle', async (req, res) => {
       });
       
     } else {
-      // Original logic for settling all expenses (keep for backward compatibility)
+      // Full settlement for all group members using personal wallets
       const settlements = [];
       
       Object.keys(balances).forEach(memberId => {
@@ -1062,34 +1399,38 @@ app.post('/api/groups/:groupId/settle', async (req, res) => {
               userId: id,
               amount: Math.abs(memberBalances.netBalance[currency]),
               currency: currency,
-              address: member.wallet_address
+              address: member.wallet_address,
+              name: member.name
             });
           }
         });
       });
       
-      // Create settlement transactions for all debts
+      // Record all settlements (personal wallet payments)
       for (const settlement of settlements) {
-        await pool.run(`
-          INSERT INTO group_wallet_transactions (
-            group_wallet_id, to_address, amount, currency,
-            transaction_type, user_id, memo, status, created_at
-          ) VALUES (?, ?, ?, ?, 'settlement', ?, ?, 'completed', datetime("now"))
-        `, [
-          groupWallet.id, 
-          settlement.address, 
-          settlement.amount, 
-          settlement.currency, // Use original currency
-          settlement.userId,
-          `Automatic settlement (${settlement.currency})`
-        ]);
-        
-        // Update wallet balance (simplified)
-        await pool.run(`
-          UPDATE group_wallets 
-          SET balance = balance - ?, updated_at = datetime("now")
-          WHERE id = ?
-        `, [settlement.amount, groupWallet.id]);
+        try {
+          await pool.run(`
+            INSERT INTO personal_settlements (
+              group_id, user_id, amount, currency, settlement_type, 
+              creditors_data, status, created_at
+            ) VALUES (?, ?, ?, ?, 'full', ?, 'completed', datetime("now"))
+          `, [
+            groupId, 
+            settlement.userId, 
+            settlement.amount,
+            settlement.currency,
+            JSON.stringify([{
+              userId: settlement.userId,
+              amount: settlement.amount,
+              currency: settlement.currency,
+              address: settlement.address,
+              name: settlement.name
+            }])
+          ]);
+        } catch (tableError) {
+          // Table creation is handled in individual settlement, so this should work
+          console.warn('Settlement recording failed:', tableError);
+        }
       }
       
       res.json({
@@ -1130,6 +1471,62 @@ app.get('/api/groups/:groupId/wallet/transactions', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching group wallet transactions:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+// Simple endpoint to record a personal settlement payment
+app.post('/api/groups/:groupId/record-settlement', async (req, res) => {
+  const { groupId } = req.params;
+  const { userId, amount, recipientId, currency = 'USDC' } = req.body;
+  
+  try {
+    // Get user and recipient information
+    const [userResult, recipientResult] = await Promise.all([
+      pool.query('SELECT * FROM users WHERE id = ?', [userId]),
+      pool.query('SELECT * FROM users WHERE id = ?', [recipientId])
+    ]);
+    
+    if (userResult.rows.length === 0 || recipientResult.rows.length === 0) {
+      return res.status(400).json({ error: 'User or recipient not found' });
+    }
+    
+    const user = userResult.rows[0];
+    const recipient = recipientResult.rows[0];
+    
+    // Create the settlement table if it doesn't exist
+    await pool.run(`
+      CREATE TABLE IF NOT EXISTS personal_settlements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        recipient_id INTEGER,
+        amount REAL NOT NULL,
+        currency TEXT DEFAULT 'USDC',
+        settlement_type TEXT DEFAULT 'individual',
+        status TEXT DEFAULT 'completed',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES groups(id),
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (recipient_id) REFERENCES users(id)
+      )
+    `);
+    
+    // Record the settlement
+    await pool.run(`
+      INSERT INTO personal_settlements (
+        group_id, user_id, recipient_id, amount, currency, 
+        settlement_type, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, 'personal_payment', 'completed', datetime("now"))
+    `, [groupId, userId, recipientId, amount, currency]);
+    
+    res.json({
+      success: true,
+      message: `Settlement of ${amount} ${currency} from ${user.name} to ${recipient.name} recorded successfully`
+    });
+    
+  } catch (err) {
+    console.error('Error recording settlement:', err);
     res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
@@ -1208,6 +1605,280 @@ app.get('/api/groups/:groupId/settlement-calculation', async (req, res) => {
     res.json(settlements);
   } catch (err) {
     console.error('Error calculating settlement:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+// Payment reminder endpoints
+app.post('/api/groups/:groupId/send-reminder', async (req, res) => {
+  const { groupId } = req.params;
+  const { senderId, recipientId, amount, reminderType = 'individual' } = req.body;
+  
+  try {
+    // Get sender and recipient information
+    const [senderResult, recipientResult, groupResult] = await Promise.all([
+      pool.query('SELECT * FROM users WHERE id = ?', [senderId]),
+      pool.query('SELECT * FROM users WHERE id = ?', [recipientId]),
+      pool.query('SELECT * FROM groups WHERE id = ?', [groupId])
+    ]);
+    
+    if (senderResult.rows.length === 0 || recipientResult.rows.length === 0 || groupResult.rows.length === 0) {
+      return res.status(400).json({ error: 'User or group not found' });
+    }
+    
+    const sender = senderResult.rows[0];
+    const recipient = recipientResult.rows[0];
+    const group = groupResult.rows[0];
+    
+    // Create reminders table if it doesn't exist
+    await pool.run(`
+      CREATE TABLE IF NOT EXISTS payment_reminders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        sender_id INTEGER NOT NULL,
+        recipient_id INTEGER NOT NULL,
+        amount REAL NOT NULL,
+        reminder_type TEXT DEFAULT 'individual',
+        last_sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES groups(id),
+        FOREIGN KEY (sender_id) REFERENCES users(id),
+        FOREIGN KEY (recipient_id) REFERENCES users(id)
+      )
+    `);
+    
+    // Check if a reminder was sent recently (24-hour cooldown)
+    const recentReminderResult = await pool.query(`
+      SELECT * FROM payment_reminders 
+      WHERE group_id = ? AND sender_id = ? AND recipient_id = ?
+      AND datetime(last_sent_at, '+24 hours') > datetime('now')
+      ORDER BY last_sent_at DESC
+      LIMIT 1
+    `, [groupId, senderId, recipientId]);
+    
+    if (recentReminderResult.rows.length > 0) {
+      const lastSent = new Date(recentReminderResult.rows[0].last_sent_at);
+      const nextAllowed = new Date(lastSent.getTime() + 24 * 60 * 60 * 1000);
+      const timeRemaining = Math.ceil((nextAllowed.getTime() - Date.now()) / (1000 * 60 * 60));
+      
+      return res.status(429).json({ 
+        error: 'Reminder cooldown active',
+        message: `You can send another reminder in ${timeRemaining} hours`,
+        nextAllowedAt: nextAllowed.toISOString()
+      });
+    }
+    
+    // Record the reminder
+    await pool.run(`
+      INSERT INTO payment_reminders (
+        group_id, sender_id, recipient_id, amount, reminder_type, last_sent_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `, [groupId, senderId, recipientId, amount, reminderType]);
+    
+    // Send notification to recipient
+    await pool.run(
+      'INSERT INTO notifications (user_id, title, message, type, data, read, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))',
+      [
+        recipientId,
+        'Payment Reminder',
+        `${sender.name} is reminding you about a $${amount.toFixed(2)} payment in ${group.name}`,
+        'payment_reminder',
+        JSON.stringify({
+          groupId: groupId,
+          senderId: senderId,
+          senderName: sender.name,
+          amount: amount,
+          groupName: group.name
+        }),
+        0
+      ]
+    );
+    
+    res.json({
+      success: true,
+      message: `Reminder sent to ${recipient.name}`,
+      recipientName: recipient.name,
+      amount: amount
+    });
+    
+  } catch (err) {
+    console.error('Error sending reminder:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+app.post('/api/groups/:groupId/send-reminder-all', async (req, res) => {
+  const { groupId } = req.params;
+  const { senderId, debtors } = req.body; // debtors: [{ recipientId, amount, name }]
+  
+  try {
+    // Get sender and group information
+    const [senderResult, groupResult] = await Promise.all([
+      pool.query('SELECT * FROM users WHERE id = ?', [senderId]),
+      pool.query('SELECT * FROM groups WHERE id = ?', [groupId])
+    ]);
+    
+    if (senderResult.rows.length === 0 || groupResult.rows.length === 0) {
+      return res.status(400).json({ error: 'User or group not found' });
+    }
+    
+    const sender = senderResult.rows[0];
+    const group = groupResult.rows[0];
+    
+    // Check global reminder cooldown for "remind all" (24-hour cooldown)
+    const recentGlobalReminderResult = await pool.query(`
+      SELECT * FROM payment_reminders 
+      WHERE group_id = ? AND sender_id = ? AND reminder_type = 'bulk'
+      AND datetime(last_sent_at, '+24 hours') > datetime('now')
+      ORDER BY last_sent_at DESC
+      LIMIT 1
+    `, [groupId, senderId]);
+    
+    if (recentGlobalReminderResult.rows.length > 0) {
+      const lastSent = new Date(recentGlobalReminderResult.rows[0].last_sent_at);
+      const nextAllowed = new Date(lastSent.getTime() + 24 * 60 * 60 * 1000);
+      const timeRemaining = Math.ceil((nextAllowed.getTime() - Date.now()) / (1000 * 60));
+      
+      return res.status(429).json({ 
+        error: 'Bulk reminder cooldown active',
+        message: `You can send "Remind all" again in ${Math.floor(timeRemaining / 60)}:${String(timeRemaining % 60).padStart(2, '0')}`,
+        nextAllowedAt: nextAllowed.toISOString()
+      });
+    }
+    
+    const results = [];
+    const notifications = [];
+    
+    // Send reminders to all debtors
+    for (const debtor of debtors) {
+      try {
+        // Record the reminder
+        await pool.run(`
+          INSERT INTO payment_reminders (
+            group_id, sender_id, recipient_id, amount, reminder_type, last_sent_at, created_at
+          ) VALUES (?, ?, ?, ?, 'bulk', datetime('now'), datetime('now'))
+        `, [groupId, senderId, debtor.recipientId, debtor.amount]);
+        
+        // Send notification
+        await pool.run(
+          'INSERT INTO notifications (user_id, title, message, type, data, read, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))',
+          [
+            debtor.recipientId,
+            'Payment Reminder',
+            `${sender.name} is reminding you about a $${debtor.amount.toFixed(2)} payment in ${group.name}`,
+            'payment_reminder',
+            JSON.stringify({
+              groupId: groupId,
+              senderId: senderId,
+              senderName: sender.name,
+              amount: debtor.amount,
+              groupName: group.name,
+              isPartOfBulk: true
+            }),
+            0
+          ]
+        );
+        
+        results.push({
+          recipientId: debtor.recipientId,
+          recipientName: debtor.name,
+          amount: debtor.amount,
+          success: true
+        });
+        
+      } catch (error) {
+        console.error(`Error sending reminder to ${debtor.name}:`, error);
+        results.push({
+          recipientId: debtor.recipientId,
+          recipientName: debtor.name,
+          amount: debtor.amount,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+    
+    const successCount = results.filter(r => r.success).length;
+    const totalAmount = debtors.reduce((sum, d) => sum + d.amount, 0);
+    
+    res.json({
+      success: true,
+      message: `Reminders sent to ${successCount} members about $${totalAmount.toFixed(2)} total`,
+      results: results,
+      totalAmount: totalAmount
+    });
+    
+  } catch (err) {
+    console.error('Error sending bulk reminders:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+app.get('/api/groups/:groupId/reminder-status/:userId', async (req, res) => {
+  const { groupId, userId } = req.params;
+  
+  try {
+    // Check individual reminder cooldowns
+    const individualRemindersResult = await pool.query(`
+      SELECT recipient_id, last_sent_at,
+             CASE 
+               WHEN datetime(last_sent_at, '+24 hours') > datetime('now') 
+               THEN 1 ELSE 0 
+             END as is_on_cooldown
+      FROM payment_reminders 
+      WHERE group_id = ? AND sender_id = ? AND reminder_type = 'individual'
+      AND datetime(last_sent_at, '+24 hours') > datetime('now')
+    `, [groupId, userId]);
+    
+    // Check bulk reminder cooldown
+    const bulkReminderResult = await pool.query(`
+      SELECT last_sent_at,
+             CASE 
+               WHEN datetime(last_sent_at, '+24 hours') > datetime('now') 
+               THEN 1 ELSE 0 
+             END as is_on_cooldown
+      FROM payment_reminders 
+      WHERE group_id = ? AND sender_id = ? AND reminder_type = 'bulk'
+      AND datetime(last_sent_at, '+24 hours') > datetime('now')
+      ORDER BY last_sent_at DESC
+      LIMIT 1
+    `, [groupId, userId]);
+    
+    const cooldowns = {};
+    individualRemindersResult.rows.forEach(row => {
+      if (row.is_on_cooldown) {
+        const lastSent = new Date(row.last_sent_at);
+        const nextAllowed = new Date(lastSent.getTime() + 24 * 60 * 60 * 1000);
+        cooldowns[row.recipient_id] = {
+          nextAllowedAt: nextAllowed.toISOString(),
+          timeRemainingMinutes: Math.ceil((nextAllowed.getTime() - Date.now()) / (1000 * 60))
+        };
+      }
+    });
+    
+    let bulkCooldown = null;
+    if (bulkReminderResult.rows.length > 0 && bulkReminderResult.rows[0].is_on_cooldown) {
+      const lastSent = new Date(bulkReminderResult.rows[0].last_sent_at);
+      const nextAllowed = new Date(lastSent.getTime() + 24 * 60 * 60 * 1000);
+      const timeRemainingMs = nextAllowed.getTime() - Date.now();
+      const hours = Math.floor(timeRemainingMs / (1000 * 60 * 60));
+      const minutes = Math.floor((timeRemainingMs % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((timeRemainingMs % (1000 * 60)) / 1000);
+      
+      bulkCooldown = {
+        nextAllowedAt: nextAllowed.toISOString(),
+        timeRemainingMs: timeRemainingMs,
+        formattedTimeRemaining: `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+      };
+    }
+    
+    res.json({
+      individualCooldowns: cooldowns,
+      bulkCooldown: bulkCooldown
+    });
+    
+  } catch (err) {
+    console.error('Error checking reminder status:', err);
     res.status(500).json({ error: 'Database error', details: err.message });
   }
 });

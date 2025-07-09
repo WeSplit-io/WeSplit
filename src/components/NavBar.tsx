@@ -1,59 +1,66 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors, fontSizes, fontWeights, spacing } from '../lib/theme';
+import { colors, spacing, typography } from '../theme';
 import Icon from './Icon';
 
 const navItems = [
-  { icon: 'home', label: 'Home' },
-  { icon: 'plus-circle', label: 'Add' },
-  { icon: 'users', label: 'Groups' },
-  { icon: 'user', label: 'Profile' },
+  { icon: 'home', label: 'Home', route: 'Dashboard' },
+  { icon: 'grid', label: 'Groups', route: 'GroupsList' },
+  { icon: 'plus', label: 'Add', route: 'CreateGroup', isSpecial: true },
+  { icon: 'users', label: 'People', route: 'GroupsList' },
+  { icon: 'user', label: 'Profile', route: 'Profile' },
 ];
 
 interface NavBarProps {
-  onNavigate: (screen: string) => void;
+  navigation: any;
+  currentRoute?: string;
 }
 
-const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
-  const handleProfilePress = () => {
-    onNavigate('Profile');
+const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
+  const handleNavigation = (route: string) => {
+    if (route && navigation) {
+      navigation.navigate(route);
+    }
   };
 
-  const handleHomePress = () => {
-    onNavigate('Dashboard');
-  };
-
-  const handleAddPress = () => {
-    onNavigate('CreateGroup');
-  };
-
-  const handleGroupsPress = () => {
-    // Navigate to Dashboard since that's where groups are displayed
-    onNavigate('Dashboard');
+  const isActiveRoute = (route: string) => {
+    return currentRoute === route;
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.scrollContent}>
-        <TouchableOpacity style={styles.navItem} onPress={handleHomePress}>
-          <Icon name="home" size={24} color="#FFF" />
-          <Text style={styles.navLabel}>Home</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.navItem} onPress={handleAddPress}>
-          <Icon name="plus-circle" size={24} color="#FFF" />
-          <Text style={styles.navLabel}>Add</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.navItem} onPress={handleGroupsPress}>
-          <Icon name="users" size={24} color="#FFF" />
-          <Text style={styles.navLabel}>Groups</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.navItem} onPress={handleProfilePress}>
-          <Icon name="user" size={24} color="#FFF" />
-          <Text style={styles.navLabel}>Profile</Text>
-        </TouchableOpacity>
+        {navItems.map((item, index) => {
+          const isActive = isActiveRoute(item.route);
+          
+          return (
+            <TouchableOpacity 
+              key={index} 
+              style={[styles.navItem, item.isSpecial && styles.specialNavItem]} 
+              onPress={() => handleNavigation(item.route)}
+            >
+              {item.isSpecial ? (
+                <View style={styles.specialButton}>
+                  <Icon name={item.icon} size={24} color={colors.darkBackground} />
+                </View>
+              ) : (
+                <Icon 
+                  name={item.icon} 
+                  size={24} 
+                  color={isActive ? colors.brandGreen : colors.textLight} 
+                />
+              )}
+              {!item.isSpecial && (
+                <Text style={[
+                  styles.navLabel, 
+                  isActive && styles.navLabelActive
+                ]}>
+                  {item.label}
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </View>
   );
@@ -62,9 +69,9 @@ const NavBar: React.FC<NavBarProps> = ({ onNavigate }) => {
 const styles = StyleSheet.create({
   container: {
     paddingVertical: spacing.sm,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.darkCard,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: colors.darkBorder,
     position: 'absolute',
     left: 0,
     right: 0,
@@ -85,10 +92,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navLabel: {
-    fontSize: fontSizes.xs,
-    color: '#FFF',
+    fontSize: typography.fontSize.xs,
+    color: colors.textLight,
     marginTop: 2,
     textAlign: 'center',
+  },
+  navLabelActive: {
+    color: colors.brandGreen,
+  },
+  specialNavItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  specialButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.brandGreen,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

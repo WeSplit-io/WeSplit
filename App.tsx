@@ -5,36 +5,42 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WalletProvider } from './src/context/WalletContext';
 import { AppProvider } from './src/context/AppContext';
-import WelcomeScreen from './src/screens/WelcomeScreen';
-import CreatePoolScreen from './src/screens/CreatePoolScreen';
-import ViewPoolScreen from './src/screens/ViewPoolScreen';
-import TransactionConfirmationScreen from './src/screens/TransactionConfirmationScreen';
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View } from 'react-native';
+import { styles } from './App.styles';
 
 // Import all new screens
-import DashboardScreen from './src/screens/DashboardScreen';
-import AuthScreen from './src/screens/AuthScreen';
-import AddExpenseScreen from './src/screens/AddExpenseScreen';
-import CreateGroupScreen from './src/screens/CreateGroupScreen';
-import AddMembersScreen from './src/screens/AddMembersScreen';
-import BalanceScreen from './src/screens/BalanceScreen';
-import GroupDetailsScreen from './src/screens/GroupDetailsScreen';
-import SettleUpModal from './src/screens/SettleUpModal';
-import GroupSettingsScreen from './src/screens/GroupSettingsScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
-import ScreensMenu from './src/screens/ScreensMenu';
-import SplashScreen from './src/screens/SplashScreen';
-import GetStartedScreen from './src/screens/GetStartedScreen';
-import AuthMethodsScreen from './src/screens/AuthMethodsScreen';
-import VerificationScreen from './src/screens/VerificationScreen';
-import CreateProfileScreen from './src/screens/CreateProfileScreen';
-import OnboardingScreen from './src/screens/OnboardingScreen';
-import EditExpenseScreen from './src/screens/EditExpenseScreen';
-import DepositScreen from './src/screens/DepositScreen';
-import AccountSettingsScreen from './src/screens/AccountSettingsScreen';
-import PremiumScreen from './src/screens/PremiumScreen';
-import NotificationsScreen from './src/screens/NotificationsScreen';
-import LanguageScreen from './src/screens/LanguageScreen';
+import DashboardScreen from './src/screens/Dashboard/DashboardScreen';
+import AddExpenseScreen from './src/screens/AddExpense/AddExpenseScreen';
+import ExpenseSuccessScreen from './src/screens/AddExpense/ExpenseSuccessScreen';
+import CreateGroupScreen from './src/screens/CreateGroup/CreateGroupScreen';
+import GroupCreatedScreen from './src/screens/GroupCreated/GroupCreatedScreen';
+import AddMembersScreen from './src/screens/AddMembers/AddMembersScreen';
+import BalanceScreen from './src/screens/Balance/BalanceScreen';
+import GroupDetailsScreen from './src/screens/GroupDetails/GroupDetailsScreen';
+import SettleUpModal from './src/screens/SettleUp/SettleUpModal';
+import GroupSettingsScreen from './src/screens/GroupSettings/GroupSettingsScreen';
+import ProfileScreen from './src/screens/Profile/ProfileScreen';
+import SplashScreen from './src/screens/Splash/SplashScreen';
+import GetStartedScreen from './src/screens/GetStarted/GetStartedScreen';
+import AuthMethodsScreen from './src/screens/AuthMethods/AuthMethodsScreen';
+import VerificationScreen from './src/screens/Verification/VerificationScreen';
+import CreateProfileScreen from './src/screens/CreateProfile/CreateProfileScreen';
+import OnboardingScreen from './src/screens/Onboarding/OnboardingScreen';
+import EditExpenseScreen from './src/screens/EditExpense/EditExpenseScreen';
+import DepositScreen from './src/screens/Deposit/DepositScreen';
+import AccountSettingsScreen from './src/screens/AccountSettings/AccountSettingsScreen';
+import PremiumScreen from './src/screens/Premium/PremiumScreen';
+import NotificationsScreen from './src/screens/Notifications/NotificationsScreen';
+import LanguageScreen from './src/screens/Language/LanguageScreen';
+import SendContactsScreen from './src/screens/Send/SendContactsScreen';
+import SendAmountScreen from './src/screens/Send/SendAmountScreen';
+import SendConfirmationScreen from './src/screens/Send/SendConfirmationScreen';
+import SendSuccessScreen from './src/screens/Send/SendSuccessScreen';
+import RequestContactsScreen from './src/screens/Request/RequestContactsScreen';
+import RequestAmountScreen from './src/screens/Request/RequestAmountScreen';
+import RequestConfirmationScreen from './src/screens/Request/RequestConfirmationScreen';
+import RequestSuccessScreen from './src/screens/Request/RequestSuccessScreen';
+import GroupsListScreen from './src/screens/GroupsList/GroupsListScreen';
 
 const Stack = createStackNavigator();
 const queryClient = new QueryClient();
@@ -105,15 +111,11 @@ export default function App() {
               <Stack.Screen name="Verification" component={VerificationScreen} />
               <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
               <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-              <Stack.Screen name="Auth" component={AuthScreen} />
-              <Stack.Screen name="ScreensMenu" component={ScreensMenu} />
-              <Stack.Screen name="Welcome" component={WelcomeScreen} />
               <Stack.Screen name="Dashboard" component={DashboardScreen} />
-              <Stack.Screen name="CreatePool" component={CreatePoolScreen} />
-              <Stack.Screen name="ViewPool" component={ViewPoolScreen} />
-              <Stack.Screen name="TransactionConfirmation" component={TransactionConfirmationScreen} />
               <Stack.Screen name="AddExpense" component={AddExpenseScreen} />
+              <Stack.Screen name="ExpenseSuccess" component={ExpenseSuccessScreen} />
               <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
+              <Stack.Screen name="GroupCreated" component={GroupCreatedScreen} />
               <Stack.Screen name="AddMembers" component={AddMembersScreen} />
               <Stack.Screen name="Balance" component={BalanceScreen} />
               <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
@@ -126,6 +128,15 @@ export default function App() {
               <Stack.Screen name="Premium" component={PremiumScreen} />
               <Stack.Screen name="Notifications" component={NotificationsScreen} />
               <Stack.Screen name="Language" component={LanguageScreen} />
+              <Stack.Screen name="SendContacts" component={SendContactsScreen} />
+              <Stack.Screen name="SendAmount" component={SendAmountScreen} />
+              <Stack.Screen name="SendConfirmation" component={SendConfirmationScreen} />
+              <Stack.Screen name="SendSuccess" component={SendSuccessScreen} />
+              <Stack.Screen name="RequestContacts" component={RequestContactsScreen} />
+              <Stack.Screen name="RequestAmount" component={RequestAmountScreen} />
+              <Stack.Screen name="RequestConfirmation" component={RequestConfirmationScreen} />
+              <Stack.Screen name="RequestSuccess" component={RequestSuccessScreen} />
+              <Stack.Screen name="GroupsList" component={GroupsListScreen} />
             </Stack.Navigator>
           </NavigationContainer>
         </AppProvider>
@@ -134,33 +145,4 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    fontSize: 18,
-    color: '#333',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#d32f2f',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  errorSubtext: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-});
+
