@@ -98,6 +98,10 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
+  submitButtonDisabled: {
+    backgroundColor: colors.darkGray,
+    opacity: 0.6,
+  },
   submitButtonText: {
     color: BG_COLOR,
     fontSize: typography.fontSize.xl,

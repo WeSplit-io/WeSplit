@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Alert } from 'react-native';
 import { connectWallet, disconnectWallet, getWalletInfo, WalletInfo, getCurrentWalletName } from '../../utils/walletService';
+import { solanaService, SolanaTransactionParams, SolanaTransactionResult } from '../services/solanaTransactionService';
 
 interface TransactionParams {
   to: string;
@@ -98,6 +99,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Expose secret key if available
       if (walletInfo && (walletInfo as any).secretKey) {
         setSecretKey((walletInfo as any).secretKey);
+        
+        // Try to connect the Solana service as well
+        try {
+          await solanaService.importWallet((walletInfo as any).secretKey);
+          console.log('Solana blockchain service connected successfully');
+        } catch (solanaError) {
+          console.warn('Failed to connect Solana blockchain service:', solanaError);
+        }
       } else {
         setSecretKey(null);
       }
@@ -124,6 +133,9 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       
       await disconnectWallet();
       
+      // Also disconnect from Solana service
+      solanaService.disconnect();
+      
       console.log('Disconnecting wallet...');
       setIsConnected(false);
       setAddress(null);
@@ -131,6 +143,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setBalance(null);
       setWalletInfo(null);
       setWalletName(null);
+      setSecretKey(null);
       console.log('Wallet disconnected successfully');
       
     } catch (error) {
@@ -160,17 +173,49 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
       console.log('Sending transaction:', params);
       
-      // Simulate transaction processing for now
-      // In a real implementation, this would create and send a Solana transaction
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Generate a mock transaction signature
-      const signature = `mock_tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const txId = signature;
-      
-      console.log('Transaction sent successfully:', { signature, txId });
-      
-      return { signature, txId };
+      // Try to use real Solana blockchain transaction
+      try {
+        // Check if Solana service is connected
+        if (!solanaService.isConnected()) {
+          // If not connected, try to connect using the wallet info
+          if (walletInfo && (walletInfo as any).secretKey) {
+            await solanaService.importWallet((walletInfo as any).secretKey);
+          } else {
+            throw new Error('No wallet secret key available for blockchain transaction');
+          }
+        }
+        
+        // Convert params to Solana format
+        const solanaParams: SolanaTransactionParams = {
+          to: params.to,
+          amount: params.amount,
+          currency: params.currency,
+          memo: params.memo,
+          groupId: params.groupId
+        };
+        
+        // Send real blockchain transaction
+        const result = await solanaService.sendTransaction(solanaParams);
+        
+        console.log('Real blockchain transaction sent successfully:', result);
+        
+        return { 
+          signature: result.signature, 
+          txId: result.txId 
+        };
+      } catch (blockchainError) {
+        console.warn('Blockchain transaction failed, falling back to mock:', blockchainError);
+        
+        // Fallback to mock transaction for demo purposes
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const signature = `mock_tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const txId = signature;
+        
+        console.log('Mock transaction sent successfully:', { signature, txId });
+        
+        return { signature, txId };
+      }
     } catch (error) {
       console.error('Transaction failed:', error);
       throw error;

@@ -7,7 +7,7 @@ const navItems = [
   { icon: 'home', label: 'Home', route: 'Dashboard' },
   { icon: 'grid', label: 'Groups', route: 'GroupsList' },
   { icon: 'plus', label: 'Add', route: 'CreateGroup', isSpecial: true },
-  { icon: 'users', label: 'People', route: 'GroupsList' },
+  { icon: 'users', label: 'People', route: 'SendContacts' },
   { icon: 'user', label: 'Profile', route: 'Profile' },
 ];
 
@@ -18,13 +18,43 @@ interface NavBarProps {
 
 const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
   const handleNavigation = (route: string) => {
-    if (route && navigation) {
-      navigation.navigate(route);
+    if (!route) {
+      console.warn('NavBar: No route provided for navigation');
+      return;
+    }
+    
+    if (!navigation) {
+      console.warn('NavBar: Navigation object not available');
+      return;
+    }
+
+    try {
+      console.log(`NavBar: Navigating to ${route}`);
+      
+      // Handle special navigation cases
+      if (route === 'SendContacts') {
+        // Navigate to contacts without groupId for general contacts view
+        navigation.navigate(route, {});
+      } else {
+        navigation.navigate(route);
+      }
+    } catch (error) {
+      console.error(`NavBar: Error navigating to ${route}:`, error);
     }
   };
 
   const isActiveRoute = (route: string) => {
-    return currentRoute === route;
+    // Handle both exact matches and logical equivalences
+    if (currentRoute === route) {
+      return true;
+    }
+    
+    // Special case: if we're on SendContacts from navbar, consider People tab active
+    if (route === 'SendContacts' && currentRoute === 'SendContacts') {
+      return true;
+    }
+    
+    return false;
   };
 
   return (

@@ -1,18 +1,22 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Image } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
+import { verifyCode, sendVerificationCode } from '../../services/emailAuthService';
+import { useApp } from '../../context/AppContext';
 
-const CODE_LENGTH = 4;
+const CODE_LENGTH = 4; // 4-digit code
 const RESEND_SECONDS = 30;
 
 const VerificationScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
+  const { authenticateUser } = useApp();
   const [code, setCode] = useState(Array(CODE_LENGTH).fill(''));
   const [error, setError] = useState('');
   const [timer, setTimer] = useState(RESEND_SECONDS);
   const [resending, setResending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
@@ -45,20 +49,81 @@ const VerificationScreen: React.FC = () => {
     }
   };
 
-  const handleSubmit = () => {
-    if (code.join('').length === CODE_LENGTH) {
-      (navigation as any).navigate('CreateProfile', { email: route.params?.email });
-    } else {
+  const handleSubmit = async () => {
+    if (code.join('').length !== CODE_LENGTH) {
       setError('Please enter the 4-digit code');
+      return;
+    }
+
+    setError('');
+    setVerifying(true);
+
+    try {
+      const email = route.params?.email;
+      if (!email) {
+        throw new Error('Email not found');
+      }
+
+      const codeString = code.join('');
+      console.log('🔐 Verifying code:', codeString, 'for email:', email);
+      
+      const authResponse = await verifyCode(email, codeString);
+
+      // Code verified successfully and user is now authenticated
+      console.log('✅ Authentication successful:', authResponse.user);
+      
+      // Transform API response to match User type (snake_case)
+      const transformedUser = {
+        id: authResponse.user.id,
+        name: authResponse.user.name,
+        email: authResponse.user.email,
+        wallet_address: authResponse.user.walletAddress,
+        wallet_public_key: authResponse.user.walletPublicKey,
+        created_at: authResponse.user.createdAt,
+        avatar: authResponse.user.avatar
+      };
+      
+      // Update the global app context with the authenticated user
+      authenticateUser(transformedUser, 'email');
+      console.log('📱 User authenticated in app context');
+      
+      // Navigate to dashboard as user is now logged in
+      (navigation as any).reset({
+        index: 0,
+        routes: [{ name: 'Dashboard' }],
+      });
+      
+    } catch (error) {
+      console.error('❌ Verification failed:', error);
+      setError(error instanceof Error ? error.message : 'Verification failed');
+    } finally {
+      setVerifying(false);
     }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (timer === 0 && !resending) {
       setResending(true);
-      // TODO: Call resend code API here if needed
+      setError('');
+      
+      try {
+        const email = route.params?.email;
+        if (!email) {
+          throw new Error('Email not found');
+        }
+
+        await sendVerificationCode(email);
       setTimer(RESEND_SECONDS);
-      setTimeout(() => setResending(false), 1000);
+        
+        // Show success message
+        Alert.alert('Success', 'New verification code sent to your email');
+        
+      } catch (error) {
+        console.error('Failed to resend code:', error);
+        setError(error instanceof Error ? error.message : 'Failed to resend code');
+      } finally {
+        setResending(false);
+      }
     }
   };
 
@@ -98,8 +163,16 @@ const VerificationScreen: React.FC = () => {
           ))}
         </View>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+        <TouchableOpacity 
+          style={[styles.submitButton, verifying && styles.submitButtonDisabled]} 
+          onPress={handleSubmit}
+          disabled={verifying}
+        >
+          {verifying ? (
+            <ActivityIndicator color="white" size="small" />
+          ) : (
           <Text style={styles.submitButtonText}>Submit</Text>
+          )}
         </TouchableOpacity>
         {/* Timer and resend */}
         <Text style={styles.timer}>{timerText}</Text>

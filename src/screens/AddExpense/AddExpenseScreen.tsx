@@ -35,14 +35,14 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [showGroupSelector, setShowGroupSelector] = useState(false);
 
-  // Use expense operations hook - Initialize with 0 first, then update when group is selected
+  // Use expense operations hook - Initialize with selected group ID
   const { 
     createExpense: handleCreateExpense, 
     loading: expenseLoading,
     getGroupMembers,
     error: expenseError,
     clearError
-  } = useExpenseOperations(selectedGroup?.id || 0);
+  } = useExpenseOperations(selectedGroup?.id || (groupId ? Number(groupId) : (groups[0]?.id || 0)));
 
   // Set initial group when data loads
   useEffect(() => {
@@ -67,7 +67,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
   useEffect(() => {
     if (selectedGroup && groupMembers.length > 0) {
       setSelectedMembers(groupMembers.map(m => m.id));
-      setCustomAmounts({});
+        setCustomAmounts({});
     }
   }, [selectedGroup, groupMembers]);
 
@@ -135,8 +135,8 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
         description: description.trim(),
         amount: parseFloat(amount),
         currency: selectedCurrency.symbol,
-        paidBy: currentUser.id.toString(),
-        groupId: selectedGroup.id.toString(),
+        paidBy: currentUser.id, // Backend API expects camelCase
+        groupId: selectedGroup.id, // Backend API expects camelCase
         category: categories[selectedCategory].name.toLowerCase(),
         splitType: splitType,
         splitData: { 

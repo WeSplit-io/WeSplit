@@ -121,6 +121,29 @@ export const styles = StyleSheet.create({
     borderColor: colors.textLight,
   },
 
+  // Notification badge with count on bell icon
+  bellBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#FF6B6B',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: colors.darkBackground,
+  },
+
+  // Text inside notification badge
+  bellBadgeText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+
   // === BALANCE CARD (MAIN FOCAL POINT) ===
   // Large green card displaying user's balance
   balanceCard: {

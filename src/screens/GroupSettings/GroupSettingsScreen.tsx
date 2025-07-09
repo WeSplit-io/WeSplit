@@ -5,7 +5,7 @@ import QRCode from 'react-native-qrcode-svg';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
-import { generateInviteLink, updateGroup } from '../../services/groupService';
+import { generateInviteLink, updateGroup, leaveGroup, deleteGroup } from '../../services/groupService';
 import { GroupMember, Expense } from '../../types';
 import { styles } from './styles';
 
@@ -32,8 +32,34 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   const [editGroupIcon, setEditGroupIcon] = useState('people');
   const [editGroupColor, setEditGroupColor] = useState('#A5EA15');
 
-  // Get computed values from group data
-  const members = group?.members || [];
+  // State for real members data
+  const [realMembers, setRealMembers] = useState<GroupMember[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+
+  // Load real member data from backend
+  useEffect(() => {
+    const loadRealMembers = async () => {
+      if (!groupId) return;
+      
+      setLoadingMembers(true);
+      try {
+        const response = await fetch(`http://192.168.1.75:4000/api/groups/${groupId}/members`);
+        const members = await response.json();
+        console.log(`Group Settings - Loaded ${members.length} real members:`, members.map((m: any) => m.name));
+        setRealMembers(members);
+      } catch (error) {
+        console.error('Error loading members in Group Settings:', error);
+        setRealMembers(group?.members || []);
+      } finally {
+        setLoadingMembers(false);
+      }
+    };
+
+    loadRealMembers();
+  }, [groupId]);
+
+  // Get computed values from real member data
+  const members = realMembers;
   const expenses = group?.expenses || [];
 
   // Generate invite link when group data is available
@@ -127,7 +153,7 @@ Or click this link: ${inviteData.inviteLink}`;
     }
   };
 
-  const handleLeaveGroup = () => {
+  const handleLeaveGroup = async () => {
     Alert.alert(
       'Leave Group',
       'Are you sure you want to leave this group?',
@@ -136,13 +162,22 @@ Or click this link: ${inviteData.inviteLink}`;
         { 
           text: 'Leave', 
           style: 'destructive',
-          onPress: () => navigation.navigate('Dashboard')
+          onPress: async () => {
+            try {
+              const result = await leaveGroup(groupId.toString(), currentUser?.id?.toString() || '');
+              Alert.alert('Success', result.message || 'You have left the group successfully');
+              navigation.navigate('Dashboard');
+            } catch (error) {
+              console.error('Error leaving group:', error);
+              Alert.alert('Error', (error as Error).message || 'Failed to leave group. Please try again.');
+            }
+          }
         }
       ]
     );
   };
 
-  const handleDeleteGroup = () => {
+  const handleDeleteGroup = async () => {
     Alert.alert(
       'Delete Group',
       'Are you sure you want to delete this group? This action cannot be undone.',
@@ -151,7 +186,16 @@ Or click this link: ${inviteData.inviteLink}`;
         { 
           text: 'Delete', 
           style: 'destructive',
-          onPress: () => navigation.navigate('Dashboard')
+          onPress: async () => {
+            try {
+              const result = await deleteGroup(groupId.toString(), currentUser?.id?.toString() || '');
+              Alert.alert('Success', result.message || 'Group deleted successfully');
+              navigation.navigate('Dashboard');
+            } catch (error) {
+              console.error('Error deleting group:', error);
+              Alert.alert('Error', (error as Error).message || 'Failed to delete group. Please try again.');
+            }
+          }
         }
       ]
     );
@@ -273,37 +317,47 @@ Or click this link: ${inviteData.inviteLink}`;
         {/* Members Section */}
         <Text style={styles.membersTitle}>{members.length} Members</Text>
         
-        {members.map((member) => {
-          const balance = getMemberBalance(member.id);
-          return (
-            <View key={member.id} style={styles.memberItem}>
-              <View style={styles.memberAvatar} />
-              <View style={styles.memberInfo}>
-                <Text style={styles.memberName}>{member.name}</Text>
-                <Text style={styles.memberEmail}>{member.email}</Text>
+        {loadingMembers ? (
+          <View style={styles.memberItem}>
+            <ActivityIndicator size="small" color="#A5EA15" />
+            <Text style={styles.memberEmail}>Loading members...</Text>
+          </View>
+        ) : (
+          members.map((member) => {
+            const balance = getMemberBalance(member.id);
+            return (
+              <View key={member.id} style={styles.memberItem}>
+                <View style={styles.memberAvatar} />
+                <View style={styles.memberInfo}>
+                  <Text style={styles.memberName}>{member.name}</Text>
+                  <Text style={styles.memberEmail}>{member.email}</Text>
+                  <Text style={styles.memberWallet} numberOfLines={1} ellipsizeMode="middle">
+                    {member.wallet_address}
+                  </Text>
+                </View>
+                <View style={styles.memberBalance}>
+                  <Text style={[
+                    styles.memberBalanceText,
+                    (balance.type === 'gets_back' || balance.type === 'you_get_back') ? styles.memberBalancePositive :
+                    (balance.type === 'you_owe' || balance.type === 'owes') ? styles.memberBalanceNegative : styles.memberBalanceNeutral
+                  ]}>
+                    {balance.type === 'gets_back' ? 'gets back' : 
+                     balance.type === 'you_get_back' ? 'you get back' :
+                     balance.type === 'you_owe' ? 'you owe' : 
+                     balance.type === 'owes' ? 'owes' : 'settled'}
+                  </Text>
+                  <Text style={[
+                    styles.memberBalanceAmount,
+                    balance.type === 'gets_back' ? styles.memberBalancePositive :
+                    balance.type === 'you_owe' ? styles.memberBalanceNegative : styles.memberBalanceNeutral
+                  ]}>
+                    {balance.amount > 0 ? `${balance.currency} ${balance.amount.toFixed(2)}` : ''}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.memberBalance}>
-                <Text style={[
-                  styles.memberBalanceText,
-                  (balance.type === 'gets_back' || balance.type === 'you_get_back') ? styles.memberBalancePositive :
-                  (balance.type === 'you_owe' || balance.type === 'owes') ? styles.memberBalanceNegative : styles.memberBalanceNeutral
-                ]}>
-                  {balance.type === 'gets_back' ? 'gets back' : 
-                   balance.type === 'you_get_back' ? 'you get back' :
-                   balance.type === 'you_owe' ? 'you owe' : 
-                   balance.type === 'owes' ? 'owes' : 'settled'}
-                </Text>
-                <Text style={[
-                  styles.memberBalanceAmount,
-                  balance.type === 'gets_back' ? styles.memberBalancePositive :
-                  balance.type === 'you_owe' ? styles.memberBalanceNegative : styles.memberBalanceNeutral
-                ]}>
-                  {balance.amount > 0 ? `${balance.currency} ${balance.amount.toFixed(2)}` : ''}
-                </Text>
-              </View>
-            </View>
-          );
-        })}
+            );
+          })
+        )}
 
         {/* Bottom Action Buttons */}
         <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveGroup}>

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, SafeAreaView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '../../components/Icon';
+import NavBar from '../../components/NavBar';
 import { useApp } from '../../context/AppContext';
 import { useGroupList } from '../../hooks/useGroupData';
 import { getTotalSpendingInUSDC } from '../../services/priceService';
@@ -50,30 +51,30 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
       };
     });
     return balances;
-  }, [groups, getGroupBalances, currentUser?.id]);
+  }, [groups, currentUser?.id]);
 
-  // Convert group amounts to USD for display
+  // Convert group amounts to USD for display using available summary data
   const convertGroupAmountsToUSD = useCallback(async (groups: GroupWithDetails[]) => {
     try {
       const usdAmounts: Record<number, number> = {};
       
       for (const group of groups) {
-        if (group.expenses && group.expenses.length > 0) {
+        // Use expenses_by_currency data that's actually available from the backend
+        if (group.expenses_by_currency && group.expenses_by_currency.length > 0) {
           try {
-            // Use the total amount already calculated in GroupWithDetails
             const totalUSD = await getTotalSpendingInUSDC(
-              group.expenses.map(expense => ({
-                amount: expense.amount,
-                currency: expense.currency
+              group.expenses_by_currency.map(expense => ({
+                amount: expense.total_amount || 0,
+                currency: expense.currency || 'SOL'
               }))
             );
             usdAmounts[group.id] = totalUSD;
           } catch (error) {
             console.error(`Error converting group ${group.id} amounts:`, error);
             // Use fallback conversion if price service fails
-            const fallbackTotal = group.expenses.reduce((sum, expense) => {
-              const rate = expense.currency === 'SOL' ? 200 : (expense.currency === 'USDC' ? 1 : 100);
-              return sum + (expense.amount * rate);
+            const fallbackTotal = group.expenses_by_currency.reduce((sum, expense) => {
+              const rate = (expense.currency === 'SOL' ? 200 : (expense.currency === 'USDC' ? 1 : 100));
+              return sum + ((expense.total_amount || 0) * rate);
             }, 0);
             usdAmounts[group.id] = fallbackTotal;
           }
@@ -102,15 +103,25 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
   }, [refresh]);
 
   const getFilteredGroups = useCallback(() => {
-    if (activeFilter === 'all') return groups;
+    let filteredGroups = groups;
     
-    return groups.filter(group => {
-      const userBalance = groupUserBalances[group.id]?.amount || 0;
-      if (activeFilter === 'open') return userBalance !== 0;
-      if (activeFilter === 'paid') return userBalance === 0;
-      return true;
+    // Apply filter
+    if (activeFilter !== 'all') {
+      filteredGroups = groups.filter(group => {
+        const userBalance = groupUserBalances[group.id]?.amount || 0;
+        if (activeFilter === 'open') return userBalance !== 0;
+        if (activeFilter === 'paid') return userBalance === 0;
+        return true;
+      });
+    }
+    
+    // Sort by highest value first
+    return filteredGroups.sort((a, b) => {
+      const aUSD = groupAmountsInUSD[a.id] || 0;
+      const bUSD = groupAmountsInUSD[b.id] || 0;
+      return bUSD - aUSD;
     });
-  }, [groups, groupUserBalances, activeFilter]);
+  }, [groups, groupUserBalances, activeFilter, groupAmountsInUSD]);
 
   const renderFilterButton = (filter: FilterType, label: string) => {
     const isActive = activeFilter === filter;
@@ -293,7 +304,8 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
           getFilteredGroups().map(renderGroupCard)
         )}
       </ScrollView>
-      {/* NavBar is now handled by useGroupList or removed if not needed */}
+      
+      <NavBar currentRoute="GroupsList" navigation={navigation} />
     </SafeAreaView>
   );
 };

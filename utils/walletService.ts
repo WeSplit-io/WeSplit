@@ -9,6 +9,7 @@ import {
   Keypair,
   LAMPORTS_PER_SOL
 } from '@solana/web3.js';
+import { solanaService } from '../src/services/solanaTransactionService';
 
 // Your Solana network configuration
 const SOLANA_NETWORK = 'devnet'; // or 'mainnet-beta'
@@ -175,7 +176,25 @@ const walletManager = new SolanaWalletManager();
 
 // Export wallet functions
 export const generateWallet = async (): Promise<WalletInfo> => {
-  return await walletManager.generateWallet();
+  try {
+    // Try to use the new Solana service first
+    const walletData = await solanaService.generateWallet();
+    
+    // Also generate with the old service for compatibility
+    const oldWalletInfo = await walletManager.generateWallet();
+    
+    return {
+      publicKey: oldWalletInfo.publicKey,
+      address: walletData.address,
+      isConnected: true,
+      balance: 0,
+      walletName: 'Generated Wallet',
+      secretKey: walletData.secretKey
+    };
+  } catch (error) {
+    console.warn('Failed to generate wallet with new service, falling back to old service:', error);
+    return await walletManager.generateWallet();
+  }
 };
 
 export const importWallet = async (secretKey: string): Promise<WalletInfo> => {

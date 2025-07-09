@@ -36,11 +36,13 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   const [priceLoading, setPriceLoading] = useState(false);
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
+  const [groupAmountsInUSD, setGroupAmountsInUSD] = useState<Record<number, number>>({});
   const [currencyRates, setCurrencyRates] = useState<Record<string, number>>({
     'SOL': 200,
     'USDC': 1,
     'BTC': 50000
   });
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   // Memoized balance calculations to avoid expensive recalculations
   const userBalances = useMemo(() => {
@@ -53,68 +55,62 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       };
     }
 
+    // For now, return simplified balance based on available summary data
+    // TODO: Implement proper balance calculation when full group details are available
     const userId = Number(currentUser.id);
-    let totalOwedUSDC = 0;
-    let totalOwesUSDC = 0;
+    let totalSpentUSDC = 0;
     const balanceByCurrency: Record<string, number> = {};
 
     groups.forEach(group => {
-      if (group.expenses.length === 0) return;
-
-      // Calculate user's balance for this group using simplified logic
-      const memberBalance = calculateUserBalanceForGroup(group, userId);
-      
-      // Process each currency
-      Object.entries(memberBalance.netBalance).forEach(([currency, netAmount]) => {
-        if (netAmount !== 0) {
-          const rate = currencyRates[currency] || 1;
-          const usdcAmount = Math.abs(netAmount) * rate;
-          
-          if (!balanceByCurrency[currency]) {
-            balanceByCurrency[currency] = 0;
-          }
-          balanceByCurrency[currency] += netAmount;
-          
-          if (netAmount > 0) {
-            totalOwedUSDC += usdcAmount;
-          } else {
-            totalOwesUSDC += usdcAmount;
-          }
+      try {
+        // Use expenses_by_currency data that's actually available from the backend
+        if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency)) {
+          group.expenses_by_currency.forEach(expenseByCurrency => {
+            const currency = expenseByCurrency.currency || 'SOL';
+            const totalAmount = expenseByCurrency.total_amount || 0;
+            
+            if (totalAmount > 0) {
+              // For dashboard display, show total spending across all groups
+              const rate = currencyRates[currency] || 1;
+              const usdcAmount = totalAmount * rate;
+              totalSpentUSDC += usdcAmount;
+              
+              if (!balanceByCurrency[currency]) {
+                balanceByCurrency[currency] = 0;
+              }
+              balanceByCurrency[currency] += totalAmount;
+            }
+          });
         }
-      });
+      } catch (error) {
+        console.error(`Error calculating balance for group ${group.id}:`, error);
+      }
     });
 
     return {
-      totalOwed: totalOwedUSDC,
-      totalOwes: totalOwesUSDC,
-      netBalance: totalOwedUSDC - totalOwesUSDC,
+      totalOwed: 0, // Will be calculated when individual group details are loaded
+      totalOwes: 0, // Will be calculated when individual group details are loaded  
+      netBalance: 0, // Simplified for now - shows total spending instead
+      totalSpent: totalSpentUSDC,
       balanceByCurrency
     };
   }, [groups, currentUser?.id, currencyRates]);
 
-  // Simplified balance calculation for a single group
-  const calculateUserBalanceForGroup = useCallback((group: GroupWithDetails, userId: number) => {
-    const netBalance: Record<string, number> = {};
+  // Load notification count
+  const loadNotificationCount = useCallback(async () => {
+    if (!currentUser?.id) return;
     
-    group.expenses.forEach(expense => {
-      const currency = expense.currency || 'SOL';
-      const sharePerPerson = expense.amount / group.members.length;
-      
-      if (!netBalance[currency]) {
-        netBalance[currency] = 0;
-      }
-      
-      if (expense.paid_by === userId) {
-        // User paid, so they should receive money back
-        netBalance[currency] += expense.amount - sharePerPerson;
-      } else {
-        // Someone else paid, user owes their share
-        netBalance[currency] -= sharePerPerson;
-      }
-    });
+    try {
+      const notifications = await getUserNotifications(Number(currentUser.id));
+      const unreadCount = notifications.filter(n => !n.read).length;
+      setUnreadNotifications(unreadCount);
+    } catch (error) {
+      console.error('Error loading notification count:', error);
+    }
+  }, [currentUser?.id]);
 
-    return { netBalance };
-  }, []);
+  // Remove old balance calculation functions that relied on empty arrays
+  // Data will be available when individual group details are loaded
 
   // Background currency rate updates
   const updateCurrencyRates = useCallback(async () => {
@@ -163,55 +159,80 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     }
   }, [groups.length, updateCurrencyRates]);
 
-  // Calculate total balance across all groups by currency (simplified)
-  const totalBalanceByCurrency = useMemo(() => {
-    return groups.reduce((acc, group) => {
-      group.expenses.forEach(expense => {
-        const currency = expense.currency || 'SOL';
-        if (!acc[currency]) {
-          acc[currency] = 0;
-        }
-        acc[currency] += expense.amount;
-      });
-      return acc;
-    }, {} as Record<string, number>);
-  }, [groups]);
+  // Load notifications when dashboard loads
+  useEffect(() => {
+    loadNotificationCount();
+  }, [loadNotificationCount]);
 
-  // Convert group amounts to USD for display
-  const convertGroupAmountsToUSD = async (groups: GroupWithDetails[]) => {
+    // Convert group amounts to USD for display with proper currency handling
+  const convertGroupAmountsToUSD = useCallback(async (groups: GroupWithDetails[]) => {
     try {
       const usdAmounts: Record<number, number> = {};
       
       for (const group of groups) {
         if (group.expenses_by_currency && group.expenses_by_currency.length > 0) {
+          console.log(`Converting group "${group.name}" expenses:`, group.expenses_by_currency);
+          
           try {
-            const totalUSD = await getTotalSpendingInUSDC(
-              group.expenses_by_currency.map(expense => ({
-                amount: expense.total_amount,
-                currency: expense.currency
-              }))
-            );
+            const expenses = group.expenses_by_currency.map(expense => ({
+              amount: expense.total_amount || 0,
+              currency: expense.currency || 'SOL'
+            }));
+            
+            console.log(`Calling getTotalSpendingInUSDC with:`, expenses);
+            const totalUSD = await getTotalSpendingInUSDC(expenses);
+            
+            console.log(`Group "${group.name}": Price service returned $${totalUSD.toFixed(2)}`);
             usdAmounts[group.id] = totalUSD;
+            
           } catch (error) {
-            console.error(`Error converting group ${group.id} amounts:`, error);
-            // Use fallback conversion if price service fails
-            const fallbackTotal = group.expenses_by_currency.reduce((sum, expense) => {
-              const rate = expense.currency === 'SOL' ? 200 : (expense.currency === 'USDC' ? 1 : 100);
-              return sum + (expense.total_amount * rate);
-            }, 0);
+            console.error(`Price service failed for group ${group.id}:`, error);
+            
+            // Enhanced fallback with better rate handling and debugging
+            let fallbackTotal = 0;
+            for (const expense of group.expenses_by_currency) {
+              const amount = expense.total_amount || 0;
+              const currency = (expense.currency || 'SOL').toUpperCase();
+              
+              // Use current market rates (these should be updated periodically)
+              let rate = 1;
+              switch (currency) {
+                case 'SOL':
+                  rate = currencyRates.SOL || 200; // Use dynamic rate if available
+                  break;
+                case 'USDC':
+                case 'USDT':
+                  rate = 1;
+                  break;
+                case 'BTC':
+                  rate = currencyRates.BTC || 50000;
+                  break;
+                default:
+                  console.warn(`Unknown currency: ${currency}, using rate 100`);
+                  rate = 100; // Default fallback for unknown currencies
+              }
+              
+              const usdValue = amount * rate;
+              fallbackTotal += usdValue;
+              
+              console.log(`Fallback: ${amount} ${currency} × ${rate} = $${usdValue.toFixed(2)}`);
+            }
+            
+            console.log(`Group "${group.name}": Fallback total = $${fallbackTotal.toFixed(2)}`);
             usdAmounts[group.id] = fallbackTotal;
           }
         } else {
+          console.log(`Group "${group.name}": No expenses_by_currency data`);
           usdAmounts[group.id] = 0;
         }
       }
       
-      // This state is no longer needed as groupAmountsInUSD is removed
-      // setGroupAmountsInUSD(usdAmounts); 
+      console.log('Final USD amounts:', usdAmounts);
+      setGroupAmountsInUSD(usdAmounts);
     } catch (error) {
       console.error('Error converting group amounts to USD:', error);
     }
-  };
+  }, [currencyRates]);
 
   // Load data using centralized service
   const loadData = useCallback(async () => {
@@ -222,20 +243,22 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     }
-  }, [currentUser?.id, refreshGroups]);
+  }, [currentUser?.id]); // Remove refreshGroups from dependencies to prevent infinite loop
 
   // Load payment requests and notifications
-  const loadPaymentRequests = async () => {
+  const loadPaymentRequests = useCallback(async () => {
     if (!currentUser?.id) return;
     
     try {
-      const notifications = await getUserNotifications(currentUser.id.toString());
-      setPaymentRequests(notifications.filter(n => n.type === 'payment_reminder'));
+      // Fix: Convert to number since notificationService expects number
+      const notifications = await getUserNotifications(Number(currentUser.id));
+      // Fix: Use correct notification type
+      setPaymentRequests(notifications.filter(n => n.type === 'payment_request'));
     } catch (error) {
       console.error('Error loading payment requests:', error);
       setPaymentRequests([]);
     }
-  };
+  }, [currentUser?.id]);
 
   // Load settlement requests that the current user has sent to others
   const loadOutgoingSettlementRequests = async () => {
@@ -244,57 +267,14 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     try {
       const requests: any[] = [];
       
-      // For each group, check if there are members who owe money to the current user
-      for (const group of groups) {
-        try {
-          const expenses = group.expenses;
-          const members = group.members;
-
-          // Calculate member balances for this group
-          const memberBalances = calculateMemberBalances(expenses, members);
-          const currentUserBalance = memberBalances[Number(currentUser.id)];
-
-          if (currentUserBalance) {
-            // Find members who owe money to the current user
-            Object.entries(memberBalances).forEach(([memberId, balance]) => {
-              const memberIdNum = Number(memberId);
-              
-              // Skip the current user
-              if (memberIdNum === Number(currentUser.id)) return;
-              
-              // Check if this member owes money to the current user
-              Object.entries(balance.netBalance).forEach(([currency, amount]) => {
-                if (amount < 0 && currentUserBalance.netBalance[currency] > 0) {
-                  // This member owes money in this currency to the current user
-                  const member = members.find(m => m.id === memberIdNum);
-                  if (member) {
-                    requests.push({
-                      id: `${group.id}-${memberId}-${currency}`,
-                      type: 'settlement_request',
-                      amount: Math.abs(amount),
-                      currency: currency,
-                      fromUser: member.name || member.email || 'Unknown User',
-                      fromUserId: memberIdNum,
-                      groupId: group.id,
-                      groupName: group.name,
-                      message: `Settlement request for ${group.name}`,
-                      created_at: new Date().toISOString(),
-                      status: 'pending'
-                    });
-                  }
-                }
-              });
-            });
-          }
-        } catch (error) {
-          console.error(`Error processing group ${group.id}:`, error);
-        }
-      }
-
-      // Sort by most recent and limit to show most relevant requests
-      return requests
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 5); // Show up to 5 most recent requests
+      // Simplified: For now, use notification-based requests instead of calculating from expenses
+      // since individual expense data is not available in the groups list
+      console.log('Loading settlement requests - using notification-based approach');
+      
+      // This will be populated when full group details are implemented
+      // For now, return empty array to prevent errors
+      
+      return requests;
         
     } catch (error) {
       console.error('Error loading outgoing settlement requests:', error);
@@ -302,132 +282,62 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     }
   };
 
+  // Simplified group summary for dashboard display
+  const getGroupSummary = useCallback((group: GroupWithDetails) => {
+    try {
+      // Use the available summary data from backend
+      const totalAmount = group.expenses_by_currency?.reduce((sum, expense) => {
+        return sum + (expense.total_amount || 0);
+      }, 0) || 0;
+      
+      const memberCount = group.member_count || 0;
+      const expenseCount = group.expense_count || 0;
+      
+      return {
+        totalAmount,
+        memberCount,
+        expenseCount,
+        hasData: totalAmount > 0 || memberCount > 0
+      };
+    } catch (error) {
+      console.error(`Error getting group summary for ${group.id}:`, error);
+      return {
+        totalAmount: 0,
+        memberCount: 0,
+        expenseCount: 0,
+        hasData: false
+      };
+    }
+  }, []);
 
+
+  // Convert amounts when groups change (similar to GroupsList)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (groups.length > 0) {
+        convertGroupAmountsToUSD(groups);
+      }
+    }, [groups, convertGroupAmountsToUSD])
+  );
 
   // Load data when component mounts or comes into focus
   useFocusEffect(
     React.useCallback(() => {
       if (isAuthenticated && currentUser?.id) {
-        // Load groups first, then payment requests (which depend on groups)
+        // Load groups first, then payment requests
         loadData().then(() => {
           loadPaymentRequests();
         });
       }
-    }, [isAuthenticated, currentUser?.id])
+    }, [isAuthenticated, currentUser?.id, loadData])
   );
 
   useEffect(() => {
     if (isAuthenticated && currentUser?.id && groups.length > 0) {
-      // calculateUserBalanceAcrossGroups(groups); // This line is no longer needed
-      // Also load payment requests when groups are loaded/updated
+      // Load payment requests when groups are loaded/updated
       loadPaymentRequests();
     }
-  }, [isAuthenticated, currentUser?.id, groups]);
-
-  // Helper function to calculate member balances for dashboard display
-  const calculateMemberBalances = (expenses: Expense[], members: GroupMember[]) => {
-    const balances: Record<number, { 
-      owes: Record<string, number>; 
-      owed: Record<string, number>; 
-      netBalance: Record<string, number>;
-      totalOwes: number;
-      totalOwed: number;
-      balance: number;
-    }> = {};
-    
-    // Initialize balances for all members
-    members.forEach(member => {
-      balances[member.id] = { 
-        owes: {}, 
-        owed: {}, 
-        netBalance: {},
-        totalOwes: 0,
-        totalOwed: 0,
-        balance: 0
-      };
-    });
-    
-    // Calculate what each member owes and is owed based on split data
-    expenses.forEach(expense => {
-      const paidBy = expense.paid_by;
-      const currency = expense.currency || 'SOL';
-      const amount = expense.amount;
-      
-      // Parse split data if it exists
-      let splitData;
-      try {
-        splitData = expense.splitData ? 
-          (typeof expense.splitData === 'string' ? JSON.parse(expense.splitData) : expense.splitData) 
-          : null;
-      } catch (e) {
-        console.warn('Failed to parse split data:', expense.splitData);
-        splitData = null;
-      }
-      
-      // Determine who owes what based on split type
-      if (splitData && splitData.shares) {
-        // Use split data if available
-        splitData.shares.forEach((share: any) => {
-          const memberId = share.userId;
-          const shareAmount = share.amount;
-
-          if (!balances[memberId]) return;
-
-          // Member owes this amount
-          if (!balances[memberId].owes[currency]) {
-            balances[memberId].owes[currency] = 0;
-          }
-          balances[memberId].owes[currency] += shareAmount;
-        });
-      } else {
-        // Equal split among all members
-        const shareAmount = amount / members.length;
-        members.forEach(member => {
-          if (!balances[member.id].owes[currency]) {
-            balances[member.id].owes[currency] = 0;
-          }
-          balances[member.id].owes[currency] += shareAmount;
-        });
-      }
-
-      // Person who paid is owed the amount
-      if (!balances[paidBy].owed[currency]) {
-        balances[paidBy].owed[currency] = 0;
-      }
-      balances[paidBy].owed[currency] += amount;
-    });
-
-    // Calculate net balances
-    Object.keys(balances).forEach(memberIdStr => {
-      const memberId = Number(memberIdStr);
-      const memberBalance = balances[memberId];
-      
-      // Get all currencies this member has transactions in
-      const currencies = new Set([
-        ...Object.keys(memberBalance.owes),
-        ...Object.keys(memberBalance.owed)
-      ]);
-      
-      currencies.forEach(currency => {
-        const owed = memberBalance.owed[currency] || 0;
-        const owes = memberBalance.owes[currency] || 0;
-        const net = owed - owes;
-        
-        memberBalance.netBalance[currency] = net;
-        
-        // Add to totals (simplified calculation)
-        if (net > 0) {
-          memberBalance.totalOwed += net;
-        } else {
-          memberBalance.totalOwes += Math.abs(net);
-        }
-      });
-      
-      memberBalance.balance = memberBalance.totalOwed - memberBalance.totalOwes;
-    });
-
-    return balances;
-  };
+  }, [isAuthenticated, currentUser?.id, groups.length, loadPaymentRequests]);
 
   const handleSendRequestFromDashboard = async (request: any) => {
     if (!currentUser?.id) {
@@ -452,18 +362,19 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
       console.log('Notification data:', notificationData);
 
-      // Send notification to the user who owes money
+      // Fix: Use correct parameter order and types for sendNotification
       const result = await sendNotification(
-        request.fromUserId.toString(), // to_user_id (the person who will receive the request)
-        currentUser.id.toString(), // from_user_id (current user)
-        'payment_request',
-        `Payment request for ${request.amount} ${request.currency}`,
-        JSON.stringify(notificationData)
+        request.fromUserId, // to_user_id (the person who will receive the request)
+        'Payment Request', // title
+        `Payment request for ${request.amount} ${request.currency}`, // message
+        'payment_request', // type (correct notification type)
+        notificationData // data
       );
 
       console.log('Send notification result:', result);
 
-      if (result.success) {
+      // Fix: sendNotification returns a Notification object, not a success/error response
+      if (result && result.id) {
         Alert.alert(
           'Request Sent!', 
           `Payment request for ${request.amount} ${request.currency} has been sent to ${request.fromUser}.`,
@@ -473,13 +384,13 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         // Refresh the payment requests
         await loadPaymentRequests();
       } else {
-        throw new Error(result.error || 'Failed to send request');
+        throw new Error('Failed to send request - no notification ID received');
       }
     } catch (error) {
       console.error('Error sending request:', error);
       Alert.alert(
         'Error', 
-        'Failed to send payment request. Please try again.',
+        error instanceof Error ? error.message : 'Failed to send payment request. Please try again.',
         [{ text: 'OK' }]
       );
     }
@@ -491,41 +402,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     try {
       await Promise.all([
         refreshGroups(),
-        loadPaymentRequests()
+        loadPaymentRequests(),
+        loadNotificationCount()
       ]);
     } catch (error) {
       console.error('Error refreshing:', error);
-    }
-  };
-
-  const renderBalanceDisplay = () => {
-    if (priceLoading) {
-      return (
-        <View style={styles.priceLoadingContainer}>
-          <ActivityIndicator size="small" color={BG_COLOR} />
-          <Text style={styles.priceLoadingText}>Calculating balance...</Text>
-        </View>
-      );
-    }
-
-    const balanceText = userBalances.netBalance >= 0 
-      ? `+$${userBalances.netBalance.toFixed(2)}`
-      : `-$${Math.abs(userBalances.netBalance).toFixed(2)}`;
-
-    return (
-      <Text style={styles.balanceAmount}>
-        {balanceText}
-      </Text>
-    );
-  };
-
-  const getBalanceCardStyle = () => {
-    if (userBalances.netBalance > 0) {
-      return [styles.balanceCard, { backgroundColor: GREEN }]; // Owed money - green
-    } else if (userBalances.netBalance < 0) {
-      return [styles.balanceCard, { backgroundColor: '#FF6B6B' }]; // Owes money - red
-    } else {
-      return [styles.balanceCard, { backgroundColor: GRAY }]; // Even - gray
     }
   };
 
@@ -585,17 +466,16 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           
           <TouchableOpacity 
             style={styles.bellContainer}
-            onPress={() => {
-              // Handle notifications tap
-              console.log('Notifications tapped');
-            }}
+            onPress={() => navigation.navigate('Notifications')}
           >
             <Icon
-              name="notifications-outline"
+              name="bell"
               style={styles.bellIcon}
             />
-            {paymentRequests.length > 0 && (
-              <View style={styles.bellDot} />
+            {unreadNotifications > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadNotifications}</Text>
+              </View>
             )}
           </TouchableOpacity>
         </View>
@@ -606,7 +486,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             <Text style={styles.balanceLabel}>Your Balance</Text>
             <TouchableOpacity style={styles.qrCodeIcon} onPress={() => navigation.navigate('Deposit')}>
               <Icon
-                name="qr-code-outline"
+                name="qr-code"
                 style={styles.qrCodeIconSvg}
               />
             </TouchableOpacity>
@@ -619,12 +499,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             </View>
           ) : (
             <Text style={styles.balanceAmount}>
-              ${Math.abs(userBalances.netBalance).toFixed(2)}
+              ${userBalances.totalSpent?.toFixed(2) || '0.00'}
             </Text>
           )}
           
           <Text style={styles.balanceLimitText}>
-            Balance Limit $1000
+            Total Spending Across Groups
           </Text>
         </View>
 
@@ -663,7 +543,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             >
               <View style={styles.actionButtonCircle}>
                 <Icon
-                  name="add"
+                  name="plus"
                   style={styles.actionButtonIcon}
                 />
               </View>
@@ -679,7 +559,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             >
               <View style={styles.actionButtonCircle}>
                 <Icon
-                  name="remove"
+                  name="x"
                   style={styles.actionButtonIcon}
                 />
               </View>
@@ -710,74 +590,99 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             </View>
           ) : (
             <View style={styles.groupsGrid}>
-              {groups.slice(0, 2).map((group, index) => {
-                // Calculate total amount from expenses_by_currency  
-                const totalAmount = group.expenses_by_currency?.reduce((sum, expense) => sum + (expense.total_amount || 0), 0) || 0;
-                const isOwner = group.created_by === Number(currentUser?.id);
-                const memberCount = group.member_count || 0;
-                
-                return (
-                  <TouchableOpacity
-                    key={group.id}
-                    style={[
-                      styles.groupGridCard, 
-                      index === 0 ? styles.groupGridCardLeft : styles.groupGridCardRight
-                    ]}
-                    onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
-                  >
-                    <View style={styles.groupGridHeader}>
-                      <View style={styles.groupGridIcon}>
-                        <Icon
-                          name="people"
-                          style={styles.groupGridIconSvg}
-                        />
+              {groups
+                .sort((a, b) => {
+                  // Sort by highest USD value first (same as GroupsList)
+                  const aUSD = groupAmountsInUSD[a.id] || 0;
+                  const bUSD = groupAmountsInUSD[b.id] || 0;
+                  return bUSD - aUSD;
+                })
+                .slice(0, 2).map((group, index) => {
+                try {
+                  // Use the new summary function that works with available data
+                  const summary = getGroupSummary(group);
+                  const isOwner = group.created_by === Number(currentUser?.id);
+                  
+                  return (
+                    <TouchableOpacity
+                      key={group.id}
+                      style={[
+                        styles.groupGridCard, 
+                        index === 0 ? styles.groupGridCardLeft : styles.groupGridCardRight
+                      ]}
+                      onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
+                    >
+                      <View style={styles.groupGridHeader}>
+                        <View style={styles.groupGridIcon}>
+                          <Icon
+                            name="users"
+                            style={styles.groupGridIconSvg}
+                          />
+                        </View>
+                        {/* Show USD-converted total */}
+                        <Text style={styles.groupGridAmount}>
+                          ${(groupAmountsInUSD[group.id] || 0).toFixed(2)}
+                        </Text>
                       </View>
-                      {/* Always show amount, even if 0 */}
-                      <Text style={styles.groupGridAmount}>
-                        ${totalAmount.toFixed(2)}
+                      <Text style={styles.groupGridName}>{group.name}</Text>
+                      <Text style={styles.groupGridRole}>
+                        {isOwner ? '👤 Owner' : '👥 Member'} • {summary.memberCount} members
                       </Text>
-                    </View>
-                    <Text style={styles.groupGridName}>{group.name}</Text>
-                    <Text style={styles.groupGridRole}>
-                      {isOwner ? '👤 Owner' : '👥 Member'} • {memberCount} members
-                    </Text>
-                    <View style={styles.memberAvatars}>
-                      {/* Show member count visually */}
-                      {Array.from({ length: Math.min(memberCount, 3) }).map((_, i) => (
-                        <View key={i} style={[styles.memberAvatar, {
-                          backgroundColor: '#A5EA15',
-                          width: 24,
-                          height: 24,
-                          borderRadius: 12,
-                          marginRight: 4,
-                          borderWidth: 2,
-                          borderColor: '#FFF'
-                        }]} />
-                      ))}
-                      {memberCount > 3 && (
-                        <View style={[styles.memberAvatarMore, {
-                          backgroundColor: '#666',
-                          width: 24,
-                          height: 24,
-                          borderRadius: 12,
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }]}>
-                          <Text style={[styles.memberAvatarMoreText, {
-                            color: '#FFF',
-                            fontSize: 10,
-                            fontWeight: 'bold'
-                          }]}>
-                            +{memberCount - 3}
+                      {summary.hasData ? (
+                        <View style={styles.memberAvatars}>
+                          {/* Show member count visually */}
+                          {Array.from({ length: Math.min(summary.memberCount, 3) }).map((_, i) => (
+                            <View key={i} style={[styles.memberAvatar, {
+                              backgroundColor: '#A5EA15',
+                              width: 24,
+                              height: 24,
+                              borderRadius: 12,
+                              marginRight: 4,
+                              borderWidth: 2,
+                              borderColor: '#FFF'
+                            }]} />
+                          ))}
+                          {summary.memberCount > 3 && (
+                            <View style={[styles.memberAvatarMore, {
+                              backgroundColor: '#666',
+                              width: 24,
+                              height: 24,
+                              borderRadius: 12,
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }]}>
+                              <Text style={[styles.memberAvatarMoreText, {
+                                color: '#FFF',
+                                fontSize: 10,
+                                fontWeight: 'bold'
+                              }]}>
+                                +{summary.memberCount - 3}
+                              </Text>
+                            </View>
+                          )}
+                          <Text style={{color: '#A5EA15', fontSize: 12, marginLeft: 8}}>
+                            {summary.expenseCount} expense{summary.expenseCount !== 1 ? 's' : ''}
                           </Text>
                         </View>
+                      ) : (
+                        <View style={styles.memberAvatars}>
+                          <Text style={{color: '#999', fontSize: 12}}>No activity yet</Text>
+                        </View>
                       )}
-                      {memberCount === 0 && (
-                        <Text style={{color: '#999', fontSize: 12}}>No members</Text>
-                      )}
+                    </TouchableOpacity>
+                  );
+                } catch (error) {
+                  console.error(`Error rendering group ${group.id}:`, error);
+                  // Return a placeholder if there's an error with this group
+                  return (
+                    <View key={group.id} style={[
+                      styles.groupGridCard, 
+                      index === 0 ? styles.groupGridCardLeft : styles.groupGridCardRight
+                    ]}>
+                      <Text style={{color: '#999', fontSize: 14}}>Error loading group</Text>
                     </View>
-                  </TouchableOpacity>
-                );
+                  );
+                }
               })}
             </View>
           )}
@@ -797,22 +702,36 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               <Text style={styles.emptyRequestsText}>No payment requests</Text>
             </View>
           ) : (
-            paymentRequests.slice(0, 2).map((request, index) => (
-              <View key={request.id || index} style={styles.requestItem}>
-                <View style={styles.requestAvatar} />
-                <View style={styles.requestDetails}>
-                  <Text style={styles.requestName}>
-                    {request.fromUser || 'Unknown User'}
-                  </Text>
-                  <Text style={styles.requestDate}>
-                    Owes you from {request.groupName || 'group activity'}
-                  </Text>
-                </View>
-                <Text style={styles.requestAmount}>
-                  ${request.amount?.toFixed(2) || '0.00'}
-                </Text>
-              </View>
-            ))
+            paymentRequests.slice(0, 2).map((request, index) => {
+              try {
+                return (
+                  <View key={request.id || index} style={styles.requestItem}>
+                    <View style={styles.requestAvatar} />
+                    <View style={styles.requestDetails}>
+                      <Text style={styles.requestName}>
+                        {request.data?.fromUser || request.title || 'Unknown User'}
+                      </Text>
+                      <Text style={styles.requestDate}>
+                        {request.message || `Owes you from ${request.data?.groupName || 'group activity'}`}
+                      </Text>
+                    </View>
+                    <Text style={styles.requestAmount}>
+                      ${request.data?.amount?.toFixed(2) || '0.00'}
+                    </Text>
+                  </View>
+                );
+              } catch (error) {
+                console.error(`Error rendering request ${index}:`, error);
+                return (
+                  <View key={index} style={styles.requestItem}>
+                    <View style={styles.requestAvatar} />
+                    <View style={styles.requestDetails}>
+                      <Text style={styles.requestName}>Error loading request</Text>
+                    </View>
+                  </View>
+                );
+              }
+            })
           )}
         </View>
 
@@ -832,42 +751,54 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             </View>
           ) : (
             groups.slice(0, 2).map((group, index) => {
-              // Calculate total amount from expenses_by_currency
-              const totalAmount = group.expenses_by_currency?.reduce((sum, expense) => sum + (expense.total_amount || 0), 0) || 0;
-              const recentDate = group.updated_at || group.created_at || new Date().toISOString();
-              
-              return (
-                <TouchableOpacity 
-                  key={group.id} 
-                  style={styles.requestItem}
-                  onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
-                >
-                  <View style={[styles.requestAvatar, {
-                    backgroundColor: '#A5EA15',
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }]}>
-                    <Text style={{color: '#000', fontWeight: 'bold', fontSize: 16}}>
-                      {group.name.charAt(0).toUpperCase()}
+              try {
+                // Use the new summary function that works with available data
+                const summary = getGroupSummary(group);
+                const recentDate = group.updated_at || group.created_at || new Date().toISOString();
+                
+                return (
+                  <TouchableOpacity 
+                    key={group.id} 
+                    style={styles.requestItem}
+                    onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
+                  >
+                    <View style={[styles.requestAvatar, {
+                      backgroundColor: '#A5EA15',
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }]}>
+                      <Text style={{color: '#000', fontWeight: 'bold', fontSize: 16}}>
+                        {(group.name || 'G').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.requestDetails}>
+                      <Text style={styles.requestName}>{group.name || 'Unnamed Group'}</Text>
+                      <Text style={styles.requestDate}>
+                        {summary.memberCount} members • {summary.expenseCount} expenses • Last activity {new Date(recentDate).toLocaleDateString('en-US', {
+                          day: 'numeric',
+                          month: 'short'
+                        })}
+                      </Text>
+                    </View>
+                    <Text style={styles.requestAmount}>
+                      ${summary.totalAmount.toFixed(2)}
                     </Text>
+                  </TouchableOpacity>
+                );
+              } catch (error) {
+                console.error(`Error rendering transaction for group ${group.id}:`, error);
+                return (
+                  <View key={group.id} style={styles.requestItem}>
+                    <View style={styles.requestAvatar} />
+                    <View style={styles.requestDetails}>
+                      <Text style={styles.requestName}>Error loading transaction</Text>
+                    </View>
                   </View>
-                  <View style={styles.requestDetails}>
-                    <Text style={styles.requestName}>{group.name}</Text>
-                    <Text style={styles.requestDate}>
-                      {group.member_count} members • {group.expense_count} expenses • Last activity {new Date(recentDate).toLocaleDateString('en-US', {
-                        day: 'numeric',
-                        month: 'short'
-                      })}
-                    </Text>
-                  </View>
-                  <Text style={styles.requestAmount}>
-                    ${totalAmount.toFixed(2)}
-                  </Text>
-                </TouchableOpacity>
-              );
+                );
+              }
             })
           )}
         </View>

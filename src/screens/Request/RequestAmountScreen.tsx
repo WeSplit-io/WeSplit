@@ -38,13 +38,12 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
       return;
     }
 
-    // Navigate directly to success screen (no confirmation needed)
-    navigation.navigate('RequestSuccess', {
+    // Navigate to confirmation screen for proper backend integration
+    navigation.navigate('RequestConfirmation', {
       contact,
       amount: numAmount,
       description: note.trim(),
       groupId,
-      requestId: `REQ${Date.now()}`,
     });
   };
 

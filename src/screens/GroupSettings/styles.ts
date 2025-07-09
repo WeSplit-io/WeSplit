@@ -122,6 +122,12 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     color: '#A89B9B',
   },
+  memberWallet: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 2,
+    fontFamily: 'monospace',
+  },
   memberBalance: {
     alignItems: 'flex-end',
   },

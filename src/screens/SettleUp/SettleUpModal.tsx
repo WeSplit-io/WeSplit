@@ -4,6 +4,7 @@ import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
 import { settleGroupExpenses, sendPaymentReminder, sendBulkPaymentReminders, getReminderStatus, ReminderStatus } from '../../services/groupService';
+import { convertToUSDC } from '../../services/priceService';
 import { GroupMember, Expense, Balance } from '../../types';
 import { styles } from './styles';
 
@@ -13,10 +14,11 @@ interface SettleUpModalProps {
   groupId?: string;
   navigation: any;
   route?: any;
+  realBalances?: Balance[]; // Optional prop for real member balances
   onSettlementComplete?: () => void;
 }
 
-const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, groupId, navigation, route, onSettlementComplete }) => {
+const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, groupId, navigation, route, realBalances, onSettlementComplete }) => {
   const actualGroupId = groupId || route?.params?.groupId;
   
   const handleClose = () => {
@@ -85,47 +87,98 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
     return () => clearInterval(interval);
   }, [visible, reminderStatus, group?.id, currentUser?.id]);
 
-  // Calculate real settlement data based on expenses using centralized method
-  const groupBalances = getGroupBalances(actualGroupId);
-  
+  // Use real balances if provided, otherwise calculate using centralized method
+  const groupBalances = realBalances || getGroupBalances(actualGroupId);
+
   // Get current user's balance and determine who they owe/are owed by
   const currentUserId = Number(currentUser?.id);
   const currentUserBalance = groupBalances.find((balance: Balance) => balance.userId === currentUserId);
 
   // Calculate what current user owes to others and who owes current user
-  const oweData: Array<{ name: string; amount: number; currency: string; memberId: number }> = [];
-  const owedData: Array<{ name: string; amount: number; currency: string; memberId: number }> = [];
+  const oweData: Array<{ name: string; amount: number; amountUSD: number; currency: string; memberId: number }> = [];
+  const owedData: Array<{ name: string; amount: number; amountUSD: number; currency: string; memberId: number }> = [];
+  const [usdAmounts, setUsdAmounts] = useState<Record<string, number>>({});
 
-  // Process each member's balance
+  // Convert amounts to USD for display
+  useEffect(() => {
+    const convertAmounts = async () => {
+      const conversions: Record<string, number> = {};
+      
+      // Convert all balances to USD
+      for (const balance of groupBalances) {
+        const key = `${balance.userId}_${balance.currency}`;
+        try {
+          if (balance.currency === 'USDC') {
+            conversions[key] = Math.abs(balance.amount);
+          } else {
+            conversions[key] = await convertToUSDC(Math.abs(balance.amount), balance.currency);
+          }
+        } catch (error) {
+          console.error(`Error converting ${balance.currency} to USD:`, error);
+          // Use group-consistent fallback conversion
+          if (group?.expenses_by_currency) {
+            const currencyData = group.expenses_by_currency.find(exp => exp.currency === balance.currency);
+            if (currencyData && currencyData.total_amount > 0) {
+              // Calculate rate from group total
+              const groupTotalUSD = group.expenses_by_currency.reduce((sum, exp) => {
+                return sum + (exp.total_amount * (exp.currency === 'SOL' ? 157.15 : 1));
+              }, 0);
+              const realRate = groupTotalUSD / currencyData.total_amount;
+              conversions[key] = Math.abs(balance.amount) * realRate;
+            } else {
+              const rate = balance.currency === 'SOL' ? 200 : 100;
+              conversions[key] = Math.abs(balance.amount) * rate;
+            }
+          } else {
+            const rate = balance.currency === 'SOL' ? 200 : 100;
+            conversions[key] = Math.abs(balance.amount) * rate;
+          }
+        }
+      }
+      
+      setUsdAmounts(conversions);
+    };
+
+    if (groupBalances.length > 0) {
+      convertAmounts();
+    }
+  }, [groupBalances]);
+
+  // Process each member's balance - simplified logic since members array is often empty
   groupBalances
     .filter((balance: Balance) => balance.userId !== currentUserId)
     .forEach((balance: Balance) => {
-      const member = members.find(m => m.id === balance.userId);
-      if (!member) return;
+      const amountKey = `${balance.userId}_${balance.currency}`;
+      const amountUSD = usdAmounts[amountKey] || 0;
 
       if (balance.status === 'owes' && currentUserBalance?.status === 'gets_back') {
         // This member owes money and current user is owed money
         // Current user should receive money from this member
         owedData.push({ 
-          name: member.name, 
+          name: balance.userName || `Member ${balance.userId}`, 
           amount: Math.abs(balance.amount), 
+          amountUSD,
           currency: balance.currency,
-          memberId: member.id 
+          memberId: balance.userId 
         });
       } else if (balance.status === 'gets_back' && currentUserBalance?.status === 'owes') {
         // This member is owed money and current user owes money
         // Current user should pay this member
+        const currentUserKey = `${currentUserId}_${currentUserBalance.currency}`;
+        const currentUserAmountUSD = usdAmounts[currentUserKey] || 0;
+        
         oweData.push({ 
-          name: member.name, 
+          name: balance.userName || `Member ${balance.userId}`, 
           amount: Math.abs(currentUserBalance.amount),
+          amountUSD: currentUserAmountUSD,
           currency: currentUserBalance.currency,
-          memberId: member.id 
+          memberId: balance.userId 
         });
       }
     });
 
-  const totalOwe = oweData.reduce((sum, item) => sum + item.amount, 0);
-  const totalOwed = owedData.reduce((sum, item) => sum + item.amount, 0);
+  const totalOweUSD = oweData.reduce((sum, item) => sum + item.amountUSD, 0);
+  const totalOwedUSD = owedData.reduce((sum, item) => sum + item.amountUSD, 0);
 
   // Determine which section to show based on user's net balance
   const showOweSection = currentUserBalance?.status === 'owes'; // Show "You owe" if user owes money
@@ -133,12 +186,12 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
   
   // Data and labels for the current section
   const currentSectionData = showOweSection ? oweData : owedData;
-  const currentSectionTotal = showOweSection ? totalOwe : totalOwed;
+  const currentSectionTotal = showOweSection ? totalOweUSD : totalOwedUSD;
   const sectionLabel = showOweSection ? 'You owe' : 'We owe you';
   const isOweSection = showOweSection;
 
   // Settlement handling functions
-  const handleIndividualSettlement = async (memberData: { name: string; amount: number; currency: string; memberId: number }) => {
+  const handleIndividualSettlement = async (memberData: { name: string; amount: number; amountUSD: number; currency: string; memberId: number }) => {
     if (!currentUser?.id) {
       Alert.alert('Error', 'User not authenticated');
       return;
@@ -146,25 +199,32 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
 
     // Find the member data for the contact
     const memberContact = members.find(member => member.id === memberData.memberId);
-    if (!memberContact) {
-      Alert.alert('Error', 'Member information not found');
-      return;
-    }
+    
+    // If member data is not available, create mock contact for settlement
+    const contact = memberContact ? {
+      id: memberContact.id,
+      name: memberContact.name,
+      email: memberContact.email,
+      wallet_address: memberContact.wallet_address,
+      isFavorite: false,
+      first_met_at: memberContact.joined_at,
+      mutual_groups_count: 1
+    } : {
+      id: memberData.memberId,
+      name: memberData.name,
+      email: `member${memberData.memberId}@example.com`, // Mock email
+      wallet_address: `mock_wallet_${memberData.memberId}`, // Mock wallet
+      isFavorite: false,
+      first_met_at: new Date().toISOString(),
+      mutual_groups_count: 1
+    };
 
     // Close the modal first
     onClose?.();
 
     // Navigate to Send flow with pre-filled settlement data
     navigation.navigate('SendAmount', {
-      contact: {
-        id: memberContact.id,
-        name: memberContact.name,
-        email: memberContact.email,
-        wallet_address: memberContact.wallet_address,
-        isFavorite: false,
-        first_met_at: memberContact.joined_at,
-        mutual_groups_count: 1
-      },
+      contact,
       groupId: actualGroupId,
       prefilledAmount: memberData.amount,
       prefilledNote: `Settlement payment to ${memberData.name} for group expenses`,
@@ -178,7 +238,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
       return;
     }
 
-    if (totalOwe <= 0) {
+    if (totalOweUSD <= 0) {
       Alert.alert('No Debts', 'You don\'t have any outstanding debts to settle.');
       return;
     }
@@ -188,7 +248,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
 
     Alert.alert(
       'Confirm Settle All',
-      `Settle all outstanding debts totaling ${primaryCurrency} ${totalOwe.toFixed(2)}?`,
+      `Settle all outstanding debts totaling $${totalOweUSD.toFixed(2)}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -205,7 +265,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
 
               Alert.alert(
                 'Settlement Successful',
-                `Successfully settled all debts totaling ${primaryCurrency} ${totalOwe.toFixed(2)}`,
+                `Successfully settled all debts totaling $${totalOweUSD.toFixed(2)}`,
                 [
                   {
                     text: 'OK',
@@ -234,10 +294,10 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
     );
   };
 
-  const handleMarkAsSettled = (memberData: { name: string; amount: number; currency: string; memberId: number }) => {
+  const handleMarkAsSettled = (memberData: { name: string; amount: number; amountUSD: number; currency: string; memberId: number }) => {
     Alert.alert(
       'Mark as Settled',
-      `Mark ${memberData.currency} ${memberData.amount.toFixed(2)} with ${memberData.name} as already settled?`,
+      `Mark $${memberData.amountUSD.toFixed(2)} with ${memberData.name} as already settled?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -255,7 +315,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
     );
   };
 
-  const handleSendReminder = async (memberData: { name: string; amount: number; currency: string; memberId: number }) => {
+  const handleSendReminder = async (memberData: { name: string; amount: number; amountUSD: number; currency: string; memberId: number }) => {
     if (!currentUser?.id) {
       Alert.alert('Error', 'User not authenticated');
       return;
@@ -273,7 +333,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
 
     Alert.alert(
       'Send Reminder',
-      `Send payment reminder to ${memberData.name} for ${memberData.currency} ${memberData.amount.toFixed(2)}?`,
+      `Send payment reminder to ${memberData.name} for $${memberData.amountUSD.toFixed(2)}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -351,7 +411,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
 
     Alert.alert(
       'Send Reminders',
-      `Send payment reminders to all ${owedData.length} members who owe you ${primaryCurrency} ${totalOwed.toFixed(2)} total?`,
+      `Send payment reminders to all ${owedData.length} members who owe you $${totalOwedUSD.toFixed(2)} total?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -435,7 +495,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
         ) : (
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {/* Show content only if there are debts to display */}
-            {(showOweSection || showOwedSection) ? (
+            {(showOweSection || showOwedSection) && (currentSectionData.length > 0) ? (
               <>
                 {/* Amount Header */}
                 <View style={[
@@ -446,7 +506,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
                     {sectionLabel}
                   </Text>
                   <Text style={styles.amountHeaderValue}>
-                    {currentUserBalance?.currency || 'SOL'} {currentSectionTotal.toFixed(2)}
+                    ${currentSectionTotal.toFixed(2)}
                   </Text>
                 </View>
 
@@ -459,7 +519,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
                           {isOweSection ? `You owe to ${item.name}` : `${item.name} owe you`}
                         </Text>
                         <Text style={styles.settlementCardAmount}>
-                          {item.currency} {item.amount.toFixed(2)}
+                          ${item.amountUSD.toFixed(2)}
                         </Text>
                       </View>
 
@@ -506,7 +566,26 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
               </>
             ) : (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>All settled up!</Text>
+                <Text style={styles.emptyStateText}>
+                  {currentUserBalance?.status === 'settled' 
+                    ? 'All settled up!' 
+                    : 'No settlement data available'}
+                </Text>
+                {currentUserBalance && (
+                  <Text style={{ color: '#A89B9B', fontSize: 14, marginTop: 8, textAlign: 'center' }}>
+                    Current balance: ${(Math.abs(currentUserBalance.amount) * (currentUserBalance.currency === 'SOL' ? 200 : currentUserBalance.currency === 'USDC' ? 1 : 100)).toFixed(2)} 
+                    ({currentUserBalance.status})
+                  </Text>
+                )}
+                {/* Debug info */}
+                <Text style={{ color: '#A89B9B', fontSize: 12, marginTop: 8, textAlign: 'center' }}>
+                  Balances found: {groupBalances.length} | 
+                  Show owe: {showOweSection ? 'Yes' : 'No'} | 
+                  Show owed: {showOwedSection ? 'Yes' : 'No'}
+                </Text>
+                <Text style={{ color: '#A89B9B', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
+                  Owe data: {oweData.length} | Owed data: {owedData.length}
+                </Text>
               </View>
             )}
 

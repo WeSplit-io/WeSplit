@@ -2,30 +2,54 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
 import Icon from '../../components/Icon';
 import { GroupMember } from '../../services/groupService';
+import { createPaymentRequest } from '../../services/requestService';
+import { useApp } from '../../context/AppContext';
 import { styles } from './styles';
 
 const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, amount, description, groupId } = route.params || {};
+  const { state } = useApp();
+  const { currentUser } = state;
   const [requesting, setRequesting] = useState(false);
 
   const handleConfirmRequest = async () => {
+    if (!currentUser) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    if (!contact) {
+      Alert.alert('Error', 'Contact information is missing');
+      return;
+    }
+
     setRequesting(true);
     
     try {
-      // Simulate request process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Create real payment request using backend API
+      const requestData = {
+        senderId: currentUser.id,
+        recipientId: contact.id,
+        amount: amount,
+        currency: 'USDC',
+        description: description || '',
+        groupId: groupId || undefined,
+      };
+
+      const createdRequest = await createPaymentRequest(requestData);
       
-      // Navigate to success screen
+      // Navigate to success screen with real request data
       navigation.navigate('RequestSuccess', {
         contact,
         amount,
         description,
         groupId,
-        requestId: `REQ${Date.now()}`,
+        requestId: createdRequest.id,
+        createdRequest,
       });
     } catch (error) {
       console.error('Request error:', error);
-      Alert.alert('Error', 'Failed to send request. Please try again.');
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to send request. Please try again.');
     } finally {
       setRequesting(false);
     }

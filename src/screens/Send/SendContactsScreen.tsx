@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, SafeAreaView } from 'react-native';
 import Icon from '../../components/Icon';
+import NavBar from '../../components/NavBar';
 import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
 import { getUserContacts } from '../../services/groupService';
@@ -233,6 +234,9 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
           </ScrollView>
         )}
       </View>
+      
+      {/* Show NavBar only when accessed from People tab (no groupId) */}
+      {!groupId && <NavBar currentRoute="SendContacts" navigation={navigation} />}
     </SafeAreaView>
   );
 };

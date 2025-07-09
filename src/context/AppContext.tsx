@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
 import { 
   User, 
   GroupWithDetails, 
@@ -9,6 +9,7 @@ import {
   NavigationParams 
 } from '../types';
 import { dataService } from '../services/dataService';
+import { i18nService } from '../services/i18nService';
 
 // Initial State - now clean without mock data
 const initialState: AppState = {
@@ -282,8 +283,153 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// Helper function to calculate balances when we have actual member data
+const calculateBalancesFromMembers = (group: GroupWithDetails, currentUserId?: number): Balance[] => {
+  const balances: Balance[] = [];
+  
+  if (!group.members || group.members.length === 0) return balances;
+  
+  // If we have individual expenses, calculate based on actual payments
+  if (group.expenses && group.expenses.length > 0) {
+    const memberBalances: Record<number, Record<string, number>> = {};
+    
+    // Initialize balances for all members
+    group.members.forEach(member => {
+      memberBalances[member.id] = {};
+    });
+
+    // Calculate balances by currency based on actual expenses
+    group.expenses.forEach(expense => {
+      const currency = expense.currency || 'SOL';
+      const sharePerPerson = expense.amount / group.members.length;
+      
+      group.members.forEach(member => {
+        if (!memberBalances[member.id][currency]) {
+          memberBalances[member.id][currency] = 0;
+        }
+        
+        if (expense.paid_by === member.id) {
+          // Member paid this expense, so they're owed the amount minus their share
+          memberBalances[member.id][currency] += expense.amount - sharePerPerson;
+        } else {
+          // Member didn't pay, so they owe their share
+          memberBalances[member.id][currency] -= sharePerPerson;
+        }
+      });
+    });
+
+    // Convert to Balance objects
+    group.members.forEach(member => {
+      const currencies = memberBalances[member.id];
+      
+      // Find the currency with the largest absolute balance
+      let primaryCurrency = group.currency || 'SOL';
+      let primaryAmount = currencies[primaryCurrency] || 0;
+      
+      const balanceEntries = Object.entries(currencies);
+      if (balanceEntries.length > 0) {
+        const [maxCurrency, maxAmount] = balanceEntries.reduce((max, [curr, amount]) => 
+          Math.abs(amount) > Math.abs(max[1]) ? [curr, amount] : max
+        );
+        if (Math.abs(maxAmount) > Math.abs(primaryAmount)) {
+          primaryCurrency = maxCurrency;
+          primaryAmount = maxAmount;
+        }
+      }
+
+      balances.push({
+        userId: member.id,
+        userName: member.name,
+        userAvatar: member.avatar,
+        amount: primaryAmount,
+        currency: primaryCurrency,
+        status: Math.abs(primaryAmount) < 0.01 ? 'settled' : primaryAmount > 0 ? 'gets_back' : 'owes'
+      });
+    });
+  } else {
+    // No individual expenses, create equal split scenario
+    const primaryCurrency = group.expenses_by_currency?.[0]?.currency || 'SOL';
+    const totalAmount = group.expenses_by_currency?.reduce((sum, curr) => sum + curr.total_amount, 0) || 0;
+    const sharePerPerson = totalAmount / group.members.length;
+    
+    // Scenario: current user paid everything, others owe their shares
+    group.members.forEach(member => {
+      const isCurrentUser = member.id === currentUserId;
+      const amount = isCurrentUser ? totalAmount - sharePerPerson : -sharePerPerson;
+      
+      balances.push({
+        userId: member.id,
+        userName: member.name,
+        userAvatar: member.avatar,
+        amount: amount,
+        currency: primaryCurrency,
+        status: Math.abs(amount) < 0.01 ? 'settled' : amount > 0 ? 'gets_back' : 'owes'
+      });
+    });
+  }
+  
+  return balances;
+};
+
+// Helper function to calculate balances from summary data
+const calculateBalancesFromSummary = (group: GroupWithDetails, currentUser?: any): Balance[] => {
+  const balances: Balance[] = [];
+  
+  if (!group.expenses_by_currency || group.expenses_by_currency.length === 0) return balances;
+  
+  // Get primary currency (largest amount)
+  const primaryCurrencyEntry = group.expenses_by_currency.reduce((max, curr) => 
+    curr.total_amount > max.total_amount ? curr : max
+  );
+  
+  const totalAmount = primaryCurrencyEntry.total_amount;
+  const actualMemberCount = group.member_count || 2;
+  const sharePerPerson = totalAmount / actualMemberCount;
+  
+  // Current user paid everything, others owe their shares
+  const currentUserOwedAmount = totalAmount - sharePerPerson;
+  
+  // Current user balance
+  balances.push({
+    userId: currentUser?.id || 1,
+    userName: currentUser?.name || 'You',
+    userAvatar: undefined,
+    amount: currentUserOwedAmount,
+    currency: primaryCurrencyEntry.currency,
+    status: 'gets_back'
+  });
+  
+  // Other members owe their shares
+  for (let i = 1; i < actualMemberCount; i++) {
+    balances.push({
+      userId: 100 + i,
+      userName: `Member ${i + 1}`,
+      userAvatar: undefined,
+      amount: -sharePerPerson,
+      currency: primaryCurrencyEntry.currency,
+      status: 'owes'
+    });
+  }
+  
+  return balances;
+};
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
+
+  // Initialize i18n service
+  useEffect(() => {
+    const initializeI18n = async () => {
+      try {
+        await i18nService.initialize();
+        console.log('i18n service initialized');
+      } catch (error) {
+        console.error('Failed to initialize i18n service:', error);
+      }
+    };
+
+    initializeI18n();
+  }, []);
 
   // Cache management
   const shouldRefreshData = useCallback((type: 'groups' | 'expenses' | 'members', groupId?: number): boolean => {
@@ -473,68 +619,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return state.groups.find(group => group.id === id);
   }, [state.groups]);
 
-  const getGroupBalances = useCallback((groupId: number): Balance[] => {
-    const group = getGroupById(groupId);
-    if (!group) return [];
-
-    // CRITICAL FIX: Handle multi-currency balances properly
-    // Calculate balances per currency first, then convert to display currency
-    const memberBalances: Record<number, Record<string, number>> = {};
-    
-    // Initialize balances for all members
-    group.members.forEach(member => {
-      memberBalances[member.id] = {};
-    });
-
-    // Calculate balances by currency
-    group.expenses.forEach(expense => {
-      const currency = expense.currency || 'SOL';
-      const sharePerPerson = expense.amount / group.members.length;
+    const getGroupBalances = useCallback((groupId: number): Balance[] => {
+    try {
+      const group = getGroupById(groupId);
       
-      group.members.forEach(member => {
-        if (!memberBalances[member.id][currency]) {
-          memberBalances[member.id][currency] = 0;
-        }
-        
-        if (expense.paid_by === member.id) {
-          memberBalances[member.id][currency] += expense.amount - sharePerPerson;
-        } else {
-          memberBalances[member.id][currency] -= sharePerPerson;
-        }
-      });
-    });
-
-    // Convert to Balance objects with primary currency for display
-    // For now, use the group's default currency or show the largest balance
-    return group.members.map(member => {
-      const currencies = memberBalances[member.id];
-      
-      // Find the currency with the largest absolute balance for display
-      let primaryCurrency = group.currency || 'SOL';
-      let primaryAmount = currencies[primaryCurrency] || 0;
-      
-      // If the primary currency has no balance, find the largest one
-      if (Math.abs(primaryAmount) < 0.01) {
-        const balanceEntries = Object.entries(currencies);
-        if (balanceEntries.length > 0) {
-          const [maxCurrency, maxAmount] = balanceEntries.reduce((max, [curr, amount]) => 
-            Math.abs(amount) > Math.abs(max[1]) ? [curr, amount] : max
-          );
-          primaryCurrency = maxCurrency;
-          primaryAmount = maxAmount;
-        }
+      if (!group) {
+        return [];
       }
 
-      return {
-        userId: member.id,
-        userName: member.name,
-        userAvatar: member.avatar,
-        amount: primaryAmount,
-        currency: primaryCurrency, // Add currency to balance
-        status: Math.abs(primaryAmount) < 0.01 ? 'settled' : primaryAmount > 0 ? 'gets_back' : 'owes'
-      };
-    });
-  }, [getGroupById]);
+      // Use summary data from the basic group (synchronous)
+      if (group.expenses_by_currency && group.expenses_by_currency.length > 0 && group.member_count > 0) {
+        try {
+          return calculateBalancesFromSummary(group, state.currentUser);
+        } catch (error) {
+          console.error('Error calculating balances from summary:', error);
+        }
+      }
+      
+      // If group has detailed member/expense data, use that
+      if (group.members && group.members.length > 0 && group.expenses && group.expenses.length > 0) {
+        try {
+          return calculateBalancesFromMembers(group, state.currentUser?.id);
+        } catch (error) {
+          console.error('Error calculating balances from members:', error);
+        }
+      }
+      
+      // Return empty array silently for groups without data
+      return [];
+    } catch (error) {
+      console.error(`getGroupBalances: Error processing group ${groupId}:`, error);
+      return [];
+    }
+  }, [getGroupById, state.currentUser]);
 
   const getTotalExpenses = useCallback((groupId: number): number => {
     const group = getGroupById(groupId);

@@ -301,15 +301,27 @@ export const expenseService = {
     return apiRequest<Expense[]>(`/api/expenses/${groupId}`, {}, !forceRefresh);
   },
 
-  createExpense: async (expenseData: Omit<Expense, 'id' | 'created_at' | 'updated_at'>): Promise<Expense> => {
+  createExpense: async (expenseData: any): Promise<Expense> => {
+    // Transform snake_case to camelCase for backend API
+    const backendData = {
+      description: expenseData.description,
+      amount: expenseData.amount,
+      currency: expenseData.currency,
+      paidBy: expenseData.paidBy || expenseData.paid_by,
+      groupId: expenseData.groupId || expenseData.group_id,
+      category: expenseData.category,
+      splitType: expenseData.splitType,
+      splitData: expenseData.splitData
+    };
+    
     const result = await apiRequest<Expense>('/api/expenses', {
       method: 'POST',
-      body: JSON.stringify(expenseData),
+      body: JSON.stringify(backendData),
     }, false);
     
     invalidateCache('expenses');
     invalidateCache('groups');
-    invalidateCache(`group_${expenseData.group_id}`);
+    invalidateCache(`group_${backendData.groupId}`);
     return result;
   },
 

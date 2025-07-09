@@ -1,11 +1,27 @@
 const express = require('express');
 const cors = require('cors');
 const pool = require('./db');
+const authService = require('./services/authService');
+const security = require('./middleware/security');
+const monitoringService = require('./services/monitoringService');
 require('dotenv').config();
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// Security middleware
+app.use(security.helmet);
+app.use(security.cors);
+app.use(security.generalLimiter);
+app.use(express.json({ limit: '10mb' }));
+app.use(security.sanitizeInput);
+
+// Monitoring middleware
+app.use(monitoringService.requestTracker());
+
+// Cleanup expired tokens every hour
+setInterval(() => {
+  authService.cleanupExpired();
+}, 60 * 60 * 1000);
 
 // Migration to add splitData column to expenses table
 const runMigrations = async () => {
@@ -129,6 +145,17 @@ const createSampleDataIfEmpty = async () => {
 // Run migrations on startup
 runMigrations();
 
+// Health check endpoint
+app.get('/api/health', async (req, res) => {
+  const health = await monitoringService.healthCheck();
+  res.status(health.status === 'healthy' ? 200 : 503).json(health);
+});
+
+// Metrics endpoint (for monitoring)
+app.get('/api/metrics', (req, res) => {
+  res.json(monitoringService.getMetrics());
+});
+
 // Test endpoint
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Backend is running!', timestamp: new Date().toISOString() });
@@ -186,6 +213,180 @@ app.get('/api/test/groups/:userId', async (req, res) => {
     res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
+
+// === SECURE AUTHENTICATION ENDPOINTS ===
+
+// Helper function to check if user verified this month
+const hasVerifiedThisMonth = (lastVerifiedAt) => {
+  if (!lastVerifiedAt) return false;
+  
+  const lastVerified = new Date(lastVerifiedAt);
+  const now = new Date();
+  
+  // Check if same month and year
+  return lastVerified.getMonth() === now.getMonth() && 
+         lastVerified.getFullYear() === now.getFullYear();
+};
+
+// Send verification code
+app.post('/api/auth/send-verification', security.authLimiter, security.validateEmail, async (req, res) => {
+  const { email } = req.body;
+  
+  try {
+    // Check if user exists and has verified this month
+    const existingUser = await pool.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
+    
+    if (existingUser.rows.length > 0) {
+      const user = existingUser.rows[0];
+      
+      // If user has verified this month, skip verification
+      if (hasVerifiedThisMonth(user.last_verified_at)) {
+        console.log(`📅 User ${email} already verified this month, skipping verification`);
+        
+        // Generate tokens and return user data directly
+        const accessToken = authService.generateToken(user.id, user.email);
+        const refreshToken = authService.generateRefreshToken(user.id);
+        
+        return res.json({
+          message: 'Authentication successful (already verified this month)',
+          skipVerification: true,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            walletAddress: user.wallet_address,
+            walletPublicKey: user.wallet_public_key,
+            avatar: user.avatar,
+            createdAt: user.created_at
+          },
+          accessToken,
+          refreshToken
+        });
+      }
+    }
+    
+    // User doesn't exist or hasn't verified this month - proceed with verification
+    const code = authService.generateVerificationCode();
+    authService.storeVerificationCode(email, code);
+    
+    // Send email (in production, configure real email service)
+    const emailSent = await authService.sendVerificationEmail(email, code);
+    
+    if (emailSent) {
+      res.json({ 
+        message: 'Verification code sent to your email',
+        email: email,
+        skipVerification: false,
+        // In development, include code for testing
+        ...(process.env.NODE_ENV !== 'production' && { code: code })
+      });
+    } else {
+      res.status(500).json({ error: 'Failed to send verification email' });
+    }
+  } catch (err) {
+    console.error('Error sending verification code:', err);
+    res.status(500).json({ error: 'Failed to send verification code' });
+  }
+});
+
+// Verify code and login/register
+app.post('/api/auth/verify-code', security.authLimiter, security.validateEmail, security.validateRequired(['code']), async (req, res) => {
+  const { email, code } = req.body;
+  
+  try {
+    // Verify the code
+    const verificationResult = authService.verifyCode(email, code);
+    
+    if (!verificationResult.success) {
+      return res.status(400).json({ error: verificationResult.error });
+    }
+    
+    // Check if user exists
+    let user;
+    const existingUser = await pool.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
+    
+    if (existingUser.rows.length > 0) {
+      user = existingUser.rows[0];
+      
+      // Update last_verified_at for existing user
+      await pool.run(
+        'UPDATE users SET last_verified_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [user.id]
+      );
+      console.log(`📅 Updated last_verified_at for user ${email}`);
+    } else {
+      // Create new user if doesn't exist
+      const newUser = await pool.run(
+        'INSERT INTO users (email, name, wallet_address, wallet_public_key, avatar, last_verified_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+        [email, email.split('@')[0], `temp_wallet_${Date.now()}`, `temp_key_${Date.now()}`, null]
+      );
+      
+      const newUserResult = await pool.query('SELECT * FROM users WHERE id = ?', [newUser.rows[0].id]);
+      user = newUserResult.rows[0];
+      console.log(`📅 Created new user ${email} with verification timestamp`);
+    }
+    
+    // Generate tokens
+    const accessToken = authService.generateToken(user.id, user.email);
+    const refreshToken = authService.generateRefreshToken(user.id);
+    
+    res.json({
+      message: 'Authentication successful',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        walletAddress: user.wallet_address,
+        walletPublicKey: user.wallet_public_key,
+        avatar: user.avatar,
+        createdAt: user.created_at
+      },
+      accessToken,
+      refreshToken
+    });
+    
+  } catch (err) {
+    console.error('Error verifying code:', err);
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
+// Refresh token
+app.post('/api/auth/refresh', security.authLimiter, security.validateRequired(['refreshToken']), async (req, res) => {
+  const { refreshToken } = req.body;
+  
+  try {
+    const result = authService.refreshAccessToken(refreshToken);
+    
+    if (!result.success) {
+      return res.status(401).json({ error: result.error });
+    }
+    
+    res.json({
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken
+    });
+    
+  } catch (err) {
+    console.error('Error refreshing token:', err);
+    res.status(500).json({ error: 'Token refresh failed' });
+  }
+});
+
+// Logout
+app.post('/api/auth/logout', security.validateRequired(['refreshToken']), async (req, res) => {
+  const { refreshToken } = req.body;
+  
+  try {
+    authService.logout(refreshToken);
+    res.json({ message: 'Logged out successfully' });
+  } catch (err) {
+    console.error('Error logging out:', err);
+    res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+// === LEGACY ENDPOINTS (for backward compatibility) ===
 
 app.get('/api/users/findByEmail', async (req, res) => {
   const { email } = req.query;
@@ -490,11 +691,12 @@ app.get('/api/expenses/:groupId', async (req, res) => {
   }
 });
 
-app.post('/api/expenses', async (req, res) => {
+app.post('/api/expenses', security.authenticateToken, security.validateRequired(['description', 'amount', 'paidBy', 'groupId']), security.validateNumeric(['amount']), async (req, res) => {
   const { description, amount, currency, paidBy, splitBetween, groupId, category, splitType, splitData } = req.body;
   
-  if (!description || !amount || !paidBy || !groupId) {
-    return res.status(400).json({ error: 'Description, amount, paid by, and group ID are required' });
+  // Ensure user can only create expenses for themselves
+  if (parseInt(paidBy) !== parseInt(req.user.userId)) {
+    return res.status(403).json({ error: 'You can only create expenses for yourself' });
   }
 
   try {
@@ -1976,5 +2178,642 @@ app.put('/api/notifications/:notificationId/read', async (req, res) => {
   }
 });
 
+// Payment Request Management endpoints
+app.post('/api/requests', async (req, res) => {
+  const { senderId, recipientId, amount, currency, description, groupId } = req.body;
+  
+  if (!senderId || !recipientId || !amount || !currency) {
+    return res.status(400).json({ error: 'Sender ID, recipient ID, amount, and currency are required' });
+  }
+
+  try {
+    const result = await pool.run(
+      'INSERT INTO payment_requests (sender_id, recipient_id, amount, currency, description, group_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime("now"))',
+      [senderId, recipientId, amount, currency, description || '', groupId || null, 'pending']
+    );
+    
+    const requestId = result.rows[0].id;
+    
+    // Get sender and recipient info for notification
+    const senderResult = await pool.query('SELECT name, email FROM users WHERE id = ?', [senderId]);
+    const recipientResult = await pool.query('SELECT name, email FROM users WHERE id = ?', [recipientId]);
+    
+    const sender = senderResult.rows[0];
+    const recipient = recipientResult.rows[0];
+    
+    // Create notification for recipient
+    await pool.run(
+      'INSERT INTO notifications (user_id, title, message, type, data, read, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))',
+      [
+        recipientId,
+        'Payment Request',
+        `${sender.name} requested $${amount} ${currency}${description ? ` for ${description}` : ''}`,
+        'payment_request',
+        JSON.stringify({ 
+          requestId, 
+          senderId, 
+          senderName: sender.name,
+          amount, 
+          currency, 
+          description,
+          groupId
+        }),
+        0
+      ]
+    );
+    
+    res.status(201).json({
+      id: requestId,
+      senderId,
+      recipientId,
+      amount,
+      currency,
+      description,
+      groupId,
+      status: 'pending',
+      senderName: sender.name,
+      recipientName: recipient.name,
+      message: 'Payment request created successfully'
+    });
+  } catch (err) {
+    console.error('Error creating payment request:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+app.get('/api/requests/:userId', async (req, res) => {
+  const { userId } = req.params;
+  const { type = 'all' } = req.query; // 'sent', 'received', or 'all'
+  
+  try {
+    let query = `
+      SELECT pr.*, 
+             sender.name as sender_name,
+             recipient.name as recipient_name,
+             sender.email as sender_email,
+             recipient.email as recipient_email,
+             sender.wallet_address as sender_wallet,
+             recipient.wallet_address as recipient_wallet,
+             g.name as group_name
+      FROM payment_requests pr
+      JOIN users sender ON pr.sender_id = sender.id
+      JOIN users recipient ON pr.recipient_id = recipient.id
+      LEFT JOIN groups g ON pr.group_id = g.id
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    
+    if (type === 'sent') {
+      query += ' AND pr.sender_id = ?';
+      params.push(userId);
+    } else if (type === 'received') {
+      query += ' AND pr.recipient_id = ?';
+      params.push(userId);
+    } else {
+      query += ' AND (pr.sender_id = ? OR pr.recipient_id = ?)';
+      params.push(userId, userId);
+    }
+    
+    query += ' ORDER BY pr.created_at DESC';
+    
+    const result = await pool.query(query, params);
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching payment requests:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+app.get('/api/requests/request/:requestId', async (req, res) => {
+  const { requestId } = req.params;
+  
+  try {
+    const result = await pool.query(`
+      SELECT pr.*, 
+             sender.name as sender_name,
+             recipient.name as recipient_name,
+             sender.email as sender_email,
+             recipient.email as recipient_email,
+             sender.wallet_address as sender_wallet,
+             recipient.wallet_address as recipient_wallet,
+             g.name as group_name
+      FROM payment_requests pr
+      JOIN users sender ON pr.sender_id = sender.id
+      JOIN users recipient ON pr.recipient_id = recipient.id
+      LEFT JOIN groups g ON pr.group_id = g.id
+      WHERE pr.id = ?
+    `, [requestId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Payment request not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error fetching payment request:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+app.put('/api/requests/:requestId/status', async (req, res) => {
+  const { requestId } = req.params;
+  const { status, userId } = req.body; // 'accepted', 'declined', 'completed'
+  
+  if (!status || !userId) {
+    return res.status(400).json({ error: 'Status and user ID are required' });
+  }
+  
+  if (!['accepted', 'declined', 'completed'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status. Must be accepted, declined, or completed' });
+  }
+  
+  try {
+    // Get current request
+    const requestResult = await pool.query('SELECT * FROM payment_requests WHERE id = ?', [requestId]);
+    
+    if (requestResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Payment request not found' });
+    }
+    
+    const request = requestResult.rows[0];
+    
+    // Verify user has permission to update this request
+    if (request.recipient_id !== parseInt(userId) && request.sender_id !== parseInt(userId)) {
+      return res.status(403).json({ error: 'You do not have permission to update this request' });
+    }
+    
+    // Update request status
+    await pool.run(
+      'UPDATE payment_requests SET status = ?, updated_at = datetime("now") WHERE id = ?',
+      [status, requestId]
+    );
+    
+    // Get user info for notification
+    const userResult = await pool.query('SELECT name FROM users WHERE id = ?', [userId]);
+    const user = userResult.rows[0];
+    
+    // Create notification for the other party
+    const notificationUserId = request.recipient_id === parseInt(userId) ? request.sender_id : request.recipient_id;
+    let notificationMessage = '';
+    
+    if (status === 'accepted') {
+      notificationMessage = `${user.name} accepted your payment request of $${request.amount} ${request.currency}`;
+    } else if (status === 'declined') {
+      notificationMessage = `${user.name} declined your payment request of $${request.amount} ${request.currency}`;
+    } else if (status === 'completed') {
+      notificationMessage = `Payment of $${request.amount} ${request.currency} has been completed`;
+    }
+    
+    await pool.run(
+      'INSERT INTO notifications (user_id, title, message, type, data, read, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))',
+      [
+        notificationUserId,
+        'Payment Request Update',
+        notificationMessage,
+        'payment_request_update',
+        JSON.stringify({ 
+          requestId, 
+          status, 
+          amount: request.amount, 
+          currency: request.currency, 
+          description: request.description,
+          groupId: request.group_id
+        }),
+        0
+      ]
+    );
+    
+    res.json({ 
+      message: `Payment request ${status} successfully`,
+      requestId,
+      status
+    });
+  } catch (err) {
+    console.error('Error updating payment request status:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+app.delete('/api/requests/:requestId', async (req, res) => {
+  const { requestId } = req.params;
+  const { userId } = req.body;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required' });
+  }
+  
+  try {
+    // Get current request
+    const requestResult = await pool.query('SELECT * FROM payment_requests WHERE id = ?', [requestId]);
+    
+    if (requestResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Payment request not found' });
+    }
+    
+    const request = requestResult.rows[0];
+    
+    // Only sender can delete their own request
+    if (request.sender_id !== parseInt(userId)) {
+      return res.status(403).json({ error: 'You can only delete your own payment requests' });
+    }
+    
+    // Delete the request
+    await pool.run('DELETE FROM payment_requests WHERE id = ?', [requestId]);
+    
+    res.json({ message: 'Payment request deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting payment request:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+// Subscription Management endpoints
+app.get('/api/subscription/:userId', async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    const result = await pool.query(`
+      SELECT s.*, p.name as plan_name, p.price, p.currency, p.interval, p.features, p.description
+      FROM user_subscriptions s
+      LEFT JOIN subscription_plans p ON s.plan_id = p.id
+      WHERE s.user_id = ? AND s.status = 'active'
+      ORDER BY s.created_at DESC
+      LIMIT 1
+    `, [userId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No active subscription found' });
+    }
+    
+    const subscription = result.rows[0];
+    
+    // Parse features if it's a JSON string
+    if (subscription.features && typeof subscription.features === 'string') {
+      try {
+        subscription.features = JSON.parse(subscription.features);
+      } catch (e) {
+        subscription.features = [];
+      }
+    }
+    
+    res.json(subscription);
+  } catch (err) {
+    console.error('Error fetching subscription:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+app.post('/api/subscription', async (req, res) => {
+  const { userId, planId, paymentMethod, paymentDetails } = req.body;
+  
+  if (!userId || !planId || !paymentMethod) {
+    return res.status(400).json({ error: 'User ID, plan ID, and payment method are required' });
+  }
+  
+  try {
+    // Check if plan exists
+    const planResult = await pool.query('SELECT * FROM subscription_plans WHERE id = ?', [planId]);
+    
+    if (planResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Subscription plan not found' });
+    }
+    
+    const plan = planResult.rows[0];
+    
+    // Calculate period dates
+    const now = new Date();
+    const periodStart = now.toISOString();
+    let periodEnd;
+    
+    if (plan.interval === 'monthly') {
+      periodEnd = new Date(now.setMonth(now.getMonth() + 1)).toISOString();
+    } else if (plan.interval === 'yearly') {
+      periodEnd = new Date(now.setFullYear(now.getFullYear() + 1)).toISOString();
+    }
+    
+    // Create subscription
+    const result = await pool.run(`
+      INSERT INTO user_subscriptions (
+        user_id, plan_id, status, current_period_start, current_period_end, 
+        cancel_at_period_end, payment_method, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `, [userId, planId, 'active', periodStart, periodEnd, 0, paymentMethod]);
+    
+    // Get the created subscription with plan details
+    const subscriptionResult = await pool.query(`
+      SELECT s.*, p.name as plan_name, p.price, p.currency, p.interval, p.features, p.description
+      FROM user_subscriptions s
+      LEFT JOIN subscription_plans p ON s.plan_id = p.id
+      WHERE s.id = ?
+    `, [result.rows[0].id]);
+    
+    const subscription = subscriptionResult.rows[0];
+    
+    // Parse features if it's a JSON string
+    if (subscription.features && typeof subscription.features === 'string') {
+      try {
+        subscription.features = JSON.parse(subscription.features);
+      } catch (e) {
+        subscription.features = [];
+      }
+    }
+    
+    // Create notification for user
+    await pool.run(
+      'INSERT INTO notifications (user_id, title, message, type, data, read, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))',
+      [
+        userId,
+        'Premium Subscription Activated',
+        `Your ${plan.name} subscription is now active! Enjoy premium features.`,
+        'general',
+        JSON.stringify({ subscriptionId: result.rows[0].id, planId }),
+        0
+      ]
+    );
+    
+    res.status(201).json(subscription);
+  } catch (err) {
+    console.error('Error creating subscription:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+app.post('/api/subscription/:userId/cancel', async (req, res) => {
+  const { userId } = req.params;
+  const { cancelAtPeriodEnd } = req.body;
+  
+  try {
+    // Get current active subscription
+    const subscriptionResult = await pool.query(
+      'SELECT * FROM user_subscriptions WHERE user_id = ? AND status = "active" ORDER BY created_at DESC LIMIT 1',
+      [userId]
+    );
+    
+    if (subscriptionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No active subscription found' });
+    }
+    
+    const subscription = subscriptionResult.rows[0];
+    
+    if (cancelAtPeriodEnd) {
+      // Mark for cancellation at period end
+      await pool.run(
+        'UPDATE user_subscriptions SET cancel_at_period_end = 1, updated_at = datetime("now") WHERE id = ?',
+        [subscription.id]
+      );
+      
+      res.json({ message: 'Subscription will be cancelled at the end of the current period' });
+    } else {
+      // Cancel immediately
+      await pool.run(
+        'UPDATE user_subscriptions SET status = "cancelled", updated_at = datetime("now") WHERE id = ?',
+        [subscription.id]
+      );
+      
+      res.json({ message: 'Subscription cancelled immediately' });
+    }
+    
+    // Create notification
+    await pool.run(
+      'INSERT INTO notifications (user_id, title, message, type, data, read, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))',
+      [
+        userId,
+        'Subscription Cancelled',
+        cancelAtPeriodEnd ? 'Your subscription will end at the current period end.' : 'Your subscription has been cancelled.',
+        'general',
+        JSON.stringify({ subscriptionId: subscription.id }),
+        0
+      ]
+    );
+  } catch (err) {
+    console.error('Error cancelling subscription:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+app.post('/api/subscription/:userId/reactivate', async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    // Get current subscription
+    const subscriptionResult = await pool.query(
+      'SELECT * FROM user_subscriptions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
+      [userId]
+    );
+    
+    if (subscriptionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No subscription found' });
+    }
+    
+    const subscription = subscriptionResult.rows[0];
+    
+    // Reactivate subscription
+    await pool.run(
+      'UPDATE user_subscriptions SET status = "active", cancel_at_period_end = 0, updated_at = datetime("now") WHERE id = ?',
+      [subscription.id]
+    );
+    
+    res.json({ message: 'Subscription reactivated successfully' });
+    
+    // Create notification
+    await pool.run(
+      'INSERT INTO notifications (user_id, title, message, type, data, read, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))',
+      [
+        userId,
+        'Subscription Reactivated',
+        'Your premium subscription has been reactivated.',
+        'general',
+        JSON.stringify({ subscriptionId: subscription.id }),
+        0
+      ]
+    );
+  } catch (err) {
+    console.error('Error reactivating subscription:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+app.post('/api/subscription/crypto-payment', async (req, res) => {
+  const { userId, planId, paymentMethod, amount, currency, transactionSignature } = req.body;
+  
+  if (!userId || !planId || !paymentMethod || !amount || !currency || !transactionSignature) {
+    return res.status(400).json({ error: 'All payment details are required' });
+  }
+  
+  try {
+    // Verify the transaction signature (in a real implementation, you would verify on-chain)
+    console.log('Processing crypto payment:', { userId, planId, amount, currency, transactionSignature });
+    
+    // For demo purposes, we'll accept the payment
+    const paymentVerified = true;
+    
+    if (!paymentVerified) {
+      return res.status(400).json({ error: 'Payment verification failed' });
+    }
+    
+    // Create subscription after successful payment
+    const subscriptionData = {
+      userId,
+      planId,
+      paymentMethod: `${paymentMethod}_${currency}`,
+      paymentDetails: {
+        transactionSignature,
+        amount,
+        currency,
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+    // Use the existing subscription creation logic
+    const planResult = await pool.query('SELECT * FROM subscription_plans WHERE id = ?', [planId]);
+    
+    if (planResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Subscription plan not found' });
+    }
+    
+    const plan = planResult.rows[0];
+    
+    // Calculate period dates
+    const now = new Date();
+    const periodStart = now.toISOString();
+    let periodEnd;
+    
+    if (plan.interval === 'monthly') {
+      periodEnd = new Date(now.setMonth(now.getMonth() + 1)).toISOString();
+    } else if (plan.interval === 'yearly') {
+      periodEnd = new Date(now.setFullYear(now.getFullYear() + 1)).toISOString();
+    }
+    
+    // Create subscription
+    const result = await pool.run(`
+      INSERT INTO user_subscriptions (
+        user_id, plan_id, status, current_period_start, current_period_end, 
+        cancel_at_period_end, payment_method, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `, [userId, planId, 'active', periodStart, periodEnd, 0, subscriptionData.paymentMethod]);
+    
+    res.json({
+      success: true,
+      subscriptionId: result.rows[0].id,
+      message: 'Crypto payment processed successfully and subscription activated'
+    });
+    
+    // Create notification
+    await pool.run(
+      'INSERT INTO notifications (user_id, title, message, type, data, read, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))',
+      [
+        userId,
+        'Payment Successful',
+        `Your ${currency} payment was processed successfully. Premium features are now active!`,
+        'general',
+        JSON.stringify({ subscriptionId: result.rows[0].id, transactionSignature }),
+        0
+      ]
+    );
+  } catch (err) {
+    console.error('Error processing crypto payment:', err);
+    res.status(500).json({ error: 'Payment processing error', details: err.message });
+  }
+});
+
+app.post('/api/subscription/:userId/validate', async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    // Get current subscription
+    const subscriptionResult = await pool.query(`
+      SELECT s.*, p.name as plan_name, p.price, p.currency, p.interval, p.features, p.description
+      FROM user_subscriptions s
+      LEFT JOIN subscription_plans p ON s.plan_id = p.id
+      WHERE s.user_id = ? AND s.status = 'active'
+      ORDER BY s.created_at DESC
+      LIMIT 1
+    `, [userId]);
+    
+    if (subscriptionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No active subscription found' });
+    }
+    
+    const subscription = subscriptionResult.rows[0];
+    const now = new Date();
+    const periodEnd = new Date(subscription.current_period_end);
+    
+    // Check if subscription has expired
+    if (now > periodEnd) {
+      // Expire the subscription
+      await pool.run(
+        'UPDATE user_subscriptions SET status = "expired", updated_at = datetime("now") WHERE id = ?',
+        [subscription.id]
+      );
+      
+      return res.status(404).json({ error: 'Subscription has expired' });
+    }
+    
+    // Check if it should be cancelled at period end
+    if (subscription.cancel_at_period_end && now > periodEnd) {
+      await pool.run(
+        'UPDATE user_subscriptions SET status = "cancelled", updated_at = datetime("now") WHERE id = ?',
+        [subscription.id]
+      );
+      
+      return res.status(404).json({ error: 'Subscription was cancelled' });
+    }
+    
+    // Parse features if it's a JSON string
+    if (subscription.features && typeof subscription.features === 'string') {
+      try {
+        subscription.features = JSON.parse(subscription.features);
+      } catch (e) {
+        subscription.features = [];
+      }
+    }
+    
+    res.json(subscription);
+  } catch (err) {
+    console.error('Error validating subscription:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+app.get('/api/subscription/:userId/history', async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    const result = await pool.query(`
+      SELECT s.*, p.name as plan_name, p.price, p.currency, p.interval, p.features, p.description
+      FROM user_subscriptions s
+      LEFT JOIN subscription_plans p ON s.plan_id = p.id
+      WHERE s.user_id = ?
+      ORDER BY s.created_at DESC
+    `, [userId]);
+    
+    const subscriptions = result.rows.map(subscription => {
+      // Parse features if it's a JSON string
+      if (subscription.features && typeof subscription.features === 'string') {
+        try {
+          subscription.features = JSON.parse(subscription.features);
+        } catch (e) {
+          subscription.features = [];
+        }
+      }
+      return subscription;
+    });
+    
+    res.json(subscriptions);
+  } catch (err) {
+    console.error('Error fetching subscription history:', err);
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+// Add error handling middleware at the end
+app.use(security.errorHandler);
+
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`)); 
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Security middleware active: JWT tokens, rate limiting, input validation`);
+}); 

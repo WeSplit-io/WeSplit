@@ -66,6 +66,17 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CR
               console.error('Error adding avatar column:', err.message);
             }
           });
+
+          // Add last_verified_at column to existing table if it doesn't exist
+          db.run(`
+            ALTER TABLE users ADD COLUMN last_verified_at DATETIME DEFAULT NULL
+          `, (err) => {
+            if (err && !err.message.includes('duplicate column name')) {
+              console.error('Error adding last_verified_at column:', err.message);
+            } else {
+              console.log('last_verified_at column added to users table');
+            }
+          });
         }
       });
 
@@ -434,6 +445,114 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CR
               }
             });
           });
+        }
+      });
+
+      // Create payment_requests table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS payment_requests (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sender_id INTEGER NOT NULL,
+          recipient_id INTEGER NOT NULL,
+          amount DECIMAL(10, 2) NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'USDC',
+          description TEXT,
+          group_id INTEGER,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined', 'completed')),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE,
+          FOREIGN KEY (recipient_id) REFERENCES users (id) ON DELETE CASCADE,
+          FOREIGN KEY (group_id) REFERENCES groups (id) ON DELETE CASCADE
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Error creating payment_requests table:', err.message);
+        } else {
+          console.log('Payment requests table ready');
+        }
+      });
+
+      // Create subscription_plans table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS subscription_plans (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          price DECIMAL(10, 2) NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'USD',
+          interval TEXT NOT NULL CHECK (interval IN ('monthly', 'yearly')),
+          features TEXT NOT NULL,
+          description TEXT,
+          is_popular INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Error creating subscription_plans table:', err.message);
+        } else {
+          console.log('Subscription plans table ready');
+          
+          // Insert default plans if they don't exist
+          db.get('SELECT COUNT(*) as count FROM subscription_plans', (countErr, row) => {
+            if (!countErr && row.count === 0) {
+              console.log('Creating default subscription plans...');
+              
+              const monthlyFeatures = JSON.stringify([
+                'Advanced Analytics',
+                'Unlimited Groups',
+                'Enhanced Security',
+                'Export Reports',
+                'Priority Support',
+                'Faster Transactions'
+              ]);
+              
+              const yearlyFeatures = JSON.stringify([
+                'Advanced Analytics',
+                'Unlimited Groups',
+                'Enhanced Security',
+                'Export Reports',
+                'Priority Support',
+                'Faster Transactions',
+                'Early Access to New Features'
+              ]);
+              
+              db.run(`
+                INSERT INTO subscription_plans (id, name, price, currency, interval, features, description, is_popular)
+                VALUES ('premium_monthly', 'Premium Monthly', 4.99, 'USD', 'monthly', ?, 'Monthly premium subscription', 0)
+              `, [monthlyFeatures]);
+              
+              db.run(`
+                INSERT INTO subscription_plans (id, name, price, currency, interval, features, description, is_popular)
+                VALUES ('premium_yearly', 'Premium Yearly', 49.99, 'USD', 'yearly', ?, 'Yearly premium subscription (2 months free)', 1)
+              `, [yearlyFeatures]);
+              
+              console.log('Default subscription plans created');
+            }
+          });
+        }
+      });
+
+      // Create user_subscriptions table
+      db.run(`
+        CREATE TABLE IF NOT EXISTS user_subscriptions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          plan_id TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'cancelled', 'expired')),
+          current_period_start DATETIME NOT NULL,
+          current_period_end DATETIME NOT NULL,
+          cancel_at_period_end INTEGER DEFAULT 0,
+          payment_method TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+          FOREIGN KEY (plan_id) REFERENCES subscription_plans (id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Error creating user_subscriptions table:', err.message);
+        } else {
+          console.log('User subscriptions table ready');
         }
       });
     });

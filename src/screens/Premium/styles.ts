@@ -189,4 +189,126 @@ export default StyleSheet.create({
     textAlign: 'center',
     lineHeight: spacing.lg,
   },
+  // Subscription status styles
+  subscriptionStatus: {
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.itemSpacing,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.brandGreen,
+  },
+  subscriptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  subscriptionTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.brandGreen,
+    marginLeft: spacing.sm,
+  },
+  subscriptionText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textLight,
+    marginBottom: spacing.sm,
+  },
+  cancellationNotice: {
+    fontSize: typography.fontSize.xs,
+    color: colors.darkGray,
+    fontStyle: 'italic',
+    marginBottom: spacing.md,
+  },
+  cancelButton: {
+    backgroundColor: colors.darkGray + '33',
+    borderRadius: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignSelf: 'flex-start',
+  },
+  cancelButtonText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.darkGray,
+    fontWeight: typography.fontWeight.medium,
+  },
+  // Plan selection styles
+  selectedPricingCard: {
+    borderWidth: 2,
+    borderColor: colors.brandGreen,
+  },
+  popularPricingCard: {
+    borderWidth: 1,
+    borderColor: colors.brandGreen,
+    position: 'relative',
+  },
+  popularBadge: {
+    position: 'absolute',
+    top: -8,
+    left: spacing.lg,
+    backgroundColor: colors.brandGreen,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: spacing.xs,
+  },
+  popularBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.darkBackground,
+  },
+  savings: {
+    fontSize: typography.fontSize.xs,
+    color: colors.brandGreen,
+    fontWeight: typography.fontWeight.medium,
+    marginTop: spacing.xs,
+  },
+  // Payment method styles
+  paymentSection: {
+    marginTop: spacing.xl,
+  },
+  paymentMethod: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.sm,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  selectedPaymentMethod: {
+    borderColor: colors.brandGreen,
+    backgroundColor: colors.brandGreen + '11',
+  },
+  paymentMethodText: {
+    flex: 1,
+    fontSize: typography.fontSize.md,
+    color: colors.textLight,
+    marginLeft: spacing.md,
+  },
+  // Subscribe section styles
+  subscribeSection: {
+    marginTop: spacing.xl,
+    alignItems: 'center',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  warningText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.darkGray,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
+  // Restore button styles
+  restoreButton: {
+    marginTop: spacing.xl,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+  },
+  restoreButtonText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.darkGray,
+    textDecorationLine: 'underline',
+  },
 }); 
