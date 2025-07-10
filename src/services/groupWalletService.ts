@@ -1,6 +1,6 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 
-const BACKEND_URL = 'http://192.168.1.75:4000';
+import { apiRequest } from '../config/api';
 
 export interface GroupWallet {
   id: number;
@@ -36,7 +36,7 @@ export async function createGroupWallet(groupId: string, createdBy: string): Pro
     const publicKey = keypair.publicKey.toBase58();
     const secretKey = Buffer.from(keypair.secretKey).toString('base64');
 
-    const response = await fetch(`${BACKEND_URL}/api/groups/${groupId}/wallet`, {
+    return await apiRequest<GroupWallet>(`/api/groups/${groupId}/wallet`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -49,13 +49,6 @@ export async function createGroupWallet(groupId: string, createdBy: string): Pro
         currency: 'USDC'
       }),
     });
-
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create group wallet');
-    }
   } catch (e) {
     console.error('Error creating group wallet:', e);
     throw e;
@@ -64,16 +57,11 @@ export async function createGroupWallet(groupId: string, createdBy: string): Pro
 
 export async function getGroupWallet(groupId: string): Promise<GroupWallet | null> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/groups/${groupId}/wallet`);
-    if (response.ok) {
-      return await response.json();
-    } else if (response.status === 404) {
-      return null; // No wallet exists for this group
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch group wallet');
+    return await apiRequest<GroupWallet>(`/api/groups/${groupId}/wallet`);
+  } catch (e: any) {
+    if (e.message && e.message.includes('404')) {
+      return null;
     }
-  } catch (e) {
     console.error('Error fetching group wallet:', e);
     throw e;
   }
@@ -87,7 +75,7 @@ export async function fundGroupWallet(
   fromAddress: string
 ): Promise<GroupWalletTransaction> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/groups/${groupId}/wallet/fund`, {
+    return await apiRequest<GroupWalletTransaction>(`/api/groups/${groupId}/wallet/fund`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -100,13 +88,6 @@ export async function fundGroupWallet(
         memo: `Funding group wallet from ${fromAddress}`
       }),
     });
-
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fund group wallet');
-    }
   } catch (e) {
     console.error('Error funding group wallet:', e);
     throw e;
@@ -114,7 +95,7 @@ export async function fundGroupWallet(
 }
 
 export const settleGroupExpenses = async (groupId: string, userId: string) => {
-  const response = await fetch(`${BACKEND_URL}/api/groups/${groupId}/settle`, {
+  return await apiRequest(`/api/groups/${groupId}/settle`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -124,18 +105,11 @@ export const settleGroupExpenses = async (groupId: string, userId: string) => {
       settlementType: 'individual' // Use individual settlement by default
     }),
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to settle group expenses');
-  }
-
-  return response.json();
 };
 
 // Add function for full group settlement if needed
 export const settleAllGroupExpenses = async (groupId: string, userId: string) => {
-  const response = await fetch(`${BACKEND_URL}/api/groups/${groupId}/settle`, {
+  return await apiRequest(`/api/groups/${groupId}/settle`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -145,24 +119,11 @@ export const settleAllGroupExpenses = async (groupId: string, userId: string) =>
       settlementType: 'full' // Full settlement for all members
     }),
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to settle all group expenses');
-  }
-
-  return response.json();
 };
 
 export async function getGroupWalletTransactions(groupId: string): Promise<GroupWalletTransaction[]> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/groups/${groupId}/wallet/transactions`);
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch group wallet transactions');
-    }
+    return await apiRequest<GroupWalletTransaction[]>(`/api/groups/${groupId}/wallet/transactions`);
   } catch (e) {
     console.error('Error fetching group wallet transactions:', e);
     throw e;
@@ -173,13 +134,7 @@ export async function calculateOptimalSettlement(
   groupId: string
 ): Promise<Array<{ from: string; to: string; amount: number }>> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/groups/${groupId}/settlement-calculation`);
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to calculate optimal settlement');
-    }
+    return await apiRequest<Array<{ from: string; to: string; amount: number }>>(`/api/groups/${groupId}/settlement-calculation`);
   } catch (e) {
     console.error('Error calculating optimal settlement:', e);
     throw e;

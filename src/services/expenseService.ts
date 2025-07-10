@@ -1,102 +1,79 @@
-const BACKEND_URL = 'http://192.168.1.75:4000';
+import { apiRequest } from '../config/api';
 
 export interface Expense {
   id: number;
+  group_id: number;
   description: string;
   amount: number;
   currency: string;
   paid_by: number;
-  group_id: number;
   category: string;
+  split_type?: string;
+  split_data?: any;
   created_at: string;
-  paid_by_name: string;
-  paid_by_wallet: string;
+  updated_at: string;
+  paid_by_user?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+}
+
+export interface CreateExpenseData {
+  description: string;
+  amount: number;
+  currency: string;
+  paidBy: number;
+  groupId: number;
+  category: string;
+  splitType?: string;
+  splitData?: any;
 }
 
 export async function getGroupExpenses(groupId: string): Promise<Expense[]> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/expenses/${groupId}`);
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch expenses');
-    }
+    return await apiRequest<Expense[]>(`/api/expenses/${groupId}`);
   } catch (e) {
-    console.error('Error fetching expenses:', e);
+    console.error('Error fetching group expenses:', e);
     throw e;
   }
 }
 
-export async function createExpense(expenseData: {
-  description: string;
-  amount: number;
-  currency: string;
-  paidBy: string;
-  groupId: string;
-  category?: string;
-}): Promise<Expense> {
+export async function createExpense(expenseData: CreateExpenseData): Promise<Expense> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/expenses`, {
+    return await apiRequest<Expense>('/api/expenses', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(expenseData),
     });
-
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create expense');
-    }
   } catch (e) {
     console.error('Error creating expense:', e);
     throw e;
   }
 }
 
-export async function updateExpense(expenseId: number, expenseData: {
-  description: string;
-  amount: number;
-  currency: string;
-  category?: string;
-}): Promise<Expense> {
+export async function updateExpense(expenseId: number, updates: Partial<Expense>): Promise<Expense> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/expenses/${expenseId}`, {
+    return await apiRequest<Expense>(`/api/expenses/${expenseId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(expenseData),
+      body: JSON.stringify(updates),
     });
-
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to update expense');
-    }
   } catch (e) {
     console.error('Error updating expense:', e);
     throw e;
   }
 }
 
-export async function deleteExpense(expenseId: number): Promise<void> {
+export async function deleteExpense(expenseId: number): Promise<{ message: string }> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/expenses/${expenseId}`, {
+    return await apiRequest<{ message: string }>(`/api/expenses/${expenseId}`, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to delete expense');
-    }
   } catch (e) {
     console.error('Error deleting expense:', e);
     throw e;

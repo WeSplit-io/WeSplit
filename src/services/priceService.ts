@@ -1,4 +1,4 @@
-const BACKEND_URL = 'http://192.168.1.75:4000';
+import { apiRequest } from '../config/api';
 
 export interface PriceData {
   symbol: string;

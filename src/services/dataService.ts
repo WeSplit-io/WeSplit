@@ -12,9 +12,7 @@ import {
   ReminderStatus,
   ApiResponse 
 } from '../types';
-
-// Backend URL configuration
-const BACKEND_URL = 'http://192.168.1.75:4000';
+import { apiRequest, getBackendURL } from '../config/api';
 
 // Cache configuration
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -115,8 +113,8 @@ const calculateUserBalance = (expenses: Expense[], members: GroupMember[], userI
   return balance;
 };
 
-// Generic API request handler
-const apiRequest = async <T>(
+// Generic API request handler with caching
+const makeApiRequest = async <T>(
   endpoint: string,
   options: RequestInit = {},
   useCache: boolean = true
@@ -131,21 +129,7 @@ const apiRequest = async <T>(
     }
   }
   
-  const url = `${BACKEND_URL}${endpoint}`;
-  const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Network error' }));
-    throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-  }
-  
-  const data = await response.json();
+  const data = await apiRequest<T>(endpoint, options, 2); // Use 2 retries
   
   // Cache successful GET requests
   if (options.method !== 'POST' && options.method !== 'PUT' && options.method !== 'DELETE' && useCache) {
@@ -158,11 +142,11 @@ const apiRequest = async <T>(
 // User services
 export const userService = {
   getCurrentUser: async (userId: string): Promise<User> => {
-    return apiRequest<User>(`/api/users/${userId}`);
+    return makeApiRequest<User>(`/api/users/${userId}`);
   },
 
   createUser: async (userData: Omit<User, 'id' | 'created_at'>): Promise<User> => {
-    const result = await apiRequest<User>('/api/users', {
+    const result = await makeApiRequest<User>('/api/users', {
       method: 'POST',
       body: JSON.stringify(userData),
     }, false);
@@ -172,7 +156,7 @@ export const userService = {
   },
 
   updateUser: async (userId: string, updates: Partial<User>): Promise<User> => {
-    const result = await apiRequest<User>(`/api/users/${userId}`, {
+    const result = await makeApiRequest<User>(`/api/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
     }, false);
@@ -185,7 +169,7 @@ export const userService = {
 // Group services
 export const groupService = {
   getUserGroups: async (userId: string, forceRefresh: boolean = false): Promise<GroupWithDetails[]> => {
-    const groups = await apiRequest<Group[]>(`/api/groups/${userId}`, {}, !forceRefresh);
+    const groups = await makeApiRequest<Group[]>(`/api/groups/${userId}`, {}, !forceRefresh);
     
     // Transform backend groups to GroupWithDetails, preserving all backend data
     const groupsWithDetails = groups.map((group) => {
@@ -227,7 +211,7 @@ export const groupService = {
 
   getGroupDetails: async (groupId: string, forceRefresh: boolean = false): Promise<GroupWithDetails> => {
     const [group, members, expenses] = await Promise.all([
-      apiRequest<Group>(`/api/groups/${groupId}`, {}, !forceRefresh),
+      makeApiRequest<Group>(`/api/groups/${groupId}`, {}, !forceRefresh),
       groupService.getGroupMembers(groupId, !forceRefresh),
       expenseService.getGroupExpenses(groupId, !forceRefresh)
     ]);
@@ -236,11 +220,11 @@ export const groupService = {
   },
 
   getGroupMembers: async (groupId: string, forceRefresh: boolean = false): Promise<GroupMember[]> => {
-    return apiRequest<GroupMember[]>(`/api/groups/${groupId}/members`, {}, !forceRefresh);
+    return makeApiRequest<GroupMember[]>(`/api/groups/${groupId}/members`, {}, !forceRefresh);
   },
 
   createGroup: async (groupData: Omit<Group, 'id' | 'created_at' | 'updated_at' | 'member_count' | 'expense_count' | 'expenses_by_currency'>): Promise<Group> => {
-    const result = await apiRequest<Group>('/api/groups', {
+    const result = await makeApiRequest<Group>('/api/groups', {
       method: 'POST',
       body: JSON.stringify(groupData),
     }, false);
@@ -251,7 +235,7 @@ export const groupService = {
   },
 
   updateGroup: async (groupId: string, userId: string, updates: Partial<Group>): Promise<{ message: string; group: Group }> => {
-    const result = await apiRequest<{ message: string; group: Group }>(`/api/groups/${groupId}`, {
+    const result = await makeApiRequest<{ message: string; group: Group }>(`/api/groups/${groupId}`, {
       method: 'PUT',
       body: JSON.stringify({ userId, ...updates }),
     }, false);
@@ -262,7 +246,7 @@ export const groupService = {
   },
 
   deleteGroup: async (groupId: string, userId: string): Promise<{ message: string }> => {
-    const result = await apiRequest<{ message: string }>(`/api/groups/${groupId}`, {
+    const result = await makeApiRequest<{ message: string }>(`/api/groups/${groupId}`, {
       method: 'DELETE',
       body: JSON.stringify({ userId }),
     }, false);
@@ -273,18 +257,18 @@ export const groupService = {
   },
 
   getUserContacts: async (userId: string, forceRefresh: boolean = false): Promise<UserContact[]> => {
-    return apiRequest<UserContact[]>(`/api/users/${userId}/contacts`, {}, !forceRefresh);
+    return makeApiRequest<UserContact[]>(`/api/users/${userId}/contacts`, {}, !forceRefresh);
   },
 
   generateInviteLink: async (groupId: string, userId: string): Promise<InviteLinkData> => {
-    return apiRequest<InviteLinkData>(`/api/groups/${groupId}/invite`, {
+    return makeApiRequest<InviteLinkData>(`/api/groups/${groupId}/invite`, {
       method: 'POST',
       body: JSON.stringify({ userId }),
     }, false);
   },
 
   joinGroupViaInvite: async (inviteCode: string, userId: string): Promise<{ message: string; groupId: number; groupName: string }> => {
-    const result = await apiRequest<{ message: string; groupId: number; groupName: string }>(`/api/groups/join/${inviteCode}`, {
+    const result = await makeApiRequest<{ message: string; groupId: number; groupName: string }>(`/api/groups/join/${inviteCode}`, {
       method: 'POST',
       body: JSON.stringify({ userId }),
     }, false);
@@ -298,7 +282,7 @@ export const groupService = {
 // Expense services
 export const expenseService = {
   getGroupExpenses: async (groupId: string, forceRefresh: boolean = false): Promise<Expense[]> => {
-    return apiRequest<Expense[]>(`/api/expenses/${groupId}`, {}, !forceRefresh);
+    return makeApiRequest<Expense[]>(`/api/expenses/${groupId}`, {}, !forceRefresh);
   },
 
   createExpense: async (expenseData: any): Promise<Expense> => {
@@ -314,7 +298,7 @@ export const expenseService = {
       splitData: expenseData.splitData
     };
     
-    const result = await apiRequest<Expense>('/api/expenses', {
+    const result = await makeApiRequest<Expense>('/api/expenses', {
       method: 'POST',
       body: JSON.stringify(backendData),
     }, false);
@@ -326,7 +310,7 @@ export const expenseService = {
   },
 
   updateExpense: async (expenseId: number, updates: Partial<Expense>): Promise<Expense> => {
-    const result = await apiRequest<Expense>(`/api/expenses/${expenseId}`, {
+    const result = await makeApiRequest<Expense>(`/api/expenses/${expenseId}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
     }, false);
@@ -340,7 +324,7 @@ export const expenseService = {
   },
 
   deleteExpense: async (expenseId: number): Promise<{ message: string }> => {
-    const result = await apiRequest<{ message: string }>(`/api/expenses/${expenseId}`, {
+    const result = await makeApiRequest<{ message: string }>(`/api/expenses/${expenseId}`, {
       method: 'DELETE',
     }, false);
     
@@ -353,11 +337,11 @@ export const expenseService = {
 // Settlement services
 export const settlementService = {
   getSettlementCalculation: async (groupId: string): Promise<SettlementCalculation[]> => {
-    return apiRequest<SettlementCalculation[]>(`/api/groups/${groupId}/settlement-calculation`);
+    return makeApiRequest<SettlementCalculation[]>(`/api/groups/${groupId}/settlement-calculation`);
   },
 
   settleGroupExpenses: async (groupId: string, userId: string, settlementType: 'individual' | 'full' = 'individual'): Promise<SettlementResult> => {
-    const result = await apiRequest<SettlementResult>(`/api/groups/${groupId}/settle`, {
+    const result = await makeApiRequest<SettlementResult>(`/api/groups/${groupId}/settle`, {
       method: 'POST',
       body: JSON.stringify({ userId, settlementType }),
     }, false);
@@ -374,7 +358,7 @@ export const settlementService = {
     amount: number,
     currency: string = 'USDC'
   ): Promise<{ success: boolean; message: string }> => {
-    const result = await apiRequest<{ success: boolean; message: string }>(`/api/groups/${groupId}/record-settlement`, {
+    const result = await makeApiRequest<{ success: boolean; message: string }>(`/api/groups/${groupId}/record-settlement`, {
       method: 'POST',
       body: JSON.stringify({ userId, recipientId, amount, currency }),
     }, false);
@@ -385,7 +369,7 @@ export const settlementService = {
   },
 
   getReminderStatus: async (groupId: string, userId: string): Promise<ReminderStatus> => {
-    return apiRequest<ReminderStatus>(`/api/groups/${groupId}/reminder-status?userId=${userId}`);
+    return makeApiRequest<ReminderStatus>(`/api/groups/${groupId}/reminder-status?userId=${userId}`);
   },
 
   sendPaymentReminder: async (
@@ -394,7 +378,7 @@ export const settlementService = {
     recipientId: string,
     amount: number
   ): Promise<{ success: boolean; message: string; recipientName: string; amount: number }> => {
-    return apiRequest<{ success: boolean; message: string; recipientName: string; amount: number }>(`/api/groups/${groupId}/send-reminder`, {
+    return makeApiRequest<{ success: boolean; message: string; recipientName: string; amount: number }>(`/api/groups/${groupId}/send-reminder`, {
       method: 'POST',
       body: JSON.stringify({ senderId, recipientId, amount }),
     }, false);

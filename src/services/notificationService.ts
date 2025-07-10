@@ -1,4 +1,4 @@
-const BACKEND_URL = 'http://192.168.1.75:4000';
+import { apiRequest } from '../config/api';
 
 export interface Notification {
   id: number;
@@ -20,11 +20,8 @@ export async function sendNotification(
   data?: any
 ): Promise<Notification> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/notifications`, {
+    return await apiRequest<Notification>('/api/notifications', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         userId,
         title,
@@ -33,13 +30,6 @@ export async function sendNotification(
         data
       }),
     });
-
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to send notification');
-    }
   } catch (e) {
     console.error('Error sending notification:', e);
     throw e;
@@ -55,11 +45,8 @@ export async function sendNotificationsToUsers(
   data?: any
 ): Promise<Notification[]> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/notifications/bulk`, {
+    return await apiRequest<Notification[]>('/api/notifications/bulk', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         userIds,
         title,
@@ -68,13 +55,6 @@ export async function sendNotificationsToUsers(
         data
       }),
     });
-
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to send notifications');
-    }
   } catch (e) {
     console.error('Error sending bulk notifications:', e);
     throw e;
@@ -84,13 +64,7 @@ export async function sendNotificationsToUsers(
 // Get notifications for a user
 export async function getUserNotifications(userId: number): Promise<Notification[]> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/notifications/${userId}`);
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch notifications');
-    }
+    return await apiRequest<Notification[]>(`/api/notifications/${userId}`);
   } catch (e) {
     console.error('Error fetching notifications:', e);
     throw e;
@@ -100,14 +74,9 @@ export async function getUserNotifications(userId: number): Promise<Notification
 // Mark notification as read
 export async function markNotificationAsRead(notificationId: number): Promise<void> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/notifications/${notificationId}/read`, {
+    await apiRequest<void>(`/api/notifications/${notificationId}/read`, {
       method: 'PUT',
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to mark notification as read');
-    }
   } catch (e) {
     console.error('Error marking notification as read:', e);
     throw e;

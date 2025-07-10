@@ -5,6 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WalletProvider } from './src/context/WalletContext';
 import { AppProvider } from './src/context/AppContext';
+import { initializeBackendURL } from './src/config/api';
 import { Text, View } from 'react-native';
 import { styles } from './App.styles';
 
@@ -62,6 +63,11 @@ export default function App() {
     const initializeApp = async () => {
       try {
         console.log('Initializing app with Solana wallet system...');
+        
+        // Initialize backend URL
+        console.log('Initializing backend URL...');
+        const backendUrl = await initializeBackendURL();
+        console.log('Backend URL initialized:', backendUrl);
         
         // Initialize Solana wallet system
         console.log('Solana wallet system initialized successfully');

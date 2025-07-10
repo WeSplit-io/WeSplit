@@ -1,23 +1,26 @@
-const BACKEND_URL = 'http://192.168.1.75:4000';
+import { apiRequest } from '../config/api';
 
 export interface PaymentRequest {
   id: number;
-  sender_id: number;
-  recipient_id: number;
+  senderId: number;
+  recipientId: number;
   amount: number;
   currency: string;
   description?: string;
-  group_id?: number;
-  status: 'pending' | 'accepted' | 'declined' | 'completed';
-  created_at: string;
-  updated_at: string;
-  sender_name?: string;
-  recipient_name?: string;
-  sender_email?: string;
-  recipient_email?: string;
-  sender_wallet?: string;
-  recipient_wallet?: string;
-  group_name?: string;
+  groupId?: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+  sender?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+  recipient?: {
+    id: number;
+    name: string;
+    email: string;
+  };
 }
 
 export interface CreatePaymentRequestData {
@@ -30,26 +33,19 @@ export interface CreatePaymentRequestData {
 }
 
 export interface UpdateRequestStatusData {
-  status: 'accepted' | 'declined' | 'completed';
+  status: 'accepted' | 'rejected' | 'cancelled';
   userId: number;
 }
 
 export async function createPaymentRequest(data: CreatePaymentRequestData): Promise<PaymentRequest> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/requests`, {
+    return await apiRequest<PaymentRequest>('/api/requests', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
     });
-
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create payment request');
-    }
   } catch (e) {
     console.error('Error creating payment request:', e);
     throw e;
@@ -58,14 +54,7 @@ export async function createPaymentRequest(data: CreatePaymentRequestData): Prom
 
 export async function getPaymentRequests(userId: number, type: 'sent' | 'received' | 'all' = 'all'): Promise<PaymentRequest[]> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/requests/${userId}?type=${type}`);
-
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch payment requests');
-    }
+    return await apiRequest<PaymentRequest[]>(`/api/requests/${userId}?type=${type}`);
   } catch (e) {
     console.error('Error fetching payment requests:', e);
     throw e;
@@ -74,14 +63,7 @@ export async function getPaymentRequests(userId: number, type: 'sent' | 'receive
 
 export async function getPaymentRequest(requestId: number): Promise<PaymentRequest> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/requests/request/${requestId}`);
-
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch payment request');
-    }
+    return await apiRequest<PaymentRequest>(`/api/requests/request/${requestId}`);
   } catch (e) {
     console.error('Error fetching payment request:', e);
     throw e;
@@ -90,42 +72,24 @@ export async function getPaymentRequest(requestId: number): Promise<PaymentReque
 
 export async function updatePaymentRequestStatus(requestId: number, data: UpdateRequestStatusData): Promise<{ message: string; requestId: number; status: string }> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/requests/${requestId}/status`, {
+    return await apiRequest<{ message: string; requestId: number; status: string }>(`/api/requests/${requestId}/status`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
     });
-
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to update payment request status');
-    }
   } catch (e) {
     console.error('Error updating payment request status:', e);
     throw e;
   }
 }
 
-export async function deletePaymentRequest(requestId: number, userId: number): Promise<{ message: string }> {
+export async function deletePaymentRequest(requestId: number): Promise<{ message: string }> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/requests/${requestId}`, {
+    return await apiRequest<{ message: string }>(`/api/requests/${requestId}`, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userId }),
     });
-
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to delete payment request');
-    }
   } catch (e) {
     console.error('Error deleting payment request:', e);
     throw e;
@@ -160,10 +124,10 @@ export async function acceptPaymentRequest(requestId: number, userId: number): P
 
 // Helper function to decline a payment request
 export async function declinePaymentRequest(requestId: number, userId: number): Promise<{ message: string; requestId: number; status: string }> {
-  return await updatePaymentRequestStatus(requestId, { status: 'declined', userId });
+  return await updatePaymentRequestStatus(requestId, { status: 'rejected', userId });
 }
 
 // Helper function to mark a payment request as completed
 export async function completePaymentRequest(requestId: number, userId: number): Promise<{ message: string; requestId: number; status: string }> {
-  return await updatePaymentRequestStatus(requestId, { status: 'completed', userId });
+  return await updatePaymentRequestStatus(requestId, { status: 'cancelled', userId });
 } 

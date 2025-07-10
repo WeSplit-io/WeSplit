@@ -1,4 +1,4 @@
-const BACKEND_URL = 'http://192.168.1.75:4000';
+import { apiRequest } from '../config/api';
 
 // MoonPay direct URL parameters (for fallback when backend is unavailable)
 const MOONPAY_DIRECT_CONFIG = {
@@ -40,7 +40,7 @@ export async function createMoonPayURL(walletAddress: string, amount?: number, c
   
   // First try to use the backend API
   try {
-    const response = await fetch(`${BACKEND_URL}/api/moonpay/create-url`, {
+    const data = await apiRequest<MoonPayURLResponse>('/api/moonpay/create-url', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -52,17 +52,8 @@ export async function createMoonPayURL(walletAddress: string, amount?: number, c
       }),
     });
 
-    console.log('MoonPay backend response status:', response.status);
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log('MoonPay URL created successfully via backend:', data);
-      return data;
-    } else {
-      const errorData = await response.json().catch(() => ({ error: 'Backend error' }));
-      console.warn('Backend failed, falling back to direct URL:', errorData);
-      throw new Error('Backend failed');
-    }
+    console.log('MoonPay URL created successfully via backend:', data);
+    return data;
   } catch (backendError) {
     console.warn('Backend unavailable, using direct MoonPay URL:', backendError);
     
@@ -86,14 +77,7 @@ export async function createMoonPayURL(walletAddress: string, amount?: number, c
 
 export async function checkMoonPayStatus(transactionId: string): Promise<MoonPayStatusResponse> {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/moonpay/status/${transactionId}`);
-
-    if (response.ok) {
-      return await response.json();
-    } else {
-      const errorData = await response.json().catch(() => ({ error: 'Status check failed' }));
-      throw new Error(errorData.error || 'Failed to check transaction status');
-    }
+    return await apiRequest<MoonPayStatusResponse>(`/api/moonpay/status/${transactionId}`);
   } catch (e) {
     console.error('Error checking MoonPay status:', e);
     throw new Error('Unable to check transaction status. Please contact support if needed.');
