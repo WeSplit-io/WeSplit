@@ -308,8 +308,6 @@ export const styles = StyleSheet.create({
     height: spacing.actionButtonSize,
     borderRadius: spacing.actionButtonRadius,
     backgroundColor: colors.darkCard,
-    borderWidth: spacing.borderWidthMedium,
-    borderColor: GREEN,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.sm,
@@ -317,18 +315,11 @@ export const styles = StyleSheet.create({
     position: 'relative',
   },
   
-  // Request button variation (filled green)
-  actionButtonCircleRequest: {
-    backgroundColor: GREEN,
-    borderColor: GREEN,
-    borderWidth: spacing.borderWidthMedium,
-  },
-  
   // === ACTION BUTTON ICONS & TEXT ===
   // Icon inside action button (default)
   actionButtonIcon: {
-    width: 24,
-    height: 24,
+    width: 30,
+    height: 30,
     tintColor: colors.textLight,
   },
   
@@ -341,9 +332,9 @@ export const styles = StyleSheet.create({
   
   // Label text below action buttons
   actionButtonText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.normal,
+    fontWeight: typography.fontWeight.medium,
   },
 
   // === REQUESTS SECTION ===

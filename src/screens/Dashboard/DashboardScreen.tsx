@@ -23,7 +23,7 @@ import { getTotalSpendingInUSDC } from '../../services/priceService';
 import { getUserNotifications, sendNotification } from '../../services/notificationService';
 
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
-  const { state } = useApp();
+  const { state, notifications, loadNotifications, refreshNotifications } = useApp();
   const { currentUser, isAuthenticated } = state;
   
   // Use efficient group list hook
@@ -96,18 +96,13 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     };
   }, [groups, currentUser?.id, currencyRates]);
 
-  // Load notification count
-  const loadNotificationCount = useCallback(async () => {
-    if (!currentUser?.id) return;
-    
-    try {
-      const notifications = await getUserNotifications(Number(currentUser.id));
-      const unreadCount = notifications.filter(n => !n.read).length;
+  // Load notification count from context notifications
+  useEffect(() => {
+    if (notifications) {
+      const unreadCount = notifications.filter(n => !n.is_read).length;
       setUnreadNotifications(unreadCount);
-    } catch (error) {
-      console.error('Error loading notification count:', error);
     }
-  }, [currentUser?.id]);
+  }, [notifications]);
 
   // Remove old balance calculation functions that relied on empty arrays
   // Data will be available when individual group details are loaded
@@ -161,8 +156,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   // Load notifications when dashboard loads
   useEffect(() => {
-    loadNotificationCount();
-  }, [loadNotificationCount]);
+    loadNotifications();
+  }, [loadNotifications]);
 
     // Convert group amounts to USD for display with proper currency handling
   const convertGroupAmountsToUSD = useCallback(async (groups: GroupWithDetails[]) => {
@@ -245,20 +240,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     }
   }, [currentUser?.id]); // Remove refreshGroups from dependencies to prevent infinite loop
 
-  // Load payment requests and notifications
+  // Load payment requests and notifications from context
   const loadPaymentRequests = useCallback(async () => {
-    if (!currentUser?.id) return;
-    
-    try {
-      // Fix: Convert to number since notificationService expects number
-      const notifications = await getUserNotifications(Number(currentUser.id));
-      // Fix: Use correct notification type
-      setPaymentRequests(notifications.filter(n => n.type === 'payment_request'));
-    } catch (error) {
-      console.error('Error loading payment requests:', error);
-      setPaymentRequests([]);
-    }
-  }, [currentUser?.id]);
+    if (!notifications) return;
+    // Only include notifications of type 'settlement_request' or 'payment_reminder' (adjust as needed)
+    setPaymentRequests(notifications.filter(n => n.type === 'settlement_request' || n.type === 'payment_reminder'));
+  }, [notifications]);
 
   // Load settlement requests that the current user has sent to others
   const loadOutgoingSettlementRequests = async () => {
@@ -402,9 +389,9 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     try {
       await Promise.all([
         refreshGroups(),
-        loadPaymentRequests(),
-        loadNotificationCount()
+        refreshNotifications(),
       ]);
+      loadPaymentRequests();
     } catch (error) {
       console.error('Error refreshing:', error);
     }
@@ -516,8 +503,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               onPress={() => navigation.navigate('SendContacts')}
             >
               <View style={styles.actionButtonCircle}>
-                <Icon
-                  name="arrow-up-right"
+                <Image
+                  source={require('../../../assets/icon-send.png')}
                   style={styles.actionButtonIcon}
                 />
               </View>
@@ -528,10 +515,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               style={styles.actionButton}
               onPress={() => navigation.navigate('RequestContacts')}
             >
-              <View style={[styles.actionButtonCircle, styles.actionButtonCircleRequest]}>
-                <Icon
-                  name="arrow-down-left"
-                  style={styles.actionButtonIconRequest}
+              <View style={styles.actionButtonCircle}>
+              <Image
+                  source={require('../../../assets/icon-receive.png')}
+                  style={styles.actionButtonIcon}
                 />
               </View>
               <Text style={styles.actionButtonText}>Request</Text>
@@ -542,8 +529,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               onPress={() => navigation.navigate('Deposit')}
             >
               <View style={styles.actionButtonCircle}>
-                <Icon
-                  name="plus"
+              <Image
+                  source={require('../../../assets/icon-deposit.png')}
                   style={styles.actionButtonIcon}
                 />
               </View>
@@ -558,8 +545,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               }}
             >
               <View style={styles.actionButtonCircle}>
-                <Icon
-                  name="x"
+              <Image
+                  source={require('../../../assets/icon-withdraw.png')}
                   style={styles.actionButtonIcon}
                 />
               </View>

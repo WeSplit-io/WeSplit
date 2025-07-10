@@ -43,103 +43,103 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
     console.error('Error fetching subscription plans:', e);
     throw e;
   }
-}
+  }
 
-// Get user's current subscription
+  // Get user's current subscription
 export async function getUserSubscription(userId: number): Promise<UserSubscription | null> {
-  try {
+    try {
     return await apiRequest<UserSubscription>(`/api/subscription/${userId}`);
   } catch (e: any) {
     if (e.message && e.message.includes('404')) {
-      return null; // No subscription found
+        return null; // No subscription found
+      }
+      console.error('Error fetching user subscription:', e);
+      throw e;
     }
-    console.error('Error fetching user subscription:', e);
-    throw e;
   }
-}
 
-// Create a new subscription
+  // Create a new subscription
 export async function createSubscription(userId: number, planId: number, paymentMethod: string): Promise<UserSubscription> {
-  try {
+    try {
     return await apiRequest<UserSubscription>('/api/subscription', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       body: JSON.stringify({
         userId,
         planId,
         paymentMethod
       }),
-    });
-  } catch (e) {
-    console.error('Error creating subscription:', e);
-    throw e;
+      });
+    } catch (e) {
+      console.error('Error creating subscription:', e);
+      throw e;
+    }
   }
-}
 
 // Cancel a subscription
 export async function cancelSubscription(userId: number): Promise<{ message: string }> {
-  try {
+    try {
     return await apiRequest<{ message: string }>(`/api/subscription/${userId}/cancel`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-  } catch (e) {
-    console.error('Error cancelling subscription:', e);
-    throw e;
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (e) {
+      console.error('Error cancelling subscription:', e);
+      throw e;
+    }
   }
-}
 
 // Reactivate a cancelled subscription
 export async function reactivateSubscription(userId: number): Promise<{ message: string }> {
-  try {
+    try {
     return await apiRequest<{ message: string }>(`/api/subscription/${userId}/reactivate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
     });
-  } catch (e) {
-    console.error('Error reactivating subscription:', e);
-    throw e;
+    } catch (e) {
+      console.error('Error reactivating subscription:', e);
+      throw e;
+    }
   }
-}
 
 // Process crypto payment for subscription
 export async function processCryptoPayment(data: CryptoPaymentData): Promise<{ success: boolean; subscriptionId: number; message: string }> {
   try {
     return await apiRequest<{ success: boolean; subscriptionId: number; message: string }>('/api/subscription/crypto-payment', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       body: JSON.stringify(data),
-    });
-  } catch (e) {
-    console.error('Error processing crypto payment:', e);
-    throw e;
+      });
+    } catch (e) {
+      console.error('Error processing crypto payment:', e);
+      throw e;
+    }
   }
-}
 
 // Validate subscription status
 export async function validateSubscription(userId: number): Promise<UserSubscription> {
-  try {
+    try {
     return await apiRequest<UserSubscription>(`/api/subscription/${userId}/validate`);
-  } catch (e) {
-    console.error('Error validating subscription:', e);
-    throw e;
+    } catch (e) {
+      console.error('Error validating subscription:', e);
+      throw e;
+    }
   }
-}
 
-// Get subscription history
+  // Get subscription history
 export async function getSubscriptionHistory(userId: number): Promise<UserSubscription[]> {
-  try {
+    try {
     return await apiRequest<UserSubscription[]>(`/api/subscription/${userId}/history`);
-  } catch (e) {
-    console.error('Error fetching subscription history:', e);
-    throw e;
+    } catch (e) {
+      console.error('Error fetching subscription history:', e);
+      throw e;
+    }
   }
-} 

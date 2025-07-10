@@ -7,7 +7,7 @@ export interface Notification {
   message: string;
   type: 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'general';
   data?: any; // Additional data for the notification
-  read: boolean;
+  is_read: boolean; // Rename from 'read' to 'is_read' to match types/index
   created_at: string;
 }
 

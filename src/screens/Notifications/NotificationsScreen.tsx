@@ -15,46 +15,29 @@ import { getUserNotifications, markNotificationAsRead, Notification } from '../.
 import styles from './styles';
 
 const NotificationsScreen: React.FC<any> = ({ navigation }) => {
-  const { state } = useApp();
+  const { state, notifications, loadNotifications } = useApp();
   const { currentUser } = state;
   
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadNotifications = async () => {
-    if (!currentUser?.id) return;
-    
-    try {
-      const userNotifications = await getUserNotifications(Number(currentUser.id));
-      console.log(`Loaded ${userNotifications.length} notifications for user ${currentUser.id}`);
-      setNotifications(userNotifications);
-    } catch (error) {
-      console.error('Error loading notifications:', error);
-      Alert.alert('Error', 'Failed to load notifications');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
+  // Use notifications from context
   useEffect(() => {
     loadNotifications();
-  }, [currentUser?.id]);
+  }, [loadNotifications]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadNotifications();
+    await loadNotifications(true);
+    setRefreshing(false);
   };
 
   const handleNotificationPress = async (notification: Notification) => {
     // Mark as read if not already read
-    if (!notification.read) {
+    if (!notification.is_read) {
       try {
         await markNotificationAsRead(notification.id);
-        setNotifications(prev => 
-          prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
-        );
+        loadNotifications(); // Refresh notifications to update read status
       } catch (error) {
         console.error('Error marking notification as read:', error);
       }
@@ -117,7 +100,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     return `${diffInWeeks}w ago`;
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   if (loading) {
     return (
@@ -171,7 +154,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               key={notification.id}
               style={[
                 styles.notificationItem,
-                !notification.read && styles.unreadNotification
+                !notification.is_read && styles.unreadNotification
               ]}
               onPress={() => handleNotificationPress(notification)}
             >
@@ -190,7 +173,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                 <View style={styles.notificationHeader}>
                   <Text style={[
                     styles.notificationTitle,
-                    !notification.read && styles.unreadText
+                    !notification.is_read && styles.unreadText
                   ]}>
                     {notification.title}
                   </Text>
@@ -216,7 +199,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                 )}
               </View>
               
-              {!notification.read && (
+              {!notification.is_read && (
                 <View style={styles.unreadDot} />
               )}
             </TouchableOpacity>

@@ -207,6 +207,8 @@ export interface AppState {
   // Data state
   groups: GroupWithDetails[];
   selectedGroup: GroupWithDetails | null;
+  notifications?: Notification[]; // Add notifications to state
+  lastNotificationsFetch?: number; // Timestamp for notifications cache
   
   // UI state
   isLoading: boolean;
@@ -236,7 +238,8 @@ export type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'CLEAR_ERROR' }
-  | { type: 'UPDATE_CACHE_TIMESTAMP'; payload: { type: 'groups' | 'expenses' | 'members'; groupId?: number; timestamp: number } };
+  | { type: 'UPDATE_CACHE_TIMESTAMP'; payload: { type: 'groups' | 'expenses' | 'members'; groupId?: number; timestamp: number } }
+  | { type: 'SET_NOTIFICATIONS'; payload: { notifications: Notification[]; timestamp: number } };
 
 // Data transformation utilities
 export interface DataTransformers {

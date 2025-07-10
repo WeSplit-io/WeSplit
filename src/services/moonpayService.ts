@@ -52,8 +52,8 @@ export async function createMoonPayURL(walletAddress: string, amount?: number, c
       }),
     });
 
-    console.log('MoonPay URL created successfully via backend:', data);
-    return data;
+      console.log('MoonPay URL created successfully via backend:', data);
+      return data;
   } catch (backendError) {
     console.warn('Backend unavailable, using direct MoonPay URL:', backendError);
     

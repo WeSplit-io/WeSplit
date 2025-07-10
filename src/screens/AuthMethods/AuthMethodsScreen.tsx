@@ -21,7 +21,7 @@ type RootStackParamList = {
 const AuthMethodsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { authenticateUser } = useApp();
-  const [email, setEmail] = useState('vinc.charles0@gmail.com');
+  const [email, setEmail] = useState('pauline.milaalonso@gmail.com');
   const [loading, setLoading] = useState(false);
 
   const handleNext = async () => {

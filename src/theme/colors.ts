@@ -1,14 +1,31 @@
 export const colors = {
   // === PRIMARY BRAND COLORS (From Figma) ===
+  // Root colors
+  green: '#A5EA15',
+  green10: 'rgba(165, 234, 21, 0.10)',
+  black: '#212121',
+  white: '#FFFFFF',
+  white10: 'rgba(255, 255, 255, 0.10)',
+  white50: 'rgba(255, 255, 255, 0.50)',
+  white70: 'rgba(255, 255, 255, 0.70)',
+  red: '#DC3434',
+  red20: 'rgba(220, 52, 52, 0.20)',
+  blackOverlay: 'rgba(0, 0, 0, 0.65)',
+
+
+
+
+
+
   // Main brand green - used for primary actions, highlights, and success states
-  primaryGreen: '#C5FF00',
+  primaryGreen: '#A5EA15',
   primaryGreenDark: '#A5EA15', // Legacy compatibility
   primaryGreenLight: '#D7FF33',
   primaryGreenAlpha: 'rgba(197, 255, 0, 0.1)',
   
   // === DARK THEME COLORS (From Figma) ===
   // Main dark background used throughout the app
-  darkBackground: '#1B1B1B',
+  darkBackground: '#212121',
   darkCard: '#2A2A2A',
   darkCardSecondary: '#1E1E1E',
   darkBorder: '#333333',
@@ -48,8 +65,6 @@ export const colors = {
   cryptoRed: '#FF6B9D',
   
   // === NEUTRAL COLORS ===
-  white: '#FFFFFF',
-  black: '#000000',
   transparent: 'transparent',
   overlay: 'rgba(0, 0, 0, 0.5)',
   overlayLight: 'rgba(0, 0, 0, 0.3)',

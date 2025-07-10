@@ -6,10 +6,12 @@ import {
   Balance, 
   AppState, 
   AppAction,
-  NavigationParams 
+  NavigationParams,
+  Notification 
 } from '../types';
 import { dataService } from '../services/dataService';
 import { i18nService } from '../services/i18nService';
+import { getUserNotifications } from '../services/notificationService';
 
 // Initial State - now clean without mock data
 const initialState: AppState = {
@@ -31,7 +33,9 @@ const initialState: AppState = {
     groups: 0,
     expenses: {},
     members: {}
-  }
+  },
+  notifications: [],
+  lastNotificationsFetch: 0,
 };
 
 // Reducer with improved state management
@@ -238,6 +242,13 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       }
       return state;
     
+    case 'SET_NOTIFICATIONS':
+      return {
+        ...state,
+        notifications: action.payload.notifications,
+        lastNotificationsFetch: action.payload.timestamp
+      };
+    
     default:
       return state;
   }
@@ -279,6 +290,11 @@ interface AppContextType {
   // Cache management
   shouldRefreshData: (type: 'groups' | 'expenses' | 'members', groupId?: number) => boolean;
   invalidateCache: (pattern: string) => void;
+
+  // Notifications
+  notifications: Notification[];
+  loadNotifications: (forceRefresh?: boolean) => Promise<void>;
+  refreshNotifications: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -672,6 +688,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dataService.cache.clearPattern(pattern);
   }, []);
 
+  // Notifications logic
+  const NOTIFICATIONS_CACHE_AGE = 2 * 60 * 1000; // 2 minutes
+  const loadNotifications = useCallback(async (forceRefresh: boolean = false) => {
+    if (!state.currentUser?.id) return;
+    const now = Date.now();
+    if (!forceRefresh && state.notifications && state.lastNotificationsFetch && (now - state.lastNotificationsFetch < NOTIFICATIONS_CACHE_AGE)) {
+      return; // Use cached notifications
+    }
+    try {
+      const notifications = await getUserNotifications(state.currentUser.id);
+      dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications, timestamp: now } });
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
+  }, [state.currentUser?.id, state.notifications, state.lastNotificationsFetch]);
+
+  const refreshNotifications = useCallback(async () => {
+    await loadNotifications(true);
+  }, [loadNotifications]);
+
   const value: AppContextType = {
     state,
     dispatch,
@@ -694,7 +730,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     getUserBalance,
     clearError,
     shouldRefreshData,
-    invalidateCache
+    invalidateCache,
+    notifications: state.notifications ?? [],
+    loadNotifications,
+    refreshNotifications,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
