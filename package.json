@@ -7,7 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "clear": "powershell -Command \"Remove-Item -Recurse -Force node_modules; Remove-Item -Force package-lock.json\""
+    "clear": "npx expo start --clear"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "1.23.1",

@@ -418,9 +418,9 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.statusBar} />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={styles.loadingCenter}>
           <ActivityIndicator size="large" color={GREEN} />
-          <Text style={{ color: '#FFF', marginTop: 16, fontSize: 16 }}>Loading your groups...</Text>
+          <Text style={styles.loadingText}>Loading your groups...</Text>
         </View>
       </SafeAreaView>
     );
@@ -632,41 +632,22 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                         <View style={styles.memberAvatars}>
                           {/* Show member count visually */}
                           {Array.from({ length: Math.min(summary.memberCount, 3) }).map((_, i) => (
-                            <View key={i} style={[styles.memberAvatar, {
-                              backgroundColor: '#A5EA15',
-                              width: 24,
-                              height: 24,
-                              borderRadius: 12,
-                              marginRight: 4,
-                              borderWidth: 2,
-                              borderColor: '#FFF'
-                            }]} />
+                            <View key={i} style={styles.memberAvatar} />
                           ))}
                           {summary.memberCount > 3 && (
-                            <View style={[styles.memberAvatarMore, {
-                              backgroundColor: '#666',
-                              width: 24,
-                              height: 24,
-                              borderRadius: 12,
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }]}>
-                              <Text style={[styles.memberAvatarMoreText, {
-                                color: '#FFF',
-                                fontSize: 10,
-                                fontWeight: 'bold'
-                              }]}>
+                            <View style={styles.memberAvatarMore}>
+                              <Text style={styles.memberAvatarMoreText}>
                                 +{summary.memberCount - 3}
                               </Text>
                             </View>
                           )}
-                          <Text style={{color: '#A5EA15', fontSize: 12, marginLeft: 8}}>
+                          <Text style={styles.activityIndicator}>
                             {summary.expenseCount} expense{summary.expenseCount !== 1 ? 's' : ''}
                           </Text>
                         </View>
                       ) : (
                         <View style={styles.memberAvatars}>
-                          <Text style={{color: '#999', fontSize: 12}}>No activity yet</Text>
+                          <Text style={styles.inactiveText}>No activity yet</Text>
                         </View>
                       )}
                     </TouchableOpacity>
@@ -679,7 +660,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                       styles.groupGridCard, 
                       index === 0 ? styles.groupGridCardLeft : styles.groupGridCardRight
                     ]}>
-                      <Text style={{color: '#999', fontSize: 14}}>Error loading group</Text>
+                      <Text style={styles.errorText}>Error loading group</Text>
                     </View>
                   );
                 }
@@ -762,15 +743,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                     style={styles.requestItem}
                     onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
                   >
-                    <View style={[styles.requestAvatar, {
-                      backgroundColor: '#A5EA15',
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }]}>
-                      <Text style={{color: '#000', fontWeight: 'bold', fontSize: 16}}>
+                    <View style={styles.transactionAvatar}>
+                      <Text style={styles.balanceAmountText}>
                         {(group.name || 'G').charAt(0).toUpperCase()}
                       </Text>
                     </View>

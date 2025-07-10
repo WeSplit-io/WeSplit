@@ -196,6 +196,45 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
     marginLeft: spacing.xs,
   },
+  // Alert and notification styles
+  alertContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF6B6B',
+    padding: spacing.md,
+    borderRadius: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  alertText: {
+    color: colors.white,
+    marginLeft: spacing.sm,
+    fontSize: typography.fontSize.sm,
+  },
+  walletAddressText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  centeredAmountLabel: {
+    fontSize: typography.fontSize.md,
+    marginBottom: spacing.sm,
+  },
+  largeAmountValue: {
+    fontSize: typography.fontSize.hero,
+    fontWeight: typography.fontWeight.bold,
+  },
+  settlementInfoText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  walletFromText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+  },
+
   confirmationCard: {
     backgroundColor: colors.darkBackground,
     borderRadius: spacing.screenPadding,

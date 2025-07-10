@@ -147,7 +147,8 @@ npm start
 Once the app is running successfully, you're ready to customize it!
 
 ### 🎨 **Design System Guide**
-📖 **Read the complete guide**: [DESIGN_SYSTEM_README.md](./DESIGN_SYSTEM_README.md)
+📖 **Quick start**: [DESIGNER_HANDOFF.md](./DESIGNER_HANDOFF.md) - **Essential info for designers**  
+📖 **Complete guide**: [DESIGN_SYSTEM_README.md](./DESIGN_SYSTEM_README.md) - **Detailed documentation**
 
 **Quick Overview:**
 - **Colors**: Edit `src/theme/colors.ts` to change the app's color scheme
@@ -335,6 +336,7 @@ eas build --platform ios --profile production
 ## 📚 **Additional Resources**
 
 ### **Design & Styling**
+- 🎨 [Designer Handoff Summary](./DESIGNER_HANDOFF.md) - **Quick start guide**
 - 📖 [Complete Design System Guide](./DESIGN_SYSTEM_README.md)
 - 🎨 [React Native Styling Docs](https://reactnative.dev/docs/style)
 - 📐 [8px Grid System Guide](https://builttoadapt.io/intro-to-the-8-point-grid-system-d2573cde8632)

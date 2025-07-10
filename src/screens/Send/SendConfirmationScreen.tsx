@@ -110,31 +110,17 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       <View style={styles.content}>
         {/* Wallet Connection Status */}
         {!isConnected && (
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: '#FF6B6B',
-            padding: 12,
-            borderRadius: 8,
-            marginBottom: 16,
-          }}>
+          <View style={styles.alertContainer}>
             <Icon name="alert-triangle" size={20} color="#FFF" />
-            <Text style={{ color: '#FFF', marginLeft: 8, fontSize: 14 }}>Wallet not connected</Text>
+            <Text style={styles.alertText}>Wallet not connected</Text>
           </View>
         )}
 
         {/* Balance Warning */}
         {isConnected && !hasSufficientBalance && (
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: '#FF6B6B',
-            padding: 12,
-            borderRadius: 8,
-            marginBottom: 16,
-          }}>
+          <View style={styles.alertContainer}>
             <Icon name="alert-triangle" size={20} color="#FFF" />
-            <Text style={{ color: '#FFF', marginLeft: 8, fontSize: 14 }}>
+            <Text style={styles.alertText}>
               Insufficient balance ({balance?.toFixed(4)} USDC available)
             </Text>
           </View>
@@ -150,7 +136,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           <View style={styles.mockupRecipientInfo}>
             <Text style={styles.mockupRecipientName}>{contact?.name || 'Unknown'}</Text>
             <Text style={styles.mockupRecipientEmail}>{contact?.email || ''}</Text>
-            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }} numberOfLines={1} ellipsizeMode="middle">
+            <Text style={styles.walletAddressText} numberOfLines={1} ellipsizeMode="middle">
               {contact?.wallet_address || 'No wallet address'}
             </Text>
           </View>
@@ -161,23 +147,12 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           alignItems: 'center',
           marginBottom: 32,
         }]}>
-          <Text style={[styles.sentAmountLabel, {
-            fontSize: 16,
-            marginBottom: 8,
-          }]}>
+          <Text style={[styles.sentAmountLabel, styles.centeredAmountLabel]}>
             {isSettlement ? 'Settlement amount' : 'Sent amount'}
           </Text>
-          <Text style={[styles.sentAmountValue, {
-            fontSize: 36,
-            fontWeight: 'bold',
-          }]}>{amount} USDC</Text>
+          <Text style={[styles.sentAmountValue, styles.largeAmountValue]}>{amount} USDC</Text>
           {isSettlement && (
-            <Text style={{
-              fontSize: 14,
-              color: colors.textSecondary,
-              marginTop: 4,
-              textAlign: 'center',
-            }}>
+            <Text style={styles.settlementInfoText}>
               Group expense settlement
             </Text>
           )}
@@ -214,7 +189,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
             Double check the person you're sending money to!
           </Text>
           {isConnected && address && (
-            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 8 }} numberOfLines={1} ellipsizeMode="middle">
+            <Text style={styles.walletFromText} numberOfLines={1} ellipsizeMode="middle">
               From: {address}
             </Text>
           )}

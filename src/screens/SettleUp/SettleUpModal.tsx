@@ -572,18 +572,18 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
                     : 'No settlement data available'}
                 </Text>
                 {currentUserBalance && (
-                  <Text style={{ color: '#A89B9B', fontSize: 14, marginTop: 8, textAlign: 'center' }}>
-                    Current balance: ${(Math.abs(currentUserBalance.amount) * (currentUserBalance.currency === 'SOL' ? 200 : currentUserBalance.currency === 'USDC' ? 1 : 100)).toFixed(2)} 
-                    ({currentUserBalance.status})
-                  </Text>
+                                  <Text style={styles.debugText}>
+                  Current balance: ${(Math.abs(currentUserBalance.amount) * (currentUserBalance.currency === 'SOL' ? 200 : currentUserBalance.currency === 'USDC' ? 1 : 100)).toFixed(2)} 
+                  ({currentUserBalance.status})
+                </Text>
                 )}
                 {/* Debug info */}
-                <Text style={{ color: '#A89B9B', fontSize: 12, marginTop: 8, textAlign: 'center' }}>
+                <Text style={styles.debugTextSmall}>
                   Balances found: {groupBalances.length} | 
                   Show owe: {showOweSection ? 'Yes' : 'No'} | 
                   Show owed: {showOwedSection ? 'Yes' : 'No'}
                 </Text>
-                <Text style={{ color: '#A89B9B', fontSize: 12, marginTop: 4, textAlign: 'center' }}>
+                <Text style={styles.debugTextTiny}>
                   Owe data: {oweData.length} | Owed data: {owedData.length}
                 </Text>
               </View>

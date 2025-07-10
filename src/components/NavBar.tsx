@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors, spacing, typography } from '../theme';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { colors } from '../theme';
 import Icon from './Icon';
+import { styles } from './NavBar.styles';
 
 const navItems = [
   { icon: 'home', label: 'Home', route: 'Dashboard' },
@@ -96,52 +97,6 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.darkCard,
-    borderTopWidth: 1,
-    borderTopColor: colors.darkBorder,
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 64,
-  },
-  scrollContent: {
-    paddingHorizontal: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    flexDirection: 'row',
-    flex: 1,
-  },
-  navItem: {
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    minWidth: 72,
-    flex: 1,
-  },
-  navLabel: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textLight,
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  navLabelActive: {
-    color: colors.brandGreen,
-  },
-  specialNavItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  specialButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.brandGreen,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
+
 
 export default NavBar; 

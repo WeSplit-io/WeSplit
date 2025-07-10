@@ -166,6 +166,36 @@ export const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.6,
   },
+
+  // Empty State
+  emptyState: {
+    padding: spacing.lg,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: typography.fontSize.md,
+    color: colors.textLight,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  debugText: {
+    color: colors.textGray,
+    fontSize: typography.fontSize.sm,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  debugTextSmall: {
+    color: colors.textGray,
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  debugTextTiny: {
+    color: colors.textGray,
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
   description: {
     fontSize: typography.fontSize.md,
     color: colors.darkGray,
@@ -315,18 +345,6 @@ export const styles = StyleSheet.create({
     color: colors.textLight,
     marginBottom: spacing.md,
     marginTop: spacing.lg,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  emptyStateText: {
-    color: colors.darkGray,
-    fontSize: typography.fontSize.md,
-    textAlign: 'center',
-    lineHeight: spacing.iconSize,
   },
   refreshButton: {
     backgroundColor: 'transparent',

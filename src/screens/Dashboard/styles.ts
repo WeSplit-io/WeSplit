@@ -196,6 +196,46 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
   },
   
+  // Loading and message styles
+  loadingCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: colors.textLight,
+    marginTop: spacing.md,
+    fontSize: typography.fontSize.md,
+  },
+  activityIndicator: {
+    color: colors.primaryGreen,
+    fontSize: typography.fontSize.xs,
+    marginLeft: spacing.sm,
+  },
+  inactiveText: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.xs,
+  },
+  errorText: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+  },
+  balanceAmountText: {
+    color: colors.darkBackground,
+    fontWeight: typography.fontWeight.bold,
+    fontSize: typography.fontSize.md,
+  },
+
+  // Transaction avatar styles 
+  transactionAvatar: {
+    backgroundColor: colors.primaryGreen,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   // QR icon SVG styling
   qrCodeIconSvg: {
     width: 20,
