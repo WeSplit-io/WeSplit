@@ -157,6 +157,18 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
       </View>
 
       <View style={styles.content}>
+        {/* Search Input */}
+        <View style={styles.mockupSearchContainer}>
+          <Icon name="search" size={20} color={colors.textSecondary} />
+          <TextInput
+            style={styles.mockupSearchInput}
+            placeholder="Search"
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+        
         {/* Tabs */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
@@ -177,17 +189,7 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Search Input */}
-        <View style={styles.mockupSearchContainer}>
-          <Icon name="search" size={20} color={colors.textSecondary} />
-          <TextInput
-            style={styles.mockupSearchInput}
-            placeholder="Search"
-            placeholderTextColor={colors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
+        
 
         {/* Content */}
         {loading ? (

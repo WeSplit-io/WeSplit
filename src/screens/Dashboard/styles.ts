@@ -32,6 +32,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.black,
     paddingHorizontal: 0,
     paddingTop: 0,
+    
   },
   
   // Scrollable content wrapper
@@ -56,8 +57,9 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.screenPadding,
     marginBottom: spacing.sm,
+    paddingHorizontal: spacing.lg,
+
   },
   
   // Left side of header (profile + welcome text)
@@ -148,7 +150,7 @@ export const styles = StyleSheet.create({
   balanceCard: {
     backgroundColor: GREEN,
     borderRadius: spacing.lg,
-    marginHorizontal: spacing.screenPadding,
+    marginHorizontal: spacing.lg,
     marginTop: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
@@ -272,7 +274,7 @@ export const styles = StyleSheet.create({
   // === ACTION BUTTONS GRID ===
   // Container for action buttons below balance card
   actionsGrid: {
-    marginHorizontal: spacing.screenPadding,
+    marginHorizontal: spacing.lg,
     marginBottom: spacing.xxl,
     marginTop: 0,
   },
@@ -330,7 +332,7 @@ export const styles = StyleSheet.create({
   // === REQUESTS SECTION ===
   // Container for requests list
   requestsSection: {
-    marginHorizontal: spacing.screenPadding,
+    marginHorizontal: spacing.lg,
     marginBottom: spacing.lg,
   },
   
@@ -455,7 +457,7 @@ export const styles = StyleSheet.create({
   // === GROUPS SECTION ===
   // Container for groups list
   groupsSection: {
-    marginHorizontal: spacing.screenPadding,
+    marginHorizontal: spacing.lg,
     marginBottom: spacing.xl,
   },
   
