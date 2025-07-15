@@ -36,7 +36,7 @@ function createDirectMoonPayURL(walletAddress: string, amount?: number, currency
 }
 
 export async function createMoonPayURL(walletAddress: string, amount?: number, currency: string = 'SOL'): Promise<MoonPayURLResponse> {
-  console.log('Creating MoonPay URL for wallet:', walletAddress, 'amount:', amount);
+  if (__DEV__) { console.log('Creating MoonPay URL for wallet:', walletAddress, 'amount:', amount); }
   
   // First try to use the backend API
   try {
@@ -52,7 +52,7 @@ export async function createMoonPayURL(walletAddress: string, amount?: number, c
       }),
     });
 
-      console.log('MoonPay URL created successfully via backend:', data);
+      if (__DEV__) { console.log('MoonPay URL created successfully via backend:', data); }
       return data;
   } catch (backendError) {
     console.warn('Backend unavailable, using direct MoonPay URL:', backendError);
@@ -60,7 +60,7 @@ export async function createMoonPayURL(walletAddress: string, amount?: number, c
     // Fallback to direct MoonPay URL
     try {
       const directUrl = createDirectMoonPayURL(walletAddress, amount, currency);
-      console.log('Created direct MoonPay URL:', directUrl);
+      if (__DEV__) { console.log('Created direct MoonPay URL:', directUrl); }
       
       return {
         url: directUrl,
@@ -85,6 +85,6 @@ export async function checkMoonPayStatus(transactionId: string): Promise<MoonPay
 }
 
 export function openMoonPayInBrowser(url: string): void {
-  console.log('Opening MoonPay URL:', url);
+  if (__DEV__) { console.log('Opening MoonPay URL:', url); }
   // This would use Linking.openURL(url) in React Native
 } 

@@ -15,7 +15,7 @@ export const useWalletConnection = () => {
 
   const handleConnect = useCallback(async () => {
     try {
-      console.log('useWalletConnection: Initiating wallet connection...');
+      if (__DEV__) { console.log('useWalletConnection: Initiating wallet connection...'); }
       await connectWallet();
     } catch (error) {
       console.error('useWalletConnection: Connection failed:', error);
@@ -25,7 +25,7 @@ export const useWalletConnection = () => {
 
   const handleDisconnect = useCallback(async () => {
     try {
-      console.log('useWalletConnection: Disconnecting wallet...');
+      if (__DEV__) { console.log('useWalletConnection: Disconnecting wallet...'); }
       await disconnectWallet();
     } catch (error) {
       console.error('useWalletConnection: Disconnect failed:', error);

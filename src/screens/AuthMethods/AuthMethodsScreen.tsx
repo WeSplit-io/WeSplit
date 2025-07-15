@@ -25,29 +25,29 @@ const AuthMethodsScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const handleNext = async () => {
-    console.log('=== Continue button pressed ===');
-    console.log('Email entered:', email);
+    if (__DEV__) { console.log('=== Continue button pressed ==='); }
+    if (__DEV__) { console.log('Email entered:', email); }
     
     if (!email || !email.includes('@')) {
       Alert.alert('Invalid Email', 'Please enter a valid email address.');
       return;
     }
     
-    console.log('Email validation passed, setting loading to true');
+    if (__DEV__) { console.log('Email validation passed, setting loading to true'); }
     setLoading(true);
     
     try {
-      console.log('Attempting to send verification code...');
+      if (__DEV__) { console.log('Attempting to send verification code...'); }
       
       // Always send verification code with new secure authentication
       // This works for both new and existing users
       const response = await sendVerificationCode(email);
-      console.log('Verification code response:', response);
+      if (__DEV__) { console.log('Verification code response:', response); }
       
       // Check if verification was skipped (user already verified this month)
       if (response.skipVerification && response.user) {
-        console.log('✅ User already verified this month, skipping verification');
-        console.log('📱 Authenticating user directly...');
+        if (__DEV__) { console.log('✅ User already verified this month, skipping verification'); }
+        if (__DEV__) { console.log('📱 Authenticating user directly...'); }
         
         // Store tokens securely
         if (response.accessToken && response.refreshToken) {
@@ -78,10 +78,10 @@ const AuthMethodsScreen: React.FC = () => {
         return;
       }
       
-      console.log('📧 Verification code sent, navigating to verification screen');
+      if (__DEV__) { console.log('📧 Verification code sent, navigating to verification screen'); }
       
       // Navigate to verification screen
-      console.log('Navigating to Verification screen...');
+      if (__DEV__) { console.log('Navigating to Verification screen...'); }
       navigation.navigate('Verification', { email });
       
     } catch (error) {
@@ -102,7 +102,7 @@ const AuthMethodsScreen: React.FC = () => {
       
       Alert.alert('Connection Error', errorMessage);
     } finally {
-      console.log('Setting loading to false');
+      if (__DEV__) { console.log('Setting loading to false'); }
       setLoading(false);
     }
   };

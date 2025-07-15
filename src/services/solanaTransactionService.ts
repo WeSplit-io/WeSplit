@@ -32,7 +32,7 @@ const USDC_MINT_ADDRESSES = {
 };
 
 // Current network configuration
-const CURRENT_NETWORK = 'devnet';
+const CURRENT_NETWORK = process.env.NODE_ENV === 'production' ? 'mainnet' : 'devnet';
 const RPC_ENDPOINT = SOLANA_RPC_ENDPOINTS[CURRENT_NETWORK];
 const USDC_MINT_ADDRESS = USDC_MINT_ADDRESSES[CURRENT_NETWORK];
 

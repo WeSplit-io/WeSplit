@@ -50,23 +50,23 @@ export interface VerificationResponse {
 
 // Helper function to try different backend URLs
 async function tryBackendUrls(endpoint: string, options: RequestInit): Promise<Response> {
-  console.log('Trying different backend URLs...');
+  if (__DEV__) { console.log('Trying different backend URLs...'); }
   
   for (const baseUrl of POSSIBLE_BACKEND_URLS) {
     try {
-      console.log(`Trying: ${baseUrl}${endpoint}`);
+      if (__DEV__) { console.log(`Trying: ${baseUrl}${endpoint}`); }
       const response = await fetch(`${baseUrl}${endpoint}`, {
         ...options,
         // Add shorter timeout to prevent hanging (3 seconds per URL)
         signal: AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined,
       });
       
-      console.log(`${baseUrl} responded with status: ${response.status}`);
+      if (__DEV__) { console.log(`${baseUrl} responded with status: ${response.status}`); }
       
       // If successful, update the API_BASE_URL for future requests
       if (response.ok) {
         API_BASE_URL = baseUrl;
-        console.log(`Successfully connected to: ${baseUrl}`);
+        if (__DEV__) { console.log(`Successfully connected to: ${baseUrl}`); }
         return response;
       }
       
@@ -87,11 +87,11 @@ async function tryBackendUrls(endpoint: string, options: RequestInit): Promise<R
 }
 
 export async function sendVerificationCode(email: string): Promise<VerificationResponse> {
-  console.log('=== sendVerificationCode called ===');
-  console.log('Email:', email);
+  if (__DEV__) { console.log('=== sendVerificationCode called ==='); }
+  if (__DEV__) { console.log('Email:', email); }
   
   try {
-    console.log('Making fetch request...');
+    if (__DEV__) { console.log('Making fetch request...'); }
     const response = await tryBackendUrls('/api/auth/send-verification', {
       method: 'POST',
       headers: {
@@ -100,11 +100,11 @@ export async function sendVerificationCode(email: string): Promise<VerificationR
       body: JSON.stringify({ email }),
     });
 
-    console.log('Response status:', response.status);
-    console.log('Response ok:', response.ok);
+    if (__DEV__) { console.log('Response status:', response.status); }
+    if (__DEV__) { console.log('Response ok:', response.ok); }
 
     if (!response.ok) {
-      console.log('Response not ok, getting error data...');
+      if (__DEV__) { console.log('Response not ok, getting error data...'); }
       let errorData;
       try {
         errorData = await response.json();
@@ -116,13 +116,13 @@ export async function sendVerificationCode(email: string): Promise<VerificationR
       throw new Error(errorData.error || `HTTP ${response.status}: Failed to send verification code`);
     }
 
-    console.log('Response ok, getting data...');
+    if (__DEV__) { console.log('Response ok, getting data...'); }
     const data = await response.json();
-    console.log('Response data:', data);
+    if (__DEV__) { console.log('Response data:', data); }
     
     // In development, log the code for testing
     if (data.code) {
-      console.log(`[DEV] Verification code for ${email}: ${data.code}`);
+      if (__DEV__) { console.log(`[DEV] Verification code for ${email}: ${data.code}`); }
     }
     
     return data;
