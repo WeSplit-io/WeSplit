@@ -65,12 +65,12 @@ const VerificationScreen: React.FC = () => {
       }
 
       const codeString = code.join('');
-      console.log('🔐 Verifying code:', codeString, 'for email:', email);
+      if (__DEV__) { console.log('🔐 Verifying code:', codeString, 'for email:', email); }
       
       const authResponse = await verifyCode(email, codeString);
 
       // Code verified successfully and user is now authenticated
-      console.log('✅ Authentication successful:', authResponse.user);
+      if (__DEV__) { console.log('✅ Authentication successful:', authResponse.user); }
       
       // Transform API response to match User type (snake_case)
       const transformedUser = {
@@ -85,7 +85,7 @@ const VerificationScreen: React.FC = () => {
       
       // Update the global app context with the authenticated user
       authenticateUser(transformedUser, 'email');
-      console.log('📱 User authenticated in app context');
+      if (__DEV__) { console.log('📱 User authenticated in app context'); }
       
       // Navigate to dashboard as user is now logged in
       (navigation as any).reset({

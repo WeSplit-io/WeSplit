@@ -53,7 +53,7 @@ const LoadingScreen = () => (
   </View>
 );
 
-console.log('App.tsx loaded - initializing Solana wallet system');
+if (__DEV__) { console.log('App.tsx loaded - initializing Solana wallet system'); }
 
 export default function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -62,15 +62,15 @@ export default function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        console.log('Initializing app with Solana wallet system...');
+        if (__DEV__) { console.log('Initializing app with Solana wallet system...'); }
         
         // Initialize backend URL
-        console.log('Initializing backend URL...');
+        if (__DEV__) { console.log('Initializing backend URL...'); }
         const backendUrl = await initializeBackendURL();
-        console.log('Backend URL initialized:', backendUrl);
+        if (__DEV__) { console.log('Backend URL initialized:', backendUrl); }
         
         // Initialize Solana wallet system
-        console.log('Solana wallet system initialized successfully');
+        if (__DEV__) { console.log('Solana wallet system initialized successfully'); }
         setIsInitialized(true);
       } catch (error) {
         console.error('Failed to initialize app:', error);
@@ -83,7 +83,7 @@ export default function App() {
     initializeApp();
   }, []);
 
-  console.log('App component rendered, initialized:', isInitialized, 'error:', error);
+  if (__DEV__) { console.log('App component rendered, initialized:', isInitialized, 'error:', error); }
 
   if (!isInitialized) {
     return <LoadingScreen />;

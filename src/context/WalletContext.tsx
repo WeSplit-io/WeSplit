@@ -50,8 +50,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [secretKey, setSecretKey] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('WalletProvider mounted successfully');
-    console.log('Current wallet state:', { address, isConnected, chainId, balance, walletName });
+    if (__DEV__) { console.log('WalletProvider mounted successfully'); }
+    if (__DEV__) { console.log('Current wallet state:', { address, isConnected, chainId, balance, walletName }); }
   }, [address, isConnected, chainId, balance, walletName]);
 
   // Check initial wallet connection status
@@ -65,14 +65,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           setBalance(info.balance || null);
           setWalletInfo(info);
           setWalletName(info.walletName || null);
-          setChainId('solana:devnet');
+          setChainId(process.env.NODE_ENV === 'production' ? 'solana:mainnet' : 'solana:devnet');
           // Expose secret key if available
           if (info && (info as any).secretKey) {
             setSecretKey((info as any).secretKey);
           } else {
             setSecretKey(null);
           }
-          console.log('Found existing wallet connection:', info.address, 'using', info.walletName);
+          if (__DEV__) { console.log('Found existing wallet connection:', info.address, 'using', info.walletName); }
         }
       } catch (error) {
         console.error('Error checking initial connection:', error);
@@ -84,7 +84,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   const handleConnectWallet = async () => {
     try {
-      console.log('WalletProvider: connectWallet called');
+      if (__DEV__) { console.log('WalletProvider: connectWallet called'); }
       setIsLoading(true);
       
       // Connect to Solana wallet
@@ -95,7 +95,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setBalance(walletInfo.balance || null);
       setWalletInfo(walletInfo);
       setWalletName(walletInfo.walletName || null);
-      setChainId('solana:devnet');
+      setChainId(process.env.NODE_ENV === 'production' ? 'solana:mainnet' : 'solana:devnet');
       // Expose secret key if available
       if (walletInfo && (walletInfo as any).secretKey) {
         setSecretKey((walletInfo as any).secretKey);
@@ -103,14 +103,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         // Try to connect the Solana service as well
         try {
           await solanaService.importWallet((walletInfo as any).secretKey);
-          console.log('Solana blockchain service connected successfully');
+          if (__DEV__) { console.log('Solana blockchain service connected successfully'); }
         } catch (solanaError) {
           console.warn('Failed to connect Solana blockchain service:', solanaError);
         }
       } else {
         setSecretKey(null);
       }
-      console.log('Solana wallet connected successfully:', walletInfo.address, 'using', walletInfo.walletName);
+      if (__DEV__) { console.log('Solana wallet connected successfully:', walletInfo.address, 'using', walletInfo.walletName); }
       
     } catch (error) {
       console.error('Error in connectWallet:', error);
@@ -128,7 +128,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   const handleDisconnectWallet = async () => {
     try {
-      console.log('WalletProvider: disconnectWallet called');
+      if (__DEV__) { console.log('WalletProvider: disconnectWallet called'); }
       setIsLoading(true);
       
       await disconnectWallet();
@@ -136,7 +136,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Also disconnect from Solana service
       solanaService.disconnect();
       
-      console.log('Disconnecting wallet...');
+      if (__DEV__) { console.log('Disconnecting wallet...'); }
       setIsConnected(false);
       setAddress(null);
       setChainId(null);
@@ -144,7 +144,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setWalletInfo(null);
       setWalletName(null);
       setSecretKey(null);
-      console.log('Wallet disconnected successfully');
+      if (__DEV__) { console.log('Wallet disconnected successfully'); }
       
     } catch (error) {
       console.error('Error in disconnectWallet:', error);
@@ -156,12 +156,12 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   // Listen for wallet connection events
   useEffect(() => {
-    console.log('WalletProvider: Setting up event listeners');
+    if (__DEV__) { console.log('WalletProvider: Setting up event listeners'); }
     
     if (isConnected && address) {
-      console.log('Wallet connected:', { address, chainId, balance, walletName });
+      if (__DEV__) { console.log('Wallet connected:', { address, chainId, balance, walletName }); }
     } else if (!isConnected) {
-      console.log('Wallet disconnected');
+      if (__DEV__) { console.log('Wallet disconnected'); }
     }
   }, [isConnected, address, chainId, balance, walletName]);
 
@@ -171,7 +171,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         throw new Error('Wallet not connected');
       }
 
-      console.log('Sending transaction:', params);
+      if (__DEV__) { console.log('Sending transaction:', params); }
       
       // Try to use real Solana blockchain transaction
       try {
@@ -197,7 +197,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         // Send real blockchain transaction
         const result = await solanaService.sendTransaction(solanaParams);
         
-        console.log('Real blockchain transaction sent successfully:', result);
+        if (__DEV__) { console.log('Real blockchain transaction sent successfully:', result); }
         
         return { 
           signature: result.signature, 
@@ -212,7 +212,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         const signature = `mock_tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const txId = signature;
         
-        console.log('Mock transaction sent successfully:', { signature, txId });
+        if (__DEV__) { console.log('Mock transaction sent successfully:', { signature, txId }); }
         
         return { signature, txId };
       }

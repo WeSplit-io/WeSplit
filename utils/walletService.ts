@@ -12,7 +12,7 @@ import {
 import { solanaService } from '../src/services/solanaTransactionService';
 
 // Your Solana network configuration
-const SOLANA_NETWORK = 'devnet'; // or 'mainnet-beta'
+const SOLANA_NETWORK = process.env.NODE_ENV === 'production' ? 'mainnet-beta' : 'devnet';
 const SOLANA_RPC_URL = clusterApiUrl(SOLANA_NETWORK);
 
 // Create connection to Solana network
@@ -37,13 +37,13 @@ class SolanaWalletManager {
   // Generate a new wallet
   async generateWallet(): Promise<WalletInfo> {
     try {
-      console.log('Generating new Solana wallet...');
+      if (__DEV__) { console.log('Generating new Solana wallet...'); }
       
       this.keypair = Keypair.generate();
       this.publicKey = this.keypair.publicKey;
       this.isConnected = true;
       
-      console.log('Wallet generated successfully');
+      if (__DEV__) { console.log('Wallet generated successfully'); }
       
       return {
         publicKey: this.publicKey,
@@ -62,14 +62,14 @@ class SolanaWalletManager {
   // Import wallet from secret key
   async importWallet(secretKey: string): Promise<WalletInfo> {
     try {
-      console.log('Importing wallet from secret key...');
+      if (__DEV__) { console.log('Importing wallet from secret key...'); }
       
       const secretKeyBytes = new Uint8Array(Buffer.from(secretKey, 'hex'));
       this.keypair = Keypair.fromSecretKey(secretKeyBytes);
       this.publicKey = this.keypair.publicKey;
       this.isConnected = true;
       
-      console.log('Wallet imported successfully');
+      if (__DEV__) { console.log('Wallet imported successfully'); }
       
       return {
         publicKey: this.publicKey,
@@ -87,13 +87,13 @@ class SolanaWalletManager {
 
   async disconnect(): Promise<void> {
     try {
-      console.log('Disconnecting Solana wallet...');
+      if (__DEV__) { console.log('Disconnecting Solana wallet...'); }
       
       this.keypair = null;
       this.publicKey = null;
       this.isConnected = false;
       
-      console.log('Solana wallet disconnected successfully');
+      if (__DEV__) { console.log('Solana wallet disconnected successfully'); }
     } catch (error) {
       console.error('Failed to disconnect wallet:', error);
       throw error;
@@ -110,7 +110,7 @@ class SolanaWalletManager {
       try {
         balance = await connection.getBalance(this.publicKey);
       } catch (balanceError) {
-        console.log('Could not retrieve balance, using 0');
+        if (__DEV__) { console.log('Could not retrieve balance, using 0'); }
         balance = 0;
       }
       
@@ -133,9 +133,9 @@ class SolanaWalletManager {
     }
 
     try {
-      console.log('Signing transaction...');
+      if (__DEV__) { console.log('Signing transaction...'); }
       transaction.sign(this.keypair);
-      console.log('Transaction signed successfully');
+      if (__DEV__) { console.log('Transaction signed successfully'); }
       return transaction;
     } catch (error) {
       console.error('Failed to sign transaction:', error);
@@ -149,7 +149,7 @@ class SolanaWalletManager {
     }
 
     try {
-      console.log('Sending transaction...');
+      if (__DEV__) { console.log('Sending transaction...'); }
       
       // Sign the transaction
       const signedTransaction = await this.signTransaction(transaction);
@@ -157,7 +157,7 @@ class SolanaWalletManager {
       // Send the transaction
       const signature = await connection.sendRawTransaction(signedTransaction.serialize());
       
-      console.log('Transaction sent successfully:', signature);
+      if (__DEV__) { console.log('Transaction sent successfully:', signature); }
       return signature;
     } catch (error) {
       console.error('Failed to send transaction:', error);

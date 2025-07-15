@@ -166,7 +166,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       
       for (const group of groups) {
         if (group.expenses_by_currency && group.expenses_by_currency.length > 0) {
-          console.log(`Converting group "${group.name}" expenses:`, group.expenses_by_currency);
+          if (__DEV__) { console.log(`Converting group "${group.name}" expenses:`, group.expenses_by_currency); }
           
           try {
             const expenses = group.expenses_by_currency.map(expense => ({
@@ -174,7 +174,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               currency: expense.currency || 'SOL'
             }));
             
-            console.log(`Calling getTotalSpendingInUSDC with:`, expenses);
+            if (__DEV__) { console.log(`Calling getTotalSpendingInUSDC with:`, expenses); }
             const totalUSD = await getTotalSpendingInUSDC(expenses);
             
             console.log(`Group "${group.name}": Price service returned $${totalUSD.toFixed(2)}`);
@@ -217,12 +217,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             usdAmounts[group.id] = fallbackTotal;
           }
         } else {
-          console.log(`Group "${group.name}": No expenses_by_currency data`);
+          if (__DEV__) { console.log(`Group "${group.name}": No expenses_by_currency data`); }
           usdAmounts[group.id] = 0;
         }
       }
       
-      console.log('Final USD amounts:', usdAmounts);
+      if (__DEV__) { console.log('Final USD amounts:', usdAmounts); }
       setGroupAmountsInUSD(usdAmounts);
     } catch (error) {
       console.error('Error converting group amounts to USD:', error);
@@ -256,7 +256,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       
       // Simplified: For now, use notification-based requests instead of calculating from expenses
       // since individual expense data is not available in the groups list
-      console.log('Loading settlement requests - using notification-based approach');
+      if (__DEV__) { console.log('Loading settlement requests - using notification-based approach'); }
       
       // This will be populated when full group details are implemented
       // For now, return empty array to prevent errors
@@ -333,7 +333,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     }
 
     try {
-      console.log('Sending request from dashboard:', request);
+      if (__DEV__) { console.log('Sending request from dashboard:', request); }
       
       // Create notification data
       const notificationData = {
@@ -347,7 +347,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         request_id: request.request_id || Date.now().toString()
       };
 
-      console.log('Notification data:', notificationData);
+      if (__DEV__) { console.log('Notification data:', notificationData); }
 
       // Fix: Use correct parameter order and types for sendNotification
       const result = await sendNotification(
@@ -358,7 +358,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         notificationData // data
       );
 
-      console.log('Send notification result:', result);
+      if (__DEV__) { console.log('Send notification result:', result); }
 
       // Fix: sendNotification returns a Notification object, not a success/error response
       if (result && result.id) {
@@ -541,7 +541,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               style={styles.actionButton}
               onPress={() => {
                 // TODO: Implement withdraw functionality
-                console.log('Withdraw tapped');
+                if (__DEV__) { console.log('Withdraw tapped'); }
               }}
             >
               <View style={styles.actionButtonCircle}>
