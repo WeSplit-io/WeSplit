@@ -1,5 +1,7 @@
 import React from 'react';
 import { ViewStyle, StyleProp } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 
 // Bootstrap Icons imports - Using correct paths
 import HouseFill from 'react-native-bootstrap-icons/icons/house-fill';
@@ -72,8 +74,12 @@ import PersonPlus from 'react-native-bootstrap-icons/icons/person-plus';
 import DollarSign from 'react-native-bootstrap-icons/icons/currency-dollar';
 import Bell from 'react-native-bootstrap-icons/icons/bell';
 import BellFill from 'react-native-bootstrap-icons/icons/bell-fill';
+import Camera from 'react-native-bootstrap-icons/icons/camera';
+import CameraFill from 'react-native-bootstrap-icons/icons/camera-fill';
+import UpcScan from 'react-native-bootstrap-icons/icons/upc-scan';
+import Upc from 'react-native-bootstrap-icons/icons/upc';
 
-export type IconType = 'bootstrap';
+export type IconType = 'bootstrap' | 'ionicons' | 'fontawesome5';
 
 interface IconProps {
   name: string;
@@ -140,7 +146,10 @@ const iconMap: Record<string, React.ComponentType<any>> = {
   'eye': Eye,
   'eye-off': EyeSlash,
   'eye-fill': EyeFill,
-  'qr-code': Square, // Using square as QR code fallback
+  'qr-code': Upc, // Using UPC as QR code representation
+  'qr-code-scan': UpcScan, // Using UPC scan for QR code scanner
+  'camera': Camera,
+  'camera-fill': CameraFill,
   
   // Finance/Wallet
   'wallet': Wallet,
@@ -194,7 +203,31 @@ const iconMap: Record<string, React.ComponentType<any>> = {
   'circle': Circle,
 };
 
-const Icon: React.FC<IconProps> = ({ name, size = 24, color = '#333', style }) => {
+const Icon: React.FC<IconProps> = ({ name, size = 24, color = '#333', type = 'bootstrap', style }) => {
+  // Handle QR code icons with react-native-vector-icons
+  if (name === 'qr-code' || name === 'qr-code-scan') {
+    if (type === 'ionicons' || name === 'qr-code-scan') {
+      return (
+        <Ionicons 
+          name={name === 'qr-code' ? 'qr-code' : 'qr-code-outline'} 
+          size={size} 
+          color={color} 
+          style={style} 
+        />
+      );
+    } else if (type === 'fontawesome5') {
+      return (
+        <FontAwesome5 
+          name="qrcode" 
+          size={size} 
+          color={color} 
+          style={style} 
+        />
+      );
+    }
+  }
+
+  // Handle other icons with Bootstrap icons
   const IconComponent = iconMap[name] || Circle; // Default to circle if icon not found
   
   return (

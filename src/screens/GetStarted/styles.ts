@@ -5,6 +5,7 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.darkBackground,
+    
   },
   content: {
     flex: 1,
@@ -12,18 +13,18 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.xl,
   },
   logoSection: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginTop: spacing.lg,
     marginBottom: spacing.xl,
   },
   logoText: {
-    fontSize: 28,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: typography.fontSize.gigantic,
+    fontWeight: typography.fontWeight.extrabold,
     color: colors.textLight,
     letterSpacing: 0.5,
   },
   logoSplit: {
-    color: colors.brandGreen,
+    color: colors.green,
   },
   heroSection: {
     flex: 1,
@@ -36,36 +37,32 @@ export const styles = StyleSheet.create({
   },
   messageSection: {
     alignItems: 'flex-start',
-    paddingHorizontal: spacing.md,
     marginBottom: spacing.xl,
   },
   headline: {
-    fontSize: 32,
+    fontSize: typography.fontSize.title,
     fontWeight: typography.fontWeight.bold,
     color: colors.textLight,
-    lineHeight: 38,
-    marginBottom: spacing.xs,
+    lineHeight: 52,
   },
   subtitle: {
-    fontSize: typography.fontSize.md,
-    color: colors.textLight,
-    lineHeight: 22,
-    opacity: 0.8,
+    fontSize: typography.fontSize.lg,
+    color: colors.white70,
+    lineHeight: 24,
     marginTop: spacing.md,
   },
   buttonSection: {
     paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.md,
   },
   getStartedButton: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     borderRadius: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingVertical: 20,
     alignItems: 'center',
   },
   getStartedButtonText: {
-    color: colors.darkBackground,
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
+    color: colors.black,
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.medium,
   },
 }); 

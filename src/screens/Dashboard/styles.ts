@@ -29,7 +29,7 @@ export const styles = StyleSheet.create({
   // Root container with dark background
   container: {
     flex: 1,
-    backgroundColor: BG_COLOR,
+    backgroundColor: colors.black,
     paddingHorizontal: 0,
     paddingTop: 0,
   },
@@ -57,7 +57,6 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.screenPadding,
-    paddingTop: spacing.screenPadding,
     marginBottom: spacing.sm,
   },
   
@@ -80,15 +79,15 @@ export const styles = StyleSheet.create({
   
   // Welcome text above user name
   welcomeText: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.lg,
+    color: colors.white70,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.normal,
     marginBottom: spacing.xs / 2,
   },
   
   // User's display name (large, bold)
   userName: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.xxxl,
     fontWeight: typography.fontWeight.bold,
     marginBottom: 0,
@@ -103,9 +102,9 @@ export const styles = StyleSheet.create({
   
   // Bell icon styling
   bellIcon: {
-    width: spacing.iconSize,
-    height: spacing.iconSize,
-    tintColor: colors.textLight,
+    width: 30,
+    height: 30,
+    color: colors.white,
   },
   
   // Red notification dot on bell icon
@@ -116,7 +115,7 @@ export const styles = StyleSheet.create({
     width: spacing.bellDotSize,
     height: spacing.bellDotSize,
     borderRadius: spacing.bellDotRadius,
-    backgroundColor: GREEN,
+    backgroundColor: colors.green,
     borderWidth: spacing.borderWidthThin,
     borderColor: colors.textLight,
   },
@@ -152,9 +151,9 @@ export const styles = StyleSheet.create({
     marginHorizontal: spacing.screenPadding,
     marginTop: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xxxl,
+    paddingVertical: spacing.lg,
     alignItems: 'flex-start',
-    marginBottom: spacing.xxxl,
+    marginBottom: spacing.lg,
     minHeight: spacing.balanceCardMinHeight,
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: spacing.xs },
@@ -174,26 +173,24 @@ export const styles = StyleSheet.create({
   
   // "Your Balance" label
   balanceLabel: {
-    color: BG_COLOR,
+    color: colors.black,
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.regular,
   },
   
   // QR code icon container
   qrCodeIcon: {
     width: spacing.qrCodeIconSize,
     height: spacing.qrCodeIconSize,
-    backgroundColor: colors.qrCodeOverlay,
     borderRadius: spacing.radiusSm,
     justifyContent: 'center',
     alignItems: 'center',
   },
   
   // QR text inside icon
-  qrCodeText: {
-    color: BG_COLOR,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
+  qrCodeImage: {
+    width: 25,
+    height: 25,
   },
   
   // Loading and message styles
@@ -236,17 +233,10 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // QR icon SVG styling
-  qrCodeIconSvg: {
-    width: 20,
-    height: 20,
-    tintColor: BG_COLOR,
-  },
-  
   // === BALANCE AMOUNT (HERO ELEMENT) ===
   // Large dollar amount display
   balanceAmount: {
-    color: BG_COLOR,
+    color: colors.black,
     fontSize: typography.fontSize.hero,
     fontWeight: typography.fontWeight.extrabold,
     marginBottom: spacing.sm,
@@ -256,8 +246,8 @@ export const styles = StyleSheet.create({
   
   // Small limit text below amount
   balanceLimitText: {
-    color: BG_COLOR,
-    fontSize: typography.fontSize.tiny,
+    color: colors.black,
+    fontSize: typography.fontSize.small,
     fontWeight: typography.fontWeight.normal,
     marginTop: spacing.xs,
     opacity: 0.8,
@@ -273,7 +263,7 @@ export const styles = StyleSheet.create({
   
   // Loading text during price calculation
   priceLoadingText: {
-    color: BG_COLOR,
+    color: colors.black,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
     marginLeft: spacing.sm,
@@ -283,7 +273,7 @@ export const styles = StyleSheet.create({
   // Container for action buttons below balance card
   actionsGrid: {
     marginHorizontal: spacing.screenPadding,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.xxl,
     marginTop: 0,
   },
   

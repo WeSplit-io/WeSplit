@@ -278,7 +278,7 @@ Or click this link: ${inviteData.inviteLink}`;
           style={styles.qrButton}
           onPress={() => setShowQRModal(true)}
         >
-          <Icon name="qr-code" size={24} color="#A5EA15" />
+                        <Icon name="qr-code" type="ionicons" size={24} color="#A5EA15" />
         </TouchableOpacity>
       </View>
 

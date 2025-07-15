@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
+import { colors } from '../../theme';
 import AuthGuard from '../../components/AuthGuard';
 import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
@@ -457,6 +458,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           >
             <Icon
               name="bell"
+              color={colors.white}
               style={styles.bellIcon}
             />
             {unreadNotifications > 0 && (
@@ -472,9 +474,9 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           <View style={styles.balanceHeader}>
             <Text style={styles.balanceLabel}>Your Balance</Text>
             <TouchableOpacity style={styles.qrCodeIcon} onPress={() => navigation.navigate('Deposit')}>
-              <Icon
-                name="qr-code"
-                style={styles.qrCodeIconSvg}
+              <Image  
+                source={require('../../../assets/qr-code-scan.png')}
+                style={styles.qrCodeImage}
               />
             </TouchableOpacity>
           </View>
@@ -491,7 +493,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           )}
           
           <Text style={styles.balanceLimitText}>
-            Total Spending Across Groups
+          Balance Limit $1000
           </Text>
         </View>
 

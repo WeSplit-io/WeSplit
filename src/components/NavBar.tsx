@@ -1,15 +1,53 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { colors } from '../theme';
-import Icon from './Icon';
+import NavIcon from './NavIcon';
 import { styles } from './NavBar.styles';
 
+// Fonction pour obtenir l'image selon le nom
+const getImageSource = (iconName: string) => {
+  switch (iconName) {
+    case 'home':
+      return require('../../assets/home-icon-default.png');
+    case 'groups':
+      return require('../../assets/folder-icon-default.png');
+    default:
+      return require('../../assets/folder-icon-default.png');
+  }
+};
+
+// Fonction pour détecter si c'est un chemin d'image
+const isImagePath = (icon: string) => {
+  return icon.startsWith('../') || icon.startsWith('./') || icon.includes('.png') || icon.includes('.jpg');
+};
+
+// Fonction pour obtenir l'image depuis un chemin
+const getImageFromPath = (path: string) => {
+  // Supprimer le préfixe '../' et mapper vers les assets disponibles
+  const cleanPath = path.replace(/^\.\.\/assets\//, '');
+  
+  switch (cleanPath) {
+    case 'home-icon-default.png':
+      return require('../../assets/home-icon-default.png');
+    case 'folder-icon-default.png':
+      return require('../../assets/folder-icon-default.png');
+    case 'wallet-icon-default.png':
+      return require('../../assets/wallet-icon-default.png');
+    case 'book-icon-default.png':
+      return require('../../assets/book-icon-default.png');
+    case 'profile-icon-default.png':
+      return require('../../assets/profile-icon-default.png');
+    default:
+      return require('../../assets/folder-icon-default.png');
+  }
+};
+
 const navItems = [
-  { icon: 'home', label: 'Home', route: 'Dashboard' },
-  { icon: 'grid', label: 'Groups', route: 'GroupsList' },
-  { icon: 'plus', label: 'Add', route: 'CreateGroup', isSpecial: true },
-  { icon: 'users', label: 'People', route: 'SendContacts' },
-  { icon: 'user', label: 'Profile', route: 'Profile' },
+  { icon: 'home-icon-default.png', label: 'Home', route: 'Dashboard' },
+  { icon: 'wallet-icon-default.png', label: 'Wallet', route: 'Wallet' },
+  { icon: 'folder-icon-default.png', label: 'Groups', route: 'GroupsList', isSpecial: true },
+  { icon: 'book-icon-default.png', label: 'Contact', route: 'SendContacts' },
+  { icon: 'profile-icon-default.png', label: 'Profil', route: 'Profile' },
 ];
 
 interface NavBarProps {
@@ -50,7 +88,7 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
       return true;
     }
     
-    // Special case: if we're on SendContacts from navbar, consider People tab active
+    // Special case: if we're on SendContacts from navbar, consider Contact tab active
     if (route === 'SendContacts' && currentRoute === 'SendContacts') {
       return true;
     }
@@ -72,23 +110,29 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
             >
               {item.isSpecial ? (
                 <View style={styles.specialButton}>
-                  <Icon name={item.icon} size={24} color={colors.darkBackground} />
+                  <Image 
+                    source={getImageFromPath(item.icon)} 
+                    style={styles.specialButtonImage} 
+                  />
                 </View>
+              ) : isImagePath(item.icon) ? (
+                <Image 
+                  source={getImageFromPath(item.icon)} 
+                  style={[styles.navIcon, isActive && styles.navIconActive]} 
+                />
               ) : (
-                <Icon 
+                <NavIcon 
                   name={item.icon} 
                   size={24} 
-                  color={isActive ? colors.brandGreen : colors.textLight} 
+                  isActive={isActive}
                 />
               )}
-              {!item.isSpecial && (
-                <Text style={[
-                  styles.navLabel, 
-                  isActive && styles.navLabelActive
-                ]}>
-                  {item.label}
-                </Text>
-              )}
+              <Text style={[
+                styles.navLabel, 
+                isActive && styles.navLabelActive
+              ]}>
+                {item.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
