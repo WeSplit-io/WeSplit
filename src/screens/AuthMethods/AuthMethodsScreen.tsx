@@ -1,11 +1,26 @@
-import React, { useState } from 'react';
-import { View, Text, Image, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  Image, 
+  TouchableOpacity, 
+  TextInput, 
+  ActivityIndicator, 
+  Alert, 
+  Modal,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform
+} from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { styles } from './styles';
 import { colors } from '../../theme';
-import { sendVerificationCode } from '../../services/emailAuthService';
 import { useApp } from '../../context/AppContext';
+import { useWallet } from '../../context/WalletContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { firebaseAuth, firestoreService, auth } from '../../config/firebase';
+import { solanaAppKitService, WalletInfo } from '../../services/solanaAppKitService';
+import { sendVerificationCode } from '../../services/firebaseAuthService';
 
 type RootStackParamList = {
   Dashboard: undefined;
@@ -21,150 +36,267 @@ type RootStackParamList = {
 const AuthMethodsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { authenticateUser } = useApp();
-  const [email, setEmail] = useState('pauline.milaalonso@gmail.com');
+  const { connectWallet } = useWallet();
+  
+  // State management
+  const [email, setEmail] = useState('vincent@we.split');
   const [loading, setLoading] = useState(false);
+  const [walletCreationModal, setWalletCreationModal] = useState(false);
+  const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
 
-  const handleNext = async () => {
-    if (__DEV__) { console.log('=== Continue button pressed ==='); }
-    if (__DEV__) { console.log('Email entered:', email); }
-    
+  // Check if user is already authenticated
+  useEffect(() => {
+    const unsubscribe = firebaseAuth.onAuthStateChanged(async (firebaseUser) => {
+      if (firebaseUser) {
+        // User is signed in
+        if (firebaseUser.emailVerified) {
+          // Email is verified, proceed with wallet connection
+          await handleAuthenticatedUser(firebaseUser);
+        } else {
+          // Email not verified, navigate to verification screen
+          navigation.navigate('Verification', { email: firebaseUser.email || '' });
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Handle authenticated user
+  const handleAuthenticatedUser = async (firebaseUser: any) => {
+    try {
+      // Get or create user document
+      let userData = await firestoreService.getUserDocument(firebaseUser.uid);
+      
+      if (!userData) {
+        // Create new user document
+        userData = await firestoreService.createUserDocument(firebaseUser);
+      }
+
+      // Transform to app user format
+      const appUser = {
+        id: parseInt(userData.id) || 0,
+        name: userData.name || firebaseUser.displayName || '',
+        email: userData.email || firebaseUser.email || '',
+        wallet_address: userData.wallet_address || '',
+        wallet_public_key: userData.wallet_public_key || '',
+        created_at: userData.created_at || new Date().toISOString(),
+        avatar: userData.avatar || ''
+      };
+
+      // Check if user has a wallet
+      if (appUser.wallet_address) {
+        // User has wallet, authenticate and navigate to dashboard
+        authenticateUser(appUser, 'email');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Dashboard' }],
+        });
+      } else {
+        // User needs wallet creation
+        setWalletCreationModal(true);
+      }
+    } catch (error) {
+      console.error('Error handling authenticated user:', error);
+      Alert.alert('Error', 'Failed to load user data. Please try again.');
+    }
+  };
+
+  // Handle email authentication using Firebase directly
+  const handleEmailAuth = async () => {
     if (!email || !email.includes('@')) {
       Alert.alert('Invalid Email', 'Please enter a valid email address.');
       return;
     }
     
-    if (__DEV__) { console.log('Email validation passed, setting loading to true'); }
     setLoading(true);
     
     try {
-      if (__DEV__) { console.log('Attempting to send verification code...'); }
+      // Use Firebase backend service for 4-digit code verification
+      const result = await sendVerificationCode(email);
       
-      // Always send verification code with new secure authentication
-      // This works for both new and existing users
-      const response = await sendVerificationCode(email);
-      if (__DEV__) { console.log('Verification code response:', response); }
-      
-      // Check if verification was skipped (user already verified this month)
-      if (response.skipVerification && response.user) {
-        if (__DEV__) { console.log('✅ User already verified this month, skipping verification'); }
-        if (__DEV__) { console.log('📱 Authenticating user directly...'); }
+      if (result.success) {
+        // Navigate directly to verification screen
+        navigation.navigate('Verification', { email });
         
-        // Store tokens securely
-        if (response.accessToken && response.refreshToken) {
-          await AsyncStorage.setItem('accessToken', response.accessToken);
-          await AsyncStorage.setItem('refreshToken', response.refreshToken);
-          await AsyncStorage.setItem('user', JSON.stringify(response.user));
+        // Store email for later use
+        await AsyncStorage.setItem('pendingEmail', email);
+        
+        if (__DEV__) {
+          console.log('Verification code sent to:', email);
         }
-        
-        // Transform user data to match User type (snake_case)
-        const transformedUser = {
-          id: response.user.id,
-          name: response.user.name,
-          email: response.user.email,
-          wallet_address: response.user.walletAddress,
-          wallet_public_key: response.user.walletPublicKey,
-          created_at: response.user.createdAt,
-          avatar: response.user.avatar
-        };
-        
-        // Update the global app context with the authenticated user
-        authenticateUser(transformedUser, 'email');
-        
-        // Navigate to dashboard
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Dashboard' }],
-        });
-        return;
-      }
-      
-      if (__DEV__) { console.log('📧 Verification code sent, navigating to verification screen'); }
-      
-      // Navigate to verification screen
-      if (__DEV__) { console.log('Navigating to Verification screen...'); }
-      navigation.navigate('Verification', { email });
-      
-    } catch (error) {
-      console.error('=== ERROR in handleNext ===');
-      console.error('Error type:', typeof error);
-      console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
-      console.error('Full error:', error);
-      
-      let errorMessage = 'Failed to send verification code.';
-      
-      if (error instanceof Error) {
-        if (error.message.includes('Cannot connect to backend')) {
-          errorMessage = 'Cannot connect to server. Please make sure the backend is running on port 4000.\n\nTo start the backend:\n1. Open terminal in backend folder\n2. Run: npm start';
       } else {
-          errorMessage = error.message;
-        }
+        Alert.alert('Authentication Error', result.error || 'Failed to send verification code');
       }
-      
-      Alert.alert('Connection Error', errorMessage);
+    } catch (error: any) {
+      console.error('Authentication error:', error);
+      Alert.alert('Authentication Error', 'Failed to send verification code. Please try again.');
     } finally {
-      if (__DEV__) { console.log('Setting loading to false'); }
       setLoading(false);
     }
   };
 
+  // Handle wallet creation
+  const handleWalletCreation = async () => {
+    try {
+      setLoading(true);
+      
+      // Create new wallet using AppKit
+      const result = await solanaAppKitService.createWallet();
+      const wallet = result.wallet;
+      
+      setWalletInfo(wallet);
+      
+      // Update user document with wallet info
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await firestoreService.updateUserWallet(currentUser.uid, {
+          address: wallet.address,
+          publicKey: wallet.publicKey
+        });
+      }
+      
+      // Request airdrop for development
+      if (process.env.NODE_ENV !== 'production') {
+        try {
+          await solanaAppKitService.requestAirdrop(1);
+          Alert.alert('Success', '1 SOL airdropped to your wallet for testing!');
+        } catch (airdropError) {
+          console.log('Airdrop failed (this is normal in some cases):', airdropError);
+        }
+      }
+      
+      // Get updated user data
+      if (currentUser) {
+        await handleAuthenticatedUser(currentUser);
+      }
+      
+    } catch (error) {
+      console.error('Error creating wallet:', error);
+      Alert.alert('Wallet Creation Error', 'Failed to create wallet. Please try again.');
+    } finally {
+      setLoading(false);
+      setWalletCreationModal(false);
+    }
+  };
+
+  // Handle social authentication (placeholder for future implementation)
+  const handleSocialAuth = (provider: 'google' | 'twitter' | 'apple') => {
+    Alert.alert('Coming Soon', `${provider} authentication will be available soon!`);
+  };
+
   return (
-    <View style={styles.container}>
-      {/* Logo row */}
-      <View style={styles.logoRow}>
-        <Image source={require('../../../assets/WeSplitLogo.png')} style={styles.logoIcon} />
-        <Text style={styles.logoText}>
-          We<Text style={styles.logoSplit}>Split</Text>
-        </Text>
-      </View>
-      {/* Centered content */}
-      <View style={styles.centerContent}>
-        <TouchableOpacity style={styles.socialButton}>
-          <Image source={require('../../../assets/google.png')} style={styles.socialIcon} />
-          <Text style={styles.socialText}>Continue with Google</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton}>
-          <Image source={require('../../../assets/twitter.png')} style={styles.socialIcon} />
-          <Text style={styles.socialText}>Continue with Twitter</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.socialButton}>
-          <Image source={require('../../../assets/apple.png')} style={styles.socialIcon} />
-          <Text style={styles.socialText}>Continue with Apple</Text>
-        </TouchableOpacity>
-        {/* Divider */}
-        <View style={styles.dividerRow}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>or</Text>
-          <View style={styles.divider} />
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Logo row */}
+        <View style={styles.logoRow}>
+          <Image source={require('../../../assets/WeSplitLogo.png')} style={styles.logoIcon} />
+          <Text style={styles.logoText}>
+            We<Text style={styles.logoSplit}>Split</Text>
+          </Text>
         </View>
-        {/* Email input */}
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your email"
-          placeholderTextColor={colors.textSecondary}
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <TouchableOpacity 
-          style={[styles.nextButton, loading && { opacity: 0.6 }]} 
-          onPress={handleNext} 
-          disabled={loading}
-          activeOpacity={0.7}
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.darkBackground} />
-          ) : (
-            <Text style={styles.nextButtonText}>Next</Text>
-          )}
+
+        {/* Centered content */}
+        <View style={styles.centerContent}>
+          {/* Social buttons */}
+          <TouchableOpacity 
+            style={styles.socialButton}
+            onPress={() => handleSocialAuth('google')}
+          >
+            <Image source={require('../../../assets/google.png')} style={styles.socialIcon} />
+            <Text style={styles.socialText}>Continue with Google</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.socialButton}
+            onPress={() => handleSocialAuth('twitter')}
+          >
+            <Image source={require('../../../assets/twitter.png')} style={styles.socialIcon} />
+            <Text style={styles.socialText}>Continue with Twitter</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.socialButton}
+            onPress={() => handleSocialAuth('apple')}
+          >
+            <Image source={require('../../../assets/apple.png')} style={styles.socialIcon} />
+            <Text style={styles.socialText}>Continue with Apple</Text>
+          </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={styles.dividerRow}>
+            <View style={styles.divider} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.divider} />
+          </View>
+
+          {/* Email input */}
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your email"
+            placeholderTextColor={colors.textSecondary}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+          />
+
+          {/* Submit button */}
+          <TouchableOpacity 
+            style={[styles.nextButton, loading && { opacity: 0.6 }]} 
+            onPress={handleEmailAuth} 
+            disabled={loading}
+            activeOpacity={0.7}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.darkBackground} />
+            ) : (
+              <Text style={styles.nextButtonText}>Next</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Help link */}
+        <TouchableOpacity style={styles.helpLink}>
+          <Text style={styles.helpText}>Need help?</Text>
         </TouchableOpacity>
-      </View>
-      {/* Help link */}
-      <TouchableOpacity style={styles.helpLink}>
-        <Text style={styles.helpText}>Need help ?</Text>
-      </TouchableOpacity>
-    </View>
+      </ScrollView>
+
+
+
+      {/* Wallet Creation Modal */}
+      <Modal
+        visible={walletCreationModal}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Create Solana Wallet</Text>
+            <Text style={styles.modalText}>
+              We'll create a secure Solana wallet for you to send and receive USDC payments.
+            </Text>
+            
+            <TouchableOpacity 
+              style={[styles.modalButton, loading && { opacity: 0.6 }]}
+              onPress={handleWalletCreation}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.darkBackground} />
+              ) : (
+                <Text style={styles.modalButtonText}>Create Wallet</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </KeyboardAvoidingView>
   );
 };
 

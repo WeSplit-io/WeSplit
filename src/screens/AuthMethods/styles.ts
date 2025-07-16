@@ -8,6 +8,10 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: 60,
   },
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: spacing.xl,
+  },
   logoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -104,5 +108,72 @@ export const styles = StyleSheet.create({
   helpText: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: colors.darkBackground,
+    borderRadius: spacing.lg,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textLight,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  modalText: {
+    fontSize: typography.fontSize.md,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    lineHeight: 22,
+  },
+  modalEmail: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.green,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: spacing.lg,
+  },
+  modalButton: {
+    backgroundColor: colors.green,
+    borderRadius: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    flex: 1,
+    marginHorizontal: spacing.xs,
+    alignItems: 'center',
+  },
+  modalButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.green,
+  },
+  modalButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.black,
+  },
+  modalButtonTextSecondary: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.green,
   },
 }); 

@@ -1,0 +1,374 @@
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
+  onAuthStateChanged, 
+  User as FirebaseUser,
+  signOut,
+  updateProfile,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  updateDoc,
+  collection,
+  addDoc,
+  query,
+  where,
+  getDocs,
+  deleteDoc
+} from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "AIzaSyBqXqXqXqXqXqXqXqXqXqXqXqXqXqXqXqXqXqXqXq",
+  authDomain: "wesplit-35186.firebaseapp.com",
+  projectId: "wesplit-35186",
+  storageBucket: "wesplit-35186.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abcdef123456"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// Initialize Firebase Authentication and get a reference to the service
+export const auth = getAuth(app);
+
+// Initialize Cloud Firestore and get a reference to the service
+export const db = getFirestore(app);
+
+// Firebase Authentication functions for email-only flow
+export const firebaseAuth = {
+  // Send sign-in link to email (passwordless authentication)
+  async sendSignInLink(email: string, actionCodeSettings?: any) {
+    try {
+      const defaultSettings = {
+        url: 'https://wesplit.app/auth', // Replace with your app's auth URL
+        handleCodeInApp: true,
+        iOS: {
+          bundleId: 'com.wesplit.app'
+        },
+        android: {
+          packageName: 'com.wesplit.app',
+          installApp: true,
+          minimumVersion: '12'
+        },
+        dynamicLinkDomain: 'wesplit.page.link' // Replace with your dynamic link domain
+      };
+
+      const settings = actionCodeSettings || defaultSettings;
+      
+      await sendSignInLinkToEmail(auth, email, settings);
+      
+      // Save the email for later use
+      await AsyncStorage.setItem('emailForSignIn', email);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error sending sign-in link:', error);
+      throw error;
+    }
+  },
+
+  // Check if the current URL is a sign-in link
+  isSignInLink(url: string): boolean {
+    return isSignInWithEmailLink(auth, url);
+  },
+
+  // Sign in with email link
+  async signInWithEmailLink(email: string, url: string) {
+    try {
+      const result = await signInWithEmailLink(auth, email, url);
+      return result.user;
+    } catch (error) {
+      console.error('Error signing in with email link:', error);
+      throw error;
+    }
+  },
+
+  // Create user with email and temporary password (for verification flow)
+  async createUserWithEmail(email: string, temporaryPassword: string) {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, temporaryPassword);
+      return userCredential.user;
+    } catch (error) {
+      console.error('Error creating user with email:', error);
+      throw error;
+    }
+  },
+
+  // Sign in with email and password
+  async signInWithEmail(email: string, password: string) {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      return userCredential.user;
+    } catch (error) {
+      console.error('Error signing in with email:', error);
+      throw error;
+    }
+  },
+
+  // Send email verification
+  async sendEmailVerification(user: FirebaseUser) {
+    try {
+      await sendEmailVerification(user);
+    } catch (error) {
+      console.error('Error sending email verification:', error);
+      throw error;
+    }
+  },
+
+  // Send password reset email
+  async sendPasswordResetEmail(email: string) {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      console.error('Error sending password reset email:', error);
+      throw error;
+    }
+  },
+
+  // Sign out
+  async signOut() {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Error signing out:', error);
+      throw error;
+    }
+  },
+
+  // Check if email is verified
+  isEmailVerified(user: FirebaseUser): boolean {
+    return user.emailVerified;
+  },
+
+  // Listen to auth state changes
+  onAuthStateChanged(callback: (user: FirebaseUser | null) => void) {
+    return onAuthStateChanged(auth, callback);
+  },
+
+  // Get stored email for sign-in
+  async getStoredEmail(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem('emailForSignIn');
+    } catch (error) {
+      console.error('Error getting stored email:', error);
+      return null;
+    }
+  },
+
+  // Clear stored email
+  async clearStoredEmail() {
+    try {
+      await AsyncStorage.removeItem('emailForSignIn');
+    } catch (error) {
+      console.error('Error clearing stored email:', error);
+    }
+  }
+};
+
+// Firestore functions for user data and verification codes
+export const firestoreService = {
+  // Create or update user document
+  async createUserDocument(user: FirebaseUser, walletData?: { address: string; publicKey: string }) {
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const userData = {
+        id: user.uid,
+        name: user.displayName || '',
+        email: user.email || '',
+        wallet_address: walletData?.address || '',
+        wallet_public_key: walletData?.publicKey || '',
+        created_at: new Date().toISOString(),
+        avatar: user.photoURL || '',
+        emailVerified: user.emailVerified,
+        lastLoginAt: new Date().toISOString()
+      };
+
+      await setDoc(userRef, userData, { merge: true });
+      return userData;
+    } catch (error) {
+      console.error('Error creating user document:', error);
+      throw error;
+    }
+  },
+
+  // Get user document
+  async getUserDocument(uid: string) {
+    try {
+      const userRef = doc(db, 'users', uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        return userSnap.data();
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error('Error getting user document:', error);
+      throw error;
+    }
+  },
+
+  // Update user wallet information
+  async updateUserWallet(uid: string, walletData: { address: string; publicKey: string }) {
+    try {
+      const userRef = doc(db, 'users', uid);
+      await updateDoc(userRef, {
+        wallet_address: walletData.address,
+        wallet_public_key: walletData.publicKey,
+        updated_at: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error updating user wallet:', error);
+      throw error;
+    }
+  },
+
+  // Update user document
+  async updateUserDocument(uid: string, profileData: any) {
+    try {
+      const userRef = doc(db, 'users', uid);
+      await updateDoc(userRef, {
+        ...profileData,
+        updated_at: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error updating user document:', error);
+      throw error;
+    }
+  },
+
+  // Store verification code in Firestore
+  async storeVerificationCode(email: string, code: string, expiresAt: Date) {
+    try {
+      // First, clean up any existing unused codes for this email
+      const verificationRef = collection(db, 'verificationCodes');
+      const existingCodesQuery = query(
+        verificationRef,
+        where('email', '==', email),
+        where('used', '==', false)
+      );
+      const existingCodesSnapshot = await getDocs(existingCodesQuery);
+      
+      if (__DEV__) { 
+        console.log('🧹 Cleaning up', existingCodesSnapshot.docs.length, 'existing unused codes for', email);
+      }
+      
+      // Delete existing unused codes
+      const deletePromises = existingCodesSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+      
+      // Store the new verification code
+      await addDoc(verificationRef, {
+        email,
+        code,
+        expiresAt,
+        createdAt: new Date().toISOString(),
+        used: false
+      });
+      
+      if (__DEV__) { 
+        console.log('💾 Stored new verification code:', code, 'for email:', email);
+      }
+    } catch (error) {
+      console.error('Error storing verification code:', error);
+      throw error;
+    }
+  },
+
+  // Verify code from Firestore
+  async verifyCode(email: string, code: string): Promise<boolean> {
+    try {
+      if (__DEV__) { console.log('🔍 Firestore: Looking for code', code, 'for email', email); }
+      
+      const verificationRef = collection(db, 'verificationCodes');
+      const q = query(
+        verificationRef,
+        where('email', '==', email),
+        where('code', '==', code),
+        where('used', '==', false)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      if (__DEV__) { console.log('🔍 Firestore: Found', querySnapshot.docs.length, 'matching documents'); }
+      
+      // Debug: Show all verification codes for this email
+      if (__DEV__) {
+        const allCodesQuery = query(
+          verificationRef,
+          where('email', '==', email)
+        );
+        const allCodesSnapshot = await getDocs(allCodesQuery);
+        console.log('🔍 Firestore: All codes for this email:', allCodesSnapshot.docs.map(doc => ({
+          id: doc.id,
+          code: doc.data().code,
+          used: doc.data().used,
+          expiresAt: doc.data().expiresAt,
+          createdAt: doc.data().createdAt
+        })));
+      }
+      
+      if (querySnapshot.empty) {
+        if (__DEV__) { console.log('🔍 Firestore: No matching documents found'); }
+        return false;
+      }
+
+      const doc = querySnapshot.docs[0];
+      const data = doc.data();
+      
+      if (__DEV__) { console.log('🔍 Firestore: Document data:', data); }
+      
+      // Check if code is expired
+      const expiresAt = data.expiresAt?.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);
+      const now = new Date();
+      
+      if (__DEV__) { console.log('🔍 Firestore: Code expires at:', expiresAt, 'Current time:', now); }
+      
+      if (now > expiresAt) {
+        if (__DEV__) { console.log('🔍 Firestore: Code is expired'); }
+        return false;
+      }
+
+      // Mark code as used
+      await updateDoc(doc.ref, { used: true });
+      
+      if (__DEV__) { console.log('🔍 Firestore: Code verified successfully'); }
+      return true;
+    } catch (error) {
+      console.error('Error verifying code:', error);
+      return false;
+    }
+  },
+
+  // Clean up expired verification codes
+  async cleanupExpiredCodes() {
+    try {
+      const verificationRef = collection(db, 'verificationCodes');
+      const q = query(verificationRef, where('expiresAt', '<', new Date()));
+      
+      const querySnapshot = await getDocs(q);
+      
+      const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+      
+      console.log(`Cleaned up ${querySnapshot.docs.length} expired verification codes`);
+    } catch (error) {
+      console.error('Error cleaning up expired codes:', error);
+    }
+  }
+};
+
+export default app; 

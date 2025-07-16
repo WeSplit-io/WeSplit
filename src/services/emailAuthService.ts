@@ -86,13 +86,13 @@ async function tryBackendUrls(endpoint: string, options: RequestInit): Promise<R
   throw new Error(`Cannot connect to backend. Tried all URLs: ${POSSIBLE_BACKEND_URLS.join(', ')}`);
 }
 
-export async function sendVerificationCode(email: string): Promise<VerificationResponse> {
+export async function sendVerificationCode(email: string): Promise<{ success: boolean }> {
   if (__DEV__) { console.log('=== sendVerificationCode called ==='); }
   if (__DEV__) { console.log('Email:', email); }
   
   try {
     if (__DEV__) { console.log('Making fetch request...'); }
-    const response = await tryBackendUrls('/api/auth/send-verification', {
+    const response = await tryBackendUrls('/api/auth/send-code', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -100,38 +100,25 @@ export async function sendVerificationCode(email: string): Promise<VerificationR
       body: JSON.stringify({ email }),
     });
 
-    if (__DEV__) { console.log('Response status:', response.status); }
-    if (__DEV__) { console.log('Response ok:', response.ok); }
-
     if (!response.ok) {
-      if (__DEV__) { console.log('Response not ok, getting error data...'); }
       let errorData;
       try {
         errorData = await response.json();
         console.log('Error data:', errorData);
       } catch (e) {
-        console.log('Failed to parse error response as JSON');
         errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
       }
       throw new Error(errorData.error || `HTTP ${response.status}: Failed to send verification code`);
     }
 
-    if (__DEV__) { console.log('Response ok, getting data...'); }
     const data = await response.json();
     if (__DEV__) { console.log('Response data:', data); }
-    
-    // In development, log the code for testing
-    if (data.code) {
-      if (__DEV__) { console.log(`[DEV] Verification code for ${email}: ${data.code}`); }
-    }
-    
     return data;
   } catch (error) {
     console.error('=== Error in sendVerificationCode ===');
     console.error('Error type:', typeof error);
     console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
     console.error('Full error:', error);
-    
     throw error;
   }
 }

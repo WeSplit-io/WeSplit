@@ -9,7 +9,7 @@ import {
   NavigationParams,
   Notification 
 } from '../types';
-import { dataService } from '../services/dataService';
+import { hybridDataService } from '../services/hybridDataService';
 import { i18nService } from '../services/i18nService';
 import { getUserNotifications } from '../services/notificationService';
 
@@ -58,7 +58,7 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       };
 
     case 'LOGOUT_USER':
-      dataService.cache.clearAll();
+      // Clear any cached data
       return {
         ...initialState
       };
@@ -474,11 +474,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     try {
+      if (__DEV__) { console.log('🔄 AppContext: Loading user groups for user:', state.currentUser.id); }
       dispatch({ type: 'SET_LOADING', payload: true });
-      const groups = await dataService.group.getUserGroups(state.currentUser.id.toString(), forceRefresh);
+      const groups = await hybridDataService.group.getUserGroups(state.currentUser.id.toString(), forceRefresh);
+      if (__DEV__) { console.log('🔄 AppContext: Received groups from hybrid service:', groups.length, 'groups'); }
+      if (__DEV__) { console.log('🔄 AppContext: Groups data source:', groups.length > 0 ? 'Firebase' : 'SQLite fallback'); }
       dispatch({ type: 'SET_GROUPS', payload: groups });
     } catch (error) {
-      console.error('Error loading user groups:', error);
+      console.error('❌ AppContext: Error loading user groups:', error);
       dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Failed to load groups' });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
@@ -487,7 +490,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const loadGroupDetails = useCallback(async (groupId: number, forceRefresh: boolean = false): Promise<GroupWithDetails> => {
     try {
-      const group = await dataService.group.getGroupDetails(groupId.toString(), forceRefresh);
+      const group = await hybridDataService.group.getGroupDetails(groupId.toString(), forceRefresh);
       
       // Update the group in state if it exists
       const existingGroup = state.groups.find(g => g.id === groupId);
@@ -520,15 +523,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     try {
-      const group = await dataService.group.createGroup({
+      const group = await hybridDataService.group.createGroup({
         ...groupData,
         created_by: state.currentUser.id
       });
       
       // Transform to GroupWithDetails
-      const groupWithDetails = dataService.transformers.transformGroupWithDetails(
+      const groupWithDetails = hybridDataService.transformers.transformGroupWithDetails(
         group, 
-        [dataService.transformers.userToGroupMember(state.currentUser)], 
+        [hybridDataService.transformers.userToGroupMember(state.currentUser)], 
         [], 
         state.currentUser.id
       );
@@ -547,7 +550,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     try {
-      const result = await dataService.group.updateGroup(groupId.toString(), state.currentUser.id.toString(), updates);
+      const result = await hybridDataService.group.updateGroup(groupId.toString(), state.currentUser.id.toString(), updates);
       const updatedGroup = await loadGroupDetails(groupId, true);
       dispatch({ type: 'UPDATE_GROUP', payload: updatedGroup });
     } catch (error) {
@@ -562,9 +565,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     try {
-      await dataService.group.deleteGroup(groupId.toString(), state.currentUser.id.toString());
+      await hybridDataService.group.deleteGroup(groupId.toString(), state.currentUser.id.toString());
       dispatch({ type: 'DELETE_GROUP', payload: groupId });
-      dataService.cache.clearGroup(groupId);
+      hybridDataService.cache.clearGroup(groupId);
     } catch (error) {
       console.error('Error deleting group:', error);
       throw error;
@@ -578,7 +581,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Expense operations
   const createExpense = useCallback(async (expenseData: any): Promise<Expense> => {
     try {
-      const expense = await dataService.expense.createExpense(expenseData);
+      const expense = await hybridDataService.expense.createExpense(expenseData);
       dispatch({ type: 'ADD_EXPENSE', payload: { groupId: expense.group_id, expense } });
       return expense;
     } catch (error) {
@@ -589,7 +592,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateExpense = useCallback(async (groupId: number, expense: Expense) => {
     try {
-      const updatedExpense = await dataService.expense.updateExpense(expense.id, expense);
+      const updatedExpense = await hybridDataService.expense.updateExpense(expense.id, expense);
       dispatch({ type: 'UPDATE_EXPENSE', payload: { groupId, expense: updatedExpense } });
     } catch (error) {
       console.error('Error updating expense:', error);
@@ -599,7 +602,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const deleteExpense = useCallback(async (groupId: number, expenseId: number) => {
     try {
-      await dataService.expense.deleteExpense(expenseId);
+      await hybridDataService.expense.deleteExpense(expenseId);
       dispatch({ type: 'DELETE_EXPENSE', payload: { groupId, expenseId } });
     } catch (error) {
       console.error('Error deleting expense:', error);
@@ -618,7 +621,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     try {
-      const updatedUser = await dataService.user.updateUser(state.currentUser.id.toString(), updates);
+      const updatedUser = await hybridDataService.user.updateUser(state.currentUser.id.toString(), updates);
       dispatch({ type: 'SET_CURRENT_USER', payload: updatedUser });
     } catch (error) {
       console.error('Error updating user:', error);
@@ -685,7 +688,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   const invalidateCache = useCallback((pattern: string) => {
-    dataService.cache.clearPattern(pattern);
+    hybridDataService.cache.clearPattern(pattern);
   }, []);
 
   // Notifications logic

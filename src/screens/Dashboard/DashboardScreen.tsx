@@ -35,14 +35,20 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     refresh: refreshGroups 
   } = useGroupList();
 
+  // Debug logging
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('📊 Dashboard: Current user:', currentUser);
+      console.log('📊 Dashboard: Groups loaded:', groups.length);
+      console.log('📊 Dashboard: Groups data:', groups);
+      console.log('📊 Dashboard: Loading state:', groupsLoading);
+      console.log('📊 Dashboard: Is authenticated:', isAuthenticated);
+    }
+  }, [groups, groupsLoading, currentUser, isAuthenticated]);
+
   const [priceLoading, setPriceLoading] = useState(false);
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [groupAmountsInUSD, setGroupAmountsInUSD] = useState<Record<number, number>>({});
-  const [currencyRates, setCurrencyRates] = useState<Record<string, number>>({
-    'SOL': 200,
-    'USDC': 1,
-    'BTC': 50000
-  });
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   // Memoized balance calculations to avoid expensive recalculations
@@ -72,7 +78,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             
             if (totalAmount > 0) {
               // For dashboard display, show total spending across all groups
-              const rate = currencyRates[currency] || 1;
+              // Use simple fallback rates for now since we have proper price service
+              const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
               const usdcAmount = totalAmount * rate;
               totalSpentUSDC += usdcAmount;
               
@@ -95,7 +102,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       totalSpent: totalSpentUSDC,
       balanceByCurrency
     };
-  }, [groups, currentUser?.id, currencyRates]);
+  }, [groups, currentUser?.id]);
 
   // Load notification count from context notifications
   useEffect(() => {
@@ -105,80 +112,27 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     }
   }, [notifications]);
 
-  // Remove old balance calculation functions that relied on empty arrays
-  // Data will be available when individual group details are loaded
-
-  // Background currency rate updates
-  const updateCurrencyRates = useCallback(async () => {
-    try {
-      // Only update rates if there are actual expenses with different currencies
-      const currencies = new Set<string>();
-      groups.forEach(group => {
-        group.expenses.forEach(expense => {
-          currencies.add(expense.currency || 'SOL');
-        });
-      });
-
-      if (currencies.size === 0) return;
-
-      // Batch convert small amounts to get rates
-      const rateUpdates: Record<string, number> = {};
-      for (const currency of currencies) {
-        if (currency === 'USDC') {
-          rateUpdates[currency] = 1;
-        } else {
-          try {
-            const rate = await getTotalSpendingInUSDC([{ amount: 1, currency }]);
-            rateUpdates[currency] = rate;
-          } catch (error) {
-            console.error(`Failed to get rate for ${currency}:`, error);
-            // Keep existing rate or use fallback
-            rateUpdates[currency] = currencyRates[currency] || (currency === 'SOL' ? 200 : 100);
-          }
-        }
-      }
-      
-      setCurrencyRates(prev => ({ ...prev, ...rateUpdates }));
-    } catch (error) {
-      console.error('Error updating currency rates:', error);
-    }
-  }, [groups, currencyRates]);
-
-  // Update currency rates periodically in background
-  useEffect(() => {
-    if (groups.length > 0) {
-      updateCurrencyRates();
-      
-      // Update rates every 5 minutes
-      const interval = setInterval(updateCurrencyRates, 5 * 60 * 1000);
-      return () => clearInterval(interval);
-    }
-  }, [groups.length, updateCurrencyRates]);
-
   // Load notifications when dashboard loads
   useEffect(() => {
     loadNotifications();
   }, [loadNotifications]);
 
-    // Convert group amounts to USD for display with proper currency handling
+  // Convert group amounts to USD for display with proper currency handling
   const convertGroupAmountsToUSD = useCallback(async (groups: GroupWithDetails[]) => {
     try {
       const usdAmounts: Record<number, number> = {};
       
       for (const group of groups) {
         if (group.expenses_by_currency && group.expenses_by_currency.length > 0) {
-          if (__DEV__) { console.log(`Converting group "${group.name}" expenses:`, group.expenses_by_currency); }
-          
           try {
             const expenses = group.expenses_by_currency.map(expense => ({
               amount: expense.total_amount || 0,
               currency: expense.currency || 'SOL'
             }));
             
-            if (__DEV__) { console.log(`Calling getTotalSpendingInUSDC with:`, expenses); }
             const totalUSD = await getTotalSpendingInUSDC(expenses);
             
-            console.log(`Group "${group.name}": Price service returned $${totalUSD.toFixed(2)}`);
+            if (__DEV__) { console.log(`Group "${group.name}": Price service returned $${totalUSD.toFixed(2)}`); }
             usdAmounts[group.id] = totalUSD;
             
           } catch (error) {
@@ -190,18 +144,18 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               const amount = expense.total_amount || 0;
               const currency = (expense.currency || 'SOL').toUpperCase();
               
-              // Use current market rates (these should be updated periodically)
+              // Use simple fallback rates since we have proper price service
               let rate = 1;
               switch (currency) {
                 case 'SOL':
-                  rate = currencyRates.SOL || 200; // Use dynamic rate if available
+                  rate = 200;
                   break;
                 case 'USDC':
                 case 'USDT':
                   rate = 1;
                   break;
                 case 'BTC':
-                  rate = currencyRates.BTC || 50000;
+                  rate = 50000;
                   break;
                 default:
                   console.warn(`Unknown currency: ${currency}, using rate 100`);
@@ -211,10 +165,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               const usdValue = amount * rate;
               fallbackTotal += usdValue;
               
-              console.log(`Fallback: ${amount} ${currency} × ${rate} = $${usdValue.toFixed(2)}`);
             }
             
-            console.log(`Group "${group.name}": Fallback total = $${fallbackTotal.toFixed(2)}`);
             usdAmounts[group.id] = fallbackTotal;
           }
         } else {
@@ -223,12 +175,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         }
       }
       
-      if (__DEV__) { console.log('Final USD amounts:', usdAmounts); }
       setGroupAmountsInUSD(usdAmounts);
     } catch (error) {
       console.error('Error converting group amounts to USD:', error);
     }
-  }, [currencyRates]);
+  }, []);
 
   // Load data using centralized service
   const loadData = useCallback(async () => {
@@ -300,13 +251,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
 
   // Convert amounts when groups change (similar to GroupsList)
-  useFocusEffect(
-    React.useCallback(() => {
-      if (groups.length > 0) {
-        convertGroupAmountsToUSD(groups);
-      }
-    }, [groups, convertGroupAmountsToUSD])
-  );
+  useEffect(() => {
+    if (groups.length > 0) {
+      convertGroupAmountsToUSD(groups);
+    }
+  }, [groups]);
 
   // Load data when component mounts or comes into focus
   useFocusEffect(

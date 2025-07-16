@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read and write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Verification codes can be created by anyone but only read by the email owner
+    match /verificationCodes/{docId} {
+      allow create: if true; // Anyone can create verification codes
+      allow read, update, delete: if request.auth != null && 
+        resource.data.email == request.auth.token.email;
+    }
+    
+    // Groups can be read by members and written by owners
+    match /groups/{groupId} {
+      allow read: if request.auth != null && 
+        request.auth.uid in resource.data.members;
+      allow write: if request.auth != null && 
+        request.auth.uid == resource.data.ownerId;
+    }
+    
+    // Expenses can be read by group members and written by the creator
+    match /expenses/{expenseId} {
+      allow read: if request.auth != null && 
+        request.auth.uid in get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.members;
+      allow write: if request.auth != null && 
+        request.auth.uid == resource.data.createdBy;
+    }
+  }
+} 

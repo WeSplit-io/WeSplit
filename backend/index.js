@@ -4,6 +4,7 @@ const pool = require('./db');
 const authService = require('./services/authService');
 const security = require('./middleware/security');
 const monitoringService = require('./services/monitoringService');
+const emailVerificationService = require('./services/emailVerificationService');
 require('dotenv').config();
 
 const app = express();
@@ -228,126 +229,39 @@ const hasVerifiedThisMonth = (lastVerifiedAt) => {
          lastVerified.getFullYear() === now.getFullYear();
 };
 
-// Send verification code
-app.post('/api/auth/send-verification', security.authLimiter, security.validateEmail, async (req, res) => {
+// Send verification code (signup or login)
+app.post('/api/auth/send-code', async (req, res) => {
   const { email } = req.body;
-  
+  if (!email) return res.status(400).json({ error: 'Email required' });
   try {
-    // Check if user exists and has verified this month
-    const existingUser = await pool.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
-    
-    if (existingUser.rows.length > 0) {
-      const user = existingUser.rows[0];
-      
-      // If user has verified this month, skip verification
-      if (hasVerifiedThisMonth(user.last_verified_at)) {
-        console.log(`📅 User ${email} already verified this month, skipping verification`);
-        
-        // Generate tokens and return user data directly
-        const accessToken = authService.generateToken(user.id, user.email);
-        const refreshToken = authService.generateRefreshToken(user.id);
-        
-        return res.json({
-          message: 'Authentication successful (already verified this month)',
-          skipVerification: true,
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            walletAddress: user.wallet_address,
-            walletPublicKey: user.wallet_public_key,
-            avatar: user.avatar,
-            createdAt: user.created_at
-          },
-          accessToken,
-          refreshToken
-        });
-      }
-    }
-    
-    // User doesn't exist or hasn't verified this month - proceed with verification
-    const code = authService.generateVerificationCode();
-    authService.storeVerificationCode(email, code);
-    
-    // Send email (in production, configure real email service)
-    const emailSent = await authService.sendVerificationEmail(email, code);
-    
-    if (emailSent) {
-      res.json({ 
-        message: 'Verification code sent to your email',
-        email: email,
-        skipVerification: false,
-        // In development, include code for testing
-        ...(process.env.NODE_ENV !== 'production' && { code: code })
-      });
-    } else {
-      res.status(500).json({ error: 'Failed to send verification email' });
-    }
+    await emailVerificationService.sendVerificationCode(email);
+    res.json({ success: true });
   } catch (err) {
     console.error('Error sending verification code:', err);
     res.status(500).json({ error: 'Failed to send verification code' });
   }
 });
 
-// Verify code and login/register
-app.post('/api/auth/verify-code', security.authLimiter, security.validateEmail, security.validateRequired(['code']), async (req, res) => {
+// Verify code
+app.post('/api/auth/verify-code', async (req, res) => {
   const { email, code } = req.body;
-  
+  if (!email || !code) return res.status(400).json({ error: 'Email and code required' });
   try {
-    // Verify the code
-    const verificationResult = authService.verifyCode(email, code);
-    
-    if (!verificationResult.success) {
-      return res.status(400).json({ error: verificationResult.error });
-    }
-    
-    // Check if user exists
-    let user;
-    const existingUser = await pool.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
-    
-    if (existingUser.rows.length > 0) {
-      user = existingUser.rows[0];
-      
-      // Update last_verified_at for existing user
-      await pool.run(
-        'UPDATE users SET last_verified_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [user.id]
-      );
-      console.log(`📅 Updated last_verified_at for user ${email}`);
-    } else {
-      // Create new user if doesn't exist
-      const newUser = await pool.run(
-        'INSERT INTO users (email, name, wallet_address, wallet_public_key, avatar, last_verified_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-        [email, email.split('@')[0], `temp_wallet_${Date.now()}`, `temp_key_${Date.now()}`, null]
-      );
-      
-      const newUserResult = await pool.query('SELECT * FROM users WHERE id = ?', [newUser.rows[0].id]);
-      user = newUserResult.rows[0];
-      console.log(`📅 Created new user ${email} with verification timestamp`);
-    }
-    
-    // Generate tokens
-    const accessToken = authService.generateToken(user.id, user.email);
-    const refreshToken = authService.generateRefreshToken(user.id);
-    
+    const result = await emailVerificationService.verifyCode(email, code);
+    if (result.success) {
     res.json({
-      message: 'Authentication successful',
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        walletAddress: user.wallet_address,
-        walletPublicKey: user.wallet_public_key,
-        avatar: user.avatar,
-        createdAt: user.created_at
-      },
-      accessToken,
-      refreshToken
+        success: true,
+        message: 'Code verified successfully',
+        user: result.user,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken
     });
-    
+    } else {
+      res.status(400).json({ error: result.error || 'Invalid code' });
+    }
   } catch (err) {
     console.error('Error verifying code:', err);
-    res.status(500).json({ error: 'Verification failed' });
+    res.status(500).json({ error: 'Failed to verify code' });
   }
 });
 
@@ -356,7 +270,7 @@ app.post('/api/auth/refresh', security.authLimiter, security.validateRequired(['
   const { refreshToken } = req.body;
   
   try {
-    const result = authService.refreshAccessToken(refreshToken);
+    const result = await authService.refreshAccessToken(refreshToken);
     
     if (!result.success) {
       return res.status(401).json({ error: result.error });
@@ -378,8 +292,12 @@ app.post('/api/auth/logout', security.validateRequired(['refreshToken']), async 
   const { refreshToken } = req.body;
   
   try {
-    authService.logout(refreshToken);
+    const result = await authService.logout(refreshToken);
+    if (result.success) {
     res.json({ message: 'Logged out successfully' });
+    } else {
+      res.status(500).json({ error: result.error });
+    }
   } catch (err) {
     console.error('Error logging out:', err);
     res.status(500).json({ error: 'Logout failed' });

@@ -1,0 +1,62 @@
+[debug] [2025-07-16T11:42:46.333Z] ----------------------------------------------------------------------
+[debug] [2025-07-16T11:42:46.336Z] Command:       D:\nodejs\node.exe D:\nodejs\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions
+[debug] [2025-07-16T11:42:46.336Z] CLI Version:   14.10.1
+[debug] [2025-07-16T11:42:46.336Z] Platform:      win32
+[debug] [2025-07-16T11:42:46.336Z] Node Version:  v20.18.0
+[debug] [2025-07-16T11:42:46.336Z] Time:          Wed Jul 16 2025 13:42:46 GMT+0200 (heure d’été d’Europe centrale)
+[debug] [2025-07-16T11:42:46.336Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-07-16T11:42:46.522Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-07-16T11:42:46.523Z] > authorizing via signed-in user (vinc.charles0@gmail.com)
+[debug] [2025-07-16T11:42:46.523Z] [iam] checking project wesplit-35186 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2025-07-16T11:42:46.524Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:46.524Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:46.525Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/wesplit-35186:testIamPermissions [none]
+[debug] [2025-07-16T11:42:46.525Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/wesplit-35186:testIamPermissions x-goog-quota-user=projects/wesplit-35186
+[debug] [2025-07-16T11:42:46.525Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/wesplit-35186:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-07-16T11:42:47.177Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/wesplit-35186:testIamPermissions 200
+[debug] [2025-07-16T11:42:47.177Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/wesplit-35186:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-07-16T11:42:47.177Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:47.177Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:47.178Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/wesplit-35186/serviceAccounts/wesplit-35186@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-07-16T11:42:47.178Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/wesplit-35186/serviceAccounts/wesplit-35186@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-07-16T11:42:47.811Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/wesplit-35186/serviceAccounts/wesplit-35186@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2025-07-16T11:42:47.811Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/wesplit-35186/serviceAccounts/wesplit-35186@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'wesplit-35186'...
+[info] 
+[info] i  deploying functions 
+[debug] [2025-07-16T11:42:47.814Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:47.814Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:47.814Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/wesplit-35186 [none]
+[debug] [2025-07-16T11:42:48.190Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/wesplit-35186 200
+[debug] [2025-07-16T11:42:48.190Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/wesplit-35186 {"projectNumber":"483370851807","projectId":"wesplit-35186","lifecycleState":"ACTIVE","name":"WeSplit","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-07-16T07:49:26.489476Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2025-07-16T11:42:48.193Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:48.193Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:48.193Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/wesplit-35186/adminSdkConfig [none]
+[debug] [2025-07-16T11:42:48.535Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/wesplit-35186/adminSdkConfig 200
+[debug] [2025-07-16T11:42:48.535Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/wesplit-35186/adminSdkConfig {"projectId":"wesplit-35186","storageBucket":"wesplit-35186.firebasestorage.app"}
+[debug] [2025-07-16T11:42:48.535Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:48.535Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:48.535Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/wesplit-35186/configs [none]
+[debug] [2025-07-16T11:42:48.773Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/wesplit-35186/configs 200
+[debug] [2025-07-16T11:42:48.773Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/wesplit-35186/configs {"configs":[{"name":"projects/wesplit-35186/configs/email"}]}
+[debug] [2025-07-16T11:42:48.773Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:48.773Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:48.773Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/wesplit-35186/configs/email/variables [none]
+[debug] [2025-07-16T11:42:48.967Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/wesplit-35186/configs/email/variables 200
+[debug] [2025-07-16T11:42:48.967Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/wesplit-35186/configs/email/variables {"variables":[{"name":"projects/wesplit-35186/configs/email/variables/user","updateTime":"2025-07-16T10:23:13.665948674Z"},{"name":"projects/wesplit-35186/configs/email/variables/password","updateTime":"2025-07-16T10:23:12.915564190Z"}]}
+[debug] [2025-07-16T11:42:48.967Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:48.967Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:48.967Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:48.967Z] Checked if tokens are valid: true, expires at: 1752667269290
+[debug] [2025-07-16T11:42:48.968Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/wesplit-35186/configs/email/variables/user [none]
+[debug] [2025-07-16T11:42:48.968Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/wesplit-35186/configs/email/variables/password [none]
+[debug] [2025-07-16T11:42:49.155Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/wesplit-35186/configs/email/variables/user 200
+[debug] [2025-07-16T11:42:49.155Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/wesplit-35186/configs/email/variables/user {"name":"projects/wesplit-35186/configs/email/variables/user","updateTime":"2025-07-16T10:23:13.665948674Z","text":"wesplit.io@gmail.com"}
+[debug] [2025-07-16T11:42:49.196Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/wesplit-35186/configs/email/variables/password 200
+[debug] [2025-07-16T11:42:49.196Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/wesplit-35186/configs/email/variables/password {"name":"projects/wesplit-35186/configs/email/variables/password","updateTime":"2025-07-16T10:23:12.915564190Z","text":"igmb qpxi lzqo gclj"}

@@ -18,9 +18,10 @@ const emailTransporter = process.env.NODE_ENV === 'production'
     })
   : null; // Skip email transporter in development
 
-// In-memory store for verification codes (in production, use Redis)
-const verificationCodes = new Map();
-const refreshTokens = new Map();
+// Initialize Firebase Admin
+const { initializeFirebaseAdmin, getFirestore } = require('../config/firebase-admin');
+initializeFirebaseAdmin();
+const db = getFirestore();
 
 class AuthService {
   // Generate secure verification code
@@ -38,12 +39,17 @@ class AuthService {
   }
 
   // Generate refresh token
-  generateRefreshToken(userId) {
+  async generateRefreshToken(userId, email) {
     const refreshToken = crypto.randomBytes(32).toString('hex');
-    refreshTokens.set(refreshToken, {
+    
+    // Store in Firestore
+    await db.collection('refresh_tokens').doc(refreshToken).set({
       userId,
-      expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days
+      email,
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + (30 * 24 * 60 * 60 * 1000)) // 30 days
     });
+    
     return refreshToken;
   }
 
@@ -134,32 +140,45 @@ class AuthService {
   }
 
   // Refresh access token
-  refreshAccessToken(refreshToken) {
-    const tokenData = refreshTokens.get(refreshToken);
-    
-    if (!tokenData) {
-      return { success: false, error: 'Invalid refresh token' };
-    }
+  async refreshAccessToken(refreshToken) {
+    try {
+      // Check if refresh token exists in Firestore
+      const tokenRef = db.collection('refresh_tokens').doc(refreshToken);
+      const tokenDoc = await tokenRef.get();
+      
+      if (!tokenDoc.exists) {
+        return { success: false, error: 'Invalid refresh token' };
+      }
 
-    if (Date.now() > tokenData.expiresAt) {
-      refreshTokens.delete(refreshToken);
-      return { success: false, error: 'Refresh token expired' };
-    }
+      const tokenData = tokenDoc.data();
+      if (Date.now() > tokenData.expiresAt.toDate().getTime()) {
+        await tokenRef.delete();
+        return { success: false, error: 'Refresh token expired' };
+      }
 
-    // Generate new access token
-    const newAccessToken = this.generateToken(tokenData.userId, tokenData.email);
-    
-    return { 
-      success: true, 
-      accessToken: newAccessToken,
-      refreshToken: refreshToken // Keep same refresh token
-    };
+      // Generate new access token
+      const newAccessToken = this.generateToken(tokenData.userId, tokenData.email);
+      
+      return { 
+        success: true, 
+        accessToken: newAccessToken,
+        refreshToken: refreshToken // Keep same refresh token
+      };
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      return { success: false, error: 'Token refresh failed' };
+    }
   }
 
   // Logout (invalidate refresh token)
-  logout(refreshToken) {
-    refreshTokens.delete(refreshToken);
-    return { success: true };
+  async logout(refreshToken) {
+    try {
+      await db.collection('refresh_tokens').doc(refreshToken).delete();
+      return { success: true };
+    } catch (error) {
+      console.error('Error logging out:', error);
+      return { success: false, error: 'Logout failed' };
+    }
   }
 
   // Clean up expired tokens and codes (run periodically)

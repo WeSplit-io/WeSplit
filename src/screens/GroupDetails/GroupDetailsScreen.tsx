@@ -172,7 +172,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   );
 
   // Calculate totals using available summary data with USDC conversion for display
-  const getGroupSummary = useCallback(async () => {
+  const getGroupSummary = useMemo(() => {
     if (!group) {
       return {
         totalAmountUSD: 0,
@@ -187,6 +187,30 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
 
     const memberCount = group.member_count || group.members?.length || 0;
     const expenseCount = group.expense_count || group.expenses?.length || 0;
+
+    // For now, return a promise-based calculation that will be handled by the component
+    return {
+      memberCount,
+      expenseCount,
+      loading: true
+    };
+  }, [group, currentUserBalance]);
+
+  // State for group summary
+  const [groupSummary, setGroupSummary] = useState({
+    totalAmountUSD: 0,
+    totalAmountDisplay: '$0.00',
+    memberCount: 0,
+    expenseCount: 0,
+    userPaidUSD: 0,
+    userOwesUSD: 0,
+    loading: true
+  });
+
+  // Load group summary when component mounts or group changes
+  useEffect(() => {
+    const loadSummary = async () => {
+      if (!group) return;
 
     try {
       let totalAmountUSD = 0;
@@ -213,15 +237,15 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       const userPaidUSD = userBalance > 0 ? userBalanceUSD : 0;
       const userOwesUSD = userBalance < 0 ? userBalanceUSD : 0;
 
-      return {
+        setGroupSummary({
         totalAmountUSD,
         totalAmountDisplay: `$${totalAmountUSD.toFixed(2)}`,
-        memberCount,
-        expenseCount,
+          memberCount: group.member_count || group.members?.length || 0,
+          expenseCount: group.expense_count || group.expenses?.length || 0,
         userPaidUSD,
         userOwesUSD,
         loading: false
-      };
+        });
     } catch (error) {
       console.error('Error calculating group summary:', error);
       
@@ -241,40 +265,22 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       const rate = userCurrency === 'SOL' ? 200 : (userCurrency === 'USDC' ? 1 : 100);
       const userBalanceUSD = Math.abs(userBalance) * rate;
 
-      return {
+        setGroupSummary({
         totalAmountUSD,
         totalAmountDisplay: `$${totalAmountUSD.toFixed(2)}`,
-        memberCount,
-        expenseCount,
+          memberCount: group.member_count || group.members?.length || 0,
+          expenseCount: group.expense_count || group.expenses?.length || 0,
         userPaidUSD: userBalance > 0 ? userBalanceUSD : 0,
         userOwesUSD: userBalance < 0 ? userBalanceUSD : 0,
         loading: false
-      };
-    }
-  }, [group, currentUserBalance]);
-
-  // State for group summary
-  const [groupSummary, setGroupSummary] = useState({
-    totalAmountUSD: 0,
-    totalAmountDisplay: '$0.00',
-    memberCount: 0,
-    expenseCount: 0,
-    userPaidUSD: 0,
-    userOwesUSD: 0,
-    loading: true
-  });
-
-  // Load group summary when component mounts or group changes
-  useEffect(() => {
-    const loadSummary = async () => {
-      const summary = await getGroupSummary();
-      setGroupSummary(summary);
+        });
+      }
     };
     
     if (group) {
       loadSummary();
     }
-  }, [group, getGroupSummary]);
+  }, [group, currentUserBalance]);
 
   // Get computed values from available data
   const expenses = group?.expenses || []; // Will be empty but keeping for compatibility

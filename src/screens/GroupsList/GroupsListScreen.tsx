@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, SafeAreaView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '../../components/Icon';
@@ -70,7 +70,6 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
             );
             usdAmounts[group.id] = totalUSD;
           } catch (error) {
-            console.error(`Error converting group ${group.id} amounts:`, error);
             // Use fallback conversion if price service fails
             const fallbackTotal = group.expenses_by_currency.reduce((sum, expense) => {
               const rate = (expense.currency === 'SOL' ? 200 : (expense.currency === 'USDC' ? 1 : 100));
@@ -90,13 +89,11 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
   }, []);
 
   // Convert amounts when groups change
-  useFocusEffect(
-    useCallback(() => {
-      if (groups.length > 0) {
-        convertGroupAmountsToUSD(groups);
-      }
-    }, [groups, convertGroupAmountsToUSD])
-  );
+  useEffect(() => {
+    if (groups.length > 0) {
+      convertGroupAmountsToUSD(groups);
+    }
+  }, [groups]);
 
   const onRefresh = useCallback(async () => {
     await refresh();

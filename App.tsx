@@ -5,9 +5,12 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WalletProvider } from './src/context/WalletContext';
 import { AppProvider } from './src/context/AppContext';
-import { initializeBackendURL } from './src/config/api';
 import { Text, View } from 'react-native';
 import { styles } from './App.styles';
+
+// Import Firebase configuration
+import './src/config/firebase';
+import { checkFirebaseConfiguration } from './src/utils/firebaseCheck';
 
 // Import all new screens
 import DashboardScreen from './src/screens/Dashboard/DashboardScreen';
@@ -53,7 +56,7 @@ const LoadingScreen = () => (
   </View>
 );
 
-if (__DEV__) { console.log('App.tsx loaded - initializing Solana wallet system'); }
+if (__DEV__) { console.log('App.tsx loaded - initializing Firebase and Solana wallet system'); }
 
 export default function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -62,12 +65,16 @@ export default function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        if (__DEV__) { console.log('Initializing app with Solana wallet system...'); }
+        if (__DEV__) { console.log('Initializing app with Firebase and Solana wallet system...'); }
         
-        // Initialize backend URL
-        if (__DEV__) { console.log('Initializing backend URL...'); }
-        const backendUrl = await initializeBackendURL();
-        if (__DEV__) { console.log('Backend URL initialized:', backendUrl); }
+        // Firebase is automatically initialized when the config file is imported
+        if (__DEV__) { console.log('Firebase initialized successfully'); }
+        
+        // Check Firebase configuration
+        const firebaseCheck = checkFirebaseConfiguration();
+        if (__DEV__) { 
+          console.log('Firebase configuration check:', firebaseCheck.isConfigured ? '✅ PASSED' : '❌ FAILED');
+        }
         
         // Initialize Solana wallet system
         if (__DEV__) { console.log('Solana wallet system initialized successfully'); }
@@ -94,7 +101,7 @@ export default function App() {
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Failed to initialize: {error}</Text>
         <Text style={styles.errorSubtext}>
-          This might be due to network connectivity issues.
+          This might be due to Firebase configuration issues.
         </Text>
       </View>
     );

@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
-import { verifyCode, sendVerificationCode } from '../../services/emailAuthService';
+import { verifyCode, sendVerificationCode } from '../../services/firebaseAuthService';
 import { useApp } from '../../context/AppContext';
 
 const CODE_LENGTH = 4; // 4-digit code
@@ -69,12 +69,17 @@ const VerificationScreen: React.FC = () => {
       
       const authResponse = await verifyCode(email, codeString);
 
+      if (!authResponse.success || !authResponse.user) {
+        throw new Error(authResponse.error || 'Authentication failed');
+      }
+
       // Code verified successfully and user is now authenticated
       if (__DEV__) { console.log('✅ Authentication successful:', authResponse.user); }
       
       // Transform API response to match User type (snake_case)
+      // Keep Firebase user ID as string to match Firestore format
       const transformedUser = {
-        id: authResponse.user.id,
+        id: authResponse.user.id, // Keep as string for Firebase compatibility
         name: authResponse.user.name,
         email: authResponse.user.email,
         wallet_address: authResponse.user.walletAddress,
@@ -112,11 +117,15 @@ const VerificationScreen: React.FC = () => {
           throw new Error('Email not found');
         }
 
-        await sendVerificationCode(email);
-      setTimer(RESEND_SECONDS);
+        const result = await sendVerificationCode(email);
         
+        if (result.success) {
+          setTimer(RESEND_SECONDS);
         // Show success message
         Alert.alert('Success', 'New verification code sent to your email');
+        } else {
+          throw new Error(result.error || 'Failed to resend code');
+        }
         
       } catch (error) {
         console.error('Failed to resend code:', error);

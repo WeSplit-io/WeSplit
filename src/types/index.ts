@@ -1,6 +1,7 @@
 // Core entity types that match the backend database schema
+// Support both SQLite (number) and Firebase (string) user IDs
 export interface User {
-  id: number;
+  id: number | string; // Support both SQLite (number) and Firebase (string) IDs
   name: string;
   email: string;
   wallet_address: string;
@@ -40,12 +41,12 @@ export interface ExpenseSplit {
 
 // Core expense entity
 export interface Expense {
-  id: number;
+  id: number | string; // Support both SQLite (number) and Firebase (string) IDs
   description: string;
   amount: number;
   currency: string;
-  paid_by: number;
-  group_id: number;
+  paid_by: number | string; // Support both SQLite (number) and Firebase (string) IDs
+  group_id: number | string; // Support both SQLite (number) and Firebase (string) IDs
   category: string;
   created_at: string;
   updated_at?: string;
@@ -65,14 +66,14 @@ export interface ExpenseByCurrency {
 
 // Core group entity
 export interface Group {
-  id: number;
+  id: number | string; // Support both SQLite (number) and Firebase (string) IDs
   name: string;
   description: string;
   category: string;
   currency: string;
   icon: string;
   color: string;
-  created_by: number;
+  created_by: number | string; // Support both SQLite (number) and Firebase (string) IDs
   created_at: string;
   updated_at: string;
   
@@ -92,7 +93,7 @@ export interface GroupWithDetails extends Group {
 
 // Balance calculation result
 export interface Balance {
-  userId: number;
+  userId: number | string; // Support both SQLite (number) and Firebase (string) IDs
   userName: string;
   userAvatar?: string;
   amount: number;
@@ -111,7 +112,7 @@ export interface SettlementCalculation {
 
 // Settlement transaction
 export interface SettlementTransaction {
-  userId: number;
+  userId: number | string; // Support both SQLite (number) and Firebase (string) IDs
   amount: number;
   currency: string;
   address: string;
@@ -136,7 +137,7 @@ export interface InviteLinkData {
 // Notification types
 export interface Notification {
   id: number;
-  user_id: number;
+  user_id: number | string; // Support both SQLite (number) and Firebase (string) IDs
   type: 'expense_added' | 'payment_reminder' | 'settlement_request' | 'group_invite';
   title: string;
   message: string;
