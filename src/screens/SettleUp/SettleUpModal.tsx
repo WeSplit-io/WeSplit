@@ -4,6 +4,7 @@ import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
 import { convertToUSDC } from '../../services/priceService';
+import { firebaseDataService } from '../../services/firebaseDataService';
 import { GroupMember, Expense, Balance } from '../../types';
 import { styles } from './styles';
 
@@ -54,9 +55,8 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
       if (!visible || !group?.id || !currentUser?.id) return;
       
       try {
-        // Use hybrid service instead of direct service call
-        const { hybridDataService } = await import('../../services/hybridDataService');
-        const status = await hybridDataService.settlement.getReminderStatus(group.id.toString(), currentUser.id.toString());
+        // Use Firebase service directly
+        const status = await firebaseDataService.settlement.getReminderStatus(group.id.toString(), currentUser.id.toString());
         setReminderStatus(status);
       } catch (err) {
         console.error('Error fetching reminder status:', err);
@@ -80,8 +80,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
     const interval = setInterval(async () => {
       if (group?.id && currentUser?.id) {
         try {
-          const { hybridDataService } = await import('../../services/hybridDataService');
-          const status = await hybridDataService.settlement.getReminderStatus(group.id.toString(), currentUser.id.toString());
+          const status = await firebaseDataService.settlement.getReminderStatus(group.id.toString(), currentUser.id.toString());
           setReminderStatus(status);
         } catch (err) {
           console.error('Error refreshing reminder status:', err);
@@ -310,14 +309,17 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
     // Find the member data for the contact
     const memberContact = members.find(member => member.id === memberData.memberId);
     
-    
+    if (!memberContact) {
+      Alert.alert('Error', 'Member not found');
+      return;
+    }
 
     // Close the modal first
     onClose?.();
 
     // Navigate to Send flow with pre-filled settlement data
     navigation.navigate('SendAmount', {
-      contact,
+      contact: memberContact,
       groupId: actualGroupId,
       prefilledAmount: memberData.amount,
       prefilledCurrency: memberData.currency, // Pass the correct currency
@@ -362,8 +364,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
             try {
               setSettlementLoading(true);
               
-              const { hybridDataService } = await import('../../services/hybridDataService');
-              const result = await hybridDataService.settlement.settleGroupExpenses(
+              const result = await firebaseDataService.settlement.settleGroupExpenses(
                 actualGroupId.toString(),
                 currentUser.id.toString(),
                 'individual' // Backend handles settling all user's debts with this
@@ -448,8 +449,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
             try {
               setReminderLoading(true);
               
-              const { hybridDataService } = await import('../../services/hybridDataService');
-              const result = await hybridDataService.settlement.sendPaymentReminder(
+              const result = await firebaseDataService.settlement.sendPaymentReminder(
                 actualGroupId.toString(),
                 currentUser.id.toString(),
                 memberData.memberId.toString(),
@@ -534,8 +534,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
                 name: item.name
               }));
 
-              const { hybridDataService } = await import('../../services/hybridDataService');
-              const result = await hybridDataService.settlement.sendBulkPaymentReminders(
+              const result = await firebaseDataService.settlement.sendBulkPaymentReminders(
                 actualGroupId.toString(),
                 currentUser.id.toString(),
                 debtors

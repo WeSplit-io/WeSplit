@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
 import Icon from '../../components/Icon';
-import { GroupMember } from '../../services/groupService';
+import SlideButton from '../../components/SlideButton';
+import { GroupMember } from '../../types';
 import { createPaymentRequest } from '../../services/requestService';
 import { useApp } from '../../context/AppContext';
+import { useWallet } from '../../context/WalletContext';
+import { colors } from '../../theme';
 import { styles } from './styles';
 
 const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
@@ -28,7 +31,7 @@ const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     try {
       // Create real payment request using backend API
       const requestData = {
-        senderId: currentUser.id,
+        senderId: Number(currentUser.id),
         recipientId: contact.id,
         amount: amount,
         currency: 'USDC',

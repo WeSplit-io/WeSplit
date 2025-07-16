@@ -1,3 +1,16 @@
+/**
+ * @deprecated This file is deprecated and should no longer be used.
+ * 
+ * The wallet functionality has been migrated to use the Solana AppKit implementation
+ * in `src/services/solanaAppKitService.ts` and `src/context/WalletContext.tsx`.
+ * 
+ * Please use the new WalletContext methods instead:
+ * - useWallet() hook for accessing wallet state and methods
+ * - solanaAppKitService for direct wallet operations
+ * 
+ * This file is kept for backward compatibility but will be removed in a future version.
+ */
+
 // Simplified Solana Wallet Service for React Native
 // This provides basic wallet functionality without web-specific adapters
 
@@ -108,17 +121,25 @@ class SolanaWalletManager {
     try {
       let balance = 0;
       try {
+        if (__DEV__) { console.log('Fetching balance for address:', this.publicKey.toString()); }
         balance = await connection.getBalance(this.publicKey);
+        if (__DEV__) { console.log('Raw balance from network:', balance, 'lamports'); }
       } catch (balanceError) {
-        if (__DEV__) { console.log('Could not retrieve balance, using 0'); }
+        if (__DEV__) { 
+          console.log('Could not retrieve balance from network:', balanceError);
+          console.log('Using fallback balance of 0');
+        }
         balance = 0;
       }
+      
+      const solBalance = balance / LAMPORTS_PER_SOL;
+      if (__DEV__) { console.log('Converted balance:', solBalance, 'SOL'); }
       
       return {
         publicKey: this.publicKey,
         address: this.publicKey.toString(),
         isConnected: true,
-        balance: balance / LAMPORTS_PER_SOL,
+        balance: solBalance,
         walletName: 'Generated Wallet'
       };
     } catch (error) {

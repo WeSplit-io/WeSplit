@@ -16,23 +16,29 @@ import { colors } from '../../theme';
 import AuthGuard from '../../components/AuthGuard';
 import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
+import WalletSelectorModal from '../../components/WalletSelectorModal';
 import { useApp } from '../../context/AppContext';
+import { useWallet } from '../../context/WalletContext';
 import { useGroupList } from '../../hooks/useGroupData';
 import { GroupWithDetails, Expense, GroupMember } from '../../types';
 import { formatCryptoAmount } from '../../utils/cryptoUtils';
 import { getTotalSpendingInUSDC } from '../../services/priceService';
-import { getUserNotifications, sendNotification } from '../../services/notificationService';
+import { getUserNotifications, sendNotification } from '../../services/firebaseNotificationService';
+import { createPaymentRequest, getReceivedPaymentRequests } from '../../services/firebasePaymentRequestService';
+import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
+
 
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const { state, notifications, loadNotifications, refreshNotifications } = useApp();
   const { currentUser, isAuthenticated } = state;
-  
+  const { balance: walletBalance, isConnected: walletConnected, connectWallet, walletName, refreshBalance } = useWallet();
+
   // Use efficient group list hook
-  const { 
-    groups, 
-    loading: groupsLoading, 
-    refreshing, 
-    refresh: refreshGroups 
+  const {
+    groups,
+    loading: groupsLoading,
+    refreshing,
+    refresh: refreshGroups
   } = useGroupList();
 
   // Debug logging - only log when data actually changes
@@ -49,6 +55,21 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [groupAmountsInUSD, setGroupAmountsInUSD] = useState<Record<number, number>>({});
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [userCreatedWalletBalance, setUserCreatedWalletBalance] = useState<UserWalletBalance | null>(null);
+  const [loadingUserWallet, setLoadingUserWallet] = useState(false);
+  const [connectingWallet, setConnectingWallet] = useState(false);
+  const [walletSelectorVisible, setWalletSelectorVisible] = useState(false);
+  const [displayWalletType, setDisplayWalletType] = useState<'connected' | 'app-created'>('app-created');
+
+
+  // Update display wallet type when external wallet connects
+  useEffect(() => {
+    if (walletConnected) {
+      setDisplayWalletType('connected');
+    } else {
+      setDisplayWalletType('app-created');
+    }
+  }, [walletConnected]);
 
   // Memoized balance calculations to avoid expensive recalculations
   const userBalances = useMemo(() => {
@@ -74,14 +95,14 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           group.expenses_by_currency.forEach(expenseByCurrency => {
             const currency = expenseByCurrency.currency || 'SOL';
             const totalAmount = expenseByCurrency.total_amount || 0;
-            
+
             if (totalAmount > 0) {
               // For dashboard display, show total spending across all groups
               // Use simple fallback rates for now since we have proper price service
               const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
               const usdcAmount = totalAmount * rate;
               totalSpentUSDC += usdcAmount;
-              
+
               if (!balanceByCurrency[currency]) {
                 balanceByCurrency[currency] = 0;
               }
@@ -111,65 +132,119 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     }
   }, [notifications]);
 
+  // Load user's created wallet balance (always load, even when external wallet is connected)
+  const loadUserCreatedWalletBalance = useCallback(async () => {
+    if (!currentUser?.id) {
+      setUserCreatedWalletBalance(null);
+      return;
+    }
+
+    try {
+      setLoadingUserWallet(true);
+      const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
+      setUserCreatedWalletBalance(balance);
+
+      if (__DEV__) {
+        console.log('📊 User created wallet balance loaded:', balance);
+      }
+    } catch (error) {
+      console.error('Error loading user created wallet balance:', error);
+      setUserCreatedWalletBalance(null);
+    } finally {
+      setLoadingUserWallet(false);
+    }
+  }, [currentUser?.id]);
+
+  // Load user wallet balance when component mounts or wallet connection changes
+  useEffect(() => {
+    loadUserCreatedWalletBalance();
+  }, [loadUserCreatedWalletBalance]);
+
+  // Reload app wallet balance when external wallet connects/disconnects
+  useEffect(() => {
+    loadUserCreatedWalletBalance();
+  }, [walletConnected, loadUserCreatedWalletBalance]);
+
+  // Keep app-created wallet as default even when external wallet connects
+  // User can manually switch using arrows if they want to see external wallet
+
   // Convert group amounts to USD for display with proper currency handling
   const convertGroupAmountsToUSD = useCallback(async (groups: GroupWithDetails[]) => {
     try {
       const usdAmounts: Record<number, number> = {};
-      
+
       for (const group of groups) {
-        if (group.expenses_by_currency && group.expenses_by_currency.length > 0) {
-          try {
+        try {
+          let totalUSD = 0;
+
+          // Check if we have expenses_by_currency data
+          if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency) && group.expenses_by_currency.length > 0) {
             const expenses = group.expenses_by_currency.map(expense => ({
               amount: expense.total_amount || 0,
               currency: expense.currency || 'SOL'
             }));
-            
-            const totalUSD = await getTotalSpendingInUSDC(expenses);
-            
-            if (__DEV__) { console.log(`Group "${group.name}": Price service returned $${totalUSD.toFixed(2)}`); }
-            usdAmounts[group.id] = totalUSD;
-            
-          } catch (error) {
-            console.error(`Price service failed for group ${group.id}:`, error);
-            
-            // Enhanced fallback with better rate handling and debugging
-            let fallbackTotal = 0;
-            for (const expense of group.expenses_by_currency) {
-              const amount = expense.total_amount || 0;
-              const currency = (expense.currency || 'SOL').toUpperCase();
-              
-              // Use simple fallback rates since we have proper price service
-              let rate = 1;
-              switch (currency) {
-                case 'SOL':
-                  rate = 200;
-                  break;
-                case 'USDC':
-                case 'USDT':
-                  rate = 1;
-                  break;
-                case 'BTC':
-                  rate = 50000;
-                  break;
-                default:
-                  console.warn(`Unknown currency: ${currency}, using rate 100`);
-                  rate = 100; // Default fallback for unknown currencies
+
+            // Filter out zero amounts
+            const validExpenses = expenses.filter(exp => exp.amount > 0);
+
+            if (validExpenses.length > 0) {
+              try {
+                totalUSD = await getTotalSpendingInUSDC(validExpenses);
+                if (__DEV__) {
+                  console.log(`Group "${group.name}": Price service returned $${totalUSD.toFixed(2)} for ${validExpenses.length} expenses`);
+                }
+              } catch (error) {
+                console.error(`Price service failed for group ${group.id}:`, error);
+
+                // Enhanced fallback with better rate handling
+                for (const expense of validExpenses) {
+                  const currency = (expense.currency || 'SOL').toUpperCase();
+
+                  let rate = 1;
+                  switch (currency) {
+                    case 'SOL':
+                      rate = 200;
+                      break;
+                    case 'USDC':
+                    case 'USDT':
+                      rate = 1;
+                      break;
+                    case 'BTC':
+                      rate = 50000;
+                      break;
+                    default:
+                      console.warn(`Unknown currency: ${currency}, using rate 100`);
+                      rate = 100;
+                  }
+
+                  totalUSD += expense.amount * rate;
+                }
+
+                if (__DEV__) {
+                  console.log(`Group "${group.name}": Fallback calculation returned $${totalUSD.toFixed(2)}`);
+                }
               }
-              
-              const usdValue = amount * rate;
-              fallbackTotal += usdValue;
-              
+            } else {
+              if (__DEV__) { console.log(`Group "${group.name}": No valid expenses found`); }
             }
-            
-            usdAmounts[group.id] = fallbackTotal;
+          } else {
+            if (__DEV__) { console.log(`Group "${group.name}": No expenses_by_currency data available`); }
           }
-        } else {
-          if (__DEV__) { console.log(`Group "${group.name}": No expenses_by_currency data`); }
+
+          usdAmounts[group.id] = totalUSD;
+
+        } catch (error) {
+          console.error(`Error processing group ${group.id}:`, error);
           usdAmounts[group.id] = 0;
         }
       }
-      
+
       setGroupAmountsInUSD(usdAmounts);
+
+      if (__DEV__) {
+        console.log('📊 Group USD amounts calculated:', usdAmounts);
+      }
+
     } catch (error) {
       console.error('Error converting group amounts to USD:', error);
     }
@@ -177,49 +252,124 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   // Load payment requests and notifications from context
   const loadPaymentRequests = useCallback(async () => {
-    if (!notifications) return;
-    // Only include notifications of type 'settlement_request' or 'payment_reminder' (adjust as needed)
-    setPaymentRequests(notifications.filter(n => n.type === 'settlement_request' || n.type === 'payment_reminder'));
-  }, [notifications]);
+    if (!currentUser?.id) return;
+
+    try {
+      // Get actual payment requests from Firebase
+      const actualPaymentRequests = await getReceivedPaymentRequests(currentUser.id, 10);
+
+      // Also include notifications of type 'settlement_request' and 'payment_reminder'
+      const notificationRequests = notifications ? notifications.filter(n =>
+        n.type === 'settlement_request' ||
+        n.type === 'payment_reminder'
+      ) : [];
+
+      // Combine both types of requests
+      const allRequests = [
+        ...actualPaymentRequests.map(req => ({
+          id: req.id,
+          type: 'payment_request' as const,
+          title: 'Payment Request',
+          message: `${req.senderName} has requested ${req.amount} ${req.currency}${req.description ? ` for ${req.description}` : ''}`,
+          data: {
+            requestId: req.id,
+            senderId: req.senderId,
+            senderName: req.senderName,
+            amount: req.amount,
+            currency: req.currency,
+            description: req.description,
+            groupId: req.groupId,
+            status: req.status
+          },
+          is_read: false,
+          created_at: req.created_at
+        })),
+        ...notificationRequests
+      ];
+
+      if (__DEV__) {
+        console.log('🔥 Loading payment requests:', {
+          actualPaymentRequests: actualPaymentRequests.length,
+          notificationRequests: notificationRequests.length,
+          totalRequests: allRequests.length
+        });
+      }
+
+      setPaymentRequests(allRequests);
+    } catch (error) {
+      console.error('Error loading payment requests:', error);
+      // Fallback to notifications only
+      if (notifications) {
+        const requests = notifications.filter(n =>
+          n.type === 'settlement_request' ||
+          n.type === 'payment_reminder' ||
+          n.type === 'payment_request'
+        );
+        setPaymentRequests(requests);
+      }
+    }
+  }, [notifications, currentUser?.id]);
 
   // Load settlement requests that the current user has sent to others
   const loadOutgoingSettlementRequests = async () => {
     if (!currentUser?.id) return [];
-    
+
     try {
       const requests: any[] = [];
-      
+
       // Simplified: For now, use notification-based requests instead of calculating from expenses
       // since individual expense data is not available in the groups list
       if (__DEV__) { console.log('Loading settlement requests - using notification-based approach'); }
-      
+
       // This will be populated when full group details are implemented
       // For now, return empty array to prevent errors
-      
+
       return requests;
-        
+
     } catch (error) {
       console.error('Error loading outgoing settlement requests:', error);
       return [];
     }
   };
 
-  // Simplified group summary for dashboard display
+  // Improved group summary for dashboard display
   const getGroupSummary = useCallback((group: GroupWithDetails) => {
     try {
-      // Use the available summary data from backend
-      const totalAmount = group.expenses_by_currency?.reduce((sum, expense) => {
-        return sum + (expense.total_amount || 0);
-      }, 0) || 0;
-      
-      const memberCount = group.member_count || 0;
-      const expenseCount = group.expense_count || 0;
-      
+      let totalAmount = 0;
+      let memberCount = 0;
+      let expenseCount = 0;
+
+      // Calculate total amount from expenses_by_currency
+      if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency)) {
+        totalAmount = group.expenses_by_currency.reduce((sum, expense) => {
+          return sum + (expense.total_amount || 0);
+        }, 0);
+      }
+
+      // Get member count from group data
+      memberCount = group.member_count || group.members?.length || 0;
+
+      // Get expense count from group data
+      expenseCount = group.expense_count || group.expenses?.length || 0;
+
+      // Check if group has any meaningful data
+      const hasData = totalAmount > 0 || memberCount > 0 || expenseCount > 0;
+
+      if (__DEV__) {
+        console.log(`📊 Group "${group.name}" summary:`, {
+          totalAmount,
+          memberCount,
+          expenseCount,
+          hasData,
+          expensesByCurrency: group.expenses_by_currency?.length || 0
+        });
+      }
+
       return {
         totalAmount,
         memberCount,
         expenseCount,
-        hasData: totalAmount > 0 || memberCount > 0
+        hasData
       };
     } catch (error) {
       console.error(`Error getting group summary for ${group.id}:`, error);
@@ -270,50 +420,39 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     }
 
     try {
-      if (__DEV__) { console.log('Sending request from dashboard:', request); }
-      
-      // Create notification data
-      const notificationData = {
-        type: 'payment_request',
-        amount: request.amount,
-        currency: request.currency,
-        fromUser: currentUser.name || currentUser.email,
-        fromUserId: currentUser.id,
-        message: request.message,
-        status: 'pending',
-        request_id: request.request_id || Date.now().toString()
-      };
+      if (__DEV__) { console.log('🔥 Sending payment request from dashboard:', request); }
 
-      if (__DEV__) { console.log('Notification data:', notificationData); }
-
-      // Fix: Use correct parameter order and types for sendNotification
-      const result = await sendNotification(
-        request.fromUserId, // to_user_id (the person who will receive the request)
-        'Payment Request', // title
-        `Payment request for ${request.amount} ${request.currency}`, // message
-        'payment_request', // type (correct notification type)
-        notificationData // data
+      // Create payment request using the new service
+      const paymentRequest = await createPaymentRequest(
+        currentUser.id, // senderId
+        request.fromUserId, // recipientId
+        request.amount,
+        request.currency,
+        request.message, // description
+        request.groupId // optional groupId
       );
 
-      if (__DEV__) { console.log('Send notification result:', result); }
+      if (__DEV__) { console.log('🔥 Payment request created:', paymentRequest); }
 
-      // Fix: sendNotification returns a Notification object, not a success/error response
-      if (result && result.id) {
+      if (paymentRequest && paymentRequest.id) {
         Alert.alert(
-          'Request Sent!', 
+          'Request Sent!',
           `Payment request for ${request.amount} ${request.currency} has been sent to ${request.fromUser}.`,
           [{ text: 'OK' }]
         );
-        
-        // Refresh the payment requests
-        await loadPaymentRequests();
+
+        // Refresh the payment requests and notifications
+        await Promise.all([
+          loadPaymentRequests(),
+          loadNotifications(true)
+        ]);
       } else {
-        throw new Error('Failed to send request - no notification ID received');
+        throw new Error('Failed to create payment request');
       }
     } catch (error) {
-      console.error('Error sending request:', error);
+      console.error('Error sending payment request:', error);
       Alert.alert(
-        'Error', 
+        'Error',
         error instanceof Error ? error.message : 'Failed to send payment request. Please try again.',
         [{ text: 'OK' }]
       );
@@ -322,11 +461,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   const onRefresh = async () => {
     if (!isAuthenticated || !currentUser?.id) return;
-    
+
     try {
       await Promise.all([
         refreshGroups(),
         refreshNotifications(),
+        refreshBalance(), // Add balance refresh to pull-to-refresh
       ]);
       loadPaymentRequests();
     } catch (error) {
@@ -353,7 +493,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.statusBar} />
-      
+
       <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
@@ -385,58 +525,283 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               <Text style={styles.userName}>
                 {currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}!
               </Text>
+              {walletConnected && (
+                <Text style={[styles.welcomeText, { fontSize: 12, color: colors.brandGreen }]}>
+                  💰 External Wallet
+                </Text>
+              )}
+              {!walletConnected && userCreatedWalletBalance && (
+                <Text style={[styles.welcomeText, { fontSize: 12, color: colors.textLightSecondary }]}>
+                  📱 App Wallet
+                </Text>
+              )}
+
             </View>
           </View>
-          
-          <TouchableOpacity 
-            style={styles.bellContainer}
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            <Icon
-              name="bell"
-              color={colors.white}
-              style={styles.bellIcon}
-            />
-            {unreadNotifications > 0 && (
-              <View style={styles.bellBadge}>
-                <Text style={styles.bellBadgeText}>{unreadNotifications}</Text>
-              </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {!walletConnected && (
+              <TouchableOpacity
+                style={{
+                  padding: 8,
+                  backgroundColor: connectingWallet ? colors.darkCard : colors.brandGreen,
+                  borderRadius: 4,
+                  marginRight: 8,
+                  opacity: connectingWallet ? 0.7 : 1
+                }}
+                onPress={async () => {
+                  if (connectingWallet) return;
+
+                  try {
+                    setConnectingWallet(true);
+                    await connectWallet();
+                    // The wallet connection will be handled by the WalletContext
+                    // and the UI will update automatically
+                  } catch (error) {
+                    console.error('Error connecting wallet:', error);
+                    // Error handling is already done in the WalletContext
+                  } finally {
+                    setConnectingWallet(false);
+                  }
+                }}
+                disabled={connectingWallet}
+              >
+                <Text style={{
+                  color: connectingWallet ? colors.textLight : colors.black,
+                  fontSize: 12,
+                  fontWeight: 'bold'
+                }}>
+                  {connectingWallet ? 'Connecting...' : 'Connect Wallet'}
+                </Text>
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+            {__DEV__ && (
+              <TouchableOpacity
+                style={{ padding: 8, backgroundColor: '#444', borderRadius: 4, marginRight: 8 }}
+                onPress={async () => {
+                  try {
+                    if (currentUser?.id) {
+                      // Create a test payment request to yourself
+                      await createPaymentRequest(
+                        currentUser.id,
+                        currentUser.id, // Send to yourself for testing
+                        25.50,
+                        'USDC',
+                        'Test payment request from dashboard'
+                      );
+                      await Promise.all([
+                        loadPaymentRequests(),
+                        loadNotifications(true)
+                      ]);
+                      Alert.alert('Success', 'Test payment request created!');
+                    }
+                  } catch (error) {
+                    console.error('Error creating test payment request:', error);
+                    Alert.alert('Error', 'Failed to create test payment request');
+                  }
+                }}
+              >
+                <Text style={{ color: '#FFF', fontSize: 12 }}>Test PR</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.bellContainer}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <Icon
+                name="bell"
+                color={colors.white}
+                style={styles.bellIcon}
+              />
+              {unreadNotifications > 0 && (
+                <View style={styles.bellBadge}>
+                  <Text style={styles.bellBadgeText}>{unreadNotifications}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Balance Card */}
-        <View style={styles.balanceCard}>
-          <View style={styles.balanceHeader}>
-            <Text style={styles.balanceLabel}>Your Balance</Text>
-            <TouchableOpacity style={styles.qrCodeIcon} onPress={() => navigation.navigate('Deposit')}>
-              <Image  
-                source={require('../../../assets/qr-code-scan.png')}
-                style={styles.qrCodeImage}
-              />
-            </TouchableOpacity>
+        <View style={[styles.balanceCard, { alignItems: 'flex-start' }]}>
+                      <View style={styles.balanceHeader}>
+              <Text style={styles.balanceLabel}>
+                {displayWalletType === 'connected'
+                  ? `${walletName || 'External Wallet'} Balance`
+                  : 'App Wallet Balance'
+                }
+              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {/* Refresh Balance Button */}
+              {(walletConnected || userCreatedWalletBalance) && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.primaryGreen + '20',
+                    paddingHorizontal: 8,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    marginRight: 8,
+                  }}
+                  onPress={async () => {
+                    if (displayWalletType === 'connected') {
+                      await refreshBalance();
+                    } else {
+                      await loadUserCreatedWalletBalance();
+                    }
+                  }}
+                >
+                  <Icon name="refresh-cw" size={14} color={colors.primaryGreen} />
+                </TouchableOpacity>
+              )}
+
+              {/* Wallet Selector Button */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.primaryGreen + '20',
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                  marginRight: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+                onPress={() => setWalletSelectorVisible(true)}
+              >
+                <Icon name="wallet" size={14} color={colors.primaryGreen} />
+                <Text style={{
+                  fontSize: 12,
+                  color: colors.primaryGreen,
+                  fontWeight: '600',
+                  marginLeft: 4,
+                }}>
+                  {walletConnected ? 'Switch' : 'Select'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.qrCodeIcon} onPress={() => navigation.navigate('Deposit')}>
+                <Image
+                  source={require('../../../assets/qr-code-scan.png')}
+                  style={styles.qrCodeImage}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
-          
+
           {priceLoading ? (
             <View style={styles.priceLoadingContainer}>
               <ActivityIndicator size="small" color={BG_COLOR} />
-              <Text style={styles.priceLoadingText}>Loading balance...</Text>
+              <Text style={styles.priceLoadingText}>
+                {walletConnected ? 'Loading balance...' : loadingUserWallet ? 'Loading your wallet...' : 'Loading balance...'}
+              </Text>
             </View>
           ) : (
-            <Text style={styles.balanceAmount}>
-              ${userBalances.totalSpent?.toFixed(2) || '0.00'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }}>
+              {/* Left Arrow - Switch to App Wallet */}
+              {walletConnected && userCreatedWalletBalance && (
+                <TouchableOpacity
+                  style={{
+                    padding: 8,
+                    marginRight: 8,
+                    opacity: displayWalletType === 'app-created' ? 0.3 : 0.8,
+                  }}
+                  onPress={() => setDisplayWalletType('app-created')}
+                  disabled={displayWalletType === 'app-created'}
+                >
+                  <Icon name="chevron-left" size={24} color={colors.black} />
+                </TouchableOpacity>
+              )}
+
+              {/* Balance Display */}
+              <View style={{ flex: 1, alignItems: 'flex-start' }}>
+                <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
+                  ${displayWalletType === 'connected' && walletConnected
+                    ? (walletBalance !== null ? walletBalance.toFixed(2) : '0.00')
+                    : (userCreatedWalletBalance?.totalUSD || 0).toFixed(2)
+                  }
+                </Text>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginTop: 4,
+                }}>
+                  <View style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: displayWalletType === 'connected' ? colors.primaryGreen : colors.textLightSecondary,
+                    marginRight: 6,
+                  }} />
+                  <Text style={{
+                    fontSize: 12,
+                    color: colors.textLightSecondary,
+                    fontWeight: '500',
+                  }}>
+                    {displayWalletType === 'connected'
+                      ? `${walletName || 'External Wallet'} Balance`
+                      : 'App Wallet Balance'
+                    }
+                  </Text>
+                </View>
+              </View>
+
+              {/* Right Arrow - Switch to Connected Wallet */}
+              {walletConnected && userCreatedWalletBalance && (
+                <TouchableOpacity
+                  style={{
+                    padding: 8,
+                    marginLeft: 8,
+                    opacity: displayWalletType === 'connected' ? 0.3 : 0.8,
+                  }}
+                  onPress={() => setDisplayWalletType('connected')}
+                  disabled={displayWalletType === 'connected'}
+                >
+                  <Icon name="chevron-right" size={24} color={colors.black} />
+                </TouchableOpacity>
+              )}
+            </View>
           )}
-          
+
           <Text style={styles.balanceLimitText}>
-          Balance Limit $1000
+            Balance Limit $1000
           </Text>
+
+          {!walletConnected && userCreatedWalletBalance && (
+            <TouchableOpacity
+              style={[
+                styles.connectWalletButton,
+                connectingWallet && { opacity: 0.7, backgroundColor: colors.darkCard }
+              ]}
+              onPress={async () => {
+                if (connectingWallet) return;
+
+                try {
+                  setConnectingWallet(true);
+                  await connectWallet();
+                  // The wallet connection will be handled by the WalletContext
+                  // and the UI will update automatically
+                } catch (error) {
+                  console.error('Error connecting wallet:', error);
+                  // Error handling is already done in the WalletContext
+                } finally {
+                  setConnectingWallet(false);
+                }
+              }}
+              disabled={connectingWallet}
+            >
+              <Text style={[
+                styles.connectWalletButtonText,
+                connectingWallet && { color: colors.textLight }
+              ]}>
+                {connectingWallet ? 'Connecting...' : 'Connect External Wallet'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Action Buttons */}
         <View style={styles.actionsGrid}>
           <View style={styles.actionButtonsRow}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButton}
               onPress={() => navigation.navigate('SendContacts')}
             >
@@ -449,12 +814,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               <Text style={styles.actionButtonText}>Send to</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButton}
               onPress={() => navigation.navigate('RequestContacts')}
             >
               <View style={styles.actionButtonCircle}>
-              <Image
+                <Image
                   source={require('../../../assets/icon-receive.png')}
                   style={styles.actionButtonIcon}
                 />
@@ -462,12 +827,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               <Text style={styles.actionButtonText}>Request</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButton}
               onPress={() => navigation.navigate('Deposit')}
             >
               <View style={styles.actionButtonCircle}>
-              <Image
+                <Image
                   source={require('../../../assets/icon-deposit.png')}
                   style={styles.actionButtonIcon}
                 />
@@ -475,15 +840,14 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               <Text style={styles.actionButtonText}>Top up</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButton}
               onPress={() => {
-                // TODO: Implement withdraw functionality
-                if (__DEV__) { console.log('Withdraw tapped'); }
+                navigation.navigate('WithdrawAmount');
               }}
             >
               <View style={styles.actionButtonCircle}>
-              <Image
+                <Image
                   source={require('../../../assets/icon-withdraw.png')}
                   style={styles.actionButtonIcon}
                 />
@@ -506,7 +870,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>No groups yet</Text>
               <Text style={styles.emptyStateSubtext}>Create a group to start splitting expenses</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.createGroupButton}
                 onPress={() => navigation.navigate('CreateGroup')}
               >
@@ -523,73 +887,73 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                   return bUSD - aUSD;
                 })
                 .slice(0, 2).map((group, index) => {
-                try {
-                  // Use the new summary function that works with available data
-                  const summary = getGroupSummary(group);
-                  const isOwner = group.created_by === Number(currentUser?.id);
-                  
-                  return (
-                    <TouchableOpacity
-                      key={group.id}
-                      style={[
-                        styles.groupGridCard, 
-                        index === 0 ? styles.groupGridCardLeft : styles.groupGridCardRight
-                      ]}
-                      onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
-                    >
-                      <View style={styles.groupGridHeader}>
-                        <View style={styles.groupGridIcon}>
-                          <Icon
-                            name="users"
-                            style={styles.groupGridIconSvg}
-                          />
-                        </View>
-                        {/* Show USD-converted total */}
-                        <Text style={styles.groupGridAmount}>
-                          ${(groupAmountsInUSD[group.id] || 0).toFixed(2)}
-                        </Text>
-                      </View>
-                      <Text style={styles.groupGridName}>{group.name}</Text>
-                      <Text style={styles.groupGridRole}>
-                        {isOwner ? '👤 Owner' : '👥 Member'} • {summary.memberCount} members
-                      </Text>
-                      {summary.hasData ? (
-                        <View style={styles.memberAvatars}>
-                          {/* Show member count visually */}
-                          {Array.from({ length: Math.min(summary.memberCount, 3) }).map((_, i) => (
-                            <View key={i} style={styles.memberAvatar} />
-                          ))}
-                          {summary.memberCount > 3 && (
-                            <View style={styles.memberAvatarMore}>
-                              <Text style={styles.memberAvatarMoreText}>
-                                +{summary.memberCount - 3}
-                              </Text>
-                            </View>
-                          )}
-                          <Text style={styles.activityIndicator}>
-                            {summary.expenseCount} expense{summary.expenseCount !== 1 ? 's' : ''}
+                  try {
+                    // Use the new summary function that works with available data
+                    const summary = getGroupSummary(group);
+                    const isOwner = group.created_by === Number(currentUser?.id);
+
+                    return (
+                      <TouchableOpacity
+                        key={group.id}
+                        style={[
+                          styles.groupGridCard,
+                          index === 0 ? styles.groupGridCardLeft : styles.groupGridCardRight
+                        ]}
+                        onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
+                      >
+                        <View style={styles.groupGridHeader}>
+                          <View style={styles.groupGridIcon}>
+                            <Icon
+                              name="users"
+                              style={styles.groupGridIconSvg}
+                            />
+                          </View>
+                          {/* Show USD-converted total */}
+                          <Text style={styles.groupGridAmount}>
+                            ${(groupAmountsInUSD[group.id] || 0).toFixed(2)}
                           </Text>
                         </View>
-                      ) : (
-                        <View style={styles.memberAvatars}>
-                          <Text style={styles.inactiveText}>No activity yet</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                } catch (error) {
-                  console.error(`Error rendering group ${group.id}:`, error);
-                  // Return a placeholder if there's an error with this group
-                  return (
-                    <View key={group.id} style={[
-                      styles.groupGridCard, 
-                      index === 0 ? styles.groupGridCardLeft : styles.groupGridCardRight
-                    ]}>
-                      <Text style={styles.errorText}>Error loading group</Text>
-                    </View>
-                  );
-                }
-              })}
+                        <Text style={styles.groupGridName}>{group.name}</Text>
+                        <Text style={styles.groupGridRole}>
+                          {isOwner ? '👤 Owner' : '👥 Member'} • {summary.memberCount} members
+                        </Text>
+                        {summary.hasData ? (
+                          <View style={styles.memberAvatars}>
+                            {/* Show member count visually */}
+                            {Array.from({ length: Math.min(summary.memberCount, 3) }).map((_, i) => (
+                              <View key={i} style={styles.memberAvatar} />
+                            ))}
+                            {summary.memberCount > 3 && (
+                              <View style={styles.memberAvatarMore}>
+                                <Text style={styles.memberAvatarMoreText}>
+                                  +{summary.memberCount - 3}
+                                </Text>
+                              </View>
+                            )}
+                            <Text style={styles.activityIndicator}>
+                              {summary.expenseCount} expense{summary.expenseCount !== 1 ? 's' : ''}
+                            </Text>
+                          </View>
+                        ) : (
+                          <View style={styles.memberAvatars}>
+                            <Text style={styles.inactiveText}>No activity yet</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  } catch (error) {
+                    console.error(`Error rendering group ${group.id}:`, error);
+                    // Return a placeholder if there's an error with this group
+                    return (
+                      <View key={group.id} style={[
+                        styles.groupGridCard,
+                        index === 0 ? styles.groupGridCardLeft : styles.groupGridCardRight
+                      ]}>
+                        <Text style={styles.errorText}>Error loading group</Text>
+                      </View>
+                    );
+                  }
+                })}
             </View>
           )}
         </View>
@@ -661,10 +1025,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                 // Use the new summary function that works with available data
                 const summary = getGroupSummary(group);
                 const recentDate = group.updated_at || group.created_at || new Date().toISOString();
-                
+
                 return (
-                  <TouchableOpacity 
-                    key={group.id} 
+                  <TouchableOpacity
+                    key={group.id}
                     style={styles.requestItem}
                     onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
                   >
@@ -702,6 +1066,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           )}
         </View>
       </ScrollView>
+
+      {/* Wallet Selector Modal */}
+      <WalletSelectorModal
+        visible={walletSelectorVisible}
+        onClose={() => setWalletSelectorVisible(false)}
+      />
 
       <NavBar currentRoute="Dashboard" navigation={navigation} />
     </SafeAreaView>

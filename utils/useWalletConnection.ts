@@ -1,3 +1,16 @@
+/**
+ * @deprecated This hook is deprecated and should no longer be used.
+ * 
+ * The wallet connection functionality has been migrated to use the WalletContext
+ * directly in `src/context/WalletContext.tsx`.
+ * 
+ * Please use the useWallet() hook directly instead:
+ * - import { useWallet } from '../src/context/WalletContext';
+ * - const { connectWallet, disconnectWallet, isConnected, address, balance } = useWallet();
+ * 
+ * This hook is kept for backward compatibility but will be removed in a future version.
+ */
+
 import { useCallback } from 'react';
 import { useWallet } from '../src/context/WalletContext';
 import { Alert } from 'react-native';
@@ -10,7 +23,9 @@ export const useWalletConnection = () => {
     disconnectWallet, 
     isLoading, 
     chainId,
-    walletName
+    walletName,
+    balance,
+    refreshBalance
   } = useWallet();
 
   const handleConnect = useCallback(async () => {
@@ -45,10 +60,12 @@ export const useWalletConnection = () => {
     isLoading,
     chainId,
     walletName,
+    balance,
     
     // Actions
     connectWallet: handleConnect,
     disconnectWallet: handleDisconnect,
+    refreshBalance,
     
     // Utilities
     getShortAddress,

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, SafeAreaView, ActivityIndicator, Share } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, ActivityIndicator, Share, TextInput } from 'react-native';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
+import { firebaseDataService } from '../../services/firebaseDataService';
 import { UserContact } from '../../types';
+import { colors } from '../../theme';
 import { styles } from './styles';
 
 const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
@@ -50,8 +52,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
         // Handle existing group flow
         try {
           // Use hybrid service instead of direct service call
-          const { hybridDataService } = await import('../../services/hybridDataService');
-          const groupMembers = await hybridDataService.group.getGroupMembers(groupId);
+          const groupMembers = await firebaseDataService.group.getGroupMembers(groupId);
           setMembers(groupMembers);
           
           setGroup({
@@ -69,8 +70,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
       if (currentUser?.id) {
         try {
           // Use hybrid service instead of direct service call
-          const { hybridDataService } = await import('../../services/hybridDataService');
-          const userContacts = await hybridDataService.group.getUserContacts(String(currentUser.id));
+          const userContacts = await firebaseDataService.group.getUserContacts(String(currentUser.id));
           setContacts(userContacts);
           setFilteredContacts(userContacts);
         } catch (err) {
@@ -160,8 +160,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
 
     try {
       // Generate invite link for the group using hybrid service
-      const { hybridDataService } = await import('../../services/hybridDataService');
-      const inviteData = await hybridDataService.group.generateInviteLink(targetGroupId, String(currentUser.id));
+      const inviteData = await firebaseDataService.group.generateInviteLink(targetGroupId, String(currentUser.id));
       
       // Prepare message for selected contacts
       const selectedContactsList = filteredContacts.filter(contact => 
@@ -211,8 +210,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
       if (fromCreation) {
         shareMessage = `Join my WeSplit group "${group?.name}"! I'll send you the invite link once it's created.`;
       } else {
-        const { hybridDataService } = await import('../../services/hybridDataService');
-        const inviteData = await hybridDataService.group.generateInviteLink(groupId!, String(currentUser.id));
+        const inviteData = await firebaseDataService.group.generateInviteLink(groupId!, String(currentUser.id));
         shareMessage = `Join my WeSplit group "${group?.name}"!\n\nInvite code: ${inviteData.inviteCode}\n\nOr click this link: wesplit://join/${inviteData.inviteCode}`;
       }
       

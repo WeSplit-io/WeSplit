@@ -136,9 +136,10 @@ export interface InviteLinkData {
 
 // Notification types
 export interface Notification {
-  id: number;
-  user_id: number | string; // Support both SQLite (number) and Firebase (string) IDs
-  type: 'expense_added' | 'payment_reminder' | 'settlement_request' | 'group_invite';
+  id: string | number; // Support both SQLite (number) and Firebase (string) IDs
+  user_id?: number | string; // Legacy field for SQLite compatibility
+  userId?: string; // Firebase field
+  type: 'expense_added' | 'payment_reminder' | 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'general' | 'group_invite';
   title: string;
   message: string;
   data?: any;

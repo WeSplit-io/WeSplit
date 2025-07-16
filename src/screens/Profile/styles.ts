@@ -186,7 +186,7 @@ export const styles = StyleSheet.create({
     color: colors.brandGreen,
   },
   unmatchedText: {
-    color: colors.accent,
+    color: colors.error,
   },
   walletActions: {
     flexDirection: 'row',
@@ -210,10 +210,10 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
   },
   disconnectBtn: {
-    borderColor: colors.accent,
+    borderColor: colors.error,
   },
   disconnectText: {
-    color: colors.accent,
+    color: colors.error,
   },
   walletMessage: {
     fontSize: typography.fontSize.sm,
@@ -286,7 +286,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.darkCard,
   },
   settingsOptionRowDestructive: {
-    borderColor: colors.accent,
+    borderColor: colors.error,
   },
   settingsOptionLabel: {
     flex: 1,
@@ -295,7 +295,7 @@ export const styles = StyleSheet.create({
     marginLeft: spacing.itemSpacing,
   },
   settingsOptionLabelDestructive: {
-    color: colors.accent,
+    color: colors.error,
   },
   // Additional styles for sections not covered
   sectionMargin: {
@@ -314,10 +314,10 @@ export const styles = StyleSheet.create({
     padding: spacing.md,
     marginVertical: spacing.md,
     borderWidth: spacing.borderWidthThin,
-    borderColor: colors.accent,
+    borderColor: colors.error,
   },
   privateKeyWarning: {
-    color: colors.accent,
+    color: colors.error,
     fontWeight: typography.fontWeight.bold,
     marginBottom: spacing.sm,
     fontSize: typography.fontSize.sm,
@@ -338,5 +338,37 @@ export const styles = StyleSheet.create({
     color: colors.darkBackground,
     fontWeight: typography.fontWeight.bold,
     fontSize: typography.fontSize.sm,
+  },
+  
+  // Wallet Management Button
+  walletManagementButton: {
+    backgroundColor: colors.darkBackground,
+    borderRadius: spacing.itemSpacing,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: spacing.borderWidthThin,
+    borderColor: colors.textLight,
+  },
+  
+  walletManagementContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  
+  walletManagementText: {
+    flex: 1,
+    marginLeft: spacing.md,
+  },
+  
+  walletManagementTitle: {
+    fontSize: typography.fontSize.md,
+    color: colors.textLight,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.xs,
+  },
+  
+  walletManagementSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.darkGray,
   },
 }); 

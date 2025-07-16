@@ -45,6 +45,14 @@ import RequestAmountScreen from './src/screens/Request/RequestAmountScreen';
 import RequestConfirmationScreen from './src/screens/Request/RequestConfirmationScreen';
 import RequestSuccessScreen from './src/screens/Request/RequestSuccessScreen';
 import GroupsListScreen from './src/screens/GroupsList/GroupsListScreen';
+import WithdrawAmountScreen from './src/screens/Withdraw/WithdrawAmountScreen';
+import WithdrawConfirmationScreen from './src/screens/Withdraw/WithdrawConfirmationScreen';
+import WithdrawSuccessScreen from './src/screens/Withdraw/WithdrawSuccessScreen';
+import WalletManagementScreen from './src/screens/WalletManagement/WalletManagementScreen';
+import SeedPhraseViewScreen from './src/screens/WalletManagement/SeedPhraseViewScreen';
+import SeedPhraseVerifyScreen from './src/screens/WalletManagement/SeedPhraseVerifyScreen';
+import MultiSignExplanationScreen from './src/screens/WalletManagement/MultiSignExplanationScreen';
+import MultiSignActivatedScreen from './src/screens/WalletManagement/MultiSignActivatedScreen';
 
 const Stack = createStackNavigator();
 const queryClient = new QueryClient();
@@ -150,6 +158,14 @@ export default function App() {
               <Stack.Screen name="RequestConfirmation" component={RequestConfirmationScreen} />
               <Stack.Screen name="RequestSuccess" component={RequestSuccessScreen} />
               <Stack.Screen name="GroupsList" component={GroupsListScreen} />
+              <Stack.Screen name="WithdrawAmount" component={WithdrawAmountScreen} />
+              <Stack.Screen name="WithdrawConfirmation" component={WithdrawConfirmationScreen} />
+              <Stack.Screen name="WithdrawSuccess" component={WithdrawSuccessScreen} />
+              <Stack.Screen name="WalletManagement" component={WalletManagementScreen} />
+              <Stack.Screen name="SeedPhraseView" component={SeedPhraseViewScreen} />
+              <Stack.Screen name="SeedPhraseVerify" component={SeedPhraseVerifyScreen} />
+              <Stack.Screen name="MultiSignExplanation" component={MultiSignExplanationScreen} />
+              <Stack.Screen name="MultiSignActivated" component={MultiSignActivatedScreen} />
             </Stack.Navigator>
           </NavigationContainer>
         </AppProvider>

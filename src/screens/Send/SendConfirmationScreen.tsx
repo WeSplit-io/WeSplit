@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
 import Icon from '../../components/Icon';
 import SlideButton from '../../components/SlideButton';
-import { GroupMember } from '../../services/groupService';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
+import { firebaseDataService } from '../../services/firebaseDataService';
+import { GroupMember } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
 
@@ -12,6 +13,23 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, amount, description, groupId, isSettlement } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
+
+  // Debug logging to ensure contact data is passed correctly
+  useEffect(() => {
+    console.log('💰 SendConfirmation: Contact data received:', {
+      name: contact?.name || 'No name',
+      email: contact?.email,
+      wallet: contact?.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet',
+      fullWallet: contact?.wallet_address,
+      id: contact?.id
+    });
+    console.log('💰 SendConfirmation: Transaction details:', {
+      amount,
+      description,
+      groupId,
+      isSettlement
+    });
+  }, [contact, amount, description, groupId, isSettlement]);
   const { 
     sendTransaction, 
     isConnected, 
@@ -55,8 +73,8 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       if (isSettlement && currentUser?.id && groupId && contact?.id) {
         try {
           // Use hybrid service instead of direct service call
-          const { hybridDataService } = await import('../../services/hybridDataService');
-          await hybridDataService.settlement.recordPersonalSettlement(
+          const { firebaseDataService } = await import('../../services/firebaseDataService');
+          await firebaseDataService.settlement.recordPersonalSettlement(
             groupId.toString(),
             currentUser.id.toString(),
             contact.id.toString(),
@@ -132,14 +150,16 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.mockupRecipientCard}>
           <View style={styles.mockupRecipientAvatar}>
             <Text style={styles.mockupRecipientAvatarText}>
-              {contact?.name?.charAt(0).toUpperCase() || 'U'}
+              {contact?.name ? contact.name.charAt(0).toUpperCase() : (contact?.wallet_address ? contact.wallet_address.substring(0, 1).toUpperCase() : 'U')}
             </Text>
           </View>
           <View style={styles.mockupRecipientInfo}>
-            <Text style={styles.mockupRecipientName}>{contact?.name || 'Unknown'}</Text>
+            <Text style={styles.mockupRecipientName}>
+              {contact?.name || (contact?.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'Unknown')}
+            </Text>
             <Text style={styles.mockupRecipientEmail}>{contact?.email || ''}</Text>
             <Text style={styles.walletAddressText} numberOfLines={1} ellipsizeMode="middle">
-              {contact?.wallet_address || 'No wallet address'}
+              {contact?.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet address'}
             </Text>
           </View>
         </View>

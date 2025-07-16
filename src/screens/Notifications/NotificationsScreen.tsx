@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
-import { getUserNotifications, markNotificationAsRead, Notification } from '../../services/notificationService';
+import { getUserNotifications, markNotificationAsRead, createTestNotification, Notification } from '../../services/firebaseNotificationService';
 import styles from './styles';
 
 const NotificationsScreen: React.FC<any> = ({ navigation }) => {
@@ -23,7 +23,18 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
   // Use notifications from context
   useEffect(() => {
-    loadNotifications();
+    const loadNotificationsAsync = async () => {
+      try {
+        setLoading(true);
+        await loadNotifications();
+      } catch (error) {
+        console.error('Error loading notifications:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadNotificationsAsync();
   }, [loadNotifications]);
 
   const onRefresh = async () => {
@@ -36,7 +47,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     // Mark as read if not already read
     if (!notification.is_read) {
       try {
-        await markNotificationAsRead(notification.id);
+        await markNotificationAsRead(String(notification.id));
         loadNotifications(); // Refresh notifications to update read status
       } catch (error) {
         console.error('Error marking notification as read:', error);
@@ -125,6 +136,25 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           <View style={styles.unreadBadge}>
             <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
           </View>
+        )}
+        {__DEV__ && (
+          <TouchableOpacity 
+            style={{ padding: 8, backgroundColor: '#333', borderRadius: 4, marginLeft: 8 }}
+            onPress={async () => {
+              try {
+                if (currentUser?.id) {
+                  await createTestNotification(currentUser.id);
+                  await loadNotifications(true);
+                  Alert.alert('Success', 'Test notification created!');
+                }
+              } catch (error) {
+                console.error('Error creating test notification:', error);
+                Alert.alert('Error', 'Failed to create test notification');
+              }
+            }}
+          >
+            <Text style={{ color: '#FFF', fontSize: 12 }}>Test</Text>
+          </TouchableOpacity>
         )}
       </View>
 

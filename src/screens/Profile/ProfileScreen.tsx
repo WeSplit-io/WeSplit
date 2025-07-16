@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, Alert, SafeAreaView, Clipboard, TextInput, Modal, Linking, Share, ActionSheetIOS, Platform } from 'react-native';
 import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
+import WalletSelectorModal from '../../components/WalletSelectorModal';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import { importWallet } from '../../../utils/walletService';
+import { solanaAppKitService } from '../../services/solanaAppKitService';
 import { createMoonPayURL } from '../../services/moonpayService';
 import Feather from 'react-native-vector-icons/Feather';
 import * as ImagePicker from 'expo-image-picker';
@@ -26,6 +27,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
   const [userWalletInfo, setUserWalletInfo] = useState<any>(null);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const [walletSelectorVisible, setWalletSelectorVisible] = useState(false);
 
   const handleLogout = async () => {
     Alert.alert(
@@ -227,7 +229,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
 
     setImportLoading(true);
     try {
-      await importWallet(importKey.trim());
+      const walletInfo = await solanaAppKitService.importWallet(importKey.trim());
       Alert.alert('Success', 'Wallet imported successfully!');
       setImportModalVisible(false);
       setImportKey('');
@@ -445,6 +447,15 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
     }
   ];
 
+  // Sync private key with wallet context
+  useEffect(() => {
+    if (secretKey) {
+      setPrivateKey(secretKey);
+    } else {
+      setPrivateKey(null);
+    }
+  }, [secretKey]);
+
   useEffect(() => {
     const loadUserWalletInfo = async () => {
       if (currentUser?.id) {
@@ -532,81 +543,23 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
           )}
         </View>
 
-        {/* Wallet Section */}
+        {/* Wallet Management Button */}
         <Text style={styles.sectionTitle}>Wallet</Text>
-        <View style={styles.walletSection}>
-          <View style={styles.walletHeader}>
-            <Icon name="wallet" size={20} color={isConnected ? "#A5EA15" : "#A89B9B"} />
-            <Text style={styles.walletStatus}>
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </Text>
-            <View style={isConnected ? styles.connectedDot : styles.disconnectedDot} />
-          </View>
-
-          {isConnected ? (
-            <>
-              <View style={styles.walletDetails}>
-                <View style={styles.walletRow}>
-                  <Text style={styles.walletLabel}>Balance:</Text>
-                  <Text style={styles.walletValue}>
-                    {balance ? `${balance.toFixed(4)} SOL` : 'Loading...'}
-                  </Text>
-                </View>
-                <View style={styles.walletRow}>
-                  <Text style={styles.walletLabel}>Network:</Text>
-                  <Text style={styles.walletValue}>{chainId || 'Solana Devnet'}</Text>
-                </View>
-                <View style={styles.walletRow}>
-                  <Text style={styles.walletLabel}>Wallet:</Text>
-                  <Text style={styles.walletValue}>{walletName || 'Unknown'}</Text>
-                </View>
-                <View style={styles.walletRow}>
-                  <Text style={styles.walletLabel}>Sync Status:</Text>
-                  <Text style={[styles.walletValue, walletsMatch ? styles.matchedText : styles.unmatchedText]}>
-                    {walletsMatch ? 'Synced' : 'Not Synced'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.walletActions}>
-                <TouchableOpacity style={styles.walletActionBtn} onPress={handleViewWalletDetails}>
-                  <Icon name="info" size={16} color="#A5EA15" />
-                  <Text style={styles.walletActionText}>Details</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.walletActionBtn} onPress={handleExportWalletData}>
-                  <Icon name="download" size={16} color="#A5EA15" />
-                  <Text style={styles.walletActionText}>Export</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.walletActionBtn, styles.disconnectBtn]} 
-                  onPress={handleDisconnectWallet}
-                  disabled={loadingWallet}
-                >
-                  <Icon name="log-out" size={16} color="#FF6B6B" />
-                  <Text style={[styles.walletActionText, styles.disconnectText]}>
-                    {loadingWallet ? 'Loading...' : 'Disconnect'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          ) : (
-            <>
-              <Text style={styles.walletMessage}>
-                Connect your wallet to access all features
+        <TouchableOpacity 
+          style={styles.walletManagementButton}
+          onPress={() => navigation.navigate('WalletManagement')}
+        >
+          <View style={styles.walletManagementContent}>
+            <Icon name="wallet" size={24} color="#A5EA15" />
+            <View style={styles.walletManagementText}>
+              <Text style={styles.walletManagementTitle}>Manage Wallet</Text>
+              <Text style={styles.walletManagementSubtitle}>
+                {isConnected ? 'Connected' : 'Not connected'} • {walletName || 'No wallet'}
               </Text>
-              <TouchableOpacity 
-                style={styles.connectWalletBtn} 
-                onPress={handleConnectWallet}
-                disabled={loadingWallet}
-              >
-                <Icon name="wallet" size={16} color="#212121" />
-                <Text style={styles.connectWalletText}>
-                  {loadingWallet ? 'Connecting...' : 'Connect Wallet'}
-                </Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
+            </View>
+            <Icon name="chevron-right" size={20} color="#A89B9B" />
+          </View>
+        </TouchableOpacity>
 
         {/* Back to Dashboard Button */}
         <TouchableOpacity style={styles.backToDashboardButton} onPress={handleBackToDashboard}>
@@ -671,6 +624,13 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+      
+      {/* Wallet Selector Modal */}
+      <WalletSelectorModal
+        visible={walletSelectorVisible}
+        onClose={() => setWalletSelectorVisible(false)}
+      />
+      
       <NavBar currentRoute="Profile" navigation={navigation} />
     </SafeAreaView>
   );

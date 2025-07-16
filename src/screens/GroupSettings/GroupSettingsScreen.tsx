@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, Alert, SafeAreaView, Share, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, SafeAreaView, Share, ActivityIndicator, Platform, Modal } from 'react-native';
 import { TextInput } from 'react-native-gesture-handler';
 import QRCode from 'react-native-qrcode-svg';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
 import { GroupMember, Expense } from '../../types';
+import { firebaseDataService } from '../../services/firebaseDataService';
+import { colors } from '../../theme';
 import { styles } from './styles';
 
 const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
@@ -43,8 +45,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
       setLoadingMembers(true);
       try {
         // Use the hybrid service instead of direct API call
-        const { hybridDataService } = await import('../../services/hybridDataService');
-        const members = await hybridDataService.group.getGroupMembers(groupId.toString());
+        const members = await firebaseDataService.group.getGroupMembers(groupId.toString());
         console.log(`Group Settings - Loaded ${members.length} real members:`, members.map((m: any) => m.name));
         setRealMembers(members);
       } catch (error) {
@@ -68,8 +69,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
       if (group?.id && currentUser?.id) {
         try {
           // Use the hybrid service instead of the old groupService
-          const { hybridDataService } = await import('../../services/hybridDataService');
-          const inviteData = await hybridDataService.group.generateInviteLink(group.id.toString(), currentUser.id.toString());
+          const inviteData = await firebaseDataService.group.generateInviteLink(group.id.toString(), currentUser.id.toString());
           setInviteLink(`wesplit://join/${inviteData.inviteCode}?name=${encodeURIComponent(group?.name || 'Group')}`);
         } catch (error) {
           console.error('Error generating invite link for QR:', error);
@@ -133,8 +133,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
 
     try {
       // Generate invite link using the hybrid service
-      const { hybridDataService } = await import('../../services/hybridDataService');
-      const inviteData = await hybridDataService.group.generateInviteLink(group.id.toString(), currentUser.id.toString());
+      const inviteData = await firebaseDataService.group.generateInviteLink(group.id.toString(), currentUser.id.toString());
       
       const shareMessage = `Join my WeSplit group "${group.name}"!
 
@@ -323,7 +322,7 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
           </View>
         ) : (
           members.map((member, index) => {
-            const balance = getMemberBalance(member.id);
+            const balance = getMemberBalance(Number(member.id));
             return (
               <View key={`member-${member.id}-${index}`} style={styles.memberItem}>
                 <View style={styles.memberAvatar} />

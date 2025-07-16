@@ -3,7 +3,8 @@ import { View, Text, ScrollView, TouchableOpacity, TextInput, SafeAreaView } fro
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import { getGroupMembers, getUserContacts, UserContact } from '../../services/groupService';
+import { firebaseDataService } from '../../services/firebaseDataService';
+import { UserContact } from '../../types';
 import QRCode from 'react-native-qrcode-svg';
 import { colors } from '../../theme';
 import { styles } from './styles';
@@ -23,9 +24,8 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Get user's wallet address for QR code (same logic as DepositScreen)
   const userWalletAddress = currentUser?.wallet_address || 
-                           currentUser?.walletAddress || 
                            address;
-  
+
   useEffect(() => {
     loadContacts();
   }, [groupId, currentUser]);
@@ -36,9 +36,9 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
     
     if (searchQuery.trim() !== '') {
       filtered = filtered.filter(contact =>
-        contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        contact.wallet_address.toLowerCase().includes(searchQuery.toLowerCase())
+        (contact.wallet_address && contact.wallet_address.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (contact.name && contact.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        contact.email.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
     
@@ -54,10 +54,12 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
 
     try {
       setLoading(true);
+      console.log('🔄 Loading contacts for user:', currentUser.id, 'groupId:', groupId);
       
       if (groupId) {
         // Load group members
-        const members = await getGroupMembers(groupId);
+        console.log('📱 Loading group members for group:', groupId);
+        const members = await firebaseDataService.group.getGroupMembers(groupId);
         // Filter out current user and convert to UserContact format
         const otherMembers = members.filter(member => 
           String(member.id) !== String(currentUser.id)
@@ -67,14 +69,22 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
           mutual_groups_count: 1,
           isFavorite: false // Default to false for group members
         }));
+        console.log('📱 Loaded', otherMembers.length, 'group members');
         setContacts(otherMembers);
       } else {
         // Load all contacts from groups the user has been in
-        const userContacts = await getUserContacts(String(currentUser.id));
+        console.log('📱 Loading all user contacts...');
+        const userContacts = await firebaseDataService.group.getUserContacts(String(currentUser.id));
+        console.log('📱 Loaded', userContacts.length, 'user contacts:', userContacts.map((c: UserContact) => ({
+          name: c.name || 'No name',
+          email: c.email,
+          wallet: c.wallet_address ? formatWalletAddress(c.wallet_address) : 'No wallet',
+          fullWallet: c.wallet_address
+        })));
         setContacts(userContacts);
       }
     } catch (error) {
-      console.error('Error loading contacts:', error);
+      console.error('❌ Error loading contacts:', error);
       setContacts([]);
     } finally {
       setLoading(false);
@@ -128,21 +138,28 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
     >
       <View style={styles.sendContactAvatar}>
         <Text style={styles.sendContactAvatarText}>
-          {item.name.charAt(0).toUpperCase()}
+          {item.name ? item.name.charAt(0).toUpperCase() : formatWalletAddress(item.wallet_address).charAt(0).toUpperCase()}
         </Text>
       </View>
       <View style={styles.sendContactInfo}>
-        <Text style={styles.sendContactName}>{item.name}</Text>
+        <Text style={styles.sendContactName}>
+          {item.name || formatWalletAddress(item.wallet_address)}
+        </Text>
         <Text style={styles.sendContactWallet}>
-          {formatWalletAddress(item.wallet_address)}
+          {item.wallet_address ? formatWalletAddress(item.wallet_address) : item.email}
           {item.mutual_groups_count > 1 && (
             <Text style={styles.sendContactGroups}> • {item.mutual_groups_count} groups</Text>
           )}
         </Text>
+        {item.email && (
+          <Text style={[styles.sendContactWallet, { fontSize: 12, marginTop: 2 }]}>
+            {item.email}
+          </Text>
+        )}
       </View>
       <TouchableOpacity 
         style={styles.sendContactStar}
-        onPress={() => toggleFavorite(item.id)}
+        onPress={() => toggleFavorite(Number(item.id))}
       >
         <Icon 
           name="star" 

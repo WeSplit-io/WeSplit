@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, SafeAreaView, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, TextInput, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
-import { styles } from './styles';
+import { firebaseDataService } from '../../services/firebaseDataService';
 import { colors } from '../../theme';
+import { styles } from './styles';
 
 const JoinGroupScreen: React.FC<any> = ({ navigation }) => {
   const { state } = useApp();
@@ -27,8 +28,7 @@ const JoinGroupScreen: React.FC<any> = ({ navigation }) => {
       setIsJoining(true);
       
       // Use hybrid service instead of direct service call
-      const { hybridDataService } = await import('../../services/hybridDataService');
-      const result = await hybridDataService.group.joinGroupViaInvite(inviteCode.trim(), String(currentUser.id));
+      const result = await firebaseDataService.group.joinGroupViaInvite(inviteCode.trim(), String(currentUser.id));
       
       Alert.alert(
         'Success!',

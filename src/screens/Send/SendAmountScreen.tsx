@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, Alert, ScrollView, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, TextInput, SafeAreaView, Alert, ScrollView } from 'react-native';
 import Icon from '../../components/Icon';
-import { GroupMember } from '../../services/groupService';
+import { GroupMember } from '../../types';
+import { useApp } from '../../context/AppContext';
+import { useWallet } from '../../context/WalletContext';
 import { colors } from '../../theme';
 import { styles } from './styles';
 
@@ -10,6 +12,17 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const [amount, setAmount] = useState(prefilledAmount ? prefilledAmount.toString() : '0');
   const [showAddNote, setShowAddNote] = useState(!!prefilledNote || isSettlement);
   const [note, setNote] = useState(prefilledNote || '');
+
+  // Debug logging to ensure contact data is passed correctly
+  useEffect(() => {
+    console.log('💰 SendAmount: Contact data received:', {
+      name: contact?.name || 'No name',
+      email: contact?.email,
+      wallet: contact?.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet',
+      fullWallet: contact?.wallet_address,
+      id: contact?.id
+    });
+  }, [contact]);
 
   const handleNumberPress = (num: string) => {
     if (amount === '0') {
@@ -93,6 +106,12 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
     );
   };
 
+  const formatWalletAddress = (address: string) => {
+    if (!address) return '';
+    if (address.length <= 8) return address;
+    return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
+  };
+
   const isAmountValid = parseFloat(amount) > 0;
 
   return (
@@ -116,11 +135,20 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={[styles.recipientAvatarContainer, { marginTop: 10, marginBottom: 20 }]}>
           <View style={[styles.recipientAvatar, { width: 60, height: 60, marginBottom: 8 }]}>
             <Text style={[styles.recipientAvatarText, { fontSize: 18 }]}>
-              {contact?.name?.charAt(0).toUpperCase() || 'U'}
+              {contact?.name ? contact.name.charAt(0).toUpperCase() : formatWalletAddress(contact?.wallet_address || '').charAt(0).toUpperCase()}
             </Text>
           </View>
-          <Text style={[styles.recipientName, { fontSize: 16 }]}>{contact?.name || 'Unknown'}</Text>
-          <Text style={[styles.recipientEmail, { fontSize: 14 }]}>{contact?.wallet_address || ''}</Text>
+          <Text style={[styles.recipientName, { fontSize: 16 }]}>
+            {contact?.name || formatWalletAddress(contact?.wallet_address || '')}
+          </Text>
+          <Text style={[styles.recipientEmail, { fontSize: 14 }]}>
+            {contact?.wallet_address ? formatWalletAddress(contact.wallet_address) : contact?.email || ''}
+          </Text>
+          {contact?.email && contact?.wallet_address && (
+            <Text style={[styles.recipientEmail, { fontSize: 12, marginTop: 2 }]}>
+              {contact.email}
+            </Text>
+          )}
         </View>
 
         {/* Amount Display */}

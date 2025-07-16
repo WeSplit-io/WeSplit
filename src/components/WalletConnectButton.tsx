@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View, ActivityIndicator } from 'react-native';
-import { useWalletConnection } from '../../utils/useWalletConnection';
+import { useWallet } from '../context/WalletContext';
 
 interface WalletConnectButtonProps {
   onConnect?: () => void;
@@ -20,12 +20,18 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({
   const {
     isConnected,
     address,
-    shortAddress,
     walletName,
     isLoading,
     connectWallet,
     disconnectWallet,
-  } = useWalletConnection();
+  } = useWallet();
+
+  const getShortAddress = (address: string | null) => {
+    if (!address) return '';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const shortAddress = getShortAddress(address);
 
   const handlePress = async () => {
     if (isLoading) return;

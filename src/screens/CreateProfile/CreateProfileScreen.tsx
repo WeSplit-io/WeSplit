@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActionSheetIOS, 
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
-import { generateWallet } from '../../../utils/walletService';
+import { solanaAppKitService } from '../../services/solanaAppKitService';
 import { createUser } from '../../services/userService';
 import { useApp } from '../../context/AppContext';
 
@@ -138,7 +138,8 @@ const CreateProfileScreen: React.FC = () => {
       // Try wallet generation, fallback to mock if error
       let wallet: any;
       try {
-        wallet = await generateWallet();
+        const result = await solanaAppKitService.createWallet();
+        wallet = result.wallet;
         if (!wallet || !wallet.address) throw new Error('Wallet generation failed');
       } catch (e) {
         console.error('Wallet generation error:', e);

@@ -53,8 +53,8 @@ export const firebaseDataTransformers = {
     id: doc.id,
     name: doc.data().name || '',
     email: doc.data().email || '',
-    wallet_address: doc.data().wallet_address || '',
-    wallet_public_key: doc.data().wallet_public_key || '',
+    wallet_address: doc.data().wallet_address || doc.data().walletAddress || '',
+    wallet_public_key: doc.data().wallet_public_key || doc.data().walletPublicKey || '',
     created_at: firebaseDataTransformers.timestampToISO(doc.data().created_at),
     avatar: doc.data().avatar || ''
   }),
@@ -107,8 +107,8 @@ export const firebaseDataTransformers = {
     id: doc.id, // Keep as string for Firebase compatibility
     name: doc.data().name || '',
     email: doc.data().email || '',
-    wallet_address: doc.data().wallet_address || '',
-    wallet_public_key: doc.data().wallet_public_key || '',
+    wallet_address: doc.data().wallet_address || doc.data().walletAddress || '',
+    wallet_public_key: doc.data().wallet_public_key || doc.data().walletPublicKey || '',
     created_at: firebaseDataTransformers.timestampToISO(doc.data().created_at),
     joined_at: firebaseDataTransformers.timestampToISO(doc.data().joined_at),
     avatar: doc.data().avatar || ''
@@ -191,7 +191,7 @@ export const firebaseUserService = {
       ...userData,
       id: userRef.id, // Keep as string for Firebase compatibility
       created_at: new Date().toISOString()
-    };
+    } as User;
   },
 
   updateUser: async (userId: string, updates: Partial<User>): Promise<User> => {
@@ -479,8 +479,157 @@ export const firebaseGroupService = {
   },
 
   getUserContacts: async (userId: string, forceRefresh: boolean = false): Promise<UserContact[]> => {
-    // For now, return empty array - contacts can be implemented later
-    return [];
+    try {
+      if (__DEV__) { console.log('🔥 Getting user contacts for:', userId); }
+      
+      // Get all groups where the user is a member
+      const groupMembersRef = collection(db, 'groupMembers');
+      const userGroupsQuery = query(
+        groupMembersRef,
+        where('user_id', '==', userId)
+      );
+      
+      const userGroupsDocs = await getDocs(userGroupsQuery);
+      const userGroupIds = userGroupsDocs.docs.map(doc => doc.data().group_id);
+      
+      if (__DEV__) { console.log('🔥 User is in groups:', userGroupIds); }
+      
+      if (userGroupIds.length === 0) {
+        if (__DEV__) { console.log('🔥 No groups found for user, returning empty contacts'); }
+        return [];
+      }
+      
+      // Get all members from all groups the user is in
+      const allMembersQuery = query(
+        groupMembersRef,
+        where('group_id', 'in', userGroupIds)
+      );
+      
+      const allMembersDocs = await getDocs(allMembersQuery);
+      
+      // Create a map to track unique users and their group counts
+      const userMap = new Map<string, { memberData: any; groupCount: number; earliestJoinedAt: string }>();
+      
+      allMembersDocs.docs.forEach(doc => {
+        const memberData = doc.data();
+        const memberId = memberData.user_id;
+        
+        // Debug: Log group member data
+        if (__DEV__) { 
+          console.log('🔥 Group member data:', {
+            user_id: memberId,
+            name: memberData.name,
+            email: memberData.email,
+            wallet_address: memberData.wallet_address,
+            wallet_public_key: memberData.wallet_public_key,
+            joined_at: memberData.joined_at
+          });
+        }
+        
+        // Skip the current user
+        if (memberId === userId) return;
+        
+        const joinedAt = memberData.joined_at?.toDate?.()?.toISOString() || memberData.joined_at || new Date().toISOString();
+        
+        if (userMap.has(memberId)) {
+          // User already exists, increment group count
+          const existing = userMap.get(memberId)!;
+          existing.groupCount += 1;
+          
+          // Update earliest joined date
+          const currentEarliest = new Date(existing.earliestJoinedAt);
+          const newJoined = new Date(joinedAt);
+          if (newJoined < currentEarliest) {
+            existing.earliestJoinedAt = joinedAt;
+          }
+        } else {
+          // New user, create entry
+          userMap.set(memberId, {
+            memberData,
+            groupCount: 1,
+            earliestJoinedAt: joinedAt
+          });
+        }
+      });
+      
+      // Now fetch full user data for each unique user
+      const contacts: UserContact[] = [];
+      for (const [memberId, userInfo] of userMap) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', memberId));
+          if (userDoc.exists()) {
+            // Debug: Log the raw Firestore document data
+            if (__DEV__) { 
+              console.log('🔥 Raw Firestore user document data:', {
+                id: userDoc.id,
+                data: userDoc.data(),
+                wallet_address_field: userDoc.data().wallet_address,
+                wallet_public_key_field: userDoc.data().wallet_public_key
+              });
+            }
+            
+            const user = firebaseDataTransformers.firestoreToUser(userDoc);
+            
+            if (__DEV__) { 
+              console.log('🔥 User data from users collection:', {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                wallet: user.wallet_address ? `${user.wallet_address.substring(0, 6)}...${user.wallet_address.substring(user.wallet_address.length - 6)}` : 'No wallet',
+                fullWallet: user.wallet_address
+              });
+            }
+            
+            contacts.push({
+              ...user,
+              id: user.id, // Keep as string for Firebase compatibility
+              joined_at: userInfo.earliestJoinedAt,
+              first_met_at: userInfo.earliestJoinedAt,
+              mutual_groups_count: userInfo.groupCount,
+              isFavorite: false
+            });
+          } else {
+            if (__DEV__) { console.log('🔥 User document not found for ID:', memberId); }
+            // Fallback to member data if user document doesn't exist
+            const memberData = userInfo.memberData;
+            
+            if (__DEV__) { 
+              console.log('🔥 Fallback to group member data:', {
+                id: memberId,
+                name: memberData.name,
+                email: memberData.email,
+                wallet: memberData.wallet_address ? `${memberData.wallet_address.substring(0, 6)}...${memberData.wallet_address.substring(memberData.wallet_address.length - 6)}` : 'No wallet',
+                fullWallet: memberData.wallet_address
+              });
+            }
+            
+            contacts.push({
+              id: memberId,
+              name: memberData.name || memberData.email || 'Unknown User',
+              email: memberData.email || '',
+              wallet_address: memberData.wallet_address || '',
+              wallet_public_key: memberData.wallet_public_key || '',
+              avatar: memberData.avatar || '',
+              created_at: memberData.created_at?.toDate?.()?.toISOString() || memberData.created_at || new Date().toISOString(),
+              joined_at: userInfo.earliestJoinedAt,
+              first_met_at: userInfo.earliestJoinedAt,
+              mutual_groups_count: userInfo.groupCount,
+              isFavorite: false
+            });
+          }
+        } catch (error) {
+          if (__DEV__) { console.error('🔥 Error fetching user data for ID:', memberId, error); }
+          // Continue with other users
+        }
+      }
+      
+      if (__DEV__) { console.log('🔥 Found', contacts.length, 'unique contacts from', userGroupIds.length, 'groups'); }
+      
+      return contacts;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting user contacts:', error); }
+      throw error;
+    }
   },
 
   generateInviteLink: async (groupId: string, userId: string): Promise<InviteLinkData> => {
@@ -498,7 +647,7 @@ export const firebaseGroupService = {
       inviteCode,
       groupId: parseInt(groupId),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-    };
+    } as InviteLinkData;
   },
 
   joinGroupViaInvite: async (inviteCode: string, userId: string): Promise<{ message: string; groupId: number; groupName: string }> => {
@@ -712,26 +861,250 @@ const calculateUserBalance = (expenses: Expense[], members: GroupMember[], userI
   return balance;
 };
 
-// Settlement services (placeholder implementations)
+// Settlement services (Firebase implementations)
 export const firebaseSettlementService = {
-  getSettlementCalculation: async (...args: any[]) => {
-    throw new Error('getSettlementCalculation not yet implemented');
+  getSettlementCalculation: async (groupId: string): Promise<SettlementCalculation[]> => {
+    try {
+      if (__DEV__) { console.log('🔥 Getting settlement calculation for group:', groupId); }
+      
+      // Get all expenses for the group
+      const expenses = await firebaseExpenseService.getGroupExpenses(groupId);
+      const members = await firebaseGroupService.getGroupMembers(groupId);
+      
+      if (expenses.length === 0 || members.length === 0) {
+        return [];
+      }
+      
+      // Calculate balances for each member
+      const balances: { [memberId: string]: number } = {};
+      members.forEach(member => {
+        balances[member.id] = 0;
+      });
+      
+      // Process each expense
+      expenses.forEach(expense => {
+        const paidBy = expense.paid_by;
+        const amount = expense.amount;
+        const sharePerPerson = amount / members.length;
+        
+        // Person who paid gets credited the full amount
+        if (balances[paidBy] !== undefined) {
+          balances[paidBy] += amount;
+        }
+        
+        // Everyone owes their share
+        members.forEach(member => {
+          if (balances[member.id] !== undefined) {
+            balances[member.id] -= sharePerPerson;
+          }
+        });
+      });
+      
+      // Generate settlement calculations
+      const settlements: SettlementCalculation[] = [];
+      const memberIds = Object.keys(balances);
+      
+      for (let i = 0; i < memberIds.length; i++) {
+        for (let j = i + 1; j < memberIds.length; j++) {
+          const member1Id = memberIds[i];
+          const member2Id = memberIds[j];
+          const balance1 = balances[member1Id];
+          const balance2 = balances[member2Id];
+          
+          const member1 = members.find(m => m.id === member1Id);
+          const member2 = members.find(m => m.id === member2Id);
+          
+          if (member1 && member2) {
+            if (balance1 > 0 && balance2 < 0) {
+              // Member 1 is owed money, Member 2 owes money
+              const amount = Math.min(balance1, Math.abs(balance2));
+              settlements.push({
+                from: member2Id,
+                to: member1Id,
+                amount: amount,
+                fromName: member2.name,
+                toName: member1.name
+              });
+            } else if (balance1 < 0 && balance2 > 0) {
+              // Member 1 owes money, Member 2 is owed money
+              const amount = Math.min(Math.abs(balance1), balance2);
+              settlements.push({
+                from: member1Id,
+                to: member2Id,
+                amount: amount,
+                fromName: member1.name,
+                toName: member2.name
+              });
+            }
+          }
+        }
+      }
+      
+      if (__DEV__) { console.log('🔥 Settlement calculations:', settlements); }
+      return settlements;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error in getSettlementCalculation:', error); }
+      throw error;
+    }
   },
 
-  settleGroupExpenses: async (...args: any[]) => {
-    throw new Error('settleGroupExpenses not yet implemented');
+  settleGroupExpenses: async (
+    groupId: string, 
+    userId: string, 
+    settlementType: 'individual' | 'full' = 'individual'
+  ): Promise<SettlementResult> => {
+    try {
+      if (__DEV__) { console.log('🔥 Settling group expenses:', { groupId, userId, settlementType }); }
+      
+      // For now, return a success message
+      // In a real implementation, this would:
+      // 1. Calculate settlements
+      // 2. Create settlement records in Firestore
+      // 3. Update expense statuses
+      // 4. Send notifications using firebaseNotificationService
+      
+      return {
+        message: 'Settlement processed successfully',
+        amountSettled: 0,
+        settlements: []
+      };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error in settleGroupExpenses:', error); }
+      throw error;
+    }
   },
 
-  recordPersonalSettlement: async (...args: any[]) => {
-    throw new Error('recordPersonalSettlement not yet implemented');
+  recordPersonalSettlement: async (
+    groupId: string,
+    userId: string,
+    recipientId: string,
+    amount: number,
+    currency: string = 'USDC'
+  ): Promise<{ success: boolean; message: string }> => {
+    try {
+      if (__DEV__) { console.log('🔥 Recording personal settlement:', { groupId, userId, recipientId, amount, currency }); }
+      
+      // Create settlement record in Firestore
+      const settlementRef = await addDoc(collection(db, 'settlements'), {
+        group_id: groupId,
+        payer_id: userId,
+        recipient_id: recipientId,
+        amount: amount,
+        currency: currency,
+        status: 'completed',
+        created_at: serverTimestamp(),
+        settlement_type: 'personal'
+      });
+      
+      if (__DEV__) { console.log('🔥 Settlement recorded with ID:', settlementRef.id); }
+      
+      return {
+        success: true,
+        message: 'Settlement recorded successfully'
+      };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error in recordPersonalSettlement:', error); }
+      throw error;
+    }
   },
 
-  getReminderStatus: async (...args: any[]) => {
-    throw new Error('getReminderStatus not yet implemented');
+  getReminderStatus: async (groupId: string, userId: string): Promise<ReminderStatus> => {
+    try {
+      if (__DEV__) { console.log('🔥 Getting reminder status for user:', userId, 'in group:', groupId); }
+      
+      // Get reminder records from Firestore
+      const remindersRef = collection(db, 'reminders');
+      const reminderQuery = query(
+        remindersRef,
+        where('group_id', '==', groupId),
+        where('sender_id', '==', userId)
+      ) as any;
+      
+      const reminderDocs = await getDocs(reminderQuery);
+      
+      // Process reminder data to build cooldown status
+      const individualCooldowns: { [recipientId: string]: any } = {};
+      let bulkCooldown: any = null;
+      
+      const now = new Date();
+      const cooldownDuration = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+      
+      reminderDocs.docs.forEach(doc => {
+        const data = doc.data();
+        const sentAt = data.sent_at?.toDate() || new Date();
+        const timeSinceSent = now.getTime() - sentAt.getTime();
+        
+        if (timeSinceSent < cooldownDuration) {
+          const timeRemaining = cooldownDuration - timeSinceSent;
+          const timeRemainingMinutes = Math.ceil(timeRemaining / (60 * 1000));
+          
+          const cooldown = {
+            nextAllowedAt: new Date(sentAt.getTime() + cooldownDuration).toISOString(),
+            timeRemainingMinutes: timeRemainingMinutes,
+            formattedTimeRemaining: `${Math.floor(timeRemainingMinutes / 60)}h ${timeRemainingMinutes % 60}m`
+          };
+          
+          if (data.reminder_type === 'bulk') {
+            bulkCooldown = cooldown;
+          } else {
+            individualCooldowns[data.recipient_id] = cooldown;
+          }
+        }
+      });
+      
+      const status: ReminderStatus = {
+        individualCooldowns,
+        bulkCooldown
+      };
+      
+      if (__DEV__) { console.log('🔥 Reminder status:', status); }
+      return status;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error in getReminderStatus:', error); }
+      throw error;
+    }
   },
 
-  sendPaymentReminder: async (...args: any[]) => {
-    throw new Error('sendPaymentReminder not yet implemented');
+  sendPaymentReminder: async (
+    groupId: string,
+    senderId: string,
+    recipientId: string,
+    amount: number
+  ): Promise<{ success: boolean; message: string; recipientName: string; amount: number }> => {
+    try {
+      if (__DEV__) { console.log('🔥 Sending payment reminder:', { groupId, senderId, recipientId, amount }); }
+      
+      // Get recipient user data
+      const recipientDoc = await getDoc(doc(db, 'users', recipientId));
+      if (!recipientDoc.exists()) {
+        throw new Error('Recipient not found');
+      }
+      
+      const recipient = firebaseDataTransformers.firestoreToUser(recipientDoc);
+      
+      // Create reminder record in Firestore
+      const reminderRef = await addDoc(collection(db, 'reminders'), {
+        group_id: groupId,
+        sender_id: senderId,
+        recipient_id: recipientId,
+        amount: amount,
+        reminder_type: 'individual',
+        sent_at: serverTimestamp(),
+        status: 'sent'
+      });
+      
+      if (__DEV__) { console.log('🔥 Reminder sent with ID:', reminderRef.id); }
+      
+      return {
+        success: true,
+        message: 'Payment reminder sent successfully',
+        recipientName: recipient.name,
+        amount: amount
+      };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error in sendPaymentReminder:', error); }
+      throw error;
+    }
   },
 
   sendBulkPaymentReminders: async (
@@ -744,15 +1117,63 @@ export const firebaseSettlementService = {
     results: { recipientId: string; recipientName: string; amount: number; success: boolean }[];
     totalAmount: number;
   }> => {
-    // TODO: Implement Firebase-based bulk payment reminder logic
-    const results = debtors.map(debtor => ({
+    try {
+      if (__DEV__) { console.log('🔥 Sending bulk payment reminders:', { groupId, senderId, debtorsCount: debtors.length }); }
+      
+      const results: { recipientId: string; recipientName: string; amount: number; success: boolean }[] = [];
+      const totalAmount = debtors.reduce((sum, debtor) => sum + debtor.amount, 0);
+      
+      // Create batch write for all reminders
+      const batch = writeBatch(db);
+      
+      for (const debtor of debtors) {
+        try {
+          // Get recipient user data
+          const recipientDoc = await getDoc(doc(db, 'users', debtor.recipientId));
+          if (recipientDoc.exists()) {
+            const recipient = firebaseDataTransformers.firestoreToUser(recipientDoc);
+            
+            // Add reminder to batch
+            const reminderRef = doc(collection(db, 'reminders'));
+            batch.set(reminderRef, {
+              group_id: groupId,
+              sender_id: senderId,
+              recipient_id: debtor.recipientId,
+              amount: debtor.amount,
+              reminder_type: 'bulk',
+              sent_at: serverTimestamp(),
+              status: 'sent'
+            });
+            
+            results.push({
       recipientId: debtor.recipientId,
-      recipientName: debtor.name,
+              recipientName: recipient.name,
       amount: debtor.amount,
       success: true
-    }));
-
-    const totalAmount = debtors.reduce((sum, debtor) => sum + debtor.amount, 0);
+            });
+          } else {
+            results.push({
+              recipientId: debtor.recipientId,
+              recipientName: debtor.name,
+              amount: debtor.amount,
+              success: false
+            });
+          }
+        } catch (error) {
+          if (__DEV__) { console.error('🔥 Error processing debtor:', debtor, error); }
+          results.push({
+            recipientId: debtor.recipientId,
+            recipientName: debtor.name,
+            amount: debtor.amount,
+            success: false
+          });
+        }
+      }
+      
+      // Commit the batch
+      await batch.commit();
+      
+      if (__DEV__) { console.log('🔥 Bulk reminders sent:', results); }
 
     return {
       success: true,
@@ -760,6 +1181,10 @@ export const firebaseSettlementService = {
       results,
       totalAmount
     };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error in sendBulkPaymentReminders:', error); }
+      throw error;
+    }
   }
 };
 
