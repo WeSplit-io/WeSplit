@@ -5,13 +5,12 @@ import QRCode from 'react-native-qrcode-svg';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
-import { generateInviteLink, updateGroup, leaveGroup, deleteGroup } from '../../services/groupService';
 import { GroupMember, Expense } from '../../types';
 import { styles } from './styles';
 
 const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId } = route.params;
-  const { state, getGroupBalances } = useApp();
+  const { state, getGroupBalances, updateGroup, deleteGroup, leaveGroup } = useApp();
   const { currentUser } = state;
 
   // Use the efficient hook that provides cached data and smart loading
@@ -43,8 +42,9 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
       
       setLoadingMembers(true);
       try {
-        const response = await fetch(`http://192.168.1.75:4000/api/groups/${groupId}/members`);
-        const members = await response.json();
+        // Use the hybrid service instead of direct API call
+        const { hybridDataService } = await import('../../services/hybridDataService');
+        const members = await hybridDataService.group.getGroupMembers(groupId.toString());
         console.log(`Group Settings - Loaded ${members.length} real members:`, members.map((m: any) => m.name));
         setRealMembers(members);
       } catch (error) {
@@ -67,8 +67,10 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     const generateInvite = async () => {
       if (group?.id && currentUser?.id) {
         try {
-          const inviteData = await generateInviteLink(group.id.toString(), currentUser.id.toString());
-          setInviteLink(inviteData.inviteLink);
+          // Use the hybrid service instead of the old groupService
+          const { hybridDataService } = await import('../../services/hybridDataService');
+          const inviteData = await hybridDataService.group.generateInviteLink(group.id.toString(), currentUser.id.toString());
+          setInviteLink(`wesplit://join/${inviteData.inviteCode}?name=${encodeURIComponent(group?.name || 'Group')}`);
         } catch (error) {
           console.error('Error generating invite link for QR:', error);
           setInviteLink(`wesplit://join/${group.id}?name=${encodeURIComponent(group.name || 'Group')}`);
@@ -130,8 +132,9 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     }
 
     try {
-      // Generate invite link using the service
-      const inviteData = await generateInviteLink(group.id.toString(), currentUser.id.toString());
+      // Generate invite link using the hybrid service
+      const { hybridDataService } = await import('../../services/hybridDataService');
+      const inviteData = await hybridDataService.group.generateInviteLink(group.id.toString(), currentUser.id.toString());
       
       const shareMessage = `Join my WeSplit group "${group.name}"!
 
@@ -139,12 +142,12 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
 📱 Track balances in real-time
 🔗 Invite code: ${inviteData.inviteCode}
 
-Or click this link: ${inviteData.inviteLink}`;
+Or click this link: wesplit://join/${inviteData.inviteCode}`;
 
       await Share.share({
         message: shareMessage,
         title: `Join ${group.name} on WeSplit`,
-        url: inviteData.inviteLink,
+        url: `wesplit://join/${inviteData.inviteCode}`,
       });
 
     } catch (error) {
@@ -164,8 +167,8 @@ Or click this link: ${inviteData.inviteLink}`;
           style: 'destructive',
           onPress: async () => {
             try {
-              const result = await leaveGroup(groupId.toString(), currentUser?.id?.toString() || '');
-              Alert.alert('Success', result.message || 'You have left the group successfully');
+              await leaveGroup(Number(groupId));
+              Alert.alert('Success', 'You have left the group successfully');
               navigation.navigate('Dashboard');
             } catch (error) {
               console.error('Error leaving group:', error);
@@ -188,8 +191,8 @@ Or click this link: ${inviteData.inviteLink}`;
           style: 'destructive',
           onPress: async () => {
             try {
-              const result = await deleteGroup(groupId.toString(), currentUser?.id?.toString() || '');
-              Alert.alert('Success', result.message || 'Group deleted successfully');
+              await deleteGroup(Number(groupId));
+              Alert.alert('Success', 'Group deleted successfully');
               navigation.navigate('Dashboard');
             } catch (error) {
               console.error('Error deleting group:', error);
@@ -223,16 +226,12 @@ Or click this link: ${inviteData.inviteLink}`;
     try {
       setUpdating(true);
       
-      const result = await updateGroup(
-        group.id.toString(),
-        currentUser.id.toString(),
-        {
-          name: editGroupName.trim(),
-          category: editGroupCategory.trim() || 'general',
-          icon: editGroupIcon,
-          color: editGroupColor
-        }
-      );
+      await updateGroup(Number(groupId), {
+        name: editGroupName.trim(),
+        category: editGroupCategory.trim() || 'general',
+        icon: editGroupIcon,
+        color: editGroupColor
+      });
 
       // Refresh group data to get the latest updates
       await refresh();
@@ -323,10 +322,10 @@ Or click this link: ${inviteData.inviteLink}`;
             <Text style={styles.memberEmail}>Loading members...</Text>
           </View>
         ) : (
-          members.map((member) => {
+          members.map((member, index) => {
             const balance = getMemberBalance(member.id);
             return (
-              <View key={member.id} style={styles.memberItem}>
+              <View key={`member-${member.id}-${index}`} style={styles.memberItem}>
                 <View style={styles.memberAvatar} />
                 <View style={styles.memberInfo}>
                   <Text style={styles.memberName}>{member.name}</Text>
@@ -388,7 +387,7 @@ Or click this link: ${inviteData.inviteLink}`;
             
             <View style={styles.qrCodeContainer}>
               <QRCode
-                value={inviteLink || `wesplit://join/${groupId}?name=${encodeURIComponent(group?.name || 'Group')}`}
+                value={inviteLink || `wesplit://join/${groupId?.toString()}?name=${encodeURIComponent(group?.name || 'Group')}`}
                 size={200}
                 color="#212121"
                 backgroundColor="transparent"

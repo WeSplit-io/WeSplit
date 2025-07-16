@@ -51,6 +51,16 @@ export const hybridDataService = {
         if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for updateUser'); }
         return await dataService.user.updateUser(userId, updates);
       }
+    },
+
+    getUserContacts: async (userId: string): Promise<UserContact[]> => {
+      try {
+        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for getUserContacts'); }
+        return await firebaseDataService.user.getUserContacts(userId);
+      } catch (error) {
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for getUserContacts'); }
+        return await dataService.user.getUserContacts(userId);
+      }
     }
   },
 
@@ -156,6 +166,16 @@ export const hybridDataService = {
         if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for joinGroupViaInvite'); }
         return await dataService.group.joinGroupViaInvite(inviteCode, userId);
       }
+    },
+
+    leaveGroup: async (groupId: string, userId: string): Promise<{ message: string }> => {
+      try {
+        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for leaveGroup'); }
+        return await firebaseDataService.group.leaveGroup(groupId, userId);
+      } catch (error) {
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for leaveGroup'); }
+        return await dataService.group.leaveGroup(groupId, userId);
+      }
     }
   },
 
@@ -260,6 +280,25 @@ export const hybridDataService = {
       } catch (error) {
         if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for sendPaymentReminder'); }
         return await dataService.settlement.sendPaymentReminder(groupId, senderId, recipientId, amount);
+      }
+    },
+
+    sendBulkPaymentReminders: async (
+      groupId: string,
+      senderId: string,
+      debtors: { recipientId: string; amount: number; name: string }[]
+    ): Promise<{ 
+      success: boolean; 
+      message: string; 
+      results: { recipientId: string; recipientName: string; amount: number; success: boolean }[];
+      totalAmount: number;
+    }> => {
+      try {
+        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for sendBulkPaymentReminders'); }
+        return await firebaseDataService.settlement.sendBulkPaymentReminders(groupId, senderId, debtors);
+      } catch (error) {
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for sendBulkPaymentReminders'); }
+        return await dataService.settlement.sendBulkPaymentReminders(groupId, senderId, debtors);
       }
     }
   },

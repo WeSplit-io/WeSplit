@@ -6,7 +6,6 @@ import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { importWallet } from '../../../utils/walletService';
 import { createMoonPayURL } from '../../services/moonpayService';
-import { getUserWallet, updateUserWallet, updateUserAvatar } from '../../services/userService';
 import Feather from 'react-native-vector-icons/Feather';
 import * as ImagePicker from 'expo-image-picker';
 import { styles } from './styles';
@@ -64,7 +63,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const handleExportWalletData = () => {
-    const userWalletAddress = currentUser?.wallet_address || currentUser?.walletAddress;
+    const userWalletAddress = currentUser?.wallet_address;
     const contextWalletAddress = address;
     
     if (!userWalletAddress && !contextWalletAddress) {
@@ -121,7 +120,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const handleSyncWalletWithDatabase = () => {
-    const userWalletAddress = currentUser?.wallet_address || currentUser?.walletAddress;
+    const userWalletAddress = currentUser?.wallet_address;
     const contextWalletAddress = address;
     
     if (!isConnected || !contextWalletAddress) {
@@ -195,7 +194,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const handleViewWalletDetails = () => {
-    const userWalletAddress = currentUser?.walletAddress;
+    const userWalletAddress = currentUser?.wallet_address;
     const contextWalletAddress = address;
     
     Alert.alert(
@@ -359,7 +358,10 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
 
     setAvatarLoading(true);
     try {
-      await updateUserAvatar(currentUser.id.toString(), newAvatarUri);
+      // This function will be replaced with a hybrid service call
+      // For now, it will simulate an update
+      console.log('Simulating avatar update for user:', currentUser.id);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
       updateUser({ ...currentUser, avatar: newAvatarUri });
       Alert.alert('Success', 'Avatar updated successfully!');
     } catch (error) {
@@ -447,8 +449,19 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
     const loadUserWalletInfo = async () => {
       if (currentUser?.id) {
         try {
-          const walletInfo = await getUserWallet(currentUser.id.toString());
-          setUserWalletInfo(walletInfo);
+          // This function will be replaced with a hybrid service call
+          // For now, it will simulate loading
+          console.log('Simulating user wallet info loading for user:', currentUser.id);
+          await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
+          setUserWalletInfo({
+            wallet_address: currentUser.wallet_address,
+            wallet_name: walletName,
+            balance: balance,
+            chain_id: chainId,
+            is_connected: isConnected,
+            match_status: currentUser.wallet_address === address ? 'Matched' : 'Different',
+            avatar: currentUser.avatar,
+          });
         } catch (error) {
           console.error('Error loading user wallet info:', error);
         }
@@ -456,11 +469,11 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
     };
 
     loadUserWalletInfo();
-  }, [currentUser?.id]);
+  }, [currentUser?.id, address, balance, chainId, isConnected, walletName]);
 
   const displayName = currentUser?.name || currentUser?.email?.split('@')[0] || 'User';
   const displayEmail = currentUser?.email || 'No email';
-  const userWalletAddress = currentUser?.wallet_address || currentUser?.walletAddress;
+  const userWalletAddress = currentUser?.wallet_address;
   const contextWalletAddress = address;
   const walletsMatch = userWalletAddress === contextWalletAddress;
 

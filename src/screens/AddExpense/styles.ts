@@ -148,6 +148,23 @@ export const styles = StyleSheet.create({
     textAlign: 'right',
   },
   
+  // Conversion Styles
+  totalContainer: {
+    marginBottom: 24,
+    alignItems: 'flex-end',
+  },
+  convertingText: {
+    fontSize: 12,
+    color: '#A5EA15',
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  convertedText: {
+    fontSize: 12,
+    color: '#A89B9B',
+    marginTop: 2,
+  },
+  
   // Split Section
   splitHeader: {
     flexDirection: 'row',
@@ -239,6 +256,134 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#A5EA15',
+  },
+  
+  // Manual Amount Input Styles
+  manualAmountContainer: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 4,
+    marginBottom: 8,
+    marginLeft: 32,
+  },
+  manualAmountLabel: {
+    fontSize: 12,
+    color: '#A89B9B',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  manualAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  manualAmountInput: {
+    flex: 1,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: '#FFF',
+  },
+  manualAmountCurrency: {
+    fontSize: 14,
+    color: '#A5EA15',
+    fontWeight: '600',
+    minWidth: 40,
+  },
+  
+  // Transition Notification Styles
+  transitionNotification: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  transitionText: {
+    fontSize: 14,
+    color: '#A5EA15',
+    fontWeight: '500',
+  },
+  
+  // Paid By Selector Styles
+  paidBySelector: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  paidByInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  paidByAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#A89B9B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  paidByAvatarText: {
+    color: '#212121',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  paidByDetails: {
+    flex: 1,
+  },
+  paidByName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFF',
+    marginBottom: 2,
+  },
+  paidByEmail: {
+    fontSize: 12,
+    color: '#A89B9B',
+  },
+  
+  // Paid By Modal Option Styles
+  paidByOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  paidByOptionAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#A89B9B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  paidByOptionAvatarText: {
+    color: '#212121',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  paidByOptionDetails: {
+    flex: 1,
+  },
+  paidByOptionName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#FFF',
+    marginBottom: 2,
+  },
+  paidByOptionEmail: {
+    fontSize: 12,
+    color: '#A89B9B',
   },
   
   // Bottom Section

@@ -198,17 +198,29 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
 
     // Create or update user document in Firestore
     const userRef = db.collection('users').doc(firebaseUser.uid);
-    await userRef.set({
-      id: firebaseUser.uid,
-      email: firebaseUser.email,
-      name: firebaseUser.displayName || '',
-      wallet_address: '',
-      wallet_public_key: '',
-      created_at: admin.firestore.FieldValue.serverTimestamp(),
-      avatar: firebaseUser.photoURL || '',
-      emailVerified: true,
-      lastLoginAt: admin.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+    const userDoc = await userRef.get();
+    
+    if (userDoc.exists) {
+      // Update existing user with new verification timestamp
+      await userRef.update({
+        lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastLoginAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } else {
+      // Create new user document
+      await userRef.set({
+        id: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: firebaseUser.displayName || '',
+        wallet_address: '',
+        wallet_public_key: '',
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        avatar: firebaseUser.photoURL || '',
+        emailVerified: true,
+        lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp() // Track when user last verified
+      });
+    }
 
     console.log(`Code verified successfully for ${email}`);
     

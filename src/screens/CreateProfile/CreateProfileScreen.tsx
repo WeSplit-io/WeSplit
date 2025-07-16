@@ -7,7 +7,7 @@ import { generateWallet } from '../../../utils/walletService';
 import { createUser } from '../../services/userService';
 import { useApp } from '../../context/AppContext';
 
-const MOCK_TAKEN_PSEUDOS = ['test', 'admin', 'user'];
+
 
 const CreateProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -128,10 +128,7 @@ const CreateProfileScreen: React.FC = () => {
         setError('Pseudo is required');
         return;
       }
-      if (MOCK_TAKEN_PSEUDOS.includes(pseudo.trim().toLowerCase())) {
-        setError('Pseudo is already taken');
-        return;
-      }
+      
       setError('');
       setIsLoading(true);
 
@@ -139,17 +136,16 @@ const CreateProfileScreen: React.FC = () => {
       const email = (route?.params as any)?.email || 'user@example.com';
 
       // Try wallet generation, fallback to mock if error
-      let wallet;
+      let wallet: any;
       try {
         wallet = await generateWallet();
         if (!wallet || !wallet.address) throw new Error('Wallet generation failed');
       } catch (e) {
         console.error('Wallet generation error:', e);
-        const mockKey = 'mock_wallet_' + Date.now();
-        wallet = { 
-          address: mockKey,
-          publicKey: mockKey, // Ensure publicKey is present
-          secretKey: undefined // Ensure secretKey is present
+        // Create a fallback wallet for development
+        wallet = {
+          address: 'mock_wallet_address_' + Date.now(),
+          publicKey: 'mock_public_key_' + Date.now()
         };
       }
 
@@ -165,7 +161,7 @@ const CreateProfileScreen: React.FC = () => {
         };
 
         console.log('Creating user in backend:', { email, name: pseudo, walletAddress: wallet.address });
-        const createdUser = await createUser(userData);
+        const createdUser: any = await createUser(userData);
         console.log('User created successfully:', createdUser);
 
         // Build user object for local state
@@ -175,6 +171,8 @@ const CreateProfileScreen: React.FC = () => {
           email: createdUser.email,
           avatar: avatar || 'https://randomuser.me/api/portraits/men/32.jpg',
           walletAddress: createdUser.walletAddress,
+          wallet_address: createdUser.walletAddress, // Add missing property
+          created_at: new Date().toISOString(), // Add missing property
         };
 
         authenticateUser(user, 'email');

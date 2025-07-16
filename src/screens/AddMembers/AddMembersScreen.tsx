@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, SafeAreaView, ActivityIndicator, Share } from 'react-native';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
-import { getGroupMembers, createGroup, getUserContacts, generateInviteLink, UserContact } from '../../services/groupService';
+import { UserContact } from '../../types';
 import { styles } from './styles';
 
 const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
-  const { state } = useApp();
+  const { state, createGroup } = useApp();
   const { currentUser } = state;
   const groupId = route.params?.groupId;
   const groupData = route.params?.groupData; // For creation flow
@@ -16,7 +16,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
   const [members, setMembers] = useState<any[]>([]);
   const [contacts, setContacts] = useState<UserContact[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<UserContact[]>([]);
-  const [selectedContacts, setSelectedContacts] = useState<Set<number>>(new Set());
+  const [selectedContacts, setSelectedContacts] = useState<Set<string | number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -43,13 +43,15 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
           id: currentUser?.id,
           name: currentUser?.name || 'You',
           email: currentUser?.email || '',
-          wallet_address: currentUser?.walletAddress || '',
+          wallet_address: currentUser?.wallet_address || '',
           joined_at: new Date().toISOString()
         }]);
       } else if (groupId) {
         // Handle existing group flow
         try {
-          const groupMembers = await getGroupMembers(groupId);
+          // Use hybrid service instead of direct service call
+          const { hybridDataService } = await import('../../services/hybridDataService');
+          const groupMembers = await hybridDataService.group.getGroupMembers(groupId);
           setMembers(groupMembers);
           
           setGroup({
@@ -66,7 +68,9 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
       // Fetch user contacts for both flows
       if (currentUser?.id) {
         try {
-          const userContacts = await getUserContacts(String(currentUser.id));
+          // Use hybrid service instead of direct service call
+          const { hybridDataService } = await import('../../services/hybridDataService');
+          const userContacts = await hybridDataService.group.getUserContacts(String(currentUser.id));
           setContacts(userContacts);
           setFilteredContacts(userContacts);
         } catch (err) {
@@ -99,7 +103,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
     setFilteredContacts(filtered);
   }, [contacts, searchQuery, activeTab]);
 
-  const handleContactToggle = (contactId: number) => {
+  const handleContactToggle = (contactId: string | number) => {
     const newSelected = new Set(selectedContacts);
     if (newSelected.has(contactId)) {
       newSelected.delete(contactId);
@@ -125,16 +129,15 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
         currency: 'USDC',
         icon: groupData.icon,
         color: groupData.color,
-        createdBy: currentUser.id,
-        members: [], // We'll handle member invitations after creation
+        created_by: currentUser.id, // Use snake_case for hybrid service
       };
 
       const createdGroup = await createGroup(newGroupData);
       
-             // If users are selected, send them invites
-       if (selectedContacts.size > 0) {
-         await sendInvitesToSelected(String(createdGroup.id));
-       }
+      // If users are selected, send them invites
+      if (selectedContacts.size > 0) {
+        await sendInvitesToSelected(String(createdGroup.id));
+      }
       
       // Navigate to success screen
       navigation.navigate('GroupCreated', { 
@@ -156,8 +159,9 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
     if (!currentUser?.id) return;
 
     try {
-      // Generate invite link for the group
-      const inviteData = await generateInviteLink(targetGroupId, String(currentUser.id));
+      // Generate invite link for the group using hybrid service
+      const { hybridDataService } = await import('../../services/hybridDataService');
+      const inviteData = await hybridDataService.group.generateInviteLink(targetGroupId, String(currentUser.id));
       
       // Prepare message for selected contacts
       const selectedContactsList = filteredContacts.filter(contact => 
@@ -165,7 +169,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
       );
       
       const contactNames = selectedContactsList.map(c => c.name).join(', ');
-      const message = `Join my WeSplit group "${group?.name}"!\n\nInvite code: ${inviteData.inviteCode}\n\nOr click this link: ${inviteData.inviteLink}`;
+      const message = `Join my WeSplit group "${group?.name}"!\n\nInvite code: ${inviteData.inviteCode}\n\nOr click this link: wesplit://join/${inviteData.inviteCode}`;
       
       // Show share sheet with native options
       await Share.share({
@@ -207,8 +211,9 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
       if (fromCreation) {
         shareMessage = `Join my WeSplit group "${group?.name}"! I'll send you the invite link once it's created.`;
       } else {
-        const inviteData = await generateInviteLink(groupId!, String(currentUser.id));
-        shareMessage = `Join my WeSplit group "${group?.name}"!\n\nInvite code: ${inviteData.inviteCode}\n\nOr click this link: ${inviteData.inviteLink}`;
+        const { hybridDataService } = await import('../../services/hybridDataService');
+        const inviteData = await hybridDataService.group.generateInviteLink(groupId!, String(currentUser.id));
+        shareMessage = `Join my WeSplit group "${group?.name}"!\n\nInvite code: ${inviteData.inviteCode}\n\nOr click this link: wesplit://join/${inviteData.inviteCode}`;
       }
       
       await Share.share({

@@ -42,12 +42,7 @@ const runMigrations = async () => {
     
     console.log('Database migrations completed');
     
-    // Create sample data if database is empty
-    await createSampleDataIfEmpty();
-  } catch (error) {
-    console.error('Error running migrations:', error);
-  }
-};
+    
 
 // Create sample data if database is empty
 const createSampleDataIfEmpty = async () => {
@@ -1173,19 +1168,7 @@ app.post('/api/moonpay/create-url', async (req, res) => {
   }
 });
 
-app.get('/api/moonpay/status/:transactionId', async (req, res) => {
-  const { transactionId } = req.params;
-  
-  try {
-    // In a real implementation, you would verify the transaction with MoonPay's API
-    // For now, we'll return a mock status
-    res.json({
-      transactionId,
-      status: 'completed',
-      amount: '0.1',
-      currency: 'SOL',
-      timestamp: new Date().toISOString()
-    });
+
   } catch (err) {
     console.error('Error checking MoonPay status:', err);
     res.status(500).json({ error: 'Failed to check transaction status', details: err.message });

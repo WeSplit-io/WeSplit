@@ -4,22 +4,40 @@ import Icon from '../../components/Icon';
 import { styles } from './ExpenseSuccessStyles';
 
 const ExpenseSuccessScreen: React.FC<any> = ({ navigation, route }) => {
-  const { amount, currency, description, groupName, memberCount } = route.params;
+  const { 
+    amount, 
+    currency, 
+    originalAmount, 
+    originalCurrency, 
+    description, 
+    groupName, 
+    memberCount 
+  } = route.params;
   
-  // Mock conversion rate for demonstration (in real app, get from price service)
-  const getConversionRate = (currency: string) => {
-    const rates: { [key: string]: number } = {
-      'SOL': 135,
-      'USDC': 1,
-      'ETH': 2500,
-      'BTC': 45000,
-    };
-    return rates[currency] || 1;
-  };
-
-  const conversionRate = getConversionRate(currency);
-  const convertedAmount = currency === 'USDC' ? amount * conversionRate : amount / conversionRate;
-  const convertedCurrency = currency === 'USDC' ? 'USD' : 'USDC';
+  // Debug logging to understand the conversion values
+  console.log('🔍 ExpenseSuccessScreen: Route params:', {
+    amount,
+    currency,
+    originalAmount,
+    originalCurrency,
+    description,
+    groupName,
+    memberCount
+  });
+  
+  // Show conversion info if original currency was different
+  const showConversion = originalCurrency && originalCurrency !== currency;
+  
+  // Use the actual converted amount passed from AddExpenseScreen
+  // amount is already in USDC, so for USD display we use the same value since USDC is pegged to USD
+  const convertedAmount = showConversion ? amount : originalAmount;
+  const convertedCurrency = showConversion ? 'USD' : currency;
+  
+  console.log('🔍 ExpenseSuccessScreen: Conversion values:', {
+    showConversion,
+    convertedAmount,
+    convertedCurrency
+  });
 
   const handleGoBack = () => {
     // Navigate back to the group or dashboard
@@ -50,9 +68,9 @@ const ExpenseSuccessScreen: React.FC<any> = ({ navigation, route }) => {
           <Text style={styles.mainAmount}>
             {amount} {currency}
           </Text>
-          {currency !== 'USDC' && (
+          {showConversion && (
             <Text style={styles.conversionAmount}>
-              {convertedAmount.toFixed(0)} {convertedCurrency}
+              {convertedAmount.toFixed(2)} {convertedCurrency}
             </Text>
           )}
         </View>

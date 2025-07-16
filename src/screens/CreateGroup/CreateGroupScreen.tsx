@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
-import { createGroup } from '../../services/groupService';
 import { styles } from './styles';
 import { colors } from '../../theme';
 
@@ -21,7 +20,7 @@ const PREDEFINED_COLORS = [
 ];
 
 const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
-  const { state } = useApp();
+  const { state, createGroup } = useApp();
   const { currentUser } = state;
   
   const [selectedIcon, setSelectedIcon] = useState('people');
@@ -56,8 +55,7 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
         currency: 'USDC',
         icon: selectedIcon,
         color: selectedColor,
-        createdBy: currentUser.id,
-        members: [],
+        created_by: currentUser.id, // Use snake_case for hybrid service
       };
 
       const createdGroup = await createGroup(groupData);

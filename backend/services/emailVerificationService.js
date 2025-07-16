@@ -132,6 +132,11 @@ async function verifyCode(email, code) {
       
       if (userDoc.exists) {
         userData = userDoc.data();
+        // Update last verification timestamp for existing user
+        await userRef.update({
+          lastVerifiedAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString()
+        });
       } else {
         // Create new user document
         const { getAuth } = require('firebase-admin/auth');
@@ -147,7 +152,8 @@ async function verifyCode(email, code) {
           created_at: new Date().toISOString(),
           avatar: firebaseUser.photoURL || '',
           emailVerified: true,
-          lastLoginAt: new Date().toISOString()
+          lastLoginAt: new Date().toISOString(),
+          lastVerifiedAt: new Date().toISOString() // Track when user last verified
         };
         
         await userRef.set(userData);

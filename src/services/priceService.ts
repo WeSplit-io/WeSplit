@@ -59,6 +59,10 @@ export async function getCryptoPrice(symbol: string): Promise<PriceData | null> 
         priceCache[symbol] = priceData;
         lastFetchTime[symbol] = now;
 
+        if (__DEV__) {
+          console.log(`💰 Price service: ${symbol} = $${priceUsd} USD/USDC`);
+        }
+
         return priceData;
       } finally {
         // Clean up the pending request
@@ -87,7 +91,13 @@ export async function convertToUSDC(amount: number, fromCurrency: string): Promi
     return amount; // Fallback to 1:1 ratio
   }
 
-  return amount * priceData.price_usdc;
+  const convertedAmount = amount * priceData.price_usdc;
+  
+  if (__DEV__) {
+    console.log(`💰 Converting ${amount} ${fromCurrency} to USDC: ${amount} × $${priceData.price_usdc} = $${convertedAmount}`);
+  }
+
+  return convertedAmount;
 }
 
 // Map our symbols to CoinGecko IDs

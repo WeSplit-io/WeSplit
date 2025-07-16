@@ -30,11 +30,12 @@ export const useGroupData = (groupId: number | null) => {
     }
   }, [groupId, loadGroupDetails]);
 
-  // Refresh group data
+  // Refresh group data - FIXED: Remove problematic dependencies
   const refresh = useCallback(async () => {
     if (!groupId) return;
+    // Call refreshGroup directly from AppContext to avoid dependency issues
     await refreshGroup(groupId);
-  }, [groupId, refreshGroup]);
+  }, [groupId]);
 
   // Auto-load group data when groupId changes
   useEffect(() => {
@@ -85,12 +86,18 @@ export const useGroupList = () => {
     }
   }, [loadGroups]);
 
-  // Auto-load groups when user changes
+  // Auto-load groups when user changes - FIXED: Remove problematic dependencies
   useEffect(() => {
     if (currentUser?.id && groups.length === 0) {
-      loadGroups();
+      loadUserGroups();
     }
-  }, [currentUser?.id, groups.length, loadGroups]);
+  }, [currentUser?.id]); // Remove groups.length dependency to prevent infinite loops
+
+  // Add a function to check if groups need to be refreshed
+  const shouldRefreshGroups = useCallback(() => {
+    // Only refresh if we have no groups or if it's been more than 5 minutes
+    return groups.length === 0;
+  }, [groups.length]);
 
   return {
     groups,
@@ -98,6 +105,7 @@ export const useGroupList = () => {
     refreshing,
     loadGroups,
     refresh,
+    shouldRefreshGroups,
     // Computed values
     totalGroups: groups.length,
     hasGroups: groups.length > 0,
@@ -106,13 +114,13 @@ export const useGroupList = () => {
 };
 
 // Hook for expense operations with automatic group updates
-export const useExpenseOperations = (groupId: number) => {
+export const useExpenseOperations = (groupId: number | string) => {
   const { createExpense, updateExpense, deleteExpense, refreshGroup, state } = useApp();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get group data from context
-  const group = state.groups.find(g => g.id === groupId);
+  // Get group data from context - handle both string and number IDs
+  const group = state.groups.find(g => g.id === groupId || g.id === Number(groupId) || g.id === String(groupId));
 
   // Create expense and refresh group data
   const handleCreateExpense = useCallback(async (expenseData: any) => {
@@ -120,23 +128,40 @@ export const useExpenseOperations = (groupId: number) => {
     setError(null);
     
     try {
+      console.log('🔍 useExpenseOperations: Starting expense creation...');
+      console.log('🔍 useExpenseOperations: Group ID:', groupId);
+      console.log('🔍 useExpenseOperations: Expense data:', expenseData);
+      console.log('🔍 useExpenseOperations: Current group:', group);
+      
       const expense = await createExpense({
         ...expenseData,
         group_id: groupId
       });
       
-      // Refresh group to get updated data
-      await refreshGroup(groupId);
+      console.log('🔍 useExpenseOperations: Expense created successfully:', expense);
+      console.log('🔍 useExpenseOperations: Refreshing group...');
+      
+      // Refresh group to get updated data - convert to number for refreshGroup
+      const numericGroupId = typeof groupId === 'string' ? parseInt(groupId) || 0 : groupId;
+      await refreshGroup(numericGroupId);
+      
+      console.log('🔍 useExpenseOperations: Group refreshed successfully');
       
       return expense;
     } catch (err) {
+      console.error('❌ useExpenseOperations: Error creating expense:', err);
+      console.error('❌ useExpenseOperations: Error details:', {
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : 'No stack trace',
+        name: err instanceof Error ? err.name : 'Unknown error type'
+      });
       const errorMessage = err instanceof Error ? err.message : 'Failed to create expense';
       setError(errorMessage);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [groupId, createExpense, refreshGroup]);
+  }, [groupId, createExpense, refreshGroup, group]);
 
   // Update expense and refresh group data
   const handleUpdateExpense = useCallback(async (expenseId: number, expenseData: any) => {
@@ -149,8 +174,9 @@ export const useExpenseOperations = (groupId: number) => {
         id: expenseId,
         group_id: groupId
       };
-      await updateExpense(groupId, updatedExpense);
-      await refreshGroup(groupId);
+      const numericGroupId = typeof groupId === 'string' ? parseInt(groupId) || 0 : groupId;
+      await updateExpense(numericGroupId, updatedExpense);
+      await refreshGroup(numericGroupId);
       return updatedExpense;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update expense';
@@ -167,8 +193,9 @@ export const useExpenseOperations = (groupId: number) => {
     setError(null);
     
     try {
-      await deleteExpense(groupId, expenseId);
-      await refreshGroup(groupId);
+      const numericGroupId = typeof groupId === 'string' ? parseInt(groupId) || 0 : groupId;
+      await deleteExpense(numericGroupId, expenseId);
+      await refreshGroup(numericGroupId);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete expense';
       setError(errorMessage);

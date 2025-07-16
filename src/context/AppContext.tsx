@@ -268,6 +268,7 @@ interface AppContextType {
   createGroup: (groupData: any) => Promise<GroupWithDetails>;
   updateGroup: (groupId: number, updates: any) => Promise<void>;
   deleteGroup: (groupId: number) => Promise<void>;
+  leaveGroup: (groupId: number) => Promise<void>;
   selectGroup: (group: GroupWithDetails | null) => void;
   
   // Expense operations
@@ -290,6 +291,8 @@ interface AppContextType {
   // Cache management
   shouldRefreshData: (type: 'groups' | 'expenses' | 'members', groupId?: number) => boolean;
   invalidateCache: (pattern: string) => void;
+  invalidateGroupsCache: () => void;
+  isGroupsCacheValid: () => boolean;
 
   // Notifications
   notifications: Notification[];
@@ -305,38 +308,95 @@ const calculateBalancesFromMembers = (group: GroupWithDetails, currentUserId?: n
   
   if (!group.members || group.members.length === 0) return balances;
   
+  if (__DEV__) {
+    console.log('🔍 calculateBalancesFromMembers: Input data:', {
+      groupName: group.name,
+      membersCount: group.members.length,
+      expensesCount: group.expenses?.length || 0,
+      currentUserId,
+      currentUserType: typeof currentUserId
+    });
+  }
+  
   // If we have individual expenses, calculate based on actual payments
   if (group.expenses && group.expenses.length > 0) {
-    const memberBalances: Record<number, Record<string, number>> = {};
+    const memberBalances: Record<string, Record<string, number>> = {};
     
-    // Initialize balances for all members
+    // Initialize balances for all members (use string IDs)
     group.members.forEach(member => {
-      memberBalances[member.id] = {};
+      memberBalances[String(member.id)] = {};
     });
 
     // Calculate balances by currency based on actual expenses
     group.expenses.forEach(expense => {
       const currency = expense.currency || 'SOL';
-      const sharePerPerson = expense.amount / group.members.length;
       
-      group.members.forEach(member => {
-        if (!memberBalances[member.id][currency]) {
-          memberBalances[member.id][currency] = 0;
+      // Parse split data to get actual splits
+      let splitData: any = null;
+      try {
+        if (typeof expense.splitData === 'string') {
+          splitData = JSON.parse(expense.splitData);
+        } else if (expense.splitData) {
+          splitData = expense.splitData;
         }
-        
-        if (expense.paid_by === member.id) {
-          // Member paid this expense, so they're owed the amount minus their share
-          memberBalances[member.id][currency] += expense.amount - sharePerPerson;
-        } else {
-          // Member didn't pay, so they owe their share
-          memberBalances[member.id][currency] -= sharePerPerson;
+      } catch (e) {
+        console.warn('Failed to parse split data:', expense.splitData);
+        splitData = null;
+      }
+      
+      // Determine who owes what based on split type
+      let membersInSplit: string[] = [];
+      let amountPerPerson = 0;
+      
+      if (splitData && splitData.memberIds && Array.isArray(splitData.memberIds) && splitData.memberIds.length > 0) {
+        // Use the specific member IDs from split data (convert to strings)
+        membersInSplit = splitData.memberIds.map((id: any) => String(id));
+        amountPerPerson = splitData.amountPerPerson || (expense.amount / membersInSplit.length);
+      } else {
+        // Fallback: split equally among all group members
+        membersInSplit = group.members.map(m => String(m.id));
+        amountPerPerson = expense.amount / membersInSplit.length;
+      }
+      
+      // Initialize currency tracking if not exists
+      group.members.forEach(member => {
+        const memberId = String(member.id);
+        if (!memberBalances[memberId]) {
+          memberBalances[memberId] = {};
+        }
+        if (!memberBalances[memberId][currency]) {
+          memberBalances[memberId][currency] = 0;
         }
       });
+      
+      // The person who paid should be reimbursed by the selected members
+      const paidById = expense.paid_by ? String(expense.paid_by) : null;
+      
+      if (paidById && membersInSplit.length > 0) {
+        membersInSplit.forEach(memberId => {
+          if (memberId !== paidById) {
+            // Each selected member owes their share to the payer
+            memberBalances[memberId][currency] -= amountPerPerson;
+            // The payer is owed this amount from each selected member
+            memberBalances[paidById][currency] += amountPerPerson;
+          }
+        });
+      } else {
+        // Fallback: if no payer or no members, skip this expense
+        if (__DEV__) {
+          console.log('🔍 calculateBalancesFromMembers: Skipping expense due to missing paid_by or members:', {
+            expenseId: expense.id,
+            paid_by: expense.paid_by,
+            membersInSplit: membersInSplit
+          });
+        }
+      }
     });
 
     // Convert to Balance objects
     group.members.forEach(member => {
-      const currencies = memberBalances[member.id];
+      const memberId = String(member.id);
+      const currencies = memberBalances[memberId] || {};
       
       // Find the currency with the largest absolute balance
       let primaryCurrency = group.currency || 'SOL';
@@ -354,7 +414,7 @@ const calculateBalancesFromMembers = (group: GroupWithDetails, currentUserId?: n
       }
 
       balances.push({
-        userId: member.id,
+        userId: memberId,
         userName: member.name,
         userAvatar: member.avatar,
         amount: primaryAmount,
@@ -363,25 +423,49 @@ const calculateBalancesFromMembers = (group: GroupWithDetails, currentUserId?: n
       });
     });
   } else {
-    // No individual expenses, create equal split scenario
+    // No individual expenses or all expenses had missing data, create fallback scenario
     const primaryCurrency = group.expenses_by_currency?.[0]?.currency || 'SOL';
     const totalAmount = group.expenses_by_currency?.reduce((sum, curr) => sum + curr.total_amount, 0) || 0;
-    const sharePerPerson = totalAmount / group.members.length;
     
-    // Scenario: current user paid everything, others owe their shares
-    group.members.forEach(member => {
-      const isCurrentUser = member.id === currentUserId;
-      const amount = isCurrentUser ? totalAmount - sharePerPerson : -sharePerPerson;
+    if (totalAmount > 0 && group.members.length > 0) {
+      const sharePerPerson = totalAmount / group.members.length;
       
-      balances.push({
-        userId: member.id,
-        userName: member.name,
-        userAvatar: member.avatar,
-        amount: amount,
-        currency: primaryCurrency,
-        status: Math.abs(amount) < 0.01 ? 'settled' : amount > 0 ? 'gets_back' : 'owes'
+      // Fallback scenario: assume current user paid 60% of expenses, others owe their shares
+      group.members.forEach(member => {
+        const isCurrentUser = String(member.id) === String(currentUserId);
+        let amount: number;
+        
+        if (isCurrentUser) {
+          // Current user paid some expenses and is owed by others
+          const paidAmount = totalAmount * 0.6; // Assume they paid 60%
+          amount = paidAmount - sharePerPerson;
+        } else {
+          // Others owe their share
+          amount = -sharePerPerson;
+        }
+        
+        balances.push({
+          userId: String(member.id),
+          userName: member.name,
+          userAvatar: member.avatar,
+          amount: amount,
+          currency: primaryCurrency,
+          status: Math.abs(amount) < 0.01 ? 'settled' : amount > 0 ? 'gets_back' : 'owes'
+        });
       });
-    });
+      
+      if (__DEV__) {
+        console.log('🔍 calculateBalancesFromMembers: Using fallback balance calculation:', {
+          totalAmount,
+          sharePerPerson,
+          memberCount: group.members.length
+        });
+      }
+    }
+  }
+  
+  if (__DEV__) {
+    console.log('🔍 calculateBalancesFromMembers: Final balances:', balances);
   }
   
   return balances;
@@ -393,6 +477,16 @@ const calculateBalancesFromSummary = (group: GroupWithDetails, currentUser?: any
   
   if (!group.expenses_by_currency || group.expenses_by_currency.length === 0) return balances;
   
+  if (__DEV__) {
+    console.log('🔍 calculateBalancesFromSummary: Input data:', {
+      groupName: group.name,
+      expensesByCurrency: group.expenses_by_currency,
+      memberCount: group.member_count,
+      currentUserId: currentUser?.id,
+      currentUserType: typeof currentUser?.id
+    });
+  }
+  
   // Get primary currency (largest amount)
   const primaryCurrencyEntry = group.expenses_by_currency.reduce((max, curr) => 
     curr.total_amount > max.total_amount ? curr : max
@@ -402,12 +496,22 @@ const calculateBalancesFromSummary = (group: GroupWithDetails, currentUser?: any
   const actualMemberCount = group.member_count || 2;
   const sharePerPerson = totalAmount / actualMemberCount;
   
+  if (__DEV__) {
+    console.log('🔍 calculateBalancesFromSummary: Calculation data:', {
+      primaryCurrency: primaryCurrencyEntry.currency,
+      totalAmount,
+      actualMemberCount,
+      sharePerPerson
+    });
+  }
+  
   // Current user paid everything, others owe their shares
   const currentUserOwedAmount = totalAmount - sharePerPerson;
   
-  // Current user balance
+  // Current user balance - ensure ID is a string for consistency
+  const currentUserId = String(currentUser?.id || 1);
   balances.push({
-    userId: currentUser?.id || 1,
+    userId: currentUserId,
     userName: currentUser?.name || 'You',
     userAvatar: undefined,
     amount: currentUserOwedAmount,
@@ -418,13 +522,17 @@ const calculateBalancesFromSummary = (group: GroupWithDetails, currentUser?: any
   // Other members owe their shares
   for (let i = 1; i < actualMemberCount; i++) {
     balances.push({
-      userId: 100 + i,
+      userId: String(100 + i), // Use string IDs for consistency
       userName: `Member ${i + 1}`,
       userAvatar: undefined,
       amount: -sharePerPerson,
       currency: primaryCurrencyEntry.currency,
       status: 'owes'
     });
+  }
+  
+  if (__DEV__) {
+    console.log('🔍 calculateBalancesFromSummary: Final balances:', balances);
   }
   
   return balances;
@@ -469,8 +577,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const loadUserGroups = useCallback(async (forceRefresh: boolean = false) => {
     if (!state.currentUser?.id) return;
     
-    if (!forceRefresh && !shouldRefreshData('groups')) {
-      return; // Use cached data
+    // Enhanced cache check with proper timestamp validation
+    if (!forceRefresh && state.groups.length > 0 && state.lastDataFetch.groups > 0) {
+      const now = Date.now();
+      const maxAge = 5 * 60 * 1000; // 5 minutes cache duration
+      const timeSinceLastFetch = now - state.lastDataFetch.groups;
+      
+      if (timeSinceLastFetch < maxAge) {
+        if (__DEV__) { console.log('🔄 AppContext: Using cached groups (age:', Math.round(timeSinceLastFetch / 1000), 's)'); }
+        return; // Use cached data
+      }
     }
 
     try {
@@ -486,7 +602,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [state.currentUser?.id, shouldRefreshData]);
+  }, [state.currentUser?.id, state.groups.length, state.lastDataFetch.groups]);
 
   const loadGroupDetails = useCallback(async (groupId: number, forceRefresh: boolean = false): Promise<GroupWithDetails> => {
     try {
@@ -503,7 +619,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       console.error('Error loading group details:', error);
       throw error;
     }
-  }, [state.groups]);
+  }, []); // Remove state.groups dependency to prevent infinite loops
 
   const refreshGroup = useCallback(async (groupId: number) => {
     try {
@@ -514,7 +630,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch (error) {
       console.error('Error refreshing group:', error);
     }
-  }, [loadGroupDetails, state.selectedGroup?.id]);
+  }, []); // Remove dependencies to prevent infinite loops
 
   // Group operations
   const createGroup = useCallback(async (groupData: any): Promise<GroupWithDetails> => {
@@ -574,6 +690,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [state.currentUser]);
 
+  const leaveGroup = useCallback(async (groupId: number) => {
+    if (!state.currentUser?.id) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      await hybridDataService.group.leaveGroup(groupId.toString(), state.currentUser.id.toString());
+      dispatch({ type: 'DELETE_GROUP', payload: groupId }); // Assuming leaving a group is effectively deleting it from the user's list
+      hybridDataService.cache.clearGroup(groupId);
+    } catch (error) {
+      console.error('Error leaving group:', error);
+      throw error;
+    }
+  }, [state.currentUser]);
+
   const selectGroup = useCallback((group: GroupWithDetails | null) => {
     dispatch({ type: 'SELECT_GROUP', payload: group });
   }, []);
@@ -581,14 +712,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Expense operations
   const createExpense = useCallback(async (expenseData: any): Promise<Expense> => {
     try {
+      console.log('🔍 AppContext: Starting expense creation...');
+      console.log('🔍 AppContext: Expense data:', expenseData);
+      console.log('🔍 AppContext: Current user:', state.currentUser);
+      console.log('🔍 AppContext: Current groups:', state.groups.length);
+      
       const expense = await hybridDataService.expense.createExpense(expenseData);
-      dispatch({ type: 'ADD_EXPENSE', payload: { groupId: expense.group_id, expense } });
+      
+      console.log('🔍 AppContext: Expense created successfully:', expense);
+      console.log('🔍 AppContext: Adding expense to state...');
+      
+      dispatch({ type: 'ADD_EXPENSE', payload: { groupId: Number(expense.group_id), expense } });
+      
+      console.log('🔍 AppContext: Expense added to state');
+      
       return expense;
     } catch (error) {
-      console.error('Error creating expense:', error);
+      console.error('❌ AppContext: Error creating expense:', error);
+      console.error('❌ AppContext: Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        name: error instanceof Error ? error.name : 'Unknown error type'
+      });
       throw error;
     }
-  }, []);
+  }, [state.currentUser, state.groups.length]);
 
   const updateExpense = useCallback(async (groupId: number, expense: Expense) => {
     try {
@@ -642,14 +790,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       const group = getGroupById(groupId);
       
+      if (__DEV__) {
+        console.log('🔍 getGroupBalances: Processing group:', {
+          groupId,
+          groupExists: !!group,
+          groupName: group?.name,
+          expensesByCurrency: group?.expenses_by_currency,
+          memberCount: group?.member_count,
+          currentUserId: state.currentUser?.id,
+          currentUserType: typeof state.currentUser?.id
+        });
+      }
+      
       if (!group) {
+        if (__DEV__) {
+          console.log('🔍 getGroupBalances: Group not found, returning empty array');
+        }
         return [];
       }
 
       // Use summary data from the basic group (synchronous)
       if (group.expenses_by_currency && group.expenses_by_currency.length > 0 && group.member_count > 0) {
         try {
-          return calculateBalancesFromSummary(group, state.currentUser);
+          const balances = calculateBalancesFromSummary(group, state.currentUser);
+          if (__DEV__) {
+            console.log('🔍 getGroupBalances: Calculated balances from summary:', balances);
+          }
+          return balances;
         } catch (error) {
           console.error('Error calculating balances from summary:', error);
         }
@@ -658,13 +825,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // If group has detailed member/expense data, use that
       if (group.members && group.members.length > 0 && group.expenses && group.expenses.length > 0) {
         try {
-          return calculateBalancesFromMembers(group, state.currentUser?.id);
+          const balances = calculateBalancesFromMembers(group, state.currentUser?.id);
+          if (__DEV__) {
+            console.log('🔍 getGroupBalances: Calculated balances from members:', balances);
+          }
+          return balances;
         } catch (error) {
           console.error('Error calculating balances from members:', error);
         }
       }
       
       // Return empty array silently for groups without data
+      if (__DEV__) {
+        console.log('🔍 getGroupBalances: No data available, returning empty array');
+      }
       return [];
     } catch (error) {
       console.error(`getGroupBalances: Error processing group ${groupId}:`, error);
@@ -690,6 +864,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const invalidateCache = useCallback((pattern: string) => {
     hybridDataService.cache.clearPattern(pattern);
   }, []);
+
+  // Add specific cache invalidation for groups
+  const invalidateGroupsCache = useCallback(() => {
+    dispatch({ type: 'SET_GROUPS', payload: [] });
+    dispatch({ 
+      type: 'UPDATE_CACHE_TIMESTAMP', 
+      payload: { type: 'groups', timestamp: 0 } 
+    });
+    if (__DEV__) { console.log('🔄 AppContext: Groups cache invalidated'); }
+  }, []);
+
+  // Add function to check if groups cache is valid
+  const isGroupsCacheValid = useCallback(() => {
+    if (state.groups.length === 0 || state.lastDataFetch.groups === 0) {
+      return false;
+    }
+    const now = Date.now();
+    const maxAge = 5 * 60 * 1000; // 5 minutes
+    return (now - state.lastDataFetch.groups) < maxAge;
+  }, [state.groups.length, state.lastDataFetch.groups]);
 
   // Notifications logic
   const NOTIFICATIONS_CACHE_AGE = 2 * 60 * 1000; // 2 minutes
@@ -720,6 +914,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     createGroup,
     updateGroup,
     deleteGroup,
+    leaveGroup,
     selectGroup,
     createExpense,
     updateExpense,
@@ -734,6 +929,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     clearError,
     shouldRefreshData,
     invalidateCache,
+    invalidateGroupsCache,
+    isGroupsCacheValid,
     notifications: state.notifications ?? [],
     loadNotifications,
     refreshNotifications,

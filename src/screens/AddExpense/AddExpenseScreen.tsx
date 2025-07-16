@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext';
 import { useGroupList, useExpenseOperations } from '../../hooks/useGroupData';
 import { GroupWithDetails, GroupMember } from '../../types';
 import { SOLANA_CRYPTOCURRENCIES, Cryptocurrency } from '../../utils/cryptoUtils';
+import { convertToUSDC } from '../../services/priceService';
 import { styles } from './styles';
 
 // Updated categories with more vibrant colors matching the screenshots
@@ -30,10 +31,15 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
   const [date, setDate] = useState(new Date());
   const [selectedCurrency, setSelectedCurrency] = useState<Cryptocurrency>(SOLANA_CRYPTOCURRENCIES[0]);
   const [splitType, setSplitType] = useState<'equal' | 'manual'>('equal');
-  const [selectedMembers, setSelectedMembers] = useState<number[]>([]);
-  const [customAmounts, setCustomAmounts] = useState<{[key: number]: string}>({});
+  const [selectedMembers, setSelectedMembers] = useState<(string | number)[]>([]);
+  const [customAmounts, setCustomAmounts] = useState<{[key: string | number]: string}>({});
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [showManualTransition, setShowManualTransition] = useState(false);
   const [showGroupSelector, setShowGroupSelector] = useState(false);
+  const [paidBy, setPaidBy] = useState<string | number>('');
+  const [showPaidBySelector, setShowPaidBySelector] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
+  const [convertedAmount, setConvertedAmount] = useState<number | null>(null);
 
   // Use expense operations hook - Initialize with selected group ID
   const { 
@@ -42,32 +48,46 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
     getGroupMembers,
     error: expenseError,
     clearError
-  } = useExpenseOperations(selectedGroup?.id || (groupId ? Number(groupId) : (groups[0]?.id || 0)));
+  } = useExpenseOperations(selectedGroup?.id ? selectedGroup.id : (groupId ? groupId : (groups[0]?.id ? groups[0].id : '')));
 
   // Set initial group when data loads
   useEffect(() => {
     if (groups.length > 0 && !selectedGroup) {
       // Set selected group based on route param or first group
       const initialGroup = groupId 
-        ? groups.find(g => g.id === Number(groupId)) 
+        ? groups.find(g => g.id === (typeof groupId === 'string' ? groupId : Number(groupId))) 
         : groups[0];
         
       if (initialGroup) {
         setSelectedGroup(initialGroup);
-        // Initialize selected members with all group members
+        // Initialize selected members with all group members (use real id)
         setSelectedMembers(initialGroup.members.map(m => m.id));
+        // Initialize paidBy with current user
+        if (currentUser?.id) {
+          setPaidBy(currentUser.id);
+        }
       }
     }
-  }, [groups, groupId, selectedGroup]);
+  }, [groups, groupId, selectedGroup, currentUser]);
 
   // Get group members using the hook instead of API call
   const groupMembers = getGroupMembers();
+
+  // Debug logging for group members
+  useEffect(() => {
+    console.log('🔍 AddExpenseScreen: Group members debug:', {
+      selectedGroup: selectedGroup?.id,
+      groupMembersLength: groupMembers.length,
+      groupMembers: groupMembers,
+      selectedMembers: selectedMembers
+    });
+  }, [selectedGroup, groupMembers, selectedMembers]);
 
   // Update selected members when group changes
   useEffect(() => {
     if (selectedGroup && groupMembers.length > 0) {
       setSelectedMembers(groupMembers.map(m => m.id));
-        setCustomAmounts({});
+      setCustomAmounts({});
     }
   }, [selectedGroup, groupMembers]);
 
@@ -77,12 +97,61 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
     // Members will be automatically available from the hook
   };
 
-  const handleMemberToggle = (memberId: number) => {
-    setSelectedMembers(prev => 
-      prev.includes(memberId) 
-        ? prev.filter(id => id !== memberId)
-        : [...prev, memberId]
-    );
+  const handleMemberToggle = (memberId: string | number) => {
+    if (splitType === 'equal') {
+      // If trying to deselect in equal mode, switch to manual
+      if (selectedMembers.includes(memberId)) {
+        setSplitType('manual');
+        // Show transition notification
+        setShowManualTransition(true);
+        setTimeout(() => setShowManualTransition(false), 3000);
+        
+        // Remove the member from selectedMembers
+        setSelectedMembers(prev => prev.filter(id => id !== memberId));
+        // Initialize customAmounts for remaining members with equal split value
+        const newCustomAmounts: {[key: string | number]: string} = {};
+        const remainingMembers = selectedMembers.filter(id => id !== memberId);
+        const amountPerPerson = remainingMembers.length > 0 ? (parseFloat(amount) || 0) / remainingMembers.length : 0;
+        remainingMembers.forEach(id => {
+          newCustomAmounts[id] = amountPerPerson.toFixed(2);
+        });
+        setCustomAmounts(newCustomAmounts);
+      } else {
+        // Adding a member in equal mode - just add them normally
+        setSelectedMembers(prev => [...prev, memberId]);
+      }
+    } else {
+      // Manual mode: toggle as usual
+      if (selectedMembers.includes(memberId)) {
+        // Removing a member in manual mode
+        const remainingMembers = selectedMembers.filter(id => id !== memberId);
+        setSelectedMembers(prev => prev.filter(id => id !== memberId));
+        
+        // Recalculate amounts for remaining members
+        if (remainingMembers.length > 0) {
+          const totalAmount = parseFloat(amount) || 0;
+          const amountPerRemainingMember = totalAmount / remainingMembers.length;
+          
+          const newCustomAmounts: {[key: string | number]: string} = {};
+          remainingMembers.forEach(id => {
+            newCustomAmounts[id] = amountPerRemainingMember.toFixed(2);
+          });
+          setCustomAmounts(newCustomAmounts);
+        } else {
+          // No members left, clear custom amounts
+          setCustomAmounts({});
+        }
+      } else {
+        // Adding a member in manual mode
+        setSelectedMembers(prev => [...prev, memberId]);
+        // Initialize the new member's amount with equal split value
+        const amountPerPerson = (parseFloat(amount) || 0) / (selectedMembers.length + 1);
+        setCustomAmounts(prev => ({
+          ...prev,
+          [memberId]: amountPerPerson.toFixed(2)
+        }));
+      }
+    }
   };
 
   const getTotalAmount = () => {
@@ -94,7 +163,8 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const getAmountPerPerson = () => {
-    const totalAmount = parseFloat(amount) || 0;
+    // Use converted USDC amount if available, otherwise use original amount
+    const totalAmount = convertedAmount || parseFloat(amount) || 0;
     return selectedMembers.length > 0 ? totalAmount / selectedMembers.length : 0;
   };
 
@@ -104,6 +174,32 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
       month: '2-digit', 
       year: 'numeric'
     });
+  };
+
+  const handleManualAmountChange = (memberId: string | number, value: string) => {
+    setCustomAmounts(prev => ({
+      ...prev,
+      [memberId]: value
+    }));
+  };
+
+  const handleSplitTypeChange = (newSplitType: 'equal' | 'manual') => {
+    setSplitType(newSplitType);
+    
+    if (newSplitType === 'manual' && selectedMembers.length > 0) {
+      // Initialize custom amounts for all selected members with current equal split values
+      const newCustomAmounts: {[key: string | number]: string} = {};
+      // Use converted USDC amount if available, otherwise use original amount
+      const totalAmount = convertedAmount || parseFloat(amount) || 0;
+      const amountPerPerson = selectedMembers.length > 0 ? totalAmount / selectedMembers.length : 0;
+      selectedMembers.forEach(id => {
+        newCustomAmounts[id] = amountPerPerson.toFixed(2);
+      });
+      setCustomAmounts(newCustomAmounts);
+    } else if (newSplitType === 'equal') {
+      // Clear custom amounts when switching back to equal mode
+      setCustomAmounts({});
+    }
   };
 
   const handleSaveExpense = async () => {
@@ -131,34 +227,96 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
     }
 
     try {
+      console.log('🔍 AddExpenseScreen: Starting expense creation...');
+      console.log('🔍 AddExpenseScreen: Selected group:', selectedGroup);
+      console.log('🔍 AddExpenseScreen: Current user:', currentUser);
+      console.log('🔍 AddExpenseScreen: Selected members:', selectedMembers);
+      console.log('🔍 AddExpenseScreen: Description:', description);
+      console.log('🔍 AddExpenseScreen: Amount:', amount);
+      console.log('🔍 AddExpenseScreen: Currency:', selectedCurrency.symbol);
+
+      // Convert amount to USDC if currency is not USDC
+      let finalAmount = parseFloat(amount);
+      let finalCurrency = selectedCurrency.symbol;
+      let convertedCustomAmounts = customAmounts;
+      
+      if (selectedCurrency.symbol !== 'USDC') {
+        try {
+          setIsConverting(true);
+          const usdcAmount = await convertToUSDC(finalAmount, selectedCurrency.symbol);
+          finalAmount = usdcAmount;
+          finalCurrency = 'USDC';
+          setConvertedAmount(usdcAmount);
+          console.log(`Converted ${amount} ${selectedCurrency.symbol} to ${finalAmount} USDC`);
+          
+          // Also convert custom amounts if in manual mode
+          if (splitType === 'manual' && Object.keys(customAmounts).length > 0) {
+            convertedCustomAmounts = {};
+            for (const [memberId, memberAmount] of Object.entries(customAmounts)) {
+              const memberAmountNum = parseFloat(memberAmount);
+              if (!isNaN(memberAmountNum)) {
+                const convertedMemberAmount = await convertToUSDC(memberAmountNum, selectedCurrency.symbol);
+                convertedCustomAmounts[memberId] = convertedMemberAmount.toFixed(2);
+              }
+            }
+            console.log(`Converted custom amounts to USDC:`, convertedCustomAmounts);
+          }
+        } catch (conversionError) {
+          console.error('Currency conversion failed:', conversionError);
+          // Continue with original currency if conversion fails
+        } finally {
+          setIsConverting(false);
+        }
+      } else {
+        setConvertedAmount(null);
+      }
+
+      // Prepare split data without undefined values
+      const splitData: any = {
+        memberIds: selectedMembers,
+        amountPerPerson: getAmountPerPerson()
+      };
+      
+      if (splitType === 'manual' && Object.keys(convertedCustomAmounts).length > 0) {
+        splitData.customAmounts = convertedCustomAmounts;
+      }
+
       const expenseData = {
         description: description.trim(),
-        amount: parseFloat(amount),
-        currency: selectedCurrency.symbol,
-        paidBy: currentUser.id, // Backend API expects camelCase
-        groupId: selectedGroup.id, // Backend API expects camelCase
+        amount: finalAmount,
+        currency: finalCurrency,
+        paid_by: paidBy, // Use the selected paidBy value, snake_case for backend compatibility
+        groupId: selectedGroup.id, // Keep as string for Firebase compatibility
         category: categories[selectedCategory].name.toLowerCase(),
         splitType: splitType,
-        splitData: { 
-          memberIds: selectedMembers,
-          amountPerPerson: getAmountPerPerson(),
-          customAmounts: splitType === 'manual' ? customAmounts : undefined
-        }
+        splitData: splitData
       };
 
-      await handleCreateExpense(expenseData);
+      console.log('🔍 AddExpenseScreen: Expense data to be created:', expenseData);
+      console.log('🔍 AddExpenseScreen: Calling handleCreateExpense...');
+
+      const result = await handleCreateExpense(expenseData);
+      
+      console.log('🔍 AddExpenseScreen: Expense created successfully:', result);
       
       // Navigate to success screen
       navigation.navigate('ExpenseSuccess', {
-        amount: parseFloat(amount),
-        currency: selectedCurrency.symbol,
+        amount: finalAmount,
+        currency: finalCurrency,
+        originalAmount: parseFloat(amount),
+        originalCurrency: selectedCurrency.symbol,
         description: description.trim(),
         groupName: selectedGroup.name,
         memberCount: selectedMembers.length
       });
       
     } catch (error) {
-      console.error('Error creating expense:', error);
+      console.error('❌ AddExpenseScreen: Error creating expense:', error);
+      console.error('❌ AddExpenseScreen: Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        name: error instanceof Error ? error.name : 'Unknown error type'
+      });
       Alert.alert('Error', 'Failed to create expense. Please try again.');
     }
   };
@@ -169,6 +327,28 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
       Alert.alert('Error', expenseError);
     }
   }, [expenseError]);
+
+  // Real-time conversion preview
+  useEffect(() => {
+    const updateConversionPreview = async () => {
+      if (amount && selectedCurrency.symbol !== 'USDC') {
+        try {
+          const amountNum = parseFloat(amount);
+          if (!isNaN(amountNum)) {
+            const usdcAmount = await convertToUSDC(amountNum, selectedCurrency.symbol);
+            setConvertedAmount(usdcAmount);
+          }
+        } catch (error) {
+          console.error('Error updating conversion preview:', error);
+          setConvertedAmount(null);
+        }
+      } else {
+        setConvertedAmount(null);
+      }
+    };
+
+    updateConversionPreview();
+  }, [amount, selectedCurrency.symbol]);
 
   if (groupsLoading) {
     return (
@@ -281,10 +461,46 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
         </View>
 
         {amount && (
-          <Text style={styles.totalText}>
-            Total: {getTotalAmount().toFixed(3)} {selectedCurrency.symbol}
-          </Text>
+          <View style={styles.totalContainer}>
+            <Text style={styles.totalText}>
+              Total: {getTotalAmount().toFixed(3)} {selectedCurrency.symbol}
+            </Text>
+            {isConverting && (
+              <Text style={styles.convertingText}>
+                Converting to USDC...
+              </Text>
+            )}
+            {convertedAmount && selectedCurrency.symbol !== 'USDC' && (
+              <Text style={styles.convertedText}>
+                ≈ {convertedAmount.toFixed(2)} USDC
+              </Text>
+            )}
+          </View>
         )}
+
+        {/* Paid By */}
+        <Text style={styles.sectionLabel}>Paid By</Text>
+        <TouchableOpacity 
+          style={styles.paidBySelector}
+          onPress={() => setShowPaidBySelector(true)}
+        >
+          <View style={styles.paidByInfo}>
+            <View style={styles.paidByAvatar}>
+              <Text style={styles.paidByAvatarText}>
+                {groupMembers.find(m => m.id === paidBy)?.name?.charAt(0).toUpperCase() || '?'}
+              </Text>
+            </View>
+            <View style={styles.paidByDetails}>
+              <Text style={styles.paidByName}>
+                {groupMembers.find(m => m.id === paidBy)?.name || 'Select who paid'}
+              </Text>
+              <Text style={styles.paidByEmail}>
+                {groupMembers.find(m => m.id === paidBy)?.email || ''}
+              </Text>
+            </View>
+          </View>
+          <Icon name="chevron-down" size={20} color="#A89B9B" />
+        </TouchableOpacity>
 
         {/* Split Amount */}
         <View style={styles.splitHeader}>
@@ -292,7 +508,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
           <View style={styles.splitToggle}>
             <TouchableOpacity
               style={[styles.toggleButton, splitType === 'equal' && styles.toggleButtonActive]}
-              onPress={() => setSplitType('equal')}
+              onPress={() => handleSplitTypeChange('equal')}
             >
               <Text style={[styles.toggleText, splitType === 'equal' && styles.toggleTextActive]}>
                 Equal
@@ -300,7 +516,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toggleButton, splitType === 'manual' && styles.toggleButtonActive]}
-              onPress={() => setSplitType('manual')}
+              onPress={() => handleSplitTypeChange('manual')}
             >
               <Text style={[styles.toggleText, splitType === 'manual' && styles.toggleTextActive]}>
                 Manual
@@ -309,44 +525,74 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
           </View>
         </View>
 
+        {/* Transition Notification */}
+        {showManualTransition && (
+          <View style={styles.transitionNotification}>
+            <Icon name="info" size={16} color="#A5EA15" />
+            <Text style={styles.transitionText}>Switched to manual split mode</Text>
+          </View>
+        )}
+
         {/* Members List */}
-        {groupMembers.map((member) => {
+        {groupMembers.map((member, index) => {
           const isSelected = selectedMembers.includes(member.id);
           const memberAmount = splitType === 'equal' 
             ? getAmountPerPerson() 
             : parseFloat(customAmounts[member.id] || '0');
+          
+          // Determine which currency to display
+          const displayCurrency = convertedAmount && selectedCurrency.symbol !== 'USDC' ? 'USDC' : selectedCurrency.symbol;
 
           return (
-            <TouchableOpacity
-              key={member.id}
-              style={[styles.memberRow, isSelected && styles.memberRowSelected]}
-              onPress={() => handleMemberToggle(member.id)}
-            >
-              <View style={styles.memberCheckbox}>
-                <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                  {isSelected && <Icon name="check" size={12} color="#212121" />}
+            <View key={`${member.id}-${index}`}>
+              <TouchableOpacity
+                style={[styles.memberRow, isSelected && styles.memberRowSelected]}
+                onPress={() => handleMemberToggle(member.id)}
+              >
+                <View style={styles.memberCheckbox}>
+                  <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                    {isSelected && <Icon name="check" size={12} color="#212121" />}
+                  </View>
                 </View>
-              </View>
+                
+                <View style={styles.memberAvatar}>
+                  <Text style={styles.avatarText}>
+                    {member.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                
+                <View style={styles.memberInfo}>
+                  <Text style={styles.memberName}>{member.name}</Text>
+                  <Text style={styles.memberHandle}>
+                    {member.email.split('@')[0]}...{member.email.split('@')[0].slice(-3)}
+                  </Text>
+                </View>
+                
+                {isSelected && amount && splitType === 'equal' && (
+                  <Text style={styles.memberAmount}>
+                    ${memberAmount.toFixed(2)}
+                  </Text>
+                )}
+              </TouchableOpacity>
               
-              <View style={styles.memberAvatar}>
-                <Text style={styles.avatarText}>
-                  {member.name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              
-              <View style={styles.memberInfo}>
-                <Text style={styles.memberName}>{member.name}</Text>
-                <Text style={styles.memberHandle}>
-                  {member.email.split('@')[0]}...{member.email.split('@')[0].slice(-3)}
-                </Text>
-              </View>
-              
-              {isSelected && amount && (
-                <Text style={styles.memberAmount}>
-                  ${memberAmount.toFixed(2)}
-                </Text>
+              {/* Manual Amount Input - Only show for selected members in manual mode */}
+              {isSelected && splitType === 'manual' && amount && (
+                <View style={styles.manualAmountContainer}>
+                  <Text style={styles.manualAmountLabel}>Amount for {member.name}:</Text>
+                  <View style={styles.manualAmountRow}>
+                    <TextInput
+                      style={styles.manualAmountInput}
+                      value={customAmounts[member.id] || '0'}
+                      onChangeText={(value) => handleManualAmountChange(member.id, value)}
+                      placeholder="0.00"
+                      placeholderTextColor="#A89B9B"
+                      keyboardType="decimal-pad"
+                    />
+                    <Text style={styles.manualAmountCurrency}>{displayCurrency}</Text>
+                  </View>
+                </View>
               )}
-            </TouchableOpacity>
+            </View>
           );
         })}
       </ScrollView>
@@ -401,6 +647,56 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
                   <Text style={styles.currencySymbol}>{currency.symbol}</Text>
                   <Text style={styles.currencyName}>{currency.name}</Text>
                   {selectedCurrency.symbol === currency.symbol && (
+                    <Icon name="check" size={20} color="#A5EA15" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Paid By Selector Modal */}
+      <Modal
+        visible={showPaidBySelector}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPaidBySelector(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.currencyModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Who Paid?</Text>
+              <TouchableOpacity onPress={() => setShowPaidBySelector(false)}>
+                <Icon name="x" size={24} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView>
+              {groupMembers.map((member) => (
+                <TouchableOpacity
+                  key={member.id}
+                  style={[
+                    styles.currencyOption,
+                    paidBy === member.id && styles.currencyOptionSelected
+                  ]}
+                  onPress={() => {
+                    setPaidBy(member.id);
+                    setShowPaidBySelector(false);
+                  }}
+                >
+                  <View style={styles.paidByOptionContent}>
+                    <View style={styles.paidByOptionAvatar}>
+                      <Text style={styles.paidByOptionAvatarText}>
+                        {member.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.paidByOptionDetails}>
+                      <Text style={styles.paidByOptionName}>{member.name}</Text>
+                      <Text style={styles.paidByOptionEmail}>{member.email}</Text>
+                    </View>
+                  </View>
+                  {paidBy === member.id && (
                     <Icon name="check" size={20} color="#A5EA15" />
                   )}
                 </TouchableOpacity>

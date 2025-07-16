@@ -61,52 +61,9 @@ async function fixFirestoreData() {
     
     // 3. Add some sample expenses to groups for testing
     console.log('📝 Adding sample expenses...');
-    const sampleExpenses = [
-      {
-        description: 'Lunch',
-        amount: 25.50,
-        currency: 'USDC',
-        paid_by: 'NRR1QG3SIGMCBKlanLVZyYztQdD3',
-        group_id: '1',
-        category: 'food',
-        created_at: admin.firestore.FieldValue.serverTimestamp()
-      },
-      {
-        description: 'Coffee',
-        amount: 5.00,
-        currency: 'USDC',
-        paid_by: 'sqlite_3',
-        group_id: '1',
-        category: 'food',
-        created_at: admin.firestore.FieldValue.serverTimestamp()
-      },
-      {
-        description: 'Office supplies',
-        amount: 150.00,
-        currency: 'USDC',
-        paid_by: 'NRR1QG3SIGMCBKlanLVZyYztQdD3',
-        group_id: '3',
-        category: 'work',
-        created_at: admin.firestore.FieldValue.serverTimestamp()
-      },
-      {
-        description: 'Team dinner',
-        amount: 85.00,
-        currency: 'USDC',
-        paid_by: 'sqlite_5',
-        group_id: '5',
-        category: 'food',
-        created_at: admin.firestore.FieldValue.serverTimestamp()
-      }
-    ];
     
-    let sampleExpensesAdded = 0;
-    for (const expenseData of sampleExpenses) {
-      await db.collection('expenses').add(expenseData);
-      sampleExpensesAdded++;
-      console.log(`✅ Added sample expense: ${expenseData.description} (${expenseData.amount} ${expenseData.currency}) to group ${expenseData.group_id}`);
-    }
-    console.log(`📊 Added ${sampleExpensesAdded} sample expenses\n`);
+    
+    e expenses\n`);
     
     // 4. Update group documents with proper metadata
     console.log('🏷️  Updating group metadata...');

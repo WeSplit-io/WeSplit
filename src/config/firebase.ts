@@ -193,7 +193,8 @@ export const firestoreService = {
         created_at: new Date().toISOString(),
         avatar: user.photoURL || '',
         emailVerified: user.emailVerified,
-        lastLoginAt: new Date().toISOString()
+        lastLoginAt: new Date().toISOString(),
+        lastVerifiedAt: new Date().toISOString() // Track when user last verified
       };
 
       await setDoc(userRef, userData, { merge: true });
@@ -218,6 +219,71 @@ export const firestoreService = {
     } catch (error) {
       console.error('Error getting user document:', error);
       throw error;
+    }
+  },
+
+  // Check if user has verified this month
+  async hasVerifiedThisMonth(email: string): Promise<boolean> {
+    try {
+      // Find user by email
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', email));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        return false; // User doesn't exist, needs verification
+      }
+      
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data();
+      const lastVerifiedAt = userData.lastVerifiedAt;
+      
+      if (!lastVerifiedAt) {
+        return false; // No verification record, needs verification
+      }
+      
+      // Check if last verification was this month
+      const lastVerified = new Date(lastVerifiedAt);
+      const now = new Date();
+      
+      const hasVerifiedThisMonth = lastVerified.getMonth() === now.getMonth() && 
+                                   lastVerified.getFullYear() === now.getFullYear();
+      
+      if (__DEV__) {
+        console.log('📅 Monthly verification check for', email);
+        console.log('Last verified:', lastVerified);
+        console.log('Current date:', now);
+        console.log('Has verified this month:', hasVerifiedThisMonth);
+      }
+      
+      return hasVerifiedThisMonth;
+    } catch (error) {
+      console.error('Error checking monthly verification:', error);
+      return false; // On error, require verification
+    }
+  },
+
+  // Update user's last verification timestamp
+  async updateLastVerifiedAt(email: string) {
+    try {
+      // Find user by email
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', email));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        await updateDoc(userDoc.ref, {
+          lastVerifiedAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString()
+        });
+        
+        if (__DEV__) {
+          console.log('✅ Updated lastVerifiedAt for', email);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating lastVerifiedAt:', error);
     }
   },
 

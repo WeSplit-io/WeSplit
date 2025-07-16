@@ -7,7 +7,6 @@ import {
   TextInput, 
   ActivityIndicator, 
   Alert, 
-  Modal,
   ScrollView,
   KeyboardAvoidingView,
   Platform
@@ -19,8 +18,13 @@ import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseAuth, firestoreService, auth } from '../../config/firebase';
-import { solanaAppKitService, WalletInfo } from '../../services/solanaAppKitService';
 import { sendVerificationCode } from '../../services/firebaseAuthService';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { solanaAppKitService } from '../../services/solanaAppKitService';
+
+// Background wallet creation: Automatically creates Solana wallet for new users
+// without blocking the UI or showing any modals
 
 type RootStackParamList = {
   Dashboard: undefined;
@@ -35,19 +39,25 @@ type RootStackParamList = {
 
 const AuthMethodsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const { authenticateUser } = useApp();
+  const { authenticateUser, updateUser } = useApp();
   const { connectWallet } = useWallet();
   
   // State management
   const [email, setEmail] = useState('vincent@we.split');
   const [loading, setLoading] = useState(false);
-  const [walletCreationModal, setWalletCreationModal] = useState(false);
-  const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null);
+  const [hasCheckedMonthlyVerification, setHasCheckedMonthlyVerification] = useState(false);
+  const [hasHandledAuthState, setHasHandledAuthState] = useState(false);
 
   // Check if user is already authenticated
   useEffect(() => {
+    if (hasHandledAuthState) {
+      if (__DEV__) { console.log('🔄 Auth state already handled, skipping...'); }
+      return;
+    }
+
     const unsubscribe = firebaseAuth.onAuthStateChanged(async (firebaseUser) => {
-      if (firebaseUser) {
+      if (firebaseUser && !hasHandledAuthState) {
+        setHasHandledAuthState(true);
         // User is signed in
         if (firebaseUser.emailVerified) {
           // Email is verified, proceed with wallet connection
@@ -60,7 +70,12 @@ const AuthMethodsScreen: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [hasHandledAuthState]);
+
+  // Reset monthly verification flag when email changes
+  useEffect(() => {
+    setHasCheckedMonthlyVerification(false);
+  }, [email]);
 
   // Handle authenticated user
   const handleAuthenticatedUser = async (firebaseUser: any) => {
@@ -75,7 +90,7 @@ const AuthMethodsScreen: React.FC = () => {
 
       // Transform to app user format
       const appUser = {
-        id: parseInt(userData.id) || 0,
+        id: userData.id || firebaseUser.uid,
         name: userData.name || firebaseUser.displayName || '',
         email: userData.email || firebaseUser.email || '',
         wallet_address: userData.wallet_address || '',
@@ -84,18 +99,64 @@ const AuthMethodsScreen: React.FC = () => {
         avatar: userData.avatar || ''
       };
 
-      // Check if user has a wallet
-      if (appUser.wallet_address) {
-        // User has wallet, authenticate and navigate to dashboard
-        authenticateUser(appUser, 'email');
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Dashboard' }],
-        });
-      } else {
-        // User needs wallet creation
-        setWalletCreationModal(true);
+      // If user doesn't have a wallet, create one and update the user data
+      if (!appUser.wallet_address) {
+        if (__DEV__) { console.log('🔄 Creating wallet for new user...'); }
+        
+        try {
+          // Create wallet synchronously for new users
+          const result = await solanaAppKitService.createWallet();
+          const wallet = result.wallet;
+          
+          // Update user document with wallet info
+          await firestoreService.updateUserWallet(firebaseUser.uid, {
+            address: wallet.address,
+            publicKey: wallet.publicKey
+          });
+          
+          // Update app user with wallet info
+          appUser.wallet_address = wallet.address;
+          appUser.wallet_public_key = wallet.publicKey;
+          
+          // Request airdrop in background for development
+          if (process.env.NODE_ENV !== 'production') {
+            solanaAppKitService.requestAirdrop(1)
+              .then(() => {
+                if (__DEV__) {
+                  console.log('✅ Background airdrop successful: 1 SOL added to wallet');
+                }
+              })
+              .catch((airdropError) => {
+                if (__DEV__) {
+                  console.log('⚠️ Background airdrop failed (this is normal):', airdropError.message);
+                }
+              });
+          }
+          
+          if (__DEV__) { console.log('✅ Wallet creation successful'); }
+          
+          // Update user in AppContext to reflect wallet info
+          try {
+            await updateUser({
+              wallet_address: wallet.address,
+              wallet_public_key: wallet.publicKey
+            });
+            if (__DEV__) { console.log('✅ Updated user in AppContext with wallet info'); }
+          } catch (updateError) {
+            console.error('❌ Failed to update user in AppContext:', updateError);
+          }
+        } catch (error) {
+          console.error('❌ Wallet creation failed:', error);
+          // Continue without wallet - user can still use the app
+        }
       }
+
+      // Authenticate user with updated data (including wallet if created)
+      authenticateUser(appUser, 'email');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Dashboard' }],
+      });
     } catch (error) {
       console.error('Error handling authenticated user:', error);
       Alert.alert('Error', 'Failed to load user data. Please try again.');
@@ -109,9 +170,130 @@ const AuthMethodsScreen: React.FC = () => {
       return;
     }
     
+    // Prevent multiple checks
+    if (hasCheckedMonthlyVerification) {
+      if (__DEV__) { console.log('🔄 Monthly verification already checked, skipping...'); }
+      return;
+    }
+    
+    // Check if user is already authenticated
+    const currentUser = auth.currentUser;
+    if (currentUser && currentUser.email === email) {
+      if (__DEV__) { console.log('🔄 User already authenticated, skipping verification...'); }
+      return;
+    }
+    
     setLoading(true);
+    setHasCheckedMonthlyVerification(true);
     
     try {
+      // Check if user has already verified this month
+      const hasVerifiedThisMonth = await firestoreService.hasVerifiedThisMonth(email);
+      
+      if (hasVerifiedThisMonth) {
+        if (__DEV__) {
+          console.log('✅ User has already verified this month, bypassing verification');
+        }
+        
+        // Show loading indicator for bypass
+        setLoading(true);
+        
+        // User has verified this month, try to get their existing user data
+        try {
+          // Find existing user by email
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('email', '==', email));
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            const userData = userDoc.data();
+            
+            // Transform to app user format
+            const appUser = {
+              id: userData.id || userDoc.id,
+              name: userData.name || '',
+              email: userData.email || email,
+              wallet_address: userData.wallet_address || '',
+              wallet_public_key: userData.wallet_public_key || '',
+              created_at: userData.created_at || new Date().toISOString(),
+              avatar: userData.avatar || ''
+            };
+            
+            // Update last login timestamp
+            await firestoreService.updateLastVerifiedAt(email);
+            
+            // If user doesn't have a wallet, create one and update the user data
+            if (!appUser.wallet_address) {
+              if (__DEV__) { console.log('🔄 Creating wallet for existing user...'); }
+              
+              try {
+                // Create wallet synchronously for existing users without wallet
+                const result = await solanaAppKitService.createWallet();
+                const wallet = result.wallet;
+                
+                // Update user document with wallet info
+                await firestoreService.updateUserWallet(userDoc.id, {
+                  address: wallet.address,
+                  publicKey: wallet.publicKey
+                });
+                
+                // Update app user with wallet info
+                appUser.wallet_address = wallet.address;
+                appUser.wallet_public_key = wallet.publicKey;
+                
+                // Request airdrop in background for development
+                if (process.env.NODE_ENV !== 'production') {
+                  solanaAppKitService.requestAirdrop(1)
+                    .then(() => {
+                      if (__DEV__) {
+                        console.log('✅ Background airdrop successful: 1 SOL added to wallet');
+                      }
+                    })
+                    .catch((airdropError) => {
+                      if (__DEV__) {
+                        console.log('⚠️ Background airdrop failed (this is normal):', airdropError.message);
+                      }
+                    });
+                }
+                
+                if (__DEV__) { console.log('✅ Wallet creation successful'); }
+                
+                // Update user in AppContext to reflect wallet info
+                try {
+                  await updateUser({
+                    wallet_address: wallet.address,
+                    wallet_public_key: wallet.publicKey
+                  });
+                  if (__DEV__) { console.log('✅ Updated user in AppContext with wallet info'); }
+                } catch (updateError) {
+                  console.error('❌ Failed to update user in AppContext:', updateError);
+                }
+              } catch (error) {
+                console.error('❌ Wallet creation failed:', error);
+                // Continue without wallet - user can still use the app
+              }
+            }
+            
+            // Authenticate user with updated data (including wallet if created)
+            authenticateUser(appUser, 'email');
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Dashboard' }],
+            });
+            return;
+          }
+        } catch (userError) {
+          console.error('Error getting existing user data:', userError);
+          // Fall through to send verification code
+        }
+      }
+      
+      // User hasn't verified this month or doesn't exist, send verification code
+      if (__DEV__) {
+        console.log('📧 User needs verification, sending code to:', email);
+      }
+      
       // Use Firebase backend service for 4-digit code verification
       const result = await sendVerificationCode(email);
       
@@ -133,50 +315,6 @@ const AuthMethodsScreen: React.FC = () => {
       Alert.alert('Authentication Error', 'Failed to send verification code. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Handle wallet creation
-  const handleWalletCreation = async () => {
-    try {
-      setLoading(true);
-      
-      // Create new wallet using AppKit
-      const result = await solanaAppKitService.createWallet();
-      const wallet = result.wallet;
-      
-      setWalletInfo(wallet);
-      
-      // Update user document with wallet info
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        await firestoreService.updateUserWallet(currentUser.uid, {
-          address: wallet.address,
-          publicKey: wallet.publicKey
-        });
-      }
-      
-      // Request airdrop for development
-      if (process.env.NODE_ENV !== 'production') {
-        try {
-          await solanaAppKitService.requestAirdrop(1);
-          Alert.alert('Success', '1 SOL airdropped to your wallet for testing!');
-        } catch (airdropError) {
-          console.log('Airdrop failed (this is normal in some cases):', airdropError);
-        }
-      }
-      
-      // Get updated user data
-      if (currentUser) {
-        await handleAuthenticatedUser(currentUser);
-      }
-      
-    } catch (error) {
-      console.error('Error creating wallet:', error);
-      Alert.alert('Wallet Creation Error', 'Failed to create wallet. Please try again.');
-    } finally {
-      setLoading(false);
-      setWalletCreationModal(false);
     }
   };
 
@@ -266,36 +404,6 @@ const AuthMethodsScreen: React.FC = () => {
           <Text style={styles.helpText}>Need help?</Text>
         </TouchableOpacity>
       </ScrollView>
-
-
-
-      {/* Wallet Creation Modal */}
-      <Modal
-        visible={walletCreationModal}
-        transparent={true}
-        animationType="fade"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Create Solana Wallet</Text>
-            <Text style={styles.modalText}>
-              We'll create a secure Solana wallet for you to send and receive USDC payments.
-            </Text>
-            
-            <TouchableOpacity 
-              style={[styles.modalButton, loading && { opacity: 0.6 }]}
-              onPress={handleWalletCreation}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color={colors.darkBackground} />
-              ) : (
-                <Text style={styles.modalButtonText}>Create Wallet</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </KeyboardAvoidingView>
   );
 };

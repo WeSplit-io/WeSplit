@@ -88,6 +88,15 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     color: colors.textLight,
   },
+  amountContainer: {
+    alignItems: 'flex-end',
+  },
+  settlementCardAmountUSD: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
   settlementActions: {
     flexDirection: 'row',
     gap: spacing.md,

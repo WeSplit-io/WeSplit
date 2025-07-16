@@ -35,16 +35,15 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     refresh: refreshGroups 
   } = useGroupList();
 
-  // Debug logging
+  // Debug logging - only log when data actually changes
   useEffect(() => {
     if (__DEV__) {
       console.log('📊 Dashboard: Current user:', currentUser);
       console.log('📊 Dashboard: Groups loaded:', groups.length);
-      console.log('📊 Dashboard: Groups data:', groups);
       console.log('📊 Dashboard: Loading state:', groupsLoading);
       console.log('📊 Dashboard: Is authenticated:', isAuthenticated);
     }
-  }, [groups, groupsLoading, currentUser, isAuthenticated]);
+  }, [currentUser?.id, groups.length, groupsLoading, isAuthenticated]);
 
   const [priceLoading, setPriceLoading] = useState(false);
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
@@ -112,11 +111,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     }
   }, [notifications]);
 
-  // Load notifications when dashboard loads
-  useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
-
   // Convert group amounts to USD for display with proper currency handling
   const convertGroupAmountsToUSD = useCallback(async (groups: GroupWithDetails[]) => {
     try {
@@ -181,17 +175,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     }
   }, []);
 
-  // Load data using centralized service
-  const loadData = useCallback(async () => {
-    if (!currentUser?.id) return;
-    
-    try {
-      await refreshGroups();
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    }
-  }, [currentUser?.id]); // Remove refreshGroups from dependencies to prevent infinite loop
-
   // Load payment requests and notifications from context
   const loadPaymentRequests = useCallback(async () => {
     if (!notifications) return;
@@ -249,32 +232,36 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     }
   }, []);
 
-
   // Convert amounts when groups change (similar to GroupsList)
   useEffect(() => {
     if (groups.length > 0) {
       convertGroupAmountsToUSD(groups);
     }
-  }, [groups]);
+  }, [groups]); // Remove convertGroupAmountsToUSD dependency to prevent infinite loops
 
-  // Load data when component mounts or comes into focus
+  // Load data when component mounts or comes into focus - FIXED: Remove problematic dependencies
   useFocusEffect(
     React.useCallback(() => {
       if (isAuthenticated && currentUser?.id) {
-        // Load groups first, then payment requests
-        loadData().then(() => {
+        // Only load groups if we don't have any or if they're stale
+        if (groups.length === 0) {
+          refreshGroups().then(() => {
+            loadPaymentRequests();
+          });
+        } else {
+          // Just load payment requests if groups are already cached
           loadPaymentRequests();
-        });
+        }
       }
-    }, [isAuthenticated, currentUser?.id, loadData])
+    }, [isAuthenticated, currentUser?.id, groups.length]) // Add groups.length to check if we need to load
   );
 
+  // Load notifications when dashboard loads
   useEffect(() => {
-    if (isAuthenticated && currentUser?.id && groups.length > 0) {
-      // Load payment requests when groups are loaded/updated
-      loadPaymentRequests();
+    if (isAuthenticated && currentUser?.id) {
+      loadNotifications();
     }
-  }, [isAuthenticated, currentUser?.id, groups.length, loadPaymentRequests]);
+  }, [isAuthenticated, currentUser?.id]); // Remove loadNotifications dependency
 
   const handleSendRequestFromDashboard = async (request: any) => {
     if (!currentUser?.id) {

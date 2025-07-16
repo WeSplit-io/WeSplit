@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, SafeAreaView, ActivityIndicator } from 'react-native';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
-import { joinGroupViaInvite } from '../../services/groupService';
 import { styles } from './styles';
 import { colors } from '../../theme';
 
@@ -27,7 +26,9 @@ const JoinGroupScreen: React.FC<any> = ({ navigation }) => {
     try {
       setIsJoining(true);
       
-      const result = await joinGroupViaInvite(inviteCode.trim(), String(currentUser.id));
+      // Use hybrid service instead of direct service call
+      const { hybridDataService } = await import('../../services/hybridDataService');
+      const result = await hybridDataService.group.joinGroupViaInvite(inviteCode.trim(), String(currentUser.id));
       
       Alert.alert(
         'Success!',

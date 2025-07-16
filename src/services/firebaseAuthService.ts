@@ -97,6 +97,9 @@ export async function verifyCode(email: string, code: string): Promise<AuthRespo
       const data = result.data as any;
       
       if (data.success && data.user) {
+        // Update last verification timestamp
+        await firestoreService.updateLastVerifiedAt(email);
+        
         // Generate tokens (use custom token if available, otherwise generate local ones)
         const accessToken = data.customToken || `firebase_${data.user.id}_${Date.now()}`;
         const refreshToken = `refresh_${data.user.id}_${Date.now()}`;
@@ -198,6 +201,9 @@ export async function verifyCode(email: string, code: string): Promise<AuthRespo
       
       // Create or update user document in Firestore
       const userData = await firestoreService.createUserDocument(firebaseUser);
+      
+      // Update last verification timestamp
+      await firestoreService.updateLastVerifiedAt(email);
       
       // Generate custom tokens (in production, you'd use Firebase Functions)
       const accessToken = `firebase_${firebaseUser.uid}_${Date.now()}`;

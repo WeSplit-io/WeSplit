@@ -274,7 +274,17 @@ export const groupService = {
     }, false);
     
     invalidateCache('groups');
-    invalidateCache('users');
+    return result;
+  },
+
+  leaveGroup: async (groupId: string, userId: string): Promise<{ message: string }> => {
+    const result = await makeApiRequest<{ message: string }>(`/api/groups/${groupId}/leave`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }, false);
+    
+    invalidateCache('groups');
+    invalidateCache(`group_${groupId}`);
     return result;
   }
 };
@@ -381,6 +391,27 @@ export const settlementService = {
     return makeApiRequest<{ success: boolean; message: string; recipientName: string; amount: number }>(`/api/groups/${groupId}/send-reminder`, {
       method: 'POST',
       body: JSON.stringify({ senderId, recipientId, amount }),
+    }, false);
+  },
+
+  sendBulkPaymentReminders: async (
+    groupId: string,
+    senderId: string,
+    debtors: { recipientId: string; amount: number; name: string }[]
+  ): Promise<{ 
+    success: boolean; 
+    message: string; 
+    results: { recipientId: string; recipientName: string; amount: number; success: boolean }[];
+    totalAmount: number;
+  }> => {
+    return makeApiRequest<{ 
+      success: boolean; 
+      message: string; 
+      results: { recipientId: string; recipientName: string; amount: number; success: boolean }[];
+      totalAmount: number;
+    }>(`/api/groups/${groupId}/send-reminder-all`, {
+      method: 'POST',
+      body: JSON.stringify({ senderId, debtors }),
     }, false);
   }
 };

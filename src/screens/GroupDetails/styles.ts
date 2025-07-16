@@ -34,6 +34,12 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     color: colors.textLight,
   },
+  headerIcon: {
+    padding: spacing.sm,
+  },
+  placeholder: {
+    width: 40,
+  },
   settingsButton: {
     padding: spacing.sm,
   },
@@ -339,8 +345,34 @@ export const styles = StyleSheet.create({
   },
   memberBalanceAmount: {
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.textLight,
+  },
+  
+  // Progress Bar Styles
+  progressBarContainer: {
+    paddingHorizontal: spacing.screenPadding,
+    marginBottom: spacing.lg,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#333',
+    borderRadius: 4,
+    position: 'relative',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#A5EA15',
+    borderRadius: 4,
+  },
+  progressBarThumb: {
+    position: 'absolute',
+    top: -2,
+    width: 12,
+    height: 12,
+    backgroundColor: '#FFF',
+    borderRadius: 6,
+    transform: [{ translateX: -6 }],
   },
   recentExpenseItem: {
     flexDirection: 'row',
@@ -901,5 +933,214 @@ export const styles = StyleSheet.create({
     color: '#212121',
     fontSize: 16,
     fontWeight: '600',
+  },
+  
+  // Additional styles for the new GroupDetailsScreen
+  content: {
+    flex: 1,
+  },
+  summaryContainer: {
+    paddingHorizontal: spacing.screenPadding,
+    marginBottom: spacing.lg,
+  },
+  summaryCard: {
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.radiusMd,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  summaryCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  summaryCardTitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginLeft: spacing.xs,
+  },
+  summaryCardAmount: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textLight,
+    marginBottom: spacing.xs,
+  },
+  summaryCardSubtext: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
+  },
+  oweCard: {
+    borderLeftColor: '#FF6B6B',
+    borderLeftWidth: 4,
+  },
+  paidCard: {
+    borderLeftColor: '#4ECDC4',
+    borderLeftWidth: 4,
+  },
+  oweAmount: {
+    color: '#FF6B6B',
+  },
+  paidAmount: {
+    color: '#4ECDC4',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.screenPadding,
+    marginBottom: spacing.md,
+  },
+  expensesContainer: {
+    paddingHorizontal: spacing.screenPadding,
+    paddingBottom: spacing.xl,
+  },
+  settleUpContainer: {
+    paddingHorizontal: spacing.screenPadding,
+    paddingBottom: spacing.xl,
+  },
+  expenseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  expenseAmount: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textLight,
+  },
+  expensePaidBy: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+  },
+  expenseDate: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
+  },
+  balanceItem: {
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.radiusMd,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  balanceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  balanceUserName: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textLight,
+  },
+  balanceAmount: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  balanceStatus: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+  },
+  settleUpButton: {
+    backgroundColor: '#A5EA15',
+    borderRadius: spacing.radiusMd,
+    paddingVertical: spacing.md,
+    marginTop: spacing.lg,
+    alignItems: 'center',
+  },
+  settleUpButtonText: {
+    color: '#212121',
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.screenPadding,
+  },
+  errorText: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textLight,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  errorSubtext: {
+    fontSize: typography.fontSize.md,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  errorButton: {
+    backgroundColor: '#A5EA15',
+    borderRadius: spacing.radiusMd,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  errorButtonText: {
+    color: '#212121',
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.screenPadding,
+    paddingVertical: spacing.xl,
+  },
+  emptyStateText: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textLight,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  emptyStateSubtext: {
+    fontSize: typography.fontSize.md,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  emptyStateButton: {
+    backgroundColor: '#A5EA15',
+    borderRadius: spacing.radiusMd,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  emptyStateButtonText: {
+    color: '#212121',
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  
+  // Progress Bar Styles
+  progressBarContainer: {
+    paddingHorizontal: spacing.screenPadding,
+    marginBottom: spacing.lg,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#333',
+    borderRadius: 4,
+    position: 'relative',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#A5EA15',
+    borderRadius: 4,
+  },
+  progressBarThumb: {
+    position: 'absolute',
+    top: -2,
+    width: 12,
+    height: 12,
+    backgroundColor: '#FFF',
+    borderRadius: 6,
+    transform: [{ translateX: -6 }],
   },
 }); 

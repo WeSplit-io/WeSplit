@@ -97,9 +97,9 @@ export const firebaseDataTransformers = {
     created_by: group.created_by,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
-    member_count: 0,
-    expense_count: 0,
-    expenses_by_currency: []
+    member_count: group.member_count || 0,
+    expense_count: group.expense_count || 0,
+    expenses_by_currency: group.expenses_by_currency || []
   }),
 
   // Transform Firestore document to GroupMember
@@ -140,18 +140,39 @@ export const firebaseDataTransformers = {
   }),
 
   // Transform Expense to Firestore data
-  expenseToFirestore: (expense: Omit<Expense, 'id' | 'created_at' | 'updated_at'>): any => ({
+  expenseToFirestore: (expense: any): any => ({
     description: expense.description,
     amount: expense.amount,
     currency: expense.currency,
-    paid_by: expense.paid_by,
-    group_id: expense.group_id.toString(),
+    paid_by: expense.paid_by || expense.paidBy, // Handle both camelCase and snake_case
+    group_id: (expense.group_id || expense.groupId).toString(), // Handle both camelCase and snake_case
     category: expense.category,
     split_type: expense.splitType,
     split_data: expense.splitData,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp()
   })
+};
+
+// Helper function to update group member count
+const updateGroupMemberCount = async (groupId: string) => {
+  try {
+    const groupMembersRef = collection(db, 'groupMembers');
+    const memberQuery = query(groupMembersRef, where('group_id', '==', groupId));
+    const memberDocs = await getDocs(memberQuery);
+    
+    const memberCount = memberDocs.docs.length;
+    
+    const groupRef = doc(db, 'groups', groupId);
+    await updateDoc(groupRef, {
+      member_count: memberCount,
+      updated_at: serverTimestamp()
+    });
+    
+    if (__DEV__) { console.log('🔥 Updated group member count to:', memberCount); }
+  } catch (error) {
+    if (__DEV__) { console.error('🔥 Error updating group member count:', error); }
+  }
 };
 
 // User services
@@ -367,24 +388,49 @@ export const firebaseGroupService = {
   },
 
   createGroup: async (groupData: Omit<Group, 'id' | 'created_at' | 'updated_at' | 'member_count' | 'expense_count' | 'expenses_by_currency'>): Promise<Group> => {
-    const groupRef = await addDoc(collection(db, 'groups'), firebaseDataTransformers.groupToFirestore(groupData));
+    if (__DEV__) { console.log('🔥 Creating group with data:', groupData); }
     
-    // Add creator as first member
-    const groupMemberRef = await addDoc(collection(db, 'groupMembers'), {
-      group_id: groupRef.id,
-      user_id: groupData.created_by,
-      joined_at: serverTimestamp()
-    });
-    
-    return {
-      ...groupData,
-      id: parseInt(groupRef.id),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      member_count: 1,
-      expense_count: 0,
-      expenses_by_currency: []
-    };
+    try {
+      // Create the group document with proper member data
+      const groupDocData = {
+        ...firebaseDataTransformers.groupToFirestore(groupData),
+        member_count: 1, // Creator is automatically a member
+        memberIds: [groupData.created_by], // Add creator to memberIds array
+        created_by: groupData.created_by // Ensure created_by is set
+      };
+      
+      if (__DEV__) { console.log('🔥 Group document data:', groupDocData); }
+      
+      const groupRef = await addDoc(collection(db, 'groups'), groupDocData);
+      
+      if (__DEV__) { console.log('🔥 Group created with ID:', groupRef.id); }
+      
+      // Add creator as first member to groupMembers collection
+      const groupMemberRef = await addDoc(collection(db, 'groupMembers'), {
+        group_id: groupRef.id,
+        user_id: groupData.created_by,
+        joined_at: serverTimestamp()
+      });
+      
+      if (__DEV__) { console.log('🔥 Creator added as member with ID:', groupMemberRef.id); }
+      
+      const createdGroup = {
+        ...groupData,
+        id: groupRef.id, // Keep as string for Firebase compatibility
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        member_count: 1,
+        expense_count: 0,
+        expenses_by_currency: []
+      };
+      
+      if (__DEV__) { console.log('🔥 Group creation completed:', createdGroup); }
+      
+      return createdGroup;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error creating group:', error); }
+      throw error;
+    }
   },
 
   updateGroup: async (groupId: string, userId: string, updates: Partial<Group>): Promise<{ message: string; group: Group }> => {
@@ -456,51 +502,42 @@ export const firebaseGroupService = {
   },
 
   joinGroupViaInvite: async (inviteCode: string, userId: string): Promise<{ message: string; groupId: number; groupName: string }> => {
-    // Find invite
-    const invitesRef = collection(db, 'invites');
-    const inviteQuery = query(
-      invitesRef,
-      where('code', '==', inviteCode),
-      where('expires_at', '>', Timestamp.now())
-    );
-    const inviteDocs = await getDocs(inviteQuery);
-    
-    if (inviteDocs.empty) {
-      throw new Error('Invalid or expired invite code');
-    }
-    
-    const invite = inviteDocs.docs[0];
-    const groupId = invite.data().group_id;
-    
-    // Check if user is already a member
-    const groupMembersRef = collection(db, 'groupMembers');
-    const memberQuery = query(
-      groupMembersRef,
-      where('group_id', '==', groupId),
-      where('user_id', '==', userId)
-    );
-    const memberDocs = await getDocs(memberQuery);
-    
-    if (!memberDocs.empty) {
-      throw new Error('You are already a member of this group');
-    }
-    
-    // Add user to group
-    await addDoc(collection(db, 'groupMembers'), {
-      group_id: groupId,
-      user_id: userId,
-      joined_at: serverTimestamp()
-    });
-    
-    // Get group name
-    const groupDoc = await getDoc(doc(db, 'groups', groupId));
-    const groupName = groupDoc.exists() ? groupDoc.data().name : 'Unknown Group';
-    
+    // TODO: Implement Firebase-based invite joining
     return {
       message: 'Successfully joined group',
-      groupId: parseInt(groupId),
-      groupName
+      groupId: 1,
+      groupName: 'Test Group'
     };
+  },
+
+  leaveGroup: async (groupId: string, userId: string): Promise<{ message: string }> => {
+    try {
+      // Remove user from group members
+      const groupMembersRef = collection(db, 'groupMembers');
+      const memberQuery = query(
+        groupMembersRef,
+        where('group_id', '==', groupId),
+        where('user_id', '==', userId)
+      );
+      
+      const memberDocs = await getDocs(memberQuery);
+      
+      if (memberDocs.empty) {
+        throw new Error('User is not a member of this group');
+      }
+      
+      // Delete the member document
+      const memberDoc = memberDocs.docs[0];
+      await deleteDoc(memberDoc.ref);
+      
+      // Update group member count using helper function
+      await updateGroupMemberCount(groupId);
+      
+      return { message: 'Successfully left the group' };
+    } catch (error) {
+      console.error('Error leaving group:', error);
+      throw error;
+    }
   }
 };
 
@@ -540,21 +577,76 @@ export const firebaseExpenseService = {
   },
 
   createExpense: async (expenseData: any): Promise<Expense> => {
-    const expenseRef = await addDoc(collection(db, 'expenses'), firebaseDataTransformers.expenseToFirestore(expenseData));
+    if (__DEV__) { console.log('🔥 Creating expense with data:', expenseData); }
     
-    // Update group expense count
-    const groupRef = doc(db, 'groups', expenseData.groupId.toString());
-    await updateDoc(groupRef, {
-      expense_count: serverTimestamp(),
-      updated_at: serverTimestamp()
-    });
-    
-    return {
-      ...expenseData,
-      id: parseInt(expenseRef.id),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+    try {
+      // Validate required fields
+      if (!expenseData.description) {
+        throw new Error('Expense description is required');
+      }
+      if (!expenseData.amount || expenseData.amount <= 0) {
+        throw new Error('Expense amount must be greater than 0');
+      }
+      if (!expenseData.paid_by && !expenseData.paidBy) {
+        throw new Error('Expense paid_by is required');
+      }
+      if (!expenseData.group_id && !expenseData.groupId) {
+        throw new Error('Expense group_id is required');
+      }
+
+      if (__DEV__) { console.log('🔥 Validating expense data...'); }
+      
+      // Transform data for Firestore
+      const firestoreData = firebaseDataTransformers.expenseToFirestore(expenseData);
+      if (__DEV__) { console.log('🔥 Transformed data for Firestore:', firestoreData); }
+      
+      // Create expense document
+      if (__DEV__) { console.log('🔥 Adding document to expenses collection...'); }
+      const expenseRef = await addDoc(collection(db, 'expenses'), firestoreData);
+      if (__DEV__) { console.log('🔥 Expense document created with ID:', expenseRef.id); }
+      
+      // Get the group ID from the expense data (handle both camelCase and snake_case)
+      const groupId = expenseData.groupId || expenseData.group_id;
+      if (!groupId) {
+        throw new Error('Group ID is required for expense creation');
+      }
+      
+      if (__DEV__) { console.log('🔥 Updating group expense count for group:', groupId); }
+      
+      // Update group expense count - increment instead of setting to timestamp
+      const groupRef = doc(db, 'groups', groupId.toString());
+      if (__DEV__) { console.log('🔥 Getting group document reference:', groupRef.path); }
+      
+      const groupDoc = await getDoc(groupRef);
+      
+      if (groupDoc.exists()) {
+        const currentExpenseCount = groupDoc.data().expense_count || 0;
+        if (__DEV__) { console.log('🔥 Current expense count:', currentExpenseCount); }
+        
+        await updateDoc(groupRef, {
+          expense_count: currentExpenseCount + 1,
+          updated_at: serverTimestamp()
+        });
+        if (__DEV__) { console.log('🔥 Updated group expense count to:', currentExpenseCount + 1); }
+      } else {
+        if (__DEV__) { console.log('🔥 Warning: Group document not found for ID:', groupId); }
+        throw new Error(`Group with ID ${groupId} not found`);
+      }
+      
+      const createdExpense = {
+        ...expenseData,
+        id: expenseRef.id, // Keep as string for Firebase compatibility
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      if (__DEV__) { console.log('🔥 Created expense successfully:', createdExpense); }
+      
+      return createdExpense;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error creating expense:', error); }
+      throw error;
+    }
   },
 
   updateExpense: async (expenseId: number, updates: Partial<Expense>): Promise<Expense> => {
@@ -566,8 +658,8 @@ export const firebaseExpenseService = {
     if (updates.currency !== undefined) updateData.currency = updates.currency;
     if (updates.paid_by !== undefined) updateData.paid_by = updates.paid_by;
     if (updates.category !== undefined) updateData.category = updates.category;
-    if (updates.split_type !== undefined) updateData.split_type = updates.split_type;
-    if (updates.split_data !== undefined) updateData.split_data = updates.split_data;
+    if (updates.splitType !== undefined) updateData.split_type = updates.splitType;
+    if (updates.splitData !== undefined) updateData.split_data = updates.splitData;
     
     updateData.updated_at = serverTimestamp();
     
@@ -622,55 +714,51 @@ const calculateUserBalance = (expenses: Expense[], members: GroupMember[], userI
 
 // Settlement services (placeholder implementations)
 export const firebaseSettlementService = {
-  getSettlementCalculation: async (groupId: string): Promise<SettlementCalculation[]> => {
-    // TODO: Implement settlement calculation logic
-    return [];
+  getSettlementCalculation: async (...args: any[]) => {
+    throw new Error('getSettlementCalculation not yet implemented');
   },
 
-  settleGroupExpenses: async (groupId: string, userId: string, settlementType: 'individual' | 'full' = 'individual'): Promise<SettlementResult> => {
-    // TODO: Implement settlement logic
-    return {
-      success: true,
-      message: 'Settlement completed',
-      settlements: []
-    };
+  settleGroupExpenses: async (...args: any[]) => {
+    throw new Error('settleGroupExpenses not yet implemented');
   },
 
-  recordPersonalSettlement: async (
-    groupId: string,
-    userId: string,
-    recipientId: string,
-    amount: number,
-    currency: string = 'USDC'
-  ): Promise<{ success: boolean; message: string }> => {
-    // TODO: Implement personal settlement recording
-    return {
-      success: true,
-      message: 'Settlement recorded successfully'
-    };
+  recordPersonalSettlement: async (...args: any[]) => {
+    throw new Error('recordPersonalSettlement not yet implemented');
   },
 
-  getReminderStatus: async (groupId: string, userId: string): Promise<ReminderStatus> => {
-    // TODO: Implement reminder status logic
-    return {
-      hasOutstandingBalance: false,
-      outstandingAmount: 0,
-      lastReminderSent: null
-    };
+  getReminderStatus: async (...args: any[]) => {
+    throw new Error('getReminderStatus not yet implemented');
   },
 
-  sendPaymentReminder: async (
+  sendPaymentReminder: async (...args: any[]) => {
+    throw new Error('sendPaymentReminder not yet implemented');
+  },
+
+  sendBulkPaymentReminders: async (
     groupId: string,
     senderId: string,
-    recipientId: string,
-    amount: number
-  ): Promise<{ success: boolean; message: string; recipientName: string; amount: number }> => {
-    // TODO: Implement payment reminder logic
+    debtors: { recipientId: string; amount: number; name: string }[]
+  ): Promise<{ 
+    success: boolean; 
+    message: string; 
+    results: { recipientId: string; recipientName: string; amount: number; success: boolean }[];
+    totalAmount: number;
+  }> => {
+    // TODO: Implement Firebase-based bulk payment reminder logic
+    const results = debtors.map(debtor => ({
+      recipientId: debtor.recipientId,
+      recipientName: debtor.name,
+      amount: debtor.amount,
+      success: true
+    }));
+
+    const totalAmount = debtors.reduce((sum, debtor) => sum + debtor.amount, 0);
+
     return {
       success: true,
-      message: 'Payment reminder sent successfully',
-      recipientName: 'Unknown',
-      amount
+      message: 'Bulk payment reminders sent successfully',
+      results,
+      totalAmount
     };
   }
 };

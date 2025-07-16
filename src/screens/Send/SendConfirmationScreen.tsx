@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
 import Icon from '../../components/Icon';
 import SlideButton from '../../components/SlideButton';
-import { GroupMember, recordPersonalSettlement } from '../../services/groupService';
+import { GroupMember } from '../../services/groupService';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { colors } from '../../theme';
@@ -54,7 +54,9 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       // If this is a settlement payment, record the settlement
       if (isSettlement && currentUser?.id && groupId && contact?.id) {
         try {
-          await recordPersonalSettlement(
+          // Use hybrid service instead of direct service call
+          const { hybridDataService } = await import('../../services/hybridDataService');
+          await hybridDataService.settlement.recordPersonalSettlement(
             groupId.toString(),
             currentUser.id.toString(),
             contact.id.toString(),
