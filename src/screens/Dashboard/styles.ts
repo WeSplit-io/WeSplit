@@ -127,9 +127,9 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     top: -2,
     right: -2,
-    backgroundColor: '#FF6B6B',
+    backgroundColor: colors.green,
     borderRadius: 10,
-    minWidth: 20,
+    Width: 20,
     height: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -140,7 +140,7 @@ export const styles = StyleSheet.create({
 
   // Text inside notification badge
   bellBadgeText: {
-    color: '#FFF',
+    color: colors.black,
     fontSize: 11,
     fontWeight: 'bold',
   },
@@ -299,7 +299,7 @@ export const styles = StyleSheet.create({
     width: spacing.actionButtonSize,
     height: spacing.actionButtonSize,
     borderRadius: spacing.actionButtonRadius,
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.sm,

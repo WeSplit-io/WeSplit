@@ -531,11 +531,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                   💰 External Wallet
                 </Text>
               )}
-              {!walletConnected && userCreatedWalletBalance && (
+             {/* {!walletConnected && userCreatedWalletBalance && (
                 <Text style={[styles.welcomeText, { fontSize: 12, color: colors.textLightSecondary }]}>
                   📱 App Wallet
                 </Text>
-              )}
+              )}*/}
 
             </View>
           </View>
