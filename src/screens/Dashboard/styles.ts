@@ -338,10 +338,10 @@ export const styles = StyleSheet.create({
   
   // Title for the requests section
   sectionTitle: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    marginBottom: spacing.md,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: 10,
   },
   
   // Individual request card
@@ -410,6 +410,11 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     marginBottom: spacing.sm,
+    backgroundColor: colors.white10,
+    borderRadius: spacing.md,
+    padding: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.white50,
   },
   
   // Request avatar
@@ -453,6 +458,109 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.normal,
   },
+  
+  // New request item style matching the mockup
+  requestItemNew: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.white50,
+  },
+  
+  // Request avatar for new design
+  requestAvatarNew: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primaryGreen,
+    marginRight: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Transaction avatar with green10 background
+  transactionAvatarNew: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primaryGreen + '10',
+    marginRight: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Request avatar image
+  requestAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  
+  // Transaction icon
+  transactionIcon: {
+    width: 24,
+    height: 24,
+    tintColor: colors.white,
+  },
+  
+  // Request content container
+  requestContent: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  
+  // Request sender name
+  requestSenderName: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xs / 2,
+  },
+  
+  // Request message with amount
+  requestMessageWithAmount: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.normal,
+    marginBottom: spacing.xs / 2,
+  },
+  
+  // Request amount in green
+  requestAmountGreen: {
+    color: GREEN,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+  },
+  
+  // Request source info
+  requestSource: {
+    color: colors.white70,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.normal,
+  },
+  
+  // Send button for new design
+  requestSendButtonNew: {
+    backgroundColor: GREEN,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.radiusRound,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  // Send button text
+  requestSendButtonTextNew: {
+    color: colors.black,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
 
   // === GROUPS SECTION ===
   // Container for groups list
@@ -478,7 +586,7 @@ export const styles = StyleSheet.create({
   
   // "See all" text
   seeAllText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.normal,
   },
@@ -486,17 +594,49 @@ export const styles = StyleSheet.create({
   // Grid layout for groups
   groupsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: spacing.md,
   },
   
   // Individual group card in grid
   groupGridCard: {
-    flex: 1,
-    backgroundColor: GREEN,
+    width: 280,
     borderRadius: spacing.lg,
-    padding: spacing.md,
+    padding: 18,
     minHeight: 140,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  
+  // Group card background gradient
+  groupGridCardGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: spacing.lg,
+    backgroundColor: '#A5EA15', // Start color of the gradient
+  },
+  
+  // Group card gradient overlay for darker effect
+  groupGridCardGradientOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: spacing.lg,
+  },
+  
+  // Group card background image
+  groupGridCardImage: {
+    position: 'absolute',
+    top: spacing.xs,
+    right: spacing.xs,
+    width: 60,
+    height: 60,
+    opacity: 1,
+    zIndex: -1,
   },
   
   // Left grid card (with special positioning)
@@ -513,16 +653,16 @@ export const styles = StyleSheet.create({
   groupGridHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: spacing.sm,
   },
   
   // Icon container in group grid
   groupGridIcon: {
-    width: 32,
-    height: 32,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    borderRadius: spacing.sm,
+    width: 40,
+    height: 40 ,
+    backgroundColor: colors.white,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -531,30 +671,55 @@ export const styles = StyleSheet.create({
   groupGridIconSvg: {
     width: 20,
     height: 20,
-    tintColor: BG_COLOR,
+    tintColor: colors.black,
+  },
+  
+  // Amount container in group grid
+  groupGridAmountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  
+  // USDC logo
+  usdcLogo: {
+    width: 20,
+    height: 20,
   },
   
   // Amount text in group grid
   groupGridAmount: {
-    color: BG_COLOR,
-    fontSize: typography.fontSize.lg,
+    color: colors.black,
+    fontSize: 22,
     fontWeight: typography.fontWeight.bold,
   },
   
   // Group name in grid
   groupGridName: {
-    color: BG_COLOR,
-    fontSize: typography.fontSize.md,
+    color: colors.black,
+    fontSize: 22,
     fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  
+  // Role container in group grid
+  groupGridRoleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    gap: spacing.xs,
+  },
+  
+  // Role icon in group grid
+  groupGridRoleIcon: {
+    marginRight: spacing.xs,
   },
   
   // Role text in group grid
   groupGridRole: {
-    color: BG_COLOR,
-    fontSize: typography.fontSize.sm,
+    color: colors.black,
+    fontSize: 16,
     fontWeight: typography.fontWeight.normal,
-    marginBottom: spacing.sm,
   },
   
   // Member avatars container
@@ -565,13 +730,29 @@ export const styles = StyleSheet.create({
   
   // Individual member avatar
   memberAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.black,
     marginRight: -spacing.xs,
     borderWidth: 2,
-    borderColor: GREEN,
+    borderColor: colors.green,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Member avatar image
+  memberAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  
+  // Member avatar text (fallback)
+  memberAvatarText: {
+    color: colors.white,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
   },
   
   // More members indicator (+4)
@@ -579,7 +760,7 @@ export const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: colors.black,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: spacing.xs,
@@ -587,9 +768,16 @@ export const styles = StyleSheet.create({
   
   // Text inside more members indicator
   memberAvatarMoreText: {
-    color: BG_COLOR,
-    fontSize: typography.fontSize.tiny,
+    color: colors.white,
+    fontSize: 12,
     fontWeight: typography.fontWeight.bold,
+  },
+  
+  // Group grid navigation arrow
+  groupGridArrow: {
+    position: 'absolute',
+    bottom: 18,
+    right: 18,
   },
   
   // Empty state for groups when no groups exist

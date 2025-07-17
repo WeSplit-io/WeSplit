@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+// import LinearGradient from 'react-native-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { colors } from '../../theme';
@@ -53,7 +54,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   const [priceLoading, setPriceLoading] = useState(false);
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
-  const [groupAmountsInUSD, setGroupAmountsInUSD] = useState<Record<number, number>>({});
+  const [groupAmountsInUSD, setGroupAmountsInUSD] = useState<Record<string | number, number>>({});
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [userCreatedWalletBalance, setUserCreatedWalletBalance] = useState<UserWalletBalance | null>(null);
   const [loadingUserWallet, setLoadingUserWallet] = useState(false);
@@ -878,7 +879,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.groupsGrid}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.groupsGrid}
+            >
               {groups
                 .sort((a, b) => {
                   // Sort by highest USD value first (same as GroupsList)
@@ -901,27 +906,55 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                         ]}
                         onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
                       >
+                        {/* Background */}
+                        <View style={styles.groupGridCardGradient} />
+                        <View style={styles.groupGridCardGradientOverlay} />
                         <View style={styles.groupGridHeader}>
                           <View style={styles.groupGridIcon}>
                             <Icon
-                              name="users"
+                              name={group.icon || "briefcase"}
                               style={styles.groupGridIconSvg}
                             />
                           </View>
                           {/* Show USD-converted total */}
-                          <Text style={styles.groupGridAmount}>
-                            ${(groupAmountsInUSD[group.id] || 0).toFixed(2)}
-                          </Text>
+                          <View style={styles.groupGridAmountContainer}>
+                            <Image
+                              source={require('../../../assets/usdc-logo-black.png')}
+                              style={styles.usdcLogo}
+                            />
+                            <Text style={styles.groupGridAmount}>
+                              {(groupAmountsInUSD[group.id] || 0).toFixed(2)}
+                            </Text>
+                          </View>
                         </View>
                         <Text style={styles.groupGridName}>{group.name}</Text>
-                        <Text style={styles.groupGridRole}>
-                          {isOwner ? '👤 Owner' : '👥 Member'} • {summary.memberCount} members
-                        </Text>
+                        <View style={styles.groupGridRoleContainer}>
+                          <Icon
+                            name={isOwner ? "award" : "users"}
+                            size={16}
+                            color={colors.black}
+                            style={styles.groupGridRoleIcon}
+                          />
+                          <Text style={styles.groupGridRole}>
+                            {isOwner ? 'Owner' : 'Member'}
+                          </Text>
+                        </View>
                         {summary.hasData ? (
                           <View style={styles.memberAvatars}>
-                            {/* Show member count visually */}
-                            {Array.from({ length: Math.min(summary.memberCount, 3) }).map((_, i) => (
-                              <View key={i} style={styles.memberAvatar} />
+                            {/* Show member avatars */}
+                            {group.members && group.members.slice(0, 3).map((member, i) => (
+                              <View key={member.id} style={styles.memberAvatar}>
+                                {member.avatar ? (
+                                  <Image
+                                    source={{ uri: member.avatar }}
+                                    style={styles.memberAvatarImage}
+                                  />
+                                ) : (
+                                  <Text style={styles.memberAvatarText}>
+                                    {member.name.charAt(0).toUpperCase()}
+                                  </Text>
+                                )}
+                              </View>
                             ))}
                             {summary.memberCount > 3 && (
                               <View style={styles.memberAvatarMore}>
@@ -930,15 +963,17 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                                 </Text>
                               </View>
                             )}
-                            <Text style={styles.activityIndicator}>
-                              {summary.expenseCount} expense{summary.expenseCount !== 1 ? 's' : ''}
-                            </Text>
+
                           </View>
                         ) : (
                           <View style={styles.memberAvatars}>
                             <Text style={styles.inactiveText}>No activity yet</Text>
                           </View>
                         )}
+                        {/* Navigation arrow */}
+                        <View style={styles.groupGridArrow}>
+                          <Icon name="chevron-right" size={20} color={colors.black} />
+                        </View>
                       </TouchableOpacity>
                     );
                   } catch (error) {
@@ -954,7 +989,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                     );
                   }
                 })}
-            </View>
+            </ScrollView>
           )}
         </View>
 
@@ -974,29 +1009,57 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           ) : (
             paymentRequests.slice(0, 2).map((request, index) => {
               try {
+                const senderName = request.data?.senderName || request.data?.fromUser || request.title || 'Unknown User';
+                const amount = request.data?.amount || 0;
+                const currency = request.data?.currency || 'USDC';
+                const source = request.data?.groupName || 'group activity';
+                const senderAvatar = request.data?.senderAvatar || null;
+
                 return (
-                  <View key={request.id || index} style={styles.requestItem}>
-                    <View style={styles.requestAvatar} />
-                    <View style={styles.requestDetails}>
-                      <Text style={styles.requestName}>
-                        {request.data?.fromUser || request.title || 'Unknown User'}
+                  <View key={request.id || index} style={styles.requestItemNew}>
+                    <View style={styles.requestAvatarNew}>
+                      {senderAvatar ? (
+                        <Image
+                          source={{ uri: senderAvatar }}
+                          style={styles.requestAvatarImage}
+                        />
+                      ) : (
+                        <Text style={styles.balanceAmountText}>
+                          {senderName.charAt(0).toUpperCase()}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.requestContent}>
+                      <Text style={styles.requestMessageWithAmount}>
+                        <Text style={styles.requestSenderName}>{senderName}</Text> requested a payment of{' '}
+                        <Text style={styles.requestAmountGreen}>
+                          {amount.toFixed(1)} USDC
+                        </Text>
                       </Text>
-                      <Text style={styles.requestDate}>
-                        {request.message || `Owes you from ${request.data?.groupName || 'group activity'}`}
+                      <Text style={styles.requestSource}>
+                        from {source}
                       </Text>
                     </View>
-                    <Text style={styles.requestAmount}>
-                      ${request.data?.amount?.toFixed(2) || '0.00'}
-                    </Text>
+                    <TouchableOpacity
+                      style={styles.requestSendButtonNew}
+                      onPress={() => {
+                        // Handle send payment logic here
+                        Alert.alert('Send Payment', `Send ${amount.toFixed(2)} ${currency} to ${senderName}?`);
+                      }}
+                    >
+                      <Text style={styles.requestSendButtonTextNew}>Send</Text>
+                    </TouchableOpacity>
                   </View>
                 );
               } catch (error) {
                 console.error(`Error rendering request ${index}:`, error);
                 return (
-                  <View key={index} style={styles.requestItem}>
-                    <View style={styles.requestAvatar} />
-                    <View style={styles.requestDetails}>
-                      <Text style={styles.requestName}>Error loading request</Text>
+                  <View key={index} style={styles.requestItemNew}>
+                    <View style={styles.requestAvatarNew}>
+                      <Text style={styles.balanceAmountText}>E</Text>
+                    </View>
+                    <View style={styles.requestContent}>
+                      <Text style={styles.requestSenderName}>Error loading request</Text>
                     </View>
                   </View>
                 );
@@ -1025,39 +1088,55 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                 // Use the new summary function that works with available data
                 const summary = getGroupSummary(group);
                 const recentDate = group.updated_at || group.created_at || new Date().toISOString();
+                
+                // Determine transaction type and icon based on group activity
+                const transactionType = summary.expenseCount > 0 ? 'send' : 'request';
+                const transactionTitle = summary.expenseCount > 0 ? `Send to ${group.name}` : `Request to ${group.name}`;
+                const transactionNote = summary.expenseCount > 0 ? `Group expenses` : `Group activity`;
+                const transactionTime = new Date(recentDate).toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true
+                });
 
                 return (
                   <TouchableOpacity
                     key={group.id}
-                    style={styles.requestItem}
+                    style={styles.requestItemNew}
                     onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
                   >
-                    <View style={styles.transactionAvatar}>
-                      <Text style={styles.balanceAmountText}>
-                        {(group.name || 'G').charAt(0).toUpperCase()}
+                    <View style={styles.transactionAvatarNew}>
+                      <Image
+                        source={
+                          transactionType === 'send' 
+                            ? require('../../../assets/icon-send.png')
+                            : require('../../../assets/icon-receive.png')
+                        }
+                        style={styles.transactionIcon}
+                      />
+                    </View>
+                    <View style={styles.requestContent}>
+                      <Text style={styles.requestMessageWithAmount}>
+                        <Text style={styles.requestSenderName}>{transactionTitle}</Text>
+                      </Text>
+                      <Text style={styles.requestSource}>
+                        {transactionNote} • {transactionTime}
                       </Text>
                     </View>
-                    <View style={styles.requestDetails}>
-                      <Text style={styles.requestName}>{group.name || 'Unnamed Group'}</Text>
-                      <Text style={styles.requestDate}>
-                        {summary.memberCount} members • {summary.expenseCount} expenses • Last activity {new Date(recentDate).toLocaleDateString('en-US', {
-                          day: 'numeric',
-                          month: 'short'
-                        })}
-                      </Text>
-                    </View>
-                    <Text style={styles.requestAmount}>
-                      ${summary.totalAmount.toFixed(2)}
+                    <Text style={styles.requestAmountGreen}>
+                      {summary.totalAmount.toFixed(2)} USDC
                     </Text>
                   </TouchableOpacity>
                 );
               } catch (error) {
                 console.error(`Error rendering transaction for group ${group.id}:`, error);
                 return (
-                  <View key={group.id} style={styles.requestItem}>
-                    <View style={styles.requestAvatar} />
-                    <View style={styles.requestDetails}>
-                      <Text style={styles.requestName}>Error loading transaction</Text>
+                  <View key={group.id} style={styles.requestItemNew}>
+                    <View style={styles.requestAvatarNew}>
+                      <Text style={styles.balanceAmountText}>E</Text>
+                    </View>
+                    <View style={styles.requestContent}>
+                      <Text style={styles.requestSenderName}>Error loading transaction</Text>
                     </View>
                   </View>
                 );
