@@ -439,18 +439,17 @@ export const styles = StyleSheet.create({
   },
   
   modalHeader: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xl,
+    gap: spacing.sm,
   },
   
   modalTitle: {
     color: colors.white,
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.semibold,
   },
   
@@ -460,12 +459,24 @@ export const styles = StyleSheet.create({
   
   modalContent: {
     flex: 1,
-    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    justifyContent: 'flex-start',
+    paddingTop: spacing.lg,
+  },
+
+  // Modal content header for initial state
+  modalContentHeader: {
+    flexDirection: 'column',
+    alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xl,
+    gap: spacing.lg,
+    flex: 1,
   },
   
   explanationText: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     lineHeight: 24,
     textAlign: 'center',
@@ -760,5 +771,164 @@ export const styles = StyleSheet.create({
     color: colors.white70,
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.normal,
+  },
+
+  // === MODAL STYLES ===
+  // Modal overlay with semi-transparent background
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+
+  // Bottom sheet container
+  bottomSheet: {
+    backgroundColor: colors.darkCard,
+    borderTopLeftRadius: spacing.lg,
+    borderTopRightRadius: spacing.lg,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    maxHeight: '80%',
+  },
+
+  // Handle for bottom sheet
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.white50,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+  },
+
+  // Apple-style slider
+  appleSliderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.green10, // green10 background
+    borderRadius: spacing.radiusRound,
+    borderWidth: 1,
+    borderColor: colors.primaryGreen,
+    position: 'relative',
+    overflow: 'hidden',
+    minHeight: 70, // Make it bigger
+    padding: 5,
+  },
+
+  appleSliderTrack: {
+    flex: 1,
+    height: 60, // Increased height
+    borderRadius: spacing.radiusRound,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  appleSliderTrackActive: {
+    backgroundColor: colors.primaryGreen,
+  },
+
+  appleSliderThumb: {
+    position: 'absolute',
+    left: 5,
+    width: 60, // Bigger thumb
+    height: 60, // Bigger thumb
+    borderRadius: 100,
+    backgroundColor: colors.primaryGreen,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+
+  appleSliderText: {
+    color: colors.white50,
+    fontSize: typography.fontSize.md, // Bigger text
+    fontWeight: typography.fontWeight.medium,
+    zIndex: 1,
+  },
+
+  appleSliderTextActive: {
+    color: colors.black,
+  },
+
+  appleSliderIcon: {
+    width: 20, // Bigger icon
+    height: 20, // Bigger icon
+    tintColor: colors.black,
+  },
+
+  // Loader styles
+  loaderContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+  },
+
+  loader: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: colors.primaryGreen,
+    borderTopColor: 'transparent',
+  },
+
+  loaderText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    marginTop: spacing.md,
+    textAlign: 'center',
+  },
+
+  // Success styles
+  successContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+  },
+
+  successIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.primaryGreen,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+
+  successTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+
+  successMessage: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
+
+  goBackButton: {
+    backgroundColor: colors.primaryGreen,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+    borderRadius: spacing.radiusMd,
+    alignItems: 'center',
+  },
+
+  goBackButtonText: {
+    color: colors.black,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
   },
 }); 

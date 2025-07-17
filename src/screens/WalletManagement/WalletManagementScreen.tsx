@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,11 @@ import {
   SafeAreaView,
   Switch,
   Alert,
+  Modal,
+  Animated,
+  PanResponder,
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
@@ -31,6 +36,13 @@ const WalletManagementScreen: React.FC = () => {
   } = useWallet();
 
   const [multiSignEnabled, setMultiSignEnabled] = useState(false);
+  const [showMultiSignModal, setShowMultiSignModal] = useState(false);
+  const [sliderActive, setSliderActive] = useState(false);
+  const [showLoader, setShowLoader] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const sliderAnim = useRef(new Animated.Value(0)).current;
   const [transactions, setTransactions] = useState([
     {
       id: '1',
@@ -64,11 +76,125 @@ const WalletManagementScreen: React.FC = () => {
   const handleMultiSignToggle = (value: boolean) => {
     if (value) {
       // Show multi-sign explanation modal
-      navigation.navigate('MultiSignExplanation');
+      openModal();
     } else {
       setMultiSignEnabled(false);
     }
   };
+
+  const handleCloseMultiSignModal = () => {
+    setShowMultiSignModal(false);
+  };
+
+  const handleActivateMultiSign = () => {
+    setMultiSignEnabled(true);
+    closeModal();
+    // In a real app, this would activate multi-sign
+    // navigation.navigate('MultiSignActivated');
+  };
+
+  const handleSliderPress = () => {
+    if (!sliderActive && !showLoader && !showSuccess) {
+      setSliderActive(true);
+      Animated.timing(sliderAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        // Show loader after slider animation
+        setShowLoader(true);
+
+        // Simulate activation process
+        setTimeout(() => {
+          setShowLoader(false);
+          setShowSuccess(true);
+          setMultiSignEnabled(true);
+        }, 2000); // 2 seconds loader
+      });
+    }
+  };
+
+  const handleGoBack = () => {
+    setShowSuccess(false);
+    setSliderActive(false);
+    setShowLoader(false);
+    // Reset slider animation
+    sliderAnim.setValue(0);
+    closeModal();
+  };
+
+  const handleSliderReset = () => {
+    setSliderActive(false);
+    Animated.timing(sliderAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const openModal = () => {
+    console.log('Opening modal, resetting states...');
+    setShowMultiSignModal(true);
+    setShowSuccess(false);
+    setShowLoader(false);
+    setSliderActive(false);
+    sliderAnim.setValue(0);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closeModal = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowMultiSignModal(false);
+    });
+  };
+
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, gestureState) => {
+      return gestureState.dy > 10;
+    },
+    onPanResponderGrant: () => {
+      slideAnim.setOffset(0);
+    },
+    onPanResponderMove: (_, gestureState) => {
+      if (gestureState.dy > 0) {
+        slideAnim.setValue(gestureState.dy);
+      }
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      slideAnim.flattenOffset();
+      if (gestureState.dy > 100 || gestureState.vy > 0.5) {
+        closeModal();
+      } else {
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      }
+    },
+  });
 
   const handleViewTransactions = () => {
     navigation.navigate('TransactionsList');
@@ -230,10 +356,10 @@ const WalletManagementScreen: React.FC = () => {
           </TouchableOpacity>
 
           <View style={styles.optionRow}>
-          <View style={styles.linkWalletIconBox}>
+            <View style={styles.linkWalletIconBox}>
               <Image source={require('../../../assets/scan-icon-white.png')} style={styles.linkWalletIcon} />
               <Text style={styles.optionText}>Multi-sign</Text>
-              </View>
+            </View>
             <Switch
               value={multiSignEnabled}
               onValueChange={handleMultiSignToggle}
@@ -295,6 +421,141 @@ const WalletManagementScreen: React.FC = () => {
 
       </ScrollView>
       <NavBar currentRoute="WalletManagement" navigation={navigation} />
+
+      {/* Multi-Sign Explanation Modal */}
+      <Modal
+        visible={showMultiSignModal}
+        transparent={true}
+        animationType="none"
+        onRequestClose={closeModal}
+      >
+        {/* Animated Background Overlay */}
+        <Animated.View
+          style={[
+            styles.modalOverlay,
+            {
+              opacity: fadeAnim,
+            }
+          ]}
+        >
+          {/* Click outside to close */}
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={closeModal}
+          />
+
+          {/* Animated Bottom Sheet */}
+          <Animated.View
+            style={[
+              styles.bottomSheet,
+              {
+                transform: [{
+                  translateY: slideAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [300, 0],
+                  })
+                }]
+              }
+            ]}
+            {...panResponder.panHandlers}
+          >
+            {/* Handle */}
+            <View style={styles.handle} />
+
+
+            {/* Content */}
+            <View style={styles.modalContent}>
+              {showSuccess ? (
+                // Success State
+                <View style={styles.successContainer}>
+                  <View style={styles.successIcon}>
+                    <Icon name="check" size={32} color={colors.black} />
+                  </View>
+                  <Text style={styles.successTitle}>Multi-sign Activated!</Text>
+                  <Text style={styles.successMessage}>
+                    You can now approve multiple payments at once, saving time on each transaction.
+                  </Text>
+                </View>
+              ) : showLoader ? (
+                // Loader State
+                <View style={styles.loaderContainer}>
+                  <ActivityIndicator
+                    size="large"
+                    color={colors.primaryGreen}
+                    style={styles.loader}
+                  />
+                  <Text style={styles.loaderText}>Activating multi-sign...</Text>
+                </View>
+              ) : (
+                // Initial State
+                <>
+                  <View style={styles.modalContentHeader}>
+                    <Text style={styles.modalTitle}>What is multi-sign?</Text>
+
+                    <Text style={styles.explanationText}>
+                      Multisign lets you approve once to authorize multiple payments at the same time,
+                      saving you time by avoiding manual approval for each transaction.
+                    </Text>
+                  </View>
+                </>
+              )}
+            </View>
+
+            {/* Footer */}
+            <View style={styles.modalFooter}>
+              {showSuccess ? (
+                // Success Button
+                <TouchableOpacity
+                  style={styles.goBackButton}
+                  onPress={handleGoBack}
+                >
+                  <Text style={styles.goBackButtonText}>Go Back</Text>
+                </TouchableOpacity>
+              ) : !showLoader ? (
+                // Apple-style Slider (only show when not loading)
+                <TouchableOpacity
+                  style={styles.appleSliderContainer}
+                  onPress={handleSliderPress}
+                  activeOpacity={0.8}
+                >
+                  <Animated.View
+                    style={[
+                      styles.appleSliderTrack,
+                      sliderActive && styles.appleSliderTrackActive,
+                    ]}
+                  >
+                    <Animated.Text
+                      style={[
+                        styles.appleSliderText,
+                        sliderActive && styles.appleSliderTextActive,
+                      ]}
+                    >
+                      Activate multisign
+                    </Animated.Text>
+                  </Animated.View>
+
+                  <Animated.View
+                    style={[
+                      styles.appleSliderThumb,
+                      {
+                        transform: [{
+                          translateX: sliderAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, 250], // Increased for bigger slider
+                          })
+                        }]
+                      }
+                    ]}
+                  >
+                    <Icon name="chevron-right" size={24} color={colors.black} />
+                  </Animated.View>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
 
     </SafeAreaView>
   );

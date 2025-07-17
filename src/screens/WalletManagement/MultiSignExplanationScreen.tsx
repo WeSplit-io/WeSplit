@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -26,39 +25,47 @@ const MultiSignExplanationScreen: React.FC = () => {
   return (
     <Modal
       visible={true}
+      transparent={true}
       animationType="slide"
-      presentationStyle="pageSheet"
       onRequestClose={handleClose}
     >
-      <SafeAreaView style={styles.modalContainer}>
-        {/* Header */}
-        <View style={styles.modalHeader}>
-          <View style={styles.placeholder} />
+      {/* Semi-transparent overlay */}
+      <View style={styles.modalOverlay}>
+        {/* Bottom Sheet */}
+        <View style={styles.bottomSheet}>
+          {/* Handle */}
+          <View style={styles.handle} />
+          
+          {/* Header */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>What is multi-sign?</Text>
+            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+              <Icon name="x" size={24} color={colors.white} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Content */}
+          <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>What is multi-sign?</Text>
-          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-            <Icon name="x" size={24} color={colors.white} />
-          </TouchableOpacity>
-        </View>
 
-        {/* Content */}
-        <View style={styles.modalContent}>
-          <Text style={styles.explanationText}>
-            Multisign lets you approve once to authorize multiple payments at the same time, 
-            saving you time by avoiding manual approval for each transaction.
-          </Text>
-        </View>
+            <Text style={styles.explanationText}>
+              Multisign lets you approve once to authorize multiple payments at the same time, 
+              saving you time by avoiding manual approval for each transaction.
+            </Text>
+          </View>
 
-        {/* Action Button */}
-        <View style={styles.modalFooter}>
-          <TouchableOpacity 
-            style={styles.activateButton}
-            onPress={handleActivate}
-          >
-            <Text style={styles.activateButtonText}>Activate multisign</Text>
-            <Icon name="chevron-right" size={20} color={colors.black} />
-          </TouchableOpacity>
+          {/* Action Button */}
+          <View style={styles.modalFooter}>
+            <TouchableOpacity 
+              style={styles.activateButton}
+              onPress={handleActivate}
+            >
+              <Text style={styles.activateButtonText}>Activate multisign</Text>
+              <Icon name="chevron-right" size={20} color={colors.black} />
+            </TouchableOpacity>
+          </View>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
