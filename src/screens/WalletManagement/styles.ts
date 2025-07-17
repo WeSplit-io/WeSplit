@@ -13,12 +13,22 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   
   backButton: {
+    width: 40,
+    height: 40,
     padding: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: spacing.radiusSm,
+  },
+  
+  iconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 24,
+    height: 24,
   },
   
   headerTitle: {
@@ -33,36 +43,63 @@ export const styles = StyleSheet.create({
   
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
   },
   
-  // Balance Card
+  // Content padding to avoid bottom navigation overlap
+  scrollContent: {
+    paddingBottom: spacing.bottomNavSpace,
+  },
+  
+  // === BALANCE CARD (MAIN FOCAL POINT) ===
+  // Large green card displaying user's balance
   balanceCard: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green,
     borderRadius: spacing.lg,
-    padding: spacing.lg,
+    marginHorizontal: spacing.lg,
     marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    alignItems: 'flex-start',
     marginBottom: spacing.lg,
+    minHeight: spacing.balanceCardMinHeight,
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: spacing.xs },
     shadowOpacity: 0.1,
     shadowRadius: spacing.sm,
     elevation: 4,
   },
-  
+  // Header row of balance card (label + QR icon)
   balanceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    width: '100%',
+    marginBottom: spacing.itemSpacing,
   },
   
+  // "Your Balance" label
   balanceLabel: {
     color: colors.black,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.regular,
   },
   
+  // QR code icon container
+  qrCodeIcon: {
+    width: spacing.qrCodeIconSize,
+    height: spacing.qrCodeIconSize,
+    borderRadius: spacing.radiusSm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // QR text inside icon
+  qrCodeImage: {
+    width: 25,
+    height: 25,
+  },
+  
+  // Large dollar amount display
   balanceAmount: {
     color: colors.black,
     fontSize: typography.fontSize.hero,
@@ -72,40 +109,65 @@ export const styles = StyleSheet.create({
     lineHeight: typography.fontSize.hero + spacing.xs,
   },
   
+  // Small limit text below amount
   balanceLimitText: {
     color: colors.black,
     fontSize: typography.fontSize.small,
     fontWeight: typography.fontWeight.normal,
+    marginTop: spacing.xs,
     opacity: 0.8,
   },
-  
-  // Action Buttons
+  // === ACTION BUTTONS GRID ===
+  // Container for action buttons below balance card
   actionsGrid: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xxl,
+    marginTop: 0,
   },
   
+  // Row containing all action buttons
   actionButtonsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   
+  // Individual action button container
   actionButton: {
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
   },
   
+  // === ACTION BUTTON CIRCLES ===
+  // Circular button background (default style)
   actionButtonCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: colors.darkCard,
+    width: spacing.actionButtonSize,
+    height: spacing.actionButtonSize,
+    borderRadius: spacing.actionButtonRadius,
+    backgroundColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.sm,
+    display: 'flex',
+    position: 'relative',
   },
   
+  // === ACTION BUTTON ICONS & TEXT ===
+  // Icon inside action button (default)
+  actionButtonIcon: {
+    width: 30,
+    height: 30,
+    tintColor: colors.textLight,
+  },
+  
+  // Icon for request button (dark on green)
+  actionButtonIconRequest: {
+    width: 24,
+    height: 24,
+    tintColor: colors.black,
+  },
+  
+  // Label text below action buttons
   actionButtonText: {
     color: colors.white,
     fontSize: typography.fontSize.xs,
@@ -115,6 +177,7 @@ export const styles = StyleSheet.create({
   // Sections
   section: {
     marginBottom: spacing.lg,
+    marginHorizontal: spacing.lg,
   },
   
   sectionHeader: {
@@ -125,65 +188,85 @@ export const styles = StyleSheet.create({
   },
   
   sectionTitle: {
-    color: colors.textLight,
+    color: colors.white,
     fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: typography.fontWeight.medium,
   },
   
   changeButton: {
-    color: colors.primaryGreen,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    color: colors.white70,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.normal,
   },
   
   seeAllText: {
-    color: colors.primaryGreen,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    color: colors.white70,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.normal,
   },
   
   // External Wallet
   externalWalletButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green10,
     padding: spacing.md,
     borderRadius: spacing.radiusMd,
+    borderWidth: 1,
+    borderColor: colors.green,
   },
   
   externalWalletText: {
-    color: colors.black,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     marginLeft: spacing.sm,
+  },
+
+  linkWalletIconBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  
+  linkWalletIcon: {
+    width: 24,
+    height: 24,
   },
   
   linkWalletButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white10,
     padding: spacing.md,
     borderRadius: spacing.radiusMd,
     borderWidth: 1,
-    borderColor: colors.primaryGreen,
+    borderColor: colors.white50,
   },
   
   linkWalletText: {
-    color: colors.primaryGreen,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
   },
   
   // Options
+  optionsContainer: {
+    marginBottom: spacing.lg,
+    marginHorizontal: spacing.lg,
+    backgroundColor: colors.white10,
+    padding: spacing.md,
+    borderRadius: spacing.radiusMd,
+    gap: 10,
+  },
+
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.darkCard,
-    padding: spacing.md,
+    padding: spacing.sm,
     borderRadius: spacing.radiusMd,
-    marginBottom: spacing.sm,
   },
   
   optionText: {
@@ -196,11 +279,13 @@ export const styles = StyleSheet.create({
   transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.darkCard,
-    padding: spacing.md,
-    borderRadius: spacing.radiusMd,
+    paddingVertical: spacing.md,
     marginBottom: spacing.sm,
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.white50,
   },
   
   transactionInfo: {
@@ -594,5 +679,86 @@ export const styles = StyleSheet.create({
     color: colors.black,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
+  },
+
+  // === TRANSACTION STYLES (FROM DASHBOARD) ===
+  // Empty requests state
+  emptyRequestsState: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+  },
+
+  // Empty requests text
+  emptyRequestsText: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.normal,
+  },
+
+  // New request item style matching the mockup
+  requestItemNew: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.white50,
+  },
+
+  // Transaction avatar with green10 background
+  transactionAvatarNew: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primaryGreen + '10',
+    marginRight: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Transaction icon
+  transactionIcon: {
+    width: 24,
+    height: 24,
+    tintColor: colors.white,
+  },
+
+  // Request content container
+  requestContent: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+
+  // Request sender name
+  requestSenderName: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xs / 2,
+  },
+
+  // Request message with amount
+  requestMessageWithAmount: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.normal,
+    marginBottom: spacing.xs / 2,
+  },
+
+  // Request amount in green
+  requestAmountGreen: {
+    color: colors.primaryGreen,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+  },
+
+  // Request source info
+  requestSource: {
+    color: colors.white70,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.normal,
   },
 }); 

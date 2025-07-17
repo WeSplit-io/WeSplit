@@ -526,12 +526,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               <Text style={styles.userName}>
                 {currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}!
               </Text>
-              {walletConnected && (
+             {/*  {walletConnected && (
                 <Text style={[styles.welcomeText, { fontSize: 12, color: colors.brandGreen }]}>
                   💰 External Wallet
                 </Text>
               )}
-             {/* {!walletConnected && userCreatedWalletBalance && (
+             {!walletConnected && userCreatedWalletBalance && (
                 <Text style={[styles.welcomeText, { fontSize: 12, color: colors.textLightSecondary }]}>
                   📱 App Wallet
                 </Text>
@@ -1144,6 +1144,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             })
           )}
         </View>
+        
       </ScrollView>
 
       {/* Wallet Selector Modal */}

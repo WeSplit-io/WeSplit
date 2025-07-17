@@ -4,12 +4,14 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  Image,
   SafeAreaView,
   Switch,
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
+import NavBar from '../../components/NavBar';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
@@ -19,15 +21,15 @@ const WalletManagementScreen: React.FC = () => {
   const navigation = useNavigation();
   const { state } = useApp();
   const { currentUser } = state;
-  const { 
-    isConnected, 
-    address, 
-    balance, 
-    walletName, 
+  const {
+    isConnected,
+    address,
+    balance,
+    walletName,
     availableWallets,
-    currentWalletId 
+    currentWalletId
   } = useWallet();
-  
+
   const [multiSignEnabled, setMultiSignEnabled] = useState(false);
   const [transactions, setTransactions] = useState([
     {
@@ -88,18 +90,30 @@ const WalletManagementScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color={colors.white} />
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Wallet</Text>
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Balance Card */}
         <View style={styles.balanceCard}>
           <View style={styles.balanceHeader}>
             <Text style={styles.balanceLabel}>Your Balance</Text>
-            <Icon name="network" size={24} color={colors.black} />
+            <TouchableOpacity style={styles.qrCodeIcon} onPress={() => navigation.navigate('Deposit')}>
+              <Image
+                source={require('../../../assets/qr-code-scan.png')}
+                style={styles.qrCodeImage}
+              />
+            </TouchableOpacity>
           </View>
           <Text style={styles.balanceAmount}>
             ${balance !== null ? balance.toFixed(2) : '0.00'}
@@ -110,42 +124,56 @@ const WalletManagementScreen: React.FC = () => {
         {/* Action Buttons */}
         <View style={styles.actionsGrid}>
           <View style={styles.actionButtonsRow}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButton}
               onPress={() => navigation.navigate('SendContacts')}
             >
               <View style={styles.actionButtonCircle}>
-                <Icon name="send" size={24} color={colors.textLight} />
+                <Image
+                  source={require('../../../assets/icon-send.png')}
+                  style={styles.actionButtonIcon}
+                />
               </View>
               <Text style={styles.actionButtonText}>Send to</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButton}
               onPress={() => navigation.navigate('RequestContacts')}
             >
               <View style={styles.actionButtonCircle}>
-                <Icon name="download" size={24} color={colors.textLight} />
+                <Image
+                  source={require('../../../assets/icon-receive.png')}
+                  style={styles.actionButtonIcon}
+                />
               </View>
               <Text style={styles.actionButtonText}>Request</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButton}
               onPress={() => navigation.navigate('Deposit')}
             >
               <View style={styles.actionButtonCircle}>
-                <Icon name="plus" size={24} color={colors.textLight} />
+                <Image
+                  source={require('../../../assets/icon-deposit.png')}
+                  style={styles.actionButtonIcon}
+                />
               </View>
               <Text style={styles.actionButtonText}>Top up</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => navigation.navigate('WithdrawAmount')}
+              onPress={() => {
+                navigation.navigate('WithdrawAmount');
+              }}
             >
               <View style={styles.actionButtonCircle}>
-                <Icon name="minus" size={24} color={colors.textLight} />
+                <Image
+                  source={require('../../../assets/icon-withdraw.png')}
+                  style={styles.actionButtonIcon}
+                />
               </View>
               <Text style={styles.actionButtonText}>Withdraw</Text>
             </TouchableOpacity>
@@ -156,46 +184,63 @@ const WalletManagementScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>External wallet</Text>
-            <TouchableOpacity onPress={handleChangeExternalWallet}>
-              <Text style={styles.changeButton}>Change</Text>
-            </TouchableOpacity>
+            {isConnected && currentWallet && (
+              <TouchableOpacity onPress={handleChangeExternalWallet}>
+                <Text style={styles.changeButton}>Change</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          
+
           {isConnected && currentWallet ? (
             <TouchableOpacity style={styles.externalWalletButton}>
-              <Icon name="monster" size={20} color={colors.primaryGreen} />
-              <Text style={styles.externalWalletText}>
-                {formatAddress(currentWallet.address)}
-              </Text>
+              <View style={styles.linkWalletIconBox}>
+                <Image source={require('../../../assets/wallet-icon-green.png')} style={styles.linkWalletIcon} />
+                <Text style={styles.externalWalletText}>
+                  {formatAddress(currentWallet.address)}
+                </Text>
+              </View>
+
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.linkWalletButton}
               onPress={handleLinkExternalWallet}
             >
-              <Text style={styles.linkWalletText}>Link external wallet</Text>
-              <Icon name="chevron-right" size={16} color={colors.primaryGreen} />
+              <View style={styles.linkWalletIconBox}>
+                <Image source={require('../../../assets/wallet-icon-white.png')} style={styles.linkWalletIcon} />
+                <Text style={styles.linkWalletText}>Link external wallet</Text>
+              </View>
+
+              <Icon name="chevron-right" size={16} color={colors.white} />
             </TouchableOpacity>
           )}
         </View>
 
         {/* Wallet Management Options */}
-        <View style={styles.section}>
-          <TouchableOpacity 
+        <View style={styles.optionsContainer}>
+          <TouchableOpacity
             style={styles.optionRow}
             onPress={handleSeedPhrase}
           >
-            <Text style={styles.optionText}>Seed phrase</Text>
+            <View style={styles.linkWalletIconBox}>
+              <Image source={require('../../../assets/id-icon-white.png')} style={styles.linkWalletIcon} />
+              <Text style={styles.optionText}>Seed phrase</Text>
+            </View>
             <Icon name="chevron-right" size={16} color={colors.textLightSecondary} />
           </TouchableOpacity>
-          
+
           <View style={styles.optionRow}>
-            <Text style={styles.optionText}>Multi-sign</Text>
+          <View style={styles.linkWalletIconBox}>
+              <Image source={require('../../../assets/scan-icon-white.png')} style={styles.linkWalletIcon} />
+              <Text style={styles.optionText}>Multi-sign</Text>
+              </View>
             <Switch
               value={multiSignEnabled}
               onValueChange={handleMultiSignToggle}
               trackColor={{ false: colors.border, true: colors.primaryGreen }}
-              thumbColor={multiSignEnabled ? colors.white : colors.textLightSecondary}
+              thumbColor={multiSignEnabled ? colors.white : colors.white}
+              ios_backgroundColor={colors.white10}
+              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
             />
           </View>
         </View>
@@ -208,28 +253,49 @@ const WalletManagementScreen: React.FC = () => {
               <Text style={styles.seeAllText}>See all</Text>
             </TouchableOpacity>
           </View>
-          
+
           {transactions.length > 0 ? (
-            transactions.slice(0, 3).map((transaction) => (
-              <View key={transaction.id} style={styles.transactionItem}>
-                <View style={styles.transactionInfo}>
-                  <Text style={styles.transactionTitle}>
-                    Send to {transaction.recipient}
-                  </Text>
-                  <Text style={styles.transactionNote}>
-                    Note: {transaction.note}
+            transactions.slice(0, 3).map((transaction) => {
+              const transactionTime = new Date(transaction.date).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              });
+
+              return (
+                <View key={transaction.id} style={styles.requestItemNew}>
+                  <View style={styles.transactionAvatarNew}>
+                    <Image
+                      source={require('../../../assets/icon-send.png')}
+                      style={styles.transactionIcon}
+                    />
+                  </View>
+                  <View style={styles.requestContent}>
+                    <Text style={styles.requestMessageWithAmount}>
+                      <Text style={styles.requestSenderName}>
+                        Send to {transaction.recipient}
+                      </Text>
+                    </Text>
+                    <Text style={styles.requestSource}>
+                      Note: {transaction.note} • {transactionTime}
+                    </Text>
+                  </View>
+                  <Text style={styles.requestAmountGreen}>
+                    {transaction.amount.toFixed(2)} USDC
                   </Text>
                 </View>
-                <Text style={styles.transactionAmount}>
-                  {transaction.amount.toFixed(2)}
-                </Text>
-              </View>
-            ))
+              );
+            })
           ) : (
-            <Text style={styles.emptyText}>No transactions yet</Text>
+            <View style={styles.emptyRequestsState}>
+              <Text style={styles.emptyRequestsText}>No transactions yet</Text>
+            </View>
           )}
         </View>
+
       </ScrollView>
+      <NavBar currentRoute="WalletManagement" navigation={navigation} />
+
     </SafeAreaView>
   );
 };

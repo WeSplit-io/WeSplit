@@ -129,7 +129,7 @@ export const styles = StyleSheet.create({
     right: -2,
     backgroundColor: colors.green,
     borderRadius: 10,
-    Width: 20,
+    minWidth: 20,
     height: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -341,7 +341,6 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.medium,
-    marginBottom: 10,
   },
   
   // Individual request card
@@ -579,7 +578,7 @@ export const styles = StyleSheet.create({
   
   // Text for the "Add Group" button
   addButtonText: {
-    color: GREEN,
+    color: colors.green,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
   },
