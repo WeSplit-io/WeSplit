@@ -14,6 +14,9 @@ export interface User {
 // Group member is essentially a User but with group-specific metadata
 export interface GroupMember extends User {
   joined_at: string;
+  invitation_status?: 'pending' | 'accepted' | 'declined';
+  invited_at?: string;
+  invited_by?: string;
 }
 
 // User contact includes relationship metadata
@@ -56,6 +59,23 @@ export interface Expense {
   paid_by_wallet?: string;
   splitType?: 'equal' | 'manual';
   splitData?: ExpenseSplit | string; // Can be parsed JSON
+}
+
+// Transaction entity for crypto transfers
+export interface Transaction {
+  id: string;
+  type: 'send' | 'receive' | 'deposit' | 'withdraw';
+  amount: number;
+  currency: string;
+  from_user: string;
+  to_user: string;
+  from_wallet: string;
+  to_wallet: string;
+  tx_hash: string;
+  note?: string;
+  status: 'pending' | 'completed' | 'failed';
+  created_at: string;
+  updated_at: string;
 }
 
 // Expense summary by currency
@@ -199,7 +219,6 @@ export interface ApiResponse<T> {
   success: boolean;
 }
 
-// App state for context
 export interface AppState {
   // User state
   currentUser: User | null;
@@ -224,7 +243,6 @@ export interface AppState {
   };
 }
 
-// Action types for state management
 export type AppAction =
   | { type: 'SET_CURRENT_USER'; payload: User }
   | { type: 'AUTHENTICATE_USER'; payload: { user: User; method: 'wallet' | 'email' | 'guest' } }
@@ -243,7 +261,6 @@ export type AppAction =
   | { type: 'UPDATE_CACHE_TIMESTAMP'; payload: { type: 'groups' | 'expenses' | 'members'; groupId?: number; timestamp: number } }
   | { type: 'SET_NOTIFICATIONS'; payload: { notifications: Notification[]; timestamp: number } };
 
-// Data transformation utilities
 export interface DataTransformers {
   userToGroupMember: (user: User, joinedAt?: string) => GroupMember;
   groupMemberToUser: (member: GroupMember) => User;

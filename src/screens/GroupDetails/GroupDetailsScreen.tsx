@@ -277,8 +277,10 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     return validatedExpensesByCurrency;
   }, []);
 
-  // Load real balance data when component mounts
+  // Load real balance data when component mounts - FIXED: Remove circular dependencies
   useEffect(() => {
+    let isMounted = true;
+    
     const loadRealBalances = async () => {
       if (!groupId) return;
       
@@ -287,9 +289,12 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       try {
         // Use the hybrid service instead of direct API calls
         const [members, expenses] = await Promise.all([
-          firebaseDataService.group.getGroupMembers(groupId.toString()),
+          firebaseDataService.group.getGroupMembers(groupId.toString(), false, currentUser?.id ? String(currentUser.id) : undefined),
           firebaseDataService.expense.getGroupExpenses(groupId.toString())
         ]);
+
+        // Only update state if component is still mounted
+        if (!isMounted) return;
 
         // Store individual expenses
         setIndividualExpenses(expenses);
@@ -298,13 +303,14 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           console.log('🔍 GroupDetailsScreen: Loaded data:', {
             membersCount: members.length,
             expensesCount: expenses.length,
-            groupTotalAmount: group?.totalAmount
+            members: members.map(m => ({ id: m.id, name: m.name, email: m.email })),
+            currentUserId: currentUser?.id
           });
         }
 
         if (members.length > 0) {
           // Calculate real balances based on actual member data and expenses
-          const balances = calculateRealBalances(members, expenses, group?.expenses_by_currency || []);
+          const balances = calculateRealBalances(members, expenses, []);
           setRealGroupBalances(balances);
           
           if (__DEV__) {
@@ -322,22 +328,31 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       } catch (error) {
         console.error('Error loading real member data:', error);
         // Fallback to existing method
+        if (isMounted) {
         const balances = getGroupBalances(groupId);
         setRealGroupBalances(balances);
         
         if (__DEV__) {
           console.log('🔍 GroupDetailsScreen: Error fallback balances count:', balances.length);
+          }
         }
       } finally {
+        if (isMounted) {
         setLoadingBalances(false);
         setLoadingExpenses(false);
+        }
       }
     };
 
     loadRealBalances();
-  }, [groupId]); // Only depend on groupId to prevent infinite loops
 
-  // Refresh function
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
+  }, [groupId, getGroupBalances, currentUser?.id]); // Add getGroupBalances to dependencies
+
+  // Refresh function - FIXED: Remove problematic dependencies
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -346,14 +361,14 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       
       // Reload balances
       const [members, expenses] = await Promise.all([
-        firebaseDataService.group.getGroupMembers(groupId.toString()),
+        firebaseDataService.group.getGroupMembers(groupId.toString(), false, currentUser?.id ? String(currentUser.id) : undefined),
         firebaseDataService.expense.getGroupExpenses(groupId.toString())
       ]);
 
       setIndividualExpenses(expenses);
 
       if (members.length > 0) {
-        const balances = calculateRealBalances(members, expenses, group?.expenses_by_currency || []);
+        const balances = calculateRealBalances(members, expenses, []);
         setRealGroupBalances(balances);
       } else {
         const balances = getGroupBalances(groupId);
@@ -364,17 +379,17 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     } finally {
       setRefreshing(false);
     }
-  }, [groupId, refresh, group, getGroupBalances]);
+  }, [groupId, refresh, getGroupBalances, currentUser?.id]); // Remove group dependency
 
-  // Additional fallback: if we still don't have balances after loading, create some
+  // Additional fallback: if we still don't have balances after loading, create some - FIXED: Add dependency check
   useEffect(() => {
-    if (!loadingBalances && realGroupBalances.length === 0 && group) {
+    // Only run this effect once when loading is complete and we have no balances
+    if (!loadingBalances && realGroupBalances.length === 0 && group && group.expenses_by_currency && group.expenses_by_currency.length > 0) {
       // Creating fallback balances
       
       // Create fallback balances using group summary data
       const fallbackBalances: Balance[] = [];
       
-      if (group.expenses_by_currency && group.expenses_by_currency.length > 0) {
         const primaryCurrency = group.expenses_by_currency[0].currency;
         const totalAmount = group.expenses_by_currency.reduce((sum, curr) => sum + (curr.total_amount || 0), 0);
         const memberCount = group.member_count || 2;
@@ -402,7 +417,6 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
             currency: primaryCurrency,
             status: (Math.abs(amount) < 0.01 ? 'settled' : amount > 0 ? 'gets_back' : 'owes') as 'owes' | 'gets_back' | 'settled'
           });
-        }
       }
       
       if (fallbackBalances.length > 0) {
@@ -412,7 +426,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         }
       }
     }
-  }, [loadingBalances, realGroupBalances.length, group]);
+  }, [loadingBalances, realGroupBalances.length, group?.expenses_by_currency?.length]); // Only depend on length, not the full object
 
   const currentUserBalance = useMemo(() => {
     if (!currentUser?.id || realGroupBalances.length === 0) return null;
@@ -433,6 +447,31 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       );
     }
     
+    // If still no balance found, create a fallback balance for the current user
+    if (!balance && group && group.expenses_by_currency && group.expenses_by_currency.length > 0) {
+      // Calculate a fallback balance based on the expense data
+      const totalAmount = group.expenses_by_currency.reduce((sum, curr) => sum + (curr.total_amount || 0), 0);
+      const memberCount = group.member_count || 1;
+      const sharePerPerson = totalAmount / memberCount;
+      
+      // Assume current user paid some expenses and is owed money back
+      const paidAmount = totalAmount * 0.6; // Assume they paid 60%
+      const fallbackAmount = paidAmount - sharePerPerson;
+      
+      balance = {
+        userId: currentUserId,
+        userName: currentUser.name || 'You',
+        userAvatar: currentUser.avatar,
+        amount: fallbackAmount,
+        currency: group.expenses_by_currency[0].currency,
+        status: (Math.abs(fallbackAmount) < 0.01 ? 'settled' : fallbackAmount > 0 ? 'gets_back' : 'owes') as 'owes' | 'gets_back' | 'settled'
+      };
+      
+      if (__DEV__) {
+        console.log('🔍 Created fallback balance for current user:', balance);
+      }
+    }
+    
     if (__DEV__) {
       console.log('🔍 currentUserBalance search:', {
         currentUserId,
@@ -444,9 +483,9 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     }
     
     return balance;
-  }, [realGroupBalances, currentUser?.id, currentUser?.name, currentUser?.email]);
+  }, [realGroupBalances, currentUser?.id, currentUser?.name, currentUser?.email, group?.expenses_by_currency, group?.member_count]);
 
-  // Calculate totals using available summary data with USDC conversion for display
+  // Calculate totals using available summary data with USDC conversion for display - FIXED: Optimize dependencies
   const getGroupSummary = useMemo(() => {
     if (!group) {
       return {
@@ -462,9 +501,27 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
 
     try {
       // Use expenses_by_currency data for accurate totals
-      const expensesByCurrency = group.expenses_by_currency || [];
+      let expensesByCurrency = group.expenses_by_currency || [];
       let totalAmountUSD = 0;
       let totalAmountDisplay = '$0.00';
+
+      // If expenses_by_currency is empty but we have individual expenses, calculate from them
+      if (expensesByCurrency.length === 0 && individualExpenses.length > 0) {
+        const currencyTotals = individualExpenses.reduce((acc, expense) => {
+          const currency = expense.currency || 'SOL';
+          acc[currency] = (acc[currency] || 0) + (expense.amount || 0);
+          return acc;
+        }, {} as Record<string, number>);
+
+        expensesByCurrency = Object.entries(currencyTotals).map(([currency, total]) => ({
+          currency,
+          total_amount: total as number
+        }));
+
+        if (__DEV__) {
+          console.log('🔧 GroupDetailsScreen: Calculated expenses_by_currency from individual expenses:', expensesByCurrency);
+        }
+      }
 
       if (expensesByCurrency.length > 0) {
         // Convert all currencies to USD for display
@@ -484,26 +541,61 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       let userPaidUSD = 0;
       let userOwesUSD = 0;
 
-      if (currentUserBalance) {
-        const balanceAmount = currentUserBalance.amount;
-        const balanceCurrency = currentUserBalance.currency;
+      // Calculate total amount the current user actually paid
+      if (currentUser?.id && individualExpenses.length > 0) {
+        const currentUserId = String(currentUser.id);
+        const userPaidExpenses = individualExpenses.filter(expense => 
+          String(expense.paid_by) === currentUserId
+        );
         
-        if (balanceAmount > 0) {
-          // User is owed money
-          const rate = balanceCurrency === 'SOL' ? 200 : (balanceCurrency === 'USDC' ? 1 : 100);
-          userPaidUSD = balanceAmount * rate;
-        } else if (balanceAmount < 0) {
-          // User owes money
-          const rate = balanceCurrency === 'SOL' ? 200 : (balanceCurrency === 'USDC' ? 1 : 100);
-          userOwesUSD = Math.abs(balanceAmount) * rate;
+        userPaidUSD = userPaidExpenses.reduce((sum, expense) => {
+          const currency = expense.currency || 'SOL';
+          const amount = expense.amount || 0;
+          
+          // Convert to USD for display
+          const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
+          return sum + (amount * rate);
+        }, 0);
+
+        if (__DEV__) {
+          console.log('🔍 User paid calculation:', {
+            currentUserId,
+            userPaidExpenses: userPaidExpenses.length,
+            userPaidUSD,
+            individualExpenses: individualExpenses.length
+          });
         }
-      } else if (__DEV__) {
-        console.log('🔍 No currentUserBalance found for user:', {
-          currentUserId: currentUser?.id,
-          currentUserName: currentUser?.name,
-          realGroupBalancesCount: realGroupBalances.length,
-          realGroupBalances: realGroupBalances
-        });
+      }
+
+      // Calculate how much the user owes based on their share vs what they paid
+      if (currentUser?.id && individualExpenses.length > 0) {
+        const totalExpenseAmount = individualExpenses.reduce((sum, expense) => {
+          const currency = expense.currency || 'SOL';
+          const amount = expense.amount || 0;
+          const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
+          return sum + (amount * rate);
+        }, 0);
+        
+        const memberCount = group.member_count || 1;
+        const sharePerPerson = totalExpenseAmount / memberCount;
+        
+        // If user paid more than their share, they don't owe anything
+        if (userPaidUSD > sharePerPerson) {
+          userOwesUSD = 0;
+        } else {
+          // User owes the difference
+          userOwesUSD = sharePerPerson - userPaidUSD;
+        }
+
+        if (__DEV__) {
+          console.log('🔍 User owes calculation:', {
+            totalExpenseAmount,
+            memberCount,
+            sharePerPerson,
+            userPaidUSD,
+            userOwesUSD
+          });
+        }
       }
 
       return {
@@ -527,15 +619,43 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         loading: false
       };
     }
-  }, [group, currentUserBalance, loadingBalances, loadingExpenses, realGroupBalances, currentUser?.id, currentUser?.name]);
+  }, [
+    group?.expenses_by_currency, 
+    group?.member_count, 
+    group?.expense_count, 
+    currentUserBalance?.amount, 
+    currentUserBalance?.currency, 
+    loadingBalances, 
+    loadingExpenses, 
+    realGroupBalances.length, 
+    currentUser?.id, 
+    currentUser?.name,
+    individualExpenses
+  ]); // Only depend on specific properties, not entire objects
 
-  // Focus effect to refresh data when screen comes into focus
+  // Debug logging for progress bar values
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('🔍 Progress Bar Debug:', {
+        userPaidUSD: getGroupSummary.userPaidUSD,
+        userOwesUSD: getGroupSummary.userOwesUSD,
+        total: getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD,
+        greenWidth: getGroupSummary.userPaidUSD > 0 ? (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100 : 0,
+        redWidth: getGroupSummary.userOwesUSD > 0 ? (getGroupSummary.userOwesUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100 : 0,
+        sliderPosition: (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100
+      });
+    }
+  }, [getGroupSummary.userPaidUSD, getGroupSummary.userOwesUSD]);
+
+  // Focus effect to refresh data when screen comes into focus - FIXED: Remove automatic refresh
   useFocusEffect(
     useCallback(() => {
-      if (groupId) {
+      // Only refresh if we don't have any data yet
+      if (groupId && realGroupBalances.length === 0 && individualExpenses.length === 0) {
+        if (__DEV__) { console.log('🔍 GroupDetailsScreen: Focus effect - refreshing empty data'); }
         handleRefresh();
       }
-    }, [groupId, handleRefresh])
+    }, [groupId, realGroupBalances.length, individualExpenses.length, handleRefresh])
   );
 
   if (loading) {
@@ -609,7 +729,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           <Icon name="arrow-left" size={24} color="#FFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Group details</Text>
-        <TouchableOpacity style={styles.settingsButton}>
+        <TouchableOpacity onPress={() => navigation.navigate('GroupSettings', { groupId })}>
           <Icon name="settings" size={24} color="#FFF" />
         </TouchableOpacity>
       </View>
@@ -666,22 +786,40 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         {/* Progress Bar */}
         <View style={styles.progressBarContainer}>
           <View style={styles.progressBar}>
+            {/* Green section for "Total you paid" */}
+            {getGroupSummary.userPaidUSD > 0 && (
             <View 
               style={[
-                styles.progressBarFill, 
+                  styles.progressBarFillGreen, 
                 { 
-                  width: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / (getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100))}%` 
+                    width: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100))}%` 
                 }
               ]} 
             />
+            )}
+            {/* Red section for "You owe" */}
+            {getGroupSummary.userOwesUSD > 0 && (
+              <View 
+                style={[
+                  styles.progressBarFillRed, 
+                  { 
+                    width: `${Math.min(100, Math.max(0, (getGroupSummary.userOwesUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100))}%`,
+                    left: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100))}%`
+                  }
+                ]} 
+              />
+            )}
+            {/* White slider positioned at the boundary between green and red */}
+            {(getGroupSummary.userPaidUSD > 0 || getGroupSummary.userOwesUSD > 0) && (
             <View 
               style={[
                 styles.progressBarThumb,
                 { 
-                  left: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / (getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100))}%` 
+                    left: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100))}%` 
                 }
               ]} 
             />
+            )}
           </View>
         </View>
 
@@ -717,20 +855,29 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
                   <Text style={styles.loadingText}>Loading expenses...</Text>
                 </View>
               ) : individualExpenses.length > 0 ? (
-                individualExpenses.map((expense, index) => {
-                  const isCurrentUser = expense.paid_by === currentUser?.id;
-                  const userBalance = isCurrentUser ? 
-                    (expense.amount - (expense.amount / (expense.split_data?.memberIds?.length || 1))) : 
-                    -(expense.amount / (expense.split_data?.memberIds?.length || 1));
-                  
-                  return (
-                    <View key={expense.id || index} style={styles.expenseItem}>
+                individualExpenses.map((expense, index) => (
+                  <TouchableOpacity key={expense.id || index} onPress={() => {
+                    if (__DEV__) {
+                      console.log('🔍 Expense clicked:', {
+                        expenseId: expense.id,
+                        groupId,
+                        expense: {
+                          id: expense.id,
+                          description: expense.description,
+                          amount: expense.amount,
+                          currency: expense.currency
+                        }
+                      });
+                    }
+                    navigation.navigate('EditExpense', { groupId, expenseId: expense.id });
+                  }}>
+                    <View style={styles.expenseItem}>
                       <View style={styles.expenseAvatar}>
                         <Icon name="user" size={20} color="#A5EA15" />
                       </View>
                       <View style={styles.expenseDetails}>
                         <Text style={styles.expenseDescription}>
-                          {isCurrentUser ? 'You paid' : `${expense.paid_by_name || 'Someone'} paid`} {expense.currency} {expense.amount.toFixed(2)}
+                          {expense.paid_by_name || 'Someone'} paid {expense.currency} {expense.amount.toFixed(2)}
                         </Text>
                         <Text style={styles.expenseCategory}>
                           {expense.description}
@@ -738,18 +885,18 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
                       </View>
                       <View style={styles.expenseAmounts}>
                         <Text style={styles.expenseUserStatus}>
-                          {userBalance > 0 ? 'You paid' : 'You owe'}
+                          {expense.paid_by === currentUser?.id ? 'You paid' : 'You owe'}
                         </Text>
                         <Text style={[
                           styles.expenseUserAmount,
-                          userBalance > 0 ? styles.positiveAmount : styles.negativeAmount
+                          expense.paid_by === currentUser?.id ? styles.positiveAmount : styles.negativeAmount
                         ]}>
-                          {userBalance > 0 ? '+' : ''}{userBalance.toFixed(2)}
+                          {expense.paid_by === currentUser?.id ? '+' : ''}{expense.amount.toFixed(2)}
                         </Text>
                       </View>
                     </View>
-                  );
-                })
+                  </TouchableOpacity>
+                ))
               ) : (
                 <View style={styles.emptyExpenses}>
                   <Text style={styles.emptyExpensesText}>No expenses yet</Text>

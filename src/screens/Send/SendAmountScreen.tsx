@@ -24,20 +24,18 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
     });
   }, [contact]);
 
-  const handleNumberPress = (num: string) => {
-    if (amount === '0') {
-      setAmount(num);
-    } else {
-      setAmount((prev: string) => prev + num);
-    }
-  };
-
-  const handleBackspace = () => {
-    if (amount.length === 1) {
-      setAmount('0');
-    } else {
-      setAmount((prev: string) => prev.slice(0, -1));
-    }
+  const handleAmountChange = (value: string) => {
+    // Only allow numbers and decimal point
+    const cleaned = value.replace(/[^0-9.]/g, '');
+    
+    // Prevent multiple decimal points
+    const parts = cleaned.split('.');
+    if (parts.length > 2) return;
+    
+    // Limit decimal places to 2
+    if (parts.length === 2 && parts[1].length > 2) return;
+    
+    setAmount(cleaned || '0');
   };
 
   const handleContinue = () => {
@@ -61,50 +59,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
     });
   };
 
-  const renderNumberPad = () => {
-    const numbers = [
-      ['1', '2', '3'],
-      ['4', '5', '6'],
-      ['7', '8', '9'],
-      ['', '0', 'backspace']
-    ];
 
-    return (
-      <View style={[styles.numberPad, { flex: 0 }]}>
-        {numbers.map((row, rowIndex) => (
-          <View key={rowIndex} style={styles.numberPadRow}>
-            {row.map((item, itemIndex) => {
-              if (item === '') {
-                return <View key={itemIndex} style={[styles.numberPadButton, { width: 60, height: 60 }]} />;
-              }
-              
-              if (item === 'backspace') {
-                return (
-                  <TouchableOpacity
-                    key={itemIndex}
-                    style={[styles.numberPadButton, { width: 60, height: 60 }]}
-                    onPress={handleBackspace}
-                  >
-                    <Icon name="delete" size={20} color={colors.textLight} />
-                  </TouchableOpacity>
-                );
-              }
-
-              return (
-                <TouchableOpacity
-                  key={itemIndex}
-                  style={[styles.numberPadButton, { width: 60, height: 60 }]}
-                  onPress={() => handleNumberPress(item)}
-                >
-                  <Text style={[styles.numberPadText, { fontSize: 18 }]}>{item}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ))}
-      </View>
-    );
-  };
 
   const formatWalletAddress = (address: string) => {
     if (!address) return '';
@@ -156,13 +111,32 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
           <Text style={[styles.enterAmountLabel, { fontSize: 16, marginBottom: 8, color: colors.textSecondary }]}>
             {isSettlement ? 'Settlement Amount' : 'Enter amount'}
           </Text>
+          <TextInput
+            style={{
+              color: colors.textLight,
+              fontSize: 48,
+              fontWeight: 'bold',
+              textAlign: 'center',
+              marginBottom: 4,
+              backgroundColor: 'transparent',
+              borderWidth: 0,
+              padding: 0,
+              minWidth: 200,
+            }}
+            value={amount}
+            onChangeText={handleAmountChange}
+            placeholder="0"
+            placeholderTextColor={colors.textSecondary}
+            keyboardType="numeric"
+            autoFocus={!isSettlement}
+            editable={!isSettlement}
+          />
           <Text style={{
             color: colors.textLight,
-            fontSize: 48,
-            fontWeight: 'bold',
+            fontSize: 16,
             textAlign: 'center',
-            marginBottom: 4,
-          }}>{amount} USDC</Text>
+            marginTop: 4,
+          }}>USDC</Text>
           {isSettlement && (
             <Text style={{
               color: colors.textSecondary,
@@ -247,8 +221,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Number Pad - only show for non-settlement payments */}
-        {!isSettlement && renderNumberPad()}
+
 
         {/* Continue Button */}
         <TouchableOpacity

@@ -22,6 +22,7 @@ import { sendVerificationCode } from '../../services/firebaseAuthService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { solanaAppKitService } from '../../services/solanaAppKitService';
+import { userWalletService } from '../../services/userWalletService';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
@@ -43,7 +44,7 @@ const AuthMethodsScreen: React.FC = () => {
   const { connectWallet } = useWallet();
   
   // State management
-  const [email, setEmail] = useState('vincent@we.split');
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [hasCheckedMonthlyVerification, setHasCheckedMonthlyVerification] = useState(false);
   const [hasHandledAuthState, setHasHandledAuthState] = useState(false);
@@ -99,56 +100,40 @@ const AuthMethodsScreen: React.FC = () => {
         avatar: userData.avatar || ''
       };
 
-      // If user doesn't have a wallet, create one and update the user data
+      // Ensure user has a wallet using the centralized wallet service
       if (!appUser.wallet_address) {
-        if (__DEV__) { console.log('🔄 Creating wallet for new user...'); }
+        if (__DEV__) { console.log('🔄 Ensuring wallet exists for user...'); }
         
         try {
-          // Create wallet synchronously for new users
-          const result = await solanaAppKitService.createWallet();
-          const wallet = result.wallet;
+          const walletResult = await userWalletService.ensureUserWallet(appUser.id);
           
-          // Update user document with wallet info
-          await firestoreService.updateUserWallet(firebaseUser.uid, {
-            address: wallet.address,
-            publicKey: wallet.publicKey
-          });
-          
+          if (walletResult.success && walletResult.wallet) {
           // Update app user with wallet info
-          appUser.wallet_address = wallet.address;
-          appUser.wallet_public_key = wallet.publicKey;
-          
-          // Request airdrop in background for development
-          if (process.env.NODE_ENV !== 'production') {
-            solanaAppKitService.requestAirdrop(1)
-              .then(() => {
-                if (__DEV__) {
-                  console.log('✅ Background airdrop successful: 1 SOL added to wallet');
-                }
-              })
-              .catch((airdropError) => {
-                if (__DEV__) {
-                  console.log('⚠️ Background airdrop failed (this is normal):', airdropError.message);
-                }
-              });
-          }
-          
-          if (__DEV__) { console.log('✅ Wallet creation successful'); }
+            appUser.wallet_address = walletResult.wallet.address;
+            appUser.wallet_public_key = walletResult.wallet.publicKey;
+            
+            if (__DEV__) { console.log('✅ Wallet ensured successfully:', walletResult.wallet.address); }
           
           // Update user in AppContext to reflect wallet info
           try {
             await updateUser({
-              wallet_address: wallet.address,
-              wallet_public_key: wallet.publicKey
+                wallet_address: walletResult.wallet.address,
+                wallet_public_key: walletResult.wallet.publicKey
             });
             if (__DEV__) { console.log('✅ Updated user in AppContext with wallet info'); }
           } catch (updateError) {
             console.error('❌ Failed to update user in AppContext:', updateError);
+            }
+          } else {
+            console.error('❌ Failed to ensure wallet:', walletResult.error);
+            // Continue without wallet - user can still use the app
           }
         } catch (error) {
           console.error('❌ Wallet creation failed:', error);
           // Continue without wallet - user can still use the app
         }
+      } else {
+        if (__DEV__) { console.log('✅ User already has wallet:', appUser.wallet_address); }
       }
 
       // Authenticate user with updated data (including wallet if created)
@@ -198,129 +183,143 @@ const AuthMethodsScreen: React.FC = () => {
         // Show loading indicator for bypass
         setLoading(true);
         
-        // User has verified this month, try to get their existing user data
         try {
-          // Find existing user by email
+          // Get existing user from Firestore
           const usersRef = collection(db, 'users');
           const q = query(usersRef, where('email', '==', email));
           const querySnapshot = await getDocs(q);
           
           if (!querySnapshot.empty) {
+            // User exists in Firestore, get the user data
             const userDoc = querySnapshot.docs[0];
             const userData = userDoc.data();
             
-            // Transform to app user format
-            const appUser = {
-              id: userData.id || userDoc.id,
-              name: userData.name || '',
-              email: userData.email || email,
+            if (__DEV__) { console.log('📋 Found existing user in Firestore:', userData); }
+            
+            // Check if user exists in Firebase Auth
+            let firebaseUser = auth.currentUser;
+            
+            if (!firebaseUser || firebaseUser.email !== email) {
+              // Try to get user by email from Firebase Auth
+              try {
+                // For existing users, we need to handle this differently
+                // Since we can't sign in without knowing the password, we'll create a new Firebase Auth user
+                // with a secure temporary password and update the Firestore document
+                const temporaryPassword = `WeSplit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                
+                try {
+                  // Try to create a new Firebase Auth user
+                  firebaseUser = await firebaseAuth.createUserWithEmail(email, temporaryPassword);
+                  if (__DEV__) { console.log('✅ Created new Firebase Auth user for existing Firestore user'); }
+                } catch (createError: any) {
+                  if (createError.code === 'auth/email-already-in-use') {
+                    // User already exists in Firebase Auth, we need to handle this
+                    // For now, we'll use the existing user data and skip Firebase Auth
+                    if (__DEV__) { console.log('⚠️ User exists in Firebase Auth but we can\'t sign in without password'); }
+                    
+                    // Use the Firestore user data directly
+                    const transformedUser = {
+                      id: userData.id,
+                      name: userData.name,
+                      email: userData.email,
+                      wallet_address: userData.wallet_address || '',
+                      wallet_public_key: userData.wallet_public_key || '',
+                      created_at: userData.created_at,
+                      avatar: userData.avatar || ''
+                    };
+                    
+                    // Update the global app context with the authenticated user
+                    authenticateUser(transformedUser, 'email');
+                    
+                    // Navigate to dashboard
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'Dashboard' }],
+                    });
+                    return;
+                  } else {
+                    throw createError;
+                      }
+                }
+              } catch (authError: any) {
+                console.error('Firebase Auth error:', authError);
+                throw new Error('Failed to authenticate user');
+              }
+            }
+                
+            // Update the user's last login timestamp
+            await firestoreService.updateLastVerifiedAt(email);
+            
+            // Use the existing user data
+            const transformedUser = {
+              id: userData.id,
+              name: userData.name,
+              email: userData.email,
               wallet_address: userData.wallet_address || '',
               wallet_public_key: userData.wallet_public_key || '',
-              created_at: userData.created_at || new Date().toISOString(),
+              created_at: userData.created_at,
               avatar: userData.avatar || ''
             };
             
-            // Update last login timestamp
-            await firestoreService.updateLastVerifiedAt(email);
+            // Update the global app context with the authenticated user
+            authenticateUser(transformedUser, 'email');
             
-            // If user doesn't have a wallet, create one and update the user data
-            if (!appUser.wallet_address) {
-              if (__DEV__) { console.log('🔄 Creating wallet for existing user...'); }
-              
-              try {
-                // Create wallet synchronously for existing users without wallet
-                const result = await solanaAppKitService.createWallet();
-                const wallet = result.wallet;
-                
-                // Update user document with wallet info
-                await firestoreService.updateUserWallet(userDoc.id, {
-                  address: wallet.address,
-                  publicKey: wallet.publicKey
-                });
-                
-                // Update app user with wallet info
-                appUser.wallet_address = wallet.address;
-                appUser.wallet_public_key = wallet.publicKey;
-                
-                // Request airdrop in background for development
-                if (process.env.NODE_ENV !== 'production') {
-                  solanaAppKitService.requestAirdrop(1)
-                    .then(() => {
-                      if (__DEV__) {
-                        console.log('✅ Background airdrop successful: 1 SOL added to wallet');
-                      }
-                    })
-                    .catch((airdropError) => {
-                      if (__DEV__) {
-                        console.log('⚠️ Background airdrop failed (this is normal):', airdropError.message);
-                      }
-                    });
-                }
-                
-                if (__DEV__) { console.log('✅ Wallet creation successful'); }
-                
-                // Update user in AppContext to reflect wallet info
-                try {
-                  await updateUser({
-                    wallet_address: wallet.address,
-                    wallet_public_key: wallet.publicKey
-                  });
-                  if (__DEV__) { console.log('✅ Updated user in AppContext with wallet info'); }
-                } catch (updateError) {
-                  console.error('❌ Failed to update user in AppContext:', updateError);
-                }
-              } catch (error) {
-                console.error('❌ Wallet creation failed:', error);
-                // Continue without wallet - user can still use the app
-              }
-            }
-            
-            // Authenticate user with updated data (including wallet if created)
-            authenticateUser(appUser, 'email');
+            // Navigate to dashboard
             navigation.reset({
               index: 0,
               routes: [{ name: 'Dashboard' }],
             });
-            return;
+          } else {
+            // User doesn't exist in Firestore, create new user
+            if (__DEV__) { console.log('🆕 Creating new user since not found in Firestore'); }
+            
+            const temporaryPassword = `WeSplit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const userCredential = await firebaseAuth.createUserWithEmail(email, temporaryPassword);
+            await handleAuthenticatedUser(userCredential);
           }
-        } catch (userError) {
-          console.error('Error getting existing user data:', userError);
-          // Fall through to send verification code
-        }
-      }
-      
-      // User hasn't verified this month or doesn't exist, send verification code
-      if (__DEV__) {
-        console.log('📧 User needs verification, sending code to:', email);
-      }
-      
-      // Use Firebase backend service for 4-digit code verification
-      const result = await sendVerificationCode(email);
-      
-      if (result.success) {
-        // Navigate directly to verification screen
-        navigation.navigate('Verification', { email });
-        
-        // Store email for later use
-        await AsyncStorage.setItem('pendingEmail', email);
-        
-        if (__DEV__) {
-          console.log('Verification code sent to:', email);
+        } catch (error: any) {
+          console.error('Error handling existing user:', error);
+          throw error;
         }
       } else {
-        Alert.alert('Authentication Error', result.error || 'Failed to send verification code');
+        // User needs verification this month
+      if (__DEV__) {
+          console.log('🔄 User needs verification this month, sending OTP');
+      }
+      
+        // Send verification code
+        await sendVerificationCode(email);
+      
+        // Navigate to verification screen
+        navigation.navigate('Verification', { email });
       }
     } catch (error: any) {
-      console.error('Authentication error:', error);
-      Alert.alert('Authentication Error', 'Failed to send verification code. Please try again.');
+      console.error('Error in email authentication:', error);
+      
+      if (error.code === 'auth/too-many-requests') {
+        Alert.alert(
+          'Too Many Requests',
+          'Too many attempts. Please wait a few minutes before trying again.'
+        );
+      } else if (error.code === 'auth/invalid-email') {
+        Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      } else {
+        Alert.alert(
+          'Authentication Error',
+          error.message || 'Failed to authenticate. Please try again.'
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle social authentication (placeholder for future implementation)
+  // Handle social authentication
   const handleSocialAuth = (provider: 'google' | 'twitter' | 'apple') => {
-    Alert.alert('Coming Soon', `${provider} authentication will be available soon!`);
+    Alert.alert(
+      'Coming Soon',
+      `${provider.charAt(0).toUpperCase() + provider.slice(1)} authentication will be available soon. Please use email authentication for now.`
+    );
   };
 
   return (
@@ -328,24 +327,26 @@ const AuthMethodsScreen: React.FC = () => {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Logo row */}
-        <View style={styles.logoRow}>
-          <Image source={require('../../../assets/WeSplitLogo.png')} style={styles.logoIcon} />
-          <Text style={styles.logoText}>
-            We<Text style={styles.logoSplit}>Split</Text>
-          </Text>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Logo Section */}
+        <View style={styles.logoSection}>
+          <View style={styles.logoContainer}>
+            <Text style={styles.logoText}>W</Text>
+          </View>
+          <Text style={styles.logoName}>WeSplit</Text>
         </View>
 
-        {/* Centered content */}
-        <View style={styles.centerContent}>
-          {/* Social buttons */}
+        {/* Social Login Buttons */}
+        <View style={styles.socialSection}>
           <TouchableOpacity 
             style={styles.socialButton}
             onPress={() => handleSocialAuth('google')}
           >
             <Image source={require('../../../assets/google.png')} style={styles.socialIcon} />
-            <Text style={styles.socialText}>Continue with Google</Text>
+            <Text style={styles.socialButtonText}>Continue with Google</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -353,7 +354,7 @@ const AuthMethodsScreen: React.FC = () => {
             onPress={() => handleSocialAuth('twitter')}
           >
             <Image source={require('../../../assets/twitter.png')} style={styles.socialIcon} />
-            <Text style={styles.socialText}>Continue with Twitter</Text>
+            <Text style={styles.socialButtonText}>Continue with Twitter</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -361,48 +362,51 @@ const AuthMethodsScreen: React.FC = () => {
             onPress={() => handleSocialAuth('apple')}
           >
             <Image source={require('../../../assets/apple.png')} style={styles.socialIcon} />
-            <Text style={styles.socialText}>Continue with Apple</Text>
+            <Text style={styles.socialButtonText}>Continue with Apple</Text>
           </TouchableOpacity>
+        </View>
 
-          {/* Divider */}
-          <View style={styles.dividerRow}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.divider} />
+        {/* Separator */}
+        <View style={styles.separator}>
+          <View style={styles.separatorLine} />
+          <Text style={styles.separatorText}>or</Text>
+          <View style={styles.separatorLine} />
           </View>
 
-          {/* Email input */}
-          <Text style={styles.label}>Email</Text>
+        {/* Email Input */}
+        <View style={styles.emailSection}>
+          <Text style={styles.emailLabel}>Email</Text>
           <TextInput
-            style={styles.input}
+            style={styles.emailInput}
             placeholder="Enter your email"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.white50}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
-            autoComplete="email"
+            autoCorrect={false}
           />
+        </View>
 
-          {/* Submit button */}
+        {/* Next Button */}
           <TouchableOpacity 
-            style={[styles.nextButton, loading && { opacity: 0.6 }]} 
+          style={[styles.nextButton, (!email || loading) && styles.nextButtonDisabled]}
             onPress={handleEmailAuth} 
-            disabled={loading}
-            activeOpacity={0.7}
+          disabled={!email || loading}
           >
             {loading ? (
-              <ActivityIndicator color={colors.darkBackground} />
+            <ActivityIndicator color={colors.black} />
             ) : (
               <Text style={styles.nextButtonText}>Next</Text>
             )}
+        </TouchableOpacity>
+
+        {/* Help Link */}
+        <View style={styles.helpSection}>
+          <TouchableOpacity>
+            <Text style={styles.helpText}>Need help?</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Help link */}
-        <TouchableOpacity style={styles.helpLink}>
-          <Text style={styles.helpText}>Need help?</Text>
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );

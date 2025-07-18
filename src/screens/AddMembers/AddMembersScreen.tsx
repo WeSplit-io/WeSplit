@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, Activity
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
-import { UserContact } from '../../types';
+import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
 
@@ -13,6 +13,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
   const groupId = route.params?.groupId;
   const groupData = route.params?.groupData; // For creation flow
   const fromCreation = route.params?.fromCreation;
+  const openSearchTab = route.params?.openSearchTab;
 
   const [group, setGroup] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
@@ -23,42 +24,27 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
   const [error, setError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'favorite'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'favorite' | 'search'>(openSearchTab ? 'search' : 'all');
   const [inviteLink, setInviteLink] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     const initializeScreen = async () => {
-      if (fromCreation && groupData) {
-        // Handle creation flow with temporary group data
-        setGroup({
-          id: 'temp',
-          name: groupData.name,
-          icon: groupData.icon,
-          color: groupData.color,
-          description: groupData.description,
-          member_count: 1,
-          isTemporary: true
-        });
-        
-        // Set current user as initial member
-        setMembers([{
-          id: currentUser?.id,
-          name: currentUser?.name || 'You',
-          email: currentUser?.email || '',
-          wallet_address: currentUser?.wallet_address || '',
-          joined_at: new Date().toISOString()
-        }]);
-      } else if (groupId) {
-        // Handle existing group flow
+      if (groupId) {
+        // Handle existing group flow (both creation and existing groups)
         try {
           // Use hybrid service instead of direct service call
           const groupMembers = await firebaseDataService.group.getGroupMembers(groupId);
           setMembers(groupMembers);
           
+          // For creation flow, we might not have full group details yet
+          // So we'll set a basic group object
           setGroup({
             id: groupId,
-            name: 'Group',
-            member_count: groupMembers.length
+            name: fromCreation ? 'New Group' : 'Group',
+            member_count: groupMembers.length,
+            isNewGroup: fromCreation
           });
         } catch (err) {
           console.error('Error fetching group data:', err);
@@ -93,7 +79,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
       filtered = contacts.filter(contact => contact.isFavorite);
     }
 
-    if (searchQuery.trim()) {
+    if (searchQuery.trim() && activeTab !== 'search') {
       filtered = filtered.filter(contact => 
         contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         contact.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -102,6 +88,41 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
 
     setFilteredContacts(filtered);
   }, [contacts, searchQuery, activeTab]);
+
+  // Handle user search
+  const handleUserSearch = async (query: string) => {
+    if (!query.trim() || query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const results = await firebaseDataService.group.searchUsersByUsername(
+        query.trim(), 
+        currentUser?.id ? String(currentUser.id) : undefined
+      );
+      setSearchResults(results);
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Debounced search
+  useEffect(() => {
+    if (activeTab === 'search' && searchQuery.trim()) {
+      const timeoutId = setTimeout(() => {
+        handleUserSearch(searchQuery);
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    } else if (activeTab === 'search') {
+      setSearchResults([]);
+    }
+  }, [searchQuery, activeTab]);
 
   const handleContactToggle = (contactId: string | number) => {
     const newSelected = new Set(selectedContacts);
@@ -113,46 +134,37 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
     setSelectedContacts(newSelected);
   };
 
-  const handleCreateGroupAndInvite = async () => {
-    if (!groupData || !currentUser?.id) {
-      Alert.alert('Error', 'Missing group data or user information');
+  const handleInviteSelected = async () => {
+    if (selectedContacts.size === 0) {
+      Alert.alert('No Selection', 'Please select contacts to invite');
       return;
     }
 
-    try {
-      setIsCreating(true);
-      
-      const newGroupData = {
-        name: groupData.name,
-        description: groupData.description,
-        category: 'general',
-        currency: 'USDC',
-        icon: groupData.icon,
-        color: groupData.color,
-        created_by: currentUser.id, // Use snake_case for hybrid service
-      };
-
-      const createdGroup = await createGroup(newGroupData);
-      
-      // If users are selected, send them invites
-      if (selectedContacts.size > 0) {
-        await sendInvitesToSelected(String(createdGroup.id));
-      }
+    if (fromCreation && group?.isNewGroup) {
+      // For new groups, send invites and then navigate to success
+      await sendInvitesToSelected(groupId!);
       
       // Navigate to success screen
       navigation.navigate('GroupCreated', { 
-        groupId: createdGroup.id,
-        groupName: groupData.name,
-        groupIcon: groupData.icon,
-        groupColor: groupData.color
+        groupId: groupId,
+        groupName: group.name,
+        groupIcon: 'briefcase', // Default icon
+        groupColor: '#A5EA15' // Default color
       });
-      
-    } catch (error) {
-      console.error('Error creating group:', error);
-      Alert.alert('Error', 'Failed to create group. Please try again.');
-    } finally {
-      setIsCreating(false);
+    } else if (groupId) {
+      // For existing groups, just send invites
+      await sendInvitesToSelected(groupId);
     }
+  };
+
+  const handleDoneWithoutMembers = () => {
+    // Navigate to success screen without inviting anyone
+    navigation.navigate('GroupCreated', { 
+      groupId: groupId,
+      groupName: group?.name || 'New Group',
+      groupIcon: 'briefcase', // Default icon
+      groupColor: '#A5EA15' // Default color
+    });
   };
 
   const sendInvitesToSelected = async (targetGroupId: string) => {
@@ -187,32 +199,41 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
     }
   };
 
-  const handleInviteSelected = async () => {
-    if (selectedContacts.size === 0) {
-      Alert.alert('No Selection', 'Please select contacts to invite');
+
+
+  const handleInviteSearchedUser = async (user: User) => {
+    if (!currentUser?.id || !group?.name) {
+      Alert.alert('Error', 'Missing user or group information');
       return;
     }
 
-    if (fromCreation) {
-      await handleCreateGroupAndInvite();
-    } else if (groupId) {
-      await sendInvitesToSelected(groupId);
+    try {
+      // Send invitation via notification
+      await firebaseDataService.group.sendGroupInvitation(
+        group.id,
+        group.name,
+        String(currentUser.id),
+        currentUser.name || currentUser.email || 'Unknown User',
+        String(user.id)
+      );
+
+      Alert.alert(
+        'Invitation Sent!',
+        `Invitation sent to ${user.name || user.email}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Error sending invitation:', error);
+      Alert.alert('Error', 'Failed to send invitation. Please try again.');
     }
   };
 
   const handleShareInviteLink = async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id || !groupId) return;
 
     try {
-      const targetGroupId = fromCreation ? 'temp' : groupId;
-      let shareMessage = '';
-      
-      if (fromCreation) {
-        shareMessage = `Join my WeSplit group "${group?.name}"! I'll send you the invite link once it's created.`;
-      } else {
-        const inviteData = await firebaseDataService.group.generateInviteLink(groupId!, String(currentUser.id));
-        shareMessage = `Join my WeSplit group "${group?.name}"!\n\nInvite code: ${inviteData.inviteCode}\n\nOr click this link: wesplit://join/${inviteData.inviteCode}`;
-      }
+      const inviteData = await firebaseDataService.group.generateInviteLink(groupId, String(currentUser.id));
+      const shareMessage = `Join my WeSplit group "${group?.name}"!\n\nInvite code: ${inviteData.inviteCode}\n\nOr click this link: wesplit://join/${inviteData.inviteCode}`;
       
       await Share.share({
         message: shareMessage,
@@ -277,6 +298,12 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
         >
           <Text style={[styles.tabText, activeTab === 'favorite' && styles.activeTabText]}>Favorite</Text>
         </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'search' && styles.activeTab]}
+          onPress={() => setActiveTab('search')}
+        >
+          <Text style={[styles.tabText, activeTab === 'search' && styles.activeTabText]}>Search</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollContent} contentContainerStyle={styles.content}>
@@ -311,7 +338,17 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
                 </View>
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactName}>{contact.name}</Text>
-                  <Text style={styles.contactEmail}>{contact.email}</Text>
+                  <Text style={styles.contactEmail}>
+                    {contact.wallet_address ? 
+                      `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 
+                      contact.email
+                    }
+                  </Text>
+                  {contact.email && contact.wallet_address && (
+                    <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
+                      {contact.email}
+                    </Text>
+                  )}
                 </View>
                 <TouchableOpacity 
                   style={styles.favoriteButton}
@@ -358,7 +395,17 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
                 </View>
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactName}>{contact.name}</Text>
-                  <Text style={styles.contactEmail}>{contact.email}</Text>
+                  <Text style={styles.contactEmail}>
+                    {contact.wallet_address ? 
+                      `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 
+                      contact.email
+                    }
+                  </Text>
+                  {contact.email && contact.wallet_address && (
+                    <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
+                      {contact.email}
+                    </Text>
+                  )}
                 </View>
                 <TouchableOpacity 
                   style={styles.favoriteButton}
@@ -381,8 +428,66 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
           </>
         )}
 
+        {/* Search Results Section */}
+        {activeTab === 'search' && (
+          <>
+            {isSearching && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#A5EA15" />
+                <Text style={styles.loadingText}>Searching users...</Text>
+              </View>
+            )}
+            
+            {!isSearching && searchResults.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Search Results</Text>
+                {searchResults.map((user) => (
+                  <TouchableOpacity 
+                    key={user.id} 
+                    style={styles.contactRow}
+                    onPress={() => handleInviteSearchedUser(user)}
+                  >
+                    <View style={styles.contactAvatar}>
+                      <Text style={styles.avatarText}>
+                        {user.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.contactInfo}>
+                      <Text style={styles.contactName}>{user.name}</Text>
+                      <Text style={styles.contactEmail}>
+                        {user.wallet_address ? 
+                          `${user.wallet_address.substring(0, 6)}...${user.wallet_address.substring(user.wallet_address.length - 6)}` : 
+                          user.email
+                        }
+                      </Text>
+                      {user.email && user.wallet_address && (
+                        <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}> 
+                          {user.email}
+                        </Text>
+                      )}
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.inviteButton}
+                      onPress={() => handleInviteSearchedUser(user)}
+                    >
+                      <Icon name="user-plus" size={20} color="#A5EA15" />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
+              </>
+            )}
+            
+            {!isSearching && searchQuery.trim() && searchResults.length === 0 && (
+              <View style={styles.noContactsContainer}>
+                <Text style={styles.noContactsText}>No users found matching "{searchQuery}"</Text>
+                <Text style={styles.noContactsSubtext}>Try searching with a different username or email</Text>
+              </View>
+            )}
+          </>
+        )}
+
         {/* No Contacts Message */}
-        {filteredContacts.length === 0 && !loading && (
+        {filteredContacts.length === 0 && !loading && activeTab !== 'search' && (
           <View style={styles.noContactsContainer}>
             <Text style={styles.noContactsText}>
               {searchQuery ? 'No contacts found matching your search' : 'No contacts available'}
@@ -402,7 +507,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
             (selectedContacts.size === 0 && !fromCreation) && styles.addButtonDisabled,
             isCreating && styles.addButtonDisabled
           ]}
-          onPress={handleInviteSelected}
+          onPress={fromCreation && selectedContacts.size === 0 ? handleDoneWithoutMembers : handleInviteSelected}
           disabled={(selectedContacts.size === 0 && !fromCreation) || isCreating}
         >
           {isCreating ? (
@@ -411,8 +516,8 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
             <Text style={styles.addButtonText}>
               {fromCreation 
                 ? selectedContacts.size > 0 
-                  ? `Create & Invite ${selectedContacts.size}` 
-                  : 'Create Group'
+                  ? `Invite ${selectedContacts.size} & Done` 
+                  : 'Done'
                 : selectedContacts.size > 0 
                   ? `Add ${selectedContacts.size}` 
                   : 'Add'

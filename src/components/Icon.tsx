@@ -78,6 +78,11 @@ import Camera from 'react-native-bootstrap-icons/icons/camera';
 import CameraFill from 'react-native-bootstrap-icons/icons/camera-fill';
 import UpcScan from 'react-native-bootstrap-icons/icons/upc-scan';
 import Upc from 'react-native-bootstrap-icons/icons/upc';
+import Briefcase from 'react-native-bootstrap-icons/icons/briefcase';
+import BriefcaseFill from 'react-native-bootstrap-icons/icons/briefcase-fill';
+import CupStraw from 'react-native-bootstrap-icons/icons/cup-straw';
+import Megaphone from 'react-native-bootstrap-icons/icons/megaphone';
+import MegaphoneFill from 'react-native-bootstrap-icons/icons/megaphone-fill';
 
 export type IconType = 'bootstrap' | 'ionicons' | 'fontawesome5';
 
@@ -103,6 +108,11 @@ const iconMap: Record<string, React.ComponentType<any>> = {
   'gear': GearFill,
   'grid': Grid3x3,
   'grid-3x3': Grid3x3,
+  
+  // Category Icons
+  'briefcase': Briefcase,
+  'glass': CupStraw,
+  'megaphone': Megaphone,
   
   // Arrows
   'arrow-left': ArrowLeft,

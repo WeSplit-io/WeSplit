@@ -16,53 +16,90 @@ const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
     }
   };
 
+  // Format current date
+  const getCurrentDate = () => {
+    const date = new Date();
+    const options: Intl.DateTimeFormatOptions = { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    };
+    return date.toLocaleDateString('en-US', options);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.mockupRequestSuccessContainer}>
         {/* Success Icon */}
-        <View style={styles.mockupRequestSuccessIconContainer}>
-          <View style={styles.mockupRequestSuccessIcon}>
-            <Icon name="check" size={60} color={colors.brandGreen} />
-          </View>
+        <View style={[styles.mockupRequestSuccessIcon, {
+          width: 120,
+          height: 120,
+          borderRadius: 60,
+          marginBottom: 32,
+        }]}>
+          <Icon name="check" size={60} color={colors.darkBackground} />
         </View>
 
-        {/* Success Message */}
-        <Text style={styles.mockupRequestSuccessTitle}>Request Sent</Text>
-        <Text style={styles.mockupRequestSuccessSubtitle}>
-          {contact?.name || 'The recipient'} can now send you money
+        {/* Success Title */}
+        <Text style={[styles.mockupRequestSuccessTitle, {
+          fontSize: 24,
+          marginBottom: 8,
+        }]}>
+          Request Send
         </Text>
 
-        {/* Request Details Card */}
-        <View style={styles.mockupRequestSuccessCard}>
-          <View style={styles.mockupRequestSuccessRow}>
-            <Text style={styles.mockupRequestSuccessLabel}>Request to:</Text>
-            <Text style={styles.mockupRequestSuccessValue}>{contact?.name || 'Unknown'}</Text>
-          </View>
-          
-          <View style={styles.mockupRequestSuccessRow}>
-            <Text style={styles.mockupRequestSuccessLabel}>Amount:</Text>
-            <Text style={styles.mockupRequestSuccessValue}>{amount?.toFixed(0) || '0'} USDC</Text>
-          </View>
-          
-          {description && (
-            <View style={styles.mockupRequestSuccessRow}>
-              <Text style={styles.mockupRequestSuccessLabel}>Note:</Text>
-              <Text style={styles.mockupRequestSuccessValue}>{description}</Text>
-            </View>
-          )}
+        {/* Date */}
+        <Text style={[styles.mockupRequestSuccessDate, {
+          fontSize: 16,
+          marginBottom: 40,
+        }]}>{getCurrentDate()}</Text>
+
+        {/* Request Amount */}
+        <View style={[styles.mockupRequestAmountContainer, {
+          alignItems: 'center',
+          marginBottom: 24,
+        }]}>
+          <Text style={[styles.mockupRequestAmountLabel, {
+            fontSize: 16,
+            marginBottom: 8,
+          }]}>
+            Request amount
+          </Text>
+          <Text style={[styles.mockupRequestSuccessAmount, {
+            fontSize: 42,
+            fontWeight: 'bold',
+          }]}>{amount} USDC</Text>
         </View>
 
-        {/* Amount Display */}
-        <Text style={styles.mockupRequestSuccessAmount}>
-          {amount?.toFixed(0) || '0'} USDC
-        </Text>
+        {/* Note */}
+        {description && (
+          <View style={[styles.mockupRequestNoteContainer, {
+            marginBottom: 48,
+          }]}>
+            <Text style={{
+              fontSize: 16,
+              color: colors.textLight,
+              textAlign: 'center',
+            }}>"{description}"</Text>
+          </View>
+        )}
 
         {/* Back Home Button */}
         <TouchableOpacity 
-          style={styles.mockupRequestSuccessButton} 
+          style={[styles.mockupRequestSuccessButton, {
+            paddingVertical: 16,
+            paddingHorizontal: 48,
+            borderRadius: 12,
+            minWidth: '70%',
+          }]} 
           onPress={handleBackHome}
         >
-          <Text style={styles.mockupRequestSuccessButtonText}>Back Home</Text>
+          <Text style={[styles.mockupRequestSuccessButtonText, {
+            fontSize: 16,
+            fontWeight: '600',
+          }]}>
+            Back Home
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

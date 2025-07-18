@@ -10,20 +10,18 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const [showAddNote, setShowAddNote] = useState(false);
   const [note, setNote] = useState('');
 
-  const handleNumberPress = (num: string) => {
-    if (amount === '0') {
-      setAmount(num);
-    } else {
-      setAmount(prev => prev + num);
-    }
-  };
-
-  const handleBackspace = () => {
-    if (amount.length === 1) {
-      setAmount('0');
-    } else {
-      setAmount(prev => prev.slice(0, -1));
-    }
+  const handleAmountChange = (value: string) => {
+    // Only allow numbers and decimal point
+    const cleaned = value.replace(/[^0-9.]/g, '');
+    
+    // Prevent multiple decimal points
+    const parts = cleaned.split('.');
+    if (parts.length > 2) return;
+    
+    // Limit decimal places to 2
+    if (parts.length === 2 && parts[1].length > 2) return;
+    
+    setAmount(cleaned || '0');
   };
 
   const handleContinue = () => {
@@ -47,50 +45,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
     });
   };
 
-  const renderNumberPad = () => {
-    const numbers = [
-      ['1', '2', '3'],
-      ['4', '5', '6'],
-      ['7', '8', '9'],
-      ['', '0', 'backspace']
-    ];
 
-    return (
-      <View style={styles.mockupRequestNumberPad}>
-        {numbers.map((row, rowIndex) => (
-          <View key={rowIndex} style={styles.mockupRequestNumberPadRow}>
-            {row.map((item, itemIndex) => {
-              if (item === '') {
-                return <View key={itemIndex} style={styles.mockupRequestNumberPadButton} />;
-              }
-              
-              if (item === 'backspace') {
-                return (
-                  <TouchableOpacity
-                    key={itemIndex}
-                    style={styles.mockupRequestNumberPadButton}
-                    onPress={handleBackspace}
-                  >
-                    <Icon name="delete" size={20} color={colors.textLight} />
-                  </TouchableOpacity>
-                );
-              }
-
-              return (
-                <TouchableOpacity
-                  key={itemIndex}
-                  style={styles.mockupRequestNumberPadButton}
-                  onPress={() => handleNumberPress(item)}
-                >
-                  <Text style={styles.mockupRequestNumberPadText}>{item}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ))}
-      </View>
-    );
-  };
 
   const isAmountValid = parseFloat(amount) > 0;
 
@@ -127,7 +82,21 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
         {/* Amount Display */}
         <View style={styles.mockupRequestAmountContainer}>
           <Text style={styles.mockupRequestAmountLabel}>Enter amount</Text>
-          <Text style={styles.mockupRequestAmountDisplay}>{amount} USDC</Text>
+          <TextInput
+            style={styles.mockupRequestAmountDisplay}
+            value={amount}
+            onChangeText={handleAmountChange}
+            placeholder="0"
+            placeholderTextColor={colors.textSecondary}
+            keyboardType="numeric"
+            autoFocus={true}
+          />
+          <Text style={{
+            color: colors.textLight,
+            fontSize: 16,
+            textAlign: 'center',
+            marginTop: 4,
+          }}>USDC</Text>
         </View>
 
         {/* Add Note Section */}
@@ -174,8 +143,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Number Pad */}
-        {renderNumberPad()}
+
 
         {/* Request Button */}
         <TouchableOpacity

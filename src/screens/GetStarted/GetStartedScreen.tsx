@@ -48,6 +48,13 @@ const GetStartedScreen: React.FC<GetStartedScreenProps> = ({ navigation }) => {
             <Text style={styles.getStartedButtonText}>Get Started</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Help Link */}
+        <View style={styles.helpSection}>
+          <TouchableOpacity>
+            <Text style={styles.helpText}>Need help?</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );

@@ -136,24 +136,28 @@ const VerificationScreen: React.FC = () => {
     }
   };
 
-  const timerText = `00 : ${timer < 10 ? '0' : ''}${timer}`;
+  const timerText = `00:${timer < 10 ? '0' : ''}${timer}`;
 
   return (
     <View style={styles.container}>
-      {/* Logo row at top */}
-      <View style={styles.logoRow}>
-        <Image source={require('../../../assets/WeSplitLogo.png')} style={styles.logoIcon} />
-        <Text style={styles.logoText}>
-          We<Text style={styles.logoSplit}>Split</Text>
-        </Text>
+      {/* Logo Section */}
+      <View style={styles.logoSection}>
+        <View style={styles.logoContainer}>
+          <Text style={styles.logoText}>W</Text>
+        </View>
+        <Text style={styles.logoName}>WeSplit</Text>
       </View>
-      {/* Centered content */}
+
+      {/* Main Content */}
       <View style={styles.centerContent}>
         <View style={styles.mailIconBox}>
           <Image source={require('../../../assets/mail.png')} style={styles.mailIcon} />
         </View>
         <Text style={styles.title}>Check your Email</Text>
-        <Text style={styles.subtitle}>We sent a code to {route.params?.email || 'your email'}</Text>
+        <Text style={styles.subtitle}>
+          We sent a code to <Text style={styles.emailHighlight}>{route.params?.email || 'yourname@gmail.com'}</Text>
+        </Text>
+        
         <View style={styles.codeRow}>
           {code.map((digit, idx) => (
             <TextInput
@@ -171,7 +175,9 @@ const VerificationScreen: React.FC = () => {
             />
           ))}
         </View>
+        
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        
         <TouchableOpacity 
           style={[styles.submitButton, verifying && styles.submitButtonDisabled]} 
           onPress={handleSubmit}
@@ -183,20 +189,28 @@ const VerificationScreen: React.FC = () => {
           <Text style={styles.submitButtonText}>Submit</Text>
           )}
         </TouchableOpacity>
+        
         {/* Timer and resend */}
+        <View style={styles.timerSection}>
         <Text style={styles.timer}>{timerText}</Text>
         <TouchableOpacity
           style={styles.resendLink}
           onPress={handleResend}
           disabled={timer !== 0 || resending}
         >
-          <Text style={[styles.resendText, timer !== 0 || resending ? styles.resendTextDisabled : null]}>Resend Code</Text>
+            <Text style={[styles.resendText, timer !== 0 || resending ? styles.resendTextDisabled : null]}>
+              Resend Code
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Help Link */}
+      <View style={styles.helpSection}>
+        <TouchableOpacity>
+          <Text style={styles.helpText}>Need help?</Text>
         </TouchableOpacity>
       </View>
-      {/* Help link at bottom */}
-      <TouchableOpacity style={styles.helpLink}>
-        <Text style={styles.helpText}>Need help ?</Text>
-      </TouchableOpacity>
     </View>
   );
 };

@@ -1,6 +1,7 @@
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 import { firebaseDataService } from './firebaseDataService';
+import { solanaAppKitService } from './solanaAppKitService';
 
 // Solana RPC endpoints
 const SOLANA_RPC_ENDPOINTS = {
@@ -29,6 +30,16 @@ export interface UserWalletBalance {
   isConnected: boolean;
 }
 
+export interface WalletCreationResult {
+  success: boolean;
+  wallet?: {
+    address: string;
+    publicKey: string;
+    secretKey?: string;
+  };
+  error?: string;
+}
+
 export class UserWalletService {
   private connection: Connection;
 
@@ -36,18 +47,178 @@ export class UserWalletService {
     this.connection = new Connection(RPC_ENDPOINT, 'confirmed');
   }
 
+  // Ensure user has a wallet - create if missing
+  async ensureUserWallet(userId: string): Promise<WalletCreationResult> {
+    try {
+      if (__DEV__) {
+        console.log('🔧 Ensuring wallet exists for user:', userId);
+      }
+
+      // Get current user data
+      const user = await firebaseDataService.user.getCurrentUser(userId);
+      
+      // Check if user already has a wallet
+      if (user && user.wallet_address && user.wallet_address.trim() !== '') {
+        if (__DEV__) {
+          console.log('✅ User already has wallet:', user.wallet_address);
+        }
+        return {
+          success: true,
+          wallet: {
+            address: user.wallet_address,
+            publicKey: user.wallet_public_key || user.wallet_address
+          }
+        };
+      }
+
+      // User doesn't have a wallet, create one
+      if (__DEV__) {
+        console.log('🔄 Creating new wallet for user:', userId);
+      }
+
+      const walletResult = await this.createWalletForUser(userId);
+      
+      // Ensure user has a seed phrase
+      await this.ensureUserSeedPhrase(userId);
+      
+      if (walletResult.success && walletResult.wallet) {
+        if (__DEV__) {
+          console.log('✅ Wallet created successfully:', walletResult.wallet.address);
+        }
+        
+        // Request airdrop in background for development
+        if (process.env.NODE_ENV !== 'production') {
+          this.requestAirdrop(walletResult.wallet.address)
+            .then(() => {
+              if (__DEV__) {
+                console.log('✅ Background airdrop successful: 1 SOL added to wallet');
+              }
+            })
+            .catch((airdropError) => {
+              if (__DEV__) {
+                console.log('⚠️ Background airdrop failed (this is normal):', airdropError.message);
+              }
+            });
+        }
+      }
+
+      return walletResult;
+    } catch (error) {
+      console.error('Error ensuring user wallet:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to ensure user wallet'
+      };
+    }
+  }
+
+  // Create wallet for a specific user
+  async createWalletForUser(userId: string): Promise<WalletCreationResult> {
+    try {
+      // Create wallet using Solana AppKit
+      const result = await solanaAppKitService.createWallet();
+      const wallet = result.wallet;
+
+      if (!wallet || !wallet.address) {
+        throw new Error('Wallet creation failed - no address generated');
+      }
+
+      // Update user document with wallet info
+      await firebaseDataService.user.updateUser(userId, {
+        wallet_address: wallet.address,
+        wallet_public_key: wallet.publicKey || wallet.address
+      });
+
+      // Save seed phrase if available
+      if (result.mnemonic) {
+        const seedPhrase = result.mnemonic.split(' ');
+        await firebaseDataService.user.saveUserSeedPhrase(userId, seedPhrase);
+        
+        if (__DEV__) {
+          console.log('✅ Seed phrase saved for user:', userId);
+        }
+      }
+
+      if (__DEV__) {
+        console.log('✅ Wallet created and saved for user:', {
+          userId,
+          address: wallet.address,
+          publicKey: wallet.publicKey,
+          hasSeedPhrase: !!result.mnemonic
+        });
+      }
+
+      return {
+        success: true,
+        wallet: {
+          address: wallet.address,
+          publicKey: wallet.publicKey || wallet.address,
+          secretKey: wallet.secretKey
+        }
+      };
+    } catch (error) {
+      console.error('Error creating wallet for user:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create wallet'
+      };
+    }
+  }
+
+  // Request airdrop for development
+  async requestAirdrop(walletAddress: string, amount: number = 1): Promise<void> {
+    try {
+      const publicKey = new PublicKey(walletAddress);
+      const signature = await this.connection.requestAirdrop(publicKey, amount * LAMPORTS_PER_SOL);
+      await this.connection.confirmTransaction(signature);
+      
+      if (__DEV__) {
+        console.log('✅ Airdrop successful:', signature);
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.log('⚠️ Airdrop failed (this is normal in production):', error);
+      }
+      throw error;
+    }
+  }
+
+  // Ensure user has a seed phrase
+  async ensureUserSeedPhrase(userId: string): Promise<boolean> {
+    try {
+      // Check if user already has a seed phrase
+      const existingSeedPhrase = await firebaseDataService.user.getUserSeedPhrase(userId);
+      if (existingSeedPhrase && existingSeedPhrase.length > 0) {
+        if (__DEV__) { console.log('✅ User already has seed phrase'); }
+        return true;
+      }
+
+      // Generate and save a new seed phrase
+      const newSeedPhrase = solanaAppKitService.generateMnemonic().split(' ');
+      await firebaseDataService.user.saveUserSeedPhrase(userId, newSeedPhrase);
+      
+      if (__DEV__) { console.log('✅ Seed phrase generated and saved for user:', userId); }
+      return true;
+    } catch (error) {
+      console.error('Error ensuring user seed phrase:', error);
+      return false;
+    }
+  }
+
   // Get user's created wallet balance
   async getUserWalletBalance(userId: string): Promise<UserWalletBalance | null> {
     try {
-      // Get user data to find their wallet address
-      const user = await firebaseDataService.user.getCurrentUser(userId);
+      // First ensure user has a wallet
+      const walletResult = await this.ensureUserWallet(userId);
       
-      if (!user || !user.wallet_address) {
-        if (__DEV__) { console.log('No wallet address found for user:', userId); }
+      if (!walletResult.success || !walletResult.wallet) {
+        if (__DEV__) {
+          console.log('❌ Failed to ensure wallet for user:', userId);
+        }
         return null;
       }
 
-      const walletAddress = user.wallet_address;
+      const walletAddress = walletResult.wallet.address;
       
       if (__DEV__) { console.log('Fetching balance for user wallet:', walletAddress); }
 

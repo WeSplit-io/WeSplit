@@ -11,31 +11,31 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG_COLOR,
     flexDirection: 'column',
-    paddingHorizontal: 0,
+    paddingHorizontal: spacing.lg,
   },
-  logoRow: {
-    width: '100%',
-    flexDirection: 'row',
+  logoSection: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.radiusXl + spacing.xl + spacing.xs, // 60
+    marginTop: spacing.xl,
     marginBottom: spacing.xl,
   },
-  logoIcon: {
-    width: spacing.xl + spacing.sm, // 40
-    height: spacing.xl + spacing.sm, // 40
-    marginRight: spacing.itemSpacing,
-    resizeMode: 'contain',
+  logoContainer: {
+    width: 48,
+    height: 48,
+    backgroundColor: GREEN,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
   },
   logoText: {
-    fontSize: typography.fontSize.title,
-    fontFamily: 'Satoshi',
+    fontSize: 24,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.black,
+  },
+  logoName: {
+    fontSize: 24,
     fontWeight: typography.fontWeight.bold,
     color: colors.textLight,
-    letterSpacing: 0.5,
-  },
-  logoSplit: {
-    color: GREEN,
   },
   centerContent: {
     flex: 1,
@@ -59,7 +59,7 @@ export const styles = StyleSheet.create({
     width: '80%',
     alignSelf: 'center',
   },
-  avatarBox: {
+  avatarContainer: {
     width: 140,
     height: 140,
     borderRadius: 170,
@@ -71,82 +71,89 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     position: 'relative',
   },
+  avatarImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 170,
+  },
+  avatarPlaceholder: {
+    width: 140,
+    height: 140,
+    borderRadius: 170,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   avatarIcon: {
     width: 64,
     height: 64,
     tintColor: colors.textLight,
     opacity: 0.9,
   },
-  avatarHint: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.sm,
-    opacity: 0.6,
-    marginTop: -spacing.lg,
-    marginBottom: spacing.lg,
-    textAlign: 'center',
-  },
-  editIconBox: {
+  cameraIconContainer: {
     position: 'absolute',
     bottom: 0,
     right: 0,
     width: spacing.xl,
     height: spacing.xl,
     borderRadius: spacing.md,
+    backgroundColor: GREEN,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editIcon: {
-    width: spacing.xl,
-    height: spacing.xl,
+  cameraIcon: {
+    width: 16,
+    height: 16,
+    tintColor: colors.black,
+  },
+  inputSection: {
+    width: '100%',
+    marginBottom: spacing.xl,
   },
   inputLabel: {
     color: colors.textLight,
     fontSize: typography.fontSize.md,
-    alignSelf: 'flex-start',
-    marginLeft: spacing.xl,
-    marginBottom: 6,
+    marginBottom: spacing.sm,
   },
   input: {
-    width: '90%',
+    width: '100%',
     backgroundColor: colors.background,
     borderRadius: spacing.radiusLg,
     paddingVertical: spacing.itemSpacing,
     paddingHorizontal: spacing.lg,
     fontSize: typography.fontSize.md,
     color: colors.text,
-    marginBottom: spacing.xs + 2, // 10
     borderWidth: 1,
     borderColor: GREEN,
   },
-  error: {
+  errorText: {
     color: colors.error,
     fontSize: 15,
-    alignSelf: 'flex-start',
-    marginLeft: spacing.xl,
-    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
   },
   nextButton: {
     backgroundColor: GREEN,
     borderRadius: spacing.radiusLg,
     paddingVertical: spacing.sm + 2, // 14
-    width: '90%',
+    width: '100%',
     alignItems: 'center',
-    marginTop: spacing.sm,
-    marginBottom: 0,
+    marginBottom: spacing.xl,
+  },
+  nextButtonDisabled: {
+    backgroundColor: colors.darkGray,
+    opacity: 0.6,
   },
   nextButtonText: {
     color: BG_COLOR,
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.normal,
   },
-  helpLink: {
-    alignSelf: 'center',
-    marginBottom: spacing.xl,
-    textAlign: 'center',
+  helpSection: {
+    alignItems: 'center',
+    paddingBottom: spacing.xl,
   },
   helpText: {
-    color: GRAY,
+    color: GREEN,
     fontSize: typography.fontSize.md,
-    opacity: 0.7,
+    fontWeight: typography.fontWeight.medium,
   },
 }); 

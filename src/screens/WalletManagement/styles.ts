@@ -223,6 +223,26 @@ export const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
 
+  // External wallet card matching mockup
+  externalWalletCard: {
+    backgroundColor: colors.primaryGreen,
+    borderRadius: spacing.radiusMd,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+
+  externalWalletAddress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+
+  externalWalletAddressText: {
+    color: colors.black,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+  },
+
   linkWalletIconBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -268,6 +288,17 @@ export const styles = StyleSheet.create({
     padding: spacing.sm,
     borderRadius: spacing.radiusMd,
   },
+
+  optionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+
+  optionIcon: {
+    width: 24,
+    height: 24,
+  },
   
   optionText: {
     color: colors.textLight,
@@ -275,7 +306,169 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
   },
   
-  // Transactions
+  optionSubtext: {
+    color: colors.textLightSecondary,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.normal,
+    marginTop: spacing.xs / 2,
+  },
+  
+  // Wallet Information Styles
+  connectedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primaryGreen,
+    marginLeft: spacing.sm,
+  },
+
+  walletCard: {
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.radiusMd,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.white50,
+    marginBottom: spacing.sm,
+  },
+
+  walletHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+
+  walletType: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    marginLeft: spacing.sm,
+  },
+
+  walletDetails: {
+    gap: spacing.sm,
+  },
+
+  walletRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  walletLabel: {
+    color: colors.textLightSecondary,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+  },
+
+  walletValue: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+
+  copyableAddress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white10,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: spacing.radiusSm,
+    maxWidth: '60%',
+  },
+
+  walletAddress: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    marginRight: spacing.xs,
+  },
+
+  // Transaction Styles
+  requestItemNew: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.radiusMd,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.white50,
+  },
+  
+  transactionAvatarNew: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primaryGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+
+  transactionIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.black,
+  },
+
+  transactionDetails: {
+    flex: 1,
+  },
+  
+  transactionTitle: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.xs,
+  },
+
+  transactionSubtitle: {
+    color: colors.textLightSecondary,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.xs,
+  },
+  
+  transactionNote: {
+    color: colors.textLightSecondary,
+    fontSize: typography.fontSize.xs,
+    fontStyle: 'italic',
+  },
+
+  emptyTransactions: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+
+  emptyTransactionsText: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+
+  emptyTransactionsSubtext: {
+    color: colors.textLightSecondary,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+  },
+
+  loaderContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+
+  loader: {
+    marginBottom: spacing.md,
+  },
+
+  loaderText: {
+    color: colors.textLightSecondary,
+    fontSize: typography.fontSize.md,
+  },
+  
+  // Legacy transaction styles (keeping for backward compatibility)
   transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -290,18 +483,6 @@ export const styles = StyleSheet.create({
   
   transactionInfo: {
     flex: 1,
-  },
-  
-  transactionTitle: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    marginBottom: spacing.xs,
-  },
-  
-  transactionNote: {
-    color: colors.textLightSecondary,
-    fontSize: typography.fontSize.sm,
   },
   
   transactionAmount: {
@@ -706,37 +887,6 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.normal,
   },
 
-  // New request item style matching the mockup
-  requestItemNew: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.white50,
-  },
-
-  // Transaction avatar with green10 background
-  transactionAvatarNew: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primaryGreen + '10',
-    marginRight: spacing.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Transaction icon
-  transactionIcon: {
-    width: 24,
-    height: 24,
-    tintColor: colors.white,
-  },
-
   // Request content container
   requestContent: {
     flex: 1,
@@ -777,7 +927,7 @@ export const styles = StyleSheet.create({
   // Modal overlay with semi-transparent background
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'flex-end',
   },
 
@@ -861,29 +1011,7 @@ export const styles = StyleSheet.create({
     tintColor: colors.black,
   },
 
-  // Loader styles
-  loaderContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl,
-  },
 
-  loader: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: colors.primaryGreen,
-    borderTopColor: 'transparent',
-  },
-
-  loaderText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    marginTop: spacing.md,
-    textAlign: 'center',
-  },
 
   // Success styles
   successContainer: {

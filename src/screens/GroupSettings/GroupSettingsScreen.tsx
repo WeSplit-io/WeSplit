@@ -323,35 +323,66 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
         ) : (
           members.map((member, index) => {
             const balance = getMemberBalance(Number(member.id));
+            const isInvited = member.invitation_status === 'pending';
+            
             return (
-              <View key={`member-${member.id}-${index}`} style={styles.memberItem}>
-                <View style={styles.memberAvatar} />
+              <View key={`member-${member.id}-${index}`} style={[
+                styles.memberItem,
+                isInvited && styles.memberItemInvited
+              ]}>
+                <View style={[
+                  styles.memberAvatar,
+                  isInvited && styles.memberAvatarInvited
+                ]}>
+                  {isInvited && (
+                    <Icon name="clock" size={16} color="#A89B9B" />
+                  )}
+                </View>
                 <View style={styles.memberInfo}>
-                  <Text style={styles.memberName}>{member.name}</Text>
-                  <Text style={styles.memberEmail}>{member.email}</Text>
-                  <Text style={styles.memberWallet} numberOfLines={1} ellipsizeMode="middle">
-                    {member.wallet_address}
-                  </Text>
-                </View>
-                <View style={styles.memberBalance}>
                   <Text style={[
-                    styles.memberBalanceText,
-                    (balance.type === 'gets_back' || balance.type === 'you_get_back') ? styles.memberBalancePositive :
-                    (balance.type === 'you_owe' || balance.type === 'owes') ? styles.memberBalanceNegative : styles.memberBalanceNeutral
+                    styles.memberName,
+                    isInvited && styles.memberNameInvited
                   ]}>
-                    {balance.type === 'gets_back' ? 'gets back' : 
-                     balance.type === 'you_get_back' ? 'you get back' :
-                     balance.type === 'you_owe' ? 'you owe' : 
-                     balance.type === 'owes' ? 'owes' : 'settled'}
+                    {isInvited ? 'Invited User' : member.name}
                   </Text>
                   <Text style={[
-                    styles.memberBalanceAmount,
-                    balance.type === 'gets_back' ? styles.memberBalancePositive :
-                    balance.type === 'you_owe' ? styles.memberBalanceNegative : styles.memberBalanceNeutral
+                    styles.memberEmail,
+                    isInvited && styles.memberEmailInvited
                   ]}>
-                    {balance.amount > 0 ? `${balance.currency} ${balance.amount.toFixed(2)}` : ''}
+                    {isInvited ? 'Pending invitation' : member.email}
                   </Text>
+                  {!isInvited && member.wallet_address && (
+                    <Text style={styles.memberWallet} numberOfLines={1} ellipsizeMode="middle">
+                      {member.wallet_address}
+                    </Text>
+                  )}
                 </View>
+                {!isInvited && (
+                  <View style={styles.memberBalance}>
+                    <Text style={[
+                      styles.memberBalanceText,
+                      (balance.type === 'gets_back' || balance.type === 'you_get_back') ? styles.memberBalancePositive :
+                      (balance.type === 'you_owe' || balance.type === 'owes') ? styles.memberBalanceNegative : styles.memberBalanceNeutral
+                    ]}>
+                      {balance.type === 'gets_back' ? 'gets back' : 
+                       balance.type === 'you_get_back' ? 'you get back' :
+                       balance.type === 'you_owe' ? 'you owe' : 
+                       balance.type === 'owes' ? 'owes' : 'settled'}
+                    </Text>
+                    <Text style={[
+                      styles.memberBalanceAmount,
+                      balance.type === 'gets_back' ? styles.memberBalancePositive :
+                      balance.type === 'you_owe' ? styles.memberBalanceNegative : styles.memberBalanceNeutral
+                    ]}>
+                      {balance.amount > 0 ? `${balance.currency} ${balance.amount.toFixed(2)}` : ''}
+                    </Text>
+                  </View>
+                )}
+                {isInvited && (
+                  <View style={styles.memberInviteStatus}>
+                    <Text style={styles.memberInviteStatusText}>Invited</Text>
+                  </View>
+                )}
               </View>
             );
           })

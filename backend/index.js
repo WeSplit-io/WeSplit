@@ -954,10 +954,35 @@ app.get('/api/groups/details/:groupId', async (req, res) => {
   const { groupId } = req.params;
   
   try {
-    const result = await pool.query('SELECT * FROM groups WHERE id = ?', [groupId]);
+    // Get group with member count and expense count
+    const result = await pool.query(`
+      SELECT g.*, 
+             COUNT(DISTINCT gm.user_id) as member_count,
+             COUNT(DISTINCT e.id) as expense_count
+      FROM groups g
+      LEFT JOIN group_members gm ON g.id = gm.group_id
+      LEFT JOIN expenses e ON g.id = e.group_id
+      WHERE g.id = ?
+      GROUP BY g.id
+    `, [groupId]);
     
     if (result.rows.length > 0) {
-      res.json(result.rows[0]);
+      const group = result.rows[0];
+      
+      // Get expenses grouped by currency
+      const expensesResult = await pool.query(`
+        SELECT currency, SUM(amount) as total_amount
+        FROM expenses 
+        WHERE group_id = ?
+        GROUP BY currency
+      `, [groupId]);
+      
+      const groupWithExpenses = {
+        ...group,
+        expenses_by_currency: expensesResult.rows
+      };
+      
+      res.json(groupWithExpenses);
     } else {
       res.status(404).json({ error: 'Group not found' });
     }
@@ -1168,7 +1193,23 @@ app.post('/api/moonpay/create-url', async (req, res) => {
   }
 });
 
-
+// MoonPay status check endpoint
+app.get('/api/moonpay/status/:transactionId', async (req, res) => {
+  const { transactionId } = req.params;
+  
+  try {
+    // MoonPay API configuration
+    const MOONPAY_API_KEY = process.env.MOONPAY_API_KEY || 'pk_test_1234567890abcdef';
+    const MOONPAY_SECRET_KEY = process.env.MOONPAY_SECRET_KEY || 'sk_test_1234567890abcdef';
+    
+    // In a real implementation, you would call MoonPay's API to check transaction status
+    // For now, return a mock response
+    res.json({
+      transactionId,
+      status: 'completed',
+      amount: 100,
+      currency: 'SOL'
+    });
   } catch (err) {
     console.error('Error checking MoonPay status:', err);
     res.status(500).json({ error: 'Failed to check transaction status', details: err.message });

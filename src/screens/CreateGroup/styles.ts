@@ -35,7 +35,157 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
   },
   
-  // Icon Selection Styles
+  // Category Selection Styles
+  categoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+  },
+  categoryOption: {
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: spacing.lg,
+    backgroundColor: colors.darkCard,
+    minWidth: 70,
+    minHeight: 70,
+    justifyContent: 'center',
+  },
+  categorySelected: {
+    backgroundColor: colors.primaryGreen,
+  },
+  categoryText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textLightSecondary,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  categoryTextSelected: {
+    color: colors.textDark,
+    fontWeight: typography.fontWeight.medium,
+  },
+  
+  // Color Selection Styles
+  colorRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+  },
+  colorOption: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  colorSelected: {
+    borderColor: colors.textLight,
+    borderWidth: 3,
+  },
+  
+  // Input Styles
+  input: {
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.lg,
+    padding: spacing.md,
+    fontSize: typography.fontSize.md,
+    color: colors.textLight,
+    borderWidth: 1,
+    borderColor: colors.darkBorder,
+    marginBottom: spacing.md,
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  
+  // Members Section
+  memberItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  memberAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.darkBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  memberInfo: {
+    flex: 1,
+  },
+  memberName: {
+    fontSize: typography.fontSize.md,
+    color: colors.textLight,
+    fontWeight: typography.fontWeight.medium,
+  },
+  memberSubtext: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textLightSecondary,
+  },
+  addMembersLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  addMembersLinkText: {
+    fontSize: typography.fontSize.md,
+    color: colors.primaryGreen,
+    fontWeight: typography.fontWeight.medium,
+    marginLeft: spacing.xs,
+  },
+  linkIcon: {
+    marginRight: spacing.xs,
+  },
+  searchUsersLink: {
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  searchUsersLinkText: {
+    fontSize: typography.fontSize.md,
+    color: colors.primaryGreen,
+    fontWeight: typography.fontWeight.medium,
+  },
+  inviteLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  inviteLinkText: {
+    fontSize: typography.fontSize.md,
+    color: colors.textLightSecondary,
+    fontWeight: typography.fontWeight.medium,
+    marginLeft: spacing.xs,
+  },
+  
+  // Done Button
+  doneButton: {
+    backgroundColor: colors.primaryGreen,
+    borderRadius: spacing.lg,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  doneButtonDisabled: {
+    backgroundColor: colors.buttonDisabled,
+  },
+  doneButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textDark,
+  },
+  doneButtonTextDisabled: {
+    color: colors.textLightSecondary,
+  },
+  
+  // Legacy styles (keeping for compatibility)
   iconScrollView: {
     marginBottom: spacing.md,
   },
@@ -57,29 +207,9 @@ export const styles = StyleSheet.create({
     borderColor: colors.textLight,
     borderWidth: 3,
   },
-  
-  // Color Selection Styles
   colorScrollView: {
     marginBottom: spacing.md,
   },
-  colorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  colorOption: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: spacing.md,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  colorSelected: {
-    borderColor: colors.textLight,
-    borderWidth: 3,
-  },
-  
-  // Legacy category styles (keeping for compatibility)
   catRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -106,24 +236,6 @@ export const styles = StyleSheet.create({
     color: colors.darkGray,
     marginTop: spacing.xs / 2,
   },
-  
-  // Input Styles
-  input: {
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.lg,
-    padding: spacing.md,
-    fontSize: typography.fontSize.md,
-    color: colors.textLight,
-    borderWidth: 1,
-    borderColor: colors.darkBorder,
-    marginBottom: spacing.md,
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  
-  // Members Section
   addMembersButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -140,8 +252,6 @@ export const styles = StyleSheet.create({
     marginLeft: spacing.md,
     flex: 1,
   },
-  
-  // Create Button
   createButton: {
     backgroundColor: colors.primaryGreen,
     borderRadius: spacing.lg,
@@ -157,8 +267,6 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.textDark,
   },
-  
-  // Legacy styles (keeping for compatibility)
   selectInput: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -12,9 +12,13 @@ import { colors } from '../../theme/colors';
 import { styles } from './styles';
 import { useWallet } from '../../context/WalletContext';
 import { solanaAppKitService } from '../../services/solanaAppKitService';
+import { firebaseDataService } from '../../services/firebaseDataService';
+import { useApp } from '../../context/AppContext';
 
 const SeedPhraseViewScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
+  const { state } = useApp();
+  const currentUser = state.currentUser;
   const [isRevealed, setIsRevealed] = useState(false);
   const [seedPhrase, setSeedPhrase] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +33,46 @@ const SeedPhraseViewScreen: React.FC = () => {
         setLoading(true);
         setError(null);
         
-        // Try to get seed phrase from the wallet service
+        // Try to get seed phrase from Firebase first
+        if (currentUser?.id) {
+          try {
+            const userSeedPhrase = await firebaseDataService.user.getUserSeedPhrase(currentUser.id.toString());
+            if (userSeedPhrase && userSeedPhrase.length > 0) {
+              setSeedPhrase(userSeedPhrase);
+              setLoading(false);
+              return;
+            }
+          } catch (firebaseError) {
+            // Continue to fallback logic
+            if (__DEV__) { console.log('No seed phrase in Firebase, generating one...'); }
+          }
+        }
+        
+        // If no seed phrase exists, generate one for the user
+        if (currentUser?.id && currentUser?.wallet_address) {
+          try {
+            if (__DEV__) { console.log('🔧 Generating seed phrase for existing user:', currentUser.id); }
+            
+            // Generate a new seed phrase
+            const newSeedPhrase = solanaAppKitService.generateMnemonic().split(' ');
+            
+            // Save it to Firebase
+            await firebaseDataService.user.saveUserSeedPhrase(currentUser.id.toString(), newSeedPhrase);
+            
+            if (__DEV__) { console.log('✅ Seed phrase generated and saved for user:', currentUser.id); }
+            
+            setSeedPhrase(newSeedPhrase);
+            setLoading(false);
+            return;
+          } catch (generateError) {
+            console.error('Error generating seed phrase:', generateError);
+            setError('Failed to generate seed phrase. Please try again later.');
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // Fallback: Try to get seed phrase from the wallet service
         if (secretKey) {
           // For app-generated wallets, we can derive the seed phrase
           // Note: This is a simplified approach - in production you'd want more secure handling
@@ -39,23 +82,23 @@ const SeedPhraseViewScreen: React.FC = () => {
           if (walletData.walletType === 'app-generated') {
             // For now, we'll show a message that seed phrases are not yet implemented
             // In a real implementation, you'd store the mnemonic when creating the wallet
-            setError('Seed phrase feature not yet implemented for app-generated wallets');
+            setError('Seed phrase feature not yet implemented for app-generated wallets. This feature will be available in a future update.');
           } else {
-            setError('Seed phrase not available for external wallets');
+            setError('Seed phrase not available for external wallets. External wallets manage their own seed phrases.');
           }
         } else {
-          setError('No wallet connected');
+          setError('No wallet connected. Please ensure you have a wallet set up.');
         }
       } catch (err) {
         console.error('Error getting seed phrase:', err);
-        setError('Failed to retrieve seed phrase');
+        setError('Failed to retrieve seed phrase. Please try again later.');
       } finally {
         setLoading(false);
       }
     };
 
     getSeedPhrase();
-  }, [secretKey]);
+  }, [secretKey, currentUser?.id]);
 
   const handleBack = () => {
     navigation.goBack();
@@ -82,7 +125,7 @@ const SeedPhraseViewScreen: React.FC = () => {
   };
 
   const handleNext = () => {
-    navigation.navigate('SeedPhraseVerify');
+    navigation.navigate('SeedPhraseVerify' as never);
   };
 
   if (loading) {
@@ -143,25 +186,28 @@ const SeedPhraseViewScreen: React.FC = () => {
         <View style={styles.instructionsContainer}>
           <Text style={styles.instructionsTitle}>Write Down Your Seed Phrase</Text>
           <Text style={styles.instructionsText}>
-            This is your seed phrase. Write it down on a paper and keep it in a safe place. 
-            You'll be asked to re-enter this phrase (in order) on the next step.
+            {!isRevealed 
+              ? "This is your seed phrase. Write it down on a paper and keep it in a safe place. You'll be asked to re-enter this phrase (in order) on the next step."
+              : "This is your seed phrase. Write it down on a paper and keep it in a safe place."
+            }
           </Text>
         </View>
 
         {/* Seed Phrase Display */}
         <View style={styles.seedPhraseContainer}>
           {!isRevealed ? (
-            <View style={styles.blurredContainer}>
+            <TouchableOpacity 
+              style={styles.blurredContainer}
+              onPress={handleReveal}
+              activeOpacity={0.8}
+            >
               <Text style={styles.blurredText}>Tap to reveal your seed phrase</Text>
               <Text style={styles.blurredSubtext}>Make sure no one is watching your screen.</Text>
-              <TouchableOpacity 
-                style={styles.revealButton}
-                onPress={handleReveal}
-              >
+              <View style={styles.revealButton}>
                 <Icon name="eye" size={20} color={colors.white} />
                 <Text style={styles.revealButtonText}>View</Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
           ) : (
             <View style={styles.seedPhraseGrid}>
               {seedPhrase.map((word, index) => (

@@ -60,17 +60,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [loadingUserWallet, setLoadingUserWallet] = useState(false);
   const [connectingWallet, setConnectingWallet] = useState(false);
   const [walletSelectorVisible, setWalletSelectorVisible] = useState(false);
-  const [displayWalletType, setDisplayWalletType] = useState<'connected' | 'app-created'>('app-created');
-
-
-  // Update display wallet type when external wallet connects
-  useEffect(() => {
-    if (walletConnected) {
-      setDisplayWalletType('connected');
-    } else {
-      setDisplayWalletType('app-created');
-    }
-  }, [walletConnected]);
+  const [groupSummaries, setGroupSummaries] = useState<Record<string, { totalAmount: number; memberCount: number; expenseCount: number; hasData: boolean }>>({});
 
   // Memoized balance calculations to avoid expensive recalculations
   const userBalances = useMemo(() => {
@@ -161,18 +151,15 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     loadUserCreatedWalletBalance();
   }, [loadUserCreatedWalletBalance]);
 
-  // Reload app wallet balance when external wallet connects/disconnects
+  // Reload app wallet balance when external wallet connects/disconnects (for consistency)
   useEffect(() => {
     loadUserCreatedWalletBalance();
   }, [walletConnected, loadUserCreatedWalletBalance]);
 
-  // Keep app-created wallet as default even when external wallet connects
-  // User can manually switch using arrows if they want to see external wallet
-
   // Convert group amounts to USD for display with proper currency handling
   const convertGroupAmountsToUSD = useCallback(async (groups: GroupWithDetails[]) => {
     try {
-      const usdAmounts: Record<number, number> = {};
+      const usdAmounts: Record<string | number, number> = {};
 
       for (const group of groups) {
         try {
@@ -340,8 +327,14 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       let memberCount = 0;
       let expenseCount = 0;
 
+      // Use cached summary if available
+      const cachedSummary = groupSummaries[group.id];
+      if (cachedSummary) {
+        return cachedSummary;
+      }
+
       // Calculate total amount from expenses_by_currency
-      if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency)) {
+      if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency) && group.expenses_by_currency.length > 0) {
         totalAmount = group.expenses_by_currency.reduce((sum, expense) => {
           return sum + (expense.total_amount || 0);
         }, 0);
@@ -381,12 +374,79 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         hasData: false
       };
     }
+  }, [groupSummaries]);
+
+  // Async function to update group summaries with individual expenses
+  const updateGroupSummaries = useCallback(async (groups: GroupWithDetails[]) => {
+    try {
+      const newSummaries: Record<string, { totalAmount: number; memberCount: number; expenseCount: number; hasData: boolean }> = {};
+      
+      for (const group of groups) {
+        let totalAmount = 0;
+        let memberCount = group.member_count || group.members?.length || 0;
+        let expenseCount = group.expense_count || group.expenses?.length || 0;
+
+        // Calculate total amount from expenses_by_currency
+        if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency) && group.expenses_by_currency.length > 0) {
+          totalAmount = group.expenses_by_currency.reduce((sum, expense) => {
+            return sum + (expense.total_amount || 0);
+          }, 0);
+        } else {
+          // If expenses_by_currency is empty, fetch individual expenses
+          try {
+            const { firebaseDataService } = await import('../../services/firebaseDataService');
+            const individualExpenses = await firebaseDataService.expense.getGroupExpenses(group.id.toString());
+            
+            if (individualExpenses.length > 0) {
+              // Calculate total from individual expenses
+              const currencyTotals: Record<string, number> = {};
+              
+              individualExpenses.forEach(expense => {
+                const currency = expense.currency || 'SOL';
+                const amount = expense.amount || 0;
+                
+                if (!currencyTotals[currency]) {
+                  currencyTotals[currency] = 0;
+                }
+                currencyTotals[currency] += amount;
+              });
+              
+              // Convert to USD for display
+              totalAmount = Object.entries(currencyTotals).reduce((sum, [currency, total]) => {
+                const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
+                return sum + (total * rate);
+              }, 0);
+              
+              if (__DEV__) {
+                console.log(`🔧 Dashboard: Calculated total from individual expenses for group "${group.name}": $${(totalAmount || 0).toFixed(2)}`);
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching individual expenses for group ${group.id}:`, error);
+          }
+        }
+
+        const hasData = totalAmount > 0 || memberCount > 0 || expenseCount > 0;
+        
+        newSummaries[group.id] = {
+          totalAmount,
+          memberCount,
+          expenseCount,
+          hasData
+        };
+      }
+      
+      setGroupSummaries(newSummaries);
+    } catch (error) {
+      console.error('Error updating group summaries:', error);
+    }
   }, []);
 
   // Convert amounts when groups change (similar to GroupsList)
   useEffect(() => {
     if (groups.length > 0) {
       convertGroupAmountsToUSD(groups);
+      updateGroupSummaries(groups);
     }
   }, [groups]); // Remove convertGroupAmountsToUSD dependency to prevent infinite loops
 
@@ -627,14 +687,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         <View style={[styles.balanceCard, { alignItems: 'flex-start' }]}>
                       <View style={styles.balanceHeader}>
               <Text style={styles.balanceLabel}>
-                {displayWalletType === 'connected'
-                  ? `${walletName || 'External Wallet'} Balance`
-                  : 'App Wallet Balance'
-                }
+              App Wallet Balance
               </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               {/* Refresh Balance Button */}
-              {(walletConnected || userCreatedWalletBalance) && (
+              {userCreatedWalletBalance && (
                 <TouchableOpacity
                   style={{
                     backgroundColor: colors.primaryGreen + '20',
@@ -644,46 +701,36 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                     marginRight: 8,
                   }}
                   onPress={async () => {
-                    if (displayWalletType === 'connected') {
-                      await refreshBalance();
-                    } else {
                       await loadUserCreatedWalletBalance();
-                    }
                   }}
                 >
                   <Icon name="refresh-cw" size={14} color={colors.primaryGreen} />
                 </TouchableOpacity>
               )}
 
-              {/* Wallet Selector Button */}
-              <TouchableOpacity
-                style={{
-                  backgroundColor: colors.primaryGreen + '20',
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 8,
-                  marginRight: 8,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                }}
-                onPress={() => setWalletSelectorVisible(true)}
+              {/* QR Code Button for Deposits */}
+              <TouchableOpacity 
+                style={styles.qrCodeIcon} 
+                onPress={() => navigation.navigate('Deposit')}
               >
-                <Icon name="wallet" size={14} color={colors.primaryGreen} />
-                <Text style={{
-                  fontSize: 12,
-                  color: colors.primaryGreen,
-                  fontWeight: '600',
-                  marginLeft: 4,
-                }}>
-                  {walletConnected ? 'Switch' : 'Select'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.qrCodeIcon} onPress={() => navigation.navigate('Deposit')}>
                 <Image
                   source={require('../../../assets/qr-code-scan.png')}
                   style={styles.qrCodeImage}
                 />
+              </TouchableOpacity>
+
+              {/* Wallet Selector Button */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.primaryGreen + '20',
+                  paddingHorizontal: 8,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                  marginLeft: 8,
+                }}
+                onPress={() => setWalletSelectorVisible(true)}
+              >
+                <Icon name="settings" size={14} color={colors.primaryGreen} />
               </TouchableOpacity>
             </View>
           </View>
@@ -692,33 +739,15 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             <View style={styles.priceLoadingContainer}>
               <ActivityIndicator size="small" color={BG_COLOR} />
               <Text style={styles.priceLoadingText}>
-                {walletConnected ? 'Loading balance...' : loadingUserWallet ? 'Loading your wallet...' : 'Loading balance...'}
+                {loadingUserWallet ? 'Loading your wallet...' : 'Loading balance...'}
               </Text>
             </View>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }}>
-              {/* Left Arrow - Switch to App Wallet */}
-              {walletConnected && userCreatedWalletBalance && (
-                <TouchableOpacity
-                  style={{
-                    padding: 8,
-                    marginRight: 8,
-                    opacity: displayWalletType === 'app-created' ? 0.3 : 0.8,
-                  }}
-                  onPress={() => setDisplayWalletType('app-created')}
-                  disabled={displayWalletType === 'app-created'}
-                >
-                  <Icon name="chevron-left" size={24} color={colors.black} />
-                </TouchableOpacity>
-              )}
-
               {/* Balance Display */}
               <View style={{ flex: 1, alignItems: 'flex-start' }}>
                 <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
-                  ${displayWalletType === 'connected' && walletConnected
-                    ? (walletBalance !== null ? walletBalance.toFixed(2) : '0.00')
-                    : (userCreatedWalletBalance?.totalUSD || 0).toFixed(2)
-                  }
+                  ${(userCreatedWalletBalance?.totalUSD || 0).toFixed(2)}
                 </Text>
                 <View style={{
                   flexDirection: 'row',
@@ -729,7 +758,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                     width: 8,
                     height: 8,
                     borderRadius: 4,
-                    backgroundColor: displayWalletType === 'connected' ? colors.primaryGreen : colors.textLightSecondary,
+                    backgroundColor: colors.textLightSecondary,
                     marginRight: 6,
                   }} />
                   <Text style={{
@@ -737,28 +766,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                     color: colors.textLightSecondary,
                     fontWeight: '500',
                   }}>
-                    {displayWalletType === 'connected'
-                      ? `${walletName || 'External Wallet'} Balance`
-                      : 'App Wallet Balance'
-                    }
+                    App Wallet Balance
                   </Text>
                 </View>
               </View>
-
-              {/* Right Arrow - Switch to Connected Wallet */}
-              {walletConnected && userCreatedWalletBalance && (
-                <TouchableOpacity
-                  style={{
-                    padding: 8,
-                    marginLeft: 8,
-                    opacity: displayWalletType === 'connected' ? 0.3 : 0.8,
-                  }}
-                  onPress={() => setDisplayWalletType('connected')}
-                  disabled={displayWalletType === 'connected'}
-                >
-                  <Icon name="chevron-right" size={24} color={colors.black} />
-                </TouchableOpacity>
-              )}
             </View>
           )}
 
@@ -923,7 +934,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                               style={styles.usdcLogo}
                             />
                             <Text style={styles.groupGridAmount}>
-                              {(groupAmountsInUSD[group.id] || 0).toFixed(2)}
+                              {(groupSummaries[group.id]?.totalAmount || groupAmountsInUSD[group.id] || 0).toFixed(2)}
                             </Text>
                           </View>
                         </View>
@@ -944,14 +955,14 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                             {/* Show member avatars */}
                             {group.members && group.members.slice(0, 3).map((member, i) => (
                               <View key={member.id} style={styles.memberAvatar}>
-                                {member.avatar ? (
+                                {member.avatar && member.avatar.trim() !== '' ? (
                                   <Image
                                     source={{ uri: member.avatar }}
                                     style={styles.memberAvatarImage}
                                   />
                                 ) : (
                                   <Text style={styles.memberAvatarText}>
-                                    {member.name.charAt(0).toUpperCase()}
+                                    {((member.name || member.email || 'U') as string).charAt(0).toUpperCase()}
                                   </Text>
                                 )}
                               </View>
@@ -1018,14 +1029,14 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                 return (
                   <View key={request.id || index} style={styles.requestItemNew}>
                     <View style={styles.requestAvatarNew}>
-                      {senderAvatar ? (
+                      {senderAvatar && senderAvatar.trim() !== '' ? (
                         <Image
                           source={{ uri: senderAvatar }}
                           style={styles.requestAvatarImage}
                         />
                       ) : (
                         <Text style={styles.balanceAmountText}>
-                          {senderName.charAt(0).toUpperCase()}
+                          {(senderName || 'U').charAt(0).toUpperCase()}
                         </Text>
                       )}
                     </View>
@@ -1124,7 +1135,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                       </Text>
                     </View>
                     <Text style={styles.requestAmountGreen}>
-                      {summary.totalAmount.toFixed(2)} USDC
+                      {(summary.totalAmount || 0).toFixed(2)} USDC
                     </Text>
                   </TouchableOpacity>
                 );

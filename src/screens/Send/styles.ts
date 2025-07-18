@@ -953,5 +953,88 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
   },
+  // === SEND TABS STYLES ===
+  sendTabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.darkBackground,
+    borderRadius: spacing.lg,
+    margin: spacing.lg,
+    padding: spacing.xs,
+    borderWidth: spacing.borderWidthThin,
+    borderColor: colors.textLight,
+  },
+  sendTab: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: spacing.md,
+    alignItems: 'center',
+  },
+  sendTabActive: {
+    backgroundColor: colors.brandGreen,
+  },
+  sendTabText: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+  },
+  sendTabTextActive: {
+    color: colors.darkBackground,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  // === SEND QR CODE STYLES ===
+  sendQRTabContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  sendQRCodeTitle: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  sendQRCodeDisplay: {
+    backgroundColor: colors.brandGreen,
+    borderRadius: spacing.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    position: 'relative',
+    marginBottom: spacing.lg,
+  },
+  sendQRCodeBox: {
+    backgroundColor: colors.textLight,
+    borderRadius: spacing.md,
+    padding: spacing.lg,
+  },
+  sendQRUserBadge: {
+    position: 'absolute',
+    bottom: -spacing.sm,
+    width: spacing.xl,
+    height: spacing.xl,
+    borderRadius: spacing.md,
+    backgroundColor: colors.textLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendQRUserBadgeText: {
+    color: colors.brandGreen,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
+  sendQRContinueButton: {
+    backgroundColor: colors.brandGreen,
+    borderRadius: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+  },
+  sendQRContinueButtonText: {
+    color: colors.darkBackground,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
 
 }); 

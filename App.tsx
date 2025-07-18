@@ -51,8 +51,7 @@ import WithdrawSuccessScreen from './src/screens/Withdraw/WithdrawSuccessScreen'
 import WalletManagementScreen from './src/screens/WalletManagement/WalletManagementScreen';
 import SeedPhraseViewScreen from './src/screens/WalletManagement/SeedPhraseViewScreen';
 import SeedPhraseVerifyScreen from './src/screens/WalletManagement/SeedPhraseVerifyScreen';
-import MultiSignExplanationScreen from './src/screens/WalletManagement/MultiSignExplanationScreen';
-import MultiSignActivatedScreen from './src/screens/WalletManagement/MultiSignActivatedScreen';
+
 
 const Stack = createStackNavigator();
 const queryClient = new QueryClient();
@@ -166,8 +165,6 @@ export default function App() {
               <Stack.Screen name="WalletManagement" component={WalletManagementScreen} />
               <Stack.Screen name="SeedPhraseView" component={SeedPhraseViewScreen} />
               <Stack.Screen name="SeedPhraseVerify" component={SeedPhraseVerifyScreen} />
-              <Stack.Screen name="MultiSignExplanation" component={MultiSignExplanationScreen} />
-              <Stack.Screen name="MultiSignActivated" component={MultiSignActivatedScreen} />
             </Stack.Navigator>
           </NavigationContainer>
         </AppProvider>

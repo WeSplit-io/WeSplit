@@ -917,6 +917,21 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
   },
+  mockupRequestSuccessDate: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+  },
+  mockupRequestAmountContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  mockupRequestAmountLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+  },
+
   sendQRErrorContainer: {
     alignItems: 'center',
     justifyContent: 'center',

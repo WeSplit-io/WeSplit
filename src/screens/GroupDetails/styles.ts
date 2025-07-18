@@ -365,6 +365,19 @@ export const styles = StyleSheet.create({
     backgroundColor: '#A5EA15',
     borderRadius: 4,
   },
+  progressBarFillGreen: {
+    height: '100%',
+    backgroundColor: '#A5EA15',
+    borderRadius: 4,
+    position: 'absolute',
+    left: 0,
+  },
+  progressBarFillRed: {
+    height: '100%',
+    backgroundColor: '#FF4D4F',
+    borderRadius: 4,
+    position: 'absolute',
+  },
   progressBarThumb: {
     position: 'absolute',
     top: -2,
@@ -1116,31 +1129,5 @@ export const styles = StyleSheet.create({
     color: '#212121',
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-  },
-  
-  // Progress Bar Styles
-  progressBarContainer: {
-    paddingHorizontal: spacing.screenPadding,
-    marginBottom: spacing.lg,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#333',
-    borderRadius: 4,
-    position: 'relative',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#A5EA15',
-    borderRadius: 4,
-  },
-  progressBarThumb: {
-    position: 'absolute',
-    top: -2,
-    width: 12,
-    height: 12,
-    backgroundColor: '#FFF',
-    borderRadius: 6,
-    transform: [{ translateX: -6 }],
   },
 }); 

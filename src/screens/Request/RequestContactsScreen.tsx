@@ -3,8 +3,9 @@ import { View, Text, ScrollView, TouchableOpacity, TextInput, SafeAreaView } fro
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
+import { useGroupData } from '../../hooks/useGroupData';
 import { firebaseDataService } from '../../services/firebaseDataService';
-import { UserContact } from '../../types';
+import { UserContact, User } from '../../types';
 import QRCode from 'react-native-qrcode-svg';
 import { colors } from '../../theme';
 import { styles } from './styles';
@@ -14,36 +15,79 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
   const { address } = useWallet();
   const { currentUser } = state;
   const { groupId, preselectedContact } = route.params || {};
-  
+
+  // Use the efficient hook for group data when groupId is provided
+  const {
+    group,
+    loading: groupLoading
+  } = useGroupData(groupId);
+
   const [activeTab, setActiveTab] = useState<'Contact List' | 'Show QR code'>('Contact List');
   const [searchQuery, setSearchQuery] = useState('');
   const [contacts, setContacts] = useState<UserContact[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<UserContact[]>([]);
   const [selectedContact, setSelectedContact] = useState<UserContact | null>(preselectedContact || null);
   const [loading, setLoading] = useState(true);
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Get user's wallet address for QR code (same logic as DepositScreen)
-  const userWalletAddress = currentUser?.wallet_address || 
-                           address;
+  const userWalletAddress = currentUser?.wallet_address ||
+    address;
 
   useEffect(() => {
     loadContacts();
-  }, [groupId, currentUser]);
+  }, [groupId, currentUser, group]);
 
   useEffect(() => {
     // Filter contacts based on search query 
     let filtered = [...contacts];
-    
-    if (searchQuery.trim() !== '') {
+
+    if (searchQuery.trim() !== '' && activeTab === 'Contact List') {
       filtered = filtered.filter(contact =>
         (contact.wallet_address && contact.wallet_address.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (contact.name && contact.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         contact.email.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    
+
     setFilteredContacts(filtered);
-  }, [searchQuery, contacts]);
+  }, [searchQuery, contacts, activeTab]);
+
+  // Handle user search
+  const handleUserSearch = async (query: string) => {
+    if (!query.trim() || query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const results = await firebaseDataService.group.searchUsersByUsername(
+        query.trim(),
+        currentUser?.id ? String(currentUser.id) : undefined
+      );
+      setSearchResults(results);
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Debounced search
+  useEffect(() => {
+    if (activeTab === 'Contact List' && searchQuery.trim()) {
+      const timeoutId = setTimeout(() => {
+        handleUserSearch(searchQuery);
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    } else if (activeTab === 'Contact List') {
+      setSearchResults([]);
+    }
+  }, [searchQuery, activeTab]);
 
   const loadContacts = async () => {
     if (!currentUser) {
@@ -55,13 +99,10 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
     try {
       setLoading(true);
       console.log('🔄 Loading contacts for user:', currentUser.id, 'groupId:', groupId);
-      
-      if (groupId) {
-        // Load group members
-        console.log('📱 Loading group members for group:', groupId);
-        const members = await firebaseDataService.group.getGroupMembers(groupId);
-        // Filter out current user and convert to UserContact format
-        const otherMembers = members.filter(member => 
+
+      if (groupId && group?.members) {
+        // Use cached group members from useGroupData hook
+        const otherMembers = group.members.filter(member =>
           String(member.id) !== String(currentUser.id)
         ).map(member => ({
           ...member,
@@ -71,10 +112,10 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
         }));
         console.log('📱 Loaded', otherMembers.length, 'group members');
         setContacts(otherMembers);
-      } else {
+      } else if (!groupId) {
         // Load all contacts from groups the user has been in
         console.log('📱 Loading all user contacts...');
-        const userContacts = await firebaseDataService.group.getUserContacts(String(currentUser.id));
+        const userContacts = await firebaseDataService.user.getUserContacts(String(currentUser.id));
         console.log('📱 Loaded', userContacts.length, 'user contacts:', userContacts.map((c: UserContact) => ({
           name: c.name || 'No name',
           email: c.email,
@@ -82,6 +123,10 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
           fullWallet: c.wallet_address
         })));
         setContacts(userContacts);
+      } else {
+        // Group data is still loading or doesn't exist
+        console.log('📱 Group data still loading, setting empty contacts');
+        setContacts([]);
       }
     } catch (error) {
       console.error('❌ Error loading contacts:', error);
@@ -105,8 +150,8 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const toggleFavorite = (contactId: number) => {
-    setContacts(prev => prev.map(contact => 
-      contact.id === contactId 
+    setContacts(prev => prev.map(contact =>
+      contact.id === contactId
         ? { ...contact, isFavorite: !contact.isFavorite }
         : contact
     ));
@@ -151,20 +196,20 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
             <Text style={styles.sendContactGroups}> • {item.mutual_groups_count} groups</Text>
           )}
         </Text>
-        {item.email && (
+        {item.email && item.wallet_address && (
           <Text style={[styles.sendContactWallet, { fontSize: 12, marginTop: 2 }]}>
             {item.email}
           </Text>
         )}
       </View>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.sendContactStar}
         onPress={() => toggleFavorite(Number(item.id))}
       >
-        <Icon 
-          name="star" 
-          size={16} 
-          color={item.isFavorite ? colors.brandGreen : colors.textSecondary} 
+        <Icon
+          name="star"
+          size={16}
+          color={item.isFavorite ? colors.brandGreen : colors.textSecondary}
         />
       </TouchableOpacity>
       {selectedContact?.id === item.id && (
@@ -175,7 +220,7 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
 
   const renderContactsSection = (title: string, sectionContacts: UserContact[], section: 'friends' | 'others') => {
     if (sectionContacts.length === 0) return null;
-    
+
     return (
       <View style={styles.sendContactsSection}>
         <Text style={styles.sendContactsSectionTitle}>{title}</Text>
@@ -185,7 +230,12 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const renderContactListTab = () => (
-    <ScrollView style={styles.sendTabContent} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.sendTabContent}
+      contentContainerStyle={{ paddingBottom: 100 }}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       {/* Search */}
       <View style={styles.sendSearchContainer}>
         <Icon name="search" size={20} color={colors.textSecondary} style={styles.sendSearchIcon} />
@@ -200,22 +250,85 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
 
       {/* Contacts Sections */}
       {/* Friends Section */}
-      {getFriends().length > 0 && 
+      {getFriends().length > 0 &&
         renderContactsSection('Friends', getFriends(), 'friends')
       }
 
       {/* Others Section */}
-      {getOthers().length > 0 && 
+      {getOthers().length > 0 &&
         renderContactsSection('Others', getOthers(), 'others')
       }
-      
+
+      {/* Search Results Section */}
+      {searchQuery.trim() && searchResults.length > 0 && (
+        <>
+          <Text style={styles.sendContactsSectionTitle}>Search Results</Text>
+          {searchResults.map((user) => (
+            <TouchableOpacity
+              key={`search-${user.id}`}
+              style={[
+                styles.sendContactRow,
+                selectedContact?.id === user.id && styles.sendContactRowSelected,
+              ]}
+              onPress={() => handleSelectContact({
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                wallet_address: user.wallet_address,
+                wallet_public_key: user.wallet_public_key,
+                created_at: user.created_at,
+                joined_at: user.created_at,
+                first_met_at: user.created_at,
+                mutual_groups_count: 0,
+                isFavorite: false
+              })}
+            >
+              <View style={styles.sendContactAvatar}>
+                <Text style={styles.sendContactAvatarText}>
+                  {user.name ? user.name.charAt(0).toUpperCase() : formatWalletAddress(user.wallet_address).charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.sendContactInfo}>
+                <Text style={styles.sendContactName}>
+                  {user.name || formatWalletAddress(user.wallet_address)}
+                </Text>
+
+                {user.email && user.wallet_address && (
+                  <Text style={[styles.sendContactWallet, { fontSize: 12, marginTop: 2 }]}>
+                    {user.email}
+                  </Text>
+                )}
+                <Text style={styles.sendContactWallet}>
+                  {user.wallet_address ? formatWalletAddress(user.wallet_address) : user.email}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.sendContactStar}
+                onPress={() => {
+                  // This would add to favorites if needed
+                }}
+              >
+                <Icon
+                  name="user-plus"
+                  size={16}
+                  color={colors.brandGreen}
+                />
+              </TouchableOpacity>
+              {selectedContact?.id === user.id && (
+                <Icon name="check" size={20} color={colors.brandGreen} style={styles.sendContactCheck} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </>
+      )}
+
       {loading && (
         <View style={styles.sendLoadingContainer}>
           <Text style={styles.sendLoadingText}>Loading contacts...</Text>
         </View>
       )}
-      
-      {!loading && filteredContacts.length === 0 && (
+
+      {!loading && filteredContacts.length === 0 && !searchQuery.trim() && (
         <View style={styles.sendEmptyContainer}>
           <Icon name="users" size={48} color={colors.textSecondary} />
           <Text style={styles.sendEmptyText}>
@@ -224,6 +337,14 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
           <Text style={styles.sendEmptySubtext}>
             {!groupId && !searchQuery && 'Join groups to meet new contacts'}
           </Text>
+        </View>
+      )}
+
+      {!loading && searchQuery.trim() && searchResults.length === 0 && (
+        <View style={styles.sendEmptyContainer}>
+          <Icon name="search" size={48} color={colors.textSecondary} />
+          <Text style={styles.sendEmptyText}>No users found matching "{searchQuery}"</Text>
+          <Text style={styles.sendEmptySubtext}>Try searching with a different username or email</Text>
         </View>
       )}
     </ScrollView>
@@ -235,9 +356,9 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
       <View style={styles.sendQRCodeDisplay}>
         <View style={styles.sendQRCodeBox}>
           {userWalletAddress ? (
-            <QRCode 
-              value={userWalletAddress} 
-              size={120} 
+            <QRCode
+              value={userWalletAddress}
+              size={120}
               backgroundColor="#FFFFFF"
               color="#000000"
             />
@@ -259,13 +380,13 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
           {currentUser?.name || currentUser?.email?.split('@')[0] || 'Unknown User'}
         </Text>
         <Text style={styles.sendQRUserWallet}>
-          {userWalletAddress ? 
+          {userWalletAddress ?
             `${userWalletAddress.substring(0, 6)}...${userWalletAddress.substring(userWalletAddress.length - 6)}` :
             'No wallet connected'
           }
         </Text>
       </View>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[
           styles.sendQRContinueButton,
           !userWalletAddress && styles.sendQRContinueButtonDisabled
@@ -311,7 +432,7 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
             Contact List
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[
             styles.sendTab,
@@ -331,7 +452,7 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
       {/* Tab Content */}
       <View style={styles.sendTabContentContainer}>
         {activeTab === 'Contact List' ? renderContactListTab() : renderQRCodeTab()}
-        
+
         {/* Continue Button - only show for Contact List tab */}
         {activeTab === 'Contact List' && (
           <TouchableOpacity

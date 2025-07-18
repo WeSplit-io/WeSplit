@@ -5,37 +5,39 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.black,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: 60,
-  },
-  scrollContainer: {
-    flexGrow: 1,
     paddingBottom: spacing.xl,
   },
-  logoRow: {
-    flexDirection: 'row',
+  logoSection: {
     alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: spacing.xl,
     marginTop: spacing.lg,
   },
-  logoIcon: {
-    width: 36,
-    height: 36,
-    marginRight: spacing.sm,
+  logoContainer: {
+    width: 48,
+    height: 48,
+    backgroundColor: colors.green,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
   },
   logoText: {
-    fontSize: 35,
+    fontSize: 24,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.black,
+  },
+  logoName: {
+    fontSize: 24,
     fontWeight: typography.fontWeight.bold,
     color: colors.textLight,
-    letterSpacing: 0.5,
   },
-  logoSplit: {
-    color: colors.green,
-  },
-  centerContent: {
-    flex: 1,
-    justifyContent: 'center',
+  socialSection: {
+    marginBottom: spacing.xl,
   },
   socialButton: {
     flexDirection: 'row',
@@ -53,61 +55,65 @@ export const styles = StyleSheet.create({
     objectFit: 'contain',
     marginRight: spacing.sm,
   },
-  socialText: {
+  socialButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     color: colors.darkBackground,
   },
-  dividerRow: {
+  separator: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: spacing.lg,
   },
-  divider: {
+  separatorLine: {
     flex: 1,
     height: 1,
     backgroundColor: colors.darkBorder,
   },
-  dividerText: {
+  separatorText: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
     marginHorizontal: spacing.md,
   },
-  label: {
+  emailSection: {
+    marginBottom: spacing.lg,
+  },
+  emailLabel: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     color: colors.textLight,
     marginBottom: spacing.sm,
-    marginTop: spacing.md,
   },
-  input: {
+  emailInput: {
     backgroundColor: colors.textLight,
     borderRadius: spacing.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     fontSize: typography.fontSize.md,
     color: colors.black,
-    marginBottom: spacing.lg,
   },
   nextButton: {
     backgroundColor: colors.green,
     borderRadius: spacing.lg,
     paddingVertical: 20,
     alignItems: 'center',
-    marginTop: spacing.sm,
+    marginBottom: spacing.xl,
+  },
+  nextButtonDisabled: {
+    backgroundColor: colors.darkBorder,
   },
   nextButtonText: {
     fontSize: 20,
     fontWeight: typography.fontWeight.semibold,
     color: colors.black,
   },
-  helpLink: {
+  helpSection: {
     alignItems: 'center',
-    paddingBottom: spacing.xl,
   },
   helpText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.green,
+    fontWeight: typography.fontWeight.medium,
   },
   // Modal styles
   modalOverlay: {

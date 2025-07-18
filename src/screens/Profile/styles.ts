@@ -23,6 +23,9 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     color: colors.textLight,
   },
+  editButton: {
+    padding: spacing.sm,
+  },
   placeholder: {
     width: spacing.xxl + spacing.sm,
   },
@@ -32,7 +35,80 @@ export const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: spacing.xl,
+    paddingBottom: 150, // Add more bottom padding for NavBar and extra scrolling space
   },
+  
+  // Profile Card
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  profileAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.darkBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  avatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textLight,
+    marginBottom: spacing.xs,
+  },
+  profileId: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textLightSecondary,
+  },
+  
+  // Menu Items
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  menuItemText: {
+    flex: 1,
+    fontSize: typography.fontSize.md,
+    color: colors.textLight,
+    marginLeft: spacing.md,
+    fontWeight: typography.fontWeight.medium,
+  },
+  logoutText: {
+    color: '#FF6B6B',
+  },
+  
+  // Section Titles
+  sectionTitle: {
+    fontSize: typography.fontSize.md,
+    color: colors.textLight,
+    marginTop: spacing.xl,
+    marginBottom: spacing.md,
+    fontWeight: typography.fontWeight.medium,
+  },
+  
+  // Legacy styles (keeping for compatibility)
   profileSection: {
     alignItems: 'center',
     marginBottom: spacing.xl,
@@ -51,11 +127,6 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  avatarImage: {
-    width: spacing.xxl + spacing.xxxl,
-    height: spacing.xxl + spacing.xxxl,
-    borderRadius: spacing.xxl + spacing.screenPadding,
   },
   avatarText: {
     fontSize: typography.fontSize.display,
@@ -120,13 +191,6 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.brandGreen,
     fontFamily: 'monospace',
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize.md,
-    color: colors.darkGray,
-    marginTop: spacing.xl,
-    marginBottom: spacing.md,
-    fontWeight: typography.fontWeight.medium,
   },
   settingsSectionTitle: {
     fontSize: typography.fontSize.md,
@@ -297,7 +361,6 @@ export const styles = StyleSheet.create({
   settingsOptionLabelDestructive: {
     color: colors.error,
   },
-  // Additional styles for sections not covered
   sectionMargin: {
     marginBottom: spacing.screenPadding,
   },
@@ -307,7 +370,6 @@ export const styles = StyleSheet.create({
     marginTop: spacing.xxl + spacing.sm,
     fontSize: typography.fontSize.md,
   },
-  // Private key section styles
   privateKeySection: {
     backgroundColor: colors.darkCard,
     borderRadius: spacing.sm,
@@ -339,8 +401,6 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     fontSize: typography.fontSize.sm,
   },
-  
-  // Wallet Management Button
   walletManagementButton: {
     backgroundColor: colors.darkBackground,
     borderRadius: spacing.itemSpacing,
@@ -349,24 +409,20 @@ export const styles = StyleSheet.create({
     borderWidth: spacing.borderWidthThin,
     borderColor: colors.textLight,
   },
-  
   walletManagementContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  
   walletManagementText: {
     flex: 1,
     marginLeft: spacing.md,
   },
-  
   walletManagementTitle: {
     fontSize: typography.fontSize.md,
     color: colors.textLight,
     fontWeight: typography.fontWeight.medium,
     marginBottom: spacing.xs,
   },
-  
   walletManagementSubtitle: {
     fontSize: typography.fontSize.sm,
     color: colors.darkGray,

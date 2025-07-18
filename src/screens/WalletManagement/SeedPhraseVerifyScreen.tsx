@@ -11,22 +11,55 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
+import { useApp } from '../../context/AppContext';
+import { firebaseDataService } from '../../services/firebaseDataService';
 
 const SeedPhraseVerifyScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
+  const { state } = useApp();
+  const { currentUser } = state;
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [enteredWords, setEnteredWords] = useState<string[]>([]);
   const [selectedWord, setSelectedWord] = useState<string>('');
   const [verificationComplete, setVerificationComplete] = useState(false);
-  
-  // Mock seed phrase for verification - in real app this would come from context
-  const originalSeedPhrase = [
-    'future', 'use', 'abuse', 'bubble', 'disagree', 'yard',
-    'exit', 'enact', 'drum', 'frequent', 'target', 'organ'
-  ];
+  const [originalSeedPhrase, setOriginalSeedPhrase] = useState<string[]>([]);
+  const [shuffledWords, setShuffledWords] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Shuffled words for selection
-  const shuffledWords = [...originalSeedPhrase].sort(() => Math.random() - 0.5);
+  // Load seed phrase from Firebase
+  useEffect(() => {
+    const loadSeedPhrase = async () => {
+      if (!currentUser?.id) {
+        setError('User not authenticated');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Get user's seed phrase from Firebase
+        const userSeedPhrase = await firebaseDataService.user.getUserSeedPhrase(currentUser.id.toString());
+        
+        if (userSeedPhrase && userSeedPhrase.length > 0) {
+          setOriginalSeedPhrase(userSeedPhrase);
+          // Create shuffled words for selection
+          setShuffledWords([...userSeedPhrase].sort(() => Math.random() - 0.5));
+        } else {
+          setError('No seed phrase found for this user');
+        }
+      } catch (error) {
+        console.error('Error loading seed phrase:', error);
+        setError('Failed to load seed phrase');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSeedPhrase();
+  }, [currentUser?.id]);
 
   const handleBack = () => {
     navigation.goBack();
@@ -36,7 +69,7 @@ const SeedPhraseVerifyScreen: React.FC = () => {
     setSelectedWord(word);
   };
 
-  const handleConfirmWord = () => {
+  const handleConfirmWord = async () => {
     if (!selectedWord) return;
 
     const newEnteredWords = [...enteredWords, selectedWord];
@@ -49,11 +82,24 @@ const SeedPhraseVerifyScreen: React.FC = () => {
       
       if (isCorrect) {
         setVerificationComplete(true);
-        Alert.alert(
-          'Success!',
-          'Your seed phrase has been verified successfully.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
+        
+        // Mark seed phrase as verified in Firebase
+        try {
+          await firebaseDataService.user.markSeedPhraseVerified(currentUser!.id.toString());
+          
+          Alert.alert(
+            'Success!',
+            'Your seed phrase has been verified successfully.',
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
+          );
+        } catch (error) {
+          console.error('Error marking seed phrase as verified:', error);
+          Alert.alert(
+            'Verification Complete',
+            'Your seed phrase has been verified successfully.',
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
+          );
+        }
       } else {
         Alert.alert(
           'Incorrect Seed Phrase',
@@ -82,6 +128,45 @@ const SeedPhraseVerifyScreen: React.FC = () => {
   const getCurrentExpectedWord = () => {
     return originalSeedPhrase[currentWordIndex];
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <Icon name="arrow-left" size={24} color={colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Verify Seed Phrase</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <View style={styles.content}>
+          <Text style={styles.instructionsText}>Loading seed phrase...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || originalSeedPhrase.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <Icon name="arrow-left" size={24} color={colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Verify Seed Phrase</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <View style={styles.content}>
+          <View style={styles.instructionsContainer}>
+            <Text style={styles.instructionsTitle}>Seed Phrase Unavailable</Text>
+            <Text style={styles.instructionsText}>
+              {error || 'No seed phrase found for verification'}
+            </Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

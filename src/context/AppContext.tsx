@@ -12,6 +12,7 @@ import {
 import { firebaseDataService } from '../services/firebaseDataService';
 import { i18nService } from '../services/i18nService';
 import { getUserNotifications } from '../services/firebaseNotificationService';
+import { MultiSignStateService } from '../services/multiSignStateService';
 
 // Initial State - now clean without mock data
 const initialState: AppState = {
@@ -119,7 +120,29 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
                 ...group, 
                 expenses: [...group.expenses, action.payload.expense],
                 totalAmount: group.totalAmount + action.payload.expense.amount,
-                expense_count: group.expense_count + 1
+                expense_count: group.expense_count + 1,
+                // Update expenses_by_currency properly
+                expenses_by_currency: (() => {
+                  const existingCurrency = group.expenses_by_currency?.find(currency => 
+                    currency.currency === action.payload.expense.currency
+                  );
+                  
+                  if (existingCurrency) {
+                    // Update existing currency entry
+                    return group.expenses_by_currency.map(currency => 
+                      currency.currency === action.payload.expense.currency
+                        ? { ...currency, total_amount: currency.total_amount + action.payload.expense.amount }
+                        : currency
+                    );
+                  } else {
+                    // Add new currency entry
+                    const newCurrencyEntry = { 
+                      currency: action.payload.expense.currency, 
+                      total_amount: action.payload.expense.amount 
+                    };
+                    return [...(group.expenses_by_currency || []), newCurrencyEntry];
+                  }
+                })()
               }
             : group
         ),
@@ -128,7 +151,29 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
               ...state.selectedGroup,
               expenses: [...state.selectedGroup.expenses, action.payload.expense],
               totalAmount: state.selectedGroup.totalAmount + action.payload.expense.amount,
-              expense_count: state.selectedGroup.expense_count + 1
+              expense_count: state.selectedGroup.expense_count + 1,
+              // Update expenses_by_currency for selected group too
+              expenses_by_currency: (() => {
+                const existingCurrency = state.selectedGroup.expenses_by_currency?.find(currency => 
+                  currency.currency === action.payload.expense.currency
+                );
+                
+                if (existingCurrency) {
+                  // Update existing currency entry
+                  return state.selectedGroup.expenses_by_currency.map(currency => 
+                    currency.currency === action.payload.expense.currency
+                      ? { ...currency, total_amount: currency.total_amount + action.payload.expense.amount }
+                      : currency
+                  );
+                } else {
+                  // Add new currency entry
+                  const newCurrencyEntry = { 
+                    currency: action.payload.expense.currency, 
+                    total_amount: action.payload.expense.amount 
+                  };
+                  return [...(state.selectedGroup.expenses_by_currency || []), newCurrencyEntry];
+                }
+              })()
             }
           : state.selectedGroup,
         lastDataFetch: {
@@ -282,10 +327,10 @@ interface AppContextType {
   logoutUser: () => void;
   
   // Utility functions
-  getGroupById: (id: number) => GroupWithDetails | undefined;
-  getGroupBalances: (groupId: number) => Balance[];
-  getTotalExpenses: (groupId: number) => number;
-  getUserBalance: (groupId: number, userId: number) => number;
+  getGroupById: (id: number | string) => GroupWithDetails | undefined;
+  getGroupBalances: (groupId: number | string) => Balance[];
+  getTotalExpenses: (groupId: number | string) => number;
+  getUserBalance: (groupId: number | string, userId: number | string) => number;
   clearError: () => void;
   
   // Cache management
@@ -303,7 +348,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // Helper function to calculate balances when we have actual member data
-const calculateBalancesFromMembers = (group: GroupWithDetails, currentUserId?: number): Balance[] => {
+const calculateBalancesFromMembers = (group: GroupWithDetails, currentUserId?: number | string): Balance[] => {
   const balances: Balance[] = [];
   
   if (!group.members || group.members.length === 0) return balances;
@@ -541,18 +586,21 @@ const calculateBalancesFromSummary = (group: GroupWithDetails, currentUser?: any
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  // Initialize i18n service
+  // Initialize services
   useEffect(() => {
-    const initializeI18n = async () => {
+    const initializeServices = async () => {
       try {
         await i18nService.initialize();
         console.log('i18n service initialized');
+        
+        await MultiSignStateService.initialize();
+        console.log('multi-sign state service initialized');
       } catch (error) {
-        console.error('Failed to initialize i18n service:', error);
+        console.error('Failed to initialize services:', error);
       }
     };
 
-    initializeI18n();
+    initializeServices();
   }, []);
 
   // Cache management
@@ -606,10 +654,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const loadGroupDetails = useCallback(async (groupId: number, forceRefresh: boolean = false): Promise<GroupWithDetails> => {
     try {
+      // Try to find the group in the current state first
+      const existingGroup = state.groups.find(g => g.id === groupId || g.id === groupId.toString());
+      if (existingGroup && !forceRefresh) {
+        if (__DEV__) { console.log('🔄 AppContext: Using cached group details for:', groupId); }
+        return existingGroup;
+      }
+      
       const group = await firebaseDataService.group.getGroupDetails(groupId.toString(), forceRefresh);
       
       // Update the group in state if it exists
-      const existingGroup = state.groups.find(g => g.id === groupId);
       if (existingGroup) {
         dispatch({ type: 'UPDATE_GROUP', payload: group });
       }
@@ -619,7 +673,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       console.error('Error loading group details:', error);
       throw error;
     }
-  }, []); // Remove state.groups dependency to prevent infinite loops
+  }, [state.groups]); // Add state.groups back for caching
 
   const refreshGroup = useCallback(async (groupId: number) => {
     try {
@@ -645,12 +699,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       });
       
       // Transform to GroupWithDetails
-      const groupWithDetails = firebaseDataService.transformers.transformGroupWithDetails(
-        group, 
-        [firebaseDataService.transformers.userToGroupMember(state.currentUser)], 
-        [], 
-        state.currentUser.id
-      );
+      const groupWithDetails: GroupWithDetails = {
+        ...group,
+        members: [{
+          id: state.currentUser.id,
+          name: state.currentUser.name,
+          email: state.currentUser.email,
+          wallet_address: state.currentUser.wallet_address,
+          wallet_public_key: state.currentUser.wallet_public_key,
+          created_at: state.currentUser.created_at,
+          joined_at: new Date().toISOString(),
+          avatar: state.currentUser.avatar
+        }],
+        expenses: [],
+        totalAmount: 0,
+        userBalance: 0
+      };
       
       dispatch({ type: 'ADD_GROUP', payload: groupWithDetails });
       return groupWithDetails;
@@ -683,7 +747,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       await firebaseDataService.group.deleteGroup(groupId.toString(), state.currentUser.id.toString());
       dispatch({ type: 'DELETE_GROUP', payload: groupId });
-      firebaseDataService.cache.clearGroup(groupId);
     } catch (error) {
       console.error('Error deleting group:', error);
       throw error;
@@ -698,7 +761,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       await firebaseDataService.group.leaveGroup(groupId.toString(), state.currentUser.id.toString());
       dispatch({ type: 'DELETE_GROUP', payload: groupId }); // Assuming leaving a group is effectively deleting it from the user's list
-      firebaseDataService.cache.clearGroup(groupId);
     } catch (error) {
       console.error('Error leaving group:', error);
       throw error;
@@ -726,6 +788,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       
       console.log('🔍 AppContext: Expense added to state');
       
+      // Refresh the group data to ensure we have the latest expense count
+      const groupId = Number(expense.group_id);
+      if (groupId) {
+        try {
+          await refreshGroup(groupId);
+        } catch (refreshError) {
+          console.log('🔍 AppContext: Group refresh failed, but expense was created:', refreshError);
+        }
+      }
+      
       return expense;
     } catch (error) {
       console.error('❌ AppContext: Error creating expense:', error);
@@ -736,11 +808,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       });
       throw error;
     }
-  }, [state.currentUser, state.groups.length]);
+  }, [state.currentUser, state.groups.length, refreshGroup]);
 
   const updateExpense = useCallback(async (groupId: number, expense: Expense) => {
     try {
-      const updatedExpense = await firebaseDataService.expense.updateExpense(expense.id, expense);
+      const updatedExpense = await firebaseDataService.expense.updateExpense(expense.id.toString(), expense);
       dispatch({ type: 'UPDATE_EXPENSE', payload: { groupId, expense: updatedExpense } });
     } catch (error) {
       console.error('Error updating expense:', error);
@@ -750,7 +822,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const deleteExpense = useCallback(async (groupId: number, expenseId: number) => {
     try {
-      await firebaseDataService.expense.deleteExpense(expenseId);
+      await firebaseDataService.expense.deleteExpense(expenseId.toString(), groupId.toString());
       dispatch({ type: 'DELETE_EXPENSE', payload: { groupId, expenseId } });
     } catch (error) {
       console.error('Error deleting expense:', error);
@@ -782,11 +854,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   // Utility functions
-  const getGroupById = useCallback((id: number): GroupWithDetails | undefined => {
+  const getGroupById = useCallback((id: number | string): GroupWithDetails | undefined => {
     return state.groups.find(group => group.id === id);
   }, [state.groups]);
 
-    const getGroupBalances = useCallback((groupId: number): Balance[] => {
+    const getGroupBalances = useCallback((groupId: number | string): Balance[] => {
     try {
       const group = getGroupById(groupId);
       
@@ -846,12 +918,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [getGroupById, state.currentUser]);
 
-  const getTotalExpenses = useCallback((groupId: number): number => {
+  const getTotalExpenses = useCallback((groupId: number | string): number => {
     const group = getGroupById(groupId);
     return group ? group.totalAmount : 0;
   }, [getGroupById]);
 
-  const getUserBalance = useCallback((groupId: number, userId: number): number => {
+  const getUserBalance = useCallback((groupId: number | string, userId: number | string): number => {
     const balances = getGroupBalances(groupId);
     const userBalance = balances.find(b => b.userId === userId);
     return userBalance ? userBalance.amount : 0;
@@ -862,7 +934,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   const invalidateCache = useCallback((pattern: string) => {
-    firebaseDataService.cache.clearPattern(pattern);
+    // Cache invalidation is handled by the invalidateGroupsCache function
+    console.log('Cache invalidation requested for pattern:', pattern);
   }, []);
 
   // Add specific cache invalidation for groups

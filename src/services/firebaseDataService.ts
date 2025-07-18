@@ -15,7 +15,9 @@ import {
   SettlementResult,
   SettlementCalculation,
   ReminderStatus,
-  ApiResponse 
+  ApiResponse,
+  Notification,
+  Transaction
 } from '../types';
 import { firestoreService } from '../config/firebase';
 import { 
@@ -32,9 +34,12 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
-  writeBatch
+  writeBatch,
+  onSnapshot,
+  DocumentData
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { sendNotification } from './firebaseNotificationService';
 
 // Data transformation utilities
 export const firebaseDataTransformers = {
@@ -111,7 +116,10 @@ export const firebaseDataTransformers = {
     wallet_public_key: doc.data().wallet_public_key || doc.data().walletPublicKey || '',
     created_at: firebaseDataTransformers.timestampToISO(doc.data().created_at),
     joined_at: firebaseDataTransformers.timestampToISO(doc.data().joined_at),
-    avatar: doc.data().avatar || ''
+    avatar: doc.data().avatar || '',
+    invitation_status: doc.data().invitation_status,
+    invited_at: firebaseDataTransformers.timestampToISO(doc.data().invited_at),
+    invited_by: doc.data().invited_by
   }),
 
   // Transform GroupMember to Firestore data
@@ -151,6 +159,62 @@ export const firebaseDataTransformers = {
     split_data: expense.splitData,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp()
+  }),
+
+  // Transform Firestore document to Transaction
+  firestoreToTransaction: (doc: any): Transaction => ({
+    id: doc.id,
+    type: doc.data().type || 'send',
+    amount: doc.data().amount || 0,
+    currency: doc.data().currency || 'USDC',
+    from_user: doc.data().from_user || '',
+    to_user: doc.data().to_user || '',
+    from_wallet: doc.data().from_wallet || '',
+    to_wallet: doc.data().to_wallet || '',
+    tx_hash: doc.data().tx_hash || '',
+    note: doc.data().note || '',
+    status: doc.data().status || 'pending',
+    created_at: firebaseDataTransformers.timestampToISO(doc.data().created_at),
+    updated_at: firebaseDataTransformers.timestampToISO(doc.data().updated_at)
+  }),
+
+  // Transform Transaction to Firestore data
+  transactionToFirestore: (transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>): any => ({
+    type: transaction.type,
+    amount: transaction.amount,
+    currency: transaction.currency,
+    from_user: transaction.from_user,
+    to_user: transaction.to_user,
+    from_wallet: transaction.from_wallet,
+    to_wallet: transaction.to_wallet,
+    tx_hash: transaction.tx_hash,
+    note: transaction.note,
+    status: transaction.status,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp()
+  }),
+
+  // Transform Firestore document to Notification
+  firestoreToNotification: (doc: any): Notification => ({
+    id: doc.id,
+    userId: doc.data().userId || doc.data().user_id || '',
+    type: doc.data().type || 'general',
+    title: doc.data().title || '',
+    message: doc.data().message || '',
+    data: doc.data().data || {},
+    is_read: doc.data().is_read || false,
+    created_at: firebaseDataTransformers.timestampToISO(doc.data().created_at)
+  }),
+
+  // Transform Notification to Firestore data
+  notificationToFirestore: (notification: Omit<Notification, 'id' | 'created_at'>): any => ({
+    userId: notification.userId,
+    type: notification.type,
+    title: notification.title,
+    message: notification.message,
+    data: notification.data,
+    is_read: notification.is_read,
+    created_at: serverTimestamp()
   })
 };
 
@@ -175,6 +239,27 @@ const updateGroupMemberCount = async (groupId: string) => {
   }
 };
 
+// Helper function to update group expense count
+const updateGroupExpenseCount = async (groupId: string) => {
+  try {
+    const expensesRef = collection(db, 'expenses');
+    const expenseQuery = query(expensesRef, where('group_id', '==', groupId));
+    const expenseDocs = await getDocs(expenseQuery);
+    
+    const expenseCount = expenseDocs.docs.length;
+    
+    const groupRef = doc(db, 'groups', groupId);
+    await updateDoc(groupRef, {
+      expense_count: expenseCount,
+      updated_at: serverTimestamp()
+    });
+    
+    if (__DEV__) { console.log('🔥 Updated group expense count to:', expenseCount); }
+  } catch (error) {
+    if (__DEV__) { console.error('🔥 Error updating group expense count:', error); }
+  }
+};
+
 // User services
 export const firebaseUserService = {
   getCurrentUser: async (userId: string): Promise<User> => {
@@ -186,7 +271,7 @@ export const firebaseUserService = {
   },
 
   createUser: async (userData: Omit<User, 'id' | 'created_at'>): Promise<User> => {
-    const userRef = await addDoc(collection(db, 'users'), firebaseDataTransformers.userToFirestore(userData));
+    const userRef = await addDoc(collection(db, 'users'), firebaseDataTransformers.userToFirestore(userData as User));
     return {
       ...userData,
       id: userRef.id, // Keep as string for Firebase compatibility
@@ -198,6 +283,7 @@ export const firebaseUserService = {
     const userRef = doc(db, 'users', userId);
     const updateData: any = {};
     
+    // Only update fields that are provided
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.email !== undefined) updateData.email = updates.email;
     if (updates.wallet_address !== undefined) updateData.wallet_address = updates.wallet_address;
@@ -207,99 +293,202 @@ export const firebaseUserService = {
     updateData.updated_at = serverTimestamp();
     
     await updateDoc(userRef, updateData);
-    return firebaseUserService.getCurrentUser(userId);
+    
+    // Return updated user
+    const updatedDoc = await getDoc(userRef);
+    return firebaseDataTransformers.firestoreToUser(updatedDoc);
+  },
+
+  getUserContacts: async (userId: string): Promise<UserContact[]> => {
+    try {
+      // Get user's contacts from contacts collection
+      const contactsRef = collection(db, 'contacts');
+      const contactsQuery = query(
+        contactsRef, 
+        where('user_id', '==', userId),
+        orderBy('created_at', 'desc')
+      );
+      const contactsDocs = await getDocs(contactsQuery);
+      
+      return contactsDocs.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name || '',
+          email: data.email || '',
+          wallet_address: data.wallet_address || '',
+          wallet_public_key: data.wallet_public_key || '',
+          created_at: firebaseDataTransformers.timestampToISO(data.created_at),
+          joined_at: firebaseDataTransformers.timestampToISO(data.joined_at),
+          avatar: data.avatar || '',
+          first_met_at: firebaseDataTransformers.timestampToISO(data.first_met_at),
+          mutual_groups_count: data.mutual_groups_count || 0,
+          isFavorite: data.isFavorite || false
+        } as UserContact;
+      });
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting user contacts:', error); }
+      return [];
+    }
+  },
+
+  addContact: async (userId: string, contactData: Omit<UserContact, 'id' | 'created_at' | 'joined_at' | 'first_met_at'>): Promise<UserContact> => {
+    const contactRef = await addDoc(collection(db, 'contacts'), {
+      user_id: userId,
+      name: contactData.name,
+      email: contactData.email,
+      wallet_address: contactData.wallet_address,
+      wallet_public_key: contactData.wallet_public_key,
+      avatar: contactData.avatar,
+      mutual_groups_count: contactData.mutual_groups_count || 0,
+      isFavorite: contactData.isFavorite || false,
+      first_met_at: serverTimestamp(),
+      created_at: serverTimestamp()
+    });
+    
+    return {
+      ...contactData,
+      id: contactRef.id,
+      created_at: new Date().toISOString(),
+      joined_at: new Date().toISOString(),
+      first_met_at: new Date().toISOString()
+    } as UserContact;
+  },
+
+  removeContact: async (userId: string, contactId: string): Promise<void> => {
+    const contactsRef = collection(db, 'contacts');
+    const contactQuery = query(
+      contactsRef,
+      where('user_id', '==', userId),
+      where('contact_id', '==', contactId)
+    );
+    const contactDocs = await getDocs(contactQuery);
+    
+    if (!contactDocs.empty) {
+      await deleteDoc(doc(db, 'contacts', contactDocs.docs[0].id));
+    }
+  },
+
+  toggleFavorite: async (userId: string, contactId: string, isFavorite: boolean): Promise<void> => {
+    const contactsRef = collection(db, 'contacts');
+    const contactQuery = query(
+      contactsRef,
+      where('user_id', '==', userId),
+      where('contact_id', '==', contactId)
+    );
+    const contactDocs = await getDocs(contactQuery);
+    
+    if (!contactDocs.empty) {
+      await updateDoc(doc(db, 'contacts', contactDocs.docs[0].id), {
+        isFavorite,
+        updated_at: serverTimestamp()
+      });
+    }
+  },
+
+  // Seed phrase management
+  saveUserSeedPhrase: async (userId: string, seedPhrase: string[]): Promise<void> => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        seed_phrase: seedPhrase,
+        seed_phrase_verified: false,
+        updated_at: serverTimestamp()
+      });
+      
+      if (__DEV__) { console.log('🔥 Seed phrase saved for user:', userId); }
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error saving seed phrase:', error); }
+      throw error;
+    }
+  },
+
+  getUserSeedPhrase: async (userId: string): Promise<string[] | null> => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (!userDoc.exists()) {
+        return null;
+      }
+      
+      const data = userDoc.data();
+      return data.seed_phrase || null;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting user seed phrase:', error); }
+      throw new Error('No seed phrase found for this user');
+    }
+  },
+
+  markSeedPhraseVerified: async (userId: string): Promise<void> => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        seed_phrase_verified: true,
+        updated_at: serverTimestamp()
+      });
+      
+      if (__DEV__) { console.log('🔥 Seed phrase marked as verified for user:', userId); }
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error marking seed phrase as verified:', error); }
+      throw error;
+    }
   }
 };
 
 // Group services
 export const firebaseGroupService = {
   getUserGroups: async (userId: string, forceRefresh: boolean = false): Promise<GroupWithDetails[]> => {
-    if (__DEV__) { console.log('🔥 Firebase getUserGroups called for user:', userId); }
-    
+    try {
     // Get groups where user is a member
     const groupMembersRef = collection(db, 'groupMembers');
-    const memberQuery = query(
-      groupMembersRef,
-      where('user_id', '==', userId)
-    );
+      const memberQuery = query(groupMembersRef, where('user_id', '==', userId));
     const memberDocs = await getDocs(memberQuery);
-    
-    if (__DEV__) { console.log('🔥 Found', memberDocs.docs.length, 'group memberships for user:', userId); }
     
     const groupIds = memberDocs.docs.map(doc => doc.data().group_id);
     
-    if (__DEV__) { console.log('🔥 Group IDs found:', groupIds); }
-    
     if (groupIds.length === 0) {
-      if (__DEV__) { console.log('🔥 No groups found for user:', userId); }
       return [];
     }
     
     // Get group details
-    const groups: GroupWithDetails[] = [];
-    for (const groupId of groupIds) {
-      try {
-        if (__DEV__) { console.log('🔥 Fetching group details for group:', groupId); }
-        
-        const groupDoc = await getDoc(doc(db, 'groups', groupId));
-        if (groupDoc.exists()) {
-          if (__DEV__) { console.log('🔥 Group document exists, transforming...'); }
-          
+      const groupsRef = collection(db, 'groups');
+      const groupsQuery = query(groupsRef, where('__name__', 'in', groupIds));
+      const groupsDocs = await getDocs(groupsQuery);
+      
+      // Transform to GroupWithDetails
+      const groupsWithDetails: GroupWithDetails[] = [];
+      
+      for (const groupDoc of groupsDocs.docs) {
           const group = firebaseDataTransformers.firestoreToGroup(groupDoc);
           
-          if (__DEV__) { console.log('🔥 Getting members and expenses for group:', groupId); }
-          
-          // Get members and expenses for this group
-          const [members, expenses] = await Promise.all([
-            firebaseGroupService.getGroupMembers(groupId),
-            firebaseExpenseService.getGroupExpenses(groupId)
-          ]);
-          
-          if (__DEV__) { console.log('🔥 Got members:', members.length, 'expenses:', expenses.length); }
+        // Get group members
+        const groupMembersQuery = query(groupMembersRef, where('group_id', '==', group.id));
+        const groupMemberDocs = await getDocs(groupMembersQuery);
+        const members = groupMemberDocs.docs.map(doc => firebaseDataTransformers.firestoreToGroupMember(doc));
+        
+        // Get group expenses
+        const expensesRef = collection(db, 'expenses');
+        const expensesQuery = query(expensesRef, where('group_id', '==', group.id));
+        const expensesDocs = await getDocs(expensesQuery);
+        const expenses = expensesDocs.docs.map(doc => firebaseDataTransformers.firestoreToExpense(doc));
           
                   // Calculate totals
         const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-        const userBalance = calculateUserBalance(expenses, members, userId); // Keep as string for Firebase compatibility
+        const userBalance = calculateUserBalance(expenses, members, userId);
         
-        // Calculate expenses by currency
-        const expensesByCurrency: any[] = [];
-        const currencyMap = new Map<string, number>();
-        
-        expenses.forEach(expense => {
-          const currency = expense.currency || 'USDC';
-          const currentTotal = currencyMap.get(currency) || 0;
-          currencyMap.set(currency, currentTotal + expense.amount);
-        });
-        
-        currencyMap.forEach((total, currency) => {
-          expensesByCurrency.push({
-            currency,
-            total_amount: total
-          });
-        });
-        
-        groups.push({
+        groupsWithDetails.push({
           ...group,
           members,
           expenses,
           totalAmount,
-          userBalance,
-          member_count: members.length,
-          expense_count: expenses.length,
-          expenses_by_currency: expensesByCurrency
+          userBalance
         });
-          
-          if (__DEV__) { console.log('🔥 Successfully added group to results:', group.name); }
-        } else {
-          if (__DEV__) { console.log('🔥 Group document does not exist for ID:', groupId); }
         }
+      
+      return groupsWithDetails;
       } catch (error) {
-        if (__DEV__) { console.error('🔥 Error processing group', groupId, ':', error); }
-        // Continue with other groups instead of failing completely
+      if (__DEV__) { console.error('🔥 Error getting user groups:', error); }
+      return [];
       }
-    }
-    
-    return groups;
   },
 
   getGroupDetails: async (groupId: string, forceRefresh: boolean = false): Promise<GroupWithDetails> => {
@@ -310,15 +499,21 @@ export const firebaseGroupService = {
     
     const group = firebaseDataTransformers.firestoreToGroup(groupDoc);
     
-    // Get members and expenses
-    const [members, expenses] = await Promise.all([
-      firebaseGroupService.getGroupMembers(groupId),
-      firebaseExpenseService.getGroupExpenses(groupId)
-    ]);
+    // Get group members
+    const groupMembersRef = collection(db, 'groupMembers');
+    const memberQuery = query(groupMembersRef, where('group_id', '==', groupId));
+    const memberDocs = await getDocs(memberQuery);
+    const members = memberDocs.docs.map(doc => firebaseDataTransformers.firestoreToGroupMember(doc));
+    
+    // Get group expenses
+    const expensesRef = collection(db, 'expenses');
+    const expensesQuery = query(expensesRef, where('group_id', '==', groupId));
+    const expensesDocs = await getDocs(expensesQuery);
+    const expenses = expensesDocs.docs.map(doc => firebaseDataTransformers.firestoreToExpense(doc));
     
     // Calculate totals
     const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-    const userBalance = 0; // Will be calculated when user context is available
+    const userBalance = calculateUserBalance(expenses, members, group.created_by);
     
     return {
       ...group,
@@ -329,114 +524,262 @@ export const firebaseGroupService = {
     };
   },
 
-  getGroupMembers: async (groupId: string, forceRefresh: boolean = false): Promise<GroupMember[]> => {
+  // Helper function to clean up phantom members
+  cleanupPhantomMembers: async (groupId: string): Promise<void> => {
     try {
-      if (__DEV__) { console.log('🔥 Getting members for group:', groupId); }
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      if (!groupDoc.exists()) return;
+      
+      const groupName = groupDoc.data()?.name;
+      
+      const groupMembersRef = collection(db, 'groupMembers');
+      
+      // Get all members for this group
+      const allMembersQuery = query(
+        groupMembersRef,
+        where('group_id', '==', groupId)
+      );
+      const allMembersDocs = await getDocs(allMembersQuery);
+      
+      const membersToDelete: any[] = [];
+      
+      // Clean up members with the same name as the group
+      if (groupName) {
+        allMembersDocs.docs.forEach(doc => {
+          const memberData = doc.data();
+          if (memberData.name === groupName) {
+            membersToDelete.push(doc.ref);
+            if (__DEV__) {
+              console.log('🔥 Marking for deletion - member with group name:', memberData.name);
+            }
+          }
+        });
+      }
+      
+      // Clean up members with "Unknown User" name
+      allMembersDocs.docs.forEach(doc => {
+        const memberData = doc.data();
+        if (memberData.name === 'Unknown User') {
+          membersToDelete.push(doc.ref);
+          if (__DEV__) {
+            console.log('🔥 Marking for deletion - member with "Unknown User" name');
+          }
+        }
+      });
+      
+      // Clean up duplicate members with the same email but different IDs
+      const emailGroups: Record<string, any[]> = {};
+      allMembersDocs.docs.forEach(doc => {
+        const memberData = doc.data();
+        const email = memberData.email || '';
+        if (email) {
+          if (!emailGroups[email]) {
+            emailGroups[email] = [];
+          }
+          emailGroups[email].push({ doc, data: memberData });
+        }
+      });
+      
+      // If there are multiple members with the same email, keep only the one with the most recent joined_at
+      Object.entries(emailGroups).forEach(([email, members]) => {
+        if (members.length > 1) {
+          // Sort by joined_at timestamp (most recent first)
+          members.sort((a, b) => {
+            const aTime = a.data.joined_at?.toDate?.() || new Date(0);
+            const bTime = b.data.joined_at?.toDate?.() || new Date(0);
+            return bTime.getTime() - aTime.getTime();
+          });
+          
+          // Keep the most recent one, delete the rest
+          for (let i = 1; i < members.length; i++) {
+            membersToDelete.push(members[i].doc.ref);
+            if (__DEV__) {
+              console.log('🔥 Marking for deletion - duplicate member with email:', email, 'ID:', members[i].data.user_id);
+            }
+          }
+        }
+      });
+      
+      // Delete all marked members
+      if (membersToDelete.length > 0) {
+        const batch = writeBatch(db);
+        membersToDelete.forEach(ref => {
+          batch.delete(ref);
+        });
+        await batch.commit();
+        
+        if (__DEV__) {
+          console.log('🔥 Cleaned up phantom members:', membersToDelete.length);
+        }
+      }
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error cleaning up phantom members:', error); }
+    }
+  },
+
+  getGroupMembers: async (groupId: string, forceRefresh: boolean = false, currentUserId?: string): Promise<GroupMember[]> => {
+    try {
+      // First, clean up any phantom members
+      await firebaseDataService.group.cleanupPhantomMembers(groupId);
       
       const groupMembersRef = collection(db, 'groupMembers');
       const memberQuery = query(
         groupMembersRef,
-        where('group_id', '==', groupId)
+        where('group_id', '==', groupId),
+        orderBy('joined_at', 'asc')
       );
       const memberDocs = await getDocs(memberQuery);
-      
-      if (__DEV__) { console.log('🔥 Found', memberDocs.docs.length, 'member documents for group:', groupId); }
-      
-      const members: GroupMember[] = [];
-      for (const memberDoc of memberDocs.docs) {
-        try {
-          const memberData = memberDoc.data();
-          if (__DEV__) { console.log('🔥 Processing member with user_id:', memberData.user_id); }
-          
-          const userDoc = await getDoc(doc(db, 'users', memberData.user_id));
-          if (userDoc.exists()) {
-            const user = firebaseDataTransformers.firestoreToUser(userDoc);
-            // Handle different timestamp formats
-            let joinedAt: string;
-            if (memberData.joined_at) {
-              if (typeof memberData.joined_at === 'string') {
-                joinedAt = memberData.joined_at;
-              } else if (memberData.joined_at.toDate) {
-                joinedAt = firebaseDataTransformers.timestampToISO(memberData.joined_at);
-              } else {
-                joinedAt = new Date().toISOString();
-              }
+      let members = memberDocs.docs.map(doc => firebaseDataTransformers.firestoreToGroupMember(doc));
+
+      // Get group info to filter out phantom members
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      const groupName = groupDoc.exists() ? groupDoc.data()?.name : '';
+
+      // Filter out phantom members (members with the same name as the group or "Unknown User")
+      members = members.filter(member => {
+        if (groupName && member.name === groupName) {
+          if (__DEV__) {
+            console.log('🔥 Filtering out phantom member with group name:', member.name);
+          }
+          return false;
+        }
+        if (member.name === 'Unknown User') {
+          if (__DEV__) {
+            console.log('🔥 Filtering out phantom member with "Unknown User" name');
+          }
+          return false;
+        }
+        return true;
+      });
+
+      // If currentUserId is provided and not in members, add them
+      if (currentUserId && !members.some(m => String(m.id) === String(currentUserId))) {
+        const currentUser = await firebaseDataService.user.getCurrentUser(String(currentUserId));
+        if (currentUser) {
+          // Check if there's already a member with the same email (duplicate)
+          const existingMemberWithEmail = members.find(m => m.email === currentUser.email);
+          if (existingMemberWithEmail) {
+            if (__DEV__) {
+              console.log('🔥 Found existing member with same email, updating ID:', {
+                existingId: existingMemberWithEmail.id,
+                newId: currentUser.id,
+                email: currentUser.email
+              });
+            }
+            // Update the existing member's ID to match the current user
+            existingMemberWithEmail.id = currentUser.id;
             } else {
-              joinedAt = new Date().toISOString();
+            // Add the current user to the database if they're not already there
+            const existingMemberQuery = query(
+              groupMembersRef,
+              where('group_id', '==', groupId),
+              where('user_id', '==', currentUserId)
+            );
+            const existingMemberDocs = await getDocs(existingMemberQuery);
+            
+            if (existingMemberDocs.empty) {
+              // Add current user to the database
+              await addDoc(groupMembersRef, {
+                group_id: groupId,
+                user_id: currentUserId,
+                name: currentUser.name || 'You',
+                email: currentUser.email || '',
+                wallet_address: currentUser.wallet_address || '',
+                wallet_public_key: currentUser.wallet_public_key || '',
+                avatar: currentUser.avatar || '',
+                joined_at: serverTimestamp(),
+                created_at: serverTimestamp()
+              });
+              
+              if (__DEV__) {
+                console.log('🔥 Added current user to group members in database');
+            }
             }
             
+            // Add to the returned members array
             members.push({
-              ...user,
-              id: user.id, // Keep as string for Firebase compatibility
-              joined_at: joinedAt
+              id: currentUser.id,
+              name: currentUser.name || 'You',
+              email: currentUser.email || '',
+              wallet_address: currentUser.wallet_address || '',
+              wallet_public_key: currentUser.wallet_public_key || '',
+              avatar: currentUser.avatar || '',
+              joined_at: new Date().toISOString(),
+              created_at: currentUser.created_at || new Date().toISOString()
             });
-            if (__DEV__) { console.log('🔥 Added member:', user.name || user.email); }
-          } else {
-            if (__DEV__) { console.log('🔥 User document not found for ID:', memberData.user_id); }
+            
+            if (__DEV__) {
+              console.log('🔥 Added current user to members array:', {
+                id: currentUser.id,
+                name: currentUser.name || 'You'
+              });
+            }
           }
-        } catch (error) {
-          if (__DEV__) { console.error('🔥 Error processing member document:', error); }
         }
       }
       
-      if (__DEV__) { console.log('🔥 Returning', members.length, 'members for group:', groupId); }
+      if (__DEV__) {
+        console.log('🔥 getGroupMembers returning members:', members.map(m => ({ id: m.id, name: m.name, email: m.email })));
+      }
+      
       return members;
     } catch (error) {
-      if (__DEV__) { console.error('🔥 Error in getGroupMembers for group', groupId, ':', error); }
-      throw error;
+      if (__DEV__) { console.error('🔥 Error getting group members:', error); }
+      return [];
     }
   },
 
   createGroup: async (groupData: Omit<Group, 'id' | 'created_at' | 'updated_at' | 'member_count' | 'expense_count' | 'expenses_by_currency'>): Promise<Group> => {
-    if (__DEV__) { console.log('🔥 Creating group with data:', groupData); }
-    
-    try {
-      // Create the group document with proper member data
-      const groupDocData = {
-        ...firebaseDataTransformers.groupToFirestore(groupData),
-        member_count: 1, // Creator is automatically a member
-        memberIds: [groupData.created_by], // Add creator to memberIds array
-        created_by: groupData.created_by // Ensure created_by is set
-      };
+    const groupRef = await addDoc(collection(db, 'groups'), firebaseDataTransformers.groupToFirestore(groupData as Omit<Group, 'id' | 'created_at' | 'updated_at'>));
       
-      if (__DEV__) { console.log('🔥 Group document data:', groupDocData); }
+    // Get current user data to add as member
+    const currentUser = await firebaseDataService.user.getCurrentUser(String(groupData.created_by));
       
-      const groupRef = await addDoc(collection(db, 'groups'), groupDocData);
-      
-      if (__DEV__) { console.log('🔥 Group created with ID:', groupRef.id); }
-      
-      // Add creator as first member to groupMembers collection
-      const groupMemberRef = await addDoc(collection(db, 'groupMembers'), {
+    // Add creator as first member with correct user data
+    const groupMembersRef = collection(db, 'groupMembers');
+    await addDoc(groupMembersRef, {
         group_id: groupRef.id,
         user_id: groupData.created_by,
-        joined_at: serverTimestamp()
-      });
-      
-      if (__DEV__) { console.log('🔥 Creator added as member with ID:', groupMemberRef.id); }
-      
-      const createdGroup = {
+        name: currentUser?.name || 'Unknown User',
+        email: currentUser?.email || '',
+        wallet_address: currentUser?.wallet_address || '',
+        wallet_public_key: currentUser?.wallet_public_key || '',
+        avatar: currentUser?.avatar || '',
+        joined_at: serverTimestamp(),
+        created_at: serverTimestamp()
+    });
+    
+    // Update member count
+    await updateGroupMemberCount(groupRef.id);
+    
+    return {
         ...groupData,
-        id: groupRef.id, // Keep as string for Firebase compatibility
+      id: groupRef.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         member_count: 1,
         expense_count: 0,
         expenses_by_currency: []
-      };
-      
-      if (__DEV__) { console.log('🔥 Group creation completed:', createdGroup); }
-      
-      return createdGroup;
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error creating group:', error); }
-      throw error;
-    }
+    } as Group;
   },
 
   updateGroup: async (groupId: string, userId: string, updates: Partial<Group>): Promise<{ message: string; group: Group }> => {
     const groupRef = doc(db, 'groups', groupId);
-    const updateData: any = {};
     
+    // Check if user is group creator or member
+    const groupMembersRef = collection(db, 'groupMembers');
+    const memberQuery = query(
+      groupMembersRef,
+      where('group_id', '==', groupId),
+      where('user_id', '==', userId)
+    );
+    const memberDocs = await getDocs(memberQuery);
+    
+    if (memberDocs.empty) {
+      throw new Error('User is not a member of this group');
+    }
+    
+    const updateData: any = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.description !== undefined) updateData.description = updates.description;
     if (updates.category !== undefined) updateData.category = updates.category;
@@ -448,7 +791,9 @@ export const firebaseGroupService = {
     
     await updateDoc(groupRef, updateData);
     
-    const updatedGroup = await firebaseGroupService.getGroupDetails(groupId);
+    const updatedDoc = await getDoc(groupRef);
+    const updatedGroup = firebaseDataTransformers.firestoreToGroup(updatedDoc);
+    
     return {
       message: 'Group updated successfully',
       group: updatedGroup
@@ -456,235 +801,380 @@ export const firebaseGroupService = {
   },
 
   deleteGroup: async (groupId: string, userId: string): Promise<{ message: string }> => {
-    const batch = writeBatch(db);
+    const groupRef = doc(db, 'groups', groupId);
+    const groupDoc = await getDoc(groupRef);
     
-    // Delete group
-    batch.delete(doc(db, 'groups', groupId));
+    if (!groupDoc.exists()) {
+      throw new Error('Group not found');
+    }
+    
+    const groupData = groupDoc.data();
+    if (groupData.created_by !== userId) {
+      throw new Error('Only group creator can delete the group');
+    }
     
     // Delete group members
     const groupMembersRef = collection(db, 'groupMembers');
-    const memberQuery = query(where('group_id', '==', groupId));
+    const memberQuery = query(groupMembersRef, where('group_id', '==', groupId));
     const memberDocs = await getDocs(memberQuery);
-    memberDocs.docs.forEach(doc => batch.delete(doc.ref));
+    
+    const batch = writeBatch(db);
+    memberDocs.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
     
     // Delete group expenses
     const expensesRef = collection(db, 'expenses');
-    const expenseQuery = query(where('group_id', '==', groupId));
+    const expenseQuery = query(expensesRef, where('group_id', '==', groupId));
     const expenseDocs = await getDocs(expenseQuery);
-    expenseDocs.docs.forEach(doc => batch.delete(doc.ref));
+    
+    expenseDocs.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    // Delete the group
+    batch.delete(groupRef);
     
     await batch.commit();
     
     return { message: 'Group deleted successfully' };
   },
 
-  getUserContacts: async (userId: string, forceRefresh: boolean = false): Promise<UserContact[]> => {
-    try {
-      if (__DEV__) { console.log('🔥 Getting user contacts for:', userId); }
-      
-      // Get all groups where the user is a member
+  addMemberToGroup: async (groupId: string, memberData: Omit<GroupMember, 'id' | 'joined_at'>): Promise<GroupMember> => {
       const groupMembersRef = collection(db, 'groupMembers');
-      const userGroupsQuery = query(
-        groupMembersRef,
-        where('user_id', '==', userId)
-      );
-      
-      const userGroupsDocs = await getDocs(userGroupsQuery);
-      const userGroupIds = userGroupsDocs.docs.map(doc => doc.data().group_id);
-      
-      if (__DEV__) { console.log('🔥 User is in groups:', userGroupIds); }
-      
-      if (userGroupIds.length === 0) {
-        if (__DEV__) { console.log('🔥 No groups found for user, returning empty contacts'); }
-        return [];
-      }
-      
-      // Get all members from all groups the user is in
-      const allMembersQuery = query(
-        groupMembersRef,
-        where('group_id', 'in', userGroupIds)
-      );
-      
-      const allMembersDocs = await getDocs(allMembersQuery);
-      
-      // Create a map to track unique users and their group counts
-      const userMap = new Map<string, { memberData: any; groupCount: number; earliestJoinedAt: string }>();
-      
-      allMembersDocs.docs.forEach(doc => {
-        const memberData = doc.data();
-        const memberId = memberData.user_id;
-        
-        // Debug: Log group member data
-        if (__DEV__) { 
-          console.log('🔥 Group member data:', {
-            user_id: memberId,
+    const memberRef = await addDoc(groupMembersRef, {
+      group_id: groupId,
+      user_id: (memberData as any).id || memberData.name, // Use name as fallback for user_id
             name: memberData.name,
             email: memberData.email,
             wallet_address: memberData.wallet_address,
             wallet_public_key: memberData.wallet_public_key,
-            joined_at: memberData.joined_at
-          });
-        }
+      avatar: memberData.avatar,
+      joined_at: serverTimestamp(),
+      created_at: serverTimestamp()
+    });
+    
+    // Update group member count
+    await updateGroupMemberCount(groupId);
+    
+    return {
+      ...memberData,
+      id: memberRef.id,
+      joined_at: new Date().toISOString()
+    } as GroupMember;
+  },
+
+  removeMemberFromGroup: async (groupId: string, memberId: string): Promise<{ message: string }> => {
+      const groupMembersRef = collection(db, 'groupMembers');
+      const memberQuery = query(
+        groupMembersRef,
+        where('group_id', '==', groupId),
+      where('user_id', '==', memberId)
+      );
+      const memberDocs = await getDocs(memberQuery);
+      
+    if (!memberDocs.empty) {
+      await deleteDoc(doc(db, 'groupMembers', memberDocs.docs[0].id));
+      await updateGroupMemberCount(groupId);
+    }
+    
+    return { message: 'Member removed successfully' };
+  },
+
+  leaveGroup: async (groupId: string, userId: string): Promise<{ message: string }> => {
+    return await firebaseGroupService.removeMemberFromGroup(groupId, userId);
+  },
+
+  getUserContacts: async (userId: string, forceRefresh: boolean = false): Promise<UserContact[]> => {
+    try {
+      // Get all groups where the user is a member
+      const groupMembersRef = collection(db, 'groupMembers');
+      const userGroupsQuery = query(groupMembersRef, where('user_id', '==', userId));
+      const userGroupsDocs = await getDocs(userGroupsQuery);
+      
+      const groupIds = userGroupsDocs.docs.map(doc => doc.data().group_id);
+      
+      if (groupIds.length === 0) {
+        return [];
+      }
+      
+      // Get all members from these groups (excluding the current user)
+      const allMembersQuery = query(
+        groupMembersRef,
+        where('group_id', 'in', groupIds),
+        where('user_id', '!=', userId)
+      );
+      const allMembersDocs = await getDocs(allMembersQuery);
+      
+      // Create a map to deduplicate contacts
+      const contactsMap = new Map<string, UserContact>();
+      
+      allMembersDocs.docs.forEach(doc => {
+        const memberData = doc.data();
+        const contactId = memberData.user_id;
         
-        // Skip the current user
-        if (memberId === userId) return;
-        
-        const joinedAt = memberData.joined_at?.toDate?.()?.toISOString() || memberData.joined_at || new Date().toISOString();
-        
-        if (userMap.has(memberId)) {
-          // User already exists, increment group count
-          const existing = userMap.get(memberId)!;
-          existing.groupCount += 1;
-          
-          // Update earliest joined date
-          const currentEarliest = new Date(existing.earliestJoinedAt);
-          const newJoined = new Date(joinedAt);
-          if (newJoined < currentEarliest) {
-            existing.earliestJoinedAt = joinedAt;
-          }
-        } else {
-          // New user, create entry
-          userMap.set(memberId, {
-            memberData,
-            groupCount: 1,
-            earliestJoinedAt: joinedAt
+                 if (!contactsMap.has(contactId)) {
+           contactsMap.set(contactId, {
+             id: contactId,
+             name: memberData.name || '',
+              email: memberData.email || '',
+              wallet_address: memberData.wallet_address || '',
+              wallet_public_key: memberData.wallet_public_key || '',
+             created_at: memberData.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+             joined_at: memberData.joined_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+             first_met_at: memberData.joined_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+             mutual_groups_count: 1
+           });
+         } else {
+           // Increment mutual groups count
+           const existing = contactsMap.get(contactId)!;
+           existing.mutual_groups_count = (existing.mutual_groups_count || 0) + 1;
+         }
+      });
+      
+      return Array.from(contactsMap.values());
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting user contacts:', error); }
+      return [];
+    }
+  },
+
+  // Search users by username/name
+  searchUsersByUsername: async (searchTerm: string, excludeUserId?: string): Promise<User[]> => {
+    try {
+      if (__DEV__) { console.log('🔥 Searching users by username:', searchTerm); }
+      
+      const usersRef = collection(db, 'users');
+      
+      // Search by name (case-insensitive)
+      const nameQuery = query(
+        usersRef,
+        where('name', '>=', searchTerm.toLowerCase()),
+        where('name', '<=', searchTerm.toLowerCase() + '\uf8ff'),
+        limit(10)
+      );
+      
+      const nameDocs = await getDocs(nameQuery);
+      
+      // Also search by email for partial matches
+      const emailQuery = query(
+        usersRef,
+        where('email', '>=', searchTerm.toLowerCase()),
+        where('email', '<=', searchTerm.toLowerCase() + '\uf8ff'),
+        limit(10)
+      );
+      
+      const emailDocs = await getDocs(emailQuery);
+      
+      // Combine and deduplicate results
+      const allDocs = [...nameDocs.docs, ...emailDocs.docs];
+      const uniqueUsers = new Map<string, any>();
+      
+      allDocs.forEach(doc => {
+        const userData = doc.data();
+        if (!excludeUserId || doc.id !== excludeUserId) {
+          uniqueUsers.set(doc.id, {
+            id: doc.id,
+            name: userData.name || '',
+            email: userData.email || '',
+            wallet_address: userData.wallet_address || '',
+            wallet_public_key: userData.wallet_public_key || '',
+            created_at: userData.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+            avatar: userData.avatar || ''
           });
         }
       });
       
-      // Now fetch full user data for each unique user
-      const contacts: UserContact[] = [];
-      for (const [memberId, userInfo] of userMap) {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', memberId));
-          if (userDoc.exists()) {
-            // Debug: Log the raw Firestore document data
-            if (__DEV__) { 
-              console.log('🔥 Raw Firestore user document data:', {
-                id: userDoc.id,
-                data: userDoc.data(),
-                wallet_address_field: userDoc.data().wallet_address,
-                wallet_public_key_field: userDoc.data().wallet_public_key
-              });
-            }
-            
-            const user = firebaseDataTransformers.firestoreToUser(userDoc);
-            
-            if (__DEV__) { 
-              console.log('🔥 User data from users collection:', {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                wallet: user.wallet_address ? `${user.wallet_address.substring(0, 6)}...${user.wallet_address.substring(user.wallet_address.length - 6)}` : 'No wallet',
-                fullWallet: user.wallet_address
-              });
-            }
-            
-            contacts.push({
-              ...user,
-              id: user.id, // Keep as string for Firebase compatibility
-              joined_at: userInfo.earliestJoinedAt,
-              first_met_at: userInfo.earliestJoinedAt,
-              mutual_groups_count: userInfo.groupCount,
-              isFavorite: false
-            });
-          } else {
-            if (__DEV__) { console.log('🔥 User document not found for ID:', memberId); }
-            // Fallback to member data if user document doesn't exist
-            const memberData = userInfo.memberData;
-            
-            if (__DEV__) { 
-              console.log('🔥 Fallback to group member data:', {
-                id: memberId,
-                name: memberData.name,
-                email: memberData.email,
-                wallet: memberData.wallet_address ? `${memberData.wallet_address.substring(0, 6)}...${memberData.wallet_address.substring(memberData.wallet_address.length - 6)}` : 'No wallet',
-                fullWallet: memberData.wallet_address
-              });
-            }
-            
-            contacts.push({
-              id: memberId,
-              name: memberData.name || memberData.email || 'Unknown User',
-              email: memberData.email || '',
-              wallet_address: memberData.wallet_address || '',
-              wallet_public_key: memberData.wallet_public_key || '',
-              avatar: memberData.avatar || '',
-              created_at: memberData.created_at?.toDate?.()?.toISOString() || memberData.created_at || new Date().toISOString(),
-              joined_at: userInfo.earliestJoinedAt,
-              first_met_at: userInfo.earliestJoinedAt,
-              mutual_groups_count: userInfo.groupCount,
-              isFavorite: false
-            });
-          }
-        } catch (error) {
-          if (__DEV__) { console.error('🔥 Error fetching user data for ID:', memberId, error); }
-          // Continue with other users
-        }
-      }
+      const results = Array.from(uniqueUsers.values());
       
-      if (__DEV__) { console.log('🔥 Found', contacts.length, 'unique contacts from', userGroupIds.length, 'groups'); }
+      if (__DEV__) { console.log('🔥 Found users:', results.length); }
       
-      return contacts;
+      return results;
     } catch (error) {
-      if (__DEV__) { console.error('🔥 Error getting user contacts:', error); }
-      throw error;
+      if (__DEV__) { console.error('🔥 Error searching users:', error); }
+      return [];
     }
   },
 
   generateInviteLink: async (groupId: string, userId: string): Promise<InviteLinkData> => {
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    
-    const inviteRef = await addDoc(collection(db, 'invites'), {
-      group_id: groupId,
-      created_by: userId,
-      code: inviteCode,
-      created_at: serverTimestamp(),
-      expires_at: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) // 7 days
+    try {
+      // Generate a simple invite code
+      const inviteCode = `invite_${groupId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Store invite in Firestore
+      const inviteRef = collection(db, 'invites');
+      await addDoc(inviteRef, {
+        inviteCode,
+        groupId,
+        createdBy: userId,
+        createdAt: serverTimestamp(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        used: false
     });
     
     return {
       inviteCode,
-      groupId: parseInt(groupId),
+        inviteLink: `wesplit://join/${inviteCode}`,
+        groupName: 'Group', // This should be passed as parameter or fetched
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-    } as InviteLinkData;
+      };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error generating invite link:', error); }
+      throw new Error('Failed to generate invite link');
+    }
   },
 
-  joinGroupViaInvite: async (inviteCode: string, userId: string): Promise<{ message: string; groupId: number; groupName: string }> => {
-    // TODO: Implement Firebase-based invite joining
-    return {
-      message: 'Successfully joined group',
-      groupId: 1,
-      groupName: 'Test Group'
-    };
-  },
-
-  leaveGroup: async (groupId: string, userId: string): Promise<{ message: string }> => {
+  joinGroupViaInvite: async (inviteCode: string, userId: string): Promise<{ message: string; groupId: string; groupName: string }> => {
     try {
-      // Remove user from group members
+      if (__DEV__) { console.log('🔥 Joining group via invite:', { inviteCode, userId }); }
+      
+      // Find the invite in Firestore
+      const invitesRef = collection(db, 'invites');
+      const inviteQuery = query(
+        invitesRef,
+        where('inviteCode', '==', inviteCode),
+        where('used', '==', false)
+      );
+      const inviteDocs = await getDocs(inviteQuery);
+      
+      if (inviteDocs.empty) {
+        throw new Error('Invalid or expired invite code');
+      }
+      
+      const inviteDoc = inviteDocs.docs[0];
+      const inviteData = inviteDoc.data();
+      const groupId = inviteData.groupId;
+      
+      // Check if user is already a member
       const groupMembersRef = collection(db, 'groupMembers');
       const memberQuery = query(
         groupMembersRef,
         where('group_id', '==', groupId),
         where('user_id', '==', userId)
       );
-      
       const memberDocs = await getDocs(memberQuery);
       
-      if (memberDocs.empty) {
-        throw new Error('User is not a member of this group');
+      if (!memberDocs.empty) {
+        // User is already a member, check if they have pending invitation
+        const memberDoc = memberDocs.docs[0];
+        const memberData = memberDoc.data();
+        
+        if (memberData.invitation_status === 'pending') {
+          // Get user data
+          const userDoc = await getDoc(doc(db, 'users', userId));
+          if (!userDoc.exists()) {
+            throw new Error('User not found');
+          }
+          const userData = userDoc.data();
+          
+          // Update the existing member record with user data and accepted status
+          await updateDoc(doc(db, 'groupMembers', memberDoc.id), {
+            name: userData.name,
+            email: userData.email,
+            wallet_address: userData.wallet_address,
+            wallet_public_key: userData.wallet_public_key,
+            invitation_status: 'accepted',
+            avatar: userData.avatar
+          });
+        } else {
+          throw new Error('You are already a member of this group');
+        }
+      } else {
+        // Get user data
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (!userDoc.exists()) {
+          throw new Error('User not found');
+        }
+        const userData = userDoc.data();
+        
+        // Add user to group
+        await addDoc(groupMembersRef, {
+          group_id: groupId,
+          user_id: userId,
+          name: userData.name,
+          email: userData.email,
+          wallet_address: userData.wallet_address,
+          wallet_public_key: userData.wallet_public_key,
+          joined_at: serverTimestamp(),
+          avatar: userData.avatar
+        });
       }
       
-      // Delete the member document
-      const memberDoc = memberDocs.docs[0];
-      await deleteDoc(memberDoc.ref);
+      // Mark invite as used
+      await updateDoc(doc(db, 'invites', inviteDoc.id), {
+        used: true,
+        used_at: serverTimestamp(),
+        used_by: userId
+      });
       
-      // Update group member count using helper function
+      // Update group member count
       await updateGroupMemberCount(groupId);
       
-      return { message: 'Successfully left the group' };
+      // Get group name
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      const groupName = groupDoc.exists() ? groupDoc.data()?.name : 'Group';
+      
+      if (__DEV__) { console.log('🔥 Successfully joined group:', { groupId, groupName }); }
+      
+      return {
+        message: 'Successfully joined group',
+        groupId,
+        groupName
+      };
     } catch (error) {
-      console.error('Error leaving group:', error);
+      if (__DEV__) { console.error('🔥 Error joining group via invite:', error); }
+      throw error;
+    }
+  },
+
+  // Send group invitation to a user via notification
+  sendGroupInvitation: async (
+    groupId: string,
+    groupName: string,
+    invitedByUserId: string,
+    invitedByUserName: string,
+    invitedUserId: string
+  ): Promise<void> => {
+    try {
+      if (__DEV__) { console.log('🔥 Sending group invitation:', { groupId, groupName, invitedByUserId, invitedUserId }); }
+      
+      // Generate invite link
+      const inviteData = await firebaseGroupService.generateInviteLink(groupId, invitedByUserId);
+      
+      // Add user to group with pending invitation status
+      const groupMembersRef = collection(db, 'groupMembers');
+      await addDoc(groupMembersRef, {
+        group_id: groupId,
+        user_id: invitedUserId,
+        name: 'Invited User', // Will be updated when they accept
+        email: '', // Will be updated when they accept
+        wallet_address: '', // Will be updated when they accept
+        joined_at: serverTimestamp(),
+        invitation_status: 'pending',
+        invited_at: serverTimestamp(),
+        invited_by: invitedByUserId
+      });
+      
+      // Send notification to invited user
+      await sendNotification(
+        invitedUserId,
+        'Group Invitation',
+        `${invitedByUserName} has invited you to join the group "${groupName}"`,
+        'group_invite',
+        {
+          groupId,
+          groupName,
+          invitedBy: invitedByUserId,
+          invitedByName: invitedByUserName,
+          inviteCode: inviteData.inviteCode,
+          inviteLink: inviteData.inviteLink,
+          expiresAt: inviteData.expiresAt
+        }
+      );
+      
+      if (__DEV__) { console.log('🔥 Group invitation sent successfully'); }
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error sending group invitation:', error); }
       throw error;
     }
   }
@@ -694,118 +1184,57 @@ export const firebaseGroupService = {
 export const firebaseExpenseService = {
   getGroupExpenses: async (groupId: string, forceRefresh: boolean = false): Promise<Expense[]> => {
     try {
-      if (__DEV__) { console.log('🔥 Getting expenses for group:', groupId); }
-      
       const expensesRef = collection(db, 'expenses');
-      const expenseQuery = query(
+      const expensesQuery = query(
         expensesRef,
-        where('group_id', '==', groupId)
-        // Removed orderBy to avoid index requirement
+        where('group_id', '==', groupId),
+        orderBy('created_at', 'desc')
       );
+      const expensesDocs = await getDocs(expensesQuery);
       
-      if (__DEV__) { console.log('🔥 Querying expenses for group_id:', groupId); }
-      const expenseDocs = await getDocs(expenseQuery);
-      
-      if (__DEV__) { console.log('🔥 Found', expenseDocs.docs.length, 'expense documents for group:', groupId); }
-      
-      const expenses = expenseDocs.docs.map(doc => {
-        try {
-          return firebaseDataTransformers.firestoreToExpense(doc);
+      return expensesDocs.docs.map(doc => firebaseDataTransformers.firestoreToExpense(doc));
         } catch (error) {
-          if (__DEV__) { console.error('🔥 Error transforming expense document:', error); }
-          return null;
-        }
-      }).filter(expense => expense !== null);
-      
-      if (__DEV__) { console.log('🔥 Returning', expenses.length, 'expenses for group:', groupId); }
-      return expenses;
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error in getGroupExpenses for group', groupId, ':', error); }
-      throw error;
+      if (__DEV__) { console.error('🔥 Error getting group expenses:', error); }
+      return [];
     }
   },
 
   createExpense: async (expenseData: any): Promise<Expense> => {
-    if (__DEV__) { console.log('🔥 Creating expense with data:', expenseData); }
+    const expenseRef = await addDoc(collection(db, 'expenses'), firebaseDataTransformers.expenseToFirestore(expenseData));
+      
+    // Update group expense count
+    await updateGroupExpenseCount(expenseData.group_id || expenseData.groupId);
     
-    try {
-      // Validate required fields
-      if (!expenseData.description) {
-        throw new Error('Expense description is required');
-      }
-      if (!expenseData.amount || expenseData.amount <= 0) {
-        throw new Error('Expense amount must be greater than 0');
-      }
-      if (!expenseData.paid_by && !expenseData.paidBy) {
-        throw new Error('Expense paid_by is required');
-      }
-      if (!expenseData.group_id && !expenseData.groupId) {
-        throw new Error('Expense group_id is required');
-      }
-
-      if (__DEV__) { console.log('🔥 Validating expense data...'); }
-      
-      // Transform data for Firestore
-      const firestoreData = firebaseDataTransformers.expenseToFirestore(expenseData);
-      if (__DEV__) { console.log('🔥 Transformed data for Firestore:', firestoreData); }
-      
-      // Create expense document
-      if (__DEV__) { console.log('🔥 Adding document to expenses collection...'); }
-      const expenseRef = await addDoc(collection(db, 'expenses'), firestoreData);
-      if (__DEV__) { console.log('🔥 Expense document created with ID:', expenseRef.id); }
-      
-      // Get the group ID from the expense data (handle both camelCase and snake_case)
-      const groupId = expenseData.groupId || expenseData.group_id;
-      if (!groupId) {
-        throw new Error('Group ID is required for expense creation');
-      }
-      
-      if (__DEV__) { console.log('🔥 Updating group expense count for group:', groupId); }
-      
-      // Update group expense count - increment instead of setting to timestamp
-      const groupRef = doc(db, 'groups', groupId.toString());
-      if (__DEV__) { console.log('🔥 Getting group document reference:', groupRef.path); }
-      
-      const groupDoc = await getDoc(groupRef);
-      
-      if (groupDoc.exists()) {
-        const currentExpenseCount = groupDoc.data().expense_count || 0;
-        if (__DEV__) { console.log('🔥 Current expense count:', currentExpenseCount); }
-        
-        await updateDoc(groupRef, {
-          expense_count: currentExpenseCount + 1,
-          updated_at: serverTimestamp()
-        });
-        if (__DEV__) { console.log('🔥 Updated group expense count to:', currentExpenseCount + 1); }
-      } else {
-        if (__DEV__) { console.log('🔥 Warning: Group document not found for ID:', groupId); }
-        throw new Error(`Group with ID ${groupId} not found`);
-      }
-      
-      const createdExpense = {
+    return {
         ...expenseData,
-        id: expenseRef.id, // Keep as string for Firebase compatibility
+      id: expenseRef.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      };
+    } as Expense;
+  },
+
+  getExpense: async (expenseId: string): Promise<Expense | null> => {
+    try {
+      const expenseDoc = await getDoc(doc(db, 'expenses', expenseId));
       
-      if (__DEV__) { console.log('🔥 Created expense successfully:', createdExpense); }
+      if (expenseDoc.exists()) {
+        return firebaseDataTransformers.firestoreToExpense(expenseDoc);
+      }
       
-      return createdExpense;
+      return null;
     } catch (error) {
-      if (__DEV__) { console.error('🔥 Error creating expense:', error); }
-      throw error;
+      if (__DEV__) { console.error('🔥 Error getting expense:', error); }
+      return null;
     }
   },
 
-  updateExpense: async (expenseId: number, updates: Partial<Expense>): Promise<Expense> => {
-    const expenseRef = doc(db, 'expenses', expenseId.toString());
-    const updateData: any = {};
+  updateExpense: async (expenseId: string, updates: Partial<Expense>): Promise<Expense> => {
+    const expenseRef = doc(db, 'expenses', expenseId);
     
+    const updateData: any = {};
     if (updates.description !== undefined) updateData.description = updates.description;
     if (updates.amount !== undefined) updateData.amount = updates.amount;
     if (updates.currency !== undefined) updateData.currency = updates.currency;
-    if (updates.paid_by !== undefined) updateData.paid_by = updates.paid_by;
     if (updates.category !== undefined) updateData.category = updates.category;
     if (updates.splitType !== undefined) updateData.split_type = updates.splitType;
     if (updates.splitData !== undefined) updateData.split_data = updates.splitData;
@@ -814,31 +1243,119 @@ export const firebaseExpenseService = {
     
     await updateDoc(expenseRef, updateData);
     
-    const expenseDoc = await getDoc(expenseRef);
-    return firebaseDataTransformers.firestoreToExpense(expenseDoc);
+    const updatedDoc = await getDoc(expenseRef);
+    return firebaseDataTransformers.firestoreToExpense(updatedDoc);
   },
 
-  deleteExpense: async (expenseId: number): Promise<{ message: string }> => {
-    const expenseRef = doc(db, 'expenses', expenseId.toString());
-    const expenseDoc = await getDoc(expenseRef);
-    
-    if (!expenseDoc.exists()) {
-      throw new Error('Expense not found');
-    }
-    
-    const groupId = expenseDoc.data().group_id;
-    
-    // Delete expense
-    await deleteDoc(expenseRef);
+  deleteExpense: async (expenseId: string, groupId: string): Promise<{ message: string }> => {
+    await deleteDoc(doc(db, 'expenses', expenseId));
     
     // Update group expense count
-    const groupRef = doc(db, 'groups', groupId);
-    await updateDoc(groupRef, {
-      expense_count: serverTimestamp(),
-      updated_at: serverTimestamp()
-    });
+    await updateGroupExpenseCount(groupId);
     
     return { message: 'Expense deleted successfully' };
+  }
+};
+
+// Transaction services
+export const firebaseTransactionService = {
+  getUserTransactions: async (userId: string): Promise<Transaction[]> => {
+    try {
+      const transactionsRef = collection(db, 'transactions');
+      const fromQuery = query(
+        transactionsRef,
+        where('from_user', '==', userId),
+        orderBy('created_at', 'desc')
+      );
+      const fromDocs = await getDocs(fromQuery);
+      
+      const toQuery = query(
+        transactionsRef,
+        where('to_user', '==', userId),
+        orderBy('created_at', 'desc')
+      );
+      const toDocs = await getDocs(toQuery);
+      
+      const allTransactions = [
+        ...fromDocs.docs.map(doc => firebaseDataTransformers.firestoreToTransaction(doc)),
+        ...toDocs.docs.map(doc => firebaseDataTransformers.firestoreToTransaction(doc))
+      ];
+      
+      // Sort by created_at descending
+      return allTransactions.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting user transactions:', error); }
+      return [];
+    }
+  },
+
+  createTransaction: async (transactionData: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>): Promise<Transaction> => {
+    const transactionRef = await addDoc(collection(db, 'transactions'), firebaseDataTransformers.transactionToFirestore(transactionData));
+    
+    return {
+      ...transactionData,
+      id: transactionRef.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    } as Transaction;
+  },
+
+  updateTransactionStatus: async (transactionId: string, status: string, txHash?: string): Promise<void> => {
+    const transactionRef = doc(db, 'transactions', transactionId);
+    const updateData: any = {
+      status,
+      updated_at: serverTimestamp()
+    };
+    
+    if (txHash) {
+      updateData.tx_hash = txHash;
+    }
+    
+    await updateDoc(transactionRef, updateData);
+  }
+};
+
+// Notification services
+export const firebaseNotificationService = {
+  getUserNotifications: async (userId: string): Promise<Notification[]> => {
+    try {
+      const notificationsRef = collection(db, 'notifications');
+      const notificationsQuery = query(
+        notificationsRef,
+        where('userId', '==', userId),
+        orderBy('created_at', 'desc')
+      );
+      const notificationsDocs = await getDocs(notificationsQuery);
+      
+      return notificationsDocs.docs.map(doc => firebaseDataTransformers.firestoreToNotification(doc));
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting user notifications:', error); }
+      return [];
+    }
+  },
+
+  createNotification: async (notificationData: Omit<Notification, 'id' | 'created_at'>): Promise<Notification> => {
+    const notificationRef = await addDoc(collection(db, 'notifications'), firebaseDataTransformers.notificationToFirestore(notificationData));
+    
+    return {
+      ...notificationData,
+      id: notificationRef.id,
+      created_at: new Date().toISOString()
+    } as Notification;
+  },
+
+  markNotificationAsRead: async (notificationId: string): Promise<void> => {
+    const notificationRef = doc(db, 'notifications', notificationId);
+    await updateDoc(notificationRef, {
+      is_read: true,
+      updated_at: serverTimestamp()
+    });
+  },
+    
+  deleteNotification: async (notificationId: string): Promise<void> => {
+    await deleteDoc(doc(db, 'notifications', notificationId));
   }
 };
 
@@ -849,7 +1366,7 @@ const calculateUserBalance = (expenses: Expense[], members: GroupMember[], userI
   expenses.forEach(expense => {
     const sharePerPerson = expense.amount / members.length; // Simplified equal split
     
-    if (expense.paid_by === userId.toString()) {
+    if (expense.paid_by === userId) {
       // User paid, so they should receive money back
       balance += expense.amount - sharePerPerson;
     } else {
@@ -869,7 +1386,12 @@ export const firebaseSettlementService = {
       
       // Get all expenses for the group
       const expenses = await firebaseExpenseService.getGroupExpenses(groupId);
-      const members = await firebaseGroupService.getGroupMembers(groupId);
+      
+      // Get group members directly from groupMembers collection
+      const groupMembersRef = collection(db, 'groupMembers');
+      const memberQuery = query(groupMembersRef, where('group_id', '==', groupId));
+      const memberDocs = await getDocs(memberQuery);
+      const members = memberDocs.docs.map(doc => firebaseDataTransformers.firestoreToGroupMember(doc));
       
       if (expenses.length === 0 || members.length === 0) {
         return [];
@@ -877,7 +1399,7 @@ export const firebaseSettlementService = {
       
       // Calculate balances for each member
       const balances: { [memberId: string]: number } = {};
-      members.forEach(member => {
+      members.forEach((member: GroupMember) => {
         balances[member.id] = 0;
       });
       
@@ -893,7 +1415,7 @@ export const firebaseSettlementService = {
         }
         
         // Everyone owes their share
-        members.forEach(member => {
+        members.forEach((member: GroupMember) => {
           if (balances[member.id] !== undefined) {
             balances[member.id] -= sharePerPerson;
           }
@@ -911,8 +1433,8 @@ export const firebaseSettlementService = {
           const balance1 = balances[member1Id];
           const balance2 = balances[member2Id];
           
-          const member1 = members.find(m => m.id === member1Id);
-          const member2 = members.find(m => m.id === member2Id);
+          const member1 = members.find((m: GroupMember) => m.id === member1Id);
+          const member2 = members.find((m: GroupMember) => m.id === member2Id);
           
           if (member1 && member2) {
             if (balance1 > 0 && balance2 < 0) {
@@ -1030,7 +1552,7 @@ export const firebaseSettlementService = {
       const cooldownDuration = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
       
       reminderDocs.docs.forEach(doc => {
-        const data = doc.data();
+        const data = doc.data() as any;
         const sentAt = data.sent_at?.toDate() || new Date();
         const timeSinceSent = now.getTime() - sentAt.getTime();
         
@@ -1188,11 +1710,225 @@ export const firebaseSettlementService = {
   }
 };
 
-// Export the main data service object
+// Multi-signature services
+export const firebaseMultiSigService = {
+  createMultiSigWallet: async (walletData: any) => {
+    try {
+      const walletRef = await addDoc(collection(db, 'multiSigWallets'), {
+        ...walletData,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      });
+      
+      if (__DEV__) { console.log('🔥 Multi-signature wallet created:', walletRef.id); }
+      return walletRef;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error creating multi-signature wallet:', error); }
+      throw error;
+    }
+  },
+
+  getMultiSigWallet: async (walletId: string) => {
+    try {
+      const walletDoc = await getDoc(doc(db, 'multiSigWallets', walletId));
+      if (!walletDoc.exists()) {
+        return null;
+      }
+      
+      const data = walletDoc.data();
+      return {
+        id: walletDoc.id,
+        address: data.address,
+        owners: data.owners || [],
+        threshold: data.threshold || 1,
+        pendingTransactions: data.pendingTransactions || [],
+        description: data.description,
+        createdBy: data.createdBy,
+        createdAt: firebaseDataTransformers.timestampToISO(data.created_at),
+        updatedAt: firebaseDataTransformers.timestampToISO(data.updated_at)
+      };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting multi-signature wallet:', error); }
+      return null;
+    }
+  },
+
+  getUserMultiSigWallets: async (userId: string) => {
+    try {
+      const walletsRef = collection(db, 'multiSigWallets');
+      const walletsQuery = query(walletsRef, where('owners', 'array-contains', userId));
+      const walletsDocs = await getDocs(walletsQuery);
+      
+      return walletsDocs.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          address: data.address,
+          owners: data.owners || [],
+          threshold: data.threshold || 1,
+          pendingTransactions: data.pendingTransactions || [],
+          description: data.description,
+          createdBy: data.createdBy,
+          createdAt: firebaseDataTransformers.timestampToISO(data.created_at),
+          updatedAt: firebaseDataTransformers.timestampToISO(data.updated_at)
+        };
+      });
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting user multi-signature wallets:', error); }
+      return [];
+    }
+  },
+
+  createMultiSigTransaction: async (transactionData: any) => {
+    try {
+      const transactionRef = await addDoc(collection(db, 'multiSigTransactions'), {
+        ...transactionData,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp()
+      });
+      
+      if (__DEV__) { console.log('🔥 Multi-signature transaction created:', transactionRef.id); }
+      return transactionRef;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error creating multi-signature transaction:', error); }
+      throw error;
+    }
+  },
+
+  getMultiSigTransaction: async (transactionId: string) => {
+    try {
+      const transactionDoc = await getDoc(doc(db, 'multiSigTransactions', transactionId));
+      if (!transactionDoc.exists()) {
+        return null;
+      }
+      
+      const data = transactionDoc.data();
+      return {
+        id: transactionDoc.id,
+        multiSigWalletId: data.multiSigWalletId,
+        instructions: data.instructions || [],
+        signers: data.signers || [],
+        approvals: data.approvals || [],
+        rejections: data.rejections || [],
+        executed: data.executed || false,
+        executedAt: data.executedAt ? firebaseDataTransformers.timestampToISO(data.executedAt) : undefined,
+        description: data.description,
+        amount: data.amount,
+        currency: data.currency,
+        recipient: data.recipient,
+        createdAt: firebaseDataTransformers.timestampToISO(data.created_at),
+        updatedAt: firebaseDataTransformers.timestampToISO(data.updated_at)
+      };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting multi-signature transaction:', error); }
+      return null;
+    }
+  },
+
+  updateMultiSigTransaction: async (transactionId: string, updates: any) => {
+    try {
+      const transactionRef = doc(db, 'multiSigTransactions', transactionId);
+      await updateDoc(transactionRef, {
+        ...updates,
+        updated_at: serverTimestamp()
+      });
+      
+      if (__DEV__) { console.log('🔥 Multi-signature transaction updated:', transactionId); }
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error updating multi-signature transaction:', error); }
+      throw error;
+    }
+  },
+
+  getPendingTransactions: async (walletId: string) => {
+    try {
+      const transactionsRef = collection(db, 'multiSigTransactions');
+      const transactionsQuery = query(
+        transactionsRef, 
+        where('multiSigWalletId', '==', walletId),
+        where('executed', '==', false)
+      );
+      const transactionsDocs = await getDocs(transactionsQuery);
+      
+      return transactionsDocs.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          multiSigWalletId: data.multiSigWalletId,
+          instructions: data.instructions || [],
+          signers: data.signers || [],
+          approvals: data.approvals || [],
+          rejections: data.rejections || [],
+          executed: data.executed || false,
+          executedAt: data.executedAt ? firebaseDataTransformers.timestampToISO(data.executedAt) : undefined,
+          description: data.description,
+          amount: data.amount,
+          currency: data.currency,
+          recipient: data.recipient,
+          createdAt: firebaseDataTransformers.timestampToISO(data.created_at),
+          updatedAt: firebaseDataTransformers.timestampToISO(data.updated_at)
+        };
+      });
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting pending transactions:', error); }
+      return [];
+    }
+  },
+
+  getUserTransactions: async (userId: string) => {
+    try {
+      // Get all multi-sig wallets where user is an owner
+      const walletsRef = collection(db, 'multiSigWallets');
+      const walletsQuery = query(walletsRef, where('owners', 'array-contains', userId));
+      const walletsDocs = await getDocs(walletsQuery);
+      const walletIds = walletsDocs.docs.map(doc => doc.id);
+      
+      if (walletIds.length === 0) {
+        return [];
+      }
+      
+      // Get all transactions for these wallets
+      const transactionsRef = collection(db, 'multiSigTransactions');
+      const transactionsQuery = query(
+        transactionsRef, 
+        where('multiSigWalletId', 'in', walletIds)
+      );
+      const transactionsDocs = await getDocs(transactionsQuery);
+      
+      return transactionsDocs.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          multiSigWalletId: data.multiSigWalletId,
+          instructions: data.instructions || [],
+          signers: data.signers || [],
+          approvals: data.approvals || [],
+          rejections: data.rejections || [],
+          executed: data.executed || false,
+          executedAt: data.executedAt ? firebaseDataTransformers.timestampToISO(data.executedAt) : undefined,
+          description: data.description,
+          amount: data.amount,
+          currency: data.currency,
+          recipient: data.recipient,
+          createdAt: firebaseDataTransformers.timestampToISO(data.created_at),
+          updatedAt: firebaseDataTransformers.timestampToISO(data.updated_at)
+        };
+      });
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting user transactions:', error); }
+      return [];
+    }
+  }
+};
+
+// Main Firebase data service export
 export const firebaseDataService = {
   user: firebaseUserService,
   group: firebaseGroupService,
   expense: firebaseExpenseService,
+  transaction: firebaseTransactionService,
+  notification: firebaseNotificationService,
   settlement: firebaseSettlementService,
+  multiSig: firebaseMultiSigService,
   transformers: firebaseDataTransformers
 }; 

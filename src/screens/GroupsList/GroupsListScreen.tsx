@@ -9,19 +9,7 @@ import { getTotalSpendingInUSDC } from '../../services/priceService';
 import { GroupWithDetails } from '../../types';
 import { styles } from './styles';
 
-interface ExtendedExpense {
-  id: number;
-  group_id: number;
-  description: string;
-  amount: number;
-  currency: string;
-  paid_by: number;
-  created_at: string;
-  updated_at: string;
-  splitData?: string;
-}
-
-type FilterType = 'all' | 'open' | 'paid';
+type FilterType = 'all' | 'active' | 'closed';
 
 const GroupsListScreen: React.FC<any> = ({ navigation }) => {
   const { state, getGroupBalances } = useApp();
@@ -37,11 +25,11 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
   } = useGroupList();
 
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const [groupAmountsInUSD, setGroupAmountsInUSD] = useState<Record<number, number>>({});
+  const [groupAmountsInUSD, setGroupAmountsInUSD] = useState<Record<string | number, number>>({});
 
   // Get user balances using centralized method for proper multi-currency support
   const groupUserBalances = useMemo(() => {
-    const balances: Record<number, { amount: number; currency: string }> = {};
+    const balances: Record<string | number, { amount: number; currency: string }> = {};
     groups.forEach(group => {
       const groupBalances = getGroupBalances(group.id);
       const userBalance = groupBalances.find(balance => balance.userId === currentUser?.id);
@@ -51,12 +39,12 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
       };
     });
     return balances;
-  }, [groups, currentUser?.id]);
+  }, [groups, currentUser?.id, getGroupBalances]);
 
   // Convert group amounts to USD for display using available summary data
   const convertGroupAmountsToUSD = useCallback(async (groups: GroupWithDetails[]) => {
     try {
-      const usdAmounts: Record<number, number> = {};
+      const usdAmounts: Record<string | number, number> = {};
       
       for (const group of groups) {
         // Use expenses_by_currency data that's actually available from the backend
@@ -93,7 +81,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
     if (groups.length > 0) {
       convertGroupAmountsToUSD(groups);
     }
-  }, [groups]);
+  }, [groups, convertGroupAmountsToUSD]);
 
   const onRefresh = useCallback(async () => {
     await refresh();
@@ -106,8 +94,8 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
     if (activeFilter !== 'all') {
       filteredGroups = groups.filter(group => {
         const userBalance = groupUserBalances[group.id]?.amount || 0;
-        if (activeFilter === 'open') return userBalance !== 0;
-        if (activeFilter === 'paid') return userBalance === 0;
+        if (activeFilter === 'active') return userBalance !== 0;
+        if (activeFilter === 'closed') return userBalance === 0;
         return true;
       });
     }
@@ -135,98 +123,79 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
     );
   };
 
+  const renderProminentGroupCard = (group: GroupWithDetails) => {
+    const usdAmount = groupAmountsInUSD[group.id] || 0;
+    const userBalanceData = groupUserBalances[group.id] || { amount: 0, currency: 'SOL' };
+    const userBalance = userBalanceData.amount;
+    const members = group.members || [];
+    const isOwner = group.created_by === currentUser?.id;
+    
+    return (
+      <TouchableOpacity
+        key={group.id}
+        style={[styles.prominentGroupCard, isOwner && styles.prominentGroupCardOwner]}
+        onPress={() => (navigation as any).navigate('GroupDetails', { groupId: group.id })}
+      >
+        {/* Group Icon */}
+        <View style={styles.prominentGroupIcon}>
+          <Icon name="briefcase" size={24} color="#212121" />
+        </View>
+        
+        {/* Group Info */}
+        <View style={styles.prominentGroupInfo}>
+          <Text style={styles.prominentGroupName}>{group.name}</Text>
+          <Text style={styles.prominentGroupRole}>
+            {isOwner ? 'Owner' : 'V. Member'}
+          </Text>
+        </View>
+        
+        {/* Amount */}
+        <Text style={styles.prominentGroupAmount}>
+          {usdAmount.toFixed(2)}
+        </Text>
+        
+        {/* Member Avatars */}
+        <View style={styles.prominentMemberAvatars}>
+          {Array.from({ length: Math.min(members.length, 3) }).map((_, index) => (
+            <View key={index} style={styles.prominentMemberAvatar} />
+          ))}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   const renderGroupCard = (group: GroupWithDetails) => {
     const usdAmount = groupAmountsInUSD[group.id] || 0;
     const userBalanceData = groupUserBalances[group.id] || { amount: 0, currency: 'SOL' };
     const userBalance = userBalanceData.amount;
-    const userCurrency = userBalanceData.currency;
     const members = group.members || [];
     const hasOpenBalance = userBalance !== 0;
     
-    const getStatusColor = () => {
-      return hasOpenBalance ? '#FF4D4F' : '#4CAF50';
-    };
-    
-    const getStatusText = () => {
-      return hasOpenBalance ? 'Open' : 'Paid';
-    };
-
-    const getBalanceText = () => {
-      if (userBalance < 0) {
-        return `${userCurrency} ${Math.abs(userBalance).toFixed(2)}`;
-      }
-      return 'All settled';
-    };
-
     return (
       <TouchableOpacity
         key={group.id}
         style={styles.groupCard}
         onPress={() => (navigation as any).navigate('GroupDetails', { groupId: group.id })}
       >
-        {/* Header with icon, name, date, and status */}
-        <View style={styles.groupHeader}>
-          <View style={styles.groupIconContainer}>
-            <Icon
-              name="people"
-              style={styles.groupIcon}
-            />
-          </View>
-          <View style={styles.groupHeaderInfo}>
-            <Text style={styles.groupName}>{group.name}</Text>
-            <Text style={styles.groupDate}>
-              {new Date(group.created_at).toLocaleDateString('en-US', { 
-                day: 'numeric', 
-                month: 'short', 
-                year: 'numeric' 
-              })}
-            </Text>
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor() }]}>
-            <Text style={styles.statusText}>{getStatusText()}</Text>
-          </View>
+        {/* Group Icon */}
+        <View style={styles.groupIconContainer}>
+          <Icon name="briefcase" size={20} color="#A5EA15" />
         </View>
-
-        {/* Spending info */}
-        <View style={styles.spendingSection}>
-          <View style={styles.spendingRow}>
-            <Text style={styles.spendingLabel}>Total spending:</Text>
-            <Text style={styles.spendingAmount}>${usdAmount.toFixed(2)}</Text>
-          </View>
-          <View style={styles.balanceRow}>
-            <Text style={styles.balanceLabel}>
-              {hasOpenBalance ? 'Total you owe:' : 'All settled'}
-            </Text>
-            {hasOpenBalance && (
-              <Text style={styles.balanceAmount}>
-                {getBalanceText()}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {/* Member avatars and settle button */}
-        <View style={styles.groupFooter}>
-          <View style={styles.memberAvatars}>
-            {Array.from({ length: Math.min(members.length, 4) }).map((_, index) => (
-              <View key={index} style={styles.memberAvatar} />
+        
+        {/* Group Info */}
+        <View style={styles.groupInfo}>
+          <Text style={styles.groupName}>{group.name}</Text>
+          <View style={styles.groupMemberAvatars}>
+            {Array.from({ length: Math.min(members.length, 3) }).map((_, index) => (
+              <View key={index} style={styles.groupMemberAvatar} />
             ))}
-            {members.length > 4 && (
-              <View style={styles.memberAvatarMore}>
-                <Text style={styles.memberAvatarMoreText}>+{members.length - 4}</Text>
-              </View>
-            )}
           </View>
-          
-          {hasOpenBalance && (
-            <TouchableOpacity 
-              style={styles.settleButton}
-              onPress={() => (navigation as any).navigate('SettleUp', { groupId: group.id })}
-            >
-              <Text style={styles.settleButtonText}>Settleup</Text>
-            </TouchableOpacity>
-          )}
         </View>
+        
+        {/* Activity Indicator */}
+        {hasOpenBalance && (
+          <View style={styles.activityIndicator} />
+        )}
       </TouchableOpacity>
     );
   };
@@ -241,6 +210,10 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
     );
   }
 
+  const filteredGroups = getFilteredGroups();
+  const prominentGroups = filteredGroups.slice(0, 2);
+  const regularGroups = filteredGroups.slice(2);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -250,17 +223,23 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
           style={styles.addButton}
           onPress={() => (navigation as any).navigate('CreateGroup')}
         >
-          <Text style={styles.addButtonText}>+ Add group</Text>
+          <Icon name="plus" size={20} color="#A5EA15" />
+          <Text style={styles.addButtonText}>Add group</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Filter Buttons */}
-      <View style={styles.filtersContainer}>
-        <View style={styles.filtersRow}>
-          {renderFilterButton('all', 'All')}
-          {renderFilterButton('open', 'Open')}
-          {renderFilterButton('paid', 'Paid')}
+      {/* Prominent Group Cards */}
+      {prominentGroups.length > 0 && (
+        <View style={styles.prominentGroupsContainer}>
+          {prominentGroups.map(renderProminentGroupCard)}
         </View>
+      )}
+
+      {/* Filter Tabs */}
+      <View style={styles.filtersContainer}>
+        {renderFilterButton('all', 'All')}
+        {renderFilterButton('active', 'Active')}
+        {renderFilterButton('closed', 'Closed')}
       </View>
 
       {/* Groups List */}
@@ -277,16 +256,16 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {getFilteredGroups().length === 0 ? (
+        {filteredGroups.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateIcon}>👥</Text>
             <Text style={styles.emptyStateTitle}>No groups found</Text>
             <Text style={styles.emptyStateSubtitle}>
               {activeFilter === 'all' 
                 ? "Create your first group to start splitting expenses"
-                : activeFilter === 'open'
-                ? "No groups with open balances"
-                : "No groups are settled up"}
+                : activeFilter === 'active'
+                ? "No active groups"
+                : "No closed groups"}
             </Text>
             {activeFilter === 'all' && (
               <TouchableOpacity 
@@ -298,7 +277,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
             )}
           </View>
         ) : (
-          getFilteredGroups().map(renderGroupCard)
+          regularGroups.map(renderGroupCard)
         )}
       </ScrollView>
       

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,51 +8,184 @@ import {
   SafeAreaView,
   Switch,
   Alert,
-  Modal,
-  Animated,
-  PanResponder,
-  Dimensions,
   ActivityIndicator,
+  Clipboard,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
+import { firebaseDataService } from '../../services/firebaseDataService';
+import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
+import { multiSigService } from '../../services/multiSigService';
+import { MultiSignStateService } from '../../services/multiSignStateService';
+import { useWalletCreation } from '../../hooks/useWalletCreation';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
 
 const WalletManagementScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const { state } = useApp();
-  const { currentUser } = state;
-  const {
-    isConnected,
-    address,
-    balance,
-    walletName,
-    availableWallets,
-    currentWalletId
-  } = useWallet();
-
+  const currentUser = state.currentUser;
+  const { walletInfo, isConnected, address, balance, walletName, chainId } = useWallet();
+  const { walletExists, walletAddress, isLoading: walletLoading, ensureWallet } = useWalletCreation();
+  
+  // Local state
+  const [appWalletBalance, setAppWalletBalance] = useState<UserWalletBalance | null>(null);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [multiSignEnabled, setMultiSignEnabled] = useState(false);
-  const [showMultiSignModal, setShowMultiSignModal] = useState(false);
-  const [sliderActive, setSliderActive] = useState(false);
-  const [showLoader, setShowLoader] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const sliderAnim = useRef(new Animated.Value(0)).current;
-  const [transactions, setTransactions] = useState([
-    {
-      id: '1',
-      type: 'send',
-      recipient: 'Haxoloto',
-      note: 'pay for pic...',
-      amount: 999.08,
-      date: new Date().toISOString(),
+  const [activeTab, setActiveTab] = useState<'overview' | 'transactions'>('overview');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [multiSigWallets, setMultiSigWallets] = useState<any[]>([]);
+  const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
+  const [multiSignRemainingDays, setMultiSignRemainingDays] = useState<number>(0);
+  const [showMultiSignExplanation, setShowMultiSignExplanation] = useState(false);
+  const [showMultiSignActivated, setShowMultiSignActivated] = useState(false);
+  
+
+
+  // Load multi-sign state on component mount
+  useEffect(() => {
+    const loadMultiSignState = async () => {
+      try {
+        const isEnabled = await MultiSignStateService.loadMultiSignState();
+        setMultiSignEnabled(isEnabled);
+        
+        if (isEnabled) {
+          const remainingDays = await MultiSignStateService.getRemainingDays();
+          setMultiSignRemainingDays(remainingDays);
+        }
+      } catch (error) {
+        console.error('Error loading multi-sign state:', error);
+        setMultiSignEnabled(false);
+      }
+    };
+
+    loadMultiSignState();
+  }, []);
+
+  // Load wallet information
+  useEffect(() => {
+    const loadWalletInfo = async () => {
+      if (!currentUser?.id) return;
+
+      try {
+        setIsLoading(true);
+
+        // Ensure user has a wallet first
+        const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
+        
+        if (walletResult.success && walletResult.wallet) {
+          if (__DEV__) { console.log('✅ Wallet ensured for user:', walletResult.wallet.address); }
+          
+          // Load app wallet balance
+          const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
+          setAppWalletBalance(balance);
+          
+          // Load transactions
+          const userTransactions = await firebaseDataService.transaction.getUserTransactions(
+            currentUser.id.toString()
+          );
+          
+          const formattedTransactions = userTransactions.map(tx => ({
+            id: tx.id,
+            type: tx.type || 'send',
+            recipient: tx.to_user || 'Unknown',
+            note: tx.note || '',
+            amount: tx.amount || 0,
+            date: tx.created_at || new Date().toISOString(),
+          }));
+          
+          setTransactions(formattedTransactions);
+
+          // Load multi-signature wallets and transactions
+          await loadMultiSigData();
+        } else {
+          console.error('❌ Failed to ensure wallet:', walletResult.error);
+          // Show error state
+          setAppWalletBalance(null);
+        }
+      } catch (error) {
+        console.error('Error loading wallet info:', error);
+        setAppWalletBalance(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadWalletInfo();
+  }, [currentUser?.id]);
+
+  // Load multi-signature data
+  const loadMultiSigData = async () => {
+    if (!currentUser?.id) return;
+
+    try {
+      // Load user's multi-signature wallets
+      const userMultiSigWallets = await multiSigService.getUserMultiSigWallets(currentUser.id.toString());
+      setMultiSigWallets(userMultiSigWallets);
+
+      // Load pending transactions for all wallets
+      const allPendingTransactions: any[] = [];
+      for (const wallet of userMultiSigWallets) {
+        const pending = await multiSigService.getPendingTransactions(wallet.id);
+        allPendingTransactions.push(...pending);
+      }
+      setPendingTransactions(allPendingTransactions);
+
+      if (__DEV__) {
+        console.log('✅ Multi-signature data loaded:', {
+          walletsCount: userMultiSigWallets.length,
+          pendingTransactionsCount: allPendingTransactions.length
+        });
+      }
+    } catch (error) {
+      console.error('Error loading multi-signature data:', error);
     }
-  ]);
+  };
+
+  // Load transactions from Firebase
+  useEffect(() => {
+    const loadTransactions = async () => {
+      if (!currentUser?.id) {
+        setLoadingTransactions(false);
+        return;
+      }
+
+      try {
+        setLoadingTransactions(true);
+        
+        // Get user's transactions from Firebase
+        const userTransactions = await firebaseDataService.transaction.getUserTransactions(
+          currentUser.id.toString()
+        );
+
+        // Transform transactions for display
+        const formattedTransactions = userTransactions.map(tx => ({
+          id: tx.id,
+          type: tx.type || 'send',
+          recipient: tx.to_user || 'Unknown',
+          note: tx.note || '',
+          amount: tx.amount || 0,
+          date: tx.created_at || new Date().toISOString(),
+        }));
+
+        setTransactions(formattedTransactions);
+      } catch (error) {
+        console.error('Error loading transactions:', error);
+        // Fallback to empty array
+        setTransactions([]);
+      } finally {
+        setLoadingTransactions(false);
+      }
+    };
+
+    loadTransactions();
+  }, [currentUser?.id]);
 
   const handleBack = () => {
     navigation.goBack();
@@ -69,147 +202,316 @@ const WalletManagementScreen: React.FC = () => {
     Alert.alert('Link External Wallet', 'This will open wallet connection');
   };
 
-  const handleSeedPhrase = () => {
-    navigation.navigate('SeedPhraseView');
+  const handleSeedPhrase = async () => {
+    try {
+      if (!currentUser?.id) return;
+      
+      // Ensure user has a seed phrase before navigating
+      await userWalletService.ensureUserSeedPhrase(currentUser.id.toString());
+      
+      navigation.navigate('SeedPhraseView');
+    } catch (error) {
+      console.error('Error ensuring seed phrase:', error);
+      Alert.alert('Error', 'Failed to prepare seed phrase. Please try again.');
+    }
   };
 
-  const handleMultiSignToggle = (value: boolean) => {
+  const handleCopyAddress = async (address: string) => {
+    try {
+      await Clipboard.setString(address);
+      Alert.alert('Copied', 'Wallet address copied to clipboard!');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to copy address');
+    }
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      if (!currentUser?.id) return;
+
+      // Ensure user has a wallet first
+      const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
+      
+      if (walletResult.success && walletResult.wallet) {
+        // Refresh app wallet balance
+        const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
+        setAppWalletBalance(balance);
+        
+        // Refresh transactions
+        const userTransactions = await firebaseDataService.transaction.getUserTransactions(
+          currentUser.id.toString()
+        );
+        
+        const formattedTransactions = userTransactions.map(tx => ({
+          id: tx.id,
+          type: tx.type || 'send',
+          recipient: tx.to_user || 'Unknown',
+          note: tx.note || '',
+          amount: tx.amount || 0,
+          date: tx.created_at || new Date().toISOString(),
+        }));
+        
+        setTransactions(formattedTransactions);
+        
+        // Refresh multi-signature data
+        await loadMultiSigData();
+        
+        // Refresh multi-sign state
+        const isEnabled = await MultiSignStateService.loadMultiSignState();
+        setMultiSignEnabled(isEnabled);
+        
+        if (isEnabled) {
+          const remainingDays = await MultiSignStateService.getRemainingDays();
+          setMultiSignRemainingDays(remainingDays);
+        }
+        
+        if (__DEV__) { console.log('✅ Wallet info refreshed successfully'); }
+      } else {
+        console.error('❌ Failed to ensure wallet during refresh:', walletResult.error);
+      }
+    } catch (error) {
+      console.error('Error refreshing wallet info:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleViewTransactions = () => {
+    // Navigate to a full transactions screen
+    Alert.alert('View All Transactions', 'This will open a full transaction history screen');
+  };
+
+  const handleMultiSignToggle = async (value: boolean) => {
     if (value) {
       // Show multi-sign explanation modal
-      openModal();
+      setShowMultiSignExplanation(true);
     } else {
-      setMultiSignEnabled(false);
+      try {
+        await MultiSignStateService.saveMultiSignState(false);
+        setMultiSignEnabled(false);
+        setMultiSignRemainingDays(0);
+      } catch (error) {
+        console.error('Error saving multi-sign state:', error);
+        Alert.alert('Error', 'Failed to update multi-sign state');
+      }
     }
   };
 
   const handleCloseMultiSignModal = () => {
-    setShowMultiSignModal(false);
+    // This function is no longer needed as modal is handled by separate screens
   };
 
   const handleActivateMultiSign = () => {
     setMultiSignEnabled(true);
-    closeModal();
     // In a real app, this would activate multi-sign
     // navigation.navigate('MultiSignActivated');
   };
 
-  const handleSliderPress = () => {
-    if (!sliderActive && !showLoader && !showSuccess) {
-      setSliderActive(true);
-      Animated.timing(sliderAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        // Show loader after slider animation
-        setShowLoader(true);
-
-        // Simulate activation process
-        setTimeout(() => {
-          setShowLoader(false);
-          setShowSuccess(true);
-          setMultiSignEnabled(true);
-        }, 2000); // 2 seconds loader
-      });
+  const handleApproveTransaction = async (transactionId: string) => {
+    try {
+      if (!currentUser?.id) return;
+      
+      const result = await multiSigService.approveMultiSigTransaction(
+        transactionId,
+        currentUser.id.toString()
+      );
+      
+      if (result.success) {
+        Alert.alert('Success', 'Transaction approved successfully!');
+        // Reload multi-signature data
+        await loadMultiSigData();
+      } else {
+        Alert.alert('Error', result.error || 'Failed to approve transaction');
+      }
+    } catch (error) {
+      console.error('Error approving transaction:', error);
+      Alert.alert('Error', 'Failed to approve transaction');
     }
   };
 
+  const handleRejectTransaction = async (transactionId: string) => {
+    try {
+      if (!currentUser?.id) return;
+      
+      const result = await multiSigService.rejectMultiSigTransaction(
+        transactionId,
+        currentUser.id.toString()
+      );
+      
+      if (result.success) {
+        Alert.alert('Success', 'Transaction rejected successfully!');
+        // Reload multi-signature data
+        await loadMultiSigData();
+      } else {
+        Alert.alert('Error', result.error || 'Failed to reject transaction');
+      }
+    } catch (error) {
+      console.error('Error rejecting transaction:', error);
+      Alert.alert('Error', 'Failed to reject transaction');
+    }
+  };
+
+  const handleSliderPress = () => {
+    // This function is no longer needed as slider is removed
+  };
+
   const handleGoBack = () => {
-    setShowSuccess(false);
-    setSliderActive(false);
-    setShowLoader(false);
-    // Reset slider animation
-    sliderAnim.setValue(0);
-    closeModal();
+    // This function is no longer needed as slider is removed
   };
 
   const handleSliderReset = () => {
-    setSliderActive(false);
-    Animated.timing(sliderAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+    // This function is no longer needed as slider is removed
   };
 
   const openModal = () => {
-    console.log('Opening modal, resetting states...');
-    setShowMultiSignModal(true);
-    setShowSuccess(false);
-    setShowLoader(false);
-    setSliderActive(false);
-    sliderAnim.setValue(0);
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // This function is no longer needed as modal is handled by separate screens
   };
 
   const closeModal = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowMultiSignModal(false);
-    });
-  };
-
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (_, gestureState) => {
-      return gestureState.dy > 10;
-    },
-    onPanResponderGrant: () => {
-      slideAnim.setOffset(0);
-    },
-    onPanResponderMove: (_, gestureState) => {
-      if (gestureState.dy > 0) {
-        slideAnim.setValue(gestureState.dy);
-      }
-    },
-    onPanResponderRelease: (_, gestureState) => {
-      slideAnim.flattenOffset();
-      if (gestureState.dy > 100 || gestureState.vy > 0.5) {
-        closeModal();
-      } else {
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      }
-    },
-  });
-
-  const handleViewTransactions = () => {
-    navigation.navigate('TransactionsList');
+    // This function is no longer needed as modal is handled by separate screens
   };
 
   const formatAddress = (addr: string | null) => {
-    if (!addr) return '';
-    return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
+    if (!addr) return 'No address';
+    return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
   };
 
-  const getCurrentWallet = () => {
-    return availableWallets.find(w => w.id === currentWalletId);
+  // Get display balance based on active wallet
+  const getDisplayBalance = () => {
+    if (isConnected && balance !== null) {
+      return balance;
+    }
+    if (appWalletBalance) {
+      return appWalletBalance.totalUSD;
+    }
+    return 0;
   };
 
-  const currentWallet = getCurrentWallet();
+  const renderWalletOverview = () => (
+    <View>
+      {/* External Wallet Section - Match mockup exactly */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>External wallet</Text>
+          {isConnected && walletInfo && (
+            <TouchableOpacity onPress={handleChangeExternalWallet}>
+              <Text style={styles.changeButton}>Change</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {isConnected && walletInfo ? (
+          <View style={styles.externalWalletCard}>
+            <View style={styles.externalWalletAddress}>
+              <Icon name="bug" size={16} color={colors.primaryGreen} />
+              <Text style={styles.externalWalletAddressText}>
+                {formatAddress(walletInfo.address)}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.linkWalletButton}
+            onPress={handleLinkExternalWallet}
+          >
+            <Text style={styles.linkWalletText}>Link external wallet</Text>
+            <Icon name="chevron-right" size={16} color={colors.white} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Wallet Management Options - Match mockup exactly */}
+      <View style={styles.optionsContainer}>
+        <TouchableOpacity
+          style={styles.optionRow}
+          onPress={handleSeedPhrase}
+        >
+          <View style={styles.optionLeft}>
+            <Image source={require('../../../assets/id-icon-white.png')} style={styles.optionIcon} />
+            <Text style={styles.optionText}>Seed phrase</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textLightSecondary} />
+        </TouchableOpacity>
+
+        <View style={styles.optionRow}>
+          <View style={styles.optionLeft}>
+            <Image source={require('../../../assets/scan-icon-white.png')} style={styles.optionIcon} />
+            <View>
+              <Text style={styles.optionText}>Multi-sign</Text>
+              {multiSignEnabled && multiSignRemainingDays > 0 && (
+                <Text style={styles.optionSubtext}>
+                  Expires in {multiSignRemainingDays} day{multiSignRemainingDays !== 1 ? 's' : ''}
+                </Text>
+              )}
+            </View>
+          </View>
+          <Switch
+            value={multiSignEnabled}
+            onValueChange={handleMultiSignToggle}
+            trackColor={{ false: colors.border, true: colors.primaryGreen }}
+            thumbColor={multiSignEnabled ? colors.white : colors.white}
+            ios_backgroundColor={colors.white10}
+            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+          />
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderTransactions = () => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Transactions</Text>
+        <TouchableOpacity onPress={handleViewTransactions}>
+          <Text style={styles.seeAllText}>See all</Text>
+        </TouchableOpacity>
+      </View>
+
+      {loadingTransactions ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator
+            size="large"
+            color={colors.primaryGreen}
+            style={styles.loader}
+          />
+          <Text style={styles.loaderText}>Loading transactions...</Text>
+        </View>
+      ) : transactions.length > 0 ? (
+        transactions.slice(0, 5).map((transaction) => {
+          const transactionTime = new Date(transaction.date).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          });
+
+          return (
+            <View key={transaction.id} style={styles.transactionItem}>
+              <View style={styles.transactionInfo}>
+                <Text style={styles.transactionTitle}>
+                  {transaction.type === 'send' ? 'Send to' : 'Received from'} {transaction.recipient}
+                </Text>
+                {transaction.note && (
+                  <Text style={styles.transactionNote}>{transaction.note}</Text>
+                )}
+              </View>
+              <Text style={styles.transactionAmount}>
+                {transaction.amount.toFixed(2)}
+              </Text>
+            </View>
+          );
+        })
+      ) : (
+        <View style={styles.emptyTransactions}>
+          <Icon name="file-text" size={48} color={colors.textLightSecondary} />
+          <Text style={styles.emptyTransactionsText}>No transactions yet</Text>
+          <Text style={styles.emptyTransactionsSubtext}>
+            Your transaction history will appear here
+          </Text>
+        </View>
+      )}
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -222,7 +524,13 @@ const WalletManagementScreen: React.FC = () => {
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Wallet</Text>
-        <View style={styles.placeholder} />
+        <TouchableOpacity onPress={handleRefresh} style={styles.backButton} disabled={refreshing}>
+          {refreshing ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Icon name="refresh-cw" size={20} color="#FFF" />
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -242,7 +550,7 @@ const WalletManagementScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
           <Text style={styles.balanceAmount}>
-            ${balance !== null ? balance.toFixed(2) : '0.00'}
+            ${getDisplayBalance() !== null ? getDisplayBalance().toFixed(2) : '0.00'}
           </Text>
           <Text style={styles.balanceLimitText}>Balance Limit $1000</Text>
         </View>
@@ -306,257 +614,105 @@ const WalletManagementScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* External Wallet Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>External wallet</Text>
-            {isConnected && currentWallet && (
-              <TouchableOpacity onPress={handleChangeExternalWallet}>
-                <Text style={styles.changeButton}>Change</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+        {/* Wallet Overview */}
+        {renderWalletOverview()}
 
-          {isConnected && currentWallet ? (
-            <TouchableOpacity style={styles.externalWalletButton}>
-              <View style={styles.linkWalletIconBox}>
-                <Image source={require('../../../assets/wallet-icon-green.png')} style={styles.linkWalletIcon} />
-                <Text style={styles.externalWalletText}>
-                  {formatAddress(currentWallet.address)}
+        {/* Transactions Section */}
+        {renderTransactions()}
+
+      </ScrollView>
+
+      {/* Multi-Sign Explanation Modal */}
+      {showMultiSignExplanation && (
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowMultiSignExplanation(false)}
+          statusBarTranslucent={true}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.bottomSheet}>
+              <View style={styles.handle} />
+              
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>What is multi-sign?</Text>
+                <TouchableOpacity onPress={() => setShowMultiSignExplanation(false)} style={styles.closeButton}>
+                  <Icon name="x" size={24} color={colors.white} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalContent}>
+                <Text style={styles.explanationText}>
+                  Multisign lets you approve once to authorize multiple payments at the same time, 
+                  saving you time by avoiding manual approval for each transaction.
                 </Text>
               </View>
 
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={styles.linkWalletButton}
-              onPress={handleLinkExternalWallet}
-            >
-              <View style={styles.linkWalletIconBox}>
-                <Image source={require('../../../assets/wallet-icon-white.png')} style={styles.linkWalletIcon} />
-                <Text style={styles.linkWalletText}>Link external wallet</Text>
+              <View style={styles.modalFooter}>
+                <TouchableOpacity 
+                  style={styles.activateButton}
+                  onPress={() => {
+                    setShowMultiSignExplanation(false);
+                    setShowMultiSignActivated(true);
+                  }}
+                >
+                  <Text style={styles.activateButtonText}>Activate multisign</Text>
+                  <Icon name="chevron-right" size={20} color={colors.black} />
+                </TouchableOpacity>
               </View>
-
-              <Icon name="chevron-right" size={16} color={colors.white} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Wallet Management Options */}
-        <View style={styles.optionsContainer}>
-          <TouchableOpacity
-            style={styles.optionRow}
-            onPress={handleSeedPhrase}
-          >
-            <View style={styles.linkWalletIconBox}>
-              <Image source={require('../../../assets/id-icon-white.png')} style={styles.linkWalletIcon} />
-              <Text style={styles.optionText}>Seed phrase</Text>
             </View>
-            <Icon name="chevron-right" size={16} color={colors.textLightSecondary} />
-          </TouchableOpacity>
-
-          <View style={styles.optionRow}>
-            <View style={styles.linkWalletIconBox}>
-              <Image source={require('../../../assets/scan-icon-white.png')} style={styles.linkWalletIcon} />
-              <Text style={styles.optionText}>Multi-sign</Text>
-            </View>
-            <Switch
-              value={multiSignEnabled}
-              onValueChange={handleMultiSignToggle}
-              trackColor={{ false: colors.border, true: colors.primaryGreen }}
-              thumbColor={multiSignEnabled ? colors.white : colors.white}
-              ios_backgroundColor={colors.white10}
-              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-            />
           </View>
-        </View>
+        </Modal>
+      )}
 
-        {/* Transactions Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Transactions</Text>
-            <TouchableOpacity onPress={handleViewTransactions}>
-              <Text style={styles.seeAllText}>See all</Text>
-            </TouchableOpacity>
-          </View>
-
-          {transactions.length > 0 ? (
-            transactions.slice(0, 3).map((transaction) => {
-              const transactionTime = new Date(transaction.date).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-              });
-
-              return (
-                <View key={transaction.id} style={styles.requestItemNew}>
-                  <View style={styles.transactionAvatarNew}>
-                    <Image
-                      source={require('../../../assets/icon-send.png')}
-                      style={styles.transactionIcon}
-                    />
-                  </View>
-                  <View style={styles.requestContent}>
-                    <Text style={styles.requestMessageWithAmount}>
-                      <Text style={styles.requestSenderName}>
-                        Send to {transaction.recipient}
-                      </Text>
-                    </Text>
-                    <Text style={styles.requestSource}>
-                      Note: {transaction.note} • {transactionTime}
-                    </Text>
-                  </View>
-                  <Text style={styles.requestAmountGreen}>
-                    {transaction.amount.toFixed(2)} USDC
-                  </Text>
-                </View>
-              );
-            })
-          ) : (
-            <View style={styles.emptyRequestsState}>
-              <Text style={styles.emptyRequestsText}>No transactions yet</Text>
-            </View>
-          )}
-        </View>
-
-      </ScrollView>
-      <NavBar currentRoute="WalletManagement" navigation={navigation} />
-
-      {/* Multi-Sign Explanation Modal */}
-      <Modal
-        visible={showMultiSignModal}
-        transparent={true}
-        animationType="none"
-        onRequestClose={closeModal}
-      >
-        {/* Animated Background Overlay */}
-        <Animated.View
-          style={[
-            styles.modalOverlay,
-            {
-              opacity: fadeAnim,
-            }
-          ]}
+      {/* Multi-Sign Activated Modal */}
+      {showMultiSignActivated && (
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowMultiSignActivated(false)}
+          statusBarTranslucent={true}
         >
-          {/* Click outside to close */}
-          <TouchableOpacity
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={closeModal}
-          />
-
-          {/* Animated Bottom Sheet */}
-          <Animated.View
-            style={[
-              styles.bottomSheet,
-              {
-                transform: [{
-                  translateY: slideAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [300, 0],
-                  })
-                }]
-              }
-            ]}
-            {...panResponder.panHandlers}
-          >
-            {/* Handle */}
-            <View style={styles.handle} />
-
-
-            {/* Content */}
-            <View style={styles.modalContent}>
-              {showSuccess ? (
-                // Success State
+          <View style={styles.modalOverlay}>
+            <View style={styles.bottomSheet}>
+              <View style={styles.handle} />
+              
+              <View style={styles.modalContent}>
                 <View style={styles.successContainer}>
                   <View style={styles.successIcon}>
                     <Icon name="check" size={32} color={colors.black} />
                   </View>
-                  <Text style={styles.successTitle}>Multi-sign Activated!</Text>
-                  <Text style={styles.successMessage}>
-                    You can now approve multiple payments at once, saving time on each transaction.
-                  </Text>
+                  <Text style={styles.successTitle}>Multi-sign activated</Text>
                 </View>
-              ) : showLoader ? (
-                // Loader State
-                <View style={styles.loaderContainer}>
-                  <ActivityIndicator
-                    size="large"
-                    color={colors.primaryGreen}
-                    style={styles.loader}
-                  />
-                  <Text style={styles.loaderText}>Activating multi-sign...</Text>
-                </View>
-              ) : (
-                // Initial State
-                <>
-                  <View style={styles.modalContentHeader}>
-                    <Text style={styles.modalTitle}>What is multi-sign?</Text>
+              </View>
 
-                    <Text style={styles.explanationText}>
-                      Multisign lets you approve once to authorize multiple payments at the same time,
-                      saving you time by avoiding manual approval for each transaction.
-                    </Text>
-                  </View>
-                </>
-              )}
-            </View>
-
-            {/* Footer */}
-            <View style={styles.modalFooter}>
-              {showSuccess ? (
-                // Success Button
-                <TouchableOpacity
+              <View style={styles.modalFooter}>
+                <TouchableOpacity 
                   style={styles.goBackButton}
-                  onPress={handleGoBack}
+                  onPress={async () => {
+                    try {
+                      // Save multi-sign state
+                      await MultiSignStateService.saveMultiSignState(true);
+                      setShowMultiSignActivated(false);
+                      // Refresh the multi-sign state
+                      handleRefresh();
+                    } catch (error) {
+                      console.error('Error saving multi-sign state:', error);
+                      Alert.alert('Error', 'Failed to activate multi-sign');
+                    }
+                  }}
                 >
                   <Text style={styles.goBackButtonText}>Go Back</Text>
                 </TouchableOpacity>
-              ) : !showLoader ? (
-                // Apple-style Slider (only show when not loading)
-                <TouchableOpacity
-                  style={styles.appleSliderContainer}
-                  onPress={handleSliderPress}
-                  activeOpacity={0.8}
-                >
-                  <Animated.View
-                    style={[
-                      styles.appleSliderTrack,
-                      sliderActive && styles.appleSliderTrackActive,
-                    ]}
-                  >
-                    <Animated.Text
-                      style={[
-                        styles.appleSliderText,
-                        sliderActive && styles.appleSliderTextActive,
-                      ]}
-                    >
-                      Activate multisign
-                    </Animated.Text>
-                  </Animated.View>
-
-                  <Animated.View
-                    style={[
-                      styles.appleSliderThumb,
-                      {
-                        transform: [{
-                          translateX: sliderAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [0, 250], // Increased for bigger slider
-                          })
-                        }]
-                      }
-                    ]}
-                  >
-                    <Icon name="chevron-right" size={24} color={colors.black} />
-                  </Animated.View>
-                </TouchableOpacity>
-              ) : null}
+              </View>
             </View>
-          </Animated.View>
-        </Animated.View>
-      </Modal>
+          </View>
+        </Modal>
+      )}
 
+      <NavBar currentRoute="WalletManagement" navigation={navigation} />
     </SafeAreaView>
   );
 };

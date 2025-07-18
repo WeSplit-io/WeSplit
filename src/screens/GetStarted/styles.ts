@@ -65,4 +65,13 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.medium,
   },
+  helpSection: {
+    alignItems: 'center',
+    paddingBottom: spacing.xl,
+  },
+  helpText: {
+    color: colors.green,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+  },
 }); 

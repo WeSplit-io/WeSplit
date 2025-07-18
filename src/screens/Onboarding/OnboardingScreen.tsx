@@ -6,22 +6,22 @@ import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 const slides = [
   {
     title: 'Add Friends',
-    subtitle: 'Invite your friends to join your group and start splitting bills together.',
+    subtitle: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
     image: require('../../../assets/onboarding1.png'),
   },
   {
     title: 'Create Groups',
-    subtitle: 'Organize your expenses by creating groups for different occasions.',
+    subtitle: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
     image: require('../../../assets/onboarding2.png'),
   },
   {
-    title: 'Add Expenses',
-    subtitle: 'Easily add expenses and keep track of who owes what.',
+    title: 'Add expenses',
+    subtitle: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
     image: require('../../../assets/onboarding3.png'),
   },
   {
     title: 'Pay your friends in a few clicks',
-    subtitle: 'Settle up instantly and securely with crypto payments.',
+    subtitle: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
     image: require('../../../assets/onboarding4.png'),
   },
 ];
@@ -56,6 +56,7 @@ const OnboardingScreen: React.FC = () => {
       <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
         <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>
+      
       {/* Centered content */}
       <ScrollView
         ref={scrollRef}
@@ -74,10 +75,12 @@ const OnboardingScreen: React.FC = () => {
           </View>
         ))}
       </ScrollView>
+      
       {/* Next button */}
       <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
         <Text style={styles.nextButtonText}>→</Text>
       </TouchableOpacity>
+      
       {/* Pagination - horizontal bars at bottom left */}
       <View style={styles.paginationContainer}>
         {slides.map((_, idx) => (

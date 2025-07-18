@@ -149,6 +149,36 @@ export const styles = StyleSheet.create({
   memberBalanceNeutral: {
     color: '#A89B9B',
   },
+  // Invited Member Styles
+  memberItemInvited: {
+    backgroundColor: '#1E1E1E',
+    borderColor: '#333333',
+    opacity: 0.7,
+  },
+  memberAvatarInvited: {
+    backgroundColor: '#333333',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberNameInvited: {
+    color: '#A89B9B',
+    fontStyle: 'italic',
+  },
+  memberEmailInvited: {
+    color: '#666666',
+    fontStyle: 'italic',
+  },
+  memberInviteStatus: {
+    backgroundColor: '#333333',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  memberInviteStatusText: {
+    color: '#A89B9B',
+    fontSize: 12,
+    fontWeight: '500',
+  },
   // Bottom Action Buttons
   leaveButton: {
     backgroundColor: 'transparent',

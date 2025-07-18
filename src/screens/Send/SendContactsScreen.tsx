@@ -5,7 +5,7 @@ import NavBar from '../../components/NavBar';
 import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
 import { firebaseDataService } from '../../services/firebaseDataService';
-import { UserContact } from '../../types';
+import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
 
@@ -24,8 +24,10 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
   const [filteredContacts, setFilteredContacts] = useState<UserContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'All' | 'Favorite'>('All');
+  const [activeTab, setActiveTab] = useState<'All' | 'Favorite' | 'Search'>('All');
   const [selectedContact, setSelectedContact] = useState<UserContact | null>(null);
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     loadContacts();
@@ -34,20 +36,60 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
   useEffect(() => {
     let filtered = [...contacts];
     
-    if (activeTab === 'Favorite') {
+    if (activeTab === 'All') {
+      // Show all contacts in All tab
+      if (searchQuery.trim() !== '') {
+        filtered = filtered.filter(contact =>
+          (contact.wallet_address && contact.wallet_address.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (contact.name && contact.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          contact.email.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
+    } else if (activeTab === 'Favorite') {
+      // Show only favorite contacts
       filtered = filtered.filter(contact => contact.isFavorite);
-    }
-    
-    if (searchQuery.trim() !== '') {
-      filtered = filtered.filter(contact =>
-        (contact.wallet_address && contact.wallet_address.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (contact.name && contact.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        contact.email.toLowerCase().includes(searchQuery.toLowerCase())
-      );
     }
     
     setFilteredContacts(filtered);
   }, [searchQuery, contacts, activeTab]);
+
+  // Handle user search
+  const handleUserSearch = async (query: string) => {
+    if (!query.trim() || query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const results = await firebaseDataService.group.searchUsersByUsername(
+        query.trim(), 
+        currentUser?.id ? String(currentUser.id) : undefined
+      );
+      setSearchResults(results);
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Debounced search
+  useEffect(() => {
+    if (activeTab === 'Search' && searchQuery.trim()) {
+      const timeoutId = setTimeout(() => {
+        handleUserSearch(searchQuery);
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    } else if (activeTab === 'Search') {
+      setSearchResults([]);
+    } else {
+      // Clear search results when not in search tab
+      setSearchResults([]);
+    }
+  }, [searchQuery, activeTab]);
 
   const loadContacts = async () => {
     if (!currentUser) {
@@ -75,7 +117,7 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
       } else if (!groupId) {
         // Load all contacts from groups the user has been in
         console.log('📱 Loading all user contacts...');
-        const userContacts = await firebaseDataService.group.getUserContacts(String(currentUser.id));
+        const userContacts = await firebaseDataService.user.getUserContacts(String(currentUser.id));
         console.log('📱 Loaded', userContacts.length, 'user contacts:', userContacts.map((c: UserContact) => ({
           name: c.name || 'No name',
           email: c.email,
@@ -115,7 +157,15 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
     });
   };
 
-  const toggleFavorite = (contactId: number) => {
+  const handleTabChange = (tab: 'All' | 'Favorite' | 'Search') => {
+    setActiveTab(tab);
+    if (tab !== 'Search') {
+      setSearchQuery('');
+      setSearchResults([]);
+    }
+  };
+
+  const toggleFavorite = (contactId: number | string) => {
     setContacts(prev => prev.map(contact => 
       contact.id === contactId 
         ? { ...contact, isFavorite: !contact.isFavorite }
@@ -153,7 +203,7 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
             <Text style={styles.mutualGroupsText}> • {item.mutual_groups_count} groups</Text>
           )}
         </Text>
-        {item.email && (
+        {item.email && item.wallet_address && (
           <Text style={[styles.mockupContactEmail, { fontSize: 12, marginTop: 2 }]}>
             {item.email}
           </Text>
@@ -161,7 +211,7 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
       </View>
       <TouchableOpacity 
         style={styles.favoriteButton}
-        onPress={() => toggleFavorite(Number(item.id))}
+        onPress={() => toggleFavorite(item.id)}
       >
         <Icon 
           name="star" 
@@ -184,34 +234,45 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
       </View>
 
       <View style={styles.content}>
-        {/* Search Input */}
-        <View style={styles.mockupSearchContainer}>
-          <Icon name="search" size={20} color={colors.textSecondary} />
-          <TextInput
-            style={styles.mockupSearchInput}
-            placeholder="Search"
-            placeholderTextColor={colors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
+        {/* Search Input - only show for Search tab */}
+        {activeTab === 'Search' && (
+          <View style={styles.mockupSearchContainer}>
+            <Icon name="search" size={20} color={colors.textSecondary} />
+            <TextInput
+              style={styles.mockupSearchInput}
+              placeholder="Search users by username or email"
+              placeholderTextColor={colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus={true}
+            />
+          </View>
+        )}
         
         {/* Tabs */}
-        <View style={styles.tabContainer}>
+        <View style={styles.sendTabsContainer}>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'All' && styles.activeTab]}
+            style={[styles.sendTab, activeTab === 'All' && styles.sendTabActive]}
             onPress={() => setActiveTab('All')}
           >
-            <Text style={[styles.tabText, activeTab === 'All' && styles.activeTabText]}>
+            <Text style={[styles.sendTabText, activeTab === 'All' && styles.sendTabTextActive]}>
               All
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'Favorite' && styles.activeTab]}
+            style={[styles.sendTab, activeTab === 'Favorite' && styles.sendTabActive]}
             onPress={() => setActiveTab('Favorite')}
           >
-            <Text style={[styles.tabText, activeTab === 'Favorite' && styles.activeTabText]}>
+            <Text style={[styles.sendTabText, activeTab === 'Favorite' && styles.sendTabTextActive]}>
               Favorite
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.sendTab, activeTab === 'Search' && styles.sendTabActive]}
+            onPress={() => setActiveTab('Search')}
+          >
+            <Text style={[styles.sendTabText, activeTab === 'Search' && styles.sendTabTextActive]}>
+              Search
             </Text>
           </TouchableOpacity>
         </View>
@@ -224,39 +285,128 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
             <Text style={styles.loadingText}>Loading contacts...</Text>
           </View>
         ) : (
-          <ScrollView style={styles.contactsScrollView} showsVerticalScrollIndicator={false}>
-            {/* Friends Section */}
-            {(activeTab === 'All' && getFriends().length > 0) && (
-              <View style={styles.sectionContainer}>
-                <Text style={styles.mockupSectionTitle}>Friends</Text>
-                {getFriends().map(contact => renderContact(contact, 'friends'))}
-              </View>
+          <ScrollView 
+            style={styles.contactsScrollView} 
+            contentContainerStyle={{ paddingBottom: 100 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* All Tab Content */}
+            {activeTab === 'All' && (
+              <>
+                {/* Friends Section */}
+                {getFriends().length > 0 && (
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.mockupSectionTitle}>Friends</Text>
+                    {getFriends().map(contact => renderContact(contact, 'friends'))}
+                  </View>
+                )}
+
+                {/* Others Section */}
+                {getOthers().length > 0 && (
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.mockupSectionTitle}>Others</Text>
+                    {getOthers().map(contact => renderContact(contact, 'others'))}
+                  </View>
+                )}
+              </>
             )}
 
-            {/* Others Section */}
-            {(activeTab === 'All' && getOthers().length > 0) && (
-              <View style={styles.sectionContainer}>
-                <Text style={styles.mockupSectionTitle}>Others</Text>
-                {getOthers().map(contact => renderContact(contact, 'others'))}
-              </View>
-            )}
-
-            {/* Favorites Only */}
+            {/* Favorite Tab Content */}
             {activeTab === 'Favorite' && (
-              <View style={styles.sectionContainer}>
-                {getFriends().map(contact => renderContact(contact, 'friends'))}
-              </View>
+              <>
+                {/* Favorite Contacts Section */}
+                {getFriends().length > 0 && (
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.mockupSectionTitle}>Favorite Contacts</Text>
+                    {getFriends().map(contact => renderContact(contact, 'friends'))}
+                  </View>
+                )}
+              </>
+            )}
+
+            {/* Search Results */}
+            {activeTab === 'Search' && (
+              <>
+                {isSearching && (
+                  <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Searching users...</Text>
+                  </View>
+                )}
+                
+                {!isSearching && searchResults.length > 0 && (
+                  <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>Search Results</Text>
+                    {searchResults.map((user) => (
+                      <TouchableOpacity
+                        key={`search-${user.id}`}
+                        style={styles.mockupContactRow}
+                        onPress={() => handleSelectContact({
+                          id: user.id,
+                          name: user.name,
+                          email: user.email,
+                          wallet_address: user.wallet_address,
+                          wallet_public_key: user.wallet_public_key,
+                          created_at: user.created_at,
+                          joined_at: user.created_at,
+                          first_met_at: user.created_at,
+                          mutual_groups_count: 0,
+                          isFavorite: false
+                        })}
+                      >
+                        <View style={styles.mockupAvatar}>
+                          <Text style={styles.mockupAvatarText}>
+                            {user.name ? user.name.charAt(0).toUpperCase() : formatWalletAddress(user.wallet_address).charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.mockupContactInfo}>
+                          <Text style={styles.mockupContactName}>
+                            {user.name || formatWalletAddress(user.wallet_address)}
+                          </Text>                         
+                          {user.email && user.wallet_address && (
+                            <Text style={[styles.mockupContactEmail, { fontSize: 12, marginTop: 2 }]}>
+                              {user.email}
+                            </Text>
+                          )}
+                           <Text style={styles.mockupContactEmail}>
+                            {user.wallet_address ? formatWalletAddress(user.wallet_address) : user.email}
+                          </Text>
+                        </View>
+                        <View style={styles.favoriteButton}>
+                          <Icon 
+                            name="user-plus" 
+                            size={16} 
+                            color={colors.brandGreen} 
+                          />
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+                
+                {!isSearching && searchQuery.trim() && searchResults.length === 0 && (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>No users found matching "{searchQuery}"</Text>
+                  </View>
+                )}
+
+                {!isSearching && !searchQuery.trim() && (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>Search for users by username or email</Text>
+                  </View>
+                )}
+              </>
             )}
 
             {/* Empty State */}
-            {filteredContacts.length === 0 && (
+            {filteredContacts.length === 0 && (activeTab === 'All' || activeTab === 'Favorite') && (
               <View style={styles.emptyContainer}>
-                <Icon name="users" size={48} color={colors.textSecondary} />
                 <Text style={styles.emptyText}>
-                  {searchQuery ? 'No contacts found' : activeTab === 'Favorite' ? 'No favorite contacts' : groupId ? 'No other group members' : 'No contacts available'}
-                </Text>
-                <Text style={styles.emptySubtext}>
-                  {!groupId && !searchQuery && 'Join groups to meet new contacts'}
+                  {searchQuery.trim() !== '' 
+                    ? 'No contacts found matching your search'
+                    : activeTab === 'Favorite'
+                    ? 'No favorite contacts yet'
+                    : 'No contacts available'}
                 </Text>
               </View>
             )}
@@ -264,8 +414,7 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
         )}
       </View>
       
-      {/* Show NavBar only when accessed from People tab (no groupId) */}
-      {!groupId && <NavBar currentRoute="SendContacts" navigation={navigation} />}
+      <NavBar currentRoute="SendContacts" navigation={navigation} />
     </SafeAreaView>
   );
 };

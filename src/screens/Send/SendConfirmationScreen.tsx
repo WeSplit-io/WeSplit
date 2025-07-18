@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, Alert, ScrollView } from 'react-native';
 import Icon from '../../components/Icon';
 import SlideButton from '../../components/SlideButton';
 import { useApp } from '../../context/AppContext';
@@ -127,7 +127,12 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.placeholder} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Wallet Connection Status */}
         {!isConnected && (
           <View style={styles.alertContainer}>
@@ -211,7 +216,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
             Double check the person you're sending money to!
           </Text>
           {isConnected && address && (
-            <Text style={styles.walletFromText} numberOfLines={1} ellipsizeMode="middle">
+            <Text style={styles.walletInfoText} numberOfLines={1} ellipsizeMode="middle">
               From: {address}
             </Text>
           )}
@@ -224,7 +229,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           disabled={sending || !isConnected || !hasSufficientBalance || walletLoading}
           loading={sending || walletLoading}
         />
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };

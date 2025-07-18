@@ -11,31 +11,31 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG_COLOR,
     flexDirection: 'column',
-    paddingHorizontal: 0,
+    paddingHorizontal: spacing.lg,
   },
-  logoRow: {
-    width: '100%',
-    flexDirection: 'row',
+  logoSection: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.logoTopMargin,
+    marginTop: spacing.xl,
     marginBottom: spacing.xl,
   },
-  logoIcon: {
-    width: spacing.logoIconSize,
-    height: spacing.logoIconSize,
-    marginRight: spacing.itemSpacing,
-    resizeMode: 'contain',
+  logoContainer: {
+    width: 48,
+    height: 48,
+    backgroundColor: GREEN,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
   },
   logoText: {
-    fontSize: typography.fontSize.title,
-    fontFamily: 'Satoshi',
+    fontSize: 24,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.black,
+  },
+  logoName: {
+    fontSize: 24,
     fontWeight: typography.fontWeight.bold,
     color: colors.textLight,
-    letterSpacing: 0.5,
-  },
-  logoSplit: {
-    color: GREEN,
   },
   centerContent: {
     flex: 1,
@@ -72,6 +72,9 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.8,
   },
+  emailHighlight: {
+    color: colors.textSecondary,
+  },
   codeRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -107,6 +110,9 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.normal,
   },
+  timerSection: {
+    alignItems: 'center',
+  },
   timer: {
     color: colors.textLight,
     fontSize: typography.fontSize.md,
@@ -133,14 +139,13 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     textAlign: 'center',
   },
-  helpLink: {
-    alignSelf: 'center',
-    marginBottom: spacing.xl,
-    textAlign: 'center',
+  helpSection: {
+    alignItems: 'center',
+    paddingBottom: spacing.xl,
   },
   helpText: {
-    color: GRAY,
+    color: GREEN,
     fontSize: typography.fontSize.md,
-    opacity: 0.7,
+    fontWeight: typography.fontWeight.medium,
   },
 }); 

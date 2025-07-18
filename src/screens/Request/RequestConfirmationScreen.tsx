@@ -3,9 +3,9 @@ import { View, Text, TouchableOpacity, SafeAreaView, Alert } from 'react-native'
 import Icon from '../../components/Icon';
 import SlideButton from '../../components/SlideButton';
 import { GroupMember } from '../../types';
-import { createPaymentRequest } from '../../services/requestService';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
+import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
 import { colors } from '../../theme';
 import { styles } from './styles';
 
@@ -16,12 +16,12 @@ const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const [requesting, setRequesting] = useState(false);
 
   const handleConfirmRequest = async () => {
-    if (!currentUser) {
+    if (!currentUser?.id) {
       Alert.alert('Error', 'User not authenticated');
       return;
     }
 
-    if (!contact) {
+    if (!contact?.id) {
       Alert.alert('Error', 'Contact information is missing');
       return;
     }
@@ -29,17 +29,15 @@ const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     setRequesting(true);
     
     try {
-      // Create real payment request using backend API
-      const requestData = {
-        senderId: Number(currentUser.id),
-        recipientId: contact.id,
-        amount: amount,
-        currency: 'USDC',
-        description: description || '',
-        groupId: groupId || undefined,
-      };
-
-      const createdRequest = await createPaymentRequest(requestData);
+      // Create payment request using Firebase service
+      const createdRequest = await createPaymentRequest(
+        currentUser.id,
+        contact.id,
+        amount,
+        'USDC',
+        description || '',
+        groupId
+      );
       
       // Navigate to success screen with real request data
       navigation.navigate('RequestSuccess', {

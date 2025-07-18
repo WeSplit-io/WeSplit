@@ -1,13 +1,25 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActionSheetIOS, Platform } from 'react-native';
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  SafeAreaView,
+  Alert,
+  ActivityIndicator,
+  ScrollView,
+  ActionSheetIOS,
+  Platform,
+} from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import * as ImagePicker from 'expo-image-picker';
-import { styles, BG_COLOR, GREEN, GRAY } from './styles';
-import { solanaAppKitService } from '../../services/solanaAppKitService';
-import { createUser } from '../../services/userService';
 import { useApp } from '../../context/AppContext';
-
-
+import { createUser } from '../../services/userService';
+import { userWalletService } from '../../services/userWalletService';
+import { styles, BG_COLOR, GREEN, GRAY } from './styles';
+import { colors } from '../../theme';
+import { solanaAppKitService } from '../../services/solanaAppKitService';
+import * as ImagePicker from 'expo-image-picker';
 
 const CreateProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -135,35 +147,39 @@ const CreateProfileScreen: React.FC = () => {
       // Get email from route/context
       const email = (route?.params as any)?.email || 'user@example.com';
 
-      // Try wallet generation, fallback to mock if error
-      let wallet: any;
-      try {
-        const result = await solanaAppKitService.createWallet();
-        wallet = result.wallet;
-        if (!wallet || !wallet.address) throw new Error('Wallet generation failed');
-      } catch (e) {
-        console.error('Wallet generation error:', e);
-        // Create a fallback wallet for development
-        wallet = {
-          address: 'mock_wallet_address_' + Date.now(),
-          publicKey: 'mock_public_key_' + Date.now()
-        };
-      }
-
-      // Create user in backend
+      // Create user in backend first
       try {
         const userData = {
           email,
           name: pseudo,
-          walletAddress: wallet.address,
-          walletPublicKey: wallet.publicKey?.toString() || wallet.address,
-          walletSecretKey: (wallet as any).secretKey || undefined,
+          walletAddress: '', // Will be set after wallet creation
+          walletPublicKey: '', // Will be set after wallet creation
           avatar: avatar || undefined,
         };
 
-        console.log('Creating user in backend:', { email, name: pseudo, walletAddress: wallet.address });
+        console.log('Creating user in backend:', { email, name: pseudo });
         const createdUser: any = await createUser(userData);
         console.log('User created successfully:', createdUser);
+
+        // Now ensure the user has a wallet
+        if (__DEV__) { console.log('🔄 Ensuring wallet for new user...'); }
+        
+        const walletResult = await userWalletService.ensureUserWallet(createdUser.id.toString());
+        
+        if (walletResult.success && walletResult.wallet) {
+          if (__DEV__) { console.log('✅ Wallet created successfully:', walletResult.wallet.address); }
+          
+          // Update user with wallet information
+          const updatedUserData = {
+            email,
+            name: pseudo,
+            walletAddress: walletResult.wallet.address,
+            walletPublicKey: walletResult.wallet.publicKey,
+            avatar: avatar || undefined,
+          };
+
+          // Update the user in backend with wallet info
+          await createUser(updatedUserData);
 
         // Build user object for local state
         const user = {
@@ -171,9 +187,10 @@ const CreateProfileScreen: React.FC = () => {
           name: createdUser.name,
           email: createdUser.email,
           avatar: avatar || 'https://randomuser.me/api/portraits/men/32.jpg',
-          walletAddress: createdUser.walletAddress,
-          wallet_address: createdUser.walletAddress, // Add missing property
-          created_at: new Date().toISOString(), // Add missing property
+            walletAddress: walletResult.wallet.address,
+            wallet_address: walletResult.wallet.address,
+            wallet_public_key: walletResult.wallet.publicKey,
+            created_at: new Date().toISOString(),
         };
 
         authenticateUser(user, 'email');
@@ -183,6 +200,10 @@ const CreateProfileScreen: React.FC = () => {
         } catch (e) {
           console.error('Navigation error:', e);
           Alert.alert('Navigation Error', 'Navigation error: ' + (e as any).message);
+          }
+        } else {
+          console.error('❌ Failed to create wallet:', walletResult.error);
+          Alert.alert('Error', 'Failed to create wallet. Please try again.');
         }
       } catch (createError) {
         console.error('Error creating user in backend:', createError);
@@ -198,46 +219,42 @@ const CreateProfileScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.logoRow}>
-        <Image 
-          source={require('../../../assets/WeSplitLogo.png')} 
-          style={styles.logoIcon}
-        />
-        <Text style={styles.logoText}>
-          We<Text style={styles.logoSplit}>Split</Text>
-        </Text>
+      {/* Logo Section */}
+      <View style={styles.logoSection}>
+        <View style={styles.logoContainer}>
+          <Text style={styles.logoText}>W</Text>
+        </View>
+        <Text style={styles.logoName}>WeSplit</Text>
       </View>
 
+      {/* Main Content */}
       <View style={styles.centerContent}>
-        <Text style={styles.title}>Create Profile</Text>
+        <Text style={styles.title}>Create Your Profile</Text>
         <Text style={styles.subtitle}>
-          Choose a unique pseudo and a nice profile picture to get started
+          Create your initial profile to get started, you can always edit it later.
         </Text>
 
-        <TouchableOpacity style={styles.avatarBox} onPress={handlePickImage}>
+        {/* Profile Picture */}
+        <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
           {avatar ? (
-            <Image source={{ uri: avatar }} style={[styles.avatarBox, { borderWidth: 0 }]} />
+            <Image source={{ uri: avatar }} style={styles.avatarImage} />
           ) : (
-            <Image 
-              source={require('../../../assets/user.png')} 
-              style={styles.avatarIcon}
-            />
+            <View style={styles.avatarPlaceholder}>
+              <Image source={require('../../../assets/user.png')} style={styles.avatarIcon} />
+            </View>
           )}
-          <View style={styles.editIconBox}>
-            <Image 
-              source={require('../../../assets/edit.png')} 
-              style={styles.editIcon}
-            />
+          <View style={styles.cameraIconContainer}>
+            <Image source={require('../../../assets/edit.png')} style={styles.cameraIcon} />
           </View>
         </TouchableOpacity>
         
-        <Text style={styles.avatarHint}>Tap to select profile picture</Text>
-
-        <Text style={styles.inputLabel}>Pseudo</Text>
+        {/* Pseudo Input */}
+        <View style={styles.inputSection}>
+          <Text style={styles.inputLabel}>Pseudo*</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter a unique pseudo"
-          placeholderTextColor="#888"
+            placeholder="Enter your pseudo"
+            placeholderTextColor={colors.white50}
           value={pseudo}
           onChangeText={(text) => {
             setPseudo(text);
@@ -246,22 +263,25 @@ const CreateProfileScreen: React.FC = () => {
           autoCapitalize="none"
           autoCorrect={false}
         />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        </View>
 
+        {/* Next Button */}
         <TouchableOpacity
-          style={[styles.nextButton, { opacity: isLoading ? 0.7 : 1 }]}
+          style={[styles.nextButton, (!pseudo || isLoading) && styles.nextButtonDisabled]}
           onPress={handleNext}
-          disabled={isLoading}
+          disabled={!pseudo || isLoading}
         >
-          <Text style={styles.nextButtonText}>
-            {isLoading ? 'Creating Profile...' : 'Next'}
-          </Text>
+          <Text style={styles.nextButtonText}>Next</Text>
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.helpLink}>
+      {/* Help Link */}
+      <View style={styles.helpSection}>
+        <TouchableOpacity>
         <Text style={styles.helpText}>Need help?</Text>
       </TouchableOpacity>
+      </View>
     </View>
   );
 };

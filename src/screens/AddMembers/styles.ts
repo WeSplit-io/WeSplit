@@ -137,7 +137,15 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     color: '#A89B9B',
   },
+  avatarText: {
+    color: '#212121',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   favoriteButton: {
+    padding: 8,
+  },
+  inviteButton: {
     padding: 8,
   },
   
@@ -204,6 +212,13 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 16,
   },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
+    marginBottom: 12,
+    marginTop: 24,
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -253,13 +268,7 @@ export const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#FFF',
-    marginBottom: 16,
-    marginTop: 8,
-  },
+
   membersList: {
     marginBottom: 24,
   },
@@ -281,11 +290,6 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
-  },
-  avatarText: {
-    color: '#212121',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   memberInfo: {
     flex: 1,

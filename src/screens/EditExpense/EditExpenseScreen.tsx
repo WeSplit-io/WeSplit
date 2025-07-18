@@ -4,35 +4,73 @@ import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useExpenseOperations } from '../../hooks/useGroupData';
 import { SOLANA_CRYPTOCURRENCIES, Cryptocurrency } from '../../utils/cryptoUtils';
+import { firebaseDataService } from '../../services/firebaseDataService';
 import { styles } from './styles';
 
 const EditExpenseScreen: React.FC<any> = ({ navigation, route }) => {
   const { state } = useApp();
   const { currentUser } = state;
   
-  const expense = route.params?.expense;
-  const [description, setDescription] = useState(expense?.description || '');
-  const [amount, setAmount] = useState(expense?.amount?.toString() || '');
-  const [selectedCurrency, setSelectedCurrency] = useState<Cryptocurrency>(
-    SOLANA_CRYPTOCURRENCIES.find(c => c.symbol === expense?.currency) || SOLANA_CRYPTOCURRENCIES[0]
-  );
+  const { groupId, expenseId } = route.params;
+  const [expense, setExpense] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [selectedCurrency, setSelectedCurrency] = useState<Cryptocurrency>(SOLANA_CRYPTOCURRENCIES[0]);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
   // Use expense operations hook instead of direct service calls
   const {
     updateExpense: handleUpdateExpense,
     deleteExpense: handleDeleteExpense,
-    loading,
+    loading: operationsLoading,
     error,
     clearError
-  } = useExpenseOperations(expense?.group_id || 0);
+  } = useExpenseOperations(groupId || 0);
+
+  // Load expense data
+  useEffect(() => {
+    const loadExpense = async () => {
+      if (!expenseId) {
+        Alert.alert('Error', 'No expense ID provided');
+        navigation.goBack();
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const expenseData = await firebaseDataService.expense.getExpense(expenseId);
+        
+        if (!expenseData) {
+          Alert.alert('Error', 'Expense not found');
+          navigation.goBack();
+          return;
+        }
+
+        setExpense(expenseData);
+        setDescription(expenseData.description || '');
+        setAmount(expenseData.amount?.toString() || '');
+        setSelectedCurrency(
+          SOLANA_CRYPTOCURRENCIES.find(c => c.symbol === expenseData.currency) || SOLANA_CRYPTOCURRENCIES[0]
+        );
+
+        if (__DEV__) {
+          console.log('🔍 EditExpenseScreen: Loaded expense data:', expenseData);
+        }
+      } catch (error) {
+        console.error('Error loading expense:', error);
+        Alert.alert('Error', 'Failed to load expense data');
+        navigation.goBack();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadExpense();
+  }, [expenseId, navigation]);
 
   useEffect(() => {
-    if (!expense) {
-      Alert.alert('Error', 'No expense data provided');
-      navigation.goBack();
-      return;
-    }
+    if (!expense) return;
 
     // Check if current user is the creator of the expense
     if (expense.paid_by.toString() !== currentUser?.id?.toString()) {
@@ -40,7 +78,7 @@ const EditExpenseScreen: React.FC<any> = ({ navigation, route }) => {
       navigation.goBack();
       return;
     }
-  }, [expense, currentUser?.id]);
+  }, [expense, currentUser?.id, navigation]);
 
   const handleUpdateExpenseSubmit = async () => {
     // Clear any previous errors
@@ -138,12 +176,23 @@ const EditExpenseScreen: React.FC<any> = ({ navigation, route }) => {
     }
   }, [error]);
 
-  if (!expense) {
+  if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#A5EA15" />
           <Text style={styles.loadingText}>Loading expense...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!expense) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#A5EA15" />
+          <Text style={styles.loadingText}>Expense not found.</Text>
         </View>
       </SafeAreaView>
     );
@@ -247,11 +296,11 @@ const EditExpenseScreen: React.FC<any> = ({ navigation, route }) => {
 
         {/* Update Button */}
         <TouchableOpacity 
-          style={[styles.updateBtn, loading && styles.updateBtnDisabled]} 
+          style={[styles.updateBtn, operationsLoading && styles.updateBtnDisabled]} 
           onPress={handleUpdateExpenseSubmit}
-          disabled={loading}
+          disabled={operationsLoading}
         >
-          {loading ? (
+          {operationsLoading ? (
             <ActivityIndicator size="small" color="#212121" />
           ) : (
             <Text style={styles.updateBtnText}>Update Expense</Text>
