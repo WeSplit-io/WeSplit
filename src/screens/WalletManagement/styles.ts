@@ -623,9 +623,8 @@ export const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.xl,
-    gap: spacing.sm,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
   },
   
   modalTitle: {
@@ -640,8 +639,8 @@ export const styles = StyleSheet.create({
   
   modalContent: {
     flex: 1,
+    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
-    justifyContent: 'flex-start',
     paddingTop: spacing.lg,
   },
 
@@ -656,15 +655,21 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   
+  explanationContainer: {
+    flex: 1,
+    paddingVertical: spacing.lg,
+  },
+  
   explanationText: {
     color: colors.white,
     fontSize: typography.fontSize.md,
     lineHeight: 24,
     textAlign: 'center',
+    marginTop: spacing.md,
   },
   
   modalFooter: {
-    padding: spacing.lg,
+    paddingVertical: spacing.md,
   },
   
   activateButton: {
@@ -684,17 +689,7 @@ export const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   
-  // Success Styles
-  successIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.primaryGreen,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-    alignSelf: 'center',
-  },
+
   
   successText: {
     color: colors.white,
@@ -940,6 +935,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
     maxHeight: '80%',
+    minHeight: 350,
   },
 
   // Handle for bottom sheet
@@ -956,22 +952,25 @@ export const styles = StyleSheet.create({
   appleSliderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.green10, // green10 background
+    backgroundColor: colors.green10,
     borderRadius: spacing.radiusRound,
     borderWidth: 1,
     borderColor: colors.primaryGreen,
     position: 'relative',
     overflow: 'hidden',
-    minHeight: 70, // Make it bigger
+    minHeight: 70,
     padding: 5,
+    width: '100%',
+    height: 70,
   },
 
   appleSliderTrack: {
     flex: 1,
-    height: 60, // Increased height
+    height: 60,
     borderRadius: spacing.radiusRound,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: spacing.lg,
   },
 
   appleSliderTrackActive: {
@@ -981,24 +980,20 @@ export const styles = StyleSheet.create({
   appleSliderThumb: {
     position: 'absolute',
     left: 5,
-    width: 60, // Bigger thumb
-    height: 60, // Bigger thumb
-    borderRadius: 100,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: colors.primaryGreen,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
   },
 
   appleSliderText: {
     color: colors.white50,
-    fontSize: typography.fontSize.md, // Bigger text
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     zIndex: 1,
+    textAlign: 'center',
   },
 
   appleSliderTextActive: {
@@ -1017,24 +1012,21 @@ export const styles = StyleSheet.create({
   successContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xl,
   },
 
   successIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.primaryGreen,
+    width: 120,
+    height: 120,
+    borderRadius: 45,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
   },
 
   successTitle: {
     color: colors.white,
     fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing.sm,
+    fontWeight: typography.fontWeight.semibold,
     textAlign: 'center',
   },
 
@@ -1043,13 +1035,12 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     lineHeight: 24,
     textAlign: 'center',
-    marginBottom: spacing.xl,
   },
 
   goBackButton: {
     backgroundColor: colors.primaryGreen,
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     borderRadius: spacing.radiusMd,
     alignItems: 'center',
   },

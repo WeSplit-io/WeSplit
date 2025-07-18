@@ -45,7 +45,7 @@ export const styles = StyleSheet.create({
     marginLeft: spacing.xs,
   },
   
-  // Prominent Group Cards
+  // Prominent Group Cards - Updated to match Dashboard design
   prominentGroupsContainer: {
     flexDirection: 'row',
     paddingHorizontal: spacing.screenPadding,
@@ -54,55 +54,155 @@ export const styles = StyleSheet.create({
   },
   prominentGroupCard: {
     flex: 1,
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.radiusMd,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: spacing.lg,
+    padding: 18,
+    minHeight: 140,
+    position: 'relative',
+    overflow: 'hidden',
   },
   prominentGroupCardOwner: {
     backgroundColor: '#A5EA15',
   },
-  prominentGroupIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: spacing.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
+  
+  // Background gradient for prominent cards
+  prominentGroupCardGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: spacing.lg,
+    backgroundColor: '#A5EA15',
+  },
+  
+  // Gradient overlay for prominent cards
+  prominentGroupCardGradientOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: spacing.lg,
+  },
+  
+  // Header of prominent group card
+  prominentGroupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  prominentGroupInfo: {
-    marginBottom: spacing.sm,
+  
+  prominentGroupIcon: {
+    width: 40,
+    height: 40,
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+  
+  prominentGroupIconSvg: {
+    width: 20,
+    height: 20,
+    tintColor: colors.black,
+  },
+  
+  prominentGroupAmountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  
+  prominentUsdcLogo: {
+    width: 20,
+    height: 20,
+  },
+  
   prominentGroupName: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
-    marginBottom: spacing.xs,
-  },
-  prominentGroupRole: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-  },
-  prominentGroupAmount: {
-    fontSize: typography.fontSize.lg,
+    color: colors.black,
+    fontSize: 22,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
     marginBottom: spacing.sm,
   },
+  
+  prominentGroupRoleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    gap: spacing.xs,
+  },
+  
+  prominentGroupRoleIcon: {
+    marginRight: spacing.xs,
+  },
+  
+  prominentGroupRole: {
+    color: colors.black,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.normal,
+  },
+  
+  prominentGroupAmount: {
+    color: colors.black,
+    fontSize: 22,
+    fontWeight: typography.fontWeight.bold,
+  },
+  
   prominentMemberAvatars: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  
   prominentMemberAvatar: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.darkGray,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.black,
     marginRight: -spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.darkCard,
+    borderWidth: 2,
+    borderColor: colors.green,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  prominentMemberAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  
+  prominentMemberAvatarText: {
+    color: colors.white,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+  },
+  
+  prominentMemberAvatarMore: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.black,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: spacing.xs,
+  },
+  
+  prominentMemberAvatarMoreText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.bold,
+  },
+  
+  prominentGroupArrow: {
+    position: 'absolute',
+    bottom: 18,
+    right: 18,
+  },
+  
+  // Legacy prominent card styles (keeping for compatibility)
+  prominentGroupInfo: {
+    marginBottom: spacing.sm,
   },
   
   filtersContainer: {
@@ -200,131 +300,56 @@ export const styles = StyleSheet.create({
     height: 20,
     tintColor: colors.textLight,
   },
-  groupHeaderInfo: {
-    flex: 1,
-  },
-  groupDate: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-  },
-  statusBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
-    borderRadius: spacing.xs,
-  },
-  statusText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.medium,
-    color: '#FFF',
-  },
-  spendingSection: {
-    marginBottom: spacing.md,
-  },
-  spendingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
-  },
-  spendingLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-  },
-  spendingAmount: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+  groupTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.textLight,
+    marginLeft: spacing.sm,
   },
-  balanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  balanceLabel: {
+  groupSubtitle: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
+    marginLeft: spacing.sm,
   },
-  balanceAmount: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: '#FF4D4F',
-  },
-  groupFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  memberAvatars: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  memberAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.darkGray,
-    marginRight: -spacing.xs,
-    borderWidth: 2,
-    borderColor: colors.darkCard,
-  },
-  memberAvatarMore: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.textSecondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: spacing.xs,
-  },
-  memberAvatarMoreText: {
-    fontSize: typography.fontSize.tiny,
+  groupAmount: {
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
     color: colors.textLight,
   },
-  settleButton: {
-    backgroundColor: '#A5EA15',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: spacing.radiusSm,
-  },
-  settleButtonText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: '#212121',
+  groupStatus: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
   emptyState: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: spacing.xxxl * 2, // 96
+    paddingVertical: spacing.xl,
   },
   emptyStateIcon: {
     fontSize: 48,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   emptyStateTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.medium,
     color: colors.textLight,
     marginBottom: spacing.sm,
-    textAlign: 'center',
   },
   emptyStateSubtitle: {
     fontSize: typography.fontSize.md,
     color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: spacing.xl,
-    paddingHorizontal: spacing.xl,
-    lineHeight: 22,
+    marginBottom: spacing.lg,
   },
   createGroupButton: {
     backgroundColor: '#A5EA15',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    borderRadius: spacing.radiusMd,
+    borderRadius: spacing.radiusLg,
   },
   createGroupButtonText: {
-    color: '#212121',
+    color: colors.black,
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.semibold,
   },
 }); 

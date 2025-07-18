@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, SafeAreaView, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
@@ -8,6 +8,7 @@ import { useGroupList } from '../../hooks/useGroupData';
 import { getTotalSpendingInUSDC } from '../../services/priceService';
 import { GroupWithDetails } from '../../types';
 import { styles } from './styles';
+import { colors } from '../../theme';
 
 type FilterType = 'all' | 'active' | 'closed';
 
@@ -108,6 +109,17 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
     });
   }, [groups, groupUserBalances, activeFilter, groupAmountsInUSD]);
 
+  // Get prominent groups (only groups where user is owner)
+  const getProminentGroups = useCallback(() => {
+    return groups
+      .filter(group => group.created_by === currentUser?.id)
+      .sort((a, b) => {
+        const aUSD = groupAmountsInUSD[a.id] || 0;
+        const bUSD = groupAmountsInUSD[b.id] || 0;
+        return bUSD - aUSD;
+      });
+  }, [groups, currentUser?.id, groupAmountsInUSD]);
+
   const renderFilterButton = (filter: FilterType, label: string) => {
     const isActive = activeFilter === filter;
     return (
@@ -136,29 +148,74 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
         style={[styles.prominentGroupCard, isOwner && styles.prominentGroupCardOwner]}
         onPress={() => (navigation as any).navigate('GroupDetails', { groupId: group.id })}
       >
-        {/* Group Icon */}
-        <View style={styles.prominentGroupIcon}>
-          <Icon name="briefcase" size={24} color="#212121" />
+        {/* Background */}
+        <View style={styles.prominentGroupCardGradient} />
+        <View style={styles.prominentGroupCardGradientOverlay} />
+        
+        {/* Header */}
+        <View style={styles.prominentGroupHeader}>
+          <View style={styles.prominentGroupIcon}>
+            <Icon
+              name={group.icon || "briefcase"}
+              style={styles.prominentGroupIconSvg}
+            />
+          </View>
+          {/* Show USD-converted total */}
+          <View style={styles.prominentGroupAmountContainer}>
+            <Image
+              source={require('../../../assets/usdc-logo-black.png')}
+              style={styles.prominentUsdcLogo}
+            />
+            <Text style={styles.prominentGroupAmount}>
+              {usdAmount.toFixed(2)}
+            </Text>
+          </View>
         </View>
         
-        {/* Group Info */}
-        <View style={styles.prominentGroupInfo}>
-          <Text style={styles.prominentGroupName}>{group.name}</Text>
+        {/* Group Name */}
+        <Text style={styles.prominentGroupName}>{group.name}</Text>
+        
+        {/* Role Container */}
+        <View style={styles.prominentGroupRoleContainer}>
+          <Icon
+            name={isOwner ? "award" : "users"}
+            size={16}
+            color={colors.black}
+            style={styles.prominentGroupRoleIcon}
+          />
           <Text style={styles.prominentGroupRole}>
-            {isOwner ? 'Owner' : 'V. Member'}
+            {isOwner ? 'Owner' : 'Member'}
           </Text>
         </View>
         
-        {/* Amount */}
-        <Text style={styles.prominentGroupAmount}>
-          {usdAmount.toFixed(2)}
-        </Text>
-        
         {/* Member Avatars */}
         <View style={styles.prominentMemberAvatars}>
-          {Array.from({ length: Math.min(members.length, 3) }).map((_, index) => (
-            <View key={index} style={styles.prominentMemberAvatar} />
+          {members.slice(0, 3).map((member, index) => (
+            <View key={member.id} style={styles.prominentMemberAvatar}>
+              {member.avatar && member.avatar.trim() !== '' ? (
+                <Image
+                  source={{ uri: member.avatar }}
+                  style={styles.prominentMemberAvatarImage}
+                />
+              ) : (
+                <Text style={styles.prominentMemberAvatarText}>
+                  {((member.name || member.email || 'U') as string).charAt(0).toUpperCase()}
+                </Text>
+              )}
+            </View>
           ))}
+          {members.length > 3 && (
+            <View style={styles.prominentMemberAvatarMore}>
+              <Text style={styles.prominentMemberAvatarMoreText}>
+                +{members.length - 3}
+              </Text>
+            </View>
+          )}
+        </View>
+        
+        {/* Navigation arrow */}
+        <View style={styles.prominentGroupArrow}>
+          <Icon name="chevron-right" size={20} color={colors.black} />
         </View>
       </TouchableOpacity>
     );
@@ -211,7 +268,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
   }
 
   const filteredGroups = getFilteredGroups();
-  const prominentGroups = filteredGroups.slice(0, 2);
+  const prominentGroups = getProminentGroups().slice(0, 2);
   const regularGroups = filteredGroups.slice(2);
 
   return (
@@ -228,7 +285,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Prominent Group Cards */}
+      {/* Prominent Group Cards - Only show groups where user is owner */}
       {prominentGroups.length > 0 && (
         <View style={styles.prominentGroupsContainer}>
           {prominentGroups.map(renderProminentGroupCard)}
