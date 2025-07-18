@@ -5,6 +5,7 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.darkBackground,
+    
   },
   loadingContainer: {
     flex: 1,
@@ -22,7 +23,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.screenPadding,
     paddingTop: spacing.md,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.lg,
   },
   headerTitle: {
     fontSize: typography.fontSize.xxl,
@@ -34,29 +35,37 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: spacing.radiusLg,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#A5EA15',
+    borderColor: colors.green,
   },
   addButtonText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: '#A5EA15',
+    color: colors.green,
     marginLeft: spacing.xs,
+  },
+  addButtonIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 4,
   },
   
   // Prominent Group Cards - Updated to match Dashboard design
   prominentGroupsContainer: {
+    marginBottom: spacing.lg,
+  },
+  
+  // Grid layout for prominent groups (horizontal scroll)
+  prominentGroupsGrid: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.screenPadding,
-    marginBottom: spacing.md,
     gap: spacing.md,
+    paddingHorizontal: spacing.screenPadding,
   },
   prominentGroupCard: {
-    flex: 1,
+    width: 280,
     borderRadius: spacing.lg,
-    padding: 18,
-    minHeight: 140,
+    padding: 16,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -90,7 +99,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: 6,
   },
   
   prominentGroupIcon: {
@@ -121,20 +130,21 @@ export const styles = StyleSheet.create({
   
   prominentGroupName: {
     color: colors.black,
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing.sm,
+    marginBottom: 4,
   },
   
   prominentGroupRoleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: 6,
     gap: spacing.xs,
   },
   
   prominentGroupRoleIcon: {
-    marginRight: spacing.xs,
+    width: 14,
+    height: 14,
   },
   
   prominentGroupRole: {
@@ -196,8 +206,18 @@ export const styles = StyleSheet.create({
   
   prominentGroupArrow: {
     position: 'absolute',
-    bottom: 18,
-    right: 18,
+    bottom: 16,
+    right: 16,
+  },
+  
+  // Left prominent card (with special positioning)
+  prominentGroupCardLeft: {
+    marginRight: spacing.sm / 2,
+  },
+  
+  // Right prominent card (with special positioning)
+  prominentGroupCardRight: {
+    marginLeft: spacing.sm / 2,
   },
   
   // Legacy prominent card styles (keeping for compatibility)
@@ -207,77 +227,193 @@ export const styles = StyleSheet.create({
   
   filtersContainer: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.screenPadding,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.green10,
+    borderRadius: 16,
+    marginHorizontal: spacing.screenPadding,
+    borderWidth: 1,
+    borderColor: colors.white10,
+    padding: 4,
+    marginBottom: spacing.md,
   },
   filterButton: {
+    flex: 1,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: spacing.radiusLg,
+    borderRadius: 12,
     backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterButtonActive: {
-    backgroundColor: '#A5EA15',
+    backgroundColor: colors.green,
   },
   filterButtonText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white70,
   },
   filterButtonTextActive: {
-    color: '#212121',
+    color: colors.black,
   },
   scrollContainer: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: spacing.screenPadding,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.xl * 3, // Add extra padding for navbar safety
   },
   
-  // Regular Group Cards
+  // Regular Group Cards - Updated to match image design
   groupCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: colors.darkCard,
-    borderRadius: spacing.radiusMd,
+    borderRadius: 16,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0.5,
+    borderColor: colors.white50,
     padding: spacing.md,
   },
+  
+  // Left section of group card
+  groupCardLeft: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    flex: 1,
+    gap: spacing.sm,
+  },
+
+  groupCardLeftTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  
+  // Right section of group card
+  groupCardRight: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: spacing.xl,
+    justifyContent: 'space-between',
+  },
+  
   groupIconContainer: {
     width: 40,
     height: 40,
-    borderRadius: spacing.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 10,
+    backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
   },
   groupInfo: {
     flex: 1,
   },
   groupName: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
+  
+  // Member status row
+  groupMemberStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+    gap: spacing.xs,
+  },
+  groupMemberStatusText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
+    fontWeight: typography.fontWeight.normal,
+  },
+  
   groupMemberAvatars: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   groupMemberAvatar: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.darkGray,
+    width: 30,
+    height: 30,
+    borderRadius: 16,
+    backgroundColor: colors.black,
     marginRight: -spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.darkCard,
+    borderWidth: 2,
+    borderColor: colors.white50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
+  groupMemberAvatarImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 16,
+    borderColor: colors.white50,
+    borderWidth: 1,
+  },
+  groupMemberAvatarText: {
+    color: colors.white,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+  },
+  groupMemberAvatarMore: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.black,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: spacing.xs,
+    borderColor: colors.white50,
+    borderWidth: 1,
+  },
+  groupMemberAvatarMoreText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.bold,
+  },
+  
+  // Status indicators
+  groupStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  groupStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  groupStatusDotActive: {
+    backgroundColor: colors.green,
+  },
+  groupStatusDotClosed: {
+    backgroundColor: '#FF4D4F',
+  },
+  groupStatusText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textLight,
+    fontWeight: typography.fontWeight.medium,
+  },
+  
+  // Premium/Private icon
+  groupPremiumIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#8B5CF6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  groupPremiumText: {
+    color: colors.white,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+  },
+  
+  // Legacy activity indicator (keeping for compatibility)
   activityIndicator: {
     width: 8,
     height: 8,
