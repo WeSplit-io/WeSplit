@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
@@ -490,11 +490,12 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     if (!group) {
       return {
         totalAmountUSD: 0,
-        totalAmountDisplay: '$0.00',
+        totalAmountDisplay: '0.00',
         memberCount: 0,
         expenseCount: 0,
         userPaidUSD: 0,
         userOwesUSD: 0,
+        settlementProgress: 0,
         loading: false
       };
     }
@@ -503,7 +504,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       // Use expenses_by_currency data for accurate totals
       let expensesByCurrency = group.expenses_by_currency || [];
       let totalAmountUSD = 0;
-      let totalAmountDisplay = '$0.00';
+      let totalAmountDisplay = '0.00';
 
       // If expenses_by_currency is empty but we have individual expenses, calculate from them
       if (expensesByCurrency.length === 0 && individualExpenses.length > 0) {
@@ -534,7 +535,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           return sum + (amount * rate);
         }, 0);
 
-        totalAmountDisplay = `$${totalAmountUSD.toFixed(2)}`;
+        totalAmountDisplay = `${totalAmountUSD.toFixed(2)}`;
       }
 
       // Calculate user-specific amounts
@@ -598,6 +599,16 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         }
       }
 
+      // Calculate settlement progress based on how much has been settled vs total
+      let settlementProgress = 0;
+      if (realGroupBalances.length > 0) {
+        const totalSettled = realGroupBalances.filter(balance => Math.abs(balance.amount) < 0.01).length;
+        settlementProgress = (totalSettled / realGroupBalances.length) * 100;
+      } else if (totalAmountUSD > 0) {
+        // Fallback: assume some progress based on total amount
+        settlementProgress = Math.min(50, (totalAmountUSD / 1000) * 100); // Assume 50% max for demo
+      }
+
       return {
         totalAmountUSD,
         totalAmountDisplay,
@@ -605,6 +616,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         expenseCount: group.expense_count || 0,
         userPaidUSD,
         userOwesUSD,
+        settlementProgress,
         loading: loadingBalances || loadingExpenses
       };
     } catch (error) {
@@ -616,6 +628,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         expenseCount: group.expense_count || 0,
         userPaidUSD: 0,
         userOwesUSD: 0,
+        settlementProgress: 0,
         loading: false
       };
     }
@@ -673,9 +686,12 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color="#FFF" />
-          </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
+        </TouchableOpacity>
           <Text style={styles.headerTitle}>Group Details</Text>
           <View style={styles.placeholder} />
         </View>
@@ -699,10 +715,12 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Group Details</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
+        </TouchableOpacity>          <Text style={styles.headerTitle}>Group Details</Text>
           <View style={styles.placeholder} />
         </View>
         
@@ -725,10 +743,12 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Group details</Text>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
+        </TouchableOpacity>        <Text style={styles.headerTitle}>Group details</Text>
         <TouchableOpacity onPress={() => navigation.navigate('GroupSettings', { groupId })}>
           <Icon name="settings" size={24} color="#FFF" />
         </TouchableOpacity>
@@ -746,25 +766,61 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           />
         }
       >
-        {/* Group Info */}
-        <View style={styles.groupInfo}>
-          <View style={styles.groupIconContainer}>
-            <Icon name="briefcase" size={24} color="#FFF" />
-          </View>
-          <Text style={styles.groupName}>{group.name}</Text>
-        </View>
+ 
 
         {/* Total Spending Card */}
         <View style={styles.totalSpendingCard}>
-          <View style={styles.spendingHeader}>
-            <Text style={styles.spendingLabel}>Total spending</Text>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>Open</Text>
+          {/* Active Status Badge */}
+          <View style={styles.activeStatusContainer}>
+            <View style={styles.activeStatusDot} />
+            <Text style={styles.activeStatusText}>Active</Text>
+          </View>
+          
+          {/* Group Icon Badge */}
+          <View style={styles.groupIconBadgeContainer}>
+            <View style={styles.groupIconBadge}>
+              <Icon 
+                name={group?.icon || "briefcase"} 
+                size={24} 
+                color="#212121" 
+              />
             </View>
           </View>
-          <Text style={styles.spendingAmount}>
-            {getGroupSummary.totalAmountDisplay}
-          </Text>
+          
+          {/* Event Name */}
+          <Text style={styles.eventName}>{group.name}</Text>
+          
+          {/* Spending and Progress Row */}
+          <View style={styles.spendingProgressRow}>
+            {/* Left side - Total spending */}
+            <View style={styles.spendingInfo}>
+              <Text style={styles.spendingLabel}>Total spending</Text>
+              <View style={styles.spendingAmountContainer}>
+                <Image source={require('../../../assets/usdc-logo-black.png')} style={styles.spendingAmountIcon} />
+                <Text style={styles.spendingAmount}>
+                  {getGroupSummary.totalAmountDisplay}
+                </Text>
+              </View>
+            </View>
+            
+            {/* Right side - Circular progress */}
+            <View style={styles.circularProgressContainer}>
+              <View style={styles.circularProgress}>
+                <View style={[
+                  styles.circularProgressFill,
+                  {
+                    transform: [
+                      { rotate: `${Math.min(360, Math.max(0, getGroupSummary.settlementProgress * 3.6))}deg` }
+                    ]
+                  }
+                ]} />
+                <Text style={styles.circularProgressText}>
+                  {Math.round(getGroupSummary.settlementProgress)}%
+                </Text>
+              </View>
+              <Text style={styles.circularProgressLabel}>Settlement progress</Text>
+            </View>
+          </View>
         </View>
 
         {/* Balance Cards */}
