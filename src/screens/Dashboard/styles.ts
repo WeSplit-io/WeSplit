@@ -463,7 +463,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.md,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
     backgroundColor: colors.darkCard,
     borderRadius: spacing.lg,
     padding: spacing.md,
@@ -679,11 +679,24 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
+  balanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
   
   // USDC logo
   usdcLogo: {
     width: 20,
     height: 20,
+  },
+  
+  // USDC logo for balance display
+  balanceUsdcLogo: {
+    width: 35,
+    height: 35,
+    marginRight: 4,
+
   },
   
   // Amount text in group grid

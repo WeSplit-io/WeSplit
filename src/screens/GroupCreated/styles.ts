@@ -5,7 +5,10 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.darkBackground,
-    paddingHorizontal: spacing.xl,
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+
   },
   
   // Success Section
@@ -13,15 +16,17 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: spacing.xxl,
     marginBottom: spacing.xl,
+    paddingBottom: 100,
   },
   checkmarkContainer: {
-    width: 80,
-    height: 80,
     borderRadius: 40,
-    backgroundColor: colors.primaryGreen,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
+  },
+  checkmarkIcon: {
+    width: 150,
+    height: 150,
   },
   successTitle: {
     fontSize: typography.fontSize.xl,
@@ -122,10 +127,15 @@ export const styles = StyleSheet.create({
   // Action Buttons
   actionButtons: {
     paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    backgroundColor: colors.black,
   },
   primaryButton: {
     backgroundColor: colors.primaryGreen,
-    borderRadius: spacing.lg,
+    borderRadius: 16,
     padding: spacing.md,
     alignItems: 'center',
     marginBottom: spacing.md,

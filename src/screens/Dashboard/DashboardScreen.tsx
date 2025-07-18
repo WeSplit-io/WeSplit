@@ -708,19 +708,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                 </TouchableOpacity>
               )}
 
-              {/* QR Code Button for Deposits */}
-              <TouchableOpacity 
-                style={styles.qrCodeIcon} 
-                onPress={() => navigation.navigate('Deposit')}
-              >
-                <Image
-                  source={require('../../../assets/qr-code-scan.png')}
-                  style={styles.qrCodeImage}
-                />
-              </TouchableOpacity>
-
-              {/* Wallet Selector Button */}
-              <TouchableOpacity
+                            {/* Wallet Selector Button */}
+                            <TouchableOpacity
                 style={{
                   backgroundColor: colors.primaryGreen + '20',
                   paddingHorizontal: 8,
@@ -732,6 +721,19 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               >
                 <Icon name="settings" size={14} color={colors.primaryGreen} />
               </TouchableOpacity>
+
+              {/* QR Code Button for Deposits */}
+              <TouchableOpacity 
+                style={styles.qrCodeIcon} 
+                onPress={() => navigation.navigate('Deposit')}
+              >
+                <Image
+                  source={require('../../../assets/qr-code-scan.png')}
+                  style={styles.qrCodeImage}
+                />
+              </TouchableOpacity>
+
+
             </View>
           </View>
 
@@ -743,13 +745,19 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               </Text>
             </View>
           ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' }}>
+            <View style={styles.balanceContainer}>
               {/* Balance Display */}
               <View style={{ flex: 1, alignItems: 'flex-start' }}>
-                <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
-                  ${(userCreatedWalletBalance?.totalUSD || 0).toFixed(2)}
-                </Text>
-                <View style={{
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Image
+                    source={require('../../../assets/usdc-logo-black.png')}
+                    style={styles.balanceUsdcLogo}
+                  />
+                  <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
+                    {(userCreatedWalletBalance?.totalUSD || 0).toFixed(2)}
+                  </Text>
+                </View>
+               {/*} <View style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   marginTop: 4,
@@ -766,9 +774,9 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                     color: colors.textLightSecondary,
                     fontWeight: '500',
                   }}>
-                    App Wallet Balance
+                    Your Balance
                   </Text>
-                </View>
+                </View>*/}
               </View>
             </View>
           )}
@@ -777,7 +785,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             Balance Limit $1000
           </Text>
 
-          {!walletConnected && userCreatedWalletBalance && (
+          {/* {!walletConnected && userCreatedWalletBalance && (
             <TouchableOpacity
               style={[
                 styles.connectWalletButton,
@@ -807,7 +815,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                 {connectingWallet ? 'Connecting...' : 'Connect External Wallet'}
               </Text>
             </TouchableOpacity>
-          )}
+          )}*/}
         </View>
 
         {/* Action Buttons */}
