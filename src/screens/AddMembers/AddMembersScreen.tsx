@@ -1,11 +1,80 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, ActivityIndicator, Share, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, ActivityIndicator, Share, TextInput, Image } from 'react-native';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
+
+// Utility function to generate dynamic avatar colors
+const getAvatarColor = (name: string): string => {
+  const colors = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+    '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+    '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2'
+  ];
+  
+  if (!name) return colors[0];
+  
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  return colors[Math.abs(hash) % colors.length];
+};
+
+// Utility function to format wallet address
+const formatWalletAddress = (address: string): string => {
+  if (!address) return '';
+  if (address.length <= 12) return address;
+  return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
+};
+
+// Utility function to get display name
+const getDisplayName = (contact: UserContact | User): string => {
+  if (contact.name && contact.name.trim()) {
+    return contact.name;
+  }
+  if (contact.wallet_address) {
+    return formatWalletAddress(contact.wallet_address);
+  }
+  if (contact.email) {
+    return contact.email.split('@')[0]; // Use email prefix as name
+  }
+  return 'Unknown';
+};
+
+// Utility function to get avatar text
+const getAvatarText = (contact: UserContact | User): string => {
+  const displayName = getDisplayName(contact);
+  return displayName.charAt(0).toUpperCase();
+};
+
+// Utility function to render avatar
+const renderAvatar = (contact: UserContact | User) => {
+  const displayName = getDisplayName(contact);
+  const avatarColor = getAvatarColor(displayName);
+  const avatarText = getAvatarText(contact);
+
+  if (contact.avatar && contact.avatar.trim()) {
+    return (
+      <Image 
+        source={{ uri: contact.avatar }} 
+        style={[styles.contactAvatar, { borderColor: avatarColor }]}
+      />
+    );
+  }
+
+  return (
+    <View style={[styles.contactAvatar, { backgroundColor: avatarColor }]}>
+      <Text style={styles.avatarText}>
+        {avatarText}
+      </Text>
+    </View>
+  );
+};
 
 const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
   const { state, createGroup } = useApp();
@@ -37,7 +106,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
           // Use hybrid service instead of direct service call
           const groupMembers = await firebaseDataService.group.getGroupMembers(groupId);
           setMembers(groupMembers);
-          
+
           // For creation flow, we might not have full group details yet
           // So we'll set a basic group object
           setGroup({
@@ -80,7 +149,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
     }
 
     if (searchQuery.trim() && activeTab !== 'search') {
-      filtered = filtered.filter(contact => 
+      filtered = filtered.filter(contact =>
         contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         contact.email.toLowerCase().includes(searchQuery.toLowerCase())
       );
@@ -99,7 +168,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
     try {
       setIsSearching(true);
       const results = await firebaseDataService.group.searchUsersByUsername(
-        query.trim(), 
+        query.trim(),
         currentUser?.id ? String(currentUser.id) : undefined
       );
       setSearchResults(results);
@@ -143,9 +212,9 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
     if (fromCreation && group?.isNewGroup) {
       // For new groups, send invites and then navigate to success
       await sendInvitesToSelected(groupId!);
-      
+
       // Navigate to success screen
-      navigation.navigate('GroupCreated', { 
+      navigation.navigate('GroupCreated', {
         groupId: groupId,
         groupName: group.name,
         groupIcon: 'briefcase', // Default icon
@@ -159,7 +228,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
 
   const handleDoneWithoutMembers = () => {
     // Navigate to success screen without inviting anyone
-    navigation.navigate('GroupCreated', { 
+    navigation.navigate('GroupCreated', {
       groupId: groupId,
       groupName: group?.name || 'New Group',
       groupIcon: 'briefcase', // Default icon
@@ -173,26 +242,26 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
     try {
       // Generate invite link for the group using hybrid service
       const inviteData = await firebaseDataService.group.generateInviteLink(targetGroupId, String(currentUser.id));
-      
+
       // Prepare message for selected contacts
-      const selectedContactsList = filteredContacts.filter(contact => 
+      const selectedContactsList = filteredContacts.filter(contact =>
         selectedContacts.has(contact.id)
       );
-      
+
       const contactNames = selectedContactsList.map(c => c.name).join(', ');
       const message = `Join my WeSplit group "${group?.name}"!\n\nInvite code: ${inviteData.inviteCode}\n\nOr click this link: wesplit://join/${inviteData.inviteCode}`;
-      
+
       // Show share sheet with native options
       await Share.share({
         message: message,
         title: `Join ${group?.name} on WeSplit`,
       });
-      
+
       Alert.alert(
-        'Invites Ready!', 
+        'Invites Ready!',
         `Share the invite with ${contactNames} using your preferred method.`
       );
-      
+
     } catch (error) {
       console.error('Error sending invites:', error);
       Alert.alert('Error', 'Failed to generate invites. Please try again.');
@@ -234,12 +303,12 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
     try {
       const inviteData = await firebaseDataService.group.generateInviteLink(groupId, String(currentUser.id));
       const shareMessage = `Join my WeSplit group "${group?.name}"!\n\nInvite code: ${inviteData.inviteCode}\n\nOr click this link: wesplit://join/${inviteData.inviteCode}`;
-      
+
       await Share.share({
         message: shareMessage,
         title: `Join ${group?.name} on WeSplit`,
       });
-      
+
     } catch (error) {
       console.error('Error sharing invite link:', error);
       Alert.alert('Error', 'Failed to share invite link. Please try again.');
@@ -266,19 +335,25 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
       {/* Header */}
       <View style={styles.headerContainer}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#FFF" />
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Add new members</Text>
-        <View style={styles.placeholder} />
+        <TouchableOpacity onPress={handleShareInviteLink} style={styles.backButton}>
+          <Icon name="share" size={20} color={colors.white} />
+        </TouchableOpacity>
+
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Icon name="search" size={20} color="#A89B9B" />
+        <Image source={require('../../../assets/search-icon-white50.png')} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search"
-          placeholderTextColor="#A89B9B"
+          placeholderTextColor={colors.white50}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -286,19 +361,19 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'all' && styles.activeTab]}
           onPress={() => setActiveTab('all')}
         >
           <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>All</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'favorite' && styles.activeTab]}
           onPress={() => setActiveTab('favorite')}
         >
           <Text style={[styles.tabText, activeTab === 'favorite' && styles.activeTabText]}>Favorite</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'search' && styles.activeTab]}
           onPress={() => setActiveTab('search')}
         >
@@ -307,63 +382,56 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
       </View>
 
       <ScrollView style={styles.scrollContent} contentContainerStyle={styles.content}>
-        {/* Share Link Option */}
-        <TouchableOpacity style={styles.shareLinkButton} onPress={handleShareInviteLink}>
-          <Icon name="share" size={20} color="#A5EA15" />
-          <Text style={styles.shareLinkText}>Share Invite Link</Text>
-          <Icon name="chevron-right" size={20} color="#A89B9B" />
-        </TouchableOpacity>
+
 
         {/* Friends Section */}
         {friends.length > 0 && (
           <>
             <Text style={styles.sectionTitle}>Friends</Text>
             {friends.map((contact) => (
-              <TouchableOpacity 
-                key={contact.id} 
+              <TouchableOpacity
+                key={contact.id}
                 style={styles.contactRow}
                 onPress={() => handleContactToggle(contact.id)}
               >
                 <View style={styles.checkboxContainer}>
                   <View style={[styles.checkbox, selectedContacts.has(contact.id) && styles.checkboxSelected]}>
                     {selectedContacts.has(contact.id) && (
-                      <Icon name="check" size={12} color="#212121" />
+                      <Icon name="check" size={16} color={colors.black} />
                     )}
                   </View>
                 </View>
-                <View style={styles.contactAvatar}>
-                  <Text style={styles.avatarText}>
-                    {contact.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
+                {renderAvatar(contact)}
                 <View style={styles.contactInfo}>
-                  <Text style={styles.contactName}>{contact.name}</Text>
+                  <Text style={styles.contactName}>{getDisplayName(contact)}</Text>
                   <Text style={styles.contactEmail}>
-                    {contact.wallet_address ? 
-                      `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 
-                      contact.email
-                    }
+                    {contact.wallet_address ? formatWalletAddress(contact.wallet_address) : contact.email}
                   </Text>
                   {contact.email && contact.wallet_address && (
                     <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
                       {contact.email}
                     </Text>
                   )}
+                  {/*{contact.mutual_groups_count > 1 && (
+                    <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2, color: colors.green }]}>
+                      {contact.mutual_groups_count} mutual groups
+                    </Text>
+                  )}*/}
                 </View>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.favoriteButton}
                   onPress={() => {
                     // Toggle favorite status
-                    const updatedContacts = contacts.map(c => 
+                    const updatedContacts = contacts.map(c =>
                       c.id === contact.id ? { ...c, isFavorite: !c.isFavorite } : c
                     );
                     setContacts(updatedContacts);
                   }}
                 >
-                  <Icon 
-                    name="star" 
-                    size={20} 
-                    color={contact.isFavorite ? "#A5EA15" : "#A89B9B"} 
+                  <Icon
+                    name="star"
+                    size={20}
+                    color={contact.isFavorite ? "#A5EA15" : "#A89B9B"}
                   />
                 </TouchableOpacity>
               </TouchableOpacity>
@@ -376,8 +444,8 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
           <>
             <Text style={styles.sectionTitle}>Others</Text>
             {others.map((contact) => (
-              <TouchableOpacity 
-                key={contact.id} 
+              <TouchableOpacity
+                key={contact.id}
                 style={styles.contactRow}
                 onPress={() => handleContactToggle(contact.id)}
               >
@@ -388,39 +456,37 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
                     )}
                   </View>
                 </View>
-                <View style={styles.contactAvatar}>
-                  <Text style={styles.avatarText}>
-                    {contact.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
+                {renderAvatar(contact)}
                 <View style={styles.contactInfo}>
-                  <Text style={styles.contactName}>{contact.name}</Text>
+                  <Text style={styles.contactName}>{getDisplayName(contact)}</Text>
                   <Text style={styles.contactEmail}>
-                    {contact.wallet_address ? 
-                      `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 
-                      contact.email
-                    }
+                    {contact.wallet_address ? formatWalletAddress(contact.wallet_address) : contact.email}
                   </Text>
                   {contact.email && contact.wallet_address && (
                     <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
                       {contact.email}
                     </Text>
                   )}
+                  {contact.mutual_groups_count > 0 && (
+                    <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2, color: colors.green }]}>
+                      {contact.mutual_groups_count} mutual group{contact.mutual_groups_count > 1 ? 's' : ''}
+                    </Text>
+                  )}
                 </View>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.favoriteButton}
                   onPress={() => {
                     // Toggle favorite status
-                    const updatedContacts = contacts.map(c => 
+                    const updatedContacts = contacts.map(c =>
                       c.id === contact.id ? { ...c, isFavorite: !c.isFavorite } : c
                     );
                     setContacts(updatedContacts);
                   }}
                 >
-                  <Icon 
-                    name="star" 
-                    size={20} 
-                    color={contact.isFavorite ? "#A5EA15" : "#A89B9B"} 
+                  <Icon
+                    name="star"
+                    size={20}
+                    color={contact.isFavorite ? "#A5EA15" : "#A89B9B"}
                   />
                 </TouchableOpacity>
               </TouchableOpacity>
@@ -437,36 +503,29 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
                 <Text style={styles.loadingText}>Searching users...</Text>
               </View>
             )}
-            
+
             {!isSearching && searchResults.length > 0 && (
               <>
                 <Text style={styles.sectionTitle}>Search Results</Text>
                 {searchResults.map((user) => (
-                  <TouchableOpacity 
-                    key={user.id} 
+                  <TouchableOpacity
+                    key={user.id}
                     style={styles.contactRow}
                     onPress={() => handleInviteSearchedUser(user)}
                   >
-                    <View style={styles.contactAvatar}>
-                      <Text style={styles.avatarText}>
-                        {user.name.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
+                    {renderAvatar(user)}
                     <View style={styles.contactInfo}>
-                      <Text style={styles.contactName}>{user.name}</Text>
+                      <Text style={styles.contactName}>{getDisplayName(user)}</Text>
                       <Text style={styles.contactEmail}>
-                        {user.wallet_address ? 
-                          `${user.wallet_address.substring(0, 6)}...${user.wallet_address.substring(user.wallet_address.length - 6)}` : 
-                          user.email
-                        }
+                        {user.wallet_address ? formatWalletAddress(user.wallet_address) : user.email}
                       </Text>
                       {user.email && user.wallet_address && (
-                        <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}> 
+                        <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
                           {user.email}
                         </Text>
                       )}
                     </View>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.inviteButton}
                       onPress={() => handleInviteSearchedUser(user)}
                     >
@@ -476,7 +535,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
                 ))}
               </>
             )}
-            
+
             {!isSearching && searchQuery.trim() && searchResults.length === 0 && (
               <View style={styles.noContactsContainer}>
                 <Text style={styles.noContactsText}>No users found matching "{searchQuery}"</Text>
@@ -501,9 +560,9 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
 
       {/* Bottom Action Button */}
       <View style={styles.bottomContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
-            styles.addButton, 
+            styles.addButton,
             (selectedContacts.size === 0 && !fromCreation) && styles.addButtonDisabled,
             isCreating && styles.addButtonDisabled
           ]}
@@ -514,12 +573,12 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
             <ActivityIndicator size="small" color="#212121" />
           ) : (
             <Text style={styles.addButtonText}>
-              {fromCreation 
-                ? selectedContacts.size > 0 
-                  ? `Invite ${selectedContacts.size} & Done` 
+              {fromCreation
+                ? selectedContacts.size > 0
+                  ? `Add ${selectedContacts.size} `
                   : 'Done'
-                : selectedContacts.size > 0 
-                  ? `Add ${selectedContacts.size}` 
+                : selectedContacts.size > 0
+                  ? `Add ${selectedContacts.size}`
                   : 'Add'
               }
             </Text>

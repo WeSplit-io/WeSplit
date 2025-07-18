@@ -251,7 +251,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
           onPress={() => (navigation as any).navigate('CreateGroup')}
         >
           <Image source={require('../../../assets/plus-icon-green.png')} style={styles.addButtonIcon} />
-          <Text style={styles.addButtonText}>Add group</Text>
+          <Text style={styles.addButtonText}>New Group</Text>
         </TouchableOpacity>
       </View>
 
