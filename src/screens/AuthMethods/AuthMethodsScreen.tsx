@@ -89,6 +89,9 @@ const AuthMethodsScreen: React.FC = () => {
         userData = await firestoreService.createUserDocument(firebaseUser);
       }
 
+      // Check if existing user should skip onboarding
+      const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
+      
       // Transform to app user format
       const appUser = {
         id: userData.id || firebaseUser.uid,
@@ -97,7 +100,8 @@ const AuthMethodsScreen: React.FC = () => {
         wallet_address: userData.wallet_address || '',
         wallet_public_key: userData.wallet_public_key || '',
         created_at: userData.created_at || new Date().toISOString(),
-        avatar: userData.avatar || ''
+        avatar: userData.avatar || '',
+        hasCompletedOnboarding: shouldSkipOnboarding
       };
 
       // Ensure user has a wallet using the centralized wallet service
@@ -138,10 +142,29 @@ const AuthMethodsScreen: React.FC = () => {
 
       // Authenticate user with updated data (including wallet if created)
       authenticateUser(appUser, 'email');
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Dashboard' }],
-      });
+      
+      // Check if user needs to create a profile (has no name/pseudo)
+      const needsProfile = !appUser.name || appUser.name.trim() === '';
+      
+      if (needsProfile) {
+        console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'CreateProfile' }],
+        });
+      } else if (appUser.hasCompletedOnboarding) {
+        console.log('✅ User completed onboarding, navigating to Dashboard');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Dashboard' }],
+        });
+      } else {
+        console.log('🔄 User needs onboarding, navigating to Onboarding');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Onboarding' }],
+        });
+      }
     } catch (error) {
       console.error('Error handling authenticated user:', error);
       Alert.alert('Error', 'Failed to load user data. Please try again.');
@@ -172,12 +195,12 @@ const AuthMethodsScreen: React.FC = () => {
     setHasCheckedMonthlyVerification(true);
     
     try {
-      // Check if user has already verified this month
-      const hasVerifiedThisMonth = await firestoreService.hasVerifiedThisMonth(email);
+      // Check if user has already verified within the last 30 days
+      const hasVerifiedWithin30Days = await firestoreService.hasVerifiedWithin30Days(email);
       
-      if (hasVerifiedThisMonth) {
+      if (hasVerifiedWithin30Days) {
         if (__DEV__) {
-          console.log('✅ User has already verified this month, bypassing verification');
+          console.log('✅ User has already verified within the last 30 days, bypassing verification');
         }
         
         // Show loading indicator for bypass
@@ -217,6 +240,9 @@ const AuthMethodsScreen: React.FC = () => {
                     // For now, we'll use the existing user data and skip Firebase Auth
                     if (__DEV__) { console.log('⚠️ User exists in Firebase Auth but we can\'t sign in without password'); }
                     
+                    // Check if existing user should skip onboarding
+                    const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
+                    
                     // Use the Firestore user data directly
                     const transformedUser = {
                       id: userData.id,
@@ -225,17 +251,35 @@ const AuthMethodsScreen: React.FC = () => {
                       wallet_address: userData.wallet_address || '',
                       wallet_public_key: userData.wallet_public_key || '',
                       created_at: userData.created_at,
-                      avatar: userData.avatar || ''
+                      avatar: userData.avatar || '',
+                      hasCompletedOnboarding: shouldSkipOnboarding
                     };
                     
                     // Update the global app context with the authenticated user
                     authenticateUser(transformedUser, 'email');
                     
-                    // Navigate to dashboard
-                    navigation.reset({
-                      index: 0,
-                      routes: [{ name: 'Dashboard' }],
-                    });
+                    // Check if user needs to create a profile (has no name/pseudo)
+                    const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+                    
+                    if (needsProfile) {
+                      console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
+                      navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'CreateProfile' }],
+                      });
+                    } else if (transformedUser.hasCompletedOnboarding) {
+                      console.log('✅ User completed onboarding, navigating to Dashboard');
+                      navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'Dashboard' }],
+                      });
+                    } else {
+                      console.log('🔄 User needs onboarding, navigating to Onboarding');
+                      navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'Onboarding' }],
+                      });
+                    }
                     return;
                   } else {
                     throw createError;
@@ -250,6 +294,9 @@ const AuthMethodsScreen: React.FC = () => {
             // Update the user's last login timestamp
             await firestoreService.updateLastVerifiedAt(email);
             
+            // Check if existing user should skip onboarding
+            const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
+            
             // Use the existing user data
             const transformedUser = {
               id: userData.id,
@@ -258,17 +305,35 @@ const AuthMethodsScreen: React.FC = () => {
               wallet_address: userData.wallet_address || '',
               wallet_public_key: userData.wallet_public_key || '',
               created_at: userData.created_at,
-              avatar: userData.avatar || ''
+              avatar: userData.avatar || '',
+              hasCompletedOnboarding: shouldSkipOnboarding
             };
             
             // Update the global app context with the authenticated user
             authenticateUser(transformedUser, 'email');
             
-            // Navigate to dashboard
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Dashboard' }],
-            });
+            // Check if user needs to create a profile (has no name/pseudo)
+            const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+            
+            if (needsProfile) {
+              console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'CreateProfile' }],
+              });
+            } else if (transformedUser.hasCompletedOnboarding) {
+              console.log('✅ User completed onboarding, navigating to Dashboard');
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Dashboard' }],
+              });
+            } else {
+              console.log('🔄 User needs onboarding, navigating to Onboarding');
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Onboarding' }],
+              });
+            }
           } else {
             // User doesn't exist in Firestore, create new user
             if (__DEV__) { console.log('🆕 Creating new user since not found in Firestore'); }
@@ -282,9 +347,9 @@ const AuthMethodsScreen: React.FC = () => {
           throw error;
         }
       } else {
-        // User needs verification this month
+        // User needs verification (not verified within 30 days)
       if (__DEV__) {
-          console.log('🔄 User needs verification this month, sending OTP');
+          console.log('🔄 User needs verification (not verified within 30 days), sending OTP');
       }
       
         // Send verification code

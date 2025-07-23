@@ -218,7 +218,8 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
         avatar: firebaseUser.photoURL || '',
         emailVerified: true,
         lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp() // Track when user last verified
+        lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(), // Track when user last verified
+        hasCompletedOnboarding: false // Track onboarding completion
       });
     }
 

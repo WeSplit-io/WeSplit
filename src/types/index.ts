@@ -9,6 +9,7 @@ export interface User {
   wallet_secret_key?: string;
   created_at: string;
   avatar?: string; // For UI purposes, can be generated or uploaded
+  hasCompletedOnboarding?: boolean; // Track if user has completed onboarding flow
 }
 
 // Group member is essentially a User but with group-specific metadata
@@ -250,7 +251,7 @@ export type AppAction =
   | { type: 'SET_GROUPS'; payload: GroupWithDetails[] }
   | { type: 'ADD_GROUP'; payload: GroupWithDetails }
   | { type: 'UPDATE_GROUP'; payload: GroupWithDetails }
-  | { type: 'DELETE_GROUP'; payload: number }
+  | { type: 'DELETE_GROUP'; payload: number | string }
   | { type: 'SELECT_GROUP'; payload: GroupWithDetails | null }
   | { type: 'ADD_EXPENSE'; payload: { groupId: number; expense: Expense } }
   | { type: 'UPDATE_EXPENSE'; payload: { groupId: number; expense: Expense } }

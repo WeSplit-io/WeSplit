@@ -85,18 +85,36 @@ const VerificationScreen: React.FC = () => {
         wallet_address: authResponse.user.walletAddress,
         wallet_public_key: authResponse.user.walletPublicKey,
         created_at: authResponse.user.createdAt,
-        avatar: authResponse.user.avatar
+        avatar: authResponse.user.avatar,
+        hasCompletedOnboarding: authResponse.user.hasCompletedOnboarding || false
       };
       
       // Update the global app context with the authenticated user
       authenticateUser(transformedUser, 'email');
       if (__DEV__) { console.log('📱 User authenticated in app context'); }
       
-      // Navigate to dashboard as user is now logged in
-      (navigation as any).reset({
-        index: 0,
-        routes: [{ name: 'Dashboard' }],
-      });
+      // Check if user needs to create a profile (has no name/pseudo)
+      const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+      
+      if (needsProfile) {
+        console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
+        (navigation as any).reset({
+          index: 0,
+          routes: [{ name: 'CreateProfile' }],
+        });
+      } else if (transformedUser.hasCompletedOnboarding) {
+        console.log('✅ User completed onboarding, navigating to Dashboard');
+        (navigation as any).reset({
+          index: 0,
+          routes: [{ name: 'Dashboard' }],
+        });
+      } else {
+        console.log('🔄 User needs onboarding, navigating to Onboarding');
+        (navigation as any).reset({
+          index: 0,
+          routes: [{ name: 'Onboarding' }],
+        });
+      }
       
     } catch (error) {
       console.error('❌ Verification failed:', error);

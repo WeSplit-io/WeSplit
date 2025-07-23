@@ -51,6 +51,7 @@ import WithdrawSuccessScreen from './src/screens/Withdraw/WithdrawSuccessScreen'
 import WalletManagementScreen from './src/screens/WalletManagement/WalletManagementScreen';
 import SeedPhraseViewScreen from './src/screens/WalletManagement/SeedPhraseViewScreen';
 import SeedPhraseVerifyScreen from './src/screens/WalletManagement/SeedPhraseVerifyScreen';
+import { ContactsScreen } from './src/screens/Contacts';
 
 
 const Stack = createStackNavigator();
@@ -150,6 +151,7 @@ export default function App() {
               <Stack.Screen name="Premium" component={PremiumScreen} />
               <Stack.Screen name="Notifications" component={NotificationsScreen} />
               <Stack.Screen name="Language" component={LanguageScreen} />
+              <Stack.Screen name="Contacts" component={ContactsScreen} />
               <Stack.Screen name="SendContacts" component={SendContactsScreen} />
               <Stack.Screen name="SendAmount" component={SendAmountScreen} />
               <Stack.Screen name="SendConfirmation" component={SendConfirmationScreen} />

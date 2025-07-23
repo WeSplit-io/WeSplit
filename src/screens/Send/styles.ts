@@ -1036,5 +1036,23 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
   },
+  contactsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.cardBackground,
+    borderRadius: spacing.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: spacing.borderWidthThin,
+    borderColor: colors.border,
+  },
+  contactsButtonText: {
+    flex: 1,
+    marginLeft: spacing.sm,
+    color: colors.textLight,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+  },
 
 }); 

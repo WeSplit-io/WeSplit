@@ -191,6 +191,7 @@ const CreateProfileScreen: React.FC = () => {
             wallet_address: walletResult.wallet.address,
             wallet_public_key: walletResult.wallet.publicKey,
             created_at: new Date().toISOString(),
+            hasCompletedOnboarding: false // New users start with onboarding incomplete
         };
 
         authenticateUser(user, 'email');

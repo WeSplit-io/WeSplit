@@ -801,22 +801,36 @@ export const firebaseGroupService = {
   },
 
   deleteGroup: async (groupId: string, userId: string): Promise<{ message: string }> => {
+    console.log('🔍 FirebaseDataService: Starting deleteGroup...');
+    console.log('🔍 FirebaseDataService: Group ID:', groupId);
+    console.log('🔍 FirebaseDataService: User ID:', userId);
+    
     const groupRef = doc(db, 'groups', groupId);
     const groupDoc = await getDoc(groupRef);
     
     if (!groupDoc.exists()) {
+      console.error('❌ FirebaseDataService: Group not found');
       throw new Error('Group not found');
     }
     
     const groupData = groupDoc.data();
+    console.log('🔍 FirebaseDataService: Group data:', groupData);
+    console.log('🔍 FirebaseDataService: Group creator:', groupData.created_by);
+    console.log('🔍 FirebaseDataService: Current user:', userId);
+    
     if (groupData.created_by !== userId) {
+      console.error('❌ FirebaseDataService: User is not the group creator');
       throw new Error('Only group creator can delete the group');
     }
+    
+    console.log('🔍 FirebaseDataService: User is group creator, proceeding with deletion...');
     
     // Delete group members
     const groupMembersRef = collection(db, 'groupMembers');
     const memberQuery = query(groupMembersRef, where('group_id', '==', groupId));
     const memberDocs = await getDocs(memberQuery);
+    
+    console.log('🔍 FirebaseDataService: Found', memberDocs.docs.length, 'members to delete');
     
     const batch = writeBatch(db);
     memberDocs.docs.forEach(doc => {
@@ -828,6 +842,8 @@ export const firebaseGroupService = {
     const expenseQuery = query(expensesRef, where('group_id', '==', groupId));
     const expenseDocs = await getDocs(expenseQuery);
     
+    console.log('🔍 FirebaseDataService: Found', expenseDocs.docs.length, 'expenses to delete');
+    
     expenseDocs.docs.forEach(doc => {
       batch.delete(doc.ref);
     });
@@ -835,8 +851,10 @@ export const firebaseGroupService = {
     // Delete the group
     batch.delete(groupRef);
     
+    console.log('🔍 FirebaseDataService: Committing batch deletion...');
     await batch.commit();
     
+    console.log('🔍 FirebaseDataService: Group deleted successfully');
     return { message: 'Group deleted successfully' };
   },
 

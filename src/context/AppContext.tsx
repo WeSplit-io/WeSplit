@@ -311,9 +311,9 @@ interface AppContextType {
   
   // Group operations
   createGroup: (groupData: any) => Promise<GroupWithDetails>;
-  updateGroup: (groupId: number, updates: any) => Promise<void>;
-  deleteGroup: (groupId: number) => Promise<void>;
-  leaveGroup: (groupId: number) => Promise<void>;
+  updateGroup: (groupId: number | string, updates: any) => Promise<void>;
+  deleteGroup: (groupId: number | string) => Promise<void>;
+  leaveGroup: (groupId: number | string) => Promise<void>;
   selectGroup: (group: GroupWithDetails | null) => void;
   
   // Expense operations
@@ -724,14 +724,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [state.currentUser]);
 
-  const updateGroup = useCallback(async (groupId: number, updates: any) => {
+  const updateGroup = useCallback(async (groupId: number | string, updates: any) => {
     if (!state.currentUser?.id) {
       throw new Error('User not authenticated');
     }
 
     try {
       const result = await firebaseDataService.group.updateGroup(groupId.toString(), state.currentUser.id.toString(), updates);
-      const updatedGroup = await loadGroupDetails(groupId, true);
+      const updatedGroup = await loadGroupDetails(typeof groupId === 'string' ? parseInt(groupId) || 0 : groupId, true);
       dispatch({ type: 'UPDATE_GROUP', payload: updatedGroup });
     } catch (error) {
       console.error('Error updating group:', error);
@@ -739,30 +739,54 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [state.currentUser, loadGroupDetails]);
 
-  const deleteGroup = useCallback(async (groupId: number) => {
+  const deleteGroup = useCallback(async (groupId: number | string) => {
     if (!state.currentUser?.id) {
       throw new Error('User not authenticated');
     }
 
     try {
+      console.log('🔍 AppContext: Starting deleteGroup...');
+      console.log('🔍 AppContext: Group ID:', groupId);
+      console.log('🔍 AppContext: User ID:', state.currentUser.id);
+      
       await firebaseDataService.group.deleteGroup(groupId.toString(), state.currentUser.id.toString());
+      console.log('🔍 AppContext: Group deleted from Firebase');
+      
       dispatch({ type: 'DELETE_GROUP', payload: groupId });
+      console.log('🔍 AppContext: Group removed from state');
     } catch (error) {
-      console.error('Error deleting group:', error);
+      console.error('❌ AppContext: Error deleting group:', error);
+      console.error('❌ AppContext: Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        name: error instanceof Error ? error.name : 'Unknown error type'
+      });
       throw error;
     }
   }, [state.currentUser]);
 
-  const leaveGroup = useCallback(async (groupId: number) => {
+  const leaveGroup = useCallback(async (groupId: number | string) => {
     if (!state.currentUser?.id) {
       throw new Error('User not authenticated');
     }
 
     try {
+      console.log('🔍 AppContext: Starting leaveGroup...');
+      console.log('🔍 AppContext: Group ID:', groupId);
+      console.log('🔍 AppContext: User ID:', state.currentUser.id);
+      
       await firebaseDataService.group.leaveGroup(groupId.toString(), state.currentUser.id.toString());
+      console.log('🔍 AppContext: User left group successfully');
+      
       dispatch({ type: 'DELETE_GROUP', payload: groupId }); // Assuming leaving a group is effectively deleting it from the user's list
+      console.log('🔍 AppContext: Group removed from user\'s list');
     } catch (error) {
-      console.error('Error leaving group:', error);
+      console.error('❌ AppContext: Error leaving group:', error);
+      console.error('❌ AppContext: Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        name: error instanceof Error ? error.name : 'Unknown error type'
+      });
       throw error;
     }
   }, [state.currentUser]);

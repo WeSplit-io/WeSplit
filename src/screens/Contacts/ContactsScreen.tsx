@@ -3,35 +3,32 @@ import { View, Text, TouchableOpacity, ScrollView, TextInput, SafeAreaView } fro
 import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
 import { useApp } from '../../context/AppContext';
-import { useGroupData } from '../../hooks/useGroupData';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
 
-const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
-  const { groupId } = route.params || {};
+interface ContactsScreenProps {
+  navigation: any;
+  route: any;
+}
+
+const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) => {
+  const { action, onContactSelect } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
   
-  // Use the efficient hook for group data when groupId is provided
-  const { 
-    group, 
-    loading: groupLoading 
-  } = useGroupData(groupId);
-
   const [contacts, setContacts] = useState<UserContact[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<UserContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'All' | 'Favorite' | 'Search'>('All');
-  const [selectedContact, setSelectedContact] = useState<UserContact | null>(null);
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     loadContacts();
-  }, [currentUser, group, groupId]);
+  }, [currentUser]);
 
   useEffect(() => {
     let filtered = [...contacts];
@@ -100,38 +97,11 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
 
     try {
       setLoading(true);
-      console.log('🔄 Loading contacts for user:', currentUser.id, 'groupId:', groupId);
-      
-      if (groupId && group?.members) {
-        // Use cached group members from useGroupData hook
-        const otherMembers = group.members.filter(member => 
-          String(member.id) !== String(currentUser.id)
-        ).map(member => ({
-          ...member,
-          first_met_at: member.joined_at,
-          mutual_groups_count: 1,
-          isFavorite: false // Default to false for group members
-        }));
-        console.log('📱 Loaded', otherMembers.length, 'group members');
-        setContacts(otherMembers);
-      } else if (!groupId) {
-        // Load all contacts from groups the user has been in
-        console.log('📱 Loading all user contacts...');
-        const userContacts = await firebaseDataService.user.getUserContacts(String(currentUser.id));
-        console.log('📱 Loaded', userContacts.length, 'user contacts:', userContacts.map((c: UserContact) => ({
-          name: c.name || 'No name',
-          email: c.email,
-          wallet: c.wallet_address ? formatWalletAddress(c.wallet_address) : 'No wallet',
-          fullWallet: c.wallet_address
-        })));
-        setContacts(userContacts);
-      } else {
-        // Group data is still loading or doesn't exist
-        console.log('📱 Group data still loading, setting empty contacts');
-        setContacts([]);
-      }
+      const userContacts = await firebaseDataService.group.getUserContacts(currentUser.id.toString());
+      console.log('📱 Contacts: Loaded contacts:', userContacts.length);
+      setContacts(userContacts);
     } catch (error) {
-      console.error('❌ Error loading contacts:', error);
+      console.error('Error loading contacts:', error);
       setContacts([]);
     } finally {
       setLoading(false);
@@ -139,31 +109,21 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const handleSelectContact = (contact: UserContact) => {
-    setSelectedContact(contact);
-    
-    // Debug logging to ensure contact data is passed correctly
-    console.log('📱 SendContacts: Selected contact for sending:', {
+    console.log('📱 Contacts: Selected contact:', {
       name: contact.name || 'No name',
       email: contact.email,
       wallet: contact.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet',
-      fullWallet: contact.wallet_address,
       id: contact.id
     });
     
-    // Auto-navigate to next screen when contact is selected
-    navigation.navigate('SendAmount', {
-      contact: contact,
-      groupId,
-    });
-  };
-
-  const handleNavigateToContacts = () => {
-    navigation.navigate('Contacts', {
-      action: 'send',
-      onContactSelect: (contact: UserContact) => {
-        handleSelectContact(contact);
-      }
-    });
+    if (onContactSelect) {
+      // If there's a callback function, call it with the selected contact
+      onContactSelect(contact);
+      navigation.goBack();
+    } else {
+      // Default behavior - navigate to send flow
+      navigation.navigate('SendContacts', { selectedContact: contact });
+    }
   };
 
   const handleTabChange = (tab: 'All' | 'Favorite' | 'Search') => {
@@ -194,26 +154,26 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
   const renderContact = (item: UserContact, section: 'friends' | 'others') => (
     <TouchableOpacity
       key={`${section}-${item.id}`}
-      style={styles.mockupContactRow}
+      style={styles.contactRow}
       onPress={() => handleSelectContact(item)}
     >
-      <View style={styles.mockupAvatar}>
-        <Text style={styles.mockupAvatarText}>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>
           {item.name ? item.name.charAt(0).toUpperCase() : formatWalletAddress(item.wallet_address).charAt(0).toUpperCase()}
         </Text>
       </View>
-      <View style={styles.mockupContactInfo}>
-        <Text style={styles.mockupContactName}>
+      <View style={styles.contactInfo}>
+        <Text style={styles.contactName}>
           {item.name || formatWalletAddress(item.wallet_address)}
         </Text>
-        <Text style={styles.mockupContactEmail}>
+        <Text style={styles.contactEmail}>
           {item.wallet_address ? formatWalletAddress(item.wallet_address) : item.email}
           {item.mutual_groups_count > 1 && (
             <Text style={styles.mutualGroupsText}> • {item.mutual_groups_count} groups</Text>
           )}
         </Text>
         {item.email && item.wallet_address && (
-          <Text style={[styles.mockupContactEmail, { fontSize: 12, marginTop: 2 }]}>
+          <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
             {item.email}
           </Text>
         )}
@@ -231,6 +191,12 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
     </TouchableOpacity>
   );
 
+  const getHeaderTitle = () => {
+    if (action === 'send') return 'Send to Contact';
+    if (action === 'request') return 'Request from Contact';
+    return 'Contacts';
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -238,17 +204,17 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-left" size={24} color={colors.textLight} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Send</Text>
+        <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
         <View style={styles.placeholder} />
       </View>
 
       <View style={styles.content}>
         {/* Search Input - only show for Search tab */}
         {activeTab === 'Search' && (
-          <View style={styles.mockupSearchContainer}>
+          <View style={styles.searchContainer}>
             <Icon name="search" size={20} color={colors.textSecondary} />
             <TextInput
-              style={styles.mockupSearchInput}
+              style={styles.searchInput}
               placeholder="Search users by username or email"
               placeholderTextColor={colors.textSecondary}
               value={searchQuery}
@@ -259,44 +225,32 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
         )}
         
         {/* Tabs */}
-        <View style={styles.sendTabsContainer}>
+        <View style={styles.tabsContainer}>
           <TouchableOpacity
-            style={[styles.sendTab, activeTab === 'All' && styles.sendTabActive]}
+            style={[styles.tab, activeTab === 'All' && styles.tabActive]}
             onPress={() => setActiveTab('All')}
           >
-            <Text style={[styles.sendTabText, activeTab === 'All' && styles.sendTabTextActive]}>
+            <Text style={[styles.tabText, activeTab === 'All' && styles.tabTextActive]}>
               All
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.sendTab, activeTab === 'Favorite' && styles.sendTabActive]}
+            style={[styles.tab, activeTab === 'Favorite' && styles.tabActive]}
             onPress={() => setActiveTab('Favorite')}
           >
-            <Text style={[styles.sendTabText, activeTab === 'Favorite' && styles.sendTabTextActive]}>
+            <Text style={[styles.tabText, activeTab === 'Favorite' && styles.tabTextActive]}>
               Favorite
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.sendTab, activeTab === 'Search' && styles.sendTabActive]}
+            style={[styles.tab, activeTab === 'Search' && styles.tabActive]}
             onPress={() => setActiveTab('Search')}
           >
-            <Text style={[styles.sendTabText, activeTab === 'Search' && styles.sendTabTextActive]}>
+            <Text style={[styles.tabText, activeTab === 'Search' && styles.tabTextActive]}>
               Search
             </Text>
           </TouchableOpacity>
         </View>
-
-        {/* Contacts Button */}
-        <TouchableOpacity
-          style={styles.contactsButton}
-          onPress={handleNavigateToContacts}
-        >
-          <Icon name="users" size={20} color={colors.textLight} />
-          <Text style={styles.contactsButtonText}>Browse All Contacts</Text>
-          <Icon name="arrow-right" size={16} color={colors.textSecondary} />
-        </TouchableOpacity>
-
-        
 
         {/* Content */}
         {loading ? (
@@ -316,7 +270,7 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
                 {/* Friends Section */}
                 {getFriends().length > 0 && (
                   <View style={styles.sectionContainer}>
-                    <Text style={styles.mockupSectionTitle}>Friends</Text>
+                    <Text style={styles.sectionTitle}>Friends</Text>
                     {getFriends().map(contact => renderContact(contact, 'friends'))}
                   </View>
                 )}
@@ -324,7 +278,7 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
                 {/* Others Section */}
                 {getOthers().length > 0 && (
                   <View style={styles.sectionContainer}>
-                    <Text style={styles.mockupSectionTitle}>Others</Text>
+                    <Text style={styles.sectionTitle}>Others</Text>
                     {getOthers().map(contact => renderContact(contact, 'others'))}
                   </View>
                 )}
@@ -337,7 +291,7 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
                 {/* Favorite Contacts Section */}
                 {getFriends().length > 0 && (
                   <View style={styles.sectionContainer}>
-                    <Text style={styles.mockupSectionTitle}>Favorite Contacts</Text>
+                    <Text style={styles.sectionTitle}>Favorite Contacts</Text>
                     {getFriends().map(contact => renderContact(contact, 'friends'))}
                   </View>
                 )}
@@ -359,7 +313,7 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
                     {searchResults.map((user) => (
                       <TouchableOpacity
                         key={`search-${user.id}`}
-                        style={styles.mockupContactRow}
+                        style={styles.contactRow}
                         onPress={() => handleSelectContact({
                           id: user.id,
                           name: user.name,
@@ -373,21 +327,21 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
                           isFavorite: false
                         })}
                       >
-                        <View style={styles.mockupAvatar}>
-                          <Text style={styles.mockupAvatarText}>
+                        <View style={styles.avatar}>
+                          <Text style={styles.avatarText}>
                             {user.name ? user.name.charAt(0).toUpperCase() : formatWalletAddress(user.wallet_address).charAt(0).toUpperCase()}
                           </Text>
                         </View>
-                        <View style={styles.mockupContactInfo}>
-                          <Text style={styles.mockupContactName}>
+                        <View style={styles.contactInfo}>
+                          <Text style={styles.contactName}>
                             {user.name || formatWalletAddress(user.wallet_address)}
                           </Text>                         
                           {user.email && user.wallet_address && (
-                            <Text style={[styles.mockupContactEmail, { fontSize: 12, marginTop: 2 }]}>
+                            <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
                               {user.email}
                             </Text>
                           )}
-                           <Text style={styles.mockupContactEmail}>
+                           <Text style={styles.contactEmail}>
                             {user.wallet_address ? formatWalletAddress(user.wallet_address) : user.email}
                           </Text>
                         </View>
@@ -433,9 +387,9 @@ const SendContactsScreen: React.FC<any> = ({ navigation, route }) => {
         )}
       </View>
       
-      <NavBar currentRoute="SendContacts" navigation={navigation} />
+      <NavBar currentRoute="Contacts" navigation={navigation} />
     </SafeAreaView>
   );
 };
 
-export default SendContactsScreen; 
+export default ContactsScreen; 

@@ -46,7 +46,7 @@ const navItems = [
   { icon: 'home-icon-default.png', label: 'Home', route: 'Dashboard' },
   { icon: 'wallet-icon-default.png', label: 'Wallet', route: 'WalletManagement' },
   { icon: 'folder-icon-default.png', label: 'Groups', route: 'GroupsList', isSpecial: true },
-  { icon: 'book-icon-default.png', label: 'Contact', route: 'SendContacts' },
+  { icon: 'book-icon-default.png', label: 'Contact', route: 'Contacts' },
   { icon: 'profile-icon-default.png', label: 'Profil', route: 'Profile' },
 ];
 
@@ -71,7 +71,10 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
       console.log(`NavBar: Navigating to ${route}`);
       
       // Handle special navigation cases
-      if (route === 'SendContacts') {
+      if (route === 'Contacts') {
+        // Navigate to standalone contacts screen
+        navigation.navigate(route, {});
+      } else if (route === 'SendContacts') {
         // Navigate to contacts without groupId for general contacts view
         navigation.navigate(route, {});
       } else {
@@ -85,6 +88,11 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
   const isActiveRoute = (route: string) => {
     // Handle both exact matches and logical equivalences
     if (currentRoute === route) {
+      return true;
+    }
+    
+    // Special case: if we're on Contacts or SendContacts, consider Contact tab active
+    if (route === 'Contacts' && (currentRoute === 'Contacts' || currentRoute === 'SendContacts')) {
       return true;
     }
     

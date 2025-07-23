@@ -239,7 +239,8 @@ export const firestoreService = {
         avatar: user.photoURL || '',
         emailVerified: user.emailVerified,
         lastLoginAt: new Date().toISOString(),
-        lastVerifiedAt: new Date().toISOString() // Track when user last verified
+        lastVerifiedAt: new Date().toISOString(), // Track when user last verified
+        hasCompletedOnboarding: false // Track onboarding completion
       };
 
       await setDoc(userRef, userData, { merge: true });
@@ -267,8 +268,8 @@ export const firestoreService = {
     }
   },
 
-  // Check if user has verified this month
-  async hasVerifiedThisMonth(email: string): Promise<boolean> {
+  // Check if user has verified within the last 30 days
+  async hasVerifiedWithin30Days(email: string): Promise<boolean> {
     try {
       // Find user by email
       const usersRef = collection(db, 'users');
@@ -287,23 +288,24 @@ export const firestoreService = {
         return false; // No verification record, needs verification
       }
       
-      // Check if last verification was this month
+      // Check if last verification was within the last 30 days
       const lastVerified = new Date(lastVerifiedAt);
       const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
       
-      const hasVerifiedThisMonth = lastVerified.getMonth() === now.getMonth() && 
-                                   lastVerified.getFullYear() === now.getFullYear();
+      const hasVerifiedWithin30Days = lastVerified > thirtyDaysAgo;
       
       if (__DEV__) {
-        console.log('📅 Monthly verification check for', email);
+        console.log('📅 30-day verification check for', email);
         console.log('Last verified:', lastVerified);
         console.log('Current date:', now);
-        console.log('Has verified this month:', hasVerifiedThisMonth);
+        console.log('30 days ago:', thirtyDaysAgo);
+        console.log('Has verified within 30 days:', hasVerifiedWithin30Days);
       }
       
-      return hasVerifiedThisMonth;
+      return hasVerifiedWithin30Days;
     } catch (error) {
-      console.error('Error checking monthly verification:', error);
+      console.error('Error checking 30-day verification:', error);
       return false; // On error, require verification
     }
   },
@@ -329,6 +331,74 @@ export const firestoreService = {
       }
     } catch (error) {
       console.error('Error updating lastVerifiedAt:', error);
+    }
+  },
+
+  // Check if existing user should be considered as having completed onboarding
+  async shouldSkipOnboardingForExistingUser(userData: any): Promise<boolean> {
+    try {
+      // If user explicitly has hasCompletedOnboarding field, use that
+      if (userData.hasCompletedOnboarding !== undefined) {
+        return userData.hasCompletedOnboarding;
+      }
+
+      // For existing users without the field, check if they have activity that suggests they've used the app
+      // Check if user has a wallet address (indicates they've gone through the setup process)
+      if (userData.wallet_address && userData.wallet_address.trim() !== '') {
+        if (__DEV__) {
+          console.log('✅ Existing user has wallet, assuming onboarding completed');
+        }
+        // Update the user document to set hasCompletedOnboarding to true
+        await this.updateExistingUserOnboardingStatus(userData.id, true);
+        return true;
+      }
+
+      // Check if user has a name (indicates they've created a profile)
+      if (userData.name && userData.name.trim() !== '') {
+        if (__DEV__) {
+          console.log('✅ Existing user has name, assuming onboarding completed');
+        }
+        // Update the user document to set hasCompletedOnboarding to true
+        await this.updateExistingUserOnboardingStatus(userData.id, true);
+        return true;
+      }
+
+      // Check if user has been verified before (indicates they've used the app)
+      if (userData.lastVerifiedAt) {
+        if (__DEV__) {
+          console.log('✅ Existing user has verification history, assuming onboarding completed');
+        }
+        // Update the user document to set hasCompletedOnboarding to true
+        await this.updateExistingUserOnboardingStatus(userData.id, true);
+        return true;
+      }
+
+      // Default to false for truly new users
+      if (__DEV__) {
+        console.log('❓ Existing user has no activity indicators, requiring onboarding');
+      }
+      return false;
+    } catch (error) {
+      console.error('Error checking onboarding status for existing user:', error);
+      return false; // Default to requiring onboarding on error
+    }
+  },
+
+  // Update existing user's onboarding status
+  async updateExistingUserOnboardingStatus(userId: string, hasCompletedOnboarding: boolean) {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        hasCompletedOnboarding: hasCompletedOnboarding,
+        updated_at: new Date().toISOString()
+      });
+      
+      if (__DEV__) {
+        console.log(`✅ Updated onboarding status for user ${userId}: ${hasCompletedOnboarding}`);
+      }
+    } catch (error) {
+      console.error('Error updating existing user onboarding status:', error);
+      // Don't throw error, just log it
     }
   },
 

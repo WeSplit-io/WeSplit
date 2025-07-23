@@ -20,6 +20,7 @@ export interface AuthResponse {
     walletPublicKey: string;
     avatar?: string;
     createdAt: string;
+    hasCompletedOnboarding?: boolean;
   };
   accessToken?: string;
   refreshToken?: string;
@@ -231,7 +232,8 @@ export async function verifyCode(email: string, code: string): Promise<AuthRespo
           walletAddress: userData.wallet_address,
           walletPublicKey: userData.wallet_public_key,
           createdAt: userData.created_at,
-          avatar: userData.avatar
+          avatar: userData.avatar,
+          hasCompletedOnboarding: userData.hasCompletedOnboarding || false
         },
         accessToken,
         refreshToken

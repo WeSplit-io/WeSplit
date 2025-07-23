@@ -490,7 +490,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     if (!group) {
       return {
         totalAmountUSD: 0,
-        totalAmountDisplay: '0.00',
+        totalAmountDisplay: '$0.00',
         memberCount: 0,
         expenseCount: 0,
         userPaidUSD: 0,
@@ -535,7 +535,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           return sum + (amount * rate);
         }, 0);
 
-        totalAmountDisplay = `${totalAmountUSD.toFixed(2)}`;
+        totalAmountDisplay = `$${totalAmountUSD.toFixed(2)}`;
       }
 
       // Calculate user-specific amounts
@@ -624,8 +624,8 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       return {
         totalAmountUSD: 0,
         totalAmountDisplay: '$0.00',
-        memberCount: group.member_count || 0,
-        expenseCount: group.expense_count || 0,
+        memberCount: group?.member_count || 0,
+        expenseCount: group?.expense_count || 0,
         userPaidUSD: 0,
         userOwesUSD: 0,
         settlementProgress: 0,
@@ -798,7 +798,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
               <View style={styles.spendingAmountContainer}>
                 <Image source={require('../../../assets/usdc-logo-black.png')} style={styles.spendingAmountIcon} />
                 <Text style={styles.spendingAmount}>
-                  {getGroupSummary.totalAmountDisplay}
+                  {getGroupSummary.totalAmountDisplay || '$0.00'}
                 </Text>
               </View>
             </View>
@@ -810,12 +810,12 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
                   styles.circularProgressFill,
                   {
                     transform: [
-                      { rotate: `${Math.min(360, Math.max(0, getGroupSummary.settlementProgress * 3.6))}deg` }
+                      { rotate: `${Math.min(360, Math.max(0, (getGroupSummary.settlementProgress || 0) * 3.6))}deg` }
                     ]
                   }
                 ]} />
                 <Text style={styles.circularProgressText}>
-                  {Math.round(getGroupSummary.settlementProgress)}%
+                  {Math.round(getGroupSummary.settlementProgress || 0)}%
                 </Text>
               </View>
               <Text style={styles.circularProgressLabel}>Settlement progress</Text>
@@ -828,13 +828,13 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>Total you paid</Text>
             <Text style={styles.balanceAmount}>
-              ${getGroupSummary.userPaidUSD.toFixed(2)}
+              ${(getGroupSummary.userPaidUSD || 0).toFixed(2)}
             </Text>
           </View>
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>You owe</Text>
             <Text style={styles.balanceAmount}>
-              ${getGroupSummary.userOwesUSD.toFixed(2)}
+              ${(getGroupSummary.userOwesUSD || 0).toFixed(2)}
             </Text>
           </View>
         </View>
@@ -848,7 +848,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
               style={[
                   styles.progressBarFillGreen, 
                 { 
-                    width: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100))}%` 
+                    width: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100)) || 0}%` 
                 }
               ]} 
             />
@@ -859,8 +859,8 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
                 style={[
                   styles.progressBarFillRed, 
                   { 
-                    width: `${Math.min(100, Math.max(0, (getGroupSummary.userOwesUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100))}%`,
-                    left: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100))}%`
+                    width: `${Math.min(100, Math.max(0, (getGroupSummary.userOwesUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100)) || 0}%`,
+                    left: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100)) || 0}%`
                   }
                 ]} 
               />
@@ -871,7 +871,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
               style={[
                 styles.progressBarThumb,
                 { 
-                    left: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100))}%` 
+                    left: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100)) || 0}%` 
                 }
               ]} 
             />

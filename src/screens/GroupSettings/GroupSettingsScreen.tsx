@@ -48,6 +48,17 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
         const members = await firebaseDataService.group.getGroupMembers(groupId.toString());
         console.log(`Group Settings - Loaded ${members.length} real members:`, members.map((m: any) => m.name));
         setRealMembers(members);
+        
+        // Debug: Log group data to check created_by field
+        if (group) {
+          console.log('🔍 GroupSettings: Group data for deletion check:', {
+            groupId: group.id,
+            groupName: group.name,
+            created_by: group.created_by,
+            currentUserId: currentUser?.id,
+            isCreator: group.created_by === currentUser?.id
+          });
+        }
       } catch (error) {
         console.error('Error loading members in Group Settings:', error);
         setRealMembers(group?.members || []);
@@ -57,7 +68,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     };
 
     loadRealMembers();
-  }, [groupId]);
+  }, [groupId, group, currentUser]);
 
   // Get computed values from real member data
   const members = realMembers;
@@ -156,25 +167,64 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
   };
 
   const handleLeaveGroup = async () => {
+    // Check if user is the only member
+    const isOnlyMember = group?.member_count === 1;
+    
+    // Check if user has any outstanding debts
+    const userBalance = getGroupBalances(groupId).find(balance => 
+      balance.userId === currentUser?.id
+    );
+    const hasOutstandingDebts = userBalance && userBalance.amount < 0;
+    
+    let alertMessage = 'Are you sure you want to leave this group?';
+    let alertTitle = 'Leave Group';
+    
+    if (isOnlyMember) {
+      alertTitle = 'Delete Group';
+      alertMessage = 'You are the only member of this group. Leaving will delete the group permanently. Are you sure?';
+    } else if (hasOutstandingDebts) {
+      alertTitle = 'Cannot Leave Group';
+      alertMessage = 'You have outstanding debts in this group. Please settle your debts before leaving.';
+    }
+    
     Alert.alert(
-      'Leave Group',
-      'Are you sure you want to leave this group?',
+      alertTitle,
+      alertMessage,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Leave', 
-          style: 'destructive',
+        ...(hasOutstandingDebts ? [] : [{
+          text: isOnlyMember ? 'Delete Group' : 'Leave', 
+          style: 'destructive' as const,
           onPress: async () => {
             try {
-              await leaveGroup(Number(groupId));
-              Alert.alert('Success', 'You have left the group successfully');
+              console.log('🔍 GroupSettings: Starting leave group...');
+              console.log('🔍 GroupSettings: Group ID:', groupId);
+              console.log('🔍 GroupSettings: Is only member:', isOnlyMember);
+              console.log('🔍 GroupSettings: User balance:', userBalance);
+              
+              if (isOnlyMember) {
+                // If user is the only member, delete the group
+                await deleteGroup(groupId);
+                console.log('🔍 GroupSettings: Group deleted (user was only member)');
+                Alert.alert('Success', 'Group deleted successfully');
+              } else {
+                // Otherwise, leave the group
+                await leaveGroup(groupId);
+                console.log('🔍 GroupSettings: User left group successfully');
+                Alert.alert('Success', 'You have left the group successfully');
+              }
               navigation.navigate('Dashboard');
             } catch (error) {
-              console.error('Error leaving group:', error);
+              console.error('❌ GroupSettings: Error leaving/deleting group:', error);
+              console.error('❌ GroupSettings: Error details:', {
+                message: error instanceof Error ? error.message : 'Unknown error',
+                stack: error instanceof Error ? error.stack : 'No stack trace',
+                name: error instanceof Error ? error.name : 'Unknown error type'
+              });
               Alert.alert('Error', (error as Error).message || 'Failed to leave group. Please try again.');
             }
           }
-        }
+        }])
       ]
     );
   };
@@ -190,11 +240,22 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteGroup(Number(groupId));
+              console.log('🔍 GroupSettings: Starting group deletion...');
+              console.log('🔍 GroupSettings: Group ID:', groupId);
+              console.log('🔍 GroupSettings: Current user:', currentUser);
+              console.log('🔍 GroupSettings: Group data:', group);
+              
+              await deleteGroup(groupId);
+              console.log('🔍 GroupSettings: Group deleted successfully');
               Alert.alert('Success', 'Group deleted successfully');
               navigation.navigate('Dashboard');
             } catch (error) {
-              console.error('Error deleting group:', error);
+              console.error('❌ GroupSettings: Error deleting group:', error);
+              console.error('❌ GroupSettings: Error details:', {
+                message: error instanceof Error ? error.message : 'Unknown error',
+                stack: error instanceof Error ? error.stack : 'No stack trace',
+                name: error instanceof Error ? error.name : 'Unknown error type'
+              });
               Alert.alert('Error', (error as Error).message || 'Failed to delete group. Please try again.');
             }
           }
@@ -225,7 +286,7 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
     try {
       setUpdating(true);
       
-      await updateGroup(Number(groupId), {
+      await updateGroup(groupId, {
         name: editGroupName.trim(),
         category: editGroupCategory.trim() || 'general',
         icon: editGroupIcon,
@@ -393,8 +454,20 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
           <Text style={styles.leaveButtonText}>Leave Group</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteGroup}>
-          <Text style={styles.deleteButtonText}>Delete Group</Text>
+        <TouchableOpacity 
+          style={[
+            styles.deleteButton, 
+            group?.created_by !== currentUser?.id && styles.disabledButton
+          ]} 
+          onPress={handleDeleteGroup}
+          disabled={group?.created_by !== currentUser?.id}
+        >
+          <Text style={[
+            styles.deleteButtonText,
+            group?.created_by !== currentUser?.id && { opacity: 0.6 }
+          ]}>
+            {group?.created_by === currentUser?.id ? 'Delete Group' : 'Only creator can delete'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 

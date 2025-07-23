@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
+import { useApp } from '../../context/AppContext';
 
 const slides = [
   {
@@ -30,18 +31,32 @@ const { width } = Dimensions.get('window');
 
 const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation();
+  const { updateUser } = useApp();
   const scrollRef = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
 
-  const handleNext = () => {
+  const markOnboardingCompleted = async () => {
+    try {
+      await updateUser({ hasCompletedOnboarding: true });
+      console.log('✅ Onboarding marked as completed');
+    } catch (error) {
+      console.error('❌ Failed to mark onboarding as completed:', error);
+    }
+  };
+
+  const handleNext = async () => {
     if (page < slides.length - 1) {
       scrollRef.current?.scrollTo({ x: width * (page + 1), animated: true });
     } else {
+      // User completed onboarding
+      await markOnboardingCompleted();
       (navigation as any).replace('Dashboard');
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    // User skipped onboarding
+    await markOnboardingCompleted();
     (navigation as any).replace('Dashboard');
   };
 
