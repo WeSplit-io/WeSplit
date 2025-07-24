@@ -9,8 +9,7 @@ export const GRAY = '#A89B9B';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BG_COLOR,
-    flexDirection: 'column',
+    backgroundColor: colors.black,
     paddingHorizontal: spacing.lg,
   },
   logoSection: {
@@ -18,45 +17,30 @@ export const styles = StyleSheet.create({
     marginTop: spacing.xl,
     marginBottom: spacing.xl,
   },
-  logoContainer: {
-    width: 48,
-    height: 48,
-    backgroundColor: GREEN,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  logoText: {
-    fontSize: 24,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.black,
-  },
-  logoName: {
-    fontSize: 24,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+  logo: {
+    height: 40,
+    objectFit: 'contain',
   },
   centerContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
+    paddingHorizontal: spacing.lg,
+
   },
   title: {
     fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: typography.fontSize.md,
-    color: colors.textLight,
+    color: colors.white70,
     marginBottom: spacing.xl,
     textAlign: 'center',
-    opacity: 0.8,
-    width: '80%',
     alignSelf: 'center',
   },
   avatarContainer: {
@@ -64,8 +48,8 @@ export const styles = StyleSheet.create({
     height: 140,
     borderRadius: 170,
     backgroundColor: 'rgba(165, 234, 21, 0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 0.5,
+    borderColor: colors.white50,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xl,
@@ -117,8 +101,8 @@ export const styles = StyleSheet.create({
   input: {
     width: '100%',
     backgroundColor: colors.background,
-    borderRadius: spacing.radiusLg,
-    paddingVertical: spacing.itemSpacing,
+    borderRadius: 16,
+    paddingVertical: 15,
     paddingHorizontal: spacing.lg,
     fontSize: typography.fontSize.md,
     color: colors.text,
@@ -132,15 +116,15 @@ export const styles = StyleSheet.create({
   },
   nextButton: {
     backgroundColor: GREEN,
-    borderRadius: spacing.radiusLg,
-    paddingVertical: spacing.sm + 2, // 14
+    borderRadius: 16,
+    paddingVertical: 15,
     width: '100%',
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
   nextButtonDisabled: {
-    backgroundColor: colors.darkGray,
-    opacity: 0.6,
+    backgroundColor: colors.white10,
+    color: colors.white50,
   },
   nextButtonText: {
     color: BG_COLOR,
@@ -152,8 +136,8 @@ export const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   helpText: {
-    color: GREEN,
+    color: colors.white50,
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.regular,
   },
 }); 

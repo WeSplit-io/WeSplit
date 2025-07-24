@@ -219,14 +219,11 @@ const CreateProfileScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Logo Section */}
-      <View style={styles.logoSection}>
-        <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>W</Text>
+    <SafeAreaView style={styles.container}>
+        {/* Logo Section */}
+        <View style={styles.logoSection}>
+          <Image source={require('../../../assets/WeSplitLogoName.png')} style={styles.logo} />
         </View>
-        <Text style={styles.logoName}>WeSplit</Text>
-      </View>
 
       {/* Main Content */}
       <View style={styles.centerContent}>
@@ -245,7 +242,7 @@ const CreateProfileScreen: React.FC = () => {
             </View>
           )}
           <View style={styles.cameraIconContainer}>
-            <Image source={require('../../../assets/edit.png')} style={styles.cameraIcon} />
+            <Image source={require('../../../assets/modify-icon-white.png')} style={styles.cameraIcon} />
           </View>
         </TouchableOpacity>
         
@@ -283,7 +280,7 @@ const CreateProfileScreen: React.FC = () => {
         <Text style={styles.helpText}>Need help?</Text>
       </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

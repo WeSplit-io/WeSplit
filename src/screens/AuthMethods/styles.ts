@@ -99,7 +99,8 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   nextButtonDisabled: {
-    backgroundColor: colors.darkBorder,
+    backgroundColor: colors.white10,
+    color: colors.white50,
   },
   nextButtonText: {
     fontSize: 20,
