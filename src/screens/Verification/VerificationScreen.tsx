@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { verifyCode, sendVerificationCode } from '../../services/firebaseAuthService';
@@ -157,14 +157,12 @@ const VerificationScreen: React.FC = () => {
   const timerText = `00:${timer < 10 ? '0' : ''}${timer}`;
 
   return (
-    <View style={styles.container}>
-      {/* Logo Section */}
-      <View style={styles.logoSection}>
-        <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>W</Text>
+    <SafeAreaView style={styles.container}>
+    <View style={styles.scrollContent}>
+        {/* Logo Section */}
+        <View style={styles.logoSection}>
+          <Image source={require('../../../assets/WeSplitLogoName.png')} style={styles.logo} />
         </View>
-        <Text style={styles.logoName}>WeSplit</Text>
-      </View>
 
       {/* Main Content */}
       <View style={styles.centerContent}>
@@ -230,6 +228,7 @@ const VerificationScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
     </View>
+    </SafeAreaView>
   );
 };
 

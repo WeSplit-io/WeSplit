@@ -11,6 +11,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: 60,
     paddingBottom: spacing.xl,
+    justifyContent: 'center',
   },
   logoSection: {
     alignItems: 'center',
@@ -26,15 +27,13 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.sm,
   },
-  logoText: {
-    fontSize: 24,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.black,
+  logo: {
+    height: 40,
+    objectFit: 'contain',
   },
-  logoName: {
-    fontSize: 24,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'center',
   },
   socialSection: {
     marginBottom: spacing.xl,
@@ -94,8 +93,8 @@ export const styles = StyleSheet.create({
   },
   nextButton: {
     backgroundColor: colors.green,
-    borderRadius: spacing.lg,
-    paddingVertical: 20,
+    borderRadius: 16,
+    paddingVertical: 15,
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
@@ -112,8 +111,8 @@ export const styles = StyleSheet.create({
   },
   helpText: {
     fontSize: typography.fontSize.sm,
-    color: colors.green,
-    fontWeight: typography.fontWeight.medium,
+    color: colors.white50,
+    fontWeight: typography.fontWeight.regular,
   },
   // Modal styles
   modalOverlay: {
