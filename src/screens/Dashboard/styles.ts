@@ -900,4 +900,6 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.bold,
   },
+
+
 }); 

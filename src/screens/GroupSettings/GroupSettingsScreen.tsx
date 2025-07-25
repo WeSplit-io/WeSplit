@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, ScrollView, Alert, SafeAreaView, Share, A
 import { TextInput } from 'react-native-gesture-handler';
 import QRCode from 'react-native-qrcode-svg';
 import Icon from '../../components/Icon';
+import GroupIcon from '../../components/GroupIcon';
+import QRCodeModal from '../../components/QRCodeModal';
 import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
 import { GroupMember, Expense } from '../../types';
@@ -337,16 +339,18 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
           style={styles.qrButton}
           onPress={() => setShowQRModal(true)}
         >
-                        <Icon name="qr-code" type="ionicons" size={24} color="#A5EA15" />
+          <Icon name="qr-code" type="ionicons" size={24} color="#A5EA15" />
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Group Info Card */}
         <View style={styles.groupInfoCard}>
-          <View style={[styles.groupIconContainer, { backgroundColor: group?.color || '#A5EA15' }]}>
-            <Icon name={group?.icon || 'people'} size={24} color="#212121" />
-          </View>
+          <GroupIcon
+            category={group?.category || 'trip'}
+            color={group?.color || '#A5EA15'}
+            size={48}
+          />
           <View style={styles.groupInfoContent}>
             <Text style={styles.groupName}>{group?.name}</Text>
             <Text style={styles.groupCategory}>{group?.category}</Text>
@@ -472,53 +476,16 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
       </ScrollView>
 
       {/* QR Code Modal */}
-      <Modal
+      <QRCodeModal
         visible={showQRModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowQRModal(false)}
-      >
-        <View style={styles.qrModalContainer}>
-          <View style={styles.qrModalContent}>
-            <View style={styles.qrModalHeader}>
-              <TouchableOpacity onPress={() => setShowQRModal(false)}>
-                <Icon name="close" size={24} color="#A89B9B" />
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={styles.qrModalTitle}>Show QR code to your friend</Text>
-            
-            <View style={styles.qrCodeContainer}>
-              <QRCode
-                value={inviteLink || `wesplit://join/${groupId?.toString()}?name=${encodeURIComponent(group?.name || 'Group')}`}
-                size={200}
-                color="#212121"
-                backgroundColor="transparent"
-                logoSize={30}
-                logoBackgroundColor='transparent'
-              />
-            </View>
-            
-            <View style={styles.qrGroupInfo}>
-              <View style={[styles.qrGroupIcon, { backgroundColor: group?.color || '#A5EA15' }]}>
-                <Icon name={group?.icon || 'people'} size={16} color="#212121" />
-              </View>
-              <Text style={styles.qrGroupName}>{group?.name}</Text>
-            </View>
-            
-            <View style={styles.qrModalActions}>
-              <TouchableOpacity style={styles.qrShareButton} onPress={handleShareInviteLink}>
-                <Icon name="share" size={16} color="#A5EA15" />
-                <Text style={styles.qrShareButtonText}>Share</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.qrDoneButton} onPress={() => setShowQRModal(false)}>
-                <Text style={styles.qrDoneButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowQRModal(false)}
+        qrValue={inviteLink || `wesplit://join/${groupId?.toString()}?name=${encodeURIComponent(group?.name || 'Group')}`}
+        title="Show QR code to your friend"
+        displayName={group?.name || 'Group'}
+        displayIcon={group?.category || 'trip'}
+        displayColor={group?.color || '#A5EA15'}
+        isGroup={true}
+      />
 
       {/* Edit Group Modal */}
       <Modal

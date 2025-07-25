@@ -1,12 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import Icon from './Icon';
+import GroupIcon from './GroupIcon';
 
 interface GroupSummaryCardProps {
   groupName: string;
   totalSpending: string;
   memberCount: number;
   expenseCount: number;
+  category?: string;
+  color?: string;
   isLoading?: boolean;
   backgroundColor?: string;
   textColor?: string;
@@ -17,6 +20,8 @@ const GroupSummaryCard: React.FC<GroupSummaryCardProps> = ({
   totalSpending,
   memberCount,
   expenseCount,
+  category = 'trip',
+  color = '#A5EA15',
   isLoading = false,
   backgroundColor = '#A5EA15',
   textColor = '#212121',
@@ -24,7 +29,11 @@ const GroupSummaryCard: React.FC<GroupSummaryCardProps> = ({
   return (
     <View style={[styles.card, { backgroundColor }]}>
       <View style={styles.header}>
-        <Icon name="users" size={20} color={textColor} />
+        <GroupIcon
+          category={category}
+          color={color}
+          size={32}
+        />
         <Text style={[styles.groupName, { color: textColor }]}>{groupName}</Text>
       </View>
       

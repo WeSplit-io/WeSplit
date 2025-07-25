@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '../../components/Icon';
+import GroupIcon from '../../components/GroupIcon';
 import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
 import { useWallet } from '../../context/WalletContext';
@@ -778,13 +779,11 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           
           {/* Group Icon Badge */}
           <View style={styles.groupIconBadgeContainer}>
-            <View style={styles.groupIconBadge}>
-              <Icon 
-                name={group?.icon || "briefcase"} 
-                size={24} 
-                color="#212121" 
-              />
-            </View>
+            <GroupIcon
+              category={group?.category || 'trip'}
+              color={group?.color || '#A5EA15'}
+              size={48}
+            />
           </View>
           
           {/* Event Name */}

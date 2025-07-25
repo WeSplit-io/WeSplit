@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from './Icon';
+import GroupIcon from './GroupIcon';
 
 interface GroupCardProps {
   groupName: string;
@@ -27,17 +28,6 @@ const GroupCard: React.FC<GroupCardProps> = ({
   onPress,
   onMenuPress,
 }) => {
-  const getCategoryIcon = (category: string) => {
-    switch (category.toLowerCase()) {
-      case 'travel': return 'map-pin';
-      case 'food': return 'coffee';
-      case 'work': return 'briefcase';
-      case 'shopping': return 'shopping-bag';
-      case 'home': return 'home';
-      default: return 'users';
-    }
-  };
-
   const getCategoryColor = (category: string) => {
     switch (category.toLowerCase()) {
       case 'travel': return '#A5A6F6';
@@ -64,9 +54,11 @@ const GroupCard: React.FC<GroupCardProps> = ({
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.8} onPress={onPress}>
       <View style={styles.header}>
-        <View style={[styles.iconContainer, { backgroundColor: getCategoryColor(category) }]}>
-          <Icon name={getCategoryIcon(category)} size={20} color="#212121" />
-        </View>
+        <GroupIcon
+          category={category}
+          color={getCategoryColor(category)}
+          size={40}
+        />
         <View style={styles.groupInfo}>
           <Text style={styles.groupName}>{groupName}</Text>
           <Text style={styles.memberCount}>{memberCount} members</Text>

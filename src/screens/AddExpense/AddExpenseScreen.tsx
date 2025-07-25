@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, SafeAreaView, ActivityIndicator, Modal } from 'react-native';
 import Icon from '../../components/Icon';
+import GroupIcon from '../../components/GroupIcon';
 import { useApp } from '../../context/AppContext';
 import { useGroupList, useExpenseOperations } from '../../hooks/useGroupData';
 import { GroupWithDetails, GroupMember } from '../../types';
@@ -413,9 +414,11 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
               ]}
               onPress={() => handleGroupSelect(group)}
             >
-              <View style={[styles.groupIcon, { backgroundColor: group.color }]}>
-                <Icon name={group.icon as any} size={24} color="#FFF" />
-              </View>
+              <GroupIcon
+                category={group.category || 'trip'}
+                color={group.color || '#A5EA15'}
+                size={48}
+              />
               <Text style={styles.groupLabel} numberOfLines={1}>
                 {group.name}
               </Text>

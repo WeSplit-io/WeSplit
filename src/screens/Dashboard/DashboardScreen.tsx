@@ -18,6 +18,8 @@ import AuthGuard from '../../components/AuthGuard';
 import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
 import WalletSelectorModal from '../../components/WalletSelectorModal';
+import QRCodeModal from '../../components/QRCodeModal';
+import GroupIcon from '../../components/GroupIcon';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { useGroupList } from '../../hooks/useGroupData';
@@ -60,6 +62,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [loadingUserWallet, setLoadingUserWallet] = useState(false);
   const [connectingWallet, setConnectingWallet] = useState(false);
   const [walletSelectorVisible, setWalletSelectorVisible] = useState(false);
+  const [qrCodeModalVisible, setQrCodeModalVisible] = useState(false);
   const [groupSummaries, setGroupSummaries] = useState<Record<string, { totalAmount: number; memberCount: number; expenseCount: number; hasData: boolean }>>({});
 
   // Memoized balance calculations to avoid expensive recalculations
@@ -725,7 +728,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               {/* QR Code Button for Deposits */}
               <TouchableOpacity 
                 style={styles.qrCodeIcon} 
-                onPress={() => navigation.navigate('Deposit')}
+                onPress={() => setQrCodeModalVisible(true)}
               >
                 <Image
                   source={require('../../../assets/qr-code-scan.png')}
@@ -929,12 +932,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                         <View style={styles.groupGridCardGradient} />
                         <View style={styles.groupGridCardGradientOverlay} />
                         <View style={styles.groupGridHeader}>
-                          <View style={styles.groupGridIcon}>
-                            <Icon
-                              name={group.icon || "briefcase"}
-                              style={styles.groupGridIconSvg}
-                            />
-                          </View>
+                          <GroupIcon
+                            category={group.category || 'trip'}
+                            color={group.color || '#A5EA15'}
+                            size={40}
+                          />
                           {/* Show USD-converted total */}
                           <View style={styles.groupGridAmountContainer}>
                             <Image
@@ -1170,6 +1172,16 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       <WalletSelectorModal
         visible={walletSelectorVisible}
         onClose={() => setWalletSelectorVisible(false)}
+      />
+
+      {/* QR Code Modal */}
+      <QRCodeModal
+        visible={qrCodeModalVisible}
+        onClose={() => setQrCodeModalVisible(false)}
+        qrValue={currentUser?.wallet_address || ''}
+        title="Show QR code to your friend"
+        displayName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
+        isGroup={false}
       />
 
       <NavBar currentRoute="Dashboard" navigation={navigation} />

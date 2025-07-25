@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, SafeAreaView, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '../../components/Icon';
+import GroupIcon from '../../components/GroupIcon';
 import NavBar from '../../components/NavBar';
 import { useApp } from '../../context/AppContext';
 import { useGroupList } from '../../hooks/useGroupData';
@@ -160,13 +161,11 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
         <View style={styles.groupCardLeft}>
           <View style={styles.groupCardLeftTop}>
             {/* Group Icon */}
-            <View style={styles.groupIconContainer}>
-              <Icon
-                name={group.icon || "briefcase"}
-                size={20}
-                color={colors.black}
-              />
-            </View>
+            <GroupIcon
+              category={group.category || 'trip'}
+              color={group.color || '#A5EA15'}
+              size={40}
+            />
 
             {/* Group Info */}
             <View style={styles.groupInfo}>
@@ -278,12 +277,11 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
 
                 {/* Header */}
                 <View style={styles.prominentGroupHeader}>
-                  <View style={styles.prominentGroupIcon}>
-                    <Icon
-                      name={group.icon || "briefcase"}
-                      style={styles.prominentGroupIconSvg}
-                    />
-                  </View>
+                  <GroupIcon
+                    category={group.category || 'trip'}
+                    color={group.color || '#A5EA15'}
+                    size={40}
+                  />
                   {/* Show USD-converted total */}
                   <View style={styles.prominentGroupAmountContainer}>
                     <Image
