@@ -5,6 +5,8 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
+  Image,
+  Clipboard,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
@@ -128,13 +130,22 @@ const SeedPhraseViewScreen: React.FC = () => {
     navigation.navigate('SeedPhraseVerify' as never);
   };
 
+  const handleCopy = () => {
+    const seedPhraseText = seedPhrase.join(' ');
+    Clipboard.setString(seedPhraseText);
+    Alert.alert('Copied!', 'Seed phrase has been copied to clipboard.');
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color={colors.white} />
-          </TouchableOpacity>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
+        </TouchableOpacity>
           <Text style={styles.headerTitle}>Seed phrase</Text>
           <View style={styles.placeholder} />
         </View>
@@ -149,9 +160,12 @@ const SeedPhraseViewScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color={colors.white} />
-          </TouchableOpacity>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
+        </TouchableOpacity>
           <Text style={styles.headerTitle}>Seed phrase</Text>
           <View style={styles.placeholder} />
         </View>
@@ -174,8 +188,11 @@ const SeedPhraseViewScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color={colors.white} />
+      <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Seed phrase</Text>
         <View style={styles.placeholder} />
@@ -201,6 +218,7 @@ const SeedPhraseViewScreen: React.FC = () => {
               onPress={handleReveal}
               activeOpacity={0.8}
             >
+              <View style={styles.blurOverlay} />
               <Text style={styles.blurredText}>Tap to reveal your seed phrase</Text>
               <Text style={styles.blurredSubtext}>Make sure no one is watching your screen.</Text>
               <View style={styles.revealButton}>
@@ -220,14 +238,14 @@ const SeedPhraseViewScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Next Button */}
+        {/* Copy Button */}
         {isRevealed && (
           <TouchableOpacity 
-            style={styles.nextButton}
-            onPress={handleNext}
+            style={styles.copyButton}
+            onPress={handleCopy}
           >
-            <Text style={styles.nextButtonText}>Next</Text>
-            <Icon name="chevron-right" size={20} color={colors.black} />
+            <Text style={styles.copyButtonText}>Copy</Text>
+            <Icon name="copy" size={20} color={colors.black} />
           </TouchableOpacity>
         )}
       </View>

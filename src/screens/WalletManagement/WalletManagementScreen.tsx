@@ -26,6 +26,7 @@ import { MultiSignStateService } from '../../services/multiSignStateService';
 import { useWalletCreation } from '../../hooks/useWalletCreation';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
+import QRCodeModal from '../../components/QRCodeModal';
 
 const WalletManagementScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -49,7 +50,7 @@ const WalletManagementScreen: React.FC = () => {
   const [showMultiSignActivated, setShowMultiSignActivated] = useState(false);
   const [sliderValue] = useState(new Animated.Value(0));
   const [isSliderActive, setIsSliderActive] = useState(false);
-
+  const [qrCodeModalVisible, setQrCodeModalVisible] = useState(false);
 
 
   // Load multi-sign state on component mount
@@ -600,7 +601,6 @@ const WalletManagementScreen: React.FC = () => {
         })
       ) : (
         <View style={styles.emptyTransactions}>
-          <Icon name="file-text" size={48} color={colors.textLightSecondary} />
           <Text style={styles.emptyTransactionsText}>No transactions yet</Text>
           <Text style={styles.emptyTransactionsSubtext}>
             Your transaction history will appear here
@@ -639,7 +639,7 @@ const WalletManagementScreen: React.FC = () => {
         <View style={styles.balanceCard}>
           <View style={styles.balanceHeader}>
             <Text style={styles.balanceLabel}>Your Balance</Text>
-            <TouchableOpacity style={styles.qrCodeIcon} onPress={() => navigation.navigate('Deposit')}>
+            <TouchableOpacity style={styles.qrCodeIcon} onPress={() => setQrCodeModalVisible(true)}>
               <Image
                 source={require('../../../assets/qr-code-scan.png')}
                 style={styles.qrCodeImage}
@@ -799,6 +799,16 @@ const WalletManagementScreen: React.FC = () => {
       )}
 
       <NavBar currentRoute="WalletManagement" navigation={navigation} />
+
+      {/* QR Code Modal */}
+      <QRCodeModal
+        visible={qrCodeModalVisible}
+        onClose={() => setQrCodeModalVisible(false)}
+        qrValue={currentUser?.wallet_address || ''}
+        title="Show QR code to your friend"
+        displayName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
+        isGroup={false}
+      />
     </SafeAreaView>
   );
 };

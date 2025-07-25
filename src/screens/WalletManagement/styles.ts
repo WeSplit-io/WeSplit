@@ -500,40 +500,72 @@ export const styles = StyleSheet.create({
   
   // Seed Phrase Styles
   instructionsContainer: {
-    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    marginTop: spacing.md, // réduit l'écart vertical
+    marginBottom: spacing.sm, // ajoute un petit espace sous les instructions
   },
   
   instructionsTitle: {
-    color: colors.primaryGreen,
-    fontSize: typography.fontSize.lg,
+    color: colors.white,
+    fontSize: 24,
     fontWeight: typography.fontWeight.semibold,
     marginBottom: spacing.md,
+    textAlign: 'center',
   },
   
   instructionsText: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.md,
+    color: colors.white70,
+    fontSize: 16,
     lineHeight: 24,
+    textAlign: 'center',
   },
   
   seedPhraseContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    alignSelf: 'center', // centré
+    borderRadius: spacing.lg,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 180,
+    marginTop: 50, // réduit l'écart avec les instructions
+    marginBottom: spacing.lg,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: spacing.xs },
+    shadowOpacity: 0.08,
+    shadowRadius: spacing.sm,
+    elevation: 2,
+    marginHorizontal: spacing.lg,
+    borderWidth: 0.5,
+    borderColor: colors.white10,
   },
   
   blurredContainer: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green10,
     borderRadius: spacing.lg,
     padding: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 200,
     width: '100%',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  
+  // Overlay pour simuler l'effet de flou
+  blurOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: spacing.lg,
   },
   
   blurredText: {
-    color: colors.black,
+    color: colors.white,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     textAlign: 'center',
@@ -541,11 +573,10 @@ export const styles = StyleSheet.create({
   },
   
   blurredSubtext: {
-    color: colors.black,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     marginBottom: spacing.lg,
-    opacity: 0.8,
   },
   
   revealButton: {
@@ -569,30 +600,35 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     width: '100%',
+    rowGap: spacing.sm, // espace vertical réduit
+    columnGap: spacing.sm, // espace horizontal réduit
   },
   
   seedWordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.green10, // pill plus claire
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: spacing.radiusMd,
-    marginBottom: spacing.sm,
-    width: '48%',
+    borderRadius: 10,
+    marginBottom: 0, // géré par rowGap
+    width: '48%', // deux colonnes
+    marginVertical: 2,
+    marginHorizontal: 0,
+    justifyContent: 'center',
   },
   
   seedWordNumber: {
-    color: colors.black,
+    color: colors.white,
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.regular,
     marginRight: spacing.xs,
   },
   
   seedWord: {
-    color: colors.black,
+    color: colors.white,
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.regular,
   },
   
   nextButton: {
@@ -1049,5 +1085,24 @@ export const styles = StyleSheet.create({
     color: colors.black,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
+  },
+
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primaryGreen,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: spacing.radiusMd,
+    marginTop: spacing.lg,
+    alignSelf: 'center',
+  },
+  
+  copyButtonText: {
+    color: colors.black,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    marginRight: spacing.sm,
   },
 }); 
