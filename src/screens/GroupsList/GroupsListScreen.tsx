@@ -366,7 +366,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
       >
         {filteredGroups.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateIcon}>👥</Text>
+            <Image source={require('../../../assets/group-enpty-state.png')} style={styles.emptyStateIcon} />
             <Text style={styles.emptyStateTitle}>No groups found</Text>
             <Text style={styles.emptyStateSubtitle}>
               {activeFilter === 'all'

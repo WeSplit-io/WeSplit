@@ -70,8 +70,8 @@ export const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   helpText: {
-    color: colors.green,
+    color: colors.white50,
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.regular,
   },
 }); 

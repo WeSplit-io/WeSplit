@@ -459,10 +459,12 @@ export const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    paddingVertical: 100,
   },
   emptyStateIcon: {
-    fontSize: 48,
+    width: 100,
+    height: 100,
+    objectFit: 'contain',
     marginBottom: spacing.md,
   },
   emptyStateTitle: {
@@ -481,7 +483,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#A5EA15',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    borderRadius: spacing.radiusLg,
+    borderRadius: 16,
   },
   createGroupButtonText: {
     color: colors.black,
