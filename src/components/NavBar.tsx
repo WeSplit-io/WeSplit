@@ -74,9 +74,6 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
       if (route === 'Contacts') {
         // Navigate to standalone contacts screen
         navigation.navigate(route, {});
-      } else if (route === 'SendContacts') {
-        // Navigate to contacts without groupId for general contacts view
-        navigation.navigate(route, {});
       } else {
         navigation.navigate(route);
       }
@@ -91,13 +88,8 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
       return true;
     }
     
-    // Special case: if we're on Contacts or SendContacts, consider Contact tab active
-    if (route === 'Contacts' && (currentRoute === 'Contacts' || currentRoute === 'SendContacts')) {
-      return true;
-    }
-    
-    // Special case: if we're on SendContacts from navbar, consider Contact tab active
-    if (route === 'SendContacts' && currentRoute === 'SendContacts') {
+    // Special case: if we're on Contacts, consider Contact tab active
+    if (route === 'Contacts' && currentRoute === 'Contacts') {
       return true;
     }
     

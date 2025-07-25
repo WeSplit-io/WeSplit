@@ -8,13 +8,8 @@ import { firebaseDataService } from '../../services/firebaseDataService';
 import { UserContact, User } from '../../types';
 import { styles } from './styles';
 
-interface ContactsScreenProps {
-  navigation: any;
-  route: any;
-}
-
-const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) => {
-  const { action, onContactSelect } = route.params || {};
+const SendScreen: React.FC<any> = ({ navigation, route }) => {
+  const { groupId } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
   
@@ -22,13 +17,20 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
   const [activeTab, setActiveTab] = useState<'All' | 'Favorite' | 'Search'>('All');
 
   const handleSelectContact = (contact: UserContact) => {
-    if (action === 'send' && onContactSelect) {
-      // If we're in send mode, call the callback
-      onContactSelect(contact);
-    } else {
-      // Default navigation to Send screen
-      navigation.navigate('Send', { selectedContact: contact });
-    }
+    // Debug logging to ensure contact data is passed correctly
+    console.log('📱 SendScreen: Selected contact for sending:', {
+      name: contact.name || 'No name',
+      email: contact.email,
+      wallet: contact.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet',
+      fullWallet: contact.wallet_address,
+      id: contact.id
+    });
+    
+    // Auto-navigate to next screen when contact is selected
+    navigation.navigate('SendAmount', {
+      contact: contact,
+      groupId,
+    });
   };
 
   const handleAddContact = async (user: User) => {
@@ -59,13 +61,6 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
     }
   };
 
-  const getHeaderTitle = () => {
-    if (action === 'send') {
-      return 'Select Contact';
-    }
-    return 'Contacts';
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -73,15 +68,16 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
             source={require('../../../assets/arrow-left.png')}
-            style={{ width: 24, height: 24 }}
+            style={styles.iconWrapper}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
+        <Text style={styles.headerTitle}>Send</Text>
         <View style={styles.placeholder} />
       </View>
 
       <View style={styles.content}>
         <ContactsList
+          groupId={groupId}
           onContactSelect={handleSelectContact}
           onAddContact={handleAddContact}
           showAddButton={true}
@@ -95,9 +91,9 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
         />
       </View>
       
-      <NavBar currentRoute="Contacts" navigation={navigation} />
+      <NavBar currentRoute="Send" navigation={navigation} />
     </SafeAreaView>
   );
 };
 
-export default ContactsScreen; 
+export default SendScreen; 

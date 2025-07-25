@@ -5,7 +5,7 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.darkBackground,
-    
+
   },
   loadingContainer: {
     flex: 1,
@@ -50,12 +50,12 @@ export const styles = StyleSheet.create({
     height: 16,
     marginRight: 4,
   },
-  
+
   // Prominent Group Cards - Updated to match Dashboard design
   prominentGroupsContainer: {
     marginBottom: spacing.lg,
   },
-  
+
   // Grid layout for prominent groups (horizontal scroll)
   prominentGroupsGrid: {
     flexDirection: 'row',
@@ -72,7 +72,7 @@ export const styles = StyleSheet.create({
   prominentGroupCardOwner: {
     backgroundColor: '#A5EA15',
   },
-  
+
   // Background gradient for prominent cards
   prominentGroupCardGradient: {
     position: 'absolute',
@@ -83,7 +83,7 @@ export const styles = StyleSheet.create({
     borderRadius: spacing.lg,
     backgroundColor: '#A5EA15',
   },
-  
+
   // Gradient overlay for prominent cards
   prominentGroupCardGradientOverlay: {
     position: 'absolute',
@@ -93,7 +93,7 @@ export const styles = StyleSheet.create({
     bottom: 0,
     borderRadius: spacing.lg,
   },
-  
+
   // Header of prominent group card
   prominentGroupHeader: {
     flexDirection: 'row',
@@ -101,7 +101,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  
+
   prominentGroupIcon: {
     width: 40,
     height: 40,
@@ -110,60 +110,60 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   prominentGroupIconSvg: {
     width: 20,
     height: 20,
     tintColor: colors.black,
   },
-  
+
   prominentGroupAmountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
   },
-  
+
   prominentUsdcLogo: {
     width: 20,
     height: 20,
   },
-  
+
   prominentGroupName: {
     color: colors.black,
     fontSize: 18,
     fontWeight: typography.fontWeight.bold,
     marginBottom: 4,
   },
-  
+
   prominentGroupRoleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
     gap: spacing.xs,
   },
-  
+
   prominentGroupRoleIcon: {
     width: 14,
     height: 14,
   },
-  
+
   prominentGroupRole: {
     color: colors.black,
     fontSize: 16,
     fontWeight: typography.fontWeight.normal,
   },
-  
+
   prominentGroupAmount: {
     color: colors.black,
     fontSize: 22,
     fontWeight: typography.fontWeight.bold,
   },
-  
+
   prominentMemberAvatars: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  
+
   prominentMemberAvatar: {
     width: 32,
     height: 32,
@@ -175,19 +175,19 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
+
   prominentMemberAvatarImage: {
     width: 32,
     height: 32,
     borderRadius: 16,
   },
-  
+
   prominentMemberAvatarText: {
     color: colors.white,
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.bold,
   },
-  
+
   prominentMemberAvatarMore: {
     width: 24,
     height: 24,
@@ -197,34 +197,34 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: spacing.xs,
   },
-  
+
   prominentMemberAvatarMoreText: {
     color: colors.white,
     fontSize: 12,
     fontWeight: typography.fontWeight.bold,
   },
-  
+
   prominentGroupArrow: {
     position: 'absolute',
     bottom: 16,
     right: 16,
   },
-  
+
   // Left prominent card (with special positioning)
   prominentGroupCardLeft: {
     marginRight: spacing.sm / 2,
   },
-  
+
   // Right prominent card (with special positioning)
   prominentGroupCardRight: {
     marginLeft: spacing.sm / 2,
   },
-  
+
   // Legacy prominent card styles (keeping for compatibility)
   prominentGroupInfo: {
     marginBottom: spacing.sm,
   },
-  
+
   filtersContainer: {
     flexDirection: 'row',
     paddingHorizontal: spacing.xs,
@@ -264,7 +264,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenPadding,
     paddingBottom: spacing.xl * 3, // Add extra padding for navbar safety
   },
-  
+
   // Regular Group Cards - Updated to match image design
   groupCard: {
     flexDirection: 'row',
@@ -277,7 +277,7 @@ export const styles = StyleSheet.create({
     borderColor: colors.white50,
     padding: spacing.md,
   },
-  
+
   // Left section of group card
   groupCardLeft: {
     flexDirection: 'column',
@@ -291,7 +291,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  
+
   // Right section of group card
   groupCardRight: {
     flexDirection: 'column',
@@ -299,7 +299,7 @@ export const styles = StyleSheet.create({
     gap: spacing.xl,
     justifyContent: 'space-between',
   },
-  
+
   groupIconContainer: {
     width: 40,
     height: 40,
@@ -317,7 +317,7 @@ export const styles = StyleSheet.create({
     color: colors.white,
     marginBottom: spacing.xs,
   },
-  
+
   // Member status row
   groupMemberStatus: {
     flexDirection: 'row',
@@ -330,7 +330,7 @@ export const styles = StyleSheet.create({
     color: colors.white70,
     fontWeight: typography.fontWeight.normal,
   },
-  
+
   groupMemberAvatars: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -374,7 +374,7 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: typography.fontWeight.bold,
   },
-  
+
   // Status indicators
   groupStatusContainer: {
     flexDirection: 'row',
@@ -397,7 +397,7 @@ export const styles = StyleSheet.create({
     color: colors.textLight,
     fontWeight: typography.fontWeight.medium,
   },
-  
+
   // Premium/Private icon
   groupPremiumIcon: {
     width: 24,
@@ -412,7 +412,7 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.bold,
   },
-  
+
   // Legacy activity indicator (keeping for compatibility)
   activityIndicator: {
     width: 8,
@@ -420,7 +420,7 @@ export const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#FF4D4F',
   },
-  
+
   // Legacy styles (keeping for compatibility)
   filtersRow: {
     flexDirection: 'row',

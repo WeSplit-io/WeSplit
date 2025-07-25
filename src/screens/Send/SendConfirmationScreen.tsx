@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, Alert, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, Alert, ScrollView, Image } from 'react-native';
 import Icon from '../../components/Icon';
 import SlideButton from '../../components/SlideButton';
 import { useApp } from '../../context/AppContext';
@@ -118,8 +118,11 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color={colors.textLight} />
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
           {isSettlement ? 'Settlement Payment' : 'Send'}

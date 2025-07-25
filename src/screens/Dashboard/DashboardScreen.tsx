@@ -826,7 +826,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           <View style={styles.actionButtonsRow}>
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => navigation.navigate('SendContacts')}
+              onPress={() => navigation.navigate('Send')}
             >
               <View style={styles.actionButtonCircle}>
                 <Image

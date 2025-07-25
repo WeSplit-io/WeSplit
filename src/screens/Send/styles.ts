@@ -20,6 +20,12 @@ export const styles = StyleSheet.create({
   backButton: {
     padding: spacing.sm,
   },
+  iconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 24,
+    height: 24,
+  },
   headerTitle: {
     ...typography.textStyles.h6,
     color: colors.white,

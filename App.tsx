@@ -36,7 +36,7 @@ import AccountSettingsScreen from './src/screens/AccountSettings/AccountSettings
 import PremiumScreen from './src/screens/Premium/PremiumScreen';
 import NotificationsScreen from './src/screens/Notifications/NotificationsScreen';
 import LanguageScreen from './src/screens/Language/LanguageScreen';
-import SendContactsScreen from './src/screens/Send/SendContactsScreen';
+import SendScreen from './src/screens/Send/SendScreen';
 import SendAmountScreen from './src/screens/Send/SendAmountScreen';
 import SendConfirmationScreen from './src/screens/Send/SendConfirmationScreen';
 import SendSuccessScreen from './src/screens/Send/SendSuccessScreen';
@@ -152,7 +152,7 @@ export default function App() {
               <Stack.Screen name="Notifications" component={NotificationsScreen} />
               <Stack.Screen name="Language" component={LanguageScreen} />
               <Stack.Screen name="Contacts" component={ContactsScreen} />
-              <Stack.Screen name="SendContacts" component={SendContactsScreen} />
+              <Stack.Screen name="Send" component={SendScreen} />
               <Stack.Screen name="SendAmount" component={SendAmountScreen} />
               <Stack.Screen name="SendConfirmation" component={SendConfirmationScreen} />
               <Stack.Screen name="SendSuccess" component={SendSuccessScreen} />
