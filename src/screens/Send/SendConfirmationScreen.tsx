@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, Alert, ScrollView, Image } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, SafeAreaView, Alert, ScrollView, Image, Animated, PanResponder } from 'react-native';
 import Icon from '../../components/Icon';
 import SlideButton from '../../components/SlideButton';
 import { useApp } from '../../context/AppContext';
@@ -8,6 +8,96 @@ import { firebaseDataService } from '../../services/firebaseDataService';
 import { GroupMember } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
+
+// --- AppleSlider adapted from WalletManagementScreen ---
+interface AppleSliderProps {
+  onSlideComplete: () => void;
+  disabled: boolean;
+  loading: boolean;
+  text?: string;
+}
+
+const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, loading, text = 'Sign transaction' }) => {
+  const maxSlideDistance = 300;
+  const sliderValue = useRef(new Animated.Value(0)).current;
+  const [isSliderActive, setIsSliderActive] = useState(false);
+
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => !disabled && !loading,
+    onMoveShouldSetPanResponder: () => !disabled && !loading,
+    onPanResponderGrant: () => {
+      setIsSliderActive(true);
+    },
+    onPanResponderMove: (_, gestureState) => {
+      const newValue = Math.max(0, Math.min(gestureState.dx, maxSlideDistance));
+      sliderValue.setValue(newValue);
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (gestureState.dx > maxSlideDistance * 0.6) {
+        Animated.timing(sliderValue, {
+          toValue: maxSlideDistance,
+          duration: 200,
+          useNativeDriver: false,
+        }).start(() => {
+          if (onSlideComplete) onSlideComplete();
+          setTimeout(() => {
+            sliderValue.setValue(0);
+            setIsSliderActive(false);
+          }, 1000);
+        });
+      } else {
+        Animated.timing(sliderValue, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }).start(() => {
+          setIsSliderActive(false);
+        });
+      }
+    },
+  });
+
+  return (
+    <View style={[styles.appleSliderContainer, disabled && { opacity: 0.5 }]} {...panResponder.panHandlers}>
+      <Animated.View
+        style={[
+          styles.appleSliderTrack,
+          {
+            backgroundColor: sliderValue.interpolate({
+              inputRange: [0, maxSlideDistance],
+              outputRange: [colors.green10, colors.brandGreen],
+            }),
+          },
+        ]}
+      >
+        <Animated.Text
+          style={[
+            styles.appleSliderText,
+            {
+              color: sliderValue.interpolate({
+                inputRange: [0, maxSlideDistance],
+                outputRange: [colors.white50, colors.black],
+              }),
+            },
+          ]}
+        >
+          {loading ? 'Signing...' : text}
+        </Animated.Text>
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.appleSliderThumb,
+          {
+            transform: [{ translateX: sliderValue }],
+          },
+        ]}
+      >
+        <Icon name="chevron-right" size={20} color={colors.black} />
+      </Animated.View>
+    </View>
+  );
+};
+// --- End AppleSlider ---
 
 const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, amount, description, groupId, isSettlement } = route.params || {};
@@ -30,12 +120,12 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       isSettlement
     });
   }, [contact, amount, description, groupId, isSettlement]);
-  const { 
-    sendTransaction, 
-    isConnected, 
-    address, 
-    balance, 
-    isLoading: walletLoading 
+  const {
+    sendTransaction,
+    isConnected,
+    address,
+    balance,
+    isLoading: walletLoading
   } = useWallet();
   const [sending, setSending] = useState(false);
 
@@ -50,13 +140,13 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       return;
     }
 
-    if (balance !== null && balance < totalAmount) {
+    if (balance !== null && balance < amount) {
       Alert.alert('Insufficient Balance', 'You do not have enough balance to complete this transaction');
       return;
     }
 
     setSending(true);
-    
+
     try {
       // Send the actual transaction using wallet context
       const transactionResult = await sendTransaction({
@@ -68,7 +158,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       });
 
       console.log('Transaction successful:', transactionResult);
-      
+
       // If this is a settlement payment, record the settlement
       if (isSettlement && currentUser?.id && groupId && contact?.id) {
         try {
@@ -87,7 +177,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           // The payment was successful, settlement tracking is secondary
         }
       }
-      
+
       // Navigate to success screen with real transaction data
       navigation.navigate('SendSuccess', {
         contact,
@@ -107,18 +197,19 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   // Calculate fees (these should be real fees from the wallet)
-  const gasFees = 0.0013; // This should come from wallet estimation
-  const transactionFees = 0.03; // This should come from network fees
-  const totalAmount = amount + gasFees + transactionFees;
+  const transactionFee = amount * 0.03; // 3% fee
+  const totalSent = amount * 1.03; // montant entré + 3%
+  const destinationAccount = contact?.wallet_address || '';
+  const transactionId = 'ZIEZHFIZENBAO'; // Replace with real tx id if available
 
   // Check if user has sufficient balance
-  const hasSufficientBalance = balance === null || balance >= totalAmount;
+  const hasSufficientBalance = balance === null || balance >= amount;
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
             source={require('../../../assets/arrow-left.png')}
             style={styles.iconWrapper}
@@ -130,30 +221,17 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingBottom: 100,
+        }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Wallet Connection Status */}
-        {!isConnected && (
-          <View style={styles.alertContainer}>
-            <Icon name="alert-triangle" size={20} color="#FFF" />
-            <Text style={styles.alertText}>Wallet not connected</Text>
-          </View>
-        )}
-
-        {/* Balance Warning */}
-        {isConnected && !hasSufficientBalance && (
-          <View style={styles.alertContainer}>
-            <Icon name="alert-triangle" size={20} color="#FFF" />
-            <Text style={styles.alertText}>
-              Insufficient balance ({balance?.toFixed(4)} USDC available)
-            </Text>
-          </View>
-        )}
-
         {/* Recipient Card */}
         <View style={styles.mockupRecipientCard}>
           <View style={styles.mockupRecipientAvatar}>
@@ -165,74 +243,68 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
             <Text style={styles.mockupRecipientName}>
               {contact?.name || (contact?.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'Unknown')}
             </Text>
-            <Text style={styles.mockupRecipientEmail}>{contact?.email || ''}</Text>
-            <Text style={styles.walletAddressText} numberOfLines={1} ellipsizeMode="middle">
-              {contact?.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet address'}
-            </Text>
+            {contact?.wallet_address ? (
+              <Text style={styles.walletAddressText} numberOfLines={1} ellipsizeMode="middle">
+                {`${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.slice(-4)}`}
+              </Text>
+            ) : contact?.email ? (
+              <Text style={styles.mockupRecipientEmail}>{contact.email}</Text>
+            ) : null}
           </View>
         </View>
 
-        {/* Sent Amount */}
-        <View style={[styles.sentAmountContainer, {
-          alignItems: 'center',
-          marginBottom: 32,
-        }]}>
-          <Text style={[styles.sentAmountLabel, styles.centeredAmountLabel]}>
-            {isSettlement ? 'Settlement amount' : 'Sent amount'}
-          </Text>
-          <Text style={[styles.sentAmountValue, styles.largeAmountValue]}>{amount} USDC</Text>
-          {isSettlement && (
-            <Text style={styles.settlementInfoText}>
-              Group expense settlement
-            </Text>
+        {/* Sent Amount Card */}
+        <View style={styles.sentAmountContainer}>
+          <Text style={styles.sentAmountLabel}>Sent amount</Text>
+          <View style={styles.sentAmountValueContainer}>
+          <Image source={require('../../../assets/usdc-logo-black.png')} style={{ width: 32, height: 32, marginRight: 8 }} />
+            <Text style={styles.sentAmountValue}>{amount}</Text>
+          </View>
+          {description && (
+            <View style={[styles.mockupNoteContainer, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }] }>
+              <Icon name="message-circle" size={16} color={colors.white} style={{ marginRight: 6 }} />
+              <Text style={styles.mockupNoteText}>{description}</Text>
+            </View>
           )}
         </View>
 
-        {/* Transaction Details */}
+        {/* Transaction Details Card (mockup style) */}
         <View style={styles.mockupTransactionDetails}>
           <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Gas fees</Text>
-            <Text style={styles.mockupFeeValue}>{gasFees.toFixed(4)} USDC</Text>
+            <Text style={styles.mockupFeeLabel}>Transaction fee (3%)</Text>
+            <Text style={styles.mockupFeeValue}>{transactionFee.toFixed(2)} USDC</Text>
           </View>
-          
           <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Transaction fees</Text>
-            <Text style={styles.mockupFeeValue}>{transactionFees.toFixed(2)} USDC</Text>
+            <Text style={styles.mockupFeeLabel}>Total sent</Text>
+            <Text style={styles.mockupFeeValue}>{totalSent.toFixed(3)} USDC</Text>
           </View>
-          
-          <View style={styles.mockupTotalRow}>
-            <Text style={styles.mockupTotalLabel}>Total</Text>
-            <Text style={styles.mockupTotalValue}>{totalAmount.toFixed(4)} USDC</Text>
+          <View style={styles.mockupFeeRowSeparator} />
+          <View style={styles.mockupFeeRow}>
+            <Text style={styles.mockupFeeLabel}>Destination account</Text>
+            <Text style={styles.mockupFeeValue}>{destinationAccount ? `${destinationAccount.substring(0, 4)}...${destinationAccount.slice(-4)}` : ''}</Text>
+          </View>
+          <View style={styles.mockupFeeRow}>
+            <Text style={styles.mockupFeeLabel}>Transaction ID</Text>
+            <Text style={styles.mockupFeeValue}>{transactionId}</Text>
           </View>
         </View>
 
-        {/* Note */}
-        {description && (
-          <View style={styles.mockupNoteContainer}>
-            <Text style={styles.mockupNoteText}>"{description}"</Text>
-          </View>
-        )}
 
-        {/* Wallet Info */}
-        <View style={styles.walletInfoContainer}>
-          <Text style={styles.walletInfoText}>
-            Double check the person you're sending money to!
-          </Text>
-          {isConnected && address && (
-            <Text style={styles.walletInfoText} numberOfLines={1} ellipsizeMode="middle">
-              From: {address}
-            </Text>
-          )}
-        </View>
 
-        {/* Slide to Sign Transaction */}
-        <SlideButton
+
+      </ScrollView>
+      {/* AppleSlider for confirmation */}
+      <View style={styles.appleSliderContainerWrapper}>
+        <Text style={styles.walletInfoText}>
+          Double check the person you're sending money to!
+        </Text>
+        <AppleSlider
           onSlideComplete={handleConfirmSend}
-          text={isConnected ? "Slide to sign transaction" : "Connect wallet first"}
           disabled={sending || !isConnected || !hasSufficientBalance || walletLoading}
           loading={sending || walletLoading}
+          text="Sign transaction"
         />
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
