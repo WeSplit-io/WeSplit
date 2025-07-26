@@ -20,6 +20,7 @@ interface ContactsListProps {
   searchQuery?: string;
   onSearchQueryChange?: (query: string) => void;
   placeholder?: string;
+  hideToggleBar?: boolean; // NEW PROP
 }
 
 const ContactsList: React.FC<ContactsListProps> = ({
@@ -33,7 +34,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
   onTabChange,
   searchQuery = '',
   onSearchQueryChange,
-  placeholder = "Search contacts"
+  placeholder = "Search contacts",
+  hideToggleBar = false, // NEW PROP
 }) => {
   const { state } = useApp();
   const { currentUser } = state;
@@ -345,32 +347,25 @@ const ContactsList: React.FC<ContactsListProps> = ({
   return (
     <View style={styles.container}>
       {/* Toggle Contact List / Scan QR Code (design simple, surlignage vert) */}
-      <View style={styles.containerToggle}>
-        <TouchableOpacity
-          style={styles.toggleButton}
-          onPress={() => setMode('list')}
-        >
-          <Text style={[styles.toggleText, mode === 'list' && styles.toggleTextActive]}>Contact List</Text>
-
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.toggleButton}
-          onPress={() => setMode('qr')}
-        >
-          <Text style={[styles.toggleText, mode === 'qr' && styles.toggleTextActive]}>Scan QR Code</Text>
-         
-        </TouchableOpacity>
-      </View>
-
-      {/* Affichage selon le mode */}
-      {mode === 'qr' ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', height: 300, backgroundColor: colors.darkBackground, borderRadius: 16, margin: 16 }}>
-          {/* TODO: Remplacer par composant caméra/QR code */}
-          <Text style={{ color: colors.textLight, fontSize: 18 }}>[Camera QR Scanner Placeholder]</Text>
+      {!hideToggleBar && (
+        <View style={styles.containerToggle}>
+          <TouchableOpacity
+            style={styles.toggleButton}
+            onPress={() => setMode('list')}
+          >
+            <Text style={[styles.toggleText, mode === 'list' && styles.toggleTextActive]}>Contact List</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.toggleButton}
+            onPress={() => setMode('qr')}
+          >
+            <Text style={[styles.toggleText, mode === 'qr' && styles.toggleTextActive]}>Scan QR Code</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
+      )}
+      {/* Affichage selon le mode */}
+      {(hideToggleBar || mode === 'list') ? (
         <>
-
           {/* Tabs All/Favorite/Search (design arrondi/fond) */}
           {showTabs && (
             <View style={styles.tabsContainer}>
@@ -543,6 +538,11 @@ const ContactsList: React.FC<ContactsListProps> = ({
             )}
           </ScrollView>
         </>
+      ) : (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', height: 300, backgroundColor: colors.darkBackground, borderRadius: 16, margin: 16 }}>
+          {/* TODO: Remplacer par composant caméra/QR code */}
+          <Text style={{ color: colors.textLight, fontSize: 18 }}>[Camera QR Scanner Placeholder]</Text>
+        </View>
       )}
     </View>
   );
