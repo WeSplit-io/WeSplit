@@ -131,7 +131,7 @@ export default function App() {
               <Stack.Screen name="Splash" component={SplashScreen} /> 
 
 
-              <Stack.Screen name="GetStarted" component={GetStartedScreen} />
+              <Stack.Screen name="GetStarted" component={WithdrawSuccessScreen} />
               <Stack.Screen name="AuthMethods" component={AuthMethodsScreen} />
               <Stack.Screen name="Verification" component={VerificationScreen} />
               <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />

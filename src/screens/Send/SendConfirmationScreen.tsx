@@ -257,7 +257,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.sentAmountContainer}>
           <Text style={styles.sentAmountLabel}>Sent amount</Text>
           <View style={styles.sentAmountValueContainer}>
-          <Image source={require('../../../assets/usdc-logo-black.png')} style={{ width: 32, height: 32, marginRight: 8 }} />
+          <Image source={require('../../../assets/usdc-logo-white.png')} style={{ width: 32, height: 32, marginRight: 8 }} />
             <Text style={styles.sentAmountValue}>{amount}</Text>
           </View>
           {description && (
