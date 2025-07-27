@@ -132,6 +132,11 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.xl,
   },
+  searchIconEmpty: {
+    height: 100,
+    marginBottom: spacing.md,
+    objectFit: 'contain',
+  },
   emptyText: {
     color: colors.textSecondary,
     fontSize: typography.fontSize.md,

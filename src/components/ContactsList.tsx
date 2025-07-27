@@ -514,12 +514,15 @@ const ContactsList: React.FC<ContactsListProps> = ({
                 )}
                 {!isSearching && searchQuery.trim() && searchResults.length === 0 && (
                   <View style={styles.emptyContainer}>
+                    <Image source={require('../../assets/search-empty-state.png')} style={styles.searchIconEmpty} />
                     <Text style={styles.emptyText}>No users found matching "{searchQuery}"</Text>
                   </View>
                 )}
                 {!isSearching && !searchQuery.trim() && (
                   <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>Search for users by username or email to add them to your contacts</Text>
+                    <Image source={require('../../assets/search-empty-state.png')} style={styles.searchIconEmpty} />
+
+                    <Text style={styles.emptyText}>Search users by username or email to add them to your contacts</Text>
                   </View>
                 )}
               </>
@@ -527,6 +530,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
             {/* Empty State */}
             {filteredContacts.length === 0 && (activeTab === 'All' || activeTab === 'Favorite') && (
               <View style={styles.emptyContainer}>
+                <Image source={require('../../assets/search-empty-state.png')} style={styles.searchIconEmpty} />
                 <Text style={styles.emptyText}>
                   {searchQuery.trim() !== ''
                     ? 'No contacts found matching your search'

@@ -26,8 +26,8 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
       // If we're in send mode, call the callback
       onContactSelect(contact);
     } else {
-      // Default navigation to Send screen
-      navigation.navigate('Send', { selectedContact: contact });
+      // Navigate to the new ContactAction screen with toggle
+      navigation.navigate('ContactAction', { selectedContact: contact });
     }
   };
 

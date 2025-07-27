@@ -54,6 +54,7 @@ import WalletManagementScreen from './src/screens/WalletManagement/WalletManagem
 import SeedPhraseViewScreen from './src/screens/WalletManagement/SeedPhraseViewScreen';
 import SeedPhraseVerifyScreen from './src/screens/WalletManagement/SeedPhraseVerifyScreen';
 import { ContactsScreen } from './src/screens/Contacts';
+import ContactActionScreen from './src/screens/ContactAction/ContactActionScreen';
 import TransactionHistoryScreen from './src/screens/TransactionHistory/TransactionHistoryScreen';
 
 
@@ -157,6 +158,7 @@ export default function App() {
               <Stack.Screen name="Notifications" component={NotificationsScreen} />
               <Stack.Screen name="Language" component={LanguageScreen} />
               <Stack.Screen name="Contacts" component={ContactsScreen} />
+              <Stack.Screen name="ContactAction" component={ContactActionScreen} />
               <Stack.Screen name="Send" component={SendScreen} />
               <Stack.Screen name="SendAmount" component={SendAmountScreen} />
               <Stack.Screen name="SendConfirmation" component={SendConfirmationScreen} />
