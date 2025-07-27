@@ -1,4 +1,7 @@
 import { StyleSheet } from 'react-native';
+import { colors } from '../../theme/colors';
+import { typography } from '../../theme/typography';
+import { spacing } from '../../theme/spacing';
 
 export const styles = StyleSheet.create({
   container: {
@@ -39,6 +42,12 @@ export const styles = StyleSheet.create({
   headerIcon: {
     padding: 8,
   },
+  iconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 24,
+    height: 24,
+  },
   placeholder: {
     width: 40,
   },
@@ -52,9 +61,9 @@ export const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   sectionLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#FFF',
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white,
     marginBottom: 12,
     marginTop: 8,
   },
@@ -91,25 +100,33 @@ export const styles = StyleSheet.create({
   
   // Input Styles
   textInput: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#FFF',
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: spacing.md,
+    fontSize: typography.fontSize.md,
+    color: colors.white,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.white50,
   },
   dateInput: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.white50,
   },
   dateText: {
-    fontSize: 16,
-    color: '#FFF',
+    fontSize: typography.fontSize.md,
+    color: colors.white,
+  },
+  dateIcon: {
+    width: 20,
+    height: 20,
   },
   
   // Amount Section
@@ -121,30 +138,34 @@ export const styles = StyleSheet.create({
   },
   amountInput: {
     flex: 1,
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#FFF',
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: spacing.md,
+    fontSize: typography.fontSize.md,
+    color: colors.white,
+    borderWidth: 1,
+    borderColor: colors.white50,
   },
   currencyButton: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     minWidth: 100,
+    borderWidth: 1,
+    borderColor: colors.white50,
   },
   currencyButtonText: {
-    fontSize: 16,
-    color: '#FFF',
-    fontWeight: '500',
+    fontSize: typography.fontSize.md,
+    color: colors.white,
+    fontWeight: typography.fontWeight.medium,
   },
   totalText: {
-    fontSize: 14,
-    color: '#A89B9B',
-    marginBottom: 24,
+    fontSize: typography.fontSize.md,
+    color: colors.white70,
+    marginBottom: 5,
     textAlign: 'right',
   },
   
@@ -154,14 +175,14 @@ export const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   convertingText: {
-    fontSize: 12,
-    color: '#A5EA15',
+    fontSize: typography.fontSize.sm,
+    color: colors.green,
     fontStyle: 'italic',
     marginTop: 4,
   },
   convertedText: {
-    fontSize: 12,
-    color: '#A89B9B',
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
     marginTop: 2,
   },
   
@@ -174,21 +195,21 @@ export const styles = StyleSheet.create({
   },
   splitToggle: {
     flexDirection: 'row',
-    backgroundColor: '#2A2A2A',
-    borderRadius: 8,
+    backgroundColor: colors.green10,
+    borderRadius: 16,
     padding: 4,
   },
   toggleButton: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 4,
+    borderRadius: 16,
   },
   toggleButtonActive: {
-    backgroundColor: '#A5EA15',
+    backgroundColor: colors.green,
   },
   toggleText: {
     fontSize: 14,
-    color: '#A89B9B',
+    color: colors.white70,
     fontWeight: '500',
   },
   toggleTextActive: {
@@ -208,8 +229,27 @@ export const styles = StyleSheet.create({
   memberRowSelected: {
     backgroundColor: '#3A3A3A',
   },
-  memberCheckbox: {
+  memberRadio: {
     marginRight: 12,
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#A89B9B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  radioButtonSelected: {
+    borderColor: '#A5EA15',
+  },
+  radioButtonInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#A5EA15',
   },
   checkbox: {
     width: 20,
@@ -259,6 +299,12 @@ export const styles = StyleSheet.create({
   },
   
   // Manual Amount Input Styles
+  manualAmountInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 'auto',
+  },
   manualAmountContainer: {
     backgroundColor: '#1A1A1A',
     borderRadius: 8,
@@ -279,12 +325,13 @@ export const styles = StyleSheet.create({
     gap: 8,
   },
   manualAmountInput: {
-    flex: 1,
+    width: 80,
     backgroundColor: '#2A2A2A',
     borderRadius: 8,
-    padding: 12,
+    padding: 8,
     fontSize: 14,
     color: '#FFF',
+    textAlign: 'center',
   },
   manualAmountCurrency: {
     fontSize: 14,
@@ -311,13 +358,15 @@ export const styles = StyleSheet.create({
   
   // Paid By Selector Styles
   paidBySelector: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: spacing.md,
     marginBottom: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: colors.white50,
   },
   paidByInfo: {
     flexDirection: 'row',
@@ -332,6 +381,12 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  paidByAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   paidByAvatarText: {
     color: '#212121',
@@ -342,14 +397,14 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   paidByName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#FFF',
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white,
     marginBottom: 2,
   },
   paidByEmail: {
-    fontSize: 12,
-    color: '#A89B9B',
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
   },
   
   // Paid By Modal Option Styles
@@ -357,6 +412,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    
   },
   paidByOptionAvatar: {
     width: 40,
@@ -366,6 +422,12 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  paidByOptionAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   paidByOptionAvatarText: {
     color: '#212121',
@@ -376,14 +438,14 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   paidByOptionName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#FFF',
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white,
     marginBottom: 2,
   },
   paidByOptionEmail: {
-    fontSize: 12,
-    color: '#A89B9B',
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
   },
   
   // Bottom Section
@@ -393,8 +455,8 @@ export const styles = StyleSheet.create({
     backgroundColor: '#212121',
   },
   saveButton: {
-    backgroundColor: '#A5EA15',
-    borderRadius: 12,
+    backgroundColor: colors.green,
+    borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 24,
     alignItems: 'center',
@@ -402,12 +464,17 @@ export const styles = StyleSheet.create({
     minHeight: 52,
   },
   saveButtonDisabled: {
-    backgroundColor: '#404040',
+    backgroundColor: colors.white10,
   },
   saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212121',
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.black,
+  },
+  saveButtonTextDisabled: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white70,
   },
   
   // Modal Styles
@@ -445,6 +512,7 @@ export const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#2A2A2A',
+    borderRadius: 16,
   },
   currencyOptionSelected: {
     backgroundColor: '#2A2A2A',
@@ -683,10 +751,266 @@ export const styles = StyleSheet.create({
   },
   splitSummaryValue: {
     fontSize: 16,
-    color: '#FFF',
+    color: colors.white,
     fontWeight: 'bold',
   },
   splitError: {
     color: '#FF6B6B',
+  },
+  
+  // Image Styles
+  imageContainer: {
+    marginBottom: 24,
+  },
+  receiptHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  removeReceiptButton: {
+    backgroundColor: colors.white10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  removeReceiptText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+  },
+  addReceiptButton: {
+    backgroundColor: colors.white10,
+    borderRadius: 12,
+    padding: 24,
+    borderWidth: 1.5,
+    borderColor: colors.white50,
+    borderStyle: 'dashed',
+  },
+  addReceiptContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addReceiptIcon: {
+    width: 32,
+    height: 32,
+    marginBottom: 12,
+    opacity: 0.7,
+  },
+  addReceiptText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+  },
+  selectedImageContainer: {
+    position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#2A2A2A',
+  },
+  selectedImage: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  // Camera Icon Styles
+  cameraIconContainer: {
+    position: 'relative',
+  },
+  cameraIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#A5EA15',
+    borderWidth: 1,
+    borderColor: '#212121',
+  },
+  
+  // Date Picker Styles
+  datePicker: {
+    backgroundColor: '#212121',
+  },
+  datePickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  datePickerOverlayTouchable: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  datePickerModalContent: {
+    backgroundColor: '#212121',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    paddingTop: 24,
+    maxHeight: '60%',
+    minHeight: 400,
+  },
+  datePickerHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#A89B9B',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 30,
+  },
+  datePickerModalTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#FFF',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  datePickerWrapper: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  datePickerDoneButton: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#A5EA15',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  datePickerDoneButtonText: {
+    color: '#A5EA15',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  
+  // Currency Picker Modal Styles
+  currencyModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  currencyOverlayTouchable: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  currencyModalContent: {
+    backgroundColor: '#212121',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    paddingTop: 24,
+    maxHeight: '70%',
+    minHeight: 400,
+  },
+  currencyHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#A89B9B',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 30,
+  },
+  currencyModalTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#FFF',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  currencyContent: {
+    flex: 1,
+  },
+  currencyContentContainer: {
+    paddingBottom: 20,
+  },
+  currencyDoneButton: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#A5EA15',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  currencyDoneButtonText: {
+    color: '#A5EA15',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  
+  // Paid By Modal Styles
+  paidByModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  paidByOverlayTouchable: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  paidByModalContent: {
+    backgroundColor: '#212121',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    paddingTop: 24,
+    maxHeight: '70%',
+    minHeight: 400,
+  },
+  paidByHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#A89B9B',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 30,
+  },
+  paidByModalTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#FFF',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  paidByContent: {
+    flex: 1,
+  },
+  paidByContentContainer: {
+    paddingBottom: 20,
+  },
+  paidByDoneButton: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#A5EA15',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  paidByDoneButtonText: {
+    color: '#A5EA15',
+    fontSize: 20,
+    fontWeight: '600',
   },
 }); 

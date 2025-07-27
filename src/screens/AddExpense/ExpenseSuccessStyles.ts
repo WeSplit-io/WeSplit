@@ -98,4 +98,49 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#212121',
   },
+
+  // Mockup Success Styles (matching SendSuccessScreen)
+  mockupSuccessContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  mockupSuccessIcon: {
+    width: 150,
+    height: 150,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  mockupSuccessIconImage: {
+    width: 150,
+    height: 150,
+  },
+  mockupSuccessTitle: {
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  mockupSuccessDate: {
+    color: '#A89B9B',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  mockupBackHomeButton: {
+    backgroundColor: '#A5EA15',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    alignItems: 'center',
+    width: '100%',
+  },
+  mockupBackHomeButtonText: {
+    color: '#212121',
+    fontSize: 16,
+    fontWeight: '500',
+  },
 }); 

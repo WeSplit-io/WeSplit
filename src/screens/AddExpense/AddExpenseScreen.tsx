@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, SafeAreaView, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, SafeAreaView, ActivityIndicator, Modal, Image, Platform, Switch } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import Icon from '../../components/Icon';
 import GroupIcon from '../../components/GroupIcon';
 import { useApp } from '../../context/AppContext';
@@ -8,6 +10,7 @@ import { GroupWithDetails, GroupMember } from '../../types';
 import { SOLANA_CRYPTOCURRENCIES, Cryptocurrency } from '../../utils/cryptoUtils';
 import { convertToUSDC } from '../../services/priceService';
 import { styles } from './styles';
+import { colors } from '../../theme/colors';
 
 // Updated categories with more vibrant colors matching the screenshots
 const categories = [
@@ -41,6 +44,9 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
   const [showPaidBySelector, setShowPaidBySelector] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [convertedAmount, setConvertedAmount] = useState<number | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [tempDate, setTempDate] = useState<Date>(new Date());
 
   // Use expense operations hook - Initialize with selected group ID
   const { 
@@ -351,6 +357,94 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
     updateConversionPreview();
   }, [amount, selectedCurrency.symbol]);
 
+  const handleImagePicker = async () => {
+    Alert.alert(
+      'Add Photo',
+      'Choose an option',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Take Photo', 
+          onPress: () => handleTakePhoto()
+        },
+        { 
+          text: 'Choose from Gallery', 
+          onPress: () => handleChooseFromGallery()
+        }
+      ]
+    );
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      // Request camera permissions
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant permission to access your camera');
+        return;
+      }
+
+      // Launch camera
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setSelectedImage(result.assets[0].uri);
+        console.log('Photo taken:', result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    }
+  };
+
+  const handleChooseFromGallery = async () => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant permission to access your photo library');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setSelectedImage(result.assets[0].uri);
+        console.log('Selected image:', result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (selectedDate) {
+      setTempDate(selectedDate);
+    }
+  };
+
+  const openDatePicker = () => {
+    setTempDate(date); // Initialize temp date with current date
+    setShowDatePicker(true);
+  };
+
+  const handleDoneDatePicker = () => {
+    setDate(tempDate);
+    setShowDatePicker(false);
+  };
+
   if (groupsLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -367,7 +461,10 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color="#FFF" />
+            <Image
+              source={require('../../../assets/arrow-left.png')}
+              style={styles.iconWrapper}
+            />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Add Expense</Text>
           <View style={styles.placeholder} />
@@ -393,38 +490,24 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#FFF" />
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Add Expense</Text>
-        <TouchableOpacity style={styles.headerIcon}>
-          <Icon name="camera" size={24} color="#FFF" />
+        <TouchableOpacity style={styles.headerIcon} onPress={handleImagePicker}>
+          <View style={styles.cameraIconContainer}>
+            <Image
+              source={require('../../../assets/camera-icon.png')}
+              style={styles.iconWrapper}
+            />
+            {selectedImage && <View style={styles.cameraIndicator} />}
+          </View>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollContent} contentContainerStyle={styles.content}>
-        {/* Group Selection */}
-        <Text style={styles.sectionLabel}>Select Group</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupsScroll}>
-          {groups.map((group) => (
-            <TouchableOpacity
-              key={group.id}
-              style={[
-                styles.groupCard,
-                selectedGroup?.id === group.id && styles.groupCardSelected
-              ]}
-              onPress={() => handleGroupSelect(group)}
-            >
-              <GroupIcon
-                category={group.category || 'trip'}
-                color={group.color || '#A5EA15'}
-                size={48}
-              />
-              <Text style={styles.groupLabel} numberOfLines={1}>
-                {group.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
 
         {/* Expense Name */}
         <Text style={styles.sectionLabel}>Expense Name</Text>
@@ -433,14 +516,52 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
           value={description}
           onChangeText={setDescription}
           placeholder="Expense Name"
-          placeholderTextColor="#A89B9B"
+          placeholderTextColor={colors.white70}
+          keyboardType="default"
         />
+
+        {/* Receipt Section */}
+        <View style={styles.imageContainer}>
+          <View style={styles.receiptHeader}>
+            <Text style={styles.sectionLabel}>Receipt</Text>
+            {selectedImage && (
+              <TouchableOpacity 
+                style={styles.removeReceiptButton}
+                onPress={() => setSelectedImage(null)}
+              >
+                <Text style={styles.removeReceiptText}>Remove</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          {selectedImage ? (
+            <View style={styles.selectedImageContainer}>
+              <Image source={{ uri: selectedImage }} style={styles.selectedImage} />
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={styles.addReceiptButton}
+              onPress={handleImagePicker}
+            >
+              <View style={styles.addReceiptContent}>
+                <Image
+                  source={require('../../../assets/camera-icon.png')}
+                  style={styles.addReceiptIcon}
+                />
+                <Text style={styles.addReceiptText}>Add Receipt</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Date */}
         <Text style={styles.sectionLabel}>Date</Text>
-        <TouchableOpacity style={styles.dateInput}>
+        <TouchableOpacity style={styles.dateInput} onPress={openDatePicker}>
           <Text style={styles.dateText}>{formatDate(date)}</Text>
-          <Icon name="calendar" size={20} color="#A89B9B" />
+          <Image
+            source={require('../../../assets/calendar-icon.png')}
+            style={styles.dateIcon}
+          />
         </TouchableOpacity>
 
         {/* Amount */}
@@ -449,9 +570,17 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
           <TextInput
             style={styles.amountInput}
             value={amount}
-            onChangeText={setAmount}
+            onChangeText={(text) => {
+              // Only allow numbers and decimal point
+              const filteredText = text.replace(/[^0-9.]/g, '');
+              // Ensure only one decimal point
+              const parts = filteredText.split('.');
+              if (parts.length <= 2) {
+                setAmount(filteredText);
+              }
+            }}
             placeholder="00.00"
-            placeholderTextColor="#A89B9B"
+            placeholderTextColor={colors.white70}
             keyboardType="decimal-pad"
           />
           <TouchableOpacity 
@@ -489,9 +618,17 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
         >
           <View style={styles.paidByInfo}>
             <View style={styles.paidByAvatar}>
-              <Text style={styles.paidByAvatarText}>
-                {groupMembers.find(m => m.id === paidBy)?.name?.charAt(0).toUpperCase() || '?'}
-              </Text>
+              {groupMembers.find(m => m.id === paidBy)?.avatar ? (
+                <Image
+                  source={{ uri: groupMembers.find(m => m.id === paidBy)?.avatar }}
+                  style={styles.paidByAvatarImage}
+                  defaultSource={require('../../../assets/user.png')}
+                />
+              ) : (
+                <Text style={styles.paidByAvatarText}>
+                  {groupMembers.find(m => m.id === paidBy)?.name?.charAt(0).toUpperCase() || '?'}
+                </Text>
+              )}
             </View>
             <View style={styles.paidByDetails}>
               <Text style={styles.paidByName}>
@@ -544,58 +681,61 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
             : parseFloat(customAmounts[member.id] || '0');
           
           // Determine which currency to display
-          const displayCurrency = convertedAmount && selectedCurrency.symbol !== 'USDC' ? 'USDC' : selectedCurrency.symbol;
+          const displayCurrency = selectedCurrency.symbol;
 
           return (
-            <View key={`${member.id}-${index}`}>
-              <TouchableOpacity
-                style={[styles.memberRow, isSelected && styles.memberRowSelected]}
-                onPress={() => handleMemberToggle(member.id)}
-              >
-                <View style={styles.memberCheckbox}>
-                  <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                    {isSelected && <Icon name="check" size={12} color="#212121" />}
-                  </View>
+            <TouchableOpacity 
+              key={`${member.id}-${index}`}
+              style={[styles.memberRow, isSelected && styles.memberRowSelected]}
+              onPress={() => handleMemberToggle(member.id)}
+            >
+              <View style={styles.memberRadio}>
+                <View style={[styles.radioButton, isSelected && styles.radioButtonSelected]}>
+                  {isSelected && <View style={styles.radioButtonInner} />}
                 </View>
-                
-                <View style={styles.memberAvatar}>
-                  <Text style={styles.avatarText}>
-                    {member.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                
-                <View style={styles.memberInfo}>
-                  <Text style={styles.memberName}>{member.name}</Text>
-                  <Text style={styles.memberHandle}>
-                    {member.email.split('@')[0]}...{member.email.split('@')[0].slice(-3)}
-                  </Text>
-                </View>
-                
-                {isSelected && amount && splitType === 'equal' && (
-                  <Text style={styles.memberAmount}>
-                    ${memberAmount.toFixed(2)}
-                  </Text>
-                )}
-              </TouchableOpacity>
+              </View>
               
-              {/* Manual Amount Input - Only show for selected members in manual mode */}
+              <View style={styles.memberAvatar}>
+                <Text style={styles.avatarText}>
+                  {member.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              
+              <View style={styles.memberInfo}>
+                <Text style={styles.memberName}>{member.name}</Text>
+                <Text style={styles.memberHandle}>
+                  {member.email.split('@')[0]}...{member.email.split('@')[0].slice(-3)}
+                </Text>
+              </View>
+              
+              {isSelected && amount && splitType === 'equal' && (
+                <Text style={styles.memberAmount}>
+                  ${memberAmount.toFixed(2)}
+                </Text>
+              )}
+              
               {isSelected && splitType === 'manual' && amount && (
-                <View style={styles.manualAmountContainer}>
-                  <Text style={styles.manualAmountLabel}>Amount for {member.name}:</Text>
-                  <View style={styles.manualAmountRow}>
-                    <TextInput
-                      style={styles.manualAmountInput}
-                      value={customAmounts[member.id] || '0'}
-                      onChangeText={(value) => handleManualAmountChange(member.id, value)}
-                      placeholder="0.00"
-                      placeholderTextColor="#A89B9B"
-                      keyboardType="decimal-pad"
-                    />
-                    <Text style={styles.manualAmountCurrency}>{displayCurrency}</Text>
-                  </View>
+                <View style={styles.manualAmountInline}>
+                  <TextInput
+                    style={styles.manualAmountInput}
+                    value={customAmounts[member.id] || '0'}
+                    onChangeText={(value) => {
+                      // Only allow numbers and decimal point
+                      const filteredText = value.replace(/[^0-9.]/g, '');
+                      // Ensure only one decimal point
+                      const parts = filteredText.split('.');
+                      if (parts.length <= 2) {
+                        handleManualAmountChange(member.id, filteredText);
+                      }
+                    }}
+                    placeholder="0.00"
+                    placeholderTextColor="#A89B9B"
+                    keyboardType="decimal-pad"
+                  />
+                  <Text style={styles.manualAmountCurrency}>{displayCurrency}</Text>
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
           );
         })}
       </ScrollView>
@@ -613,7 +753,12 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
           {expenseLoading ? (
             <ActivityIndicator size="small" color="#212121" />
           ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
+            <Text style={[
+              styles.saveButtonText,
+              (!description.trim() || !amount || selectedMembers.length === 0 || expenseLoading) && styles.saveButtonTextDisabled
+            ]}>
+              Save
+            </Text>
           )}
         </TouchableOpacity>
       </View>
@@ -622,40 +767,50 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
       <Modal
         visible={showCurrencyPicker}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowCurrencyPicker(false)}
+        statusBarTranslucent={true}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.currencyModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Currency</Text>
-              <TouchableOpacity onPress={() => setShowCurrencyPicker(false)}>
-                <Icon name="x" size={24} color="#FFF" />
-              </TouchableOpacity>
+        <View style={styles.currencyModalOverlay}>
+          <TouchableOpacity
+            style={styles.currencyOverlayTouchable}
+            activeOpacity={1}
+            onPress={() => setShowCurrencyPicker(false)}
+          >
+            <View style={styles.currencyModalContent}>
+              {/* Handle bar for slide down */}
+              <View style={styles.currencyHandle} />
+
+              {/* Title */}
+              <Text style={styles.currencyModalTitle}>Select Currency</Text>
+
+              <ScrollView 
+                style={styles.currencyContent} 
+                contentContainerStyle={styles.currencyContentContainer}
+                showsVerticalScrollIndicator={false}
+              >
+                {SOLANA_CRYPTOCURRENCIES.map((currency) => (
+                  <TouchableOpacity
+                    key={currency.symbol}
+                    style={[
+                      styles.currencyOption,
+                      selectedCurrency.symbol === currency.symbol && styles.currencyOptionSelected
+                    ]}
+                    onPress={() => {
+                      setSelectedCurrency(currency);
+                      setShowCurrencyPicker(false);
+                    }}
+                  >
+                    <Text style={styles.currencySymbol}>{currency.symbol}</Text>
+                    <Text style={styles.currencyName}>{currency.name}</Text>
+                    {selectedCurrency.symbol === currency.symbol && (
+                      <Icon name="check" size={20} color="#A5EA15" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
-            
-            <ScrollView>
-              {SOLANA_CRYPTOCURRENCIES.map((currency) => (
-                <TouchableOpacity
-                  key={currency.symbol}
-                  style={[
-                    styles.currencyOption,
-                    selectedCurrency.symbol === currency.symbol && styles.currencyOptionSelected
-                  ]}
-                  onPress={() => {
-                    setSelectedCurrency(currency);
-                    setShowCurrencyPicker(false);
-                  }}
-                >
-                  <Text style={styles.currencySymbol}>{currency.symbol}</Text>
-                  <Text style={styles.currencyName}>{currency.name}</Text>
-                  {selectedCurrency.symbol === currency.symbol && (
-                    <Icon name="check" size={20} color="#A5EA15" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+          </TouchableOpacity>
         </View>
       </Modal>
 
@@ -663,49 +818,119 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
       <Modal
         visible={showPaidBySelector}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowPaidBySelector(false)}
+        statusBarTranslucent={true}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.currencyModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Who Paid?</Text>
-              <TouchableOpacity onPress={() => setShowPaidBySelector(false)}>
-                <Icon name="x" size={24} color="#FFF" />
+        <View style={styles.paidByModalOverlay}>
+          <TouchableOpacity
+            style={styles.paidByOverlayTouchable}
+            activeOpacity={1}
+            onPress={() => setShowPaidBySelector(false)}
+          >
+            <View style={styles.paidByModalContent}>
+              {/* Handle bar for slide down */}
+              <View style={styles.paidByHandle} />
+
+              {/* Title */}
+              <Text style={styles.paidByModalTitle}>Who Paid?</Text>
+
+              <ScrollView 
+                style={styles.paidByContent} 
+                contentContainerStyle={styles.paidByContentContainer}
+                showsVerticalScrollIndicator={false}
+              >
+                {groupMembers.map((member) => (
+                  <TouchableOpacity
+                    key={member.id}
+                    style={[
+                      styles.currencyOption,
+                      paidBy === member.id && styles.currencyOptionSelected
+                    ]}
+                    onPress={() => {
+                      setPaidBy(member.id);
+                      setShowPaidBySelector(false);
+                    }}
+                  >
+                    <View style={styles.paidByOptionContent}>
+                      <View style={styles.paidByOptionAvatar}>
+                        {member.avatar ? (
+                          <Image
+                            source={{ uri: member.avatar }}
+                            style={styles.paidByOptionAvatarImage}
+                            defaultSource={require('../../../assets/user.png')}
+                          />
+                        ) : (
+                          <Text style={styles.paidByOptionAvatarText}>
+                            {member.name.charAt(0).toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.paidByOptionDetails}>
+                        <Text style={styles.paidByOptionName}>{member.name}</Text>
+                        <Text style={styles.paidByOptionEmail}>{member.email}</Text>
+                      </View>
+                    </View>
+                    {paidBy === member.id && (
+                      <Icon name="check" size={20} color="#A5EA15" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Done Button */}
+              <TouchableOpacity 
+                style={styles.paidByDoneButton} 
+                onPress={() => setShowPaidBySelector(false)}
+              >
+                <Text style={styles.paidByDoneButtonText}>Done</Text>
               </TouchableOpacity>
             </View>
-            
-            <ScrollView>
-              {groupMembers.map((member) => (
-                <TouchableOpacity
-                  key={member.id}
-                  style={[
-                    styles.currencyOption,
-                    paidBy === member.id && styles.currencyOptionSelected
-                  ]}
-                  onPress={() => {
-                    setPaidBy(member.id);
-                    setShowPaidBySelector(false);
-                  }}
-                >
-                  <View style={styles.paidByOptionContent}>
-                    <View style={styles.paidByOptionAvatar}>
-                      <Text style={styles.paidByOptionAvatarText}>
-                        {member.name.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.paidByOptionDetails}>
-                      <Text style={styles.paidByOptionName}>{member.name}</Text>
-                      <Text style={styles.paidByOptionEmail}>{member.email}</Text>
-                    </View>
-                  </View>
-                  {paidBy === member.id && (
-                    <Icon name="check" size={20} color="#A5EA15" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Date Picker Modal */}
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDatePicker(false)}
+        statusBarTranslucent={true}
+      >
+        <View style={styles.datePickerModalOverlay}>
+          <TouchableOpacity
+            style={styles.datePickerOverlayTouchable}
+            activeOpacity={1}
+            onPress={() => setShowDatePicker(false)}
+          >
+            <View style={styles.datePickerModalContent}>
+              {/* Handle bar for slide down */}
+              <View style={styles.datePickerHandle} />
+
+              {/* Title */}
+              <Text style={styles.datePickerModalTitle}>Select Date</Text>
+
+              <View style={styles.datePickerWrapper}>
+                <DateTimePicker
+                  value={tempDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleDateChange}
+                  style={styles.datePicker}
+                  textColor="#FFF"
+                />
+              </View>
+
+              {/* Done Button */}
+              <TouchableOpacity 
+                style={styles.datePickerDoneButton} 
+                onPress={handleDoneDatePicker}
+              >
+                <Text style={styles.datePickerDoneButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
         </View>
       </Modal>
     </SafeAreaView>

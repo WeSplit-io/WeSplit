@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, Image } from 'react-native';
 import Icon from '../../components/Icon';
+import { colors } from '../../theme';
 import { styles } from './ExpenseSuccessStyles';
 
 const ExpenseSuccessScreen: React.FC<any> = ({ navigation, route }) => {
@@ -40,60 +41,89 @@ const ExpenseSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   });
 
   const handleGoBack = () => {
-    // Navigate back to the group or dashboard
-    navigation.navigate('Dashboard');
+    // Navigate back to the group
+    navigation.navigate('GroupDetails', { groupId: route.params.groupId });
+  };
+
+  // Format current date
+  const getCurrentDate = () => {
+    const date = new Date();
+    const options: Intl.DateTimeFormatOptions = { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    };
+    return date.toLocaleDateString('en-US', options);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        {/* Success Icon */}
-        <View style={styles.successIcon}>
-          <Icon name="check" size={48} color="#212121" />
-        </View>
+    <SafeAreaView style={{flex: 1, backgroundColor: colors.darkBackground}}>
+      <View style={[styles.mockupSuccessContainer, {flex: 1, justifyContent: 'space-between', paddingBottom: 0}]}>  
+        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+          {/* Success Icon */}
+          <View style={styles.mockupSuccessIcon}>
+            <Image source={require('../../../assets/success-icon.png')} style={styles.mockupSuccessIconImage} />
+          </View>
 
-        {/* Success Message */}
-        <Text style={styles.successTitle}>Expense added</Text>
-        <Text style={styles.successDate}>
-          {new Date().toLocaleDateString('en-US', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-          })}
-        </Text>
-
-        {/* Amount Card */}
-        <View style={styles.amountCard}>
-          <Text style={styles.expenseLabel}>Expense Name</Text>
-          <Text style={styles.mainAmount}>
-            {amount} {currency}
+          {/* Success Title */}
+          <Text style={[styles.mockupSuccessTitle, {
+            fontSize: 24,
+            marginBottom: 8,
+          }]}> 
+            Expense Added
           </Text>
-          {showConversion && (
-            <Text style={styles.conversionAmount}>
-              {convertedAmount.toFixed(2)} {convertedCurrency}
+
+          {/* Date */}
+          <Text style={[styles.mockupSuccessDate, {
+            fontSize: 16,
+            marginBottom: 40,
+          }]}>{getCurrentDate()}</Text>
+
+          {/* Amount Card */}
+         {/* <View style={styles.amountCard}>
+            <Text style={styles.expenseLabel}>Expense Name</Text>
+            <Text style={styles.mainAmount}>
+              {amount} {currency}
             </Text>
-          )}
-        </View>
+            {showConversion && (
+              <Text style={styles.conversionAmount}>
+                {convertedAmount.toFixed(2)} {convertedCurrency}
+              </Text>
+            )}
+          </View>*/}
 
-        {/* Details */}
-        <View style={styles.detailsContainer}>
-          <Text style={styles.detailText}>
-            Added to "{groupName}" group
-          </Text>
-          <Text style={styles.detailText}>
-            Split between {memberCount} member{memberCount > 1 ? 's' : ''}
-          </Text>
-          <Text style={styles.detailText}>
-            Description: {description}
-          </Text>
+          {/* Details */}
+          {/*<View style={styles.detailsContainer}>
+            <Text style={styles.detailText}>
+              Added to "{groupName}" group
+            </Text>
+            <Text style={styles.detailText}>
+              Split between {memberCount} member{memberCount > 1 ? 's' : ''}
+            </Text>
+            <Text style={styles.detailText}>
+              Description: {description}
+            </Text>
+          </View>*/}
         </View>
-      </View>
-
-      {/* Bottom Button */}
-      <View style={styles.bottomContainer}>
-        <TouchableOpacity style={styles.goBackButton} onPress={handleGoBack}>
-          <Text style={styles.goBackButtonText}>Go Back</Text>
-        </TouchableOpacity>
+        {/* Back Home Button collé en bas */}
+        <View style={{width: '100%', paddingBottom: 24, alignItems: 'center'}}>
+          <TouchableOpacity 
+            style={[styles.mockupBackHomeButton, {
+              paddingVertical: 16,
+              paddingHorizontal: 48,
+              borderRadius: 12,
+              minWidth: '70%',
+            }]} 
+            onPress={handleGoBack}
+          >
+            <Text style={[styles.mockupBackHomeButtonText, {
+              fontSize: 16,
+              fontWeight: '600',
+            }]}> 
+              Go Back
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
