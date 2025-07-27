@@ -32,6 +32,8 @@ import CreateProfileScreen from './src/screens/CreateProfile/CreateProfileScreen
 import OnboardingScreen from './src/screens/Onboarding/OnboardingScreen';
 import EditExpenseScreen from './src/screens/EditExpense/EditExpenseScreen';
 import DepositScreen from './src/screens/Deposit/DepositScreen';
+import CryptoTransferScreen from './src/screens/Deposit/CryptoTransferScreen';
+import MoonPayWebViewScreen from './src/screens/Deposit/MoonPayWebViewScreen';
 import AccountSettingsScreen from './src/screens/AccountSettings/AccountSettingsScreen';
 import PremiumScreen from './src/screens/Premium/PremiumScreen';
 import NotificationsScreen from './src/screens/Notifications/NotificationsScreen';
@@ -147,6 +149,8 @@ export default function App() {
               <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} />
               <Stack.Screen name="Profile" component={ProfileScreen} />
               <Stack.Screen name="Deposit" component={DepositScreen} />
+              <Stack.Screen name="CryptoTransfer" component={CryptoTransferScreen} />
+              <Stack.Screen name="MoonPayWebView" component={MoonPayWebViewScreen} />
               <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
               <Stack.Screen name="Premium" component={PremiumScreen} />
               <Stack.Screen name="Notifications" component={NotificationsScreen} />

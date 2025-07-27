@@ -21,7 +21,7 @@ export const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.textLight,
+    color: colors.white,
   },
   placeholder: {
     width: 40,
