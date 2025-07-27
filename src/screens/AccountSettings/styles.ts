@@ -10,13 +10,19 @@ export default StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.darkBackground,
   },
   backButton: {
     padding: spacing.sm,
+  },
+  iconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 24,
+    height: 24,
   },
   headerTitle: {
     fontSize: typography.fontSize.lg,
@@ -26,9 +32,24 @@ export default StyleSheet.create({
   placeholder: {
     width: spacing.xxl + spacing.sm,
   },
-  content: {
+  mainContent: {
+    flex: 1,
+  },
+  scrollContent: {
     flex: 1,
     padding: spacing.xl,
+  },
+  bottomSpacing: {
+    height: spacing.xl,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl + spacing.md,
+    backgroundColor: colors.darkBackground,
   },
   
   // Profile Picture
@@ -37,32 +58,50 @@ export default StyleSheet.create({
     marginBottom: spacing.xl,
     position: 'relative',
   },
-  profilePicture: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.primaryGreen,
+  avatarContainer: {
+    width: 140,
+    height: 140,
+    borderRadius: 170,
+    backgroundColor: 'rgba(165, 234, 21, 0.10)',
+    borderWidth: 0.5,
+    borderColor: colors.white50,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    position: 'relative',
   },
-  profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  avatarImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 170,
   },
-  editPictureButton: {
+  avatarPlaceholder: {
+    width: 140,
+    height: 140,
+    borderRadius: 170,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarIcon: {
+    width: 64,
+    height: 64,
+    tintColor: colors.textLight,
+    opacity: 0.9,
+  },
+  cameraIconContainer: {
     position: 'absolute',
-    bottom: spacing.md,
-    right: '35%',
-    backgroundColor: colors.primaryGreen,
-    borderRadius: 12,
-    width: 24,
-    height: 24,
+    bottom: 0,
+    right: 0,
+    width: spacing.xl,
+    height: spacing.xl,
+    borderRadius: spacing.md,
+    backgroundColor: '#A5EA15',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.darkBackground,
+  },
+  cameraIcon: {
+    width: 16,
+    height: 16,
+    tintColor: colors.black,
   },
   
   // Input Groups
@@ -111,15 +150,20 @@ export default StyleSheet.create({
   
   // Save Button
   saveButton: {
-    backgroundColor: colors.primaryGreen,
-    borderRadius: spacing.lg,
-    paddingVertical: spacing.lg,
+    backgroundColor: colors.green,
+    borderRadius: 16,
+    paddingVertical: 20,
     alignItems: 'center',
-    marginBottom: spacing.xl,
+  },
+  saveButtonDisabled: {
+    backgroundColor: colors.white10,
   },
   saveButtonText: {
     color: colors.black,
     fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  saveButtonTextDisabled: {
+    color: colors.white50,
   },
 }); 

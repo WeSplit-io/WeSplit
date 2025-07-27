@@ -54,6 +54,7 @@ import WalletManagementScreen from './src/screens/WalletManagement/WalletManagem
 import SeedPhraseViewScreen from './src/screens/WalletManagement/SeedPhraseViewScreen';
 import SeedPhraseVerifyScreen from './src/screens/WalletManagement/SeedPhraseVerifyScreen';
 import { ContactsScreen } from './src/screens/Contacts';
+import TransactionHistoryScreen from './src/screens/TransactionHistory/TransactionHistoryScreen';
 
 
 const Stack = createStackNavigator();
@@ -131,7 +132,7 @@ export default function App() {
               <Stack.Screen name="Splash" component={SplashScreen} /> 
 
 
-              <Stack.Screen name="GetStarted" component={WithdrawSuccessScreen} />
+              <Stack.Screen name="GetStarted" component={GetStartedScreen} />
               <Stack.Screen name="AuthMethods" component={AuthMethodsScreen} />
               <Stack.Screen name="Verification" component={VerificationScreen} />
               <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
@@ -171,6 +172,7 @@ export default function App() {
               <Stack.Screen name="WalletManagement" component={WalletManagementScreen} />
               <Stack.Screen name="SeedPhraseView" component={SeedPhraseViewScreen} />
               <Stack.Screen name="SeedPhraseVerify" component={SeedPhraseVerifyScreen} />
+              <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
             </Stack.Navigator>
           </NavigationContainer>
         </AppProvider>

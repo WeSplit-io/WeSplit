@@ -10,13 +10,19 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
     backgroundColor: colors.darkBackground,
-    borderBottomWidth: spacing.borderWidthThin,
-    borderBottomColor: colors.border,
   },
   backButton: {
     padding: spacing.sm,
+  },
+  iconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 24,
+    height: 24,
   },
   headerTitle: {
     fontSize: typography.fontSize.lg,
@@ -42,12 +48,13 @@ export const styles = StyleSheet.create({
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   profileAvatar: {
     width: 60,
@@ -63,30 +70,61 @@ export const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
   },
+  avatarFallback: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.brandGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.darkBackground,
+  },
   profileInfo: {
     flex: 1,
   },
   profileName: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: 20,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.textLight,
-    marginBottom: spacing.xs,
+    marginBottom: 8,
   },
   profileId: {
     fontSize: typography.fontSize.sm,
     color: colors.textLightSecondary,
+  },
+  editIcon: {
+    width: 30,
+    height: 30,
+    tintColor: colors.white,
+    objectFit: 'contain',
+  },
+  menuIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.white,
+    objectFit: 'contain',
+  },
+  chevronIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.textLightSecondary,
+    objectFit: 'contain',
   },
   
   // Menu Items
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.lg,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.white10,
   },
   menuItemText: {
     flex: 1,
@@ -96,15 +134,15 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
   },
   logoutText: {
-    color: '#FF6B6B',
+    color: colors.white,
   },
   
   // Section Titles
   sectionTitle: {
-    fontSize: typography.fontSize.md,
+    fontSize: 18,
     color: colors.textLight,
-    marginTop: spacing.xl,
-    marginBottom: spacing.md,
+    marginTop: 20,
+    marginBottom: 20,
     fontWeight: typography.fontWeight.medium,
   },
   

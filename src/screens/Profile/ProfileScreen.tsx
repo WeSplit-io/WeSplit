@@ -5,6 +5,19 @@ import NavBar from '../../components/NavBar';
 import { useApp } from '../../context/AppContext';
 import { styles } from './styles';
 
+// Helper function to safely load images with fallback
+const SafeImage = ({ source, style, fallbackSource }: any) => {
+  const [hasError, setHasError] = useState(false);
+  
+  return (
+    <Image
+      source={hasError ? fallbackSource : source}
+      style={style}
+      onError={() => setHasError(true)}
+    />
+  );
+};
+
 const ProfileScreen: React.FC<any> = ({ navigation }) => {
   const { state, logoutUser } = useApp();
   const { currentUser } = state;
@@ -42,6 +55,10 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
     navigation.navigate('WalletManagement');
   };
 
+  const handleTransactionHistory = () => {
+    navigation.navigate('TransactionHistory');
+  };
+
   const handleVerifyAccount = () => {
     Alert.alert('Verify Account', 'Account verification feature coming soon!');
   };
@@ -70,60 +87,128 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#FFF" />
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profil</Text>
+        <Text style={styles.headerTitle}>Profile</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Header Card */}
-        <View style={styles.profileCard}>
+        <TouchableOpacity style={styles.profileCard} onPress={handleAccountInfo}>
           <View style={styles.profileAvatar}>
-            <Image 
-              source={{ uri: currentUser?.avatar }} 
-              style={styles.avatarImage}
-              defaultSource={require('../../../assets/user.png')}
-            />
+            {currentUser?.avatar && currentUser.avatar.trim() !== '' ? (
+              <Image 
+                source={{ uri: currentUser.avatar }} 
+                style={styles.avatarImage}
+                defaultSource={require('../../../assets/user.png')}
+                onError={() => {
+                  // If the avatar fails to load, we could set a fallback state here
+                  console.log('Failed to load avatar image');
+                }}
+              />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarFallbackText}>
+                  {displayName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{displayName}</Text>
             <Text style={styles.profileId}>{displayId}</Text>
           </View>
           <TouchableOpacity style={styles.editButton}>
-            <Icon name="edit-2" size={20} color="#FFF" />
+            <Image
+              source={require('../../../assets/icon-edit-white70.png')}
+              style={styles.editIcon}
+            />
           </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
 
         {/* Account Details Section */}
         <Text style={styles.sectionTitle}>Account details</Text>
         
         <TouchableOpacity style={styles.menuItem} onPress={handleAccountInfo}>
-          <Icon name="file-text" size={20} color="#A5EA15" />
+          <SafeImage 
+            source={require('../../../assets/profil-account-icon.png')} 
+            style={styles.menuIcon}
+            fallbackSource={require('../../../assets/user.png')}
+          />
           <Text style={styles.menuItemText}>Account info</Text>
-          <Icon name="chevron-right" size={20} color="#A89B9B" />
+          <SafeImage 
+            source={require('../../../assets/chevron-right.png')} 
+            style={styles.chevronIcon}
+            fallbackSource={require('../../../assets/arrow-left.png')}
+          />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={handleWallet}>
-          <Icon name="credit-card" size={20} color="#A5EA15" />
+          <SafeImage 
+            source={require('../../../assets/profil-wallet-icon.png')} 
+            style={styles.menuIcon}
+            fallbackSource={require('../../../assets/user.png')}
+          />
           <Text style={styles.menuItemText}>Wallet</Text>
-          <Icon name="chevron-right" size={20} color="#A89B9B" />
+          <SafeImage 
+            source={require('../../../assets/chevron-right.png')} 
+            style={styles.chevronIcon}
+            fallbackSource={require('../../../assets/arrow-left.png')}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={handleTransactionHistory}>
+          <SafeImage 
+            source={require('../../../assets/profil-history-icon.png')} 
+            style={styles.menuIcon}
+            fallbackSource={require('../../../assets/user.png')}
+          />
+          <Text style={styles.menuItemText}>Transaction History</Text>
+          <SafeImage 
+            source={require('../../../assets/chevron-right.png')} 
+            style={styles.chevronIcon}
+            fallbackSource={require('../../../assets/arrow-left.png')}
+          />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={handleVerifyAccount}>
-          <Icon name="check-circle" size={20} color="#A5EA15" />
+          <SafeImage 
+            source={require('../../../assets/profil-verify-icon.png')} 
+            style={styles.menuIcon}
+            fallbackSource={require('../../../assets/user.png')}
+          />
           <Text style={styles.menuItemText}>Verify account</Text>
-          <Icon name="chevron-right" size={20} color="#A89B9B" />
+          <SafeImage 
+            source={require('../../../assets/chevron-right.png')} 
+            style={styles.chevronIcon}
+            fallbackSource={require('../../../assets/arrow-left.png')}
+          />
         </TouchableOpacity>
           
         <TouchableOpacity style={styles.menuItem} onPress={handleReferralFriend}>
-          <Icon name="users" size={20} color="#A5EA15" />
-          <Text style={styles.menuItemText}>Referal Friend</Text>
-          <Icon name="chevron-right" size={20} color="#A89B9B" />
+          <SafeImage 
+            source={require('../../../assets/profil-referal-icon.png')} 
+            style={styles.menuIcon}
+            fallbackSource={require('../../../assets/user.png')}
+          />
+          <Text style={styles.menuItemText}>Referral Friend</Text>
+          <SafeImage 
+            source={require('../../../assets/chevron-right.png')} 
+            style={styles.chevronIcon}
+            fallbackSource={require('../../../assets/arrow-left.png')}
+          />
         </TouchableOpacity>
 
         <View style={styles.menuItem}>
-          <Icon name="smartphone" size={20} color="#A5EA15" />
+          <SafeImage 
+            source={require('../../../assets/profil-scan-id.png')} 
+            style={styles.menuIcon}
+            fallbackSource={require('../../../assets/user.png')}
+          />
           <Text style={styles.menuItemText}>Set up Face ID</Text>
           <Switch
             value={faceIdEnabled}
@@ -137,21 +222,45 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
         <Text style={styles.sectionTitle}>Help and Support</Text>
         
         <TouchableOpacity style={styles.menuItem} onPress={handleHelpCenter}>
-          <Icon name="help-circle" size={20} color="#A5EA15" />
+          <SafeImage 
+            source={require('../../../assets/profil-help-icon.png')} 
+            style={styles.menuIcon}
+            fallbackSource={require('../../../assets/user.png')}
+          />
           <Text style={styles.menuItemText}>Help Center</Text>
-          <Icon name="chevron-right" size={20} color="#A89B9B" />
+          <SafeImage 
+            source={require('../../../assets/chevron-right.png')} 
+            style={styles.chevronIcon}
+            fallbackSource={require('../../../assets/arrow-left.png')}
+          />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={handleFAQ}>
-          <Icon name="file-text" size={20} color="#A5EA15" />
+          <SafeImage 
+            source={require('../../../assets/profil-faq-icon.png')} 
+            style={styles.menuIcon}
+            fallbackSource={require('../../../assets/user.png')}
+          />
           <Text style={styles.menuItemText}>FAQ</Text>
-          <Icon name="chevron-right" size={20} color="#A89B9B" />
+          <SafeImage 
+            source={require('../../../assets/chevron-right.png')} 
+            style={styles.chevronIcon}
+            fallbackSource={require('../../../assets/arrow-left.png')}
+          />
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.menuItem, { marginBottom: 0 }]} onPress={handleLogout}>
-          <Icon name="log-out" size={20} color="#FF6B6B" />
+          <SafeImage 
+            source={require('../../../assets/profil-logout-icon.png')} 
+            style={styles.menuIcon}
+            fallbackSource={require('../../../assets/user.png')}
+          />
           <Text style={[styles.menuItemText, styles.logoutText]}>Log Out</Text>
-          <Icon name="chevron-right" size={20} color="#A89B9B" />
+          <SafeImage 
+            source={require('../../../assets/chevron-right.png')} 
+            style={styles.chevronIcon}
+            fallbackSource={require('../../../assets/arrow-left.png')}
+          />
         </TouchableOpacity>
         
         {/* Extra space at bottom for NavBar */}

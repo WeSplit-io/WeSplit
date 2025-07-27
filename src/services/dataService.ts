@@ -14,9 +14,11 @@ import {
 } from '../types';
 import { apiRequest, getBackendURL } from '../config/api';
 
-// Cache configuration
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+// Enhanced cache with rate limiting protection
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes instead of 5
+const RATE_LIMIT_PROTECTION = 2 * 60 * 1000; // 2 minutes minimum between requests for same endpoint
 const cache = new Map<string, { data: any; timestamp: number }>();
+const lastRequestTime = new Map<string, number>();
 
 // Cache utilities
 const getCacheKey = (endpoint: string, params?: any): string => {
@@ -113,30 +115,56 @@ const calculateUserBalance = (expenses: Expense[], members: GroupMember[], userI
   return balance;
 };
 
-// Generic API request handler with caching
+// Generic API request handler with enhanced caching and rate limiting
 const makeApiRequest = async <T>(
   endpoint: string,
   options: RequestInit = {},
   useCache: boolean = true
 ): Promise<T> => {
   const cacheKey = getCacheKey(endpoint, options.body);
+  const now = Date.now();
+  
+  // Check if we're making requests too frequently for this endpoint
+  const lastRequest = lastRequestTime.get(cacheKey) || 0;
+  const timeSinceLastRequest = now - lastRequest;
+  
+  if (timeSinceLastRequest < RATE_LIMIT_PROTECTION) {
+    console.log(`⏳ Rate limit protection: waiting ${RATE_LIMIT_PROTECTION - timeSinceLastRequest}ms before next request to ${endpoint}`);
+    await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_PROTECTION - timeSinceLastRequest));
+  }
   
   // Check cache for GET requests
   if (options.method !== 'POST' && options.method !== 'PUT' && options.method !== 'DELETE' && useCache) {
     const cached = getFromCache<T>(cacheKey);
     if (cached) {
+      console.log(`📦 Using cached data for: ${endpoint}`);
       return cached;
     }
   }
   
-  const data = await apiRequest<T>(endpoint, options, 2); // Use 2 retries
+  // Update last request time
+  lastRequestTime.set(cacheKey, Date.now());
   
-  // Cache successful GET requests
-  if (options.method !== 'POST' && options.method !== 'PUT' && options.method !== 'DELETE' && useCache) {
-    setCache(cacheKey, data);
+  try {
+    const data = await apiRequest<T>(endpoint, options, 3); // Use 3 retries
+    
+    // Cache successful GET requests
+    if (options.method !== 'POST' && options.method !== 'PUT' && options.method !== 'DELETE' && useCache) {
+      setCache(cacheKey, data);
+    }
+    
+    return data;
+  } catch (error) {
+    // If we get a 429 error, try to return cached data if available
+    if (error instanceof Error && error.message.includes('Rate limit')) {
+      const cached = getFromCache<T>(cacheKey);
+      if (cached) {
+        console.log(`📦 Returning cached data due to rate limit for: ${endpoint}`);
+        return cached;
+      }
+    }
+    throw error;
   }
-  
-  return data;
 };
 
 // User services

@@ -25,6 +25,7 @@ import { multiSigService } from '../../services/multiSigService';
 import { MultiSignStateService } from '../../services/multiSignStateService';
 import { useWalletCreation } from '../../hooks/useWalletCreation';
 import { colors } from '../../theme/colors';
+import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
 import QRCodeModal from '../../components/QRCodeModal';
 
@@ -169,17 +170,53 @@ const WalletManagementScreen: React.FC = () => {
           currentUser.id.toString()
         );
 
-        // Transform transactions for display
-        const formattedTransactions = userTransactions.map(tx => ({
-          id: tx.id,
-          type: tx.type || 'send',
-          recipient: tx.to_user || 'Unknown',
-          note: tx.note || '',
-          amount: tx.amount || 0,
-          date: tx.created_at || new Date().toISOString(),
-        }));
+        // Transform transactions for display with enhanced data
+        const formattedTransactions = await Promise.all(
+          userTransactions.map(async (tx) => {
+            // Determine if this is an incoming or outgoing transaction
+            const isIncoming = tx.to_user === currentUser.id.toString();
+            const isOutgoing = tx.from_user === currentUser.id.toString();
+            
+            // Get recipient/sender name
+            let recipientName = 'Unknown';
+            let senderName = 'Unknown';
+            
+            try {
+              if (isIncoming && tx.from_user) {
+                const sender = await firebaseDataService.user.getCurrentUser(tx.from_user);
+                senderName = sender.name || 'Unknown';
+              }
+              if (isOutgoing && tx.to_user) {
+                const recipient = await firebaseDataService.user.getCurrentUser(tx.to_user);
+                recipientName = recipient.name || 'Unknown';
+              }
+            } catch (error) {
+              console.log('Could not fetch user details for transaction:', tx.id);
+            }
+
+            return {
+              id: tx.id,
+              type: tx.type || 'send',
+              recipient: isIncoming ? senderName : recipientName,
+              sender: isOutgoing ? senderName : recipientName,
+              note: tx.note || '',
+              amount: tx.amount || 0,
+              date: tx.created_at || new Date().toISOString(),
+              status: tx.status || 'pending',
+              currency: tx.currency || 'USDC',
+              from_user: tx.from_user,
+              to_user: tx.to_user,
+              isIncoming,
+              isOutgoing
+            };
+          })
+        );
 
         setTransactions(formattedTransactions);
+        
+        if (__DEV__) {
+          console.log('✅ Loaded transactions:', formattedTransactions.length);
+        }
       } catch (error) {
         console.error('Error loading transactions:', error);
         // Fallback to empty array
@@ -243,19 +280,49 @@ const WalletManagementScreen: React.FC = () => {
         const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
         setAppWalletBalance(balance);
 
-        // Refresh transactions
+        // Refresh transactions with enhanced data
         const userTransactions = await firebaseDataService.transaction.getUserTransactions(
           currentUser.id.toString()
         );
 
-        const formattedTransactions = userTransactions.map(tx => ({
-          id: tx.id,
-          type: tx.type || 'send',
-          recipient: tx.to_user || 'Unknown',
-          note: tx.note || '',
-          amount: tx.amount || 0,
-          date: tx.created_at || new Date().toISOString(),
-        }));
+        const formattedTransactions = await Promise.all(
+          userTransactions.map(async (tx) => {
+            const isIncoming = tx.to_user === currentUser.id.toString();
+            const isOutgoing = tx.from_user === currentUser.id.toString();
+            
+            let recipientName = 'Unknown';
+            let senderName = 'Unknown';
+            
+            try {
+              if (isIncoming && tx.from_user) {
+                const sender = await firebaseDataService.user.getCurrentUser(tx.from_user);
+                senderName = sender.name || 'Unknown';
+              }
+              if (isOutgoing && tx.to_user) {
+                const recipient = await firebaseDataService.user.getCurrentUser(tx.to_user);
+                recipientName = recipient.name || 'Unknown';
+              }
+            } catch (error) {
+              console.log('Could not fetch user details for transaction:', tx.id);
+            }
+
+            return {
+              id: tx.id,
+              type: tx.type || 'send',
+              recipient: isIncoming ? senderName : recipientName,
+              sender: isOutgoing ? senderName : recipientName,
+              note: tx.note || '',
+              amount: tx.amount || 0,
+              date: tx.created_at || new Date().toISOString(),
+              status: tx.status || 'pending',
+              currency: tx.currency || 'USDC',
+              from_user: tx.from_user,
+              to_user: tx.to_user,
+              isIncoming,
+              isOutgoing
+            };
+          })
+        );
 
         setTransactions(formattedTransactions);
 
@@ -283,8 +350,8 @@ const WalletManagementScreen: React.FC = () => {
   };
 
   const handleViewTransactions = () => {
-    // Navigate to a full transactions screen
-    Alert.alert('View All Transactions', 'This will open a full transaction history screen');
+    // Navigate to transaction history screen
+    navigation.navigate('TransactionHistory');
   };
 
   const handleMultiSignToggle = async (value: boolean) => {
@@ -583,27 +650,104 @@ const WalletManagementScreen: React.FC = () => {
             hour12: true
           });
 
+          const transactionDate = new Date(transaction.date).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric'
+          });
+
+          // Determine transaction type and styling using enhanced data
+          const isIncoming = transaction.isIncoming || transaction.type === 'receive';
+          const isOutgoing = transaction.isOutgoing || transaction.type === 'send';
+          const isDeposit = transaction.type === 'deposit';
+          const isWithdraw = transaction.type === 'withdraw';
+
+          // Get appropriate icon and color
+          let transactionIcon;
+          let transactionColor;
+          let transactionTitle;
+          let transactionSubtitle;
+
+          if (isIncoming) {
+            transactionIcon = require('../../../assets/icon-receive.png');
+            transactionColor = colors.primaryGreen;
+            transactionTitle = `Received from ${transaction.recipient}`;
+            transactionSubtitle = `+$${transaction.amount.toFixed(2)}`;
+          } else if (isOutgoing) {
+            transactionIcon = require('../../../assets/icon-send.png');
+            transactionColor = colors.textLight;
+            transactionTitle = `Sent to ${transaction.recipient}`;
+            transactionSubtitle = `-$${transaction.amount.toFixed(2)}`;
+          } else if (isDeposit) {
+            transactionIcon = require('../../../assets/icon-deposit.png');
+            transactionColor = colors.primaryGreen;
+            transactionTitle = 'Deposit';
+            transactionSubtitle = `+$${transaction.amount.toFixed(2)}`;
+          } else if (isWithdraw) {
+            transactionIcon = require('../../../assets/icon-withdraw.png');
+            transactionColor = colors.textLight;
+            transactionTitle = 'Withdrawal';
+            transactionSubtitle = `-$${transaction.amount.toFixed(2)}`;
+          } else {
+            transactionIcon = require('../../../assets/icon-send.png');
+            transactionColor = colors.textLight;
+            transactionTitle = transaction.recipient || 'Unknown';
+            transactionSubtitle = `$${transaction.amount.toFixed(2)}`;
+          }
+
           return (
-            <View key={transaction.id} style={styles.transactionItem}>
-              <View style={styles.transactionInfo}>
-                <Text style={styles.transactionTitle}>
-                  {transaction.type === 'send' ? 'Send to' : 'Received from'} {transaction.recipient}
+            <TouchableOpacity 
+              key={transaction.id} 
+              style={styles.requestItemNew}
+              onPress={() => {
+                // Navigate to transaction details or show modal
+                Alert.alert(
+                  'Transaction Details',
+                  `Type: ${transaction.type}\nAmount: $${transaction.amount.toFixed(2)}\nStatus: ${transaction.status}\nDate: ${transactionDate} ${transactionTime}\n${transaction.note ? `Note: ${transaction.note}` : ''}`,
+                  [{ text: 'OK' }]
+                );
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.transactionAvatarNew, { backgroundColor: transactionColor }]}>
+                <Image source={transactionIcon} style={styles.transactionIcon} />
+              </View>
+              
+              <View style={styles.transactionDetails}>
+                <Text style={styles.transactionTitle}>{transactionTitle}</Text>
+                <Text style={styles.transactionSubtitle}>
+                  {transactionDate} • {transactionTime}
                 </Text>
                 {transaction.note && (
                   <Text style={styles.transactionNote}>{transaction.note}</Text>
                 )}
               </View>
-              <Text style={styles.transactionAmount}>
-                {transaction.amount.toFixed(2)}
-              </Text>
-            </View>
+              
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={[
+                  styles.transactionAmount,
+                  { color: isIncoming || isDeposit ? colors.primaryGreen : colors.textLight }
+                ]}>
+                  {isIncoming || isDeposit ? '+' : isOutgoing || isWithdraw ? '-' : ''}
+                  ${transaction.amount.toFixed(2)}
+                </Text>
+                <Text style={styles.transactionSource}>
+                  {transaction.status === 'completed' ? 'Completed' : 
+                   transaction.status === 'pending' ? 'Pending' : 
+                   transaction.status === 'failed' ? 'Failed' : 'Unknown'}
+                </Text>
+              </View>
+            </TouchableOpacity>
           );
         })
       ) : (
         <View style={styles.emptyTransactions}>
+          <Image 
+            source={require('../../../assets/group-enpty-state.png')} 
+            style={{ width: 80, height: 80, marginBottom: spacing.md, opacity: 0.5 }}
+          />
           <Text style={styles.emptyTransactionsText}>No transactions yet</Text>
           <Text style={styles.emptyTransactionsSubtext}>
-            Your transaction history will appear here
+            Your transaction history will appear here once you start sending or receiving money
           </Text>
         </View>
       )}
@@ -716,6 +860,9 @@ const WalletManagementScreen: React.FC = () => {
 
         {/* Transactions Section */}
         {renderTransactions()}
+
+        {/* Add some bottom padding for better scrolling experience */}
+        <View style={{ height: 20 }} />
 
       </ScrollView>
 

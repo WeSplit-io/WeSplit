@@ -435,6 +435,13 @@ export const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 
+  transactionSource: {
+    color: colors.textLightSecondary,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.normal,
+    marginTop: spacing.xs / 2,
+  },
+
   emptyTransactions: {
     alignItems: 'center',
     paddingVertical: spacing.xl,

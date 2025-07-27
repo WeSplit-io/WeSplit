@@ -1279,32 +1279,54 @@ export const firebaseExpenseService = {
 export const firebaseTransactionService = {
   getUserTransactions: async (userId: string): Promise<Transaction[]> => {
     try {
+      console.log('🔥 firebaseTransactionService.getUserTransactions called with userId:', userId);
+      
       const transactionsRef = collection(db, 'transactions');
+      
+      // Query for transactions where user is the sender
       const fromQuery = query(
         transactionsRef,
         where('from_user', '==', userId),
         orderBy('created_at', 'desc')
       );
+      console.log('🔥 Querying transactions where from_user ==', userId);
       const fromDocs = await getDocs(fromQuery);
+      console.log('🔥 Found', fromDocs.docs.length, 'transactions where user is sender');
       
+      // Query for transactions where user is the receiver
       const toQuery = query(
         transactionsRef,
         where('to_user', '==', userId),
         orderBy('created_at', 'desc')
       );
+      console.log('🔥 Querying transactions where to_user ==', userId);
       const toDocs = await getDocs(toQuery);
+      console.log('🔥 Found', toDocs.docs.length, 'transactions where user is receiver');
       
       const allTransactions = [
-        ...fromDocs.docs.map(doc => firebaseDataTransformers.firestoreToTransaction(doc)),
-        ...toDocs.docs.map(doc => firebaseDataTransformers.firestoreToTransaction(doc))
+        ...fromDocs.docs.map(doc => {
+          const transaction = firebaseDataTransformers.firestoreToTransaction(doc);
+          console.log('🔥 Sender transaction:', transaction);
+          return transaction;
+        }),
+        ...toDocs.docs.map(doc => {
+          const transaction = firebaseDataTransformers.firestoreToTransaction(doc);
+          console.log('🔥 Receiver transaction:', transaction);
+          return transaction;
+        })
       ];
       
       // Sort by created_at descending
-      return allTransactions.sort((a, b) => 
+      const sortedTransactions = allTransactions.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
+      
+      console.log('🔥 Total transactions found:', sortedTransactions.length);
+      console.log('🔥 All transactions:', sortedTransactions);
+      
+      return sortedTransactions;
     } catch (error) {
-      if (__DEV__) { console.error('🔥 Error getting user transactions:', error); }
+      console.error('🔥 Error getting user transactions:', error);
       return [];
     }
   },

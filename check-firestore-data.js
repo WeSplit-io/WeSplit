@@ -3,80 +3,74 @@
  * This will help us understand if the data migration is needed
  */
 
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase/app');
+const { getFirestore, collection, getDocs } = require('firebase/firestore');
 
-// Initialize Firebase Admin with service account
-admin.initializeApp({
-  credential: admin.credential.cert(require('./backend/wesplit-35186-firebase-adminsdk-fbsvc-2b1bb8a520.json'))
-});
+// Configuration Firebase (remplacez par vos vraies clés)
+const firebaseConfig = {
+  apiKey: "AIzaSyBXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  authDomain: "wesplit-xxxxx.firebaseapp.com",
+  projectId: "wesplit-xxxxx",
+  storageBucket: "wesplit-xxxxx.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abcdef123456"
+};
 
-const db = admin.firestore();
+// Initialiser Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
+// Fonction pour vérifier les données dans Firestore
 async function checkFirestoreData() {
   try {
-    console.log('🔍 Checking Firestore data...\n');
+    console.log('🔍 Checking Firestore data...');
     
-    // Check users collection
-    console.log('📊 USERS COLLECTION:');
-    const usersSnapshot = await db.collection('users').get();
-    console.log(`   Found ${usersSnapshot.docs.length} users`);
-    usersSnapshot.docs.forEach(doc => {
-      const data = doc.data();
-      console.log(`   - User ${doc.id}: ${data.name || data.email || 'Unknown'} (${data.email})`);
-    });
+    // Vérifier la collection transactions
+    const transactionsRef = collection(db, 'transactions');
+    const transactionsSnapshot = await getDocs(transactionsRef);
     
-    // Check groups collection
-    console.log('\n📊 GROUPS COLLECTION:');
-    const groupsSnapshot = await db.collection('groups').get();
-    console.log(`   Found ${groupsSnapshot.docs.length} groups`);
-    groupsSnapshot.docs.forEach(doc => {
-      const data = doc.data();
-      console.log(`   - Group ${doc.id}: ${data.name || 'Unnamed'} (created by: ${data.created_by})`);
-    });
+    console.log('📊 Found', transactionsSnapshot.docs.length, 'transactions in Firestore');
     
-    // Check groupMembers collection
-    console.log('\n📊 GROUP MEMBERS COLLECTION:');
-    const groupMembersSnapshot = await db.collection('groupMembers').get();
-    console.log(`   Found ${groupMembersSnapshot.docs.length} group memberships`);
-    groupMembersSnapshot.docs.forEach(doc => {
-      const data = doc.data();
-      console.log(`   - Membership ${doc.id}: User ${data.user_id} in Group ${data.group_id}`);
-    });
+    if (transactionsSnapshot.docs.length > 0) {
+      console.log('📋 Transaction details:');
+      transactionsSnapshot.docs.forEach((doc, index) => {
+        const data = doc.data();
+        console.log(`  ${index + 1}. ID: ${doc.id}`);
+        console.log(`     Type: ${data.type}`);
+        console.log(`     Amount: ${data.amount}`);
+        console.log(`     From: ${data.from_user}`);
+        console.log(`     To: ${data.to_user}`);
+        console.log(`     Status: ${data.status}`);
+        console.log(`     Created: ${data.created_at}`);
+        console.log('');
+      });
+    } else {
+      console.log('❌ No transactions found in Firestore');
+      console.log('💡 Run test-transactions.js to create test data');
+    }
     
-    // Check expenses collection
-    console.log('\n📊 EXPENSES COLLECTION:');
-    const expensesSnapshot = await db.collection('expenses').get();
-    console.log(`   Found ${expensesSnapshot.docs.length} expenses`);
-    expensesSnapshot.docs.forEach(doc => {
-      const data = doc.data();
-      console.log(`   - Expense ${doc.id}: ${data.description || 'No description'} (${data.amount} ${data.currency}) in Group ${data.group_id}`);
-    });
+    // Vérifier la collection users
+    const usersRef = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersRef);
     
-    // Check verification codes collection
-    console.log('\n📊 VERIFICATION CODES COLLECTION:');
-    const verificationCodesSnapshot = await db.collection('verificationCodes').get();
-    console.log(`   Found ${verificationCodesSnapshot.docs.length} verification codes`);
+    console.log('👥 Found', usersSnapshot.docs.length, 'users in Firestore');
     
-    // Check invites collection
-    console.log('\n📊 INVITES COLLECTION:');
-    const invitesSnapshot = await db.collection('invites').get();
-    console.log(`   Found ${invitesSnapshot.docs.length} invites`);
-    
-    console.log('\n✅ Firestore data check completed!');
-    
-    // Summary
-    console.log('\n📋 SUMMARY:');
-    console.log(`   Users: ${usersSnapshot.docs.length}`);
-    console.log(`   Groups: ${groupsSnapshot.docs.length}`);
-    console.log(`   Group Memberships: ${groupMembersSnapshot.docs.length}`);
-    console.log(`   Expenses: ${expensesSnapshot.docs.length}`);
-    console.log(`   Verification Codes: ${verificationCodesSnapshot.docs.length}`);
-    console.log(`   Invites: ${invitesSnapshot.docs.length}`);
+    if (usersSnapshot.docs.length > 0) {
+      console.log('📋 User details:');
+      usersSnapshot.docs.forEach((doc, index) => {
+        const data = doc.data();
+        console.log(`  ${index + 1}. ID: ${doc.id}`);
+        console.log(`     Name: ${data.name}`);
+        console.log(`     Email: ${data.email}`);
+        console.log(`     Wallet: ${data.wallet_address}`);
+        console.log('');
+      });
+    }
     
   } catch (error) {
     console.error('❌ Error checking Firestore data:', error);
   }
 }
 
-// Run the check
+// Exécuter le script
 checkFirestoreData(); 

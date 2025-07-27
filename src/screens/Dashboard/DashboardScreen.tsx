@@ -20,15 +20,17 @@ import NavBar from '../../components/NavBar';
 import WalletSelectorModal from '../../components/WalletSelectorModal';
 import QRCodeModal from '../../components/QRCodeModal';
 import GroupIcon from '../../components/GroupIcon';
+import TransactionModal from '../../components/TransactionModal';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { useGroupList } from '../../hooks/useGroupData';
-import { GroupWithDetails, Expense, GroupMember } from '../../types';
+import { GroupWithDetails, Expense, GroupMember, Transaction } from '../../types';
 import { formatCryptoAmount } from '../../utils/cryptoUtils';
 import { getTotalSpendingInUSDC } from '../../services/priceService';
 import { getUserNotifications, sendNotification } from '../../services/firebaseNotificationService';
 import { createPaymentRequest, getReceivedPaymentRequests } from '../../services/firebasePaymentRequestService';
 import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
+import { firebaseTransactionService } from '../../services/firebaseDataService';
 
 
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
@@ -64,6 +66,9 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [walletSelectorVisible, setWalletSelectorVisible] = useState(false);
   const [qrCodeModalVisible, setQrCodeModalVisible] = useState(false);
   const [groupSummaries, setGroupSummaries] = useState<Record<string, { totalAmount: number; memberCount: number; expenseCount: number; hasData: boolean }>>({});
+  const [transactionModalVisible, setTransactionModalVisible] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+
 
   // Memoized balance calculations to avoid expensive recalculations
   const userBalances = useMemo(() => {
@@ -1093,7 +1098,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         <View style={styles.requestsSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Transactions</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Balance')}>
+            <TouchableOpacity onPress={() => navigation.navigate('TransactionHistory')}>
               <Text style={styles.seeAllText}>See all</Text>
             </TouchableOpacity>
           </View>
@@ -1124,7 +1129,26 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                   <TouchableOpacity
                     key={group.id}
                     style={styles.requestItemNew}
-                    onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
+                                         onPress={() => {
+                       // Open transaction modal for group details without navigation
+                       const mockTransaction: Transaction = {
+                         id: group.id.toString(),
+                         type: transactionType === 'send' ? 'send' : 'receive',
+                         amount: summary.totalAmount || 0,
+                         currency: 'USDC',
+                         from_user: currentUser?.id?.toString() || '',
+                         to_user: group.name,
+                         from_wallet: currentUser?.wallet_address || '',
+                         to_wallet: group.name,
+                         tx_hash: `group_${group.id}_${Date.now()}`,
+                         note: transactionNote,
+                         created_at: recentDate,
+                         updated_at: recentDate,
+                         status: 'completed'
+                       };
+                       setSelectedTransaction(mockTransaction);
+                       setTransactionModalVisible(true);
+                     }}
                   >
                     <View style={styles.transactionAvatarNew}>
                       <Image
@@ -1183,6 +1207,16 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         displayName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
         isGroup={false}
       />
+
+             {/* Transaction Modal */}
+       <TransactionModal
+         visible={transactionModalVisible}
+         onClose={() => {
+           setTransactionModalVisible(false);
+           setSelectedTransaction(null);
+         }}
+         transaction={selectedTransaction}
+       />
 
       <NavBar currentRoute="Dashboard" navigation={navigation} />
     </SafeAreaView>

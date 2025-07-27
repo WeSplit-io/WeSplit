@@ -47,7 +47,7 @@ const navItems = [
   { icon: 'wallet-icon-default.png', label: 'Wallet', route: 'WalletManagement' },
   { icon: 'folder-icon-default.png', label: 'Groups', route: 'GroupsList', isSpecial: true },
   { icon: 'book-icon-default.png', label: 'Contact', route: 'Contacts' },
-  { icon: 'profile-icon-default.png', label: 'Profil', route: 'Profile' },
+  { icon: 'profile-icon-default.png', label: 'Profile', route: 'Profile' },
 ];
 
 interface NavBarProps {
