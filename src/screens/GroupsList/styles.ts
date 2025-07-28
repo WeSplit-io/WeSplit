@@ -25,6 +25,10 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.semibold,
@@ -489,5 +493,56 @@ export const styles = StyleSheet.create({
     color: colors.black,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
+  },
+
+  // Error state styles
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  errorTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textLight,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: typography.fontSize.md,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  retryButton: {
+    backgroundColor: colors.green,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: spacing.md,
+  },
+  retryButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.black,
+  },
+
+  // Group member count style
+  groupMemberCount: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textLight,
+    marginTop: spacing.xs,
+  },
+  groupBalance: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    marginTop: spacing.xs,
+  },
+  positiveBalance: {
+    color: colors.green,
+  },
+  negativeBalance: {
+    color: colors.red,
   },
 }); 

@@ -42,7 +42,7 @@ export const useGroupData = (groupId: number | null) => {
     if (groupId && !group) {
       loadGroup();
     }
-  }, [groupId, group, loadGroup]);
+  }, [groupId, group]); // Remove loadGroup dependency to prevent infinite loops
 
   return {
     group,
@@ -64,6 +64,7 @@ export const useGroupList = () => {
   const { groups, isLoading, currentUser } = state;
   
   const [refreshing, setRefreshing] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   // Load user groups with optional force refresh
   const loadGroups = useCallback(async (forceRefresh: boolean = false) => {
@@ -86,18 +87,27 @@ export const useGroupList = () => {
     }
   }, [loadGroups]);
 
-  // Auto-load groups when user changes - FIXED: Remove problematic dependencies
+  // Auto-load groups when user changes or when returning to app after logout
   useEffect(() => {
-    if (currentUser?.id && groups.length === 0) {
+    if (currentUser?.id && groups.length === 0 && !isLoading && !hasInitialized) {
+      // Only load groups if we don't have any, not currently loading, and haven't initialized yet
+      setHasInitialized(true);
       loadUserGroups();
     }
-  }, [currentUser?.id]); // Remove groups.length dependency to prevent infinite loops
+  }, [currentUser?.id, hasInitialized]); // Remove loadUserGroups dependency to prevent infinite loops
 
   // Add a function to check if groups need to be refreshed
   const shouldRefreshGroups = useCallback(() => {
     // Only refresh if we have no groups or if it's been more than 5 minutes
     return groups.length === 0;
   }, [groups.length]);
+
+  // Reset initialization state when user changes (for logout/login scenarios)
+  useEffect(() => {
+    if (!currentUser?.id) {
+      setHasInitialized(false);
+    }
+  }, [currentUser?.id]);
 
   return {
     groups,

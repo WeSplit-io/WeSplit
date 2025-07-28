@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, Activity
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
-import { UserContact, User } from '../../types';
+import { UserContact, User, GroupMember } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
 
@@ -97,6 +97,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
   const [inviteLink, setInviteLink] = useState<string>('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
 
   useEffect(() => {
     const initializeScreen = async () => {
@@ -106,6 +107,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
           // Use hybrid service instead of direct service call
           const groupMembers = await firebaseDataService.group.getGroupMembers(groupId);
           setMembers(groupMembers);
+          setGroupMembers(groupMembers);
 
           // For creation flow, we might not have full group details yet
           // So we'll set a basic group object
@@ -193,6 +195,24 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
     }
   }, [searchQuery, activeTab]);
 
+  // Check if a user is already in the group (member or invited)
+  const isUserInGroup = (userId: string): boolean => {
+    return groupMembers.some(member => 
+      member.id === userId || (member as any).user_id === userId
+    );
+  };
+
+  // Get the status of a user in the group
+  const getUserGroupStatus = (userId: string): 'member' | 'invited' | 'not_in_group' => {
+    const member = groupMembers.find(member => 
+      member.id === userId || (member as any).user_id === userId
+    );
+    
+    if (!member) return 'not_in_group';
+    if (member.invitation_status === 'pending') return 'invited';
+    return 'member';
+  };
+
   const handleContactToggle = (contactId: string | number) => {
     const newSelected = new Set(selectedContacts);
     if (newSelected.has(contactId)) {
@@ -249,7 +269,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
       );
 
       const contactNames = selectedContactsList.map(c => c.name).join(', ');
-      const message = `Join my WeSplit group "${group?.name}"!\n\nInvite code: ${inviteData.inviteCode}\n\nOr click this link: wesplit://join/${inviteData.inviteCode}`;
+      const message = `Join my WeSplit group "${group?.name}"!\n\nClick this link: ${inviteData.inviteLink}`;
 
       // Show share sheet with native options
       await Share.share({
@@ -293,7 +313,8 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
       );
     } catch (error) {
       console.error('Error sending invitation:', error);
-      Alert.alert('Error', 'Failed to send invitation. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send invitation. Please try again.';
+      Alert.alert('Error', errorMessage);
     }
   };
 
@@ -302,7 +323,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
 
     try {
       const inviteData = await firebaseDataService.group.generateInviteLink(groupId, String(currentUser.id));
-      const shareMessage = `Join my WeSplit group "${group?.name}"!\n\nInvite code: ${inviteData.inviteCode}\n\nOr click this link: wesplit://join/${inviteData.inviteCode}`;
+      const shareMessage = `Join my WeSplit group "${group?.name}"!\n\nClick this link: ${inviteData.inviteLink}`;
 
       await Share.share({
         message: shareMessage,
@@ -507,32 +528,52 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
             {!isSearching && searchResults.length > 0 && (
               <>
                 <Text style={styles.sectionTitle}>Search Results</Text>
-                {searchResults.map((user) => (
-                  <TouchableOpacity
-                    key={user.id}
-                    style={styles.contactRow}
-                    onPress={() => handleInviteSearchedUser(user)}
-                  >
-                    {renderAvatar(user)}
-                    <View style={styles.contactInfo}>
-                      <Text style={styles.contactName}>{getDisplayName(user)}</Text>
-                      <Text style={styles.contactEmail}>
-                        {user.wallet_address ? formatWalletAddress(user.wallet_address) : user.email}
-                      </Text>
-                      {user.email && user.wallet_address && (
-                        <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
-                          {user.email}
-                        </Text>
-                      )}
-                    </View>
+                {searchResults.map((user) => {
+                  const userStatus = getUserGroupStatus(String(user.id));
+                  const isInGroup = isUserInGroup(String(user.id));
+                  
+                  return (
                     <TouchableOpacity
-                      style={styles.inviteButton}
-                      onPress={() => handleInviteSearchedUser(user)}
+                      key={user.id}
+                      style={styles.contactRow}
+                      onPress={() => !isInGroup && handleInviteSearchedUser(user)}
                     >
-                      <Icon name="user-plus" size={20} color="#A5EA15" />
+                      {renderAvatar(user)}
+                      <View style={styles.contactInfo}>
+                        <Text style={styles.contactName}>{getDisplayName(user)}</Text>
+                        <Text style={styles.contactEmail}>
+                          {user.wallet_address ? formatWalletAddress(user.wallet_address) : user.email}
+                        </Text>
+                        {user.email && user.wallet_address && (
+                          <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
+                            {user.email}
+                          </Text>
+                        )}
+                        {isInGroup && (
+                          <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2, color: userStatus === 'invited' ? '#FFA500' : '#A5EA15' }]}>
+                            {userStatus === 'invited' ? 'Invited' : 'Member'}
+                          </Text>
+                        )}
+                      </View>
+                      {!isInGroup ? (
+                        <TouchableOpacity
+                          style={styles.inviteButton}
+                          onPress={() => handleInviteSearchedUser(user)}
+                        >
+                          <Icon name="user-plus" size={20} color="#A5EA15" />
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={styles.statusContainer}>
+                          <Icon 
+                            name={userStatus === 'invited' ? 'clock' : 'check-circle'} 
+                            size={20} 
+                            color={userStatus === 'invited' ? '#FFA500' : '#A5EA15'} 
+                          />
+                        </View>
+                      )}
                     </TouchableOpacity>
-                  </TouchableOpacity>
-                ))}
+                  );
+                })}
               </>
             )}
 

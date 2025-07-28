@@ -23,6 +23,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { solanaAppKitService } from '../../services/solanaAppKitService';
 import { userWalletService } from '../../services/userWalletService';
+import { unifiedUserService } from '../../services/unifiedUserService';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
@@ -150,7 +151,7 @@ const AuthMethodsScreen: React.FC = () => {
         console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
         navigation.reset({
           index: 0,
-          routes: [{ name: 'CreateProfile' }],
+          routes: [{ name: 'CreateProfile', params: { email: appUser.email } }],
         });
       } else if (appUser.hasCompletedOnboarding) {
         console.log('✅ User completed onboarding, navigating to Dashboard');
@@ -173,7 +174,10 @@ const AuthMethodsScreen: React.FC = () => {
 
   // Handle email authentication using Firebase directly
   const handleEmailAuth = async () => {
-    if (!email || !email.includes('@')) {
+    // Sanitize email by trimming whitespace and newlines
+    const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
+    
+    if (!sanitizedEmail || !sanitizedEmail.includes('@')) {
       Alert.alert('Invalid Email', 'Please enter a valid email address.');
       return;
     }
@@ -196,7 +200,7 @@ const AuthMethodsScreen: React.FC = () => {
 
     try {
       // Check if user has already verified within the last 30 days
-      const hasVerifiedWithin30Days = await firestoreService.hasVerifiedWithin30Days(email);
+      const hasVerifiedWithin30Days = await firestoreService.hasVerifiedWithin30Days(sanitizedEmail);
 
       if (hasVerifiedWithin30Days) {
         if (__DEV__) {
@@ -209,7 +213,7 @@ const AuthMethodsScreen: React.FC = () => {
         try {
           // Get existing user from Firestore
           const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('email', '==', email));
+          const q = query(usersRef, where('email', '==', sanitizedEmail));
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {
@@ -222,7 +226,7 @@ const AuthMethodsScreen: React.FC = () => {
             // Check if user exists in Firebase Auth
             let firebaseUser = auth.currentUser;
 
-            if (!firebaseUser || firebaseUser.email !== email) {
+            if (!firebaseUser || firebaseUser.email !== sanitizedEmail) {
               // Try to get user by email from Firebase Auth
               try {
                 // For existing users, we need to handle this differently
@@ -232,7 +236,7 @@ const AuthMethodsScreen: React.FC = () => {
 
                 try {
                   // Try to create a new Firebase Auth user
-                  firebaseUser = await firebaseAuth.createUserWithEmail(email, temporaryPassword);
+                  firebaseUser = await firebaseAuth.createUserWithEmail(sanitizedEmail, temporaryPassword);
                   if (__DEV__) { console.log('✅ Created new Firebase Auth user for existing Firestore user'); }
                 } catch (createError: any) {
                   if (createError.code === 'auth/email-already-in-use') {
@@ -265,7 +269,7 @@ const AuthMethodsScreen: React.FC = () => {
                       console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
                       navigation.reset({
                         index: 0,
-                        routes: [{ name: 'CreateProfile' }],
+                        routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
                       });
                     } else if (transformedUser.hasCompletedOnboarding) {
                       console.log('✅ User completed onboarding, navigating to Dashboard');
@@ -319,7 +323,7 @@ const AuthMethodsScreen: React.FC = () => {
               console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
               navigation.reset({
                 index: 0,
-                routes: [{ name: 'CreateProfile' }],
+                routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
               });
             } else if (transformedUser.hasCompletedOnboarding) {
               console.log('✅ User completed onboarding, navigating to Dashboard');
@@ -353,10 +357,10 @@ const AuthMethodsScreen: React.FC = () => {
         }
 
         // Send verification code
-        await sendVerificationCode(email);
+        await sendVerificationCode(sanitizedEmail);
 
         // Navigate to verification screen
-        navigation.navigate('Verification', { email });
+        navigation.navigate('Verification', { email: sanitizedEmail });
       }
     } catch (error: any) {
       console.error('Error in email authentication:', error);

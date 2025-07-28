@@ -34,10 +34,21 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
           style: 'destructive', 
           onPress: async () => {
             try {
+              // Import Firebase logout function
+              const { logout: firebaseLogout } = await import('../../services/firebaseAuthService');
+              
+              // Call Firebase logout to clear auth state
+              await firebaseLogout();
+              
+              // Clear app context state
               logoutUser();
+              
+              if (__DEV__) { console.log('✅ Logout completed successfully'); }
+              
               navigation.replace('AuthMethods');
             } catch (error) {
               console.error('Logout error:', error);
+              // Still clear app context even if Firebase logout fails
               logoutUser();
               navigation.replace('AuthMethods');
             }

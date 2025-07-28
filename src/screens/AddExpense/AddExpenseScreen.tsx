@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, SafeAreaView, ActivityIndicator, Modal, Image, Platform, Switch } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import NetInfo from '@react-native-community/netinfo';
 import Icon from '../../components/Icon';
 import GroupIcon from '../../components/GroupIcon';
 import { useApp } from '../../context/AppContext';
@@ -9,6 +10,7 @@ import { useGroupList, useExpenseOperations } from '../../hooks/useGroupData';
 import { GroupWithDetails, GroupMember } from '../../types';
 import { SOLANA_CRYPTOCURRENCIES, Cryptocurrency } from '../../utils/cryptoUtils';
 import { convertToUSDC } from '../../services/priceService';
+import { firebaseDataService } from '../../services/firebaseDataService';
 import { styles } from './styles';
 import { colors } from '../../theme/colors';
 
@@ -21,7 +23,7 @@ const categories = [
 ];
 
 const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
-  const { state } = useApp();
+  const { state, createExpense } = useApp();
   const { currentUser } = state;
   
   // Use new hooks for data management
@@ -47,6 +49,10 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [tempDate, setTempDate] = useState<Date>(new Date());
+
+  // Validation states
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Use expense operations hook - Initialize with selected group ID
   const { 
@@ -80,16 +86,6 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
   // Get group members using the hook instead of API call
   const groupMembers = getGroupMembers();
 
-  // Debug logging for group members
-  useEffect(() => {
-    console.log('🔍 AddExpenseScreen: Group members debug:', {
-      selectedGroup: selectedGroup?.id,
-      groupMembersLength: groupMembers.length,
-      groupMembers: groupMembers,
-      selectedMembers: selectedMembers
-    });
-  }, [selectedGroup, groupMembers, selectedMembers]);
-
   // Update selected members when group changes
   useEffect(() => {
     if (selectedGroup && groupMembers.length > 0) {
@@ -98,9 +94,77 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
     }
   }, [selectedGroup, groupMembers]);
 
+  // Validate form data
+  const validateForm = (): boolean => {
+    const errors: {[key: string]: string} = {};
+
+    // Validate group selection
+    if (!selectedGroup) {
+      errors.group = 'Please select a group';
+    }
+
+    // Validate description
+    if (!description.trim()) {
+      errors.description = 'Please enter a description';
+    } else if (description.trim().length < 3) {
+      errors.description = 'Description must be at least 3 characters';
+    }
+
+    // Validate amount
+    if (!amount || amount.trim() === '') {
+      errors.amount = 'Please enter an amount';
+    } else {
+      const amountNum = parseFloat(amount);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        errors.amount = 'Please enter a valid amount greater than 0';
+      }
+    }
+
+    // Validate payer
+    if (!paidBy) {
+      errors.payer = 'Please select who paid for this expense';
+    }
+
+    // Validate selected members
+    if (selectedMembers.length === 0) {
+      errors.members = 'Please select at least one member to split with';
+    }
+
+    // Validate split method
+    if (splitType === 'manual') {
+      const totalSplitAmount = selectedMembers.reduce((sum, memberId) => {
+        const memberAmount = parseFloat(customAmounts[String(memberId)] || '0');
+        return sum + (isNaN(memberAmount) ? 0 : memberAmount);
+      }, 0);
+      
+      const expenseAmount = parseFloat(amount);
+      if (Math.abs(totalSplitAmount - expenseAmount) > 0.01) {
+        errors.split = 'Total split amount must equal the expense amount';
+      }
+    }
+
+    // Validate that selected members are from the current group
+    if (selectedGroup && selectedMembers.length > 0) {
+      const groupMemberIds = selectedGroup.members.map(m => m.id);
+      const invalidMembers = selectedMembers.filter(memberId => !groupMemberIds.includes(memberId));
+      if (invalidMembers.length > 0) {
+        errors.members = 'Selected members must be from the current group';
+      }
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Clear validation errors when form changes
+  const clearValidationErrors = () => {
+    setValidationErrors({});
+  };
+
   const handleGroupSelect = (group: GroupWithDetails) => {
     setSelectedGroup(group);
     setShowGroupSelector(false);
+    clearValidationErrors();
     // Members will be automatically available from the hook
   };
 
@@ -109,77 +173,42 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
       // If trying to deselect in equal mode, switch to manual
       if (selectedMembers.includes(memberId)) {
         setSplitType('manual');
-        // Show transition notification
         setShowManualTransition(true);
-        setTimeout(() => setShowManualTransition(false), 3000);
-        
-        // Remove the member from selectedMembers
-        setSelectedMembers(prev => prev.filter(id => id !== memberId));
-        // Initialize customAmounts for remaining members with equal split value
-        const newCustomAmounts: {[key: string | number]: string} = {};
-        const remainingMembers = selectedMembers.filter(id => id !== memberId);
-        const amountPerPerson = remainingMembers.length > 0 ? (parseFloat(amount) || 0) / remainingMembers.length : 0;
-        remainingMembers.forEach(id => {
-          newCustomAmounts[id] = amountPerPerson.toFixed(2);
-        });
-        setCustomAmounts(newCustomAmounts);
-      } else {
-        // Adding a member in equal mode - just add them normally
-        setSelectedMembers(prev => [...prev, memberId]);
+        setTimeout(() => setShowManualTransition(false), 300);
       }
+      setSelectedMembers(prev => prev.filter(id => id !== memberId));
     } else {
-      // Manual mode: toggle as usual
-      if (selectedMembers.includes(memberId)) {
-        // Removing a member in manual mode
-        const remainingMembers = selectedMembers.filter(id => id !== memberId);
-        setSelectedMembers(prev => prev.filter(id => id !== memberId));
-        
-        // Recalculate amounts for remaining members
-        if (remainingMembers.length > 0) {
-          const totalAmount = parseFloat(amount) || 0;
-          const amountPerRemainingMember = totalAmount / remainingMembers.length;
-          
-          const newCustomAmounts: {[key: string | number]: string} = {};
-          remainingMembers.forEach(id => {
-            newCustomAmounts[id] = amountPerRemainingMember.toFixed(2);
-          });
-          setCustomAmounts(newCustomAmounts);
-        } else {
-          // No members left, clear custom amounts
-          setCustomAmounts({});
-        }
-      } else {
-        // Adding a member in manual mode
-        setSelectedMembers(prev => [...prev, memberId]);
-        // Initialize the new member's amount with equal split value
-        const amountPerPerson = (parseFloat(amount) || 0) / (selectedMembers.length + 1);
-        setCustomAmounts(prev => ({
-          ...prev,
-          [memberId]: amountPerPerson.toFixed(2)
-        }));
-      }
+      // Manual mode: toggle selection
+      setSelectedMembers(prev => 
+        prev.includes(memberId) 
+          ? prev.filter(id => id !== memberId)
+          : [...prev, memberId]
+      );
     }
+    clearValidationErrors();
   };
 
   const getTotalAmount = () => {
     if (splitType === 'equal') {
       return parseFloat(amount) || 0;
     } else {
-      return Object.values(customAmounts).reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0);
+      return selectedMembers.reduce((sum, memberId) => {
+        const memberAmount = parseFloat(customAmounts[String(memberId)] || '0');
+        return sum + (isNaN(memberAmount) ? 0 : memberAmount);
+      }, 0);
     }
   };
 
   const getAmountPerPerson = () => {
-    // Use converted USDC amount if available, otherwise use original amount
-    const totalAmount = convertedAmount || parseFloat(amount) || 0;
-    return selectedMembers.length > 0 ? totalAmount / selectedMembers.length : 0;
+    const total = parseFloat(amount) || 0;
+    return selectedMembers.length > 0 ? total / selectedMembers.length : 0;
   };
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
-      day: '2-digit',
-      month: '2-digit', 
-      year: 'numeric'
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     });
   };
 
@@ -188,143 +217,177 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
       ...prev,
       [memberId]: value
     }));
+    clearValidationErrors();
   };
 
   const handleSplitTypeChange = (newSplitType: 'equal' | 'manual') => {
     setSplitType(newSplitType);
+    clearValidationErrors();
     
-    if (newSplitType === 'manual' && selectedMembers.length > 0) {
-      // Initialize custom amounts for all selected members with current equal split values
+    if (newSplitType === 'equal') {
+      // Reset custom amounts when switching to equal
+      setCustomAmounts({});
+    } else {
+      // Initialize custom amounts with equal split when switching to manual
+      const amountPerPerson = getAmountPerPerson();
       const newCustomAmounts: {[key: string | number]: string} = {};
-      // Use converted USDC amount if available, otherwise use original amount
-      const totalAmount = convertedAmount || parseFloat(amount) || 0;
-      const amountPerPerson = selectedMembers.length > 0 ? totalAmount / selectedMembers.length : 0;
-      selectedMembers.forEach(id => {
-        newCustomAmounts[id] = amountPerPerson.toFixed(2);
+      selectedMembers.forEach(memberId => {
+        newCustomAmounts[memberId] = amountPerPerson.toFixed(2);
       });
       setCustomAmounts(newCustomAmounts);
-    } else if (newSplitType === 'equal') {
-      // Clear custom amounts when switching back to equal mode
-      setCustomAmounts({});
     }
   };
 
   const handleSaveExpense = async () => {
-    // Clear any previous errors
-    clearError();
-
-    if (!description.trim()) {
-      Alert.alert('Error', 'Please enter an expense name');
-      return;
-    }
-
-    if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
-      return;
-    }
-
-    if (selectedMembers.length === 0) {
-      Alert.alert('Error', 'Please select at least one member');
-      return;
-    }
-
-    if (!selectedGroup || !currentUser?.id) {
-      Alert.alert('Error', 'Missing required information');
-      return;
-    }
-
     try {
-      console.log('🔍 AddExpenseScreen: Starting expense creation...');
-      console.log('🔍 AddExpenseScreen: Selected group:', selectedGroup);
-      console.log('🔍 AddExpenseScreen: Current user:', currentUser);
-      console.log('🔍 AddExpenseScreen: Selected members:', selectedMembers);
-      console.log('🔍 AddExpenseScreen: Description:', description);
-      console.log('🔍 AddExpenseScreen: Amount:', amount);
-      console.log('🔍 AddExpenseScreen: Currency:', selectedCurrency.symbol);
-
-      // Convert amount to USDC if currency is not USDC
-      let finalAmount = parseFloat(amount);
-      let finalCurrency = selectedCurrency.symbol;
-      let convertedCustomAmounts = customAmounts;
+      // Clear previous errors
+      clearValidationErrors();
       
-      if (selectedCurrency.symbol !== 'USDC') {
-        try {
-          setIsConverting(true);
-          const usdcAmount = await convertToUSDC(finalAmount, selectedCurrency.symbol);
-          finalAmount = usdcAmount;
-          finalCurrency = 'USDC';
-          setConvertedAmount(usdcAmount);
-          console.log(`Converted ${amount} ${selectedCurrency.symbol} to ${finalAmount} USDC`);
-          
-          // Also convert custom amounts if in manual mode
-          if (splitType === 'manual' && Object.keys(customAmounts).length > 0) {
-            convertedCustomAmounts = {};
-            for (const [memberId, memberAmount] of Object.entries(customAmounts)) {
-              const memberAmountNum = parseFloat(memberAmount);
-              if (!isNaN(memberAmountNum)) {
-                const convertedMemberAmount = await convertToUSDC(memberAmountNum, selectedCurrency.symbol);
-                convertedCustomAmounts[memberId] = convertedMemberAmount.toFixed(2);
-              }
-            }
-            console.log(`Converted custom amounts to USDC:`, convertedCustomAmounts);
-          }
-        } catch (conversionError) {
-          console.error('Currency conversion failed:', conversionError);
-          // Continue with original currency if conversion fails
-        } finally {
-          setIsConverting(false);
-        }
-      } else {
-        setConvertedAmount(null);
+      // Validate form
+      if (!validateForm()) {
+        const errorMessages = Object.values(validationErrors).join('\n');
+        Alert.alert('Validation Error', errorMessages);
+        return;
       }
 
-      // Prepare split data without undefined values
-      const splitData: any = {
-        memberIds: selectedMembers,
-        amountPerPerson: getAmountPerPerson()
-      };
-      
-      if (splitType === 'manual' && Object.keys(convertedCustomAmounts).length > 0) {
-        splitData.customAmounts = convertedCustomAmounts;
+      // Check for offline mode
+      const netInfo = await NetInfo.fetch();
+      if (!netInfo.isConnected) {
+        Alert.alert('Offline Mode', 'You are currently offline. Please check your connection and try again.');
+        return;
+      }
+
+      setIsSubmitting(true);
+
+      if (!selectedGroup || !currentUser?.id) {
+        Alert.alert('Error', 'Please select a group and ensure you are logged in');
+        return;
+      }
+
+      if (!description.trim()) {
+        Alert.alert('Error', 'Please enter a description');
+        return;
+      }
+
+      if (!amount || parseFloat(amount) <= 0) {
+        Alert.alert('Error', 'Please enter a valid amount greater than 0');
+        return;
+      }
+
+      if (!paidBy) {
+        Alert.alert('Error', 'Please select who paid for this expense');
+        return;
+      }
+
+      if (selectedMembers.length === 0) {
+        Alert.alert('Error', 'Please select at least one member to split with');
+        return;
+      }
+
+      // Validate that selected members are from the current group
+      const groupMemberIds = selectedGroup.members.map(m => m.id);
+      const invalidMembers = selectedMembers.filter(memberId => !groupMemberIds.includes(memberId));
+      if (invalidMembers.length > 0) {
+        Alert.alert('Error', 'Selected members must be from the current group');
+        return;
+      }
+
+      // Validate split amounts
+      if (splitType === 'manual') {
+        const totalSplitAmount = selectedMembers.reduce((sum, memberId) => {
+          const memberAmount = parseFloat(customAmounts[String(memberId)] || '0');
+          return sum + (isNaN(memberAmount) ? 0 : memberAmount);
+        }, 0);
+        
+        const expenseAmount = parseFloat(amount);
+        if (Math.abs(totalSplitAmount - expenseAmount) > 0.01) {
+          Alert.alert('Error', 'Total split amount must equal the expense amount');
+          return;
+        }
       }
 
       const expenseData = {
+        group_id: selectedGroup.id,
         description: description.trim(),
-        amount: finalAmount,
-        currency: finalCurrency,
-        paid_by: paidBy, // Use the selected paidBy value, snake_case for backend compatibility
-        groupId: selectedGroup.id, // Keep as string for Firebase compatibility
-        category: categories[selectedCategory].name.toLowerCase(),
-        splitType: splitType,
-        splitData: splitData
+        amount: parseFloat(amount),
+        currency: selectedCurrency.symbol,
+        paid_by: paidBy,
+        category: selectedCategory,
+        date: date.toISOString(),
+        split_type: splitType,
+        split_data: splitType === 'equal' 
+          ? selectedMembers.map(memberId => ({ user_id: memberId, amount: getAmountPerPerson() }))
+          : selectedMembers.map(memberId => ({ 
+              user_id: memberId, 
+              amount: parseFloat(customAmounts[String(memberId)] || '0') 
+            })),
+        receipt_image: selectedImage,
+        converted_amount: convertedAmount,
+        converted_currency: 'USDC'
       };
 
-      console.log('🔍 AddExpenseScreen: Expense data to be created:', expenseData);
-      console.log('🔍 AddExpenseScreen: Calling handleCreateExpense...');
+      console.log('🔄 AddExpenseScreen: Creating expense with data:', expenseData);
 
-      const result = await handleCreateExpense(expenseData);
-      
-      console.log('🔍 AddExpenseScreen: Expense created successfully:', result);
-      
+      // Use context method to create expense
+      const result = await createExpense(expenseData);
+
+      console.log('✅ AddExpenseScreen: Expense created successfully:', result);
+
+      // Send notifications to all group members except the payer
+      try {
+        const membersToNotify = selectedGroup.members.filter(member => member.id !== paidBy);
+        
+        for (const member of membersToNotify) {
+          await firebaseDataService.notification.createNotification({
+            user_id: member.id,
+            type: 'expense_added',
+            title: 'New Expense Added',
+            message: `${currentUser?.name || 'Someone'} added a new expense: ${description}`,
+            data: {
+              groupId: selectedGroup.id,
+              expenseId: result.id,
+              amount: parseFloat(amount),
+              currency: selectedCurrency.symbol,
+              paidBy: paidBy,
+              description: description.trim()
+            },
+            is_read: false
+          });
+        }
+
+        console.log('✅ AddExpenseScreen: Notifications sent to', membersToNotify.length, 'members');
+      } catch (notificationError) {
+        console.error('❌ AddExpenseScreen: Error sending notifications:', notificationError);
+        // Don't fail the expense creation if notifications fail
+      }
+
       // Navigate to success screen
       navigation.navigate('ExpenseSuccess', {
-        amount: finalAmount,
-        currency: finalCurrency,
-        originalAmount: parseFloat(amount),
-        originalCurrency: selectedCurrency.symbol,
-        description: description.trim(),
-        groupName: selectedGroup.name,
-        memberCount: selectedMembers.length
+        expense: result,
+        group: selectedGroup,
+        amount: parseFloat(amount),
+        currency: selectedCurrency.symbol,
+        convertedAmount: convertedAmount
       });
-      
+
     } catch (error) {
       console.error('❌ AddExpenseScreen: Error creating expense:', error);
-      console.error('❌ AddExpenseScreen: Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : 'No stack trace',
-        name: error instanceof Error ? error.name : 'Unknown error type'
-      });
-      Alert.alert('Error', 'Failed to create expense. Please try again.');
+      
+      let errorMessage = 'Failed to create expense. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('network') || error.message.includes('connection')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('permission') || error.message.includes('unauthorized')) {
+          errorMessage = 'You do not have permission to add expenses to this group.';
+        } else if (error.message.includes('validation')) {
+          errorMessage = 'Invalid expense data. Please check your inputs.';
+        }
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -595,7 +658,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
         {amount && (
           <View style={styles.totalContainer}>
             <Text style={styles.totalText}>
-              Total: {getTotalAmount().toFixed(3)} {selectedCurrency.symbol}
+              Total: {Number(getTotalAmount()).toFixed(3)} {selectedCurrency.symbol}
             </Text>
             {isConverting && (
               <Text style={styles.convertingText}>
@@ -678,7 +741,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
           const isSelected = selectedMembers.includes(member.id);
           const memberAmount = splitType === 'equal' 
             ? getAmountPerPerson() 
-            : parseFloat(customAmounts[member.id] || '0');
+            : parseFloat(customAmounts[String(member.id)] || '0');
           
           // Determine which currency to display
           const displayCurrency = selectedCurrency.symbol;
@@ -718,7 +781,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
                 <View style={styles.manualAmountInline}>
                   <TextInput
                     style={styles.manualAmountInput}
-                    value={customAmounts[member.id] || '0'}
+                    value={customAmounts[String(member.id)] || '0'}
                     onChangeText={(value) => {
                       // Only allow numbers and decimal point
                       const filteredText = value.replace(/[^0-9.]/g, '');

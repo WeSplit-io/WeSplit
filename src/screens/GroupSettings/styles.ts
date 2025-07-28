@@ -175,9 +175,13 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
   },
   memberInviteStatusText: {
-    color: '#A89B9B',
     fontSize: 12,
-    fontWeight: '500',
+    color: '#A89B9B',
+    fontStyle: 'italic',
+  },
+  removeMemberButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   // Bottom Action Buttons
   leaveButton: {

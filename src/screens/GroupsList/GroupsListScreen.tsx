@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, SafeAreaView, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, SafeAreaView, Image, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import GroupIcon from '../../components/GroupIcon';
 import NavBar from '../../components/NavBar';
+
 import { useApp } from '../../context/AppContext';
 import { useGroupList } from '../../hooks/useGroupData';
 import { getTotalSpendingInUSDC } from '../../services/priceService';
@@ -14,7 +15,7 @@ import { colors } from '../../theme';
 type FilterType = 'all' | 'active' | 'closed';
 
 const GroupsListScreen: React.FC<any> = ({ navigation }) => {
-  const { state, getGroupBalances } = useApp();
+  const { state, getGroupBalances, loadUserGroups } = useApp();
   const { currentUser } = state;
 
   const {
@@ -28,20 +29,124 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
 
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [groupAmountsInUSD, setGroupAmountsInUSD] = useState<Record<string | number, number>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [groupUserBalances, setGroupUserBalances] = useState<Record<string | number, { amount: number; currency: string }>>({});
 
-  // Get user balances using centralized method for proper multi-currency support
-  const groupUserBalances = useMemo(() => {
-    const balances: Record<string | number, { amount: number; currency: string }> = {};
-    groups.forEach(group => {
-      const groupBalances = getGroupBalances(group.id);
-      const userBalance = groupBalances.find(balance => balance.userId === currentUser?.id);
-      balances[group.id] = {
-        amount: userBalance?.amount || 0,
-        currency: userBalance?.currency || 'SOL'
+  // Debug logging
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('🔄 GroupsListScreen: Component mounted');
+      console.log('🔄 GroupsListScreen: Current user:', currentUser?.id);
+      console.log('🔄 GroupsListScreen: Groups count:', groups.length);
+      console.log('🔄 GroupsListScreen: Loading state:', loading);
+    }
+  }, [currentUser?.id, groups.length, loading]);
+
+  // Load user groups when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (__DEV__) {
+        console.log('🔄 GroupsListScreen: Screen focused, loading user groups');
+      }
+
+      const loadGroups = async () => {
+        try {
+          setError(null);
+          if (currentUser?.id) {
+            console.log('🔄 GroupsListScreen: Loading groups for user:', currentUser.id);
+            await loadUserGroups(true); // Force refresh when screen is focused
+            console.log('🔄 GroupsListScreen: Groups loaded successfully');
+          } else {
+            console.log('🔄 GroupsListScreen: No current user, cannot load groups');
+          }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to load groups';
+          console.error('❌ GroupsListScreen: Error loading groups:', errorMessage);
+          setError(errorMessage);
+        }
       };
-    });
-    return balances;
-  }, [groups, currentUser?.id, getGroupBalances]);
+
+      loadGroups();
+    }, [currentUser?.id, loadUserGroups])
+  );
+
+  // Debug logging for groups
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('🔄 GroupsListScreen: Groups state changed:', {
+        groupsCount: groups.length,
+        groups: groups.map(g => ({ 
+          id: g.id, 
+          name: g.name, 
+          created_by: g.created_by,
+          members: g.members?.length || 0,
+          invitation_status: g.members?.map(m => m.invitation_status) || []
+        })),
+        currentUserId: currentUser?.id,
+        loading,
+        hasGroups
+      });
+      
+      // Additional debug: Check if user is in any groups at all
+      if (groups.length === 0 && currentUser?.id) {
+        console.log('🔄 GroupsListScreen: No groups found for user. This could mean:');
+        console.log('🔄 GroupsListScreen: 1. User is not a member of any groups');
+        console.log('🔄 GroupsListScreen: 2. User is only in groups with pending invitation status');
+        console.log('🔄 GroupsListScreen: 3. Groups exist but invitation_status is not "accepted"');
+        console.log('🔄 GroupsListScreen: 4. Firebase query is failing');
+      }
+    }
+  }, [groups, currentUser?.id, loading, hasGroups]);
+
+  // Manual trigger to load groups if they're not loaded
+  useEffect(() => {
+    if (currentUser?.id && groups.length === 0 && !loading) {
+      console.log('🔄 GroupsListScreen: No groups found, manually triggering load');
+      loadUserGroups(true);
+    }
+  }, [currentUser?.id, groups.length, loading, loadUserGroups]);
+
+  // Refresh groups when user changes
+  useEffect(() => {
+    if (currentUser?.id) {
+      console.log('🔄 GroupsListScreen: User changed, refreshing groups');
+      loadUserGroups(true);
+    }
+  }, [currentUser?.id, loadUserGroups]);
+
+  // Load balances for groups
+  useEffect(() => {
+    const loadBalances = async () => {
+      if (groups.length === 0) return;
+      
+      if (__DEV__) { console.log('🔄 GroupsListScreen: Loading group totals for', groups.length, 'groups'); }
+      
+      try {
+        const newBalances: { [groupId: string]: { amount: number; currency: string } } = {};
+        
+        for (const group of groups) {
+          try {
+            // Use the group's total amount (sum of all expenses)
+            const groupTotalAmount = group.totalAmount || 0;
+            newBalances[group.id] = {
+              amount: groupTotalAmount,
+              currency: group.currency || 'USDC'
+            };
+            if (__DEV__) { console.log('🔄 GroupsListScreen: Group total for', group.name, ':', groupTotalAmount); }
+          } catch (error) {
+            if (__DEV__) { console.error('🔄 GroupsListScreen: Error loading total for group', group.name, ':', error); }
+          }
+        }
+        
+        setGroupUserBalances(newBalances);
+        if (__DEV__) { console.log('🔄 GroupsListScreen: Updated group totals:', newBalances); }
+      } catch (error) {
+        if (__DEV__) { console.error('🔄 GroupsListScreen: Error loading group totals:', error); }
+      }
+    };
+    
+    loadBalances();
+  }, [groups]);
 
   // Convert group amounts to USD for display using available summary data
   const convertGroupAmountsToUSD = useCallback(async (groups: GroupWithDetails[]) => {
@@ -86,7 +191,14 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
   }, [groups, convertGroupAmountsToUSD]);
 
   const onRefresh = useCallback(async () => {
+    try {
+      setError(null);
     await refresh();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to refresh groups';
+      console.error('❌ GroupsListScreen: Error refreshing groups:', errorMessage);
+      setError(errorMessage);
+    }
   }, [refresh]);
 
   const getFilteredGroups = useCallback(() => {
@@ -95,37 +207,87 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
     // Apply filter
     if (activeFilter !== 'all') {
       filteredGroups = groups.filter(group => {
-        const userBalance = groupUserBalances[group.id]?.amount || 0;
-        if (activeFilter === 'active') return userBalance !== 0;
-        if (activeFilter === 'closed') return userBalance === 0;
+        const groupTotalAmount = group.totalAmount || 0;
+        const isActive = groupTotalAmount > 0; // Group is active if it has expenses
+        
+        if (activeFilter === 'active') return isActive;
+        if (activeFilter === 'closed') return !isActive;
         return true;
       });
     }
 
-    // Sort by highest value first
-    return filteredGroups.sort((a, b) => {
-      const aUSD = groupAmountsInUSD[a.id] || 0;
-      const bUSD = groupAmountsInUSD[b.id] || 0;
-      return bUSD - aUSD;
+    // Sort groups by status and then by name
+    filteredGroups.sort((a, b) => {
+      const totalAmountA = a.totalAmount || 0;
+      const totalAmountB = b.totalAmount || 0;
+      
+      // First sort by active status (active groups first)
+      const isActiveA = totalAmountA > 0;
+      const isActiveB = totalAmountB > 0;
+      
+      if (isActiveA !== isActiveB) {
+        return isActiveA ? -1 : 1; // Active groups first
+      }
+      
+      // Then sort by total amount (highest first)
+      if (totalAmountA !== totalAmountB) {
+        return totalAmountB - totalAmountA; // Highest amount first
+      }
+      
+      // Finally sort alphabetically by name
+      return a.name.localeCompare(b.name);
     });
-  }, [groups, groupUserBalances, activeFilter, groupAmountsInUSD]);
 
-  // Get prominent groups (only groups where user is owner)
-  const getProminentGroups = useCallback(() => {
-    return groups
-      .filter(group => group.created_by === currentUser?.id)
-      .sort((a, b) => {
-        const aUSD = groupAmountsInUSD[a.id] || 0;
-        const bUSD = groupAmountsInUSD[b.id] || 0;
-        return bUSD - aUSD;
+    // Only log when there are actual changes or in development
+    if (__DEV__ && (filteredGroups.length !== groups.length || activeFilter !== 'all')) {
+      console.log('🔄 GroupsListScreen: Filtered groups:', {
+        activeFilter,
+        totalGroups: groups.length,
+        filteredCount: filteredGroups.length,
+        groupTotals: filteredGroups.map(group => ({
+          groupId: group.id,
+          groupName: group.name,
+          totalAmount: group.totalAmount || 0
+        }))
       });
-  }, [groups, currentUser?.id, groupAmountsInUSD]);
+    }
+
+    return filteredGroups;
+  }, [groups, activeFilter]);
+
+  const getProminentGroups = useCallback(() => {
+    // Show groups where user is the creator (owner)
+    return groups.filter(group => group.created_by === currentUser?.id);
+  }, [groups, currentUser?.id]);
+
+  const handleGroupPress = useCallback((group: GroupWithDetails) => {
+    try {
+      if (__DEV__) {
+        console.log('🔄 GroupsListScreen: Navigating to GroupDetails with groupId:', group.id);
+      }
+      navigation.navigate('GroupDetails', { groupId: group.id });
+    } catch (err) {
+      console.error('❌ GroupsListScreen: Error navigating to group details:', err);
+      Alert.alert('Navigation Error', 'Failed to open group details');
+    }
+  }, [navigation]);
+
+  const handleCreateGroup = useCallback(() => {
+    try {
+      if (__DEV__) {
+        console.log('🔄 GroupsListScreen: Navigating to CreateGroup');
+      }
+      navigation.navigate('CreateGroup');
+    } catch (err) {
+      console.error('❌ GroupsListScreen: Error navigating to create group:', err);
+      Alert.alert('Navigation Error', 'Failed to open create group screen');
+    }
+  }, [navigation]);
 
   const renderFilterButton = (filter: FilterType, label: string) => {
     const isActive = activeFilter === filter;
     return (
       <TouchableOpacity
-        key={filter}
         style={[styles.filterButton, isActive && styles.filterButtonActive]}
         onPress={() => setActiveFilter(filter)}
       >
@@ -136,51 +298,39 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
     );
   };
 
-
-
   const renderGroupCard = (group: GroupWithDetails) => {
-    const usdAmount = groupAmountsInUSD[group.id] || 0;
-    const userBalanceData = groupUserBalances[group.id] || { amount: 0, currency: 'SOL' };
-    const userBalance = userBalanceData.amount;
+    // Use the group's total amount (sum of all expenses) instead of user balance
+    const groupTotalAmount = group.totalAmount || 0;
+    const isActive = groupTotalAmount > 0; // Group is active if it has expenses
     const members = group.members || [];
-    const isOwner = group.created_by === currentUser?.id;
-
-    // Determine if group is active based on multiple factors
-    const hasExpenses = group.expenses_by_currency && group.expenses_by_currency.length > 0;
-    const hasMembers = members.length > 0;
-    const hasOpenBalance = userBalance !== 0;
-    const isActive = hasExpenses || hasMembers || hasOpenBalance;
 
     return (
       <TouchableOpacity
         key={group.id}
         style={styles.groupCard}
-        onPress={() => (navigation as any).navigate('GroupDetails', { groupId: group.id })}
+        onPress={() => handleGroupPress(group)}
       >
         {/* Left Section */}
         <View style={styles.groupCardLeft}>
-          <View style={styles.groupCardLeftTop}>
             {/* Group Icon */}
             <GroupIcon
               category={group.category || 'trip'}
               color={group.color || '#A5EA15'}
-              size={40}
+            size={48}
             />
 
             {/* Group Info */}
             <View style={styles.groupInfo}>
               <Text style={styles.groupName}>{group.name}</Text>
-
-              {/* Member Status */}
-              <View style={styles.groupMemberStatus}>
-                <Image source={isOwner ? require('../../../assets/award-icon-white70.png') : require('../../../assets/user-icon-white70.png')} style={styles.prominentGroupRoleIcon} />
-                <Text style={styles.groupMemberStatusText}>
-                  {isOwner ? 'Owner' : 'Member'}
+            <Text style={styles.groupMemberCount}>
+              {members.length} member{members.length !== 1 ? 's' : ''}
                 </Text>
-              </View>
-
-
-            </View>
+              {/* Display group total amount if available */}
+              {groupTotalAmount > 0 && (
+                <Text style={styles.groupBalance}>
+                  ${groupTotalAmount.toFixed(2)}
+                </Text>
+              )}
           </View>
 
           {/* Member Avatars */}
@@ -226,12 +376,30 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
     );
   };
 
+  // Error state
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>Something went wrong</Text>
+          <Text style={styles.errorMessage}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={onRefresh}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+        <NavBar currentRoute="GroupsList" navigation={navigation} />
+      </SafeAreaView>
+    );
+  }
+
+  // Loading state
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading your groups...</Text>
         </View>
+        <NavBar currentRoute="GroupsList" navigation={navigation} />
       </SafeAreaView>
     );
   }
@@ -240,14 +408,94 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
   const prominentGroups = getProminentGroups().slice(0, 2);
   const regularGroups = filteredGroups.slice(2);
 
+  // Temporary debug function to check all group memberships
+  const debugCheckAllMemberships = useCallback(async () => {
+    if (!currentUser?.id) return;
+    
+    try {
+      console.log('🔍 GroupsListScreen: Debugging all group memberships for user:', currentUser.id);
+      
+      // Import Firebase functions for debugging
+      const { collection, query, where, getDocs } = await import('firebase/firestore');
+      const { db } = await import('../../config/firebase');
+      
+      const groupMembersRef = collection(db, 'groupMembers');
+      const memberQuery = query(
+        groupMembersRef, 
+        where('user_id', '==', currentUser.id.toString())
+      );
+      const memberDocs = await getDocs(memberQuery);
+      
+      console.log('🔍 GroupsListScreen: Found', memberDocs.docs.length, 'total member records');
+      
+      memberDocs.docs.forEach((doc, index) => {
+        const data = doc.data();
+        console.log(`🔍 GroupsListScreen: Member record ${index + 1}:`, {
+          group_id: data.group_id,
+          user_id: data.user_id,
+          invitation_status: data.invitation_status,
+          joined_at: data.joined_at,
+          invited_at: data.invited_at,
+          invited_by: data.invited_by
+        });
+      });
+      
+      // Also check groups where user is creator
+      const groupsRef = collection(db, 'groups');
+      const creatorQuery = query(groupsRef, where('created_by', '==', currentUser.id.toString()));
+      const creatorDocs = await getDocs(creatorQuery);
+      
+      console.log('🔍 GroupsListScreen: Found', creatorDocs.docs.length, 'groups where user is creator');
+      
+      creatorDocs.docs.forEach((doc, index) => {
+        const data = doc.data();
+        console.log(`🔍 GroupsListScreen: Creator group ${index + 1}:`, {
+          group_id: doc.id,
+          name: data.name,
+          created_by: data.created_by,
+          created_at: data.created_at
+        });
+      });
+      
+      // Check all groups in the database
+      const allGroupsQuery = query(groupsRef);
+      const allGroupsDocs = await getDocs(allGroupsQuery);
+      
+      console.log('🔍 GroupsListScreen: Found', allGroupsDocs.docs.length, 'total groups in database');
+      
+      allGroupsDocs.docs.forEach((doc, index) => {
+        const data = doc.data();
+        console.log(`🔍 GroupsListScreen: All groups ${index + 1}:`, {
+          group_id: doc.id,
+          name: data.name,
+          created_by: data.created_by,
+          created_at: data.created_at
+        });
+      });
+      
+    } catch (error) {
+      console.error('❌ GroupsListScreen: Error debugging memberships:', error);
+    }
+  }, [currentUser?.id]);
+
+  // Call debug function when component mounts
+  useEffect(() => {
+    if (currentUser?.id) {
+      debugCheckAllMemberships();
+    }
+  }, [currentUser?.id, debugCheckAllMemberships]);
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Navigation Debug Component */}
+
+      
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Groups</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => (navigation as any).navigate('CreateGroup')}
+          onPress={handleCreateGroup}
         >
           <Image source={require('../../../assets/plus-icon-green.png')} style={styles.addButtonIcon} />
           <Text style={styles.addButtonText}>New Group</Text>
@@ -269,7 +517,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
                   styles.prominentGroupCard,
                   index === 0 ? styles.prominentGroupCardLeft : styles.prominentGroupCardRight
                 ]}
-                onPress={() => (navigation as any).navigate('GroupDetails', { groupId: group.id })}
+                onPress={() => handleGroupPress(group)}
               >
                 {/* Background */}
                 <View style={styles.prominentGroupCardGradient} />
@@ -376,7 +624,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
             {activeFilter === 'all' && (
               <TouchableOpacity
                 style={styles.createGroupButton}
-                onPress={() => (navigation as any).navigate('CreateGroup')}
+                onPress={handleCreateGroup}
               >
                 <Text style={styles.createGroupButtonText}>Create Your First Group</Text>
               </TouchableOpacity>

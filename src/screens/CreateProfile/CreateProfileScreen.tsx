@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
-import { createUser } from '../../services/userService';
+import { unifiedUserService } from '../../services/unifiedUserService';
 import { userWalletService } from '../../services/userWalletService';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { colors } from '../../theme';
@@ -28,7 +28,7 @@ const CreateProfileScreen: React.FC = () => {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { authenticateUser } = useApp();
+  const { authenticateUser, state } = useApp();
 
   const handlePickImage = () => {
     const options = avatar 
@@ -144,54 +144,37 @@ const CreateProfileScreen: React.FC = () => {
       setError('');
       setIsLoading(true);
 
-      // Get email from route/context
-      const email = (route?.params as any)?.email || 'user@example.com';
+      // Get email from route/context or authenticated user
+      const email = (route?.params as any)?.email || state.currentUser?.email || 'user@example.com';
 
-      // Create user in backend first
+      // Create or get user using unified service
       try {
         const userData = {
           email,
           name: pseudo,
-          walletAddress: '', // Will be set after wallet creation
-          walletPublicKey: '', // Will be set after wallet creation
           avatar: avatar || undefined,
         };
 
-        console.log('Creating user in backend:', { email, name: pseudo });
-        const createdUser: any = await createUser(userData);
-        console.log('User created successfully:', createdUser);
-
-        // Now ensure the user has a wallet
-        if (__DEV__) { console.log('🔄 Ensuring wallet for new user...'); }
+        console.log('Creating/getting user with unified service:', { email, name: pseudo });
+        const result = await unifiedUserService.createOrGetUser(userData);
         
-        const walletResult = await userWalletService.ensureUserWallet(createdUser.id.toString());
-        
-        if (walletResult.success && walletResult.wallet) {
-          if (__DEV__) { console.log('✅ Wallet created successfully:', walletResult.wallet.address); }
-          
-          // Update user with wallet information
-          const updatedUserData = {
-            email,
-            name: pseudo,
-            walletAddress: walletResult.wallet.address,
-            walletPublicKey: walletResult.wallet.publicKey,
-            avatar: avatar || undefined,
-          };
+        if (!result.success || !result.user) {
+          throw new Error(result.error || 'Failed to create user');
+        }
 
-          // Update the user in backend with wallet info
-          await createUser(updatedUserData);
+        console.log('User created/retrieved successfully:', result.user);
 
         // Build user object for local state
         const user = {
-          id: createdUser.id.toString(),
-          name: createdUser.name,
-          email: createdUser.email,
+          id: result.user.id.toString(),
+          name: result.user.name,
+          email: result.user.email,
           avatar: avatar || 'https://randomuser.me/api/portraits/men/32.jpg',
-            walletAddress: walletResult.wallet.address,
-            wallet_address: walletResult.wallet.address,
-            wallet_public_key: walletResult.wallet.publicKey,
-            created_at: new Date().toISOString(),
-            hasCompletedOnboarding: false // New users start with onboarding incomplete
+          walletAddress: result.user.wallet_address,
+          wallet_address: result.user.wallet_address,
+          wallet_public_key: result.user.wallet_public_key,
+          created_at: result.user.created_at,
+          hasCompletedOnboarding: false // New users start with onboarding incomplete
         };
 
         authenticateUser(user, 'email');
@@ -201,13 +184,9 @@ const CreateProfileScreen: React.FC = () => {
         } catch (e) {
           console.error('Navigation error:', e);
           Alert.alert('Navigation Error', 'Navigation error: ' + (e as any).message);
-          }
-        } else {
-          console.error('❌ Failed to create wallet:', walletResult.error);
-          Alert.alert('Error', 'Failed to create wallet. Please try again.');
         }
       } catch (createError) {
-        console.error('Error creating user in backend:', createError);
+        console.error('Error creating user:', createError);
         Alert.alert('Error', (createError as any).message || 'Failed to create user account');
       }
     } catch (e) {

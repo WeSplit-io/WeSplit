@@ -43,8 +43,12 @@ function generateVerificationCode(): string {
  * Send verification code to email using Firebase
  */
 export async function sendVerificationCode(email: string): Promise<VerificationResponse> {
+  // Sanitize email by trimming whitespace and newlines
+  const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
+  
   if (__DEV__) { console.log('=== Firebase sendVerificationCode called ==='); }
-  if (__DEV__) { console.log('Email:', email); }
+  if (__DEV__) { console.log('Original Email:', email); }
+  if (__DEV__) { console.log('Sanitized Email:', sanitizedEmail); }
   
   try {
     // Generate a 4-digit verification code
@@ -55,7 +59,7 @@ export async function sendVerificationCode(email: string): Promise<VerificationR
     
     // Store the verification code in Firestore
     // This will trigger the onVerificationCodeCreated function to send the email
-    await firestoreService.storeVerificationCode(email, code, expiresAt);
+    await firestoreService.storeVerificationCode(sanitizedEmail, code, expiresAt);
     
     if (__DEV__) { 
       console.log('Verification code stored in Firestore, email will be sent via trigger');
@@ -84,14 +88,18 @@ export async function sendVerificationCode(email: string): Promise<VerificationR
  * Verify code and authenticate user using Firebase Functions
  */
 export async function verifyCode(email: string, code: string): Promise<AuthResponse> {
+  // Sanitize email by trimming whitespace and newlines
+  const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
+  
   try {
-    if (__DEV__) { console.log('🔐 Firebase Functions verifying code:', code, 'for email:', email); }
+    if (__DEV__) { console.log('🔐 Firebase Functions verifying code:', code, 'for original email:', email); }
+    if (__DEV__) { console.log('🔐 Firebase Functions verifying code:', code, 'for sanitized email:', sanitizedEmail); }
     
     // Try to use Firebase Functions for verification
     try {
       const functions = getFunctions();
       const verifyCodeFunction = httpsCallable(functions, 'verifyCode');
-      const result = await verifyCodeFunction({ email, code });
+      const result = await verifyCodeFunction({ email: sanitizedEmail, code });
       
       if (__DEV__) { console.log('🔍 Firebase Functions verification result:', result); }
       
@@ -99,7 +107,7 @@ export async function verifyCode(email: string, code: string): Promise<AuthRespo
       
       if (data.success && data.user) {
         // Update last verification timestamp
-        await firestoreService.updateLastVerifiedAt(email);
+        await firestoreService.updateLastVerifiedAt(sanitizedEmail);
         
         // Generate tokens (use custom token if available, otherwise generate local ones)
         const accessToken = data.customToken || `firebase_${data.user.id}_${Date.now()}`;
@@ -143,7 +151,7 @@ export async function verifyCode(email: string, code: string): Promise<AuthRespo
       
       // Verify the code from Firestore
       if (__DEV__) { console.log('🔍 Verifying code in Firestore...'); }
-      const isValidCode = await firestoreService.verifyCode(email, code);
+      const isValidCode = await firestoreService.verifyCode(sanitizedEmail, code);
       
       if (__DEV__) { console.log('🔍 Code verification result:', isValidCode); }
       
@@ -157,7 +165,7 @@ export async function verifyCode(email: string, code: string): Promise<AuthRespo
       try {
         // Check if user already exists
         const existingUser = auth.currentUser;
-        if (existingUser && existingUser.email === email) {
+        if (existingUser && existingUser.email === sanitizedEmail) {
           firebaseUser = existingUser;
         } else {
           // Create new user with a secure temporary password
@@ -165,11 +173,11 @@ export async function verifyCode(email: string, code: string): Promise<AuthRespo
           
           try {
             // Try to sign in first (user might already exist)
-            const userCredential = await firebaseAuth.signInWithEmail(email, tempPassword);
+            const userCredential = await firebaseAuth.signInWithEmail(sanitizedEmail, tempPassword);
             firebaseUser = userCredential;
           } catch (signInError) {
             // User doesn't exist, create new user
-            firebaseUser = await firebaseAuth.createUserWithEmail(email, tempPassword);
+            firebaseUser = await firebaseAuth.createUserWithEmail(sanitizedEmail, tempPassword);
             
             // Send email verification
             if (firebaseUser) {

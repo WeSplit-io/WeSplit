@@ -57,12 +57,17 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
   try {
     const { email, code } = data;
     
+    // Sanitize email by trimming whitespace and newlines
+    const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
+    
+    console.log('🧹 Email sanitization in Firebase Functions:', { original: email, sanitized: sanitizedEmail });
+    
     // Validate input
-    if (!email || !code) {
+    if (!sanitizedEmail || !code) {
       throw new functions.https.HttpsError('invalid-argument', 'Email and code are required');
     }
     
-    if (!email.includes('@')) {
+    if (!sanitizedEmail.includes('@')) {
       throw new functions.https.HttpsError('invalid-argument', 'Invalid email format');
     }
     
@@ -71,7 +76,7 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
     }
 
     // Rate limiting: Check if too many requests for this email
-    const rateLimitKey = `rate_limit_${email}`;
+    const rateLimitKey = `rate_limit_${sanitizedEmail}`;
     const rateLimitRef = db.collection('rateLimits').doc(rateLimitKey);
     const rateLimitDoc = await rateLimitRef.get();
     
@@ -89,7 +94,7 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
     // Send email
     const mailOptions = {
       from: functions.config().email?.user || 'noreply@wesplit.app',
-      to: email,
+      to: sanitizedEmail,
       subject: 'WeSplit Verification Code',
       html: generateEmailTemplate(code)
     };
@@ -98,12 +103,12 @@ exports.sendVerificationEmail = functions.https.onCall(async (data, context) => 
     
     // Update rate limit
     await rateLimitRef.set({
-      email,
+      email: sanitizedEmail,
       lastRequest: admin.firestore.FieldValue.serverTimestamp(),
       requestCount: admin.firestore.FieldValue.increment(1)
     });
     
-    console.log(`Verification email sent to ${email}`);
+    console.log(`Verification email sent to ${sanitizedEmail}`);
     
     return { 
       success: true, 
@@ -127,12 +132,17 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
   try {
     const { email, code } = data;
     
+    // Sanitize email by trimming whitespace and newlines
+    const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
+    
+    console.log('🧹 Email sanitization in verifyCode Firebase Function:', { original: email, sanitized: sanitizedEmail });
+    
     // Validate input
-    if (!email || !code) {
+    if (!sanitizedEmail || !code) {
       throw new functions.https.HttpsError('invalid-argument', 'Email and code are required');
     }
     
-    if (!email.includes('@')) {
+    if (!sanitizedEmail.includes('@')) {
       throw new functions.https.HttpsError('invalid-argument', 'Invalid email format');
     }
     
@@ -143,7 +153,7 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
     // Find the verification code in Firestore
     const verificationRef = db.collection('verificationCodes');
     const q = verificationRef
-      .where('email', '==', email)
+      .where('email', '==', sanitizedEmail)
       .where('code', '==', code)
       .where('used', '==', false);
     
@@ -196,19 +206,33 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
       verifiedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    // Create or update user document in Firestore
-    const userRef = db.collection('users').doc(firebaseUser.uid);
-    const userDoc = await userRef.get();
+    // Check if user already exists by email (to avoid duplicates)
+    const existingUserQuery = await db.collection('users')
+      .where('email', '==', email)
+      .limit(1)
+      .get();
     
-    if (userDoc.exists) {
-      // Update existing user with new verification timestamp
-      await userRef.update({
+    let userDoc;
+    
+    if (!existingUserQuery.empty) {
+      // User already exists, update the existing document
+      userDoc = existingUserQuery.docs[0];
+      await userDoc.ref.update({
         lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastLoginAt: admin.firestore.FieldValue.serverTimestamp()
+        lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+        emailVerified: true,
+        // Update Firebase Auth UID if it's different
+        id: firebaseUser.uid,
+        // Update any missing fields
+        name: userDoc.data().name || firebaseUser.displayName || '',
+        avatar: userDoc.data().avatar || firebaseUser.photoURL || ''
       });
+      
+      console.log(`Updated existing user document for ${email}`);
     } else {
-      // Create new user document
-      await userRef.set({
+      // Create new user document with Firebase Auth UID
+      userDoc = db.collection('users').doc(firebaseUser.uid);
+      await userDoc.set({
         id: firebaseUser.uid,
         email: firebaseUser.email,
         name: firebaseUser.displayName || '',
@@ -221,6 +245,8 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
         lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(), // Track when user last verified
         hasCompletedOnboarding: false // Track onboarding completion
       });
+      
+      console.log(`Created new user document for ${email}`);
     }
 
     console.log(`Code verified successfully for ${email}`);
@@ -260,13 +286,18 @@ exports.onVerificationCodeCreated = functions.firestore
       const data = snap.data();
       const { email, code } = data;
       
-      if (!email || !code) {
+      // Sanitize email by trimming whitespace and newlines
+      const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
+      
+      console.log('🧹 Email sanitization in onVerificationCodeCreated:', { original: email, sanitized: sanitizedEmail });
+      
+      if (!sanitizedEmail || !code) {
         console.error('Missing email or code in verification document');
         return;
       }
 
       // Rate limiting: Check if too many requests for this email
-      const rateLimitKey = `rate_limit_${email}`;
+      const rateLimitKey = `rate_limit_${sanitizedEmail}`;
       const rateLimitRef = db.collection('rateLimits').doc(rateLimitKey);
       const rateLimitDoc = await rateLimitRef.get();
       
@@ -285,7 +316,7 @@ exports.onVerificationCodeCreated = functions.firestore
       // Send the verification email
       const mailOptions = {
         from: functions.config().email?.user || 'noreply@wesplit.app',
-        to: email,
+        to: sanitizedEmail,
         subject: 'WeSplit Verification Code',
         html: generateEmailTemplate(code)
       };
@@ -294,12 +325,12 @@ exports.onVerificationCodeCreated = functions.firestore
       
       // Update rate limit
       await rateLimitRef.set({
-        email,
+        email: sanitizedEmail,
         lastRequest: admin.firestore.FieldValue.serverTimestamp(),
         requestCount: admin.firestore.FieldValue.increment(1)
       });
       
-      console.log(`Verification email sent to ${email} via trigger`);
+      console.log(`Verification email sent to ${sanitizedEmail} via trigger`);
     } catch (error) {
       console.error('Error in onVerificationCodeCreated:', error);
     }

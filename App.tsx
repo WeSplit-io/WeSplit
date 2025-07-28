@@ -1,12 +1,12 @@
 import 'react-native-get-random-values';
 import React, { useState, useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WalletProvider } from './src/context/WalletContext';
 import { AppProvider } from './src/context/AppContext';
 import { Text, View } from 'react-native';
 import { styles } from './App.styles';
+import NavigationWrapper from './src/components/NavigationWrapper';
 
 // Import Firebase configuration
 import './src/config/firebase';
@@ -102,6 +102,14 @@ export default function App() {
     initializeApp();
   }, []);
 
+  // Set up deep link listeners when app is initialized
+  useEffect(() => {
+    if (isInitialized) {
+      // This will be set up in the NavigationContainer
+      if (__DEV__) { console.log('Deep link system ready'); }
+    }
+  }, [isInitialized]);
+
   if (__DEV__) { console.log('App component rendered, initialized:', isInitialized, 'error:', error); }
 
   if (!isInitialized) {
@@ -123,7 +131,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <WalletProvider>
         <AppProvider>
-          <NavigationContainer>
+          <NavigationWrapper>
             <Stack.Navigator 
               initialRouteName="Splash"
               screenOptions={{
@@ -176,7 +184,7 @@ export default function App() {
               <Stack.Screen name="SeedPhraseVerify" component={SeedPhraseVerifyScreen} />
               <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
             </Stack.Navigator>
-          </NavigationContainer>
+          </NavigationWrapper>
         </AppProvider>
       </WalletProvider>
     </QueryClientProvider>

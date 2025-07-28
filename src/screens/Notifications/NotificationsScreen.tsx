@@ -8,135 +8,31 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
-  Image
+  Image,
+  Animated
 } from 'react-native';
 import Icon from '../../components/Icon';
+import NotificationCard, { NotificationData } from '../../components/NotificationCard';
 import { useApp } from '../../context/AppContext';
-import { getUserNotifications, markNotificationAsRead, createTestNotification, Notification } from '../../services/firebaseNotificationService';
+import { getUserNotifications, markNotificationAsRead, sendNotification, Notification } from '../../services/firebaseNotificationService';
+import { updatePaymentRequestStatus, updateSettlementRequestStatus } from '../../services/notificationStatusService';
+import { firebaseDataService } from '../../services/firebaseDataService';
 import styles from './styles';
 import { colors } from '../../theme/colors';
+import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
 const NotificationsScreen: React.FC<any> = ({ navigation }) => {
-  const { state, notifications, loadNotifications } = useApp();
+  const { state, notifications, loadNotifications, refreshNotifications, acceptGroupInvitation } = useApp();
   const { currentUser } = state;
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'requests'>('all');
 
-  // Mock notifications for demonstration
-  const mockNotifications = [
-    // Today notifications
-    {
-      id: '1',
-      type: 'payment_received' as const,
-      title: 'Payment Received',
-      message: 'You received a payment of 86.7 USDC from Rémi G.',
-      created_at: new Date().toISOString(),
-      is_read: false,
-      data: {
-        amount: 86.7,
-        currency: 'USDC',
-        sender: 'Rémi G.',
-        senderAvatar: 'https://example.com/avatar1.jpg'
-      }
-    },
-    {
-      id: '2',
-      type: 'payment_request' as const,
-      title: 'Payment Request',
-      message: 'Haxxxoloto requested a payment of 86.7 USDC',
-      created_at: new Date().toISOString(),
-      is_read: false,
-      data: {
-        amount: 86.7,
-        currency: 'USDC',
-        requester: 'Haxxxoloto',
-        requesterAvatar: 'https://example.com/avatar2.jpg'
-      }
-    },
-    {
-      id: '3',
-      type: 'group_payment_request' as const,
-      title: 'Group Payment Request',
-      message: 'Rémi G. requested a payment of 86.7 USDC in Hackathon Solana',
-      created_at: new Date().toISOString(),
-      is_read: false,
-      data: {
-        amount: 86.7,
-        currency: 'USDC',
-        requester: 'Rémi G.',
-        groupName: 'Hackathon Solana',
-        requesterAvatar: 'https://example.com/avatar1.jpg'
-      }
-    },
-    // Yesterday notifications
-    {
-      id: '4',
-      type: 'payment_received' as const,
-      title: 'Payment Received',
-      message: 'You received a payment of 86.7 USDC from Rémi G.',
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      is_read: true,
-      data: {
-        amount: 86.7,
-        currency: 'USDC',
-        sender: 'Rémi G.',
-        senderAvatar: 'https://example.com/avatar1.jpg'
-      }
-    },
-    {
-      id: '5',
-      type: 'payment_request' as const,
-      title: 'Payment Request',
-      message: 'Haxxxoloto requested a payment of 86.7 USDC',
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      is_read: true,
-      data: {
-        amount: 86.7,
-        currency: 'USDC',
-        requester: 'Haxxxoloto',
-        requesterAvatar: 'https://example.com/avatar2.jpg'
-      }
-    },
-    {
-      id: '6',
-      type: 'group_added' as const,
-      title: 'Added to Group',
-      message: 'You were added to Hackathon Solana by Rémi G.',
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      is_read: true,
-      data: {
-        groupName: 'Hackathon Solana',
-        addedBy: 'Rémi G.',
-        addedByAvatar: 'https://example.com/avatar1.jpg'
-      }
-    },
-    {
-      id: '7',
-      type: 'group_payment_request' as const,
-      title: 'Group Payment Request',
-      message: 'Rémi G. requested a payment of 86.7 USDC in Hackathon Solana',
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      is_read: true,
-      data: {
-        amount: 86.7,
-        currency: 'USDC',
-        requester: 'Rémi G.',
-        groupName: 'Hackathon Solana',
-        requesterAvatar: 'https://example.com/avatar1.jpg'
-      }
-    },
-    {
-      id: '8',
-      type: 'system_warning' as const,
-      title: 'Wallet Limit Warning',
-      message: 'Your wallet limit is almost exceeded.',
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      is_read: true,
-      data: {}
-    }
-  ];
+  // State for managing action button states and animations
+  const [actionStates, setActionStates] = useState<{ [key: string]: 'pending' | 'completed' | 'error' }>({});
+  const [fadeAnimations, setFadeAnimations] = useState<{ [key: string]: Animated.Value }>({});
 
   // Use notifications from context
   useEffect(() => {
@@ -160,7 +56,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  const handleNotificationPress = async (notification: any) => {
+  const handleNotificationPress = async (notification: NotificationData) => {
     // Mark as read if not already read
     if (!notification.is_read) {
       try {
@@ -180,68 +76,421 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     }
   };
 
-  const getNotificationImage = (notification: any) => {
-    // For system warnings, use warning icon (using user icon as placeholder)
-    if (notification.type === 'system_warning' || notification.type === 'system_notification') {
-      return require('../../../assets/warning-icon-red.png');
+  // Initialize fade animation for a notification
+  const initializeFadeAnimation = (notificationId: string) => {
+    if (!fadeAnimations[notificationId]) {
+      setFadeAnimations(prev => ({
+        ...prev,
+        [notificationId]: new Animated.Value(1)
+      }));
     }
-    
-    // For group notifications, use group icon
-    if (notification.type === 'group_added' || notification.type === 'group_payment_request') {
-      return require('../../../assets/folder-icon-default.png');
-    }
-    
-    // For payment received, use sender avatar or default user icon
-    if (notification.type === 'payment_received') {
-      return notification.data?.senderAvatar 
-        ? { uri: notification.data.senderAvatar }
-        : require('../../../assets/user-icon-black.png');
-    }
-    
-    // For payment requests, use requester avatar or default user icon
-    if (notification.type === 'payment_request') {
-      return notification.data?.requesterAvatar 
-        ? { uri: notification.data.requesterAvatar }
-        : require('../../../assets/user-icon-black.png');
-    }
-    
-    // For settlement notifications, use wallet icon
-    if (notification.type === 'settlement_request' || notification.type === 'settlement_notification') {
-      return require('../../../assets/wallet-icon-default.png');
-    }
-    
-    // For funding notifications, use wallet icon
-    if (notification.type === 'funding_notification') {
-      return require('../../../assets/wallet-icon-default.png');
-    }
-    
-    // Default fallback
-    return require('../../../assets/user-icon-black.png');
   };
 
-  const getNotificationIconColor = (type: string) => {
-    switch (type) {
-      case 'payment_received':
-        return '#A5EA15';
-      case 'payment_request':
-      case 'group_payment_request':
-        return '#A5EA15';
-      case 'group_added':
-        return colors.green;
-      case 'system_warning':
-        return '#FF6B6B';
-      case 'system_notification':
-        return '#A89B9B';
-      case 'settlement_request':
-        return '#FF6B6B';
-      case 'settlement_notification':
-        return '#A5EA15';
-      case 'funding_notification':
-        return '#45B7D1';
-      default:
-        return '#A89B9B';
+  // Show toast-like alert
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    Alert.alert(
+      type === 'success' ? 'Success' : 'Error',
+      message,
+      [{ text: 'OK' }]
+    );
+  };
+
+  // Comprehensive notification action handler
+  const notificationActionHandler = async (notification: NotificationData) => {
+    const notificationId = notification.id;
+    
+    // Initialize animation if not exists
+    initializeFadeAnimation(notificationId);
+    
+    // Set action state to pending
+    setActionStates(prev => ({
+      ...prev,
+      [notificationId]: 'pending'
+    }));
+
+    try {
+      if (notification.type === 'payment_request' || notification.type === 'payment_reminder') {
+        // Handle payment request
+        if (notification.status === 'paid') {
+          showToast('Payment already completed');
+          return;
+        }
+
+        // Navigate to send payment screen
+        navigation.navigate('Send', { 
+          recipient: notification.data?.requester,
+          amount: notification.data?.amount,
+          currency: notification.data?.currency,
+          fromNotification: true,
+          notificationId: notificationId
+        });
+
+        // Mark as completed after navigation
+        setActionStates(prev => ({
+          ...prev,
+          [notificationId]: 'completed'
+        }));
+
+        // Fade animation
+        Animated.timing(fadeAnimations[notificationId], {
+          toValue: 0.6,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+
+      } else if (notification.type === 'group_invite') {
+        // Handle group invitation
+        const groupId = notification.data?.groupId;
+        const inviteLink = notification.data?.inviteLink;
+        
+        if (!groupId) {
+          throw new Error('Missing group data in notification');
+        }
+
+        console.log('🔄 NotificationsScreen: Processing group invitation:', {
+          notificationId,
+          groupId,
+          inviteLink,
+          notificationData: notification.data
+        });
+
+        // Get the current user ID
+        const currentUserId = state.currentUser?.id;
+        if (!currentUserId) {
+          throw new Error('User not authenticated');
+        }
+        
+        try {
+          // Extract inviteId from inviteLink if available
+          let inviteId = groupId; // Default to groupId
+          
+          if (inviteLink) {
+            // Parse inviteLink format: "wesplit://join/invite_{groupId}_{timestamp}_{randomId}"
+            const inviteMatch = inviteLink.match(/invite_([^_]+)_(\d+)_([a-zA-Z0-9]+)/);
+            if (inviteMatch) {
+              inviteId = inviteMatch[1]; // Use the groupId part as inviteId
+              console.log('🔄 NotificationsScreen: Extracted inviteId from inviteLink:', inviteId);
+            }
+          }
+
+          // Try to join using the proper inviteId
+          const result = await firebaseDataService.group.joinGroupViaInvite(
+            inviteId,
+            currentUserId.toString()
+          );
+
+          console.log('🔄 NotificationsScreen: Successfully joined group:', result);
+
+          // Update action state
+          setActionStates(prev => ({
+            ...prev,
+            [notificationId]: 'completed'
+          }));
+
+          // Fade animation
+          Animated.timing(fadeAnimations[notificationId], {
+            toValue: 0.6,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            // Navigate to group details after animation
+            navigation.navigate('GroupDetails', { groupId });
+          });
+
+          showToast('Successfully joined the group!');
+
+        } catch (error) {
+          console.error('❌ NotificationsScreen: Error joining group:', error);
+          
+          // If the joinGroupViaInvite fails, try alternative approach
+          if (error instanceof Error && (error.message.includes('Invalid or expired invite link') || error.message.includes('invite'))) {
+            // Try to join using the group ID directly
+            try {
+              // Add user to group members directly
+              const groupMembersRef = collection(db, 'groupMembers');
+              const userDoc = await getDoc(doc(db, 'users', currentUserId.toString()));
+              
+              if (userDoc.exists()) {
+                const userData = userDoc.data();
+                
+                // Check if user is already a member
+                const memberQuery = query(
+                  groupMembersRef,
+                  where('group_id', '==', groupId),
+                  where('user_id', '==', currentUserId.toString())
+                );
+                const memberDocs = await getDocs(memberQuery);
+                
+                if (memberDocs.empty) {
+                  // Add user to group
+                  await addDoc(groupMembersRef, {
+                    group_id: groupId,
+                    user_id: currentUserId.toString(),
+                    name: userData.name || 'You',
+                    email: userData.email || '',
+                    wallet_address: userData.wallet_address || '',
+                    wallet_public_key: userData.wallet_public_key || '',
+                    joined_at: serverTimestamp(),
+                    created_at: serverTimestamp(),
+                    avatar: userData.avatar || '',
+                    invitation_status: 'accepted',
+                    invited_at: serverTimestamp(),
+                    invited_by: currentUserId.toString()
+                  });
+                  
+                  console.log('🔄 NotificationsScreen: Successfully added user to group via direct method');
+                  
+                  // Update action state
+                  setActionStates(prev => ({
+                    ...prev,
+                    [notificationId]: 'completed'
+                  }));
+
+                  // Fade animation
+                  Animated.timing(fadeAnimations[notificationId], {
+                    toValue: 0.6,
+                    duration: 300,
+                    useNativeDriver: true,
+                  }).start(() => {
+                    // Navigate to group details after animation
+                    navigation.navigate('GroupDetails', { groupId });
+                  });
+
+                  showToast('Successfully joined the group!');
+                } else {
+                  // User is already a member, update their status to accepted if it's pending
+                  const existingMember = memberDocs.docs[0];
+                  const existingData = existingMember.data();
+                  
+                  if (existingData.invitation_status === 'pending') {
+                    // Update the member's status to accepted
+                    await updateDoc(existingMember.ref, {
+                      invitation_status: 'accepted',
+                      joined_at: serverTimestamp(),
+                      name: userData.name || 'You',
+                      email: userData.email || '',
+                      wallet_address: userData.wallet_address || '',
+                      wallet_public_key: userData.wallet_public_key || '',
+                      avatar: userData.avatar || ''
+                    });
+                    
+                    console.log('🔄 NotificationsScreen: Updated user status to accepted');
+                    showToast('Successfully joined the group!');
+                  } else {
+                    console.log('🔄 NotificationsScreen: User is already a member of this group');
+                    showToast('You are already a member of this group');
+                  }
+                  
+                  // Update action state
+                  setActionStates(prev => ({
+                    ...prev,
+                    [notificationId]: 'completed'
+                  }));
+                }
+              } else {
+                throw new Error('User data not found');
+              }
+            } catch (directError) {
+              console.error('❌ NotificationsScreen: Error with direct join method:', directError);
+              showToast('Failed to join group. Please try again.', 'error');
+              
+              // Set action state to error
+              setActionStates(prev => ({
+                ...prev,
+                [notificationId]: 'error'
+              }));
+            }
+          } else {
+            // Handle other types of errors
+            showToast('Failed to join group. Please try again.', 'error');
+            
+            // Set action state to error
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'error'
+            }));
+          }
+        }
+
+      } else if (notification.type === 'expense_added') {
+        // Handle expense added notification
+        const groupId = notification.data?.groupId;
+        
+        if (groupId) {
+          // Navigate to group details
+          navigation.navigate('GroupDetails', { groupId });
+          
+          // Mark as completed
+          setActionStates(prev => ({
+            ...prev,
+            [notificationId]: 'completed'
+          }));
+
+          // Fade animation
+          Animated.timing(fadeAnimations[notificationId], {
+            toValue: 0.6,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+        }
+
+      } else if (notification.type === 'settlement_request') {
+        // Handle settlement request
+        const groupId = notification.data?.groupId;
+        
+        if (groupId) {
+          // Navigate to settlement screen
+          navigation.navigate('SettleUp', { groupId });
+          
+          // Mark as completed
+          setActionStates(prev => ({
+            ...prev,
+            [notificationId]: 'completed'
+          }));
+
+          // Fade animation
+          Animated.timing(fadeAnimations[notificationId], {
+            toValue: 0.6,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+        }
+
+      } else if (notification.type === 'settlement_notification') {
+        // Handle settlement notification (view only)
+        const groupId = notification.data?.groupId;
+        
+        if (groupId) {
+          navigation.navigate('GroupDetails', { groupId });
+          
+          setActionStates(prev => ({
+            ...prev,
+            [notificationId]: 'completed'
+          }));
+
+          Animated.timing(fadeAnimations[notificationId], {
+            toValue: 0.6,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+        }
+
+      } else {
+        // Default action for other notification types
+        setActionStates(prev => ({
+          ...prev,
+          [notificationId]: 'completed'
+        }));
+
+        Animated.timing(fadeAnimations[notificationId], {
+          toValue: 0.6,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }
+
+      // Refresh notifications to update status
+      await loadNotifications(true);
+
+    } catch (error) {
+      console.error('Error handling notification action:', error);
+      
+      // Set error state
+      setActionStates(prev => ({
+        ...prev,
+        [notificationId]: 'error'
+      }));
+
+      // Show error toast
+      showToast(
+        error instanceof Error ? error.message : 'Failed to complete action. Please try again.',
+        'error'
+      );
+
+      // Reset animation after error
+      Animated.timing(fadeAnimations[notificationId], {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     }
   };
+
+  const handlePaymentStatusUpdate = async (notificationId: string, newStatus: 'paid' | 'cancelled') => {
+    try {
+      if (!currentUser?.id) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+
+      Alert.alert(
+        'Update Payment Status',
+        `Mark notification ${notificationId} as ${newStatus}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Update', 
+            onPress: async () => {
+              try {
+                // Update the notification status in Firestore
+                await updatePaymentRequestStatus(notificationId, newStatus, String(currentUser.id));
+                
+                // Refresh notifications to show updated status
+                await loadNotifications(true);
+                
+                Alert.alert('Success', `Notification status updated to ${newStatus}`);
+              } catch (error) {
+                console.error('Error updating payment status:', error);
+                Alert.alert('Error', 'Failed to update payment status');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      Alert.alert('Error', 'Failed to update payment status');
+    }
+  };
+
+  const handleSettlementStatusUpdate = async (notificationId: string, newStatus: 'paid' | 'cancelled') => {
+    try {
+      if (!currentUser?.id) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+
+      Alert.alert(
+        'Update Settlement Status',
+        `Mark settlement ${notificationId} as ${newStatus}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Update', 
+            onPress: async () => {
+              try {
+                // Update the notification status in Firestore
+                await updateSettlementRequestStatus(notificationId, newStatus, String(currentUser.id));
+                
+                // Refresh notifications to show updated status
+                await loadNotifications(true);
+                
+                Alert.alert('Success', `Settlement status updated to ${newStatus}`);
+              } catch (error) {
+                console.error('Error updating settlement status:', error);
+                Alert.alert('Error', 'Failed to update settlement status');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error updating settlement status:', error);
+      Alert.alert('Error', 'Failed to update settlement status');
+    }
+  };
+
+
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -302,12 +551,31 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     return grouped;
   };
 
-  const filteredNotifications = activeTab === 'requests'
-    ? mockNotifications.filter(n => n.type === 'payment_request' || n.type === 'group_payment_request')
-    : mockNotifications;
+  // Transform real notifications to match NotificationData interface
+  const getDisplayNotifications = (): NotificationData[] => {
+    const realNotifications = notifications || [];
+    
+    // Transform real notifications to match NotificationData interface
+    const transformedNotifications: NotificationData[] = realNotifications.map((notification: any) => ({
+      id: notification.id,
+      type: notification.type as NotificationData['type'],
+      title: notification.title,
+      message: notification.message,
+      created_at: notification.created_at,
+      is_read: notification.is_read,
+      status: notification.data?.status || 'pending',
+      data: notification.data || {}
+    }));
+    
+    return activeTab === 'requests'
+      ? transformedNotifications.filter((n: NotificationData) => n.type === 'payment_request' || n.type === 'payment_reminder')
+      : transformedNotifications;
+  };
+
+  const filteredNotifications = getDisplayNotifications();
 
   const groupedNotifications = groupNotificationsByDate(filteredNotifications);
-  const unreadCount = mockNotifications.filter(n => !n.is_read).length;
+  const unreadCount = filteredNotifications.filter((n: NotificationData) => !n.is_read).length;
 
   if (loading) {
     return (
@@ -336,25 +604,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
           </View>
         )}
-        {__DEV__ && (
-          <TouchableOpacity
-            style={{ padding: 8, backgroundColor: '#333', borderRadius: 4, marginLeft: 8 }}
-            onPress={async () => {
-              try {
-                if (currentUser?.id) {
-                  await createTestNotification(currentUser.id);
-                  await loadNotifications(true);
-                  Alert.alert('Success', 'Test notification created!');
-                }
-              } catch (error) {
-                console.error('Error creating test notification:', error);
-                Alert.alert('Error', 'Failed to create test notification');
-              }
-            }}
-          >
-            <Text style={{ color: '#FFF', fontSize: 12 }}>Test</Text>
-          </TouchableOpacity>
-        )}
+
         <View style={styles.placeholder} />
       </View>
 
@@ -404,67 +654,14 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             <View key={sectionTitle}>
               <Text style={styles.sectionHeader}>{sectionTitle}</Text>
               {sectionNotifications.map((notification) => (
-                <TouchableOpacity
+                <NotificationCard
                   key={notification.id}
-                  style={[
-                    styles.notificationItem,
-                    !notification.is_read && styles.unreadNotification
-                  ]}
-                  onPress={() => handleNotificationPress(notification)}
-                >
-                  <View style={styles.notificationLeftWrapper}>
-                    <View style={[
-                      styles.notificationIcon,
-                      { backgroundColor: getNotificationIconColor(notification.type) + '20' }
-                    ]}>
-                      <Image
-                        source={getNotificationImage(notification)}
-                        style={styles.notificationImage}
-                      />
-                    </View>
-                    <View style={styles.notificationContent}>
-                      <Text style={styles.notificationMessage} numberOfLines={2}>
-                        {notification.message.split(/(\d+\.?\d*\s*USDC|Rémi G\.|Haxxxoloto|Hackathon Solana)/).map((part: string, index: number) => {
-                          // Check if this part is a USDC amount
-                          if (/\d+\.?\d*\s*USDC/.test(part)) {
-                            return (
-                              <Text key={index} style={styles.notificationAmount}>
-                                {part}
-                              </Text>
-                            );
-                          }
-                          // Check if this part is a user name or group name
-                          if (/Rémi G\.|Haxxxoloto|Hackathon Solana/.test(part)) {
-                            return (
-                              <Text key={index} style={styles.notificationUserName}>
-                                {part}
-                              </Text>
-                            );
-                          }
-                          return part;
-                        })}
-                      </Text>
-                      <Text style={styles.notificationTime}>
-                        {formatTime(notification.created_at)}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.notificationRightWrapper}>
-                    {/* Action Button for requests */}
-                    {(notification.type === 'payment_request' || notification.type === 'group_payment_request') && (
-                      <TouchableOpacity style={styles.actionButton}>
-                        <Text style={styles.actionButtonText}>Send</Text>
-                      </TouchableOpacity>
-                    )}
-
-                    {/* Action Button for group added */}
-                    {notification.type === 'group_added' && (
-                      <TouchableOpacity style={styles.actionButton}>
-                        <Text style={styles.actionButtonText}>View</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </TouchableOpacity>
+                  notification={notification}
+                  onPress={handleNotificationPress}
+                  onActionPress={notificationActionHandler}
+                  actionState={actionStates[notification.id]}
+                  fadeAnimation={fadeAnimations[notification.id]}
+                />
               ))}
             </View>
           ))

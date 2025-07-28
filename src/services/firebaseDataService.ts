@@ -36,7 +36,8 @@ import {
   Timestamp,
   writeBatch,
   onSnapshot,
-  DocumentData
+  DocumentData,
+  runTransaction
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { sendNotification } from './firebaseNotificationService';
@@ -109,7 +110,7 @@ export const firebaseDataTransformers = {
 
   // Transform Firestore document to GroupMember
   firestoreToGroupMember: (doc: any): GroupMember => ({
-    id: doc.id, // Keep as string for Firebase compatibility
+    id: doc.data().user_id || doc.id, // Use user_id instead of member ID
     name: doc.data().name || '',
     email: doc.data().email || '',
     wallet_address: doc.data().wallet_address || doc.data().walletAddress || '',
@@ -155,8 +156,8 @@ export const firebaseDataTransformers = {
     paid_by: expense.paid_by || expense.paidBy, // Handle both camelCase and snake_case
     group_id: (expense.group_id || expense.groupId).toString(), // Handle both camelCase and snake_case
     category: expense.category,
-    split_type: expense.splitType,
-    split_data: expense.splitData,
+    split_type: expense.split_type || expense.splitType, // Handle both camelCase and snake_case
+    split_data: expense.split_data || expense.splitData, // Handle both camelCase and snake_case
     created_at: serverTimestamp(),
     updated_at: serverTimestamp()
   }),
@@ -277,6 +278,73 @@ export const firebaseUserService = {
       id: userRef.id, // Keep as string for Firebase compatibility
       created_at: new Date().toISOString()
     } as User;
+  },
+
+  createUserIfNotExists: async (userData: Omit<User, 'id' | 'created_at'>): Promise<User> => {
+    try {
+      if (__DEV__) { console.log('🔥 createUserIfNotExists: Checking for existing user with email:', userData.email); }
+      
+      // Check if user already exists by email
+      const usersRef = collection(db, 'users');
+      const userQuery = query(usersRef, where('email', '==', userData.email));
+      const userDocs = await getDocs(userQuery);
+      
+      if (!userDocs.empty) {
+        // User already exists, return the existing user
+        const existingUserDoc = userDocs.docs[0];
+        const existingUser = firebaseDataTransformers.firestoreToUser(existingUserDoc);
+        
+        if (__DEV__) { console.log('🔥 createUserIfNotExists: User already exists, returning existing user:', existingUser.id); }
+        
+        // Update user if new data is provided
+        const updates: Partial<User> = {};
+        let hasUpdates = false;
+        
+        if (userData.name && userData.name !== existingUser.name) {
+          updates.name = userData.name;
+          hasUpdates = true;
+        }
+        
+        if (userData.wallet_address && !existingUser.wallet_address) {
+          updates.wallet_address = userData.wallet_address;
+          hasUpdates = true;
+        }
+        
+        if (userData.wallet_public_key && !existingUser.wallet_public_key) {
+          updates.wallet_public_key = userData.wallet_public_key;
+          hasUpdates = true;
+        }
+        
+        if (userData.avatar && userData.avatar !== existingUser.avatar) {
+          updates.avatar = userData.avatar;
+          hasUpdates = true;
+        }
+        
+        if (hasUpdates) {
+          if (__DEV__) { console.log('🔥 createUserIfNotExists: Updating existing user with new data'); }
+          return await firebaseDataService.user.updateUser(existingUser.id.toString(), updates);
+        }
+        
+        return existingUser;
+      }
+      
+      // User doesn't exist, create new user
+      if (__DEV__) { console.log('🔥 createUserIfNotExists: Creating new user'); }
+      
+      const userRef = await addDoc(collection(db, 'users'), firebaseDataTransformers.userToFirestore(userData as User));
+      const newUser = {
+        ...userData,
+        id: userRef.id,
+        created_at: new Date().toISOString()
+      } as User;
+      
+      if (__DEV__) { console.log('🔥 createUserIfNotExists: New user created:', newUser.id); }
+      
+      return newUser;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 createUserIfNotExists: Error:', error); }
+      throw error;
+    }
   },
 
   updateUser: async (userId: string, updates: Partial<User>): Promise<User> => {
@@ -438,36 +506,133 @@ export const firebaseUserService = {
 export const firebaseGroupService = {
   getUserGroups: async (userId: string, forceRefresh: boolean = false): Promise<GroupWithDetails[]> => {
     try {
-    // Get groups where user is a member
-    const groupMembersRef = collection(db, 'groupMembers');
-      const memberQuery = query(groupMembersRef, where('user_id', '==', userId));
-    const memberDocs = await getDocs(memberQuery);
-    
-    const groupIds = memberDocs.docs.map(doc => doc.data().group_id);
-    
-    if (groupIds.length === 0) {
-      return [];
-    }
-    
-    // Get group details
+      if (__DEV__) { console.log('🔥 Firebase: Getting groups for user:', userId, 'forceRefresh:', forceRefresh); }
+      
+      // Query groupMembers collection for this user
+      if (__DEV__) { console.log('🔥 Firebase: Querying groupMembers collection for user:', userId); }
+      const groupMembersRef = collection(db, 'groupMembers');
+      const memberQuery = query(
+        groupMembersRef,
+        where('user_id', '==', userId)
+      );
+      const memberDocs = await getDocs(memberQuery);
+      
+      if (__DEV__) { console.log('🔥 Firebase: Found', memberDocs.docs.length, 'total member records for user', userId); }
+      
+      // Process member records to get accepted groups
+      const acceptedMembers = memberDocs.docs.filter(doc => {
+        const data = doc.data();
+        const isAccepted = data.invitation_status === 'accepted';
+        if (__DEV__) { 
+          console.log('🔥 Firebase: Member record:', {
+            group_id: data.group_id,
+            invitation_status: data.invitation_status,
+            isAccepted: isAccepted,
+            user_id: data.user_id
+          }); 
+        }
+        return isAccepted;
+      });
+      
+      const groupIds = acceptedMembers.map(doc => doc.data().group_id);
+      if (__DEV__) { console.log('🔥 Firebase: Found', groupIds.length, 'groups where user is accepted member'); }
+      if (__DEV__) { console.log('🔥 Firebase: Accepted member group IDs:', groupIds); }
+      
+      // Query groups collection for groups where user is creator
+      if (__DEV__) { console.log('🔥 Firebase: Querying groups collection for creator:', userId); }
       const groupsRef = collection(db, 'groups');
-      const groupsQuery = query(groupsRef, where('__name__', 'in', groupIds));
-      const groupsDocs = await getDocs(groupsQuery);
+      const creatorQuery = query(groupsRef, where('created_by', '==', userId));
+      const creatorDocs = await getDocs(creatorQuery);
       
-      // Transform to GroupWithDetails
-      const groupsWithDetails: GroupWithDetails[] = [];
+      if (__DEV__) { console.log('🔥 Firebase: Found', creatorDocs.docs.length, 'groups where user is creator'); }
       
-      for (const groupDoc of groupsDocs.docs) {
-          const group = firebaseDataTransformers.firestoreToGroup(groupDoc);
+      const creatorGroupIds = creatorDocs.docs.map(doc => doc.id);
+      if (__DEV__) { console.log('🔥 Firebase: Creator group IDs:', creatorGroupIds); }
+      
+      // Combine and deduplicate group IDs
+      const allGroupIds = Array.from(new Set([...groupIds, ...creatorGroupIds]));
+      if (__DEV__) { console.log('🔥 Firebase: Total unique groups:', allGroupIds.length); }
+      if (__DEV__) { console.log('🔥 Firebase: All group IDs to fetch:', allGroupIds); }
+      
+      // Fetch group details individually to avoid Firebase 'in' query limit
+      const groupIdsToFetch = allGroupIds;
+      if (__DEV__) { console.log('🔥 Firebase: Group IDs to fetch:', groupIdsToFetch); }
+      if (__DEV__) { console.log('🔥 Firebase: Starting to fetch', groupIdsToFetch.length, 'groups individually'); }
+      
+      const results: GroupWithDetails[] = [];
+      
+      for (const groupId of groupIdsToFetch) {
+        if (__DEV__) { console.log('🔥 Firebase: Fetching group:', groupId); }
+        
+        try {
+          const groupDoc = await getDoc(doc(db, 'groups', groupId));
           
-        // Get group members
-        const groupMembersQuery = query(groupMembersRef, where('group_id', '==', group.id));
-        const groupMemberDocs = await getDocs(groupMembersQuery);
-        const members = groupMemberDocs.docs.map(doc => firebaseDataTransformers.firestoreToGroupMember(doc));
+          if (groupDoc.exists()) {
+            const groupData = groupDoc.data();
+            if (__DEV__) { console.log('🔥 Firebase: Successfully fetched group:', groupData.name, '(', groupId, ')'); }
+            
+            // Get member count for this group
+            const groupMembersQuery = query(
+              collection(db, 'groupMembers'),
+              where('group_id', '==', groupId),
+              where('invitation_status', '==', 'accepted')
+            );
+            const groupMembersDocs = await getDocs(groupMembersQuery);
+            const memberCount = groupMembersDocs.docs.length;
+            
+            if (__DEV__) { console.log('🔥 Firebase: Group', groupData.name, 'has', memberCount, 'accepted members'); }
+            
+            const group: GroupWithDetails = {
+              id: groupDoc.id,
+              name: groupData.name || '',
+              description: groupData.description || '',
+              category: groupData.category || 'general',
+              currency: groupData.currency || 'USDC',
+              icon: groupData.icon || 'people',
+              color: groupData.color || '#A5EA15',
+              created_by: groupData.created_by || '',
+              created_at: firebaseDataTransformers.timestampToISO(groupData.created_at),
+              updated_at: firebaseDataTransformers.timestampToISO(groupData.updated_at),
+              member_count: memberCount,
+              expense_count: groupData.expense_count || 0,
+              expenses_by_currency: groupData.expenses_by_currency || [],
+              members: [],
+              expenses: [],
+              totalAmount: 0,
+              userBalance: 0
+            };
+            
+            // Get group members
+            const groupMembersQueryForDetails = query(
+              collection(db, 'groupMembers'),
+              where('group_id', '==', groupId),
+              where('invitation_status', '==', 'accepted')
+            );
+            const groupMembersDocsForDetails = await getDocs(groupMembersQueryForDetails);
+            const members = groupMembersDocsForDetails.docs.map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                name: data.name || '',
+                email: data.email || '',
+                wallet_address: data.wallet_address || '',
+                wallet_public_key: data.wallet_public_key || '',
+                created_at: firebaseDataTransformers.timestampToISO(data.created_at),
+                joined_at: firebaseDataTransformers.timestampToISO(data.joined_at),
+                avatar: data.avatar || '',
+                invitation_status: data.invitation_status || 'accepted',
+                invited_at: firebaseDataTransformers.timestampToISO(data.invited_at),
+                invited_by: data.invited_by || ''
+              } as GroupMember;
+            });
         
         // Get group expenses
         const expensesRef = collection(db, 'expenses');
-        const expensesQuery = query(expensesRef, where('group_id', '==', group.id));
+            const expensesQuery = query(
+              expensesRef,
+              where('group_id', '==', groupId),
+              orderBy('created_at', 'desc')
+            );
         const expensesDocs = await getDocs(expensesQuery);
         const expenses = expensesDocs.docs.map(doc => firebaseDataTransformers.firestoreToExpense(doc));
           
@@ -475,19 +640,36 @@ export const firebaseGroupService = {
         const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0);
         const userBalance = calculateUserBalance(expenses, members, userId);
         
-        groupsWithDetails.push({
-          ...group,
-          members,
-          expenses,
-          totalAmount,
-          userBalance
-        });
+            // Update group with full details
+            group.members = members;
+            group.expenses = expenses;
+            group.totalAmount = totalAmount;
+            group.userBalance = userBalance;
+            
+            results.push(group);
+            if (__DEV__) { console.log('🔥 Firebase: Added group to results:', {
+              id: group.id,
+              name: group.name,
+              membersCount: group.members.length,
+              expensesCount: group.expenses.length,
+              totalAmount: group.totalAmount,
+              userBalance: group.userBalance
+            }); }
+          } else {
+            if (__DEV__) { console.log('🔥 Firebase: Group', groupId, 'not found in Firestore'); }
+          }
+        } catch (error) {
+          if (__DEV__) { console.error('🔥 Firebase: Error fetching group', groupId, ':', error); }
         }
+      }
       
-      return groupsWithDetails;
+      if (__DEV__) { console.log('🔥 Firebase: Successfully processed', results.length, 'out of', groupIdsToFetch.length, 'groups'); }
+      if (__DEV__) { console.log('🔥 Firebase: Returning', results.length, 'groups with details'); }
+      
+      return results;
       } catch (error) {
-      if (__DEV__) { console.error('🔥 Error getting user groups:', error); }
-      return [];
+      if (__DEV__) { console.error('🔥 Firebase: Error in getUserGroups:', error); }
+      throw error;
       }
   },
 
@@ -527,10 +709,13 @@ export const firebaseGroupService = {
   // Helper function to clean up phantom members
   cleanupPhantomMembers: async (groupId: string): Promise<void> => {
     try {
+      console.log('🔥 cleanupPhantomMembers: Starting cleanup for group:', groupId);
+      
       const groupDoc = await getDoc(doc(db, 'groups', groupId));
       if (!groupDoc.exists()) return;
       
       const groupName = groupDoc.data()?.name;
+      console.log('🔥 cleanupPhantomMembers: Group name:', groupName);
       
       const groupMembersRef = collection(db, 'groupMembers');
       
@@ -540,6 +725,8 @@ export const firebaseGroupService = {
         where('group_id', '==', groupId)
       );
       const allMembersDocs = await getDocs(allMembersQuery);
+      
+      console.log('🔥 cleanupPhantomMembers: Found members before cleanup:', allMembersDocs.docs.length);
       
       const membersToDelete: any[] = [];
       
@@ -602,6 +789,8 @@ export const firebaseGroupService = {
       
       // Delete all marked members
       if (membersToDelete.length > 0) {
+        console.log('🔥 cleanupPhantomMembers: Deleting members:', membersToDelete.length);
+        
         const batch = writeBatch(db);
         membersToDelete.forEach(ref => {
           batch.delete(ref);
@@ -611,6 +800,8 @@ export const firebaseGroupService = {
         if (__DEV__) {
           console.log('🔥 Cleaned up phantom members:', membersToDelete.length);
         }
+      } else {
+        console.log('🔥 cleanupPhantomMembers: No members to delete');
       }
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error cleaning up phantom members:', error); }
@@ -619,21 +810,33 @@ export const firebaseGroupService = {
 
   getGroupMembers: async (groupId: string, forceRefresh: boolean = false, currentUserId?: string): Promise<GroupMember[]> => {
     try {
+      console.log('🔥 getGroupMembers: Starting for group:', groupId, 'currentUserId:', currentUserId);
+      
       // First, clean up any phantom members
       await firebaseDataService.group.cleanupPhantomMembers(groupId);
       
       const groupMembersRef = collection(db, 'groupMembers');
+      
+      // Simplified query to avoid composite index requirement
       const memberQuery = query(
         groupMembersRef,
-        where('group_id', '==', groupId),
-        orderBy('joined_at', 'asc')
+        where('group_id', '==', groupId)
       );
       const memberDocs = await getDocs(memberQuery);
       let members = memberDocs.docs.map(doc => firebaseDataTransformers.firestoreToGroupMember(doc));
 
+      console.log('🔥 getGroupMembers: Found all members before filtering:', members.length, members.map(m => ({ id: m.id, name: m.name, email: m.email, invitation_status: m.invitation_status })));
+
+      // Filter to only accepted members on the client side
+      members = members.filter(member => member.invitation_status === 'accepted');
+
+      console.log('🔥 getGroupMembers: Found accepted members after filtering:', members.length, members.map(m => ({ id: m.id, name: m.name, email: m.email })));
+
       // Get group info to filter out phantom members
       const groupDoc = await getDoc(doc(db, 'groups', groupId));
       const groupName = groupDoc.exists() ? groupDoc.data()?.name : '';
+
+      console.log('🔥 getGroupMembers: Group name for filtering:', groupName);
 
       // Filter out phantom members (members with the same name as the group or "Unknown User")
       members = members.filter(member => {
@@ -652,6 +855,8 @@ export const firebaseGroupService = {
         return true;
       });
 
+      console.log('🔥 getGroupMembers: Members after phantom filtering:', members.length, members.map(m => ({ id: m.id, name: m.name, email: m.email })));
+
       // If currentUserId is provided and not in members, add them
       if (currentUserId && !members.some(m => String(m.id) === String(currentUserId))) {
         const currentUser = await firebaseDataService.user.getCurrentUser(String(currentUserId));
@@ -668,7 +873,7 @@ export const firebaseGroupService = {
             }
             // Update the existing member's ID to match the current user
             existingMemberWithEmail.id = currentUser.id;
-            } else {
+          } else {
             // Add the current user to the database if they're not already there
             const existingMemberQuery = query(
               groupMembersRef,
@@ -688,12 +893,13 @@ export const firebaseGroupService = {
                 wallet_public_key: currentUser.wallet_public_key || '',
                 avatar: currentUser.avatar || '',
                 joined_at: serverTimestamp(),
-                created_at: serverTimestamp()
+                created_at: serverTimestamp(),
+                invitation_status: 'accepted' // Set as accepted when adding current user
               });
               
               if (__DEV__) {
                 console.log('🔥 Added current user to group members in database');
-            }
+              }
             }
             
             // Add to the returned members array
@@ -705,7 +911,8 @@ export const firebaseGroupService = {
               wallet_public_key: currentUser.wallet_public_key || '',
               avatar: currentUser.avatar || '',
               joined_at: new Date().toISOString(),
-              created_at: currentUser.created_at || new Date().toISOString()
+              created_at: currentUser.created_at || new Date().toISOString(),
+              invitation_status: 'accepted'
             });
             
             if (__DEV__) {
@@ -730,37 +937,113 @@ export const firebaseGroupService = {
   },
 
   createGroup: async (groupData: Omit<Group, 'id' | 'created_at' | 'updated_at' | 'member_count' | 'expense_count' | 'expenses_by_currency'>): Promise<Group> => {
-    const groupRef = await addDoc(collection(db, 'groups'), firebaseDataTransformers.groupToFirestore(groupData as Omit<Group, 'id' | 'created_at' | 'updated_at'>));
+    try {
+      if (!groupData.created_by) {
+        throw new Error('Group creator ID is required');
+      }
+
+      if (!groupData.name || groupData.name.trim().length === 0) {
+        throw new Error('Group name is required');
+      }
+
+      console.log('🔥 Firebase: Creating group with data:', {
+        name: groupData.name,
+        created_by: groupData.created_by,
+        category: groupData.category,
+        currency: groupData.currency
+      });
       
     // Get current user data to add as member
     const currentUser = await firebaseDataService.user.getCurrentUser(String(groupData.created_by));
+      if (!currentUser) {
+        throw new Error('Current user not found');
+      }
+
+      // Create batch for atomic operation
+      const batch = writeBatch(db);
       
-    // Add creator as first member with correct user data
+      // Create group document
+      const groupRef = doc(collection(db, 'groups'));
+      const groupDoc = {
+        name: groupData.name.trim(),
+        description: groupData.description?.trim() || '',
+        category: groupData.category || 'general',
+        currency: groupData.currency || 'USDC',
+        icon: groupData.icon || 'people',
+        color: groupData.color || '#A5EA15',
+        created_by: groupData.created_by,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+        member_count: 1, // Creator is the first member
+        expense_count: 0,
+        expenses_by_currency: []
+      };
+      
+      batch.set(groupRef, groupDoc);
+      
+      // Add creator as first member with admin role
     const groupMembersRef = collection(db, 'groupMembers');
-    await addDoc(groupMembersRef, {
+      const memberRef = doc(groupMembersRef);
+      const memberDoc = {
         group_id: groupRef.id,
         user_id: groupData.created_by,
-        name: currentUser?.name || 'Unknown User',
-        email: currentUser?.email || '',
-        wallet_address: currentUser?.wallet_address || '',
-        wallet_public_key: currentUser?.wallet_public_key || '',
-        avatar: currentUser?.avatar || '',
+        name: currentUser.name,
+        email: currentUser.email,
+        wallet_address: currentUser.wallet_address || '',
+        wallet_public_key: currentUser.wallet_public_key || '',
+        avatar: currentUser.avatar || '',
         joined_at: serverTimestamp(),
-        created_at: serverTimestamp()
-    });
-    
-    // Update member count
-    await updateGroupMemberCount(groupRef.id);
-    
-    return {
-        ...groupData,
+        created_at: serverTimestamp(),
+        invitation_status: 'accepted',
+        invited_at: serverTimestamp(),
+        invited_by: groupData.created_by,
+        role: 'admin' // Creator is admin
+      };
+      
+      batch.set(memberRef, memberDoc);
+      
+      // Commit the batch
+      await batch.commit();
+      
+      console.log('🔥 Firebase: Group created successfully with ID:', groupRef.id);
+      
+      // Return the created group with proper structure
+      const createdGroup: Group = {
       id: groupRef.id,
+        name: groupData.name.trim(),
+        description: groupData.description?.trim() || '',
+        category: groupData.category || 'general',
+        currency: groupData.currency || 'USDC',
+        icon: groupData.icon || 'people',
+        color: groupData.color || '#A5EA15',
+        created_by: groupData.created_by,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         member_count: 1,
         expense_count: 0,
         expenses_by_currency: []
-    } as Group;
+      };
+      
+      return createdGroup;
+      
+    } catch (error) {
+      console.error('🔥 Firebase: Error creating group:', error);
+      
+      // Provide specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('permission-denied')) {
+          throw new Error('Permission denied. Please check your authentication.');
+        } else if (error.message.includes('unavailable')) {
+          throw new Error('Network error. Please check your connection and try again.');
+        } else if (error.message.includes('already-exists')) {
+          throw new Error('Group with this name already exists. Please choose a different name.');
+        } else {
+          throw new Error(`Failed to create group: ${error.message}`);
+        }
+      } else {
+        throw new Error('An unexpected error occurred while creating the group.');
+      }
+    }
   },
 
   updateGroup: async (groupId: string, userId: string, updates: Partial<Group>): Promise<{ message: string; group: Group }> => {
@@ -800,86 +1083,119 @@ export const firebaseGroupService = {
     };
   },
 
-  deleteGroup: async (groupId: string, userId: string): Promise<{ message: string }> => {
-    console.log('🔍 FirebaseDataService: Starting deleteGroup...');
-    console.log('🔍 FirebaseDataService: Group ID:', groupId);
-    console.log('🔍 FirebaseDataService: User ID:', userId);
-    
-    const groupRef = doc(db, 'groups', groupId);
-    const groupDoc = await getDoc(groupRef);
-    
+  async deleteGroup(groupId: string | number, userId: string | number): Promise<void> {
+    try {
+      // Get group data to verify ownership
+      const groupDoc = await getDoc(doc(db, 'groups', String(groupId)));
     if (!groupDoc.exists()) {
-      console.error('❌ FirebaseDataService: Group not found');
       throw new Error('Group not found');
     }
     
     const groupData = groupDoc.data();
-    console.log('🔍 FirebaseDataService: Group data:', groupData);
-    console.log('🔍 FirebaseDataService: Group creator:', groupData.created_by);
-    console.log('🔍 FirebaseDataService: Current user:', userId);
     
-    if (groupData.created_by !== userId) {
-      console.error('❌ FirebaseDataService: User is not the group creator');
+      // Verify user is the group creator
+      if (groupData.created_by !== String(userId)) {
       throw new Error('Only group creator can delete the group');
     }
     
-    console.log('🔍 FirebaseDataService: User is group creator, proceeding with deletion...');
-    
-    // Delete group members
+      // Delete all group members
     const groupMembersRef = collection(db, 'groupMembers');
-    const memberQuery = query(groupMembersRef, where('group_id', '==', groupId));
+      const memberQuery = query(groupMembersRef, where('group_id', '==', String(groupId)));
     const memberDocs = await getDocs(memberQuery);
     
-    console.log('🔍 FirebaseDataService: Found', memberDocs.docs.length, 'members to delete');
+      // Delete all expenses
+      const expensesRef = collection(db, 'expenses');
+      const expenseQuery = query(expensesRef, where('group_id', '==', String(groupId)));
+      const expenseDocs = await getDocs(expenseQuery);
     
+      // Create batch operation
     const batch = writeBatch(db);
+      
+      // Delete group members
     memberDocs.docs.forEach(doc => {
       batch.delete(doc.ref);
     });
     
-    // Delete group expenses
-    const expensesRef = collection(db, 'expenses');
-    const expenseQuery = query(expensesRef, where('group_id', '==', groupId));
-    const expenseDocs = await getDocs(expenseQuery);
-    
-    console.log('🔍 FirebaseDataService: Found', expenseDocs.docs.length, 'expenses to delete');
-    
+      // Delete expenses
     expenseDocs.docs.forEach(doc => {
       batch.delete(doc.ref);
     });
     
-    // Delete the group
-    batch.delete(groupRef);
+      // Delete the group itself
+      batch.delete(doc(db, 'groups', String(groupId)));
     
-    console.log('🔍 FirebaseDataService: Committing batch deletion...');
+      // Commit the batch
     await batch.commit();
     
-    console.log('🔍 FirebaseDataService: Group deleted successfully');
-    return { message: 'Group deleted successfully' };
+    } catch (error) {
+      console.error('Error deleting group:', error);
+      throw error;
+    }
   },
 
   addMemberToGroup: async (groupId: string, memberData: Omit<GroupMember, 'id' | 'joined_at'>): Promise<GroupMember> => {
+    try {
+      if (__DEV__) { console.log('🔥 Adding member to group:', { groupId, memberData }); }
+      
       const groupMembersRef = collection(db, 'groupMembers');
-    const memberRef = await addDoc(groupMembersRef, {
-      group_id: groupId,
-      user_id: (memberData as any).id || memberData.name, // Use name as fallback for user_id
-            name: memberData.name,
-            email: memberData.email,
-            wallet_address: memberData.wallet_address,
-            wallet_public_key: memberData.wallet_public_key,
-      avatar: memberData.avatar,
-      joined_at: serverTimestamp(),
-      created_at: serverTimestamp()
-    });
-    
-    // Update group member count
-    await updateGroupMemberCount(groupId);
-    
-    return {
-      ...memberData,
-      id: memberRef.id,
-      joined_at: new Date().toISOString()
-    } as GroupMember;
+      
+      // Check if member already exists in group
+      const existingMemberQuery = query(
+        groupMembersRef,
+        where('group_id', '==', groupId),
+        where('user_id', '==', (memberData as any).user_id || memberData.name)
+      );
+      const existingMemberDocs = await getDocs(existingMemberQuery);
+      
+      if (!existingMemberDocs.empty) {
+        if (__DEV__) { console.log('🔥 Member already exists in group, updating status'); }
+        
+        // Update existing membership to accepted
+        const existingMemberDoc = existingMemberDocs.docs[0];
+        await updateDoc(existingMemberDoc.ref, {
+          invitation_status: 'accepted',
+          joined_at: serverTimestamp(),
+          updated_at: serverTimestamp()
+        });
+        
+        const updatedData = existingMemberDoc.data();
+        return {
+          ...memberData,
+          id: existingMemberDoc.id,
+          joined_at: new Date().toISOString(),
+          invitation_status: 'accepted'
+        } as GroupMember;
+      }
+      
+      // Add new member to group
+      const memberRef = await addDoc(groupMembersRef, {
+        group_id: groupId,
+        user_id: (memberData as any).user_id || memberData.name,
+        name: memberData.name,
+        email: memberData.email,
+        wallet_address: memberData.wallet_address,
+        wallet_public_key: memberData.wallet_public_key,
+        avatar: memberData.avatar,
+        joined_at: serverTimestamp(),
+        created_at: serverTimestamp(),
+        invitation_status: 'accepted'
+      });
+      
+      if (__DEV__) { console.log('🔥 Member added to group with ID:', memberRef.id); }
+      
+      // Update group member count
+      await updateGroupMemberCount(groupId);
+      
+      return {
+        ...memberData,
+        id: memberRef.id,
+        joined_at: new Date().toISOString(),
+        invitation_status: 'accepted'
+      } as GroupMember;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error adding member to group:', error); }
+      throw error;
+    }
   },
 
   removeMemberFromGroup: async (groupId: string, memberId: string): Promise<{ message: string }> => {
@@ -1016,25 +1332,30 @@ export const firebaseGroupService = {
 
   generateInviteLink: async (groupId: string, userId: string): Promise<InviteLinkData> => {
     try {
-      // Generate a simple invite code
-      const inviteCode = `invite_${groupId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Generate a unique invite link (no separate code)
+      const inviteId = `invite_${groupId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Get group name for better link
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      const groupName = groupDoc.exists() ? groupDoc.data()?.name : 'Group';
       
       // Store invite in Firestore
       const inviteRef = collection(db, 'invites');
       await addDoc(inviteRef, {
-        inviteCode,
+        inviteId,
         groupId,
+        groupName,
         createdBy: userId,
         createdAt: serverTimestamp(),
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         used: false
-    });
+      });
     
-    return {
-      inviteCode,
-        inviteLink: `wesplit://join/${inviteCode}`,
-        groupName: 'Group', // This should be passed as parameter or fetched
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      return {
+        inviteId,
+        inviteLink: `wesplit://join/${inviteId}`,
+        groupName,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       };
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error generating invite link:', error); }
@@ -1042,21 +1363,23 @@ export const firebaseGroupService = {
     }
   },
 
-  joinGroupViaInvite: async (inviteCode: string, userId: string): Promise<{ message: string; groupId: string; groupName: string }> => {
+  joinGroupViaInvite: async (inviteId: string, userId: string): Promise<{ message: string; groupId: string; groupName: string }> => {
     try {
-      if (__DEV__) { console.log('🔥 Joining group via invite:', { inviteCode, userId }); }
+      if (__DEV__) { console.log('🔥 Firebase: Joining group via invite:', { inviteId, userId }); }
       
+      // Use Firebase transaction to ensure data consistency
+      const result = await runTransaction(db, async (transaction) => {
       // Find the invite in Firestore
       const invitesRef = collection(db, 'invites');
       const inviteQuery = query(
         invitesRef,
-        where('inviteCode', '==', inviteCode),
+        where('inviteId', '==', inviteId),
         where('used', '==', false)
       );
       const inviteDocs = await getDocs(inviteQuery);
       
       if (inviteDocs.empty) {
-        throw new Error('Invalid or expired invite code');
+        throw new Error('Invalid or expired invite link');
       }
       
       const inviteDoc = inviteDocs.docs[0];
@@ -1071,11 +1394,14 @@ export const firebaseGroupService = {
         where('user_id', '==', userId)
       );
       const memberDocs = await getDocs(memberQuery);
+        
+        let memberDocId: string | null = null;
       
       if (!memberDocs.empty) {
         // User is already a member, check if they have pending invitation
         const memberDoc = memberDocs.docs[0];
         const memberData = memberDoc.data();
+          memberDocId = memberDoc.id;
         
         if (memberData.invitation_status === 'pending') {
           // Get user data
@@ -1086,14 +1412,26 @@ export const firebaseGroupService = {
           const userData = userDoc.data();
           
           // Update the existing member record with user data and accepted status
-          await updateDoc(doc(db, 'groupMembers', memberDoc.id), {
+            transaction.update(doc(db, 'groupMembers', memberDoc.id), {
             name: userData.name,
             email: userData.email,
-            wallet_address: userData.wallet_address,
-            wallet_public_key: userData.wallet_public_key,
+              wallet_address: userData.wallet_address || '',
+              wallet_public_key: userData.wallet_public_key || '',
             invitation_status: 'accepted',
-            avatar: userData.avatar
+              avatar: userData.avatar || '',
+              updated_at: serverTimestamp(),
+              joined_at: serverTimestamp()
           });
+          
+          // Delete any duplicate pending invitations for this user
+          for (let i = 1; i < memberDocs.docs.length; i++) {
+            const duplicateDoc = memberDocs.docs[i];
+            const duplicateData = duplicateDoc.data();
+            if (duplicateData.invitation_status === 'pending') {
+                transaction.delete(doc(db, 'groupMembers', duplicateDoc.id));
+                if (__DEV__) { console.log('🔥 Firebase: Deleted duplicate pending invitation:', duplicateDoc.id); }
+            }
+          }
         } else {
           throw new Error('You are already a member of this group');
         }
@@ -1106,46 +1444,80 @@ export const firebaseGroupService = {
         const userData = userDoc.data();
         
         // Add user to group
-        await addDoc(groupMembersRef, {
+          const newMemberRef = doc(groupMembersRef);
+          transaction.set(newMemberRef, {
           group_id: groupId,
           user_id: userId,
           name: userData.name,
           email: userData.email,
-          wallet_address: userData.wallet_address,
-          wallet_public_key: userData.wallet_public_key,
+            wallet_address: userData.wallet_address || '',
+            wallet_public_key: userData.wallet_public_key || '',
           joined_at: serverTimestamp(),
-          avatar: userData.avatar
+            created_at: serverTimestamp(),
+            avatar: userData.avatar || '',
+            invitation_status: 'accepted',
+            invited_at: serverTimestamp(),
+            invited_by: userId // Self-invited
         });
+          memberDocId = newMemberRef.id;
       }
       
       // Mark invite as used
-      await updateDoc(doc(db, 'invites', inviteDoc.id), {
+        transaction.update(doc(db, 'invites', inviteDoc.id), {
         used: true,
         used_at: serverTimestamp(),
         used_by: userId
       });
       
-      // Update group member count
-      await updateGroupMemberCount(groupId);
+        // Update group member count within transaction
+        const groupRef = doc(db, 'groups', groupId);
+        const groupDoc = await getDoc(groupRef);
+        if (groupDoc.exists()) {
+          const currentMemberCount = groupDoc.data()?.member_count || 0;
+          transaction.update(groupRef, {
+            member_count: currentMemberCount + 1,
+          updated_at: serverTimestamp()
+        });
+      }
       
-      // Get group name
-      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+        // Get group name for return value
       const groupName = groupDoc.exists() ? groupDoc.data()?.name : 'Group';
       
-      if (__DEV__) { console.log('🔥 Successfully joined group:', { groupId, groupName }); }
+        return { groupId, groupName, memberDocId };
+      });
+      
+      if (__DEV__) { console.log('🔥 Firebase: Successfully joined group:', { groupId: result.groupId, groupName: result.groupName }); }
       
       return {
         message: 'Successfully joined group',
-        groupId,
-        groupName
+        groupId: result.groupId,
+        groupName: result.groupName
       };
     } catch (error) {
-      if (__DEV__) { console.error('🔥 Error joining group via invite:', error); }
-      throw error;
+      if (__DEV__) { console.error('🔥 Firebase: Error joining group via invite:', error); }
+      
+      // Provide specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('Invalid or expired invite link')) {
+          throw new Error('This invite link is invalid or has expired. Please request a new one.');
+        } else if (error.message.includes('already a member')) {
+          throw new Error('You are already a member of this group.');
+        } else if (error.message.includes('User not found')) {
+          throw new Error('User account not found. Please check your authentication.');
+        } else if (error.message.includes('permission-denied')) {
+          throw new Error('Permission denied. Please check your authentication.');
+        } else if (error.message.includes('unavailable')) {
+          throw new Error('Network error. Please check your connection and try again.');
+        } else {
+          throw new Error(`Failed to join group: ${error.message}`);
+        }
+      } else {
+        throw new Error('An unexpected error occurred while joining the group.');
+      }
     }
   },
 
-  // Send group invitation to a user via notification
+  // Send group invitation to a user via notification (DEV only) or generate link (PROD)
   sendGroupInvitation: async (
     groupId: string,
     groupName: string,
@@ -1154,46 +1526,236 @@ export const firebaseGroupService = {
     invitedUserId: string
   ): Promise<void> => {
     try {
-      if (__DEV__) { console.log('🔥 Sending group invitation:', { groupId, groupName, invitedByUserId, invitedUserId }); }
-      
-      // Generate invite link
-      const inviteData = await firebaseGroupService.generateInviteLink(groupId, invitedByUserId);
-      
-      // Add user to group with pending invitation status
-      const groupMembersRef = collection(db, 'groupMembers');
-      await addDoc(groupMembersRef, {
-        group_id: groupId,
-        user_id: invitedUserId,
-        name: 'Invited User', // Will be updated when they accept
-        email: '', // Will be updated when they accept
-        wallet_address: '', // Will be updated when they accept
-        joined_at: serverTimestamp(),
-        invitation_status: 'pending',
-        invited_at: serverTimestamp(),
-        invited_by: invitedByUserId
-      });
-      
-      // Send notification to invited user
-      await sendNotification(
-        invitedUserId,
-        'Group Invitation',
-        `${invitedByUserName} has invited you to join the group "${groupName}"`,
-        'group_invite',
-        {
-          groupId,
-          groupName,
-          invitedBy: invitedByUserId,
-          invitedByName: invitedByUserName,
-          inviteCode: inviteData.inviteCode,
-          inviteLink: inviteData.inviteLink,
-          expiresAt: inviteData.expiresAt
+      if (__DEV__) { 
+        console.log('🔥 Sending group invitation (DEV mode):', { groupId, groupName, invitedByUserId, invitedUserId }); 
+        
+        // DEV MODE: Send direct notification to user
+        // Check if user is already a member or has a pending invitation
+        const groupMembersRef = collection(db, 'groupMembers');
+        const existingMemberQuery = query(
+          groupMembersRef,
+          where('group_id', '==', groupId),
+          where('user_id', '==', invitedUserId)
+        );
+        const existingMemberDocs = await getDocs(existingMemberQuery);
+        
+        if (!existingMemberDocs.empty) {
+          const existingMember = existingMemberDocs.docs[0];
+          const existingData = existingMember.data();
+          
+          if (existingData.invitation_status === 'accepted') {
+            throw new Error('User is already a member of this group');
+          } else if (existingData.invitation_status === 'pending') {
+            throw new Error('User already has a pending invitation to this group');
+          }
         }
-      );
-      
-      if (__DEV__) { console.log('🔥 Group invitation sent successfully'); }
+        
+        // Generate invite link
+        const inviteData = await firebaseGroupService.generateInviteLink(groupId, invitedByUserId);
+        
+        // Add user to group with pending invitation status
+        await addDoc(groupMembersRef, {
+          group_id: groupId,
+          user_id: invitedUserId,
+          name: 'Invited User', // Will be updated when they accept
+          email: '', // Will be updated when they accept
+          wallet_address: '', // Will be updated when they accept
+          wallet_public_key: '',
+          joined_at: serverTimestamp(),
+          invitation_status: 'pending',
+          invited_at: serverTimestamp(),
+          invited_by: invitedByUserId
+        });
+        
+        // Send notification to invited user (DEV only)
+        console.log('🔥 About to send notification to user:', invitedUserId);
+        console.log('🔥 Notification data:', {
+          title: 'Group Invitation',
+          message: `${invitedByUserName} has invited you to join the group "${groupName}"`,
+          type: 'group_invite',
+          data: {
+            groupId,
+            groupName,
+            invitedBy: invitedByUserId,
+            invitedByName: invitedByUserName,
+            inviteLink: inviteData.inviteLink,
+            expiresAt: inviteData.expiresAt
+          }
+        });
+        
+        await sendNotification(
+          invitedUserId,
+          'Group Invitation',
+          `${invitedByUserName} has invited you to join the group "${groupName}"`,
+          'group_invite',
+          {
+            groupId,
+            groupName,
+            invitedBy: invitedByUserId,
+            invitedByName: invitedByUserName,
+            inviteLink: inviteData.inviteLink,
+            expiresAt: inviteData.expiresAt
+          }
+        );
+        
+        console.log('🔥 Notification sent successfully to user:', invitedUserId);
+        
+        console.log('🔥 Group invitation sent successfully (DEV mode)');
+      } else {
+        // PROD MODE: Only generate link, no direct notifications
+        console.log('🔥 PROD mode: Direct invitations disabled. Use share link instead.');
+        throw new Error('Direct invitations are disabled in production. Please use the share link feature.');
+      }
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error sending group invitation:', error); }
       throw error;
+    }
+  },
+
+  // Update invited user info when they view the group
+  updateInvitedUserInfo: async (groupId: string, userId: string): Promise<void> => {
+    try {
+      if (__DEV__) { console.log('🔥 Updating invited user info:', { groupId, userId }); }
+      
+      // Update the user's invitation status in the group members collection
+      const memberRef = doc(db, 'groupMembers', `${groupId}_${userId}`);
+      await updateDoc(memberRef, {
+        invitation_status: 'accepted',
+        joined_at: serverTimestamp()
+      });
+      
+      if (__DEV__) { console.log('🔥 Successfully updated invited user info'); }
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error updating invited user info:', error); }
+      throw error;
+    }
+  },
+
+  // Real-time listeners
+  listenToUserGroups: (userId: string, callback: (groups: GroupWithDetails[]) => void, onError?: (error: any) => void) => {
+    try {
+      if (__DEV__) { console.log('🔥 Setting up real-time listener for user groups:', userId); }
+      
+      // Listen to groupMembers collection for this user
+      const membersRef = collection(db, 'groupMembers');
+      const membersQuery = query(
+        membersRef,
+        where('user_id', '==', userId),
+        where('invitation_status', '==', 'accepted')
+      );
+      
+      const unsubscribe = onSnapshot(membersQuery, async (snapshot) => {
+        try {
+          const memberDocs = snapshot.docs;
+          const groupIds = memberDocs.map(doc => doc.data().group_id);
+          
+          if (__DEV__) { console.log('🔥 Real-time update: Found', groupIds.length, 'groups for user'); }
+          
+          // Fetch group details for all groups
+          const groups: GroupWithDetails[] = [];
+          for (const groupId of groupIds) {
+            try {
+              const groupDoc = await getDoc(doc(db, 'groups', groupId));
+              if (groupDoc.exists()) {
+                const groupData = groupDoc.data();
+                const group: GroupWithDetails = {
+                  id: groupDoc.id,
+                  name: groupData.name || '',
+                  description: groupData.description || '',
+                  category: groupData.category || 'general',
+                  currency: groupData.currency || 'USDC',
+                  icon: groupData.icon || 'people',
+                  color: groupData.color || '#A5EA15',
+                  created_by: groupData.created_by || '',
+                  created_at: firebaseDataTransformers.timestampToISO(groupData.created_at),
+                  updated_at: firebaseDataTransformers.timestampToISO(groupData.updated_at),
+                  member_count: groupData.member_count || 0,
+                  expense_count: groupData.expense_count || 0,
+                  expenses_by_currency: groupData.expenses_by_currency || [],
+                  members: [],
+                  expenses: [],
+                  totalAmount: 0,
+                  userBalance: 0
+                };
+                groups.push(group);
+              }
+            } catch (error) {
+              if (__DEV__) { console.error('🔥 Error fetching group in real-time listener:', groupId, error); }
+            }
+          }
+          
+          callback(groups);
+        } catch (error) {
+          if (__DEV__) { console.error('🔥 Error in real-time listener callback:', error); }
+          if (onError) onError(error);
+        }
+      }, (error) => {
+        if (__DEV__) { console.error('🔥 Real-time listener error:', error); }
+        if (onError) onError(error);
+      });
+      
+      return unsubscribe;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error setting up real-time listener:', error); }
+      if (onError) onError(error);
+      return () => {}; // Return empty unsubscribe function
+    }
+  },
+
+  listenToGroup: (groupId: string, callback: (group: GroupWithDetails) => void, onError?: (error: any) => void) => {
+    try {
+      if (__DEV__) { console.log('🔥 Setting up real-time listener for group:', groupId); }
+      
+      const groupRef = doc(db, 'groups', groupId);
+      const unsubscribe = onSnapshot(groupRef, async (snapshot) => {
+        try {
+          if (snapshot.exists()) {
+            const groupData = snapshot.data();
+            const group: GroupWithDetails = {
+              id: snapshot.id,
+              name: groupData.name || '',
+              description: groupData.description || '',
+              category: groupData.category || 'general',
+              currency: groupData.currency || 'USDC',
+              icon: groupData.icon || 'people',
+              color: groupData.color || '#A5EA15',
+              created_by: groupData.created_by || '',
+              created_at: firebaseDataTransformers.timestampToISO(groupData.created_at),
+              updated_at: firebaseDataTransformers.timestampToISO(groupData.updated_at),
+              member_count: groupData.member_count || 0,
+              expense_count: groupData.expense_count || 0,
+              expenses_by_currency: groupData.expenses_by_currency || [],
+              members: [],
+              expenses: [],
+              totalAmount: 0,
+              userBalance: 0
+            };
+            
+            // Fetch members and expenses for complete group details
+            const [members, expenses] = await Promise.all([
+              firebaseDataService.group.getGroupMembers(groupId),
+              firebaseDataService.expense.getGroupExpenses(groupId)
+            ]);
+            
+            group.members = members;
+            group.expenses = expenses;
+            
+            callback(group);
+      }
+    } catch (error) {
+          if (__DEV__) { console.error('🔥 Error in group real-time listener callback:', error); }
+          if (onError) onError(error);
+        }
+      }, (error) => {
+        if (__DEV__) { console.error('🔥 Group real-time listener error:', error); }
+        if (onError) onError(error);
+      });
+      
+      return unsubscribe;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error setting up group real-time listener:', error); }
+      if (onError) onError(error);
+      return () => {}; // Return empty unsubscribe function
     }
   }
 };
@@ -1218,17 +1780,114 @@ export const firebaseExpenseService = {
   },
 
   createExpense: async (expenseData: any): Promise<Expense> => {
-    const expenseRef = await addDoc(collection(db, 'expenses'), firebaseDataTransformers.expenseToFirestore(expenseData));
+    try {
+      if (__DEV__) { 
+        console.log('🔥 createExpense: Starting expense creation...');
+        console.log('🔥 createExpense: Expense data:', JSON.stringify(expenseData, null, 2));
+      }
       
-    // Update group expense count
-    await updateGroupExpenseCount(expenseData.group_id || expenseData.groupId);
-    
-    return {
+      const expenseRef = await addDoc(collection(db, 'expenses'), firebaseDataTransformers.expenseToFirestore(expenseData));
+      
+      if (__DEV__) { console.log('🔥 createExpense: Expense document created with ID:', expenseRef.id); }
+      
+      // Update group expense count
+      await updateGroupExpenseCount(expenseData.group_id || expenseData.groupId);
+      
+      const expense = {
         ...expenseData,
-      id: expenseRef.id,
+        id: expenseRef.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-    } as Expense;
+      } as Expense;
+      
+      if (__DEV__) { console.log('🔥 createExpense: Expense object created:', JSON.stringify(expense, null, 2)); }
+      
+      // Only send notifications if amount per person is greater than 0
+      if (expenseData.splitData && expenseData.splitData.memberIds) {
+        if (__DEV__) { 
+          console.log('🔥 createExpense: Sending payment request notifications for expense:', expense.id);
+          console.log('🔥 createExpense: Split data:', JSON.stringify(expenseData.splitData, null, 2));
+        }
+        
+        // Get group data for notification
+        const groupDoc = await getDoc(doc(db, 'groups', expenseData.group_id || expenseData.groupId));
+        const groupName = groupDoc.exists() ? groupDoc.data()?.name : 'Group';
+        
+        if (__DEV__) { console.log('🔥 createExpense: Group name:', groupName); }
+        
+        // Get payer data
+        const payerDoc = await getDoc(doc(db, 'users', expenseData.paid_by));
+        const payerName = payerDoc.exists() ? payerDoc.data()?.name : 'Unknown';
+        
+        if (__DEV__) { console.log('🔥 createExpense: Payer name:', payerName); }
+        
+        // Calculate amount per person
+        const amountPerPerson = expenseData.splitData.amountPerPerson || 
+          (expenseData.amount / expenseData.splitData.memberIds.length);
+        
+        if (__DEV__) { console.log('🔥 createExpense: Amount per person:', amountPerPerson); }
+        
+        // Only send notifications if amount per person is greater than 0
+        if (amountPerPerson > 0) {
+        // Send notifications to each member who owes money (excluding the payer)
+        for (const memberId of expenseData.splitData.memberIds) {
+          if (memberId !== expenseData.paid_by) {
+            try {
+              if (__DEV__) { console.log('🔥 createExpense: Processing member:', memberId); }
+              
+              // Get member data
+              const memberDoc = await getDoc(doc(db, 'users', memberId));
+              if (memberDoc.exists()) {
+                const memberData = memberDoc.data();
+                
+                if (__DEV__) { 
+                  console.log(`🔥 createExpense: Sending payment request to ${memberData.name} for ${amountPerPerson} ${expenseData.currency}`); 
+                }
+                
+                // Send payment request notification
+                await sendNotification(
+                  memberId,
+                  'Payment Request',
+                  `${payerName} has added an expense of ${expenseData.amount} ${expenseData.currency} in ${groupName}. You owe ${amountPerPerson.toFixed(4)} ${expenseData.currency}.`,
+                  'payment_request',
+                  {
+                    expenseId: expense.id,
+                    groupId: expenseData.group_id || expenseData.groupId,
+                    groupName: groupName,
+                    payerId: expenseData.paid_by,
+                    payerName: payerName,
+                    amount: amountPerPerson,
+                    currency: expenseData.currency,
+                    description: expenseData.description,
+                    status: 'pending'
+                  }
+                );
+                
+                if (__DEV__) { console.log(`✅ createExpense: Payment request sent to ${memberData.name}`); }
+              } else {
+                if (__DEV__) { console.log(`❌ createExpense: Member ${memberId} not found`); }
+              }
+            } catch (error) {
+              if (__DEV__) { console.error(`❌ createExpense: Error sending payment request to ${memberId}:`, error); }
+              // Don't throw error to prevent expense creation failure
+            }
+          } else {
+            if (__DEV__) { console.log(`🔥 createExpense: Skipping payer ${memberId} (they don't owe money)`); }
+          }
+          }
+        } else {
+          if (__DEV__) { console.log('🔥 createExpense: Amount per person is 0 or negative, skipping payment request notifications'); }
+        }
+      } else {
+        if (__DEV__) { console.log('🔥 createExpense: No split data or memberIds, skipping payment request notifications'); }
+      }
+      
+      if (__DEV__) { console.log('🔥 createExpense: Expense created successfully:', expense); }
+      return expense;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 createExpense: Error creating expense:', error); }
+      throw error;
+    }
   },
 
   getExpense: async (expenseId: string): Promise<Expense | null> => {
@@ -1625,339 +2284,6 @@ export const firebaseSettlementService = {
       if (__DEV__) { console.error('🔥 Error in getReminderStatus:', error); }
       throw error;
     }
-  },
-
-  sendPaymentReminder: async (
-    groupId: string,
-    senderId: string,
-    recipientId: string,
-    amount: number
-  ): Promise<{ success: boolean; message: string; recipientName: string; amount: number }> => {
-    try {
-      if (__DEV__) { console.log('🔥 Sending payment reminder:', { groupId, senderId, recipientId, amount }); }
-      
-      // Get recipient user data
-      const recipientDoc = await getDoc(doc(db, 'users', recipientId));
-      if (!recipientDoc.exists()) {
-        throw new Error('Recipient not found');
-      }
-      
-      const recipient = firebaseDataTransformers.firestoreToUser(recipientDoc);
-      
-      // Create reminder record in Firestore
-      const reminderRef = await addDoc(collection(db, 'reminders'), {
-        group_id: groupId,
-        sender_id: senderId,
-        recipient_id: recipientId,
-        amount: amount,
-        reminder_type: 'individual',
-        sent_at: serverTimestamp(),
-        status: 'sent'
-      });
-      
-      if (__DEV__) { console.log('🔥 Reminder sent with ID:', reminderRef.id); }
-      
-      return {
-        success: true,
-        message: 'Payment reminder sent successfully',
-        recipientName: recipient.name,
-        amount: amount
-      };
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error in sendPaymentReminder:', error); }
-      throw error;
-    }
-  },
-
-  sendBulkPaymentReminders: async (
-    groupId: string,
-    senderId: string,
-    debtors: { recipientId: string; amount: number; name: string }[]
-  ): Promise<{ 
-    success: boolean; 
-    message: string; 
-    results: { recipientId: string; recipientName: string; amount: number; success: boolean }[];
-    totalAmount: number;
-  }> => {
-    try {
-      if (__DEV__) { console.log('🔥 Sending bulk payment reminders:', { groupId, senderId, debtorsCount: debtors.length }); }
-      
-      const results: { recipientId: string; recipientName: string; amount: number; success: boolean }[] = [];
-      const totalAmount = debtors.reduce((sum, debtor) => sum + debtor.amount, 0);
-      
-      // Create batch write for all reminders
-      const batch = writeBatch(db);
-      
-      for (const debtor of debtors) {
-        try {
-          // Get recipient user data
-          const recipientDoc = await getDoc(doc(db, 'users', debtor.recipientId));
-          if (recipientDoc.exists()) {
-            const recipient = firebaseDataTransformers.firestoreToUser(recipientDoc);
-            
-            // Add reminder to batch
-            const reminderRef = doc(collection(db, 'reminders'));
-            batch.set(reminderRef, {
-              group_id: groupId,
-              sender_id: senderId,
-              recipient_id: debtor.recipientId,
-              amount: debtor.amount,
-              reminder_type: 'bulk',
-              sent_at: serverTimestamp(),
-              status: 'sent'
-            });
-            
-            results.push({
-      recipientId: debtor.recipientId,
-              recipientName: recipient.name,
-      amount: debtor.amount,
-      success: true
-            });
-          } else {
-            results.push({
-              recipientId: debtor.recipientId,
-              recipientName: debtor.name,
-              amount: debtor.amount,
-              success: false
-            });
-          }
-        } catch (error) {
-          if (__DEV__) { console.error('🔥 Error processing debtor:', debtor, error); }
-          results.push({
-            recipientId: debtor.recipientId,
-            recipientName: debtor.name,
-            amount: debtor.amount,
-            success: false
-          });
-        }
-      }
-      
-      // Commit the batch
-      await batch.commit();
-      
-      if (__DEV__) { console.log('🔥 Bulk reminders sent:', results); }
-
-    return {
-      success: true,
-      message: 'Bulk payment reminders sent successfully',
-      results,
-      totalAmount
-    };
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error in sendBulkPaymentReminders:', error); }
-      throw error;
-    }
-  }
-};
-
-// Multi-signature services
-export const firebaseMultiSigService = {
-  createMultiSigWallet: async (walletData: any) => {
-    try {
-      const walletRef = await addDoc(collection(db, 'multiSigWallets'), {
-        ...walletData,
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp()
-      });
-      
-      if (__DEV__) { console.log('🔥 Multi-signature wallet created:', walletRef.id); }
-      return walletRef;
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error creating multi-signature wallet:', error); }
-      throw error;
-    }
-  },
-
-  getMultiSigWallet: async (walletId: string) => {
-    try {
-      const walletDoc = await getDoc(doc(db, 'multiSigWallets', walletId));
-      if (!walletDoc.exists()) {
-        return null;
-      }
-      
-      const data = walletDoc.data();
-      return {
-        id: walletDoc.id,
-        address: data.address,
-        owners: data.owners || [],
-        threshold: data.threshold || 1,
-        pendingTransactions: data.pendingTransactions || [],
-        description: data.description,
-        createdBy: data.createdBy,
-        createdAt: firebaseDataTransformers.timestampToISO(data.created_at),
-        updatedAt: firebaseDataTransformers.timestampToISO(data.updated_at)
-      };
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error getting multi-signature wallet:', error); }
-      return null;
-    }
-  },
-
-  getUserMultiSigWallets: async (userId: string) => {
-    try {
-      const walletsRef = collection(db, 'multiSigWallets');
-      const walletsQuery = query(walletsRef, where('owners', 'array-contains', userId));
-      const walletsDocs = await getDocs(walletsQuery);
-      
-      return walletsDocs.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          address: data.address,
-          owners: data.owners || [],
-          threshold: data.threshold || 1,
-          pendingTransactions: data.pendingTransactions || [],
-          description: data.description,
-          createdBy: data.createdBy,
-          createdAt: firebaseDataTransformers.timestampToISO(data.created_at),
-          updatedAt: firebaseDataTransformers.timestampToISO(data.updated_at)
-        };
-      });
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error getting user multi-signature wallets:', error); }
-      return [];
-    }
-  },
-
-  createMultiSigTransaction: async (transactionData: any) => {
-    try {
-      const transactionRef = await addDoc(collection(db, 'multiSigTransactions'), {
-        ...transactionData,
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp()
-      });
-      
-      if (__DEV__) { console.log('🔥 Multi-signature transaction created:', transactionRef.id); }
-      return transactionRef;
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error creating multi-signature transaction:', error); }
-      throw error;
-    }
-  },
-
-  getMultiSigTransaction: async (transactionId: string) => {
-    try {
-      const transactionDoc = await getDoc(doc(db, 'multiSigTransactions', transactionId));
-      if (!transactionDoc.exists()) {
-        return null;
-      }
-      
-      const data = transactionDoc.data();
-      return {
-        id: transactionDoc.id,
-        multiSigWalletId: data.multiSigWalletId,
-        instructions: data.instructions || [],
-        signers: data.signers || [],
-        approvals: data.approvals || [],
-        rejections: data.rejections || [],
-        executed: data.executed || false,
-        executedAt: data.executedAt ? firebaseDataTransformers.timestampToISO(data.executedAt) : undefined,
-        description: data.description,
-        amount: data.amount,
-        currency: data.currency,
-        recipient: data.recipient,
-        createdAt: firebaseDataTransformers.timestampToISO(data.created_at),
-        updatedAt: firebaseDataTransformers.timestampToISO(data.updated_at)
-      };
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error getting multi-signature transaction:', error); }
-      return null;
-    }
-  },
-
-  updateMultiSigTransaction: async (transactionId: string, updates: any) => {
-    try {
-      const transactionRef = doc(db, 'multiSigTransactions', transactionId);
-      await updateDoc(transactionRef, {
-        ...updates,
-        updated_at: serverTimestamp()
-      });
-      
-      if (__DEV__) { console.log('🔥 Multi-signature transaction updated:', transactionId); }
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error updating multi-signature transaction:', error); }
-      throw error;
-    }
-  },
-
-  getPendingTransactions: async (walletId: string) => {
-    try {
-      const transactionsRef = collection(db, 'multiSigTransactions');
-      const transactionsQuery = query(
-        transactionsRef, 
-        where('multiSigWalletId', '==', walletId),
-        where('executed', '==', false)
-      );
-      const transactionsDocs = await getDocs(transactionsQuery);
-      
-      return transactionsDocs.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          multiSigWalletId: data.multiSigWalletId,
-          instructions: data.instructions || [],
-          signers: data.signers || [],
-          approvals: data.approvals || [],
-          rejections: data.rejections || [],
-          executed: data.executed || false,
-          executedAt: data.executedAt ? firebaseDataTransformers.timestampToISO(data.executedAt) : undefined,
-          description: data.description,
-          amount: data.amount,
-          currency: data.currency,
-          recipient: data.recipient,
-          createdAt: firebaseDataTransformers.timestampToISO(data.created_at),
-          updatedAt: firebaseDataTransformers.timestampToISO(data.updated_at)
-        };
-      });
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error getting pending transactions:', error); }
-      return [];
-    }
-  },
-
-  getUserTransactions: async (userId: string) => {
-    try {
-      // Get all multi-sig wallets where user is an owner
-      const walletsRef = collection(db, 'multiSigWallets');
-      const walletsQuery = query(walletsRef, where('owners', 'array-contains', userId));
-      const walletsDocs = await getDocs(walletsQuery);
-      const walletIds = walletsDocs.docs.map(doc => doc.id);
-      
-      if (walletIds.length === 0) {
-        return [];
-      }
-      
-      // Get all transactions for these wallets
-      const transactionsRef = collection(db, 'multiSigTransactions');
-      const transactionsQuery = query(
-        transactionsRef, 
-        where('multiSigWalletId', 'in', walletIds)
-      );
-      const transactionsDocs = await getDocs(transactionsQuery);
-      
-      return transactionsDocs.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          multiSigWalletId: data.multiSigWalletId,
-          instructions: data.instructions || [],
-          signers: data.signers || [],
-          approvals: data.approvals || [],
-          rejections: data.rejections || [],
-          executed: data.executed || false,
-          executedAt: data.executedAt ? firebaseDataTransformers.timestampToISO(data.executedAt) : undefined,
-          description: data.description,
-          amount: data.amount,
-          currency: data.currency,
-          recipient: data.recipient,
-          createdAt: firebaseDataTransformers.timestampToISO(data.created_at),
-          updatedAt: firebaseDataTransformers.timestampToISO(data.updated_at)
-        };
-      });
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error getting user transactions:', error); }
-      return [];
-    }
   }
 };
 
@@ -1969,6 +2295,5 @@ export const firebaseDataService = {
   transaction: firebaseTransactionService,
   notification: firebaseNotificationService,
   settlement: firebaseSettlementService,
-  multiSig: firebaseMultiSigService,
   transformers: firebaseDataTransformers
 }; 

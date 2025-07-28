@@ -153,6 +153,11 @@ export const styles = StyleSheet.create({
   inviteButton: {
     padding: spacing.md,
   },
+  statusContainer: {
+    padding: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   
   // No Contacts State
   noContactsContainer: {

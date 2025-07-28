@@ -33,8 +33,9 @@ import { userWalletService, UserWalletBalance } from '../../services/userWalletS
 import { firebaseTransactionService } from '../../services/firebaseDataService';
 
 
+
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
-  const { state, notifications, loadNotifications, refreshNotifications } = useApp();
+  const { state, notifications, loadNotifications, refreshNotifications, updateUser } = useApp();
   const { currentUser, isAuthenticated } = state;
   const { balance: walletBalance, isConnected: walletConnected, connectWallet, walletName, refreshBalance } = useWallet();
 
@@ -45,6 +46,31 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     refreshing,
     refresh: refreshGroups
   } = useGroupList();
+
+  // Load groups when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (__DEV__) {
+        console.log('📊 Dashboard: Screen focused, ensuring groups are loaded');
+      }
+
+      const loadGroups = async () => {
+        try {
+          if (currentUser?.id) {
+            console.log('📊 Dashboard: Loading groups for user:', currentUser.id);
+            await refreshGroups(); // Use the refresh function from useGroupList
+            console.log('📊 Dashboard: Groups loaded successfully');
+          } else {
+            console.log('📊 Dashboard: No current user, cannot load groups');
+          }
+        } catch (err) {
+          console.error('❌ Dashboard: Error loading groups:', err);
+        }
+      };
+
+      loadGroups();
+    }, [currentUser?.id, refreshGroups])
+  );
 
   // Debug logging - only log when data actually changes
   useEffect(() => {
@@ -140,11 +166,40 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
     try {
       setLoadingUserWallet(true);
-      const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
-      setUserCreatedWalletBalance(balance);
+      
+      // First ensure the user has a wallet
+      const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
+      
+      if (walletResult.success && walletResult.wallet) {
+        if (__DEV__) {
+          console.log('✅ Wallet ensured for dashboard:', walletResult.wallet.address);
+        }
+        
+        // Update user's wallet information in app context if it's different
+        if (currentUser.wallet_address !== walletResult.wallet.address) {
+          try {
+            await updateUser({
+              wallet_address: walletResult.wallet.address,
+              wallet_public_key: walletResult.wallet.publicKey
+            });
+            if (__DEV__) {
+              console.log('✅ Updated user wallet info in app context');
+            }
+          } catch (updateError) {
+            console.error('Failed to update user wallet info in app context:', updateError);
+          }
+        }
+        
+        // Now get the balance
+        const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
+        setUserCreatedWalletBalance(balance);
 
-      if (__DEV__) {
-        console.log('📊 User created wallet balance loaded:', balance);
+        if (__DEV__) {
+          console.log('📊 User created wallet balance loaded:', balance);
+        }
+      } else {
+        console.error('Failed to ensure wallet for dashboard:', walletResult.error);
+        setUserCreatedWalletBalance(null);
       }
     } catch (error) {
       console.error('Error loading user created wallet balance:', error);
@@ -260,34 +315,49 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         n.type === 'payment_reminder'
       ) : [];
 
-      // Combine both types of requests
+      // Combine both types of requests and filter out $0 requests
       const allRequests = [
-        ...actualPaymentRequests.map(req => ({
-          id: req.id,
-          type: 'payment_request' as const,
-          title: 'Payment Request',
-          message: `${req.senderName} has requested ${req.amount} ${req.currency}${req.description ? ` for ${req.description}` : ''}`,
-          data: {
-            requestId: req.id,
-            senderId: req.senderId,
-            senderName: req.senderName,
-            amount: req.amount,
-            currency: req.currency,
-            description: req.description,
-            groupId: req.groupId,
-            status: req.status
-          },
-          is_read: false,
-          created_at: req.created_at
-        })),
+        ...actualPaymentRequests
+          .filter(req => req.amount > 0) // Filter out $0 requests
+          .map(req => ({
+            id: req.id,
+            type: 'payment_request' as const,
+            title: 'Payment Request',
+            message: `${req.senderName} has requested ${req.amount} ${req.currency}${req.description ? ` for ${req.description}` : ''}`,
+            data: {
+              requestId: req.id,
+              senderId: req.senderId,
+              senderName: req.senderName,
+              amount: req.amount,
+              currency: req.currency,
+              description: req.description,
+              groupId: req.groupId,
+              status: req.status
+            },
+            is_read: false,
+            created_at: req.created_at
+          })),
         ...notificationRequests
+          .filter(n => {
+            // Filter out notifications with $0 amounts
+            const amount = n.data?.amount || 0;
+            return amount > 0;
+          })
       ];
+
+      // Sort by creation date (latest first)
+      allRequests.sort((a, b) => {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        return dateB - dateA; // Latest first
+      });
 
       if (__DEV__) {
         console.log('🔥 Loading payment requests:', {
           actualPaymentRequests: actualPaymentRequests.length,
           notificationRequests: notificationRequests.length,
-          totalRequests: allRequests.length
+          totalRequests: allRequests.length,
+          filteredRequests: allRequests.filter(r => r.data?.amount > 0).length
         });
       }
 
@@ -296,11 +366,18 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       console.error('Error loading payment requests:', error);
       // Fallback to notifications only
       if (notifications) {
-        const requests = notifications.filter(n =>
-          n.type === 'settlement_request' ||
-          n.type === 'payment_reminder' ||
-          n.type === 'payment_request'
-        );
+        const requests = notifications
+          .filter(n =>
+            (n.type === 'settlement_request' ||
+             n.type === 'payment_reminder' ||
+             n.type === 'payment_request') &&
+            (n.data?.amount || 0) > 0 // Filter out $0 requests
+          )
+          .sort((a, b) => {
+            const dateA = new Date(a.created_at).getTime();
+            const dateB = new Date(b.created_at).getTime();
+            return dateB - dateA; // Latest first
+          });
         setPaymentRequests(requests);
       }
     }
@@ -462,8 +539,29 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   useFocusEffect(
     React.useCallback(() => {
       if (isAuthenticated && currentUser?.id) {
-        // Only load groups if we don't have any or if they're stale
-        if (groups.length === 0) {
+        // Ensure wallet exists and load balance
+        userWalletService.ensureUserWallet(currentUser.id.toString()).then(async (walletResult) => {
+          if (walletResult.success && walletResult.wallet && currentUser.wallet_address !== walletResult.wallet.address) {
+            try {
+              await updateUser({
+                wallet_address: walletResult.wallet.address,
+                wallet_public_key: walletResult.wallet.publicKey
+              });
+              if (__DEV__) {
+                console.log('✅ Updated user wallet info in focus effect');
+              }
+            } catch (updateError) {
+              console.error('Failed to update user wallet info in focus effect:', updateError);
+            }
+          }
+          loadUserCreatedWalletBalance();
+        }).catch(error => {
+          console.error('Error ensuring wallet:', error);
+        });
+
+        // Always ensure groups are loaded when returning to dashboard
+        // This handles the case where user logs out and comes back
+        if (groups.length === 0 && !groupsLoading) {
           refreshGroups().then(() => {
             loadPaymentRequests();
           });
@@ -472,7 +570,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           loadPaymentRequests();
         }
       }
-    }, [isAuthenticated, currentUser?.id, groups.length]) // Add groups.length to check if we need to load
+    }, [isAuthenticated, currentUser?.id, groups.length, loadUserCreatedWalletBalance]) // Add loadUserCreatedWalletBalance dependency
   );
 
   // Load notifications when dashboard loads
@@ -481,6 +579,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       loadNotifications();
     }
   }, [isAuthenticated, currentUser?.id]); // Remove loadNotifications dependency
+
+  // Note: Group loading is now handled by useGroupList hook to prevent infinite loops
 
   const handleSendRequestFromDashboard = async (request: any) => {
     if (!currentUser?.id) {
@@ -532,10 +632,29 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     if (!isAuthenticated || !currentUser?.id) return;
 
     try {
+      // Ensure wallet exists and refresh balance
+      const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
+      
+      // Update user's wallet information if it changed
+      if (walletResult.success && walletResult.wallet && currentUser.wallet_address !== walletResult.wallet.address) {
+        try {
+          await updateUser({
+            wallet_address: walletResult.wallet.address,
+            wallet_public_key: walletResult.wallet.publicKey
+          });
+          if (__DEV__) {
+            console.log('✅ Updated user wallet info in refresh');
+          }
+        } catch (updateError) {
+          console.error('Failed to update user wallet info in refresh:', updateError);
+        }
+      }
+      
       await Promise.all([
         refreshGroups(),
         refreshNotifications(),
         refreshBalance(), // Add balance refresh to pull-to-refresh
+        loadUserCreatedWalletBalance(), // Refresh user wallet balance
       ]);
       loadPaymentRequests();
     } catch (error) {
@@ -562,6 +681,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.statusBar} />
+      
+
 
       <ScrollView
         style={styles.scrollContainer}
@@ -969,7 +1090,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                           <View style={styles.memberAvatars}>
                             {/* Show member avatars */}
                             {group.members && group.members.slice(0, 3).map((member, i) => (
-                              <View key={member.id} style={styles.memberAvatar}>
+                              <View key={`${member.id}-${i}`} style={styles.memberAvatar}>
                                 {member.avatar && member.avatar.trim() !== '' ? (
                                   <Image
                                     source={{ uri: member.avatar }}
@@ -1109,84 +1230,84 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               <Text style={styles.emptyRequestsText}>No recent transactions</Text>
             </View>
           ) : (
-            groups.slice(0, 2).map((group, index) => {
-              try {
-                // Use the new summary function that works with available data
-                const summary = getGroupSummary(group);
-                const recentDate = group.updated_at || group.created_at || new Date().toISOString();
-                
-                // Determine transaction type and icon based on group activity
-                const transactionType = summary.expenseCount > 0 ? 'send' : 'request';
-                const transactionTitle = summary.expenseCount > 0 ? `Send to ${group.name}` : `Request to ${group.name}`;
-                const transactionNote = summary.expenseCount > 0 ? `Group expenses` : `Group activity`;
-                const transactionTime = new Date(recentDate).toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: true
-                });
+            groups
+              .map((group, index) => {
+                try {
+                  // Use the new summary function that works with available data
+                  const summary = getGroupSummary(group);
+                  const recentDate = group.updated_at || group.created_at || new Date().toISOString();
+                  
+                  // Only show groups with meaningful activity (expenses or amounts > 0)
+                  if (summary.expenseCount === 0 && (summary.totalAmount || 0) <= 0) {
+                    return null; // Skip groups with no activity
+                  }
+                  
+                  // Determine transaction type and icon based on group activity
+                  const transactionType = summary.expenseCount > 0 ? 'send' : 'request';
+                  const transactionTitle = summary.expenseCount > 0 ? `Send to ${group.name}` : `Request to ${group.name}`;
+                  const transactionNote = summary.expenseCount > 0 ? `Group expenses` : `Group activity`;
+                  const transactionTime = new Date(recentDate).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  });
 
-                return (
-                  <TouchableOpacity
-                    key={group.id}
-                    style={styles.requestItemNew}
-                                         onPress={() => {
-                       // Open transaction modal for group details without navigation
-                       const mockTransaction: Transaction = {
-                         id: group.id.toString(),
-                         type: transactionType === 'send' ? 'send' : 'receive',
-                         amount: summary.totalAmount || 0,
-                         currency: 'USDC',
-                         from_user: currentUser?.id?.toString() || '',
-                         to_user: group.name,
-                         from_wallet: currentUser?.wallet_address || '',
-                         to_wallet: group.name,
-                         tx_hash: `group_${group.id}_${Date.now()}`,
-                         note: transactionNote,
-                         created_at: recentDate,
-                         updated_at: recentDate,
-                         status: 'completed'
-                       };
-                       setSelectedTransaction(mockTransaction);
-                       setTransactionModalVisible(true);
-                     }}
-                  >
-                    <View style={styles.transactionAvatarNew}>
-                      <Image
-                        source={
-                          transactionType === 'send' 
-                            ? require('../../../assets/icon-send.png')
-                            : require('../../../assets/icon-receive.png')
-                        }
-                        style={styles.transactionIcon}
-                      />
-                    </View>
-                    <View style={styles.requestContent}>
-                      <Text style={styles.requestMessageWithAmount}>
-                        <Text style={styles.requestSenderName}>{transactionTitle}</Text>
-                      </Text>
-                      <Text style={styles.requestSource}>
-                        {transactionNote} • {transactionTime}
-                      </Text>
-                    </View>
-                    <Text style={styles.requestAmountGreen}>
-                      {(summary.totalAmount || 0).toFixed(2)} USDC
-                    </Text>
-                  </TouchableOpacity>
-                );
-              } catch (error) {
-                console.error(`Error rendering transaction for group ${group.id}:`, error);
-                return (
-                  <View key={group.id} style={styles.requestItemNew}>
-                    <View style={styles.requestAvatarNew}>
-                      <Text style={styles.balanceAmountText}>E</Text>
-                    </View>
-                    <View style={styles.requestContent}>
-                      <Text style={styles.requestSenderName}>Error loading transaction</Text>
-                    </View>
-                  </View>
-                );
-              }
-            })
+                  return (
+                    <TouchableOpacity
+                      key={group.id}
+                      style={styles.requestItemNew}
+                      onPress={() => {
+                        // Open transaction modal for group details without navigation
+                        const mockTransaction: Transaction = {
+                          id: group.id.toString(),
+                          type: transactionType === 'send' ? 'send' : 'receive',
+                          amount: summary.totalAmount || 0,
+                          currency: 'USDC',
+                          from_user: currentUser?.id?.toString() || '',
+                          to_user: group.name,
+                          from_wallet: currentUser?.wallet_address || '',
+                          to_wallet: group.name,
+                          tx_hash: `group_${group.id}_${Date.now()}`,
+                          note: transactionNote,
+                          created_at: recentDate,
+                          updated_at: recentDate,
+                          status: 'completed'
+                        };
+                        setSelectedTransaction(mockTransaction);
+                        setTransactionModalVisible(true);
+                      }}
+                    >
+                      <View style={styles.transactionAvatarNew}>
+                        <Image
+                          source={
+                            transactionType === 'send' 
+                              ? require('../../../assets/icon-send.png')
+                              : require('../../../assets/icon-receive.png')
+                          }
+                          style={styles.transactionAvatar}
+                        />
+                      </View>
+                      <View style={styles.requestContent}>
+                        <Text style={styles.requestMessageWithAmount}>
+                          <Text style={styles.requestSenderName}>{transactionTitle}</Text>
+                          {' '}
+                          <Text style={styles.requestAmountGreen}>
+                            {(summary.totalAmount || 0).toFixed(2)} USDC
+                          </Text>
+                        </Text>
+                        <Text style={styles.requestSource}>
+                          {transactionNote} • {transactionTime}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                } catch (error) {
+                  console.error(`Error rendering transaction for group ${group.id}:`, error);
+                  return null; // Skip this group if there's an error
+                }
+              })
+              .filter(Boolean) // Remove null entries
+              .slice(0, 2) // Only show first 2 meaningful transactions
           )}
         </View>
         

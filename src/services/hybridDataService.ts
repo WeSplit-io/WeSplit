@@ -36,7 +36,7 @@ export const hybridDataService = {
     createUser: async (userData: Omit<User, 'id' | 'created_at'>): Promise<User> => {
       try {
         if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for createUser'); }
-        return await firebaseDataService.user.createUser(userData);
+        return await firebaseDataService.user.createUserIfNotExists(userData);
       } catch (error) {
         if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for createUser'); }
         return await dataService.user.createUser(userData);
@@ -55,11 +55,11 @@ export const hybridDataService = {
 
     getUserContacts: async (userId: string): Promise<UserContact[]> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for getUserContacts'); }
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for getUserContacts'); }
         return await firebaseDataService.user.getUserContacts(userId);
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for getUserContacts'); }
-        return await dataService.user.getUserContacts(userId);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for getUserContacts:', error); }
+        throw error;
       }
     }
   },
@@ -67,114 +67,104 @@ export const hybridDataService = {
   group: {
     getUserGroups: async (userId: string, forceRefresh: boolean = false): Promise<GroupWithDetails[]> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for getUserGroups'); }
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for getUserGroups for user:', userId); }
+        if (__DEV__) { console.log('🔄 Hybrid: About to call firebaseDataService.group.getUserGroups'); }
         const firebaseGroups = await firebaseDataService.group.getUserGroups(userId, forceRefresh);
         
-        // If Firebase returns groups, use them
-        if (firebaseGroups && firebaseGroups.length > 0) {
-          if (__DEV__) { console.log('🔄 Hybrid: Firebase returned', firebaseGroups.length, 'groups'); }
-          return firebaseGroups;
-        }
-        
-        // If Firebase returns empty array, try SQLite
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase returned no groups, trying SQLite'); }
-        const sqliteGroups = await dataService.group.getUserGroups(userId, forceRefresh);
-        if (__DEV__) { console.log('🔄 Hybrid: SQLite returned', sqliteGroups.length, 'groups'); }
-        return sqliteGroups;
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase returned', firebaseGroups.length, 'groups'); }
+        return firebaseGroups;
         
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for getUserGroups'); }
-        return await dataService.group.getUserGroups(userId, forceRefresh);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for getUserGroups:', error); }
+        // Return empty array instead of falling back to SQLite
+        return [];
       }
     },
 
     getGroupDetails: async (groupId: string, forceRefresh: boolean = false): Promise<GroupWithDetails> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for getGroupDetails'); }
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for getGroupDetails'); }
         return await firebaseDataService.group.getGroupDetails(groupId, forceRefresh);
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for getGroupDetails'); }
-        return await dataService.group.getGroupDetails(groupId, forceRefresh);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for getGroupDetails:', error); }
+        throw error;
       }
     },
 
     getGroupMembers: async (groupId: string, forceRefresh: boolean = false): Promise<GroupMember[]> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for getGroupMembers'); }
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for getGroupMembers'); }
         return await firebaseDataService.group.getGroupMembers(groupId, forceRefresh);
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for getGroupMembers'); }
-        return await dataService.group.getGroupMembers(groupId, forceRefresh);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for getGroupMembers:', error); }
+        throw error;
       }
     },
 
     createGroup: async (groupData: Omit<Group, 'id' | 'created_at' | 'updated_at' | 'member_count' | 'expense_count' | 'expenses_by_currency'>): Promise<Group> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for createGroup'); }
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for createGroup'); }
         return await firebaseDataService.group.createGroup(groupData);
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for createGroup'); }
-        return await dataService.group.createGroup(groupData);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for createGroup:', error); }
+        throw error;
       }
     },
 
     updateGroup: async (groupId: string, userId: string, updates: Partial<Group>): Promise<{ message: string; group: Group }> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for updateGroup'); }
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for updateGroup'); }
         return await firebaseDataService.group.updateGroup(groupId, userId, updates);
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for updateGroup'); }
-        return await dataService.group.updateGroup(groupId, userId, updates);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for updateGroup:', error); }
+        throw error;
       }
     },
 
     deleteGroup: async (groupId: string, userId: string): Promise<{ message: string }> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for deleteGroup'); }
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for deleteGroup'); }
         return await firebaseDataService.group.deleteGroup(groupId, userId);
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for deleteGroup'); }
-        return await dataService.group.deleteGroup(groupId, userId);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for deleteGroup:', error); }
+        throw error;
       }
     },
 
-    getUserContacts: async (userId: string, forceRefresh: boolean = false): Promise<UserContact[]> => {
-      try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for getUserContacts'); }
-        return await firebaseDataService.group.getUserContacts(userId, forceRefresh);
-      } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for getUserContacts'); }
-        return await dataService.group.getUserContacts(userId, forceRefresh);
-      }
-    },
+
 
     generateInviteLink: async (groupId: string, userId: string): Promise<InviteLinkData> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for generateInviteLink'); }
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for generateInviteLink'); }
         return await firebaseDataService.group.generateInviteLink(groupId, userId);
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for generateInviteLink'); }
-        return await dataService.group.generateInviteLink(groupId, userId);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for generateInviteLink:', error); }
+        throw error;
       }
     },
 
-    joinGroupViaInvite: async (inviteCode: string, userId: string): Promise<{ message: string; groupId: number; groupName: string }> => {
+    joinGroupViaInvite: async (inviteCode: string, userId: string): Promise<{ message: string; groupId: string; groupName: string }> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for joinGroupViaInvite'); }
-        return await firebaseDataService.group.joinGroupViaInvite(inviteCode, userId);
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for joinGroupViaInvite'); }
+        const result = await firebaseDataService.group.joinGroupViaInvite(inviteCode, userId);
+        return {
+          message: result.message,
+          groupId: result.groupId,
+          groupName: result.groupName
+        };
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for joinGroupViaInvite'); }
-        return await dataService.group.joinGroupViaInvite(inviteCode, userId);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for joinGroupViaInvite:', error); }
+        throw error;
       }
     },
 
     leaveGroup: async (groupId: string, userId: string): Promise<{ message: string }> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for leaveGroup'); }
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for leaveGroup'); }
         return await firebaseDataService.group.leaveGroup(groupId, userId);
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for leaveGroup'); }
-        return await dataService.group.leaveGroup(groupId, userId);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for leaveGroup:', error); }
+        throw error;
       }
     }
   },
@@ -182,41 +172,41 @@ export const hybridDataService = {
   expense: {
     getGroupExpenses: async (groupId: string, forceRefresh: boolean = false): Promise<Expense[]> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for getGroupExpenses'); }
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for getGroupExpenses'); }
         return await firebaseDataService.expense.getGroupExpenses(groupId, forceRefresh);
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for getGroupExpenses'); }
-        return await dataService.expense.getGroupExpenses(groupId, forceRefresh);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for getGroupExpenses:', error); }
+        throw error;
       }
     },
 
     createExpense: async (expenseData: any): Promise<Expense> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for createExpense'); }
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for createExpense'); }
         return await firebaseDataService.expense.createExpense(expenseData);
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for createExpense'); }
-        return await dataService.expense.createExpense(expenseData);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for createExpense:', error); }
+        throw error;
       }
     },
 
-    updateExpense: async (expenseId: number, updates: Partial<Expense>): Promise<Expense> => {
+    updateExpense: async (expenseId: string, updates: Partial<Expense>): Promise<Expense> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for updateExpense'); }
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for updateExpense'); }
         return await firebaseDataService.expense.updateExpense(expenseId, updates);
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for updateExpense'); }
-        return await dataService.expense.updateExpense(expenseId, updates);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for updateExpense:', error); }
+        throw error;
       }
     },
 
-    deleteExpense: async (expenseId: number): Promise<{ message: string }> => {
+    deleteExpense: async (expenseId: string, groupId: string): Promise<{ message: string }> => {
       try {
-        if (__DEV__) { console.log('🔄 Hybrid: Trying Firebase for deleteExpense'); }
-        return await firebaseDataService.expense.deleteExpense(expenseId);
+        if (__DEV__) { console.log('🔄 Hybrid: Using Firebase only for deleteExpense'); }
+        return await firebaseDataService.expense.deleteExpense(expenseId, groupId);
       } catch (error) {
-        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed, falling back to SQLite for deleteExpense'); }
-        return await dataService.expense.deleteExpense(expenseId);
+        if (__DEV__) { console.log('🔄 Hybrid: Firebase failed for deleteExpense:', error); }
+        throw error;
       }
     }
   },

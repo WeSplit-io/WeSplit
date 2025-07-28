@@ -39,6 +39,19 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   const [realMembers, setRealMembers] = useState<GroupMember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
 
+  console.log('🔄 GroupSettingsScreen: Group data:', {
+    groupId,
+    groupExists: !!group,
+    groupName: group?.name,
+    groupMembers: group?.members?.length || 0,
+    realMembersLength: realMembers.length,
+    loading,
+    error
+  });
+
+  // Check if current user is admin (group creator)
+  const isAdmin = group?.created_by === currentUser?.id;
+
   // Load real member data from backend
   useEffect(() => {
     const loadRealMembers = async () => {
@@ -46,23 +59,14 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
       
       setLoadingMembers(true);
       try {
+        console.log('🔄 GroupSettingsScreen: Loading members for group:', groupId);
         // Use the hybrid service instead of direct API call
-        const members = await firebaseDataService.group.getGroupMembers(groupId.toString());
-        console.log(`Group Settings - Loaded ${members.length} real members:`, members.map((m: any) => m.name));
+        const members = await firebaseDataService.group.getGroupMembers(groupId.toString(), false, currentUser?.id ? String(currentUser.id) : undefined);
+        console.log('🔄 GroupSettingsScreen: Loaded members:', members.length, members.map(m => ({ id: m.id, name: m.name, email: m.email })));
         setRealMembers(members);
         
-        // Debug: Log group data to check created_by field
-        if (group) {
-          console.log('🔍 GroupSettings: Group data for deletion check:', {
-            groupId: group.id,
-            groupName: group.name,
-            created_by: group.created_by,
-            currentUserId: currentUser?.id,
-            isCreator: group.created_by === currentUser?.id
-          });
-        }
       } catch (error) {
-        console.error('Error loading members in Group Settings:', error);
+        console.error('❌ GroupSettingsScreen: Error loading members:', error);
         setRealMembers(group?.members || []);
       } finally {
         setLoadingMembers(false);
@@ -75,7 +79,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   // Get computed values from real member data
   const members = realMembers;
   const expenses = group?.expenses || [];
-
+  
   // Generate invite link when group data is available
   useEffect(() => {
     const generateInvite = async () => {
@@ -83,10 +87,10 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
         try {
           // Use the hybrid service instead of the old groupService
           const inviteData = await firebaseDataService.group.generateInviteLink(group.id.toString(), currentUser.id.toString());
-          setInviteLink(`wesplit://join/${inviteData.inviteCode}?name=${encodeURIComponent(group?.name || 'Group')}`);
+          setInviteLink(inviteData.inviteLink);
         } catch (error) {
-          console.error('Error generating invite link for QR:', error);
-          setInviteLink(`wesplit://join/${group.id}?name=${encodeURIComponent(group.name || 'Group')}`);
+          console.error('❌ GroupSettingsScreen: Error generating invite link for QR:', error);
+          setInviteLink(`wesplit://join/${group.id}`);
         }
       }
     };
@@ -103,33 +107,50 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
 
   const colorOptions = [
     '#A5EA15', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', 
-    '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE',
+    'FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE',
     '#85C1E9', '#F8C471', '#82E0AA', '#F1948A'
   ];
 
   // Calculate member balance based on real expense data
   // REPLACED: Now using centralized getGroupBalances for multi-currency support
-  const groupBalances = getGroupBalances(groupId);
+  const [groupBalances, setGroupBalances] = useState<any[]>([]);
+
+  // Load group balances
+  useEffect(() => {
+    const loadBalances = async () => {
+      try {
+        const balances = await getGroupBalances(groupId);
+        setGroupBalances(balances);
+      } catch (error) {
+        console.error('❌ GroupSettingsScreen: Error loading balances:', error);
+        setGroupBalances([]);
+      }
+    };
+
+    if (groupId) {
+      loadBalances();
+    }
+  }, [groupId]); // Remove getGroupBalances dependency to prevent infinite loops
 
   // Get member balance display data using centralized calculations
-  const getMemberBalance = (memberId: number) => {
-    const balance = groupBalances.find(b => b.userId === memberId);
+  const getMemberBalance = (memberId: number | string) => {
+    const balance = groupBalances.find((b: any) => String(b.userId) === String(memberId));
     if (!balance) return { type: 'settled', amount: 0, currency: 'SOL' };
 
-    const currentUserId = Number(currentUser?.id);
+    const currentUserId = String(currentUser?.id);
     
     if (balance.status === 'settled') {
       return { type: 'settled', amount: 0, currency: balance.currency };
     } else if (balance.status === 'gets_back') {
       // Member is owed money
-      if (memberId === currentUserId) {
+      if (String(memberId) === currentUserId) {
         return { type: 'you_get_back', amount: balance.amount, currency: balance.currency };
       } else {
         return { type: 'gets_back', amount: balance.amount, currency: balance.currency };
       }
     } else {
       // Member owes money (status === 'owes')
-      if (memberId === currentUserId) {
+      if (String(memberId) === currentUserId) {
         return { type: 'you_owe', amount: Math.abs(balance.amount), currency: balance.currency };
       } else {
         return { type: 'owes', amount: Math.abs(balance.amount), currency: balance.currency };
@@ -152,113 +173,137 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
 
 💰 Split expenses easily
 📱 Track balances in real-time
-🔗 Invite code: ${inviteData.inviteCode}
-
-Or click this link: wesplit://join/${inviteData.inviteCode}`;
+🔗 Click this link: ${inviteData.inviteLink}`;
 
       await Share.share({
         message: shareMessage,
         title: `Join ${group.name} on WeSplit`,
-        url: `wesplit://join/${inviteData.inviteCode}`,
+        url: inviteData.inviteLink,
       });
 
     } catch (error) {
-      console.error('Error sharing invite link:', error);
+      console.error('❌ GroupSettingsScreen: Error sharing invite link:', error);
       Alert.alert('Error', 'Failed to generate invite link. Please try again.');
     }
   };
 
-  const handleLeaveGroup = async () => {
-    // Check if user is the only member
-    const isOnlyMember = group?.member_count === 1;
-    
-    // Check if user has any outstanding debts
-    const userBalance = getGroupBalances(groupId).find(balance => 
-      balance.userId === currentUser?.id
-    );
-    const hasOutstandingDebts = userBalance && userBalance.amount < 0;
-    
-    let alertMessage = 'Are you sure you want to leave this group?';
-    let alertTitle = 'Leave Group';
-    
-    if (isOnlyMember) {
-      alertTitle = 'Delete Group';
-      alertMessage = 'You are the only member of this group. Leaving will delete the group permanently. Are you sure?';
-    } else if (hasOutstandingDebts) {
-      alertTitle = 'Cannot Leave Group';
-      alertMessage = 'You have outstanding debts in this group. Please settle your debts before leaving.';
+  // Handle removing a member from the group (admin only)
+  const handleRemoveMember = async (memberId: string | number, memberName: string) => {
+    if (!isAdmin) {
+      Alert.alert('Error', 'Only group admin can remove members');
+      return;
     }
-    
+
+    if (String(memberId) === String(currentUser?.id)) {
+      Alert.alert('Error', 'You cannot remove yourself. Use "Leave Group" instead.');
+      return;
+    }
+
     Alert.alert(
-      alertTitle,
-      alertMessage,
+      'Remove Member',
+      `Are you sure you want to remove ${memberName} from the group?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        ...(hasOutstandingDebts ? [] : [{
-          text: isOnlyMember ? 'Delete Group' : 'Leave', 
-          style: 'destructive' as const,
+        {
+          text: 'Remove',
+          style: 'destructive',
           onPress: async () => {
             try {
-              console.log('🔍 GroupSettings: Starting leave group...');
-              console.log('🔍 GroupSettings: Group ID:', groupId);
-              console.log('🔍 GroupSettings: Is only member:', isOnlyMember);
-              console.log('🔍 GroupSettings: User balance:', userBalance);
+      
               
-              if (isOnlyMember) {
-                // If user is the only member, delete the group
-                await deleteGroup(groupId);
-                console.log('🔍 GroupSettings: Group deleted (user was only member)');
-                Alert.alert('Success', 'Group deleted successfully');
-              } else {
-                // Otherwise, leave the group
-                await leaveGroup(groupId);
-                console.log('🔍 GroupSettings: User left group successfully');
-                Alert.alert('Success', 'You have left the group successfully');
-              }
-              navigation.navigate('Dashboard');
+              // Remove member from Firebase using leaveGroup for the target user
+              // Note: This is a simplified approach - in a real app, you'd have a proper removeMember function
+              Alert.alert('Info', 'Member removal functionality will be implemented in a future update.');
+              
+              // For now, just refresh the members list
+              const updatedMembers = await firebaseDataService.group.getGroupMembers(
+                groupId.toString(), 
+                false, 
+                currentUser?.id ? String(currentUser.id) : undefined
+              );
+              setRealMembers(updatedMembers);
+              
             } catch (error) {
-              console.error('❌ GroupSettings: Error leaving/deleting group:', error);
-              console.error('❌ GroupSettings: Error details:', {
-                message: error instanceof Error ? error.message : 'Unknown error',
-                stack: error instanceof Error ? error.stack : 'No stack trace',
-                name: error instanceof Error ? error.name : 'Unknown error type'
-              });
-              Alert.alert('Error', (error as Error).message || 'Failed to leave group. Please try again.');
+              console.error('❌ GroupSettingsScreen: Error removing member:', error);
+              Alert.alert('Error', 'Failed to remove member. Please try again.');
             }
           }
-        }])
+        }
       ]
     );
   };
 
+  const handleLeaveGroup = async () => {
+    try {
+      if (!currentUser?.id || !group?.id) {
+        Alert.alert('Error', 'Cannot leave group');
+        return;
+      }
+
+      const groupId = String(group.id);
+      const isOnlyMember = members.length === 1;
+      const userBalance = getMemberBalance(currentUser.id);
+
+      // Check if user has outstanding balance
+      if (userBalance.type === 'you_owe' && userBalance.amount > 0) {
+        Alert.alert(
+          'Outstanding Balance',
+          `You owe ${userBalance.currency} ${userBalance.amount.toFixed(2)}. Please settle your balance before leaving the group.`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      if (isOnlyMember) {
+        // If user is the only member, delete the group
+        await deleteGroup(groupId);
+        Alert.alert('Success', 'Group deleted (you were the only member)');
+      } else {
+        // Leave the group
+        await leaveGroup(groupId);
+        Alert.alert('Success', 'You have left the group');
+      }
+
+      // Navigate back to groups list
+      navigation.navigate('GroupsList');
+    } catch (error) {
+      console.error('❌ GroupSettingsScreen: Error leaving group:', error);
+      Alert.alert('Error', 'Failed to leave group. Please try again.');
+    }
+  };
+
   const handleDeleteGroup = async () => {
+    if (!isAdmin) {
+      Alert.alert('Error', 'Only group admin can delete the group');
+      return;
+    }
+
     Alert.alert(
       'Delete Group',
       'Are you sure you want to delete this group? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('🔍 GroupSettings: Starting group deletion...');
-              console.log('🔍 GroupSettings: Group ID:', groupId);
-              console.log('🔍 GroupSettings: Current user:', currentUser);
-              console.log('🔍 GroupSettings: Group data:', group);
-              
+              if (!currentUser?.id || !group?.id) {
+                Alert.alert('Error', 'Cannot delete group');
+                return;
+              }
+
+              const groupId = String(group.id);
+
+              // Delete the group
               await deleteGroup(groupId);
-              console.log('🔍 GroupSettings: Group deleted successfully');
               Alert.alert('Success', 'Group deleted successfully');
-              navigation.navigate('Dashboard');
+
+              // Navigate back to groups list
+              navigation.navigate('GroupsList');
             } catch (error) {
-              console.error('❌ GroupSettings: Error deleting group:', error);
-              console.error('❌ GroupSettings: Error details:', {
-                message: error instanceof Error ? error.message : 'Unknown error',
-                stack: error instanceof Error ? error.stack : 'No stack trace',
-                name: error instanceof Error ? error.name : 'Unknown error type'
-              });
-              Alert.alert('Error', (error as Error).message || 'Failed to delete group. Please try again.');
+              console.error('❌ GroupSettingsScreen: Error deleting group:', error);
+              Alert.alert('Error', 'Failed to delete group. Please try again.');
             }
           }
         }
@@ -267,6 +312,11 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
   };
 
   const handleEditGroup = () => {
+    if (!isAdmin) {
+      Alert.alert('Error', 'Only group admin can edit group settings');
+      return;
+    }
+
     setEditGroupName(group?.name || '');
     setEditGroupCategory(group?.category || '');
     setEditGroupIcon(group?.icon || 'people');
@@ -280,6 +330,11 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
       return;
     }
 
+    if (!isAdmin) {
+      Alert.alert('Error', 'Only group admin can edit group settings');
+      return;
+    }
+
     if (!editGroupName.trim()) {
       Alert.alert('Error', 'Group name cannot be empty');
       return;
@@ -287,7 +342,7 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
 
     try {
       setUpdating(true);
-      
+
       await updateGroup(groupId, {
         name: editGroupName.trim(),
         category: editGroupCategory.trim() || 'general',
@@ -301,7 +356,7 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
       setShowEditModal(false);
       Alert.alert('Success', 'Group updated successfully');
     } catch (error) {
-      console.error('Error updating group:', error);
+      console.error('❌ GroupSettingsScreen: Error updating group:', error);
       Alert.alert('Error', 'Failed to update group. Please try again.');
     } finally {
       setUpdating(false);
@@ -386,9 +441,20 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
             <Text style={styles.memberEmail}>Loading members...</Text>
           </View>
         ) : (
-          members.map((member, index) => {
-            const balance = getMemberBalance(Number(member.id));
+          members.map((member: GroupMember, index: number) => {
+            const balance = getMemberBalance(member.id);
             const isInvited = member.invitation_status === 'pending';
+            const isCurrentUser = String(member.id) === String(currentUser?.id);
+            const canRemoveMember = isAdmin && !isCurrentUser && !isInvited;
+            
+            console.log('🔄 GroupSettingsScreen: Rendering member:', { 
+              id: member.id, 
+              name: member.name, 
+              email: member.email, 
+              isInvited, 
+              isCurrentUser, 
+              canRemoveMember 
+            });
             
             return (
               <View key={`member-${member.id}-${index}`} style={[
@@ -409,6 +475,8 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
                     isInvited && styles.memberNameInvited
                   ]}>
                     {isInvited ? 'Invited User' : member.name}
+                    {isCurrentUser && ' (You)'}
+                    {isAdmin && String(member.id) === String(group?.created_by) && ' (Admin)'}
                   </Text>
                   <Text style={[
                     styles.memberEmail,
@@ -447,6 +515,14 @@ Or click this link: wesplit://join/${inviteData.inviteCode}`;
                   <View style={styles.memberInviteStatus}>
                     <Text style={styles.memberInviteStatusText}>Invited</Text>
                   </View>
+                )}
+                {canRemoveMember && (
+                  <TouchableOpacity
+                    style={styles.removeMemberButton}
+                    onPress={() => handleRemoveMember(member.id, member.name)}
+                  >
+                    <Icon name="remove-circle" size={20} color="#FF6B6B" />
+                  </TouchableOpacity>
                 )}
               </View>
             );

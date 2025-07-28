@@ -24,6 +24,11 @@ function generateCode() {
 
 async function sendVerificationCode(email) {
   try {
+    // Sanitize email by trimming whitespace and newlines
+    const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
+    
+    console.log('🧹 Email sanitization:', { original: email, sanitized: sanitizedEmail });
+    
     // 1. Create or get Firebase user (if Firebase Admin is available)
     let firebaseUid = null;
     try {
@@ -31,11 +36,11 @@ async function sendVerificationCode(email) {
       const auth = getAuth();
       
       try {
-        const firebaseUser = await auth.getUserByEmail(email);
+        const firebaseUser = await auth.getUserByEmail(sanitizedEmail);
         firebaseUid = firebaseUser.uid;
       } catch (e) {
         if (e.code === 'auth/user-not-found') {
-          const firebaseUser = await auth.createUser({ email });
+          const firebaseUser = await auth.createUser({ email: sanitizedEmail });
           firebaseUid = firebaseUser.uid;
         } else {
           console.warn('Firebase user creation failed:', e.message);
@@ -53,7 +58,7 @@ async function sendVerificationCode(email) {
     // 3. Store code in Firestore
     const verificationRef = db.collection('verification_codes').doc();
     await verificationRef.set({
-      email,
+      email: sanitizedEmail,
       code,
       firebaseUid,
       createdAt: now,
@@ -66,12 +71,12 @@ async function sendVerificationCode(email) {
     if (process.env.NODE_ENV === 'production' && emailTransporter) {
       await emailTransporter.sendMail({
         from: process.env.EMAIL_USER,
-        to: email,
+        to: sanitizedEmail,
         subject: 'Your WeSplit Verification Code',
         html: `<h2>Your WeSplit verification code:</h2><h1>${code}</h1><p>This code expires in 10 minutes.</p>`
       });
     } else {
-      console.log(`\n🔐 [DEV] EMAIL VERIFICATION CODE FOR ${email}: ${code}`);
+      console.log(`\n🔐 [DEV] EMAIL VERIFICATION CODE FOR ${sanitizedEmail}: ${code}`);
       console.log('📧 Email sending skipped in development mode');
       console.log('📱 Use this code in your mobile app to continue\n');
     }
@@ -85,9 +90,14 @@ async function sendVerificationCode(email) {
 
 async function verifyCode(email, code) {
   try {
+    // Sanitize email by trimming whitespace and newlines
+    const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
+    
+    console.log('🧹 Email sanitization in verifyCode:', { original: email, sanitized: sanitizedEmail });
+    
     // 1. Find the verification code in Firestore
     const verificationQuery = await db.collection('verification_codes')
-      .where('email', '==', email)
+      .where('email', '==', sanitizedEmail)
       .orderBy('createdAt', 'desc')
       .limit(1)
       .get();

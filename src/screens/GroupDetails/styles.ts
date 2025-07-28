@@ -482,36 +482,6 @@ export const styles = StyleSheet.create({
   },
 
   // Error and Empty States
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.screenPadding,
-  },
-  errorText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  errorSubtext: {
-    fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  errorButton: {
-    backgroundColor: '#A5EA15',
-    borderRadius: spacing.radiusMd,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
-  errorButtonText: {
-    color: '#212121',
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-  },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
@@ -542,5 +512,40 @@ export const styles = StyleSheet.create({
     color: '#212121',
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
+  },
+  // Error state styles
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.screenPadding,
+  },
+  errorTitle: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+    lineHeight: 22,
+  },
+  retryButton: {
+    backgroundColor: colors.green,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: spacing.sm,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  retryButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
   },
 }); 

@@ -150,7 +150,7 @@ export interface SettlementResult {
 // Invite link data
 export interface InviteLinkData {
   inviteLink: string;
-  inviteCode: string;
+  inviteId: string;
   groupName: string;
   expiresAt: string;
 }

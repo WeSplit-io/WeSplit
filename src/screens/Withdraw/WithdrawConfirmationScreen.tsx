@@ -111,7 +111,7 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   
   const [signing, setSigning] = useState(false);
 
-  // Generate mock transaction data
+  // Generate transaction ID
   const transactionId = Math.random().toString(36).substring(2, 15).toUpperCase();
 
   // Ensure withdrawalFee and totalWithdraw have default values

@@ -100,7 +100,7 @@ const VerificationScreen: React.FC = () => {
         console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
         (navigation as any).reset({
           index: 0,
-          routes: [{ name: 'CreateProfile' }],
+          routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
         });
       } else if (transformedUser.hasCompletedOnboarding) {
         console.log('✅ User completed onboarding, navigating to Dashboard');

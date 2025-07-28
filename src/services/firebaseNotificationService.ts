@@ -68,7 +68,7 @@ export async function sendNotification(
   data?: any
 ): Promise<Notification> {
   try {
-    if (__DEV__) { console.log('🔥 Sending notification:', { userId, title, message, type, data }); }
+    console.log('🔥 Sending notification:', { userId, title, message, type, data });
     
     const notificationData = notificationTransformers.notificationToFirestore({
       userId: String(userId),
@@ -79,17 +79,20 @@ export async function sendNotification(
       is_read: false
     });
 
+    console.log('🔥 Notification data to save:', notificationData);
+
     const notificationRef = await addDoc(collection(db, 'notifications'), notificationData);
+    console.log('🔥 Notification document created with ID:', notificationRef.id);
     
     // Get the created document
     const notificationDoc = await getDoc(notificationRef);
     const notification = notificationTransformers.firestoreToNotification(notificationDoc);
     
-    if (__DEV__) { console.log('🔥 Notification sent successfully:', notification); }
+    console.log('🔥 Notification sent successfully:', notification);
     
     return notification;
   } catch (error) {
-    if (__DEV__) { console.error('🔥 Error sending notification:', error); }
+    console.error('🔥 Error sending notification:', error);
     throw error;
   }
 }
@@ -148,7 +151,7 @@ export async function sendNotificationsToUsers(
 // Get notifications for a user
 export async function getUserNotifications(userId: string | number, limitCount: number = 50): Promise<Notification[]> {
   try {
-    if (__DEV__) { console.log('🔥 Getting notifications for user:', userId); }
+    console.log('🔥 Getting notifications for user:', userId);
     
     const notificationsRef = collection(db, 'notifications');
     
@@ -161,16 +164,28 @@ export async function getUserNotifications(userId: string | number, limitCount: 
         limit(limitCount)
       );
       
+      console.log('🔥 Executing notifications query for user:', String(userId));
       const querySnapshot = await getDocs(notificationsQuery);
+      console.log('🔥 Query returned', querySnapshot.size, 'notifications');
+      
       const notifications = querySnapshot.docs.map(doc => 
         notificationTransformers.firestoreToNotification(doc)
       );
       
-      if (__DEV__) { console.log('🔥 Retrieved notifications:', notifications.length); }
+      console.log('🔥 Retrieved notifications:', notifications.length);
+      notifications.forEach((notification, index) => {
+        console.log(`🔥 Notification ${index + 1}:`, {
+          id: notification.id,
+          type: notification.type,
+          title: notification.title,
+          is_read: notification.is_read,
+          created_at: notification.created_at
+        });
+      });
       
       return notifications;
     } catch (queryError) {
-      if (__DEV__) { console.log('🔥 Main query failed, trying fallback query:', queryError); }
+      console.log('🔥 Main query failed, trying fallback query:', queryError);
       
       // Fallback: try without orderBy in case there's no index
       const fallbackQuery = query(
@@ -189,12 +204,12 @@ export async function getUserNotifications(userId: string | number, limitCount: 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       
-      if (__DEV__) { console.log('🔥 Fallback query successful, retrieved notifications:', fallbackNotifications.length); }
+      console.log('🔥 Fallback query successful, retrieved notifications:', fallbackNotifications.length);
       
       return fallbackNotifications;
     }
   } catch (error) {
-    if (__DEV__) { console.error('🔥 Error fetching notifications:', error); }
+    console.error('🔥 Error fetching notifications:', error);
     
     // Return empty array instead of throwing to prevent infinite loading
     console.warn('🔥 Returning empty notifications array due to error:', error);
@@ -396,31 +411,6 @@ export async function sendPaymentReminderNotifications(
     if (__DEV__) { console.log('🔥 Payment reminder notifications sent successfully'); }
   } catch (error) {
     if (__DEV__) { console.error('🔥 Error sending payment reminder notifications:', error); }
-    throw error;
-  }
-}
-
-// Test function to create a sample notification
-export async function createTestNotification(userId: string | number): Promise<Notification> {
-  try {
-    if (__DEV__) { console.log('🔥 Creating test notification for user:', userId); }
-    
-    const testNotification = await sendNotification(
-      userId,
-      'Test Notification',
-      'This is a test notification to verify the system is working.',
-      'general',
-      {
-        test: true,
-        timestamp: new Date().toISOString()
-      }
-    );
-    
-    if (__DEV__) { console.log('🔥 Test notification created:', testNotification); }
-    
-    return testNotification;
-  } catch (error) {
-    if (__DEV__) { console.error('🔥 Error creating test notification:', error); }
     throw error;
   }
 }

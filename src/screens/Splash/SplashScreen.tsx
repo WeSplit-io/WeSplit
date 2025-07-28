@@ -31,7 +31,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
           
           if (needsProfile) {
             console.log('🔄 SplashScreen: User needs to create profile (no name), navigating to CreateProfile');
-            navigation.replace('CreateProfile');
+            navigation.replace('CreateProfile', { email: currentUser?.email || '' });
           } else if (currentUser?.hasCompletedOnboarding) {
             console.log('✅ SplashScreen: User completed onboarding, navigating to Dashboard');
             navigation.replace('Dashboard');
@@ -48,7 +48,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
           
           if (needsProfile) {
             console.log('🔄 SplashScreen: User needs to create profile (no name), navigating to CreateProfile');
-            navigation.replace('CreateProfile');
+            navigation.replace('CreateProfile', { email: currentUser.email });
           } else if (currentUser.hasCompletedOnboarding) {
             console.log('✅ SplashScreen: User completed onboarding, navigating to Dashboard');
             navigation.replace('Dashboard');

@@ -13,6 +13,7 @@ import {
   ApiResponse 
 } from '../types';
 import { apiRequest, getBackendURL } from '../config/api';
+import { firebaseDataService } from './firebaseDataService';
 
 // Enhanced cache with rate limiting protection
 const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes instead of 5
@@ -174,13 +175,8 @@ export const userService = {
   },
 
   createUser: async (userData: Omit<User, 'id' | 'created_at'>): Promise<User> => {
-    const result = await makeApiRequest<User>('/api/users', {
-      method: 'POST',
-      body: JSON.stringify(userData),
-    }, false);
-    
-    invalidateCache('users');
-    return result;
+    // Use Firebase's createUserIfNotExists to prevent duplicates
+    return await firebaseDataService.user.createUserIfNotExists(userData);
   },
 
   updateUser: async (userId: string, updates: Partial<User>): Promise<User> => {

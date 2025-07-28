@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useCallback, useEffect, useRef } from 'react';
 import { 
   User, 
   GroupWithDetails, 
@@ -10,9 +10,13 @@ import {
   Notification 
 } from '../types';
 import { firebaseDataService } from '../services/firebaseDataService';
+import { hybridDataService } from '../services/hybridDataService';
 import { i18nService } from '../services/i18nService';
 import { getUserNotifications } from '../services/firebaseNotificationService';
 import { MultiSignStateService } from '../services/multiSignStateService';
+import { calculateGroupBalances, CalculatedBalance } from '../utils/balanceCalculator';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 // Initial State - now clean without mock data
 const initialState: AppState = {
@@ -328,9 +332,9 @@ interface AppContextType {
   
   // Utility functions
   getGroupById: (id: number | string) => GroupWithDetails | undefined;
-  getGroupBalances: (groupId: number | string) => Balance[];
+  getGroupBalances: (groupId: number | string) => Promise<Balance[]>;
   getTotalExpenses: (groupId: number | string) => number;
-  getUserBalance: (groupId: number | string, userId: number | string) => number;
+  getUserBalance: (groupId: number | string, userId: number | string) => Promise<number>;
   clearError: () => void;
   
   // Cache management
@@ -343,248 +347,48 @@ interface AppContextType {
   notifications: Notification[];
   loadNotifications: (forceRefresh?: boolean) => Promise<void>;
   refreshNotifications: () => Promise<void>;
+  
+  // Group invitation handling
+  acceptGroupInvitation: (notificationId: string, groupId: string) => Promise<void>;
+  removeNotification: (notificationId: string) => Promise<void>;
+  
+  // Real-time listener management
+  startGroupListener: (groupId: string) => void;
+  stopGroupListener: (groupId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Helper function to calculate balances when we have actual member data
-const calculateBalancesFromMembers = (group: GroupWithDetails, currentUserId?: number | string): Balance[] => {
-  const balances: Balance[] = [];
-  
-  if (!group.members || group.members.length === 0) return balances;
-  
-  if (__DEV__) {
-    console.log('🔍 calculateBalancesFromMembers: Input data:', {
-      groupName: group.name,
-      membersCount: group.members.length,
-      expensesCount: group.expenses?.length || 0,
-      currentUserId,
-      currentUserType: typeof currentUserId
+// Unified balance calculation using the new utility
+const calculateGroupBalancesUnified = async (group: GroupWithDetails, currentUserId?: number | string): Promise<Balance[]> => {
+  try {
+    const calculatedBalances = await calculateGroupBalances(group, {
+      normalizeToUSDC: false, // Keep original currency for display
+      includeZeroBalances: true,
+      currentUserId: currentUserId ? String(currentUserId) : undefined
     });
-  }
-  
-  // If we have individual expenses, calculate based on actual payments
-  if (group.expenses && group.expenses.length > 0) {
-    const memberBalances: Record<string, Record<string, number>> = {};
     
-    // Initialize balances for all members (use string IDs)
-    group.members.forEach(member => {
-      memberBalances[String(member.id)] = {};
-    });
-
-    // Calculate balances by currency based on actual expenses
-    group.expenses.forEach(expense => {
-      const currency = expense.currency || 'SOL';
-      
-      // Parse split data to get actual splits
-      let splitData: any = null;
-      try {
-        if (typeof expense.splitData === 'string') {
-          splitData = JSON.parse(expense.splitData);
-        } else if (expense.splitData) {
-          splitData = expense.splitData;
-        }
-      } catch (e) {
-        console.warn('Failed to parse split data:', expense.splitData);
-        splitData = null;
+    // Convert CalculatedBalance to Balance for backward compatibility
+    return calculatedBalances.map(balance => ({
+      userId: balance.userId,
+      userName: balance.userName,
+      userAvatar: balance.userAvatar,
+      amount: balance.amount,
+      currency: balance.currency,
+      status: balance.status
+    }));
+  } catch (error) {
+    console.error('Error calculating group balances:', error);
+    return [];
       }
-      
-      // Determine who owes what based on split type
-      let membersInSplit: string[] = [];
-      let amountPerPerson = 0;
-      
-      if (splitData && splitData.memberIds && Array.isArray(splitData.memberIds) && splitData.memberIds.length > 0) {
-        // Use the specific member IDs from split data (convert to strings)
-        membersInSplit = splitData.memberIds.map((id: any) => String(id));
-        amountPerPerson = splitData.amountPerPerson || (expense.amount / membersInSplit.length);
-      } else {
-        // Fallback: split equally among all group members
-        membersInSplit = group.members.map(m => String(m.id));
-        amountPerPerson = expense.amount / membersInSplit.length;
-      }
-      
-      // Initialize currency tracking if not exists
-      group.members.forEach(member => {
-        const memberId = String(member.id);
-        if (!memberBalances[memberId]) {
-          memberBalances[memberId] = {};
-        }
-        if (!memberBalances[memberId][currency]) {
-          memberBalances[memberId][currency] = 0;
-        }
-      });
-      
-      // The person who paid should be reimbursed by the selected members
-      const paidById = expense.paid_by ? String(expense.paid_by) : null;
-      
-      if (paidById && membersInSplit.length > 0) {
-        membersInSplit.forEach(memberId => {
-          if (memberId !== paidById) {
-            // Each selected member owes their share to the payer
-            memberBalances[memberId][currency] -= amountPerPerson;
-            // The payer is owed this amount from each selected member
-            memberBalances[paidById][currency] += amountPerPerson;
-          }
-        });
-      } else {
-        // Fallback: if no payer or no members, skip this expense
-        if (__DEV__) {
-          console.log('🔍 calculateBalancesFromMembers: Skipping expense due to missing paid_by or members:', {
-            expenseId: expense.id,
-            paid_by: expense.paid_by,
-            membersInSplit: membersInSplit
-          });
-        }
-      }
-    });
-
-    // Convert to Balance objects
-    group.members.forEach(member => {
-      const memberId = String(member.id);
-      const currencies = memberBalances[memberId] || {};
-      
-      // Find the currency with the largest absolute balance
-      let primaryCurrency = group.currency || 'SOL';
-      let primaryAmount = currencies[primaryCurrency] || 0;
-      
-      const balanceEntries = Object.entries(currencies);
-      if (balanceEntries.length > 0) {
-        const [maxCurrency, maxAmount] = balanceEntries.reduce((max, [curr, amount]) => 
-          Math.abs(amount) > Math.abs(max[1]) ? [curr, amount] : max
-        );
-        if (Math.abs(maxAmount) > Math.abs(primaryAmount)) {
-          primaryCurrency = maxCurrency;
-          primaryAmount = maxAmount;
-        }
-      }
-
-      balances.push({
-        userId: memberId,
-        userName: member.name,
-        userAvatar: member.avatar,
-        amount: primaryAmount,
-        currency: primaryCurrency,
-        status: Math.abs(primaryAmount) < 0.01 ? 'settled' : primaryAmount > 0 ? 'gets_back' : 'owes'
-      });
-    });
-  } else {
-    // No individual expenses or all expenses had missing data, create fallback scenario
-    const primaryCurrency = group.expenses_by_currency?.[0]?.currency || 'SOL';
-    const totalAmount = group.expenses_by_currency?.reduce((sum, curr) => sum + curr.total_amount, 0) || 0;
-    
-    if (totalAmount > 0 && group.members.length > 0) {
-      const sharePerPerson = totalAmount / group.members.length;
-      
-      // Fallback scenario: assume current user paid 60% of expenses, others owe their shares
-      group.members.forEach(member => {
-        const isCurrentUser = String(member.id) === String(currentUserId);
-        let amount: number;
-        
-        if (isCurrentUser) {
-          // Current user paid some expenses and is owed by others
-          const paidAmount = totalAmount * 0.6; // Assume they paid 60%
-          amount = paidAmount - sharePerPerson;
-        } else {
-          // Others owe their share
-          amount = -sharePerPerson;
-        }
-        
-        balances.push({
-          userId: String(member.id),
-          userName: member.name,
-          userAvatar: member.avatar,
-          amount: amount,
-          currency: primaryCurrency,
-          status: Math.abs(amount) < 0.01 ? 'settled' : amount > 0 ? 'gets_back' : 'owes'
-        });
-      });
-      
-      if (__DEV__) {
-        console.log('🔍 calculateBalancesFromMembers: Using fallback balance calculation:', {
-          totalAmount,
-          sharePerPerson,
-          memberCount: group.members.length
-        });
-      }
-    }
-  }
-  
-  if (__DEV__) {
-    console.log('🔍 calculateBalancesFromMembers: Final balances:', balances);
-  }
-  
-  return balances;
-};
-
-// Helper function to calculate balances from summary data
-const calculateBalancesFromSummary = (group: GroupWithDetails, currentUser?: any): Balance[] => {
-  const balances: Balance[] = [];
-  
-  if (!group.expenses_by_currency || group.expenses_by_currency.length === 0) return balances;
-  
-  if (__DEV__) {
-    console.log('🔍 calculateBalancesFromSummary: Input data:', {
-      groupName: group.name,
-      expensesByCurrency: group.expenses_by_currency,
-      memberCount: group.member_count,
-      currentUserId: currentUser?.id,
-      currentUserType: typeof currentUser?.id
-    });
-  }
-  
-  // Get primary currency (largest amount)
-  const primaryCurrencyEntry = group.expenses_by_currency.reduce((max, curr) => 
-    curr.total_amount > max.total_amount ? curr : max
-  );
-  
-  const totalAmount = primaryCurrencyEntry.total_amount;
-  const actualMemberCount = group.member_count || 2;
-  const sharePerPerson = totalAmount / actualMemberCount;
-  
-  if (__DEV__) {
-    console.log('🔍 calculateBalancesFromSummary: Calculation data:', {
-      primaryCurrency: primaryCurrencyEntry.currency,
-      totalAmount,
-      actualMemberCount,
-      sharePerPerson
-    });
-  }
-  
-  // Current user paid everything, others owe their shares
-  const currentUserOwedAmount = totalAmount - sharePerPerson;
-  
-  // Current user balance - ensure ID is a string for consistency
-  const currentUserId = String(currentUser?.id || 1);
-  balances.push({
-    userId: currentUserId,
-    userName: currentUser?.name || 'You',
-    userAvatar: undefined,
-    amount: currentUserOwedAmount,
-    currency: primaryCurrencyEntry.currency,
-    status: 'gets_back'
-  });
-  
-  // Other members owe their shares
-  for (let i = 1; i < actualMemberCount; i++) {
-    balances.push({
-      userId: String(100 + i), // Use string IDs for consistency
-      userName: `Member ${i + 1}`,
-      userAvatar: undefined,
-      amount: -sharePerPerson,
-      currency: primaryCurrencyEntry.currency,
-      status: 'owes'
-    });
-  }
-  
-  if (__DEV__) {
-    console.log('🔍 calculateBalancesFromSummary: Final balances:', balances);
-  }
-  
-  return balances;
 };
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  
+  // Refs for managing real-time listeners
+  const userGroupsListenerRef = useRef<(() => void) | null>(null);
+  const groupListenersRef = useRef<Map<string, () => void>>(new Map());
 
   // Initialize services
   useEffect(() => {
@@ -602,6 +406,108 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     initializeServices();
   }, []);
+
+  // Cleanup listeners on unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup user groups listener
+      if (userGroupsListenerRef.current) {
+        userGroupsListenerRef.current();
+        userGroupsListenerRef.current = null;
+        }
+      
+      // Cleanup individual group listeners
+      groupListenersRef.current.forEach(unsubscribe => unsubscribe());
+      groupListenersRef.current.clear();
+    };
+  }, []);
+
+  // Start real-time listener when user is authenticated
+  useEffect(() => {
+    if (!state.currentUser?.id) {
+      if (userGroupsListenerRef.current) {
+        userGroupsListenerRef.current();
+        userGroupsListenerRef.current = null;
+      }
+      return;
+        }
+    const unsubscribe = firebaseDataService.group.listenToUserGroups(
+      state.currentUser.id.toString(),
+      (groups: GroupWithDetails[]) => {
+        dispatch({ type: 'SET_GROUPS', payload: groups });
+      },
+      (error: any) => {
+        if (__DEV__) { console.error('❌ AppContext: Real-time listener error:', error); }
+        // Don't dispatch error to avoid UI crashes
+      }
+    );
+    userGroupsListenerRef.current = unsubscribe;
+    return () => {
+      if (userGroupsListenerRef.current) {
+        userGroupsListenerRef.current();
+        userGroupsListenerRef.current = null;
+      }
+    };
+  }, [state.currentUser?.id]);
+
+  // Listen for group membership changes
+  useEffect(() => {
+    if (!state.currentUser?.id) return;
+
+    const groupMembersRef = collection(db, 'groupMembers');
+    const membershipQuery = query(
+      groupMembersRef,
+      where('user_id', '==', state.currentUser?.id?.toString() || '')
+    );
+
+    const unsubscribe = onSnapshot(membershipQuery, (snapshot) => {
+      const changes = snapshot.docChanges();
+      let hasChanges = false;
+
+      changes.forEach((change) => {
+        if (change.type === 'added' || change.type === 'removed') {
+          hasChanges = true;
+          console.log('🔄 AppContext: Group membership change detected:', {
+            type: change.type,
+            groupId: change.doc.data()?.group_id,
+            userId: change.doc.data()?.user_id
+    });
+  }
+      });
+
+      if (hasChanges && state.currentUser?.id) {
+        console.log('🔄 AppContext: Group membership changed, refreshing groups...');
+        // Force refresh user groups to reflect membership changes
+        if (userGroupsListenerRef.current) {
+          userGroupsListenerRef.current();
+          userGroupsListenerRef.current = null;
+        }
+        
+        // Restart the user groups listener
+        try {
+          const newUnsubscribe = firebaseDataService.group.listenToUserGroups(
+            state.currentUser.id.toString(),
+            (groups: GroupWithDetails[]) => {
+              dispatch({ type: 'SET_GROUPS', payload: groups });
+            },
+            (error: any) => {
+              if (__DEV__) { console.error('❌ AppContext: Real-time listener error:', error); }
+              // Don't dispatch error to avoid UI crashes
+            }
+          );
+          userGroupsListenerRef.current = newUnsubscribe;
+      } catch (error) {
+          if (__DEV__) { console.error('❌ AppContext: Error setting up real-time listener:', error); }
+        }
+      }
+    }, (error) => {
+      console.error('❌ AppContext: Error listening to group membership changes:', error);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [state.currentUser?.id]);
 
   // Cache management
   const shouldRefreshData = useCallback((type: 'groups' | 'expenses' | 'members', groupId?: number): boolean => {
@@ -621,36 +527,47 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return true;
   }, [state.lastDataFetch]);
 
-  // Data operations
+  // Data operations - Updated to use real-time listeners
   const loadUserGroups = useCallback(async (forceRefresh: boolean = false) => {
-    if (!state.currentUser?.id) return;
-    
-    // Enhanced cache check with proper timestamp validation
-    if (!forceRefresh && state.groups.length > 0 && state.lastDataFetch.groups > 0) {
-      const now = Date.now();
-      const maxAge = 5 * 60 * 1000; // 5 minutes cache duration
-      const timeSinceLastFetch = now - state.lastDataFetch.groups;
-      
-      if (timeSinceLastFetch < maxAge) {
-        if (__DEV__) { console.log('🔄 AppContext: Using cached groups (age:', Math.round(timeSinceLastFetch / 1000), 's)'); }
-        return; // Use cached data
-      }
+    if (!state.currentUser?.id) {
+      if (__DEV__) { console.log('🔄 AppContext: No current user, skipping group load'); }
+      return;
     }
-
+    
+    if (__DEV__) { console.log('🔄 AppContext: loadUserGroups called with forceRefresh:', forceRefresh); }
+    
     try {
-      if (__DEV__) { console.log('🔄 AppContext: Loading user groups for user:', state.currentUser.id); }
-      dispatch({ type: 'SET_LOADING', payload: true });
-      const groups = await firebaseDataService.group.getUserGroups(state.currentUser.id.toString(), forceRefresh);
-      if (__DEV__) { console.log('🔄 AppContext: Received groups from hybrid service:', groups.length, 'groups'); }
-      if (__DEV__) { console.log('🔄 AppContext: Groups data source:', groups.length > 0 ? 'Firebase' : 'SQLite fallback'); }
-      dispatch({ type: 'SET_GROUPS', payload: groups });
+      // Actually load groups from Firebase if real-time listeners aren't working
+      const userGroups = await firebaseDataService.group.getUserGroups(state.currentUser.id.toString(), forceRefresh);
+      
+      if (__DEV__) { console.log('🔄 AppContext: Loaded groups from Firebase:', userGroups.length); }
+      
+      // Update state with loaded groups
+      dispatch({ type: 'SET_GROUPS', payload: userGroups });
+      
+      // Also ensure real-time listeners are started
+      if (userGroupsListenerRef.current) {
+        // Real-time listener is already active
+        if (__DEV__) { console.log('🔄 AppContext: Real-time listener already active'); }
+      } else {
+        // Start real-time listener
+        if (__DEV__) { console.log('🔄 AppContext: Starting real-time listener for groups'); }
+        try {
+          firebaseDataService.group.listenToUserGroups(state.currentUser.id.toString(), (updatedGroups: GroupWithDetails[]) => {
+            if (__DEV__) { console.log('🔄 AppContext: Real-time groups update:', updatedGroups.length); }
+            dispatch({ type: 'SET_GROUPS', payload: updatedGroups });
+          }, (error: any) => {
+            if (__DEV__) { console.error('❌ AppContext: Real-time listener error:', error); }
+          });
+        } catch (error) {
+          if (__DEV__) { console.error('❌ AppContext: Error setting up real-time listener:', error); }
+        }
+      }
     } catch (error) {
       console.error('❌ AppContext: Error loading user groups:', error);
-      dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Failed to load groups' });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      throw error;
     }
-  }, [state.currentUser?.id, state.groups.length, state.lastDataFetch.groups]);
+  }, [state.currentUser?.id]);
 
   const loadGroupDetails = useCallback(async (groupId: number, forceRefresh: boolean = false): Promise<GroupWithDetails> => {
     try {
@@ -692,13 +609,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       throw new Error('User not authenticated');
     }
 
+    // Validate required fields
+    if (!groupData.name || groupData.name.trim().length === 0) {
+      throw new Error('Group name is required');
+    }
+
+    if (!groupData.created_by) {
+      throw new Error('Group creator ID is required');
+    }
+
     try {
-      const group = await firebaseDataService.group.createGroup({
-        ...groupData,
-        created_by: state.currentUser.id
+      console.log('🔄 AppContext: Creating group with data:', {
+        name: groupData.name,
+        created_by: groupData.created_by,
+        category: groupData.category,
+        currency: groupData.currency
       });
+
+      // Ensure proper data structure
+      const validatedGroupData = {
+        name: groupData.name.trim(),
+        description: groupData.description?.trim() || '',
+        category: groupData.category || 'general',
+        currency: groupData.currency || 'USDC',
+        icon: groupData.icon || 'people',
+        color: groupData.color || '#A5EA15',
+        created_by: groupData.created_by.toString()
+      };
+
+      const group = await firebaseDataService.group.createGroup(validatedGroupData);
       
-      // Transform to GroupWithDetails
+      console.log('🔄 AppContext: Group created successfully:', group.id);
+      
+      // Real-time listener will automatically update the groups state
+      // But we can also manually add the group to state for immediate feedback
       const groupWithDetails: GroupWithDetails = {
         ...group,
         members: [{
@@ -709,84 +653,75 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           wallet_public_key: state.currentUser.wallet_public_key,
           created_at: state.currentUser.created_at,
           joined_at: new Date().toISOString(),
-          avatar: state.currentUser.avatar
+          avatar: state.currentUser.avatar,
+          invitation_status: 'accepted' as const,
+          invited_at: new Date().toISOString(),
+          invited_by: state.currentUser.id.toString()
         }],
         expenses: [],
         totalAmount: 0,
         userBalance: 0
       };
       
+      // Add to state immediately for better UX
       dispatch({ type: 'ADD_GROUP', payload: groupWithDetails });
+      
       return groupWithDetails;
+      
     } catch (error) {
-      console.error('Error creating group:', error);
-      throw error;
+      console.error('🔄 AppContext: Error creating group:', error);
+      
+      // Re-throw with user-friendly error message
+      if (error instanceof Error) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Failed to create group. Please try again.');
+      }
     }
   }, [state.currentUser]);
 
-  const updateGroup = useCallback(async (groupId: number | string, updates: any) => {
-    if (!state.currentUser?.id) {
-      throw new Error('User not authenticated');
-    }
-
+  const updateGroup = useCallback(async (groupId: number | string, updates: any): Promise<void> => {
     try {
-      const result = await firebaseDataService.group.updateGroup(groupId.toString(), state.currentUser.id.toString(), updates);
-      const updatedGroup = await loadGroupDetails(typeof groupId === 'string' ? parseInt(groupId) || 0 : groupId, true);
-      dispatch({ type: 'UPDATE_GROUP', payload: updatedGroup });
+      await firebaseDataService.group.updateGroup(String(groupId), state.currentUser?.id?.toString() || '', updates);
+      
+      // Real-time listener will automatically update the groups state
+      console.log('🔄 AppContext: Group updated, real-time listener will update state');
     } catch (error) {
       console.error('Error updating group:', error);
       throw error;
     }
-  }, [state.currentUser, loadGroupDetails]);
+  }, [state.currentUser]);
 
-  const deleteGroup = useCallback(async (groupId: number | string) => {
+  const deleteGroup = useCallback(async (groupId: number | string): Promise<void> => {
+    try {
     if (!state.currentUser?.id) {
       throw new Error('User not authenticated');
     }
 
-    try {
-      console.log('🔍 AppContext: Starting deleteGroup...');
-      console.log('🔍 AppContext: Group ID:', groupId);
-      console.log('🔍 AppContext: User ID:', state.currentUser.id);
+      await firebaseDataService.group.deleteGroup(String(groupId), String(state.currentUser.id));
       
-      await firebaseDataService.group.deleteGroup(groupId.toString(), state.currentUser.id.toString());
-      console.log('🔍 AppContext: Group deleted from Firebase');
+      // Real-time listener will automatically update the groups state
+      console.log('🔄 AppContext: Group deleted, real-time listener will update state');
       
-      dispatch({ type: 'DELETE_GROUP', payload: groupId });
-      console.log('🔍 AppContext: Group removed from state');
     } catch (error) {
-      console.error('❌ AppContext: Error deleting group:', error);
-      console.error('❌ AppContext: Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : 'No stack trace',
-        name: error instanceof Error ? error.name : 'Unknown error type'
-      });
+      console.error('Error deleting group:', error);
       throw error;
     }
   }, [state.currentUser]);
 
-  const leaveGroup = useCallback(async (groupId: number | string) => {
+  const leaveGroup = useCallback(async (groupId: number | string): Promise<void> => {
+    try {
     if (!state.currentUser?.id) {
       throw new Error('User not authenticated');
     }
 
-    try {
-      console.log('🔍 AppContext: Starting leaveGroup...');
-      console.log('🔍 AppContext: Group ID:', groupId);
-      console.log('🔍 AppContext: User ID:', state.currentUser.id);
+      await firebaseDataService.group.leaveGroup(String(groupId), String(state.currentUser.id));
       
-      await firebaseDataService.group.leaveGroup(groupId.toString(), state.currentUser.id.toString());
-      console.log('🔍 AppContext: User left group successfully');
+      // Real-time listener will automatically update the groups state
+      console.log('🔄 AppContext: User left group, real-time listener will update state');
       
-      dispatch({ type: 'DELETE_GROUP', payload: groupId }); // Assuming leaving a group is effectively deleting it from the user's list
-      console.log('🔍 AppContext: Group removed from user\'s list');
     } catch (error) {
-      console.error('❌ AppContext: Error leaving group:', error);
-      console.error('❌ AppContext: Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : 'No stack trace',
-        name: error instanceof Error ? error.name : 'Unknown error type'
-      });
+      console.error('Error leaving group:', error);
       throw error;
     }
   }, [state.currentUser]);
@@ -798,41 +733,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Expense operations
   const createExpense = useCallback(async (expenseData: any): Promise<Expense> => {
     try {
-      console.log('🔍 AppContext: Starting expense creation...');
-      console.log('🔍 AppContext: Expense data:', expenseData);
-      console.log('🔍 AppContext: Current user:', state.currentUser);
-      console.log('🔍 AppContext: Current groups:', state.groups.length);
-      
+      if (!state.currentUser?.id) {
+        throw new Error('User not authenticated');
+      }
+
       const expense = await firebaseDataService.expense.createExpense(expenseData);
       
-      console.log('🔍 AppContext: Expense created successfully:', expense);
-      console.log('🔍 AppContext: Adding expense to state...');
-      
-      dispatch({ type: 'ADD_EXPENSE', payload: { groupId: Number(expense.group_id), expense } });
-      
-      console.log('🔍 AppContext: Expense added to state');
-      
-      // Refresh the group data to ensure we have the latest expense count
-      const groupId = Number(expense.group_id);
-      if (groupId) {
-        try {
-          await refreshGroup(groupId);
-        } catch (refreshError) {
-          console.log('🔍 AppContext: Group refresh failed, but expense was created:', refreshError);
-        }
-      }
+      // Real-time listener will automatically update the groups state
+      console.log('🔄 AppContext: Expense created, real-time listener will update state');
       
       return expense;
     } catch (error) {
-      console.error('❌ AppContext: Error creating expense:', error);
-      console.error('❌ AppContext: Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : 'No stack trace',
-        name: error instanceof Error ? error.name : 'Unknown error type'
-      });
+      console.error('Error creating expense:', error);
       throw error;
     }
-  }, [state.currentUser, state.groups.length, refreshGroup]);
+  }, [state.currentUser]);
 
   const updateExpense = useCallback(async (groupId: number, expense: Expense) => {
     try {
@@ -854,19 +769,50 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, []);
 
+  // Real-time listener management
+  const startGroupListener = useCallback((groupId: string) => {
+    // Stop existing listener if any
+    stopGroupListener(groupId);
+    
+    console.log('🔄 AppContext: Starting listener for group:', groupId);
+    
+    const unsubscribe = firebaseDataService.group.listenToGroup(
+      groupId,
+      (group) => {
+        console.log('🔄 AppContext: Real-time group update:', groupId);
+        dispatch({ type: 'UPDATE_GROUP', payload: group });
+      },
+      (error) => {
+        console.error('🔄 AppContext: Real-time group listener error:', error);
+        dispatch({ type: 'SET_ERROR', payload: error.message });
+      }
+    );
+    
+    groupListenersRef.current.set(groupId, unsubscribe);
+  }, []);
+
+  const stopGroupListener = useCallback((groupId: string) => {
+    const unsubscribe = groupListenersRef.current.get(groupId);
+    if (unsubscribe) {
+      console.log('🔄 AppContext: Stopping listener for group:', groupId);
+      unsubscribe();
+      groupListenersRef.current.delete(groupId);
+    }
+  }, []);
+
   // User operations
   const authenticateUser = useCallback((user: User, method: 'wallet' | 'email' | 'guest') => {
     dispatch({ type: 'AUTHENTICATE_USER', payload: { user, method } });
   }, []);
 
-  const updateUser = useCallback(async (updates: Partial<User>) => {
+  const updateUser = useCallback(async (updates: Partial<User>): Promise<void> => {
     if (!state.currentUser?.id) {
       throw new Error('User not authenticated');
     }
 
     try {
-      const updatedUser = await firebaseDataService.user.updateUser(state.currentUser.id.toString(), updates);
-      dispatch({ type: 'SET_CURRENT_USER', payload: updatedUser });
+      await firebaseDataService.user.updateUser(state.currentUser.id.toString(), updates);
+      dispatch({ type: 'SET_CURRENT_USER', payload: { ...state.currentUser, ...updates } });
     } catch (error) {
       console.error('Error updating user:', error);
       throw error;
@@ -874,6 +820,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [state.currentUser]);
 
   const logoutUser = useCallback(() => {
+    // Cleanup all listeners
+    if (userGroupsListenerRef.current) {
+      userGroupsListenerRef.current();
+      userGroupsListenerRef.current = null;
+    }
+    
+    groupListenersRef.current.forEach(unsubscribe => unsubscribe());
+    groupListenersRef.current.clear();
+    
     dispatch({ type: 'LOGOUT_USER' });
   }, []);
 
@@ -882,7 +837,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return state.groups.find(group => group.id === id);
   }, [state.groups]);
 
-    const getGroupBalances = useCallback((groupId: number | string): Balance[] => {
+    const getGroupBalances = useCallback(async (groupId: number | string): Promise<Balance[]> => {
     try {
       const group = getGroupById(groupId);
       
@@ -905,37 +860,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return [];
       }
 
-      // Use summary data from the basic group (synchronous)
-      if (group.expenses_by_currency && group.expenses_by_currency.length > 0 && group.member_count > 0) {
-        try {
-          const balances = calculateBalancesFromSummary(group, state.currentUser);
+      // Use the unified balance calculator
+      const balances = await calculateGroupBalancesUnified(group, state.currentUser?.id);
           if (__DEV__) {
-            console.log('🔍 getGroupBalances: Calculated balances from summary:', balances);
+        console.log('🔍 getGroupBalances: Calculated balances:', balances);
           }
           return balances;
-        } catch (error) {
-          console.error('Error calculating balances from summary:', error);
-        }
-      }
-      
-      // If group has detailed member/expense data, use that
-      if (group.members && group.members.length > 0 && group.expenses && group.expenses.length > 0) {
-        try {
-          const balances = calculateBalancesFromMembers(group, state.currentUser?.id);
-          if (__DEV__) {
-            console.log('🔍 getGroupBalances: Calculated balances from members:', balances);
-          }
-          return balances;
-        } catch (error) {
-          console.error('Error calculating balances from members:', error);
-        }
-      }
-      
-      // Return empty array silently for groups without data
-      if (__DEV__) {
-        console.log('🔍 getGroupBalances: No data available, returning empty array');
-      }
-      return [];
     } catch (error) {
       console.error(`getGroupBalances: Error processing group ${groupId}:`, error);
       return [];
@@ -947,8 +877,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return group ? group.totalAmount : 0;
   }, [getGroupById]);
 
-  const getUserBalance = useCallback((groupId: number | string, userId: number | string): number => {
-    const balances = getGroupBalances(groupId);
+  const getUserBalance = useCallback(async (groupId: number | string, userId: number | string): Promise<number> => {
+    const balances = await getGroupBalances(groupId);
     const userBalance = balances.find(b => b.userId === userId);
     return userBalance ? userBalance.amount : 0;
   }, [getGroupBalances]);
@@ -982,6 +912,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return (now - state.lastDataFetch.groups) < maxAge;
   }, [state.groups.length, state.lastDataFetch.groups]);
 
+  // Note: Group loading is now handled by useGroupList hook to prevent infinite loops
+
   // Notifications logic
   const NOTIFICATIONS_CACHE_AGE = 2 * 60 * 1000; // 2 minutes
   const loadNotifications = useCallback(async (forceRefresh: boolean = false) => {
@@ -1005,6 +937,86 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const refreshNotifications = useCallback(async () => {
     await loadNotifications(true);
   }, [loadNotifications]);
+
+  const removeNotification = useCallback(async (notificationId: string) => {
+    if (!state.currentUser?.id) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      console.log('🔄 AppContext: Starting removeNotification...');
+      console.log('🔄 AppContext: Notification ID:', notificationId);
+      console.log('🔄 AppContext: User ID:', state.currentUser.id);
+
+      // Remove notification from Firebase
+      await firebaseDataService.notification.deleteNotification(notificationId);
+      console.log('🔄 AppContext: Notification removed from Firebase');
+
+      // Remove from state
+      const updatedNotifications = state.notifications?.filter(n => n.id !== notificationId) || [];
+      dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications: updatedNotifications, timestamp: Date.now() } });
+      console.log('🔄 AppContext: Notification removed from state');
+
+    } catch (error) {
+      console.error('❌ AppContext: Error removing notification:', error);
+      console.error('❌ AppContext: Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        name: error instanceof Error ? error.name : 'Unknown error type'
+      });
+      throw error;
+    }
+  }, [state.currentUser, state.notifications]);
+
+  // Group invitation handling
+  const acceptGroupInvitation = useCallback(async (notificationId: string, groupId: string) => {
+    if (!state.currentUser?.id) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      console.log('🔄 AppContext: Starting acceptGroupInvitation...');
+      console.log('🔄 AppContext: Notification ID:', notificationId);
+      console.log('🔄 AppContext: Group ID:', groupId);
+      console.log('🔄 AppContext: User ID:', state.currentUser.id);
+
+      // Find the notification
+      const notification = state.notifications?.find(n => n.id === notificationId);
+      if (!notification || !notification.data?.inviteId) {
+        throw new Error('Invalid notification or missing invite data');
+      }
+
+      // Join the group via invite
+      const result = await firebaseDataService.group.joinGroupViaInvite(
+        notification.data.inviteId, 
+        state.currentUser.id.toString()
+      );
+      console.log('🔄 AppContext: Group invitation accepted successfully:', result);
+
+      // Remove the notification
+      await removeNotification(notificationId);
+      console.log('🔄 AppContext: Notification removed from state');
+
+      // Start real-time listener for the new group
+      startGroupListener(groupId);
+      console.log('🔄 AppContext: Started real-time listener for group:', groupId);
+
+      // Force refresh user groups to include the new group
+      // The real-time listener will handle updates, but we can also force a refresh
+      if (__DEV__) {
+        console.log('🔄 AppContext: Real-time listener will handle group updates automatically');
+      }
+
+    } catch (error) {
+      console.error('❌ AppContext: Error accepting group invitation:', error);
+      console.error('❌ AppContext: Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        name: error instanceof Error ? error.name : 'Unknown error type'
+      });
+      throw error;
+    }
+  }, [state.currentUser, state.notifications, removeNotification, startGroupListener]);
 
   const value: AppContextType = {
     state,
@@ -1035,6 +1047,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     notifications: state.notifications ?? [],
     loadNotifications,
     refreshNotifications,
+    acceptGroupInvitation,
+    removeNotification,
+    startGroupListener,
+    stopGroupListener,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

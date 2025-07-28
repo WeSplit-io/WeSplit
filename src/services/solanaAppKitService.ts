@@ -163,90 +163,11 @@ export class SolanaAppKitService {
 
   // Initialize available wallet providers
   private initializeWalletProviders() {
-    // For now, we'll create mock providers
-    // In a real implementation, these would be actual wallet adapters
-    this.createMockProviders();
-  }
-
-  // Create mock wallet providers for development
-  private createMockProviders() {
-    const mockProviders = [
-      { name: 'Phantom', key: SUPPORTED_WALLET_PROVIDERS.PHANTOM },
-      { name: 'Solflare', key: SUPPORTED_WALLET_PROVIDERS.SOLFLARE },
-      { name: 'Backpack', key: SUPPORTED_WALLET_PROVIDERS.BACKPACK },
-      { name: 'Slope', key: SUPPORTED_WALLET_PROVIDERS.SLOPE },
-      { name: 'Glow', key: SUPPORTED_WALLET_PROVIDERS.GLOW },
-      { name: 'Exodus', key: SUPPORTED_WALLET_PROVIDERS.EXODUS },
-      { name: 'Coinbase', key: SUPPORTED_WALLET_PROVIDERS.COINBASE },
-      { name: 'OKX', key: SUPPORTED_WALLET_PROVIDERS.OKX },
-      { name: 'Brave', key: SUPPORTED_WALLET_PROVIDERS.BRAVE },
-      { name: 'Cluster', key: SUPPORTED_WALLET_PROVIDERS.CLUSTER },
-      { name: 'Magic Eden', key: SUPPORTED_WALLET_PROVIDERS.MAGIC_EDEN },
-      { name: 'Talisman', key: SUPPORTED_WALLET_PROVIDERS.TALISMAN },
-      { name: 'XDeFi', key: SUPPORTED_WALLET_PROVIDERS.XDEFI },
-      { name: 'Zerion', key: SUPPORTED_WALLET_PROVIDERS.ZERION },
-      { name: 'Trust', key: SUPPORTED_WALLET_PROVIDERS.TRUST },
-      { name: 'SafePal', key: SUPPORTED_WALLET_PROVIDERS.SAFEPAL },
-      { name: 'Bitget', key: SUPPORTED_WALLET_PROVIDERS.BITGET },
-      { name: 'Bybit', key: SUPPORTED_WALLET_PROVIDERS.BYBIT },
-      { name: 'Gate', key: SUPPORTED_WALLET_PROVIDERS.GATE },
-      { name: 'Huobi', key: SUPPORTED_WALLET_PROVIDERS.HUOBI },
-      { name: 'Kraken', key: SUPPORTED_WALLET_PROVIDERS.KRAKEN },
-      { name: 'Binance', key: SUPPORTED_WALLET_PROVIDERS.BINANCE },
-      { name: 'Math', key: SUPPORTED_WALLET_PROVIDERS.MATH },
-      { name: 'TokenPocket', key: SUPPORTED_WALLET_PROVIDERS.TOKENPOCKET },
-      { name: 'ONTO', key: SUPPORTED_WALLET_PROVIDERS.ONTO },
-      { name: 'imToken', key: SUPPORTED_WALLET_PROVIDERS.IMTOKEN },
-      { name: 'Coin98', key: SUPPORTED_WALLET_PROVIDERS.COIN98 },
-      { name: 'Blocto', key: SUPPORTED_WALLET_PROVIDERS.BLOCTO },
-      { name: 'Peak', key: SUPPORTED_WALLET_PROVIDERS.PEAK },
-      { name: 'Nightly', key: SUPPORTED_WALLET_PROVIDERS.NIGHTLY },
-      { name: 'Clover', key: SUPPORTED_WALLET_PROVIDERS.CLOVER },
-      { name: 'WalletConnect', key: SUPPORTED_WALLET_PROVIDERS.WALLET_CONNECT },
-      { name: 'MetaMask', key: SUPPORTED_WALLET_PROVIDERS.METAMASK },
-      { name: 'Rainbow', key: SUPPORTED_WALLET_PROVIDERS.RAINBOW },
-      { name: 'Argent', key: SUPPORTED_WALLET_PROVIDERS.ARGENT },
-      { name: 'Bravos', key: SUPPORTED_WALLET_PROVIDERS.BRAVOS },
-      { name: 'Myria', key: SUPPORTED_WALLET_PROVIDERS.MYRIA }
-    ];
-
-    mockProviders.forEach(({ name, key }) => {
-      const provider: WalletProvider = {
-        name,
-        icon: `${key.toLowerCase()}-icon`,
-        isAvailable: true, // Mock availability
-        connect: async () => {
-          // Mock connection - in real implementation, this would connect to actual wallet
-          const mockKeypair = Keypair.generate();
-          const address = mockKeypair.publicKey.toBase58();
-          const balance = await this.connection.getBalance(mockKeypair.publicKey);
-          const usdcBalance = await this.getUsdcBalance(mockKeypair.publicKey);
-          
-          return {
-            address,
-            publicKey: address,
-            balance: balance / LAMPORTS_PER_SOL,
-            usdcBalance,
-            isConnected: true,
-            walletName: name,
-            walletType: 'external'
-          };
-        },
-        disconnect: async () => {
-          // Mock disconnect
-        },
-        signTransaction: async (transaction: Transaction) => {
-          // Mock signing - in real implementation, this would use the actual wallet
-          return transaction;
-        },
-        signMessage: async (message: Uint8Array) => {
-          // Mock message signing
-          return message;
-        }
-      };
-      
-      this.availableProviders.set(key, provider);
-    });
+    // Initialize wallet providers - in production, these would be actual wallet adapters
+    // For now, we'll leave the providers map empty until real wallet integration is implemented
+    if (__DEV__) {
+      console.log('🔧 SolanaAppKitService: Wallet providers initialized (no mock providers)');
+    }
   }
 
   // Get available wallet providers

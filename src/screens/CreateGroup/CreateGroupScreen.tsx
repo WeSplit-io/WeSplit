@@ -59,10 +59,14 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
         currency: 'USDC',
         icon: selectedCategory || 'trip',
         color: selectedColor || '#A5EA15',
-        created_by: currentUser.id,
+        created_by: currentUser.id.toString(),
       };
 
+      console.log('🔄 CreateGroupScreen: Creating group with data:', groupData);
+
       const createdGroup = await createGroup(groupData);
+
+      console.log('🔄 CreateGroupScreen: Group created successfully:', createdGroup.id);
 
       navigation.navigate('GroupCreated', {
         groupId: createdGroup.id,
@@ -72,8 +76,15 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
       });
 
     } catch (error) {
-      console.error('Error creating group:', error);
-      Alert.alert('Error', 'Failed to create group. Please try again.');
+      console.error('🔄 CreateGroupScreen: Error creating group:', error);
+      
+      // Show user-friendly error message
+      let errorMessage = 'Failed to create group. Please try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsCreating(false);
     }
@@ -110,10 +121,14 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
         currency: 'USDC',
         icon: selectedCategory || 'trip',
         color: selectedColor || '#A5EA15',
-        created_by: currentUser.id,
+        created_by: currentUser.id.toString(),
       };
 
+      console.log('🔄 CreateGroupScreen: Creating group for AddMembers with data:', groupData);
+
       const createdGroup = await createGroup(groupData);
+
+      console.log('🔄 CreateGroupScreen: Group created for AddMembers:', createdGroup.id);
 
       // Navigate to AddMembers with the created group ID
       navigation.navigate('AddMembers', {
@@ -122,8 +137,15 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
       });
 
     } catch (error) {
-      console.error('Error creating group:', error);
-      Alert.alert('Error', 'Failed to create group. Please try again.');
+      console.error('🔄 CreateGroupScreen: Error creating group for AddMembers:', error);
+      
+      // Show user-friendly error message
+      let errorMessage = 'Failed to create group. Please try again.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsCreating(false);
     }

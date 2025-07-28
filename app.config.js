@@ -31,6 +31,7 @@ export default {
         NSPhotoLibraryUsageDescription: "This app accesses the photo library to let you select profile pictures."
       }
     },
+    scheme: "wesplit",
     android: {
       package: "com.wesplit.app",
       adaptiveIcon: {
