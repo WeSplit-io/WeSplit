@@ -2,339 +2,189 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
+  // Modal Container - similar to TransactionModal
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)', // Darkened overlay
-    justifyContent: 'flex-end', // Align modal to bottom
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalOverlayTouchable: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    height: '90%', // Cover 90% of screen
-    backgroundColor: colors.darkBackground,
-    borderTopLeftRadius: spacing.radiusMd,
-    borderTopRightRadius: spacing.radiusMd,
+    backgroundColor: colors.black,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 40,
+    paddingTop: 24,
+    maxHeight: '90%',
+    minHeight: 600,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: spacing.screenPadding,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+  
+  // Handle bar for slide down
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.white50,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 30,
   },
-  closeButton: {
-    padding: spacing.sm,
-  },
-  closeIcon: {
-    fontSize: 24,
-    color: colors.textLight,
-  },
+  
+  // Content container
   content: {
     flex: 1,
-    paddingHorizontal: spacing.screenPadding,
   },
-
-  // Amount Header
-  amountHeader: {
-    borderRadius: spacing.radiusMd,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
+  contentContainer: {
     alignItems: 'center',
+    marginBottom: 32,
   },
-  amountHeaderRed: {
-    backgroundColor: '#FF4D4F',
-  },
-  amountHeaderGreen: {
-    backgroundColor: '#A5EA15',
+  
+  // Amount Header - matching the image design
+  amountHeader: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 32,
+    paddingVertical: 24,
   },
   amountHeaderText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    color: '#FFF',
-    marginBottom: spacing.xs,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.white70,
+    marginBottom: 8,
+    textAlign: 'center',
   },
   amountHeaderValue: {
-    fontSize: typography.fontSize.xxxl,
-    fontWeight: typography.fontWeight.bold,
-    color: '#FFF',
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.white,
+    textAlign: 'center',
   },
-
-  // Settlement Cards
+  amountHeaderCurrency: {
+    width: 20,
+    height: 20,
+    marginRight: 8,
+  },
+  
+  // Settlement Cards - matching the image design
   settlementCards: {
-    marginBottom: spacing.lg,
+    width: '100%',
+    marginBottom: 32,
   },
   settlementCard: {
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.radiusMd,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.darkCard || '#363636',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   settlementCardHeader: {
-    marginBottom: spacing.md,
-  },
-  settlementCardTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
-    marginBottom: spacing.xs,
-  },
-  settlementCardAmount: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
-  },
-  amountContainer: {
-    alignItems: 'flex-end',
-  },
-  settlementCardAmountUSD: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-  settlementActions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  primaryButton: {
     flex: 1,
-    backgroundColor: '#A5EA15',
-    borderRadius: spacing.radiusSm,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  primaryButtonText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    color: '#212121',
-  },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    borderRadius: spacing.radiusSm,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  secondaryButtonText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textSecondary,
-  },
-
-  // Bottom Action Button
-  bottomActionButton: {
-    backgroundColor: '#A5EA15',
-    borderRadius: spacing.radiusMd,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  bottomActionButtonText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: '#212121',
-  },
-
-  // Section Toggle
-  sectionToggle: {
-    position: 'absolute',
-    bottom: 100,
-    left: spacing.screenPadding,
-    right: spacing.screenPadding,
-    flexDirection: 'row',
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.radiusMd,
-    padding: spacing.xs,
-  },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    borderRadius: spacing.radiusSm,
-  },
-  toggleButtonActive: {
-    backgroundColor: '#A5EA15',
-  },
-  toggleButtonText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.textSecondary,
-  },
-  toggleButtonTextActive: {
-    color: '#212121',
-  },
-
-  // Disabled state for buttons
-  disabledButton: {
-    opacity: 0.6,
-  },
-
-  // Empty State
-  emptyState: {
-    padding: spacing.lg,
-    alignItems: 'center',
-  },
-  emptyStateText: {
-    fontSize: typography.fontSize.md,
-    color: colors.textLight,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  debugText: {
-    color: colors.textGray,
-    fontSize: typography.fontSize.sm,
-    marginTop: spacing.sm,
-    textAlign: 'center',
-  },
-  debugTextSmall: {
-    color: colors.textGray,
-    fontSize: typography.fontSize.xs,
-    marginTop: spacing.sm,
-    textAlign: 'center',
-  },
-  debugTextTiny: {
-    color: colors.textGray,
-    fontSize: typography.fontSize.xs,
-    marginTop: spacing.xs,
-    textAlign: 'center',
-  },
-  description: {
-    fontSize: typography.fontSize.md,
-    color: colors.darkGray,
-    textAlign: 'center',
-    marginBottom: spacing.iconSize,
-    lineHeight: spacing.iconSize,
-  },
-  balanceContainer: {
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.lg,
-    padding: spacing.screenPadding,
-    marginBottom: spacing.iconSize,
-    alignItems: 'center',
-  },
-  balanceLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.darkGray,
-    marginBottom: spacing.sm,
-  },
-  balanceAmount: {
-    fontSize: spacing.xxl + spacing.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.brandGreen,
-  },
-  balanceAmountNegative: {
-    color: colors.error,
-  },
-  membersList: {
-    marginBottom: spacing.iconSize,
-  },
-  memberItem: {
+  settlementCardTitleBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.itemSpacing,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.itemSpacing,
-    marginBottom: spacing.sm,
+    paddingBottom: 10,
   },
-  avatar: {
-    width: spacing.xxl + spacing.sm,
-    height: spacing.xxl + spacing.sm,
-    borderRadius: spacing.screenPadding,
-    backgroundColor: colors.brandGreen,
+  settlementCardAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.brandGreen || '#99FF00',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.itemSpacing,
+    marginRight: 16,
   },
-  avatarText: {
-    color: colors.darkBackground,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
+  settlementCardAvatarImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
-  memberInfo: {
+  settlementCardAvatarText: {
+    color: colors.black,
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  settlementCardContent: {
     flex: 1,
   },
-  memberName: {
-    fontSize: typography.fontSize.md,
-    color: colors.textLight,
-    fontWeight: typography.fontWeight.medium,
+  settlementCardName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
+    marginBottom: 4,
   },
-  memberEmail: {
-    fontSize: typography.fontSize.xs,
-    color: colors.darkGray,
-    marginTop: spacing.xs / 2,
+  settlementCardStatus: {
+    fontSize: 14,
+    color: colors.white70,
+    marginBottom: 8,
   },
-  memberBalance: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
+  settlementCardQuestion: {
+    fontSize: 12,
+    color: colors.white50,
   },
-  positiveBalance: {
-    color: colors.brandGreen,
+  settlementCardAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.white,
+    textAlign: 'right',
   },
-  negativeBalance: {
-    color: colors.error,
+  settlementCardAmountContainer: {
+    alignItems: 'flex-end',
   },
-  zeroBalance: {
-    color: colors.darkGray,
+  settlementCardCurrency: {
+    width: 16,
+    height: 16,
+    marginRight: 4,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: spacing.itemSpacing,
-    marginTop: spacing.lg,
-  },
-  sendButton: {
-    flex: 1,
-    backgroundColor: colors.brandGreen,
-    borderRadius: spacing.lg,
-    paddingVertical: spacing.lg,
+  settlementCardButton: {
+    backgroundColor: colors.brandGreen || '#99FF00',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 8,
     alignItems: 'center',
   },
-  sendButtonText: {
-    color: colors.darkBackground,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
+  settlementCardButtonText: {
+    color: colors.black,
+    fontSize: 14,
+    fontWeight: '600',
   },
-  requestButton: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    borderRadius: spacing.lg,
-    paddingVertical: spacing.lg,
+  
+  // Bottom Action Button - fixed at bottom of screen
+  bottomActionButton: {
+    backgroundColor: colors.brandGreen || '#99FF00',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    width: '100%',
     alignItems: 'center',
-    borderWidth: spacing.xs / 2,
-    borderColor: colors.brandGreen,
+    position: 'absolute',
+    bottom: 40,
+    left: spacing.lg,
+    right: spacing.lg,
   },
-  requestButtonText: {
-    color: colors.brandGreen,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
+  bottomActionButtonText: {
+    color: colors.black,
+    fontSize: 18,
+    fontWeight: '600',
   },
-  settleUpButton: {
-    backgroundColor: colors.brandGreen,
-    borderRadius: spacing.lg,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    marginTop: spacing.itemSpacing,
-  },
-  settleUpButtonText: {
-    color: colors.darkBackground,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
-  },
+  
+  // Loading and Error states
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.md,
+    color: colors.white,
+    fontSize: 16,
     marginTop: spacing.lg,
   },
   errorContainer: {
@@ -344,35 +194,39 @@ export const styles = StyleSheet.create({
   },
   errorText: {
     color: colors.error,
-    fontSize: typography.fontSize.md,
+    fontSize: 16,
     textAlign: 'center',
   },
-  // Additional styles for comprehensive coverage
-  sectionHeader: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
-    marginBottom: spacing.md,
-    marginTop: spacing.lg,
-  },
-  refreshButton: {
-    backgroundColor: 'transparent',
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.textLight,
-    borderRadius: spacing.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+  
+  // Empty State
+  emptyState: {
+    padding: spacing.lg,
     alignItems: 'center',
-    marginTop: spacing.md,
   },
-  refreshButtonText: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+  emptyStateText: {
+    fontSize: 16,
+    color: colors.white,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
-  divider: {
-    height: spacing.borderWidthThin,
-    backgroundColor: colors.border,
-    marginVertical: spacing.md,
+  
+  // Debug styles (kept for development)
+  debugText: {
+    color: colors.textGray,
+    fontSize: 12,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  debugTextSmall: {
+    color: colors.textGray,
+    fontSize: 10,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  debugTextTiny: {
+    color: colors.textGray,
+    fontSize: 8,
+    marginTop: spacing.xs,
+    textAlign: 'center',
   },
 }); 

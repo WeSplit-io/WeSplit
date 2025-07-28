@@ -17,7 +17,7 @@ import { styles } from './styles';
 const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   // Validate and extract groupId from route params
   const groupId = route.params?.groupId;
-  
+
   // Early return if groupId is missing
   if (!groupId) {
     return (
@@ -25,8 +25,8 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Invalid Group</Text>
           <Text style={styles.errorMessage}>Group ID is missing. Please try navigating back and selecting a group again.</Text>
-          <TouchableOpacity 
-            style={styles.retryButton} 
+          <TouchableOpacity
+            style={styles.retryButton}
             onPress={() => navigation.goBack()}
           >
             <Text style={styles.retryButtonText}>Go Back</Text>
@@ -38,7 +38,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
 
   const { state, getGroupBalances } = useApp();
   const { currentUser } = state;
-  
+
   const {
     group,
     loading: groupLoading,
@@ -55,7 +55,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   // State for real member balances
   const [realGroupBalances, setRealGroupBalances] = useState<Balance[]>([]);
   const [loadingBalances, setLoadingBalances] = useState(false);
-  
+
   // State for individual expenses (sorted by date)
   const [individualExpenses, setIndividualExpenses] = useState<Expense[]>([]);
   const [loadingExpenses, setLoadingExpenses] = useState(false);
@@ -79,12 +79,12 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       setDataError('Group ID is missing');
       return;
     }
-    
+
     // Prevent multiple simultaneous loads
     if (loadingBalances || loadingExpenses || loadingMembers) {
       return;
     }
-      
+
     setLoadingBalances(true);
     setLoadingExpenses(true);
     setLoadingMembers(true);
@@ -159,12 +159,12 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
 
       setRealGroupBalances(balances);
       setHasLoadedData(true);
-          
 
-      } catch (error) {
+
+    } catch (error) {
       console.error('❌ GroupDetailsScreen: Error loading real balances:', error);
       setDataError('Failed to load group data. Please try again.');
-      
+
       // Fallback to context balances
       try {
         const balances = await getGroupBalances(groupId);
@@ -175,29 +175,29 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         setRealGroupBalances([]);
         setDataError('Unable to load group data. Please refresh the screen.');
         setHasLoadedData(true);
-        }
-      } finally {
-        setLoadingBalances(false);
-        setLoadingExpenses(false);
-    setLoadingMembers(false);
+      }
+    } finally {
+      setLoadingBalances(false);
+      setLoadingExpenses(false);
+      setLoadingMembers(false);
     }
   }, [groupId, currentUser?.id, group, getGroupBalances, loadingBalances, loadingExpenses, loadingMembers]);
 
   // Handle refresh with proper error handling
   const handleRefresh = useCallback(async () => {
     if (!groupId) return;
-    
+
     setRefreshing(true);
     setDataError(null);
     setHasLoadedData(false);
-    
+
     try {
       // Refresh group data
       await refresh();
-      
+
       // Load real balances
       await loadRealBalances();
-      
+
     } catch (error) {
       console.error('❌ GroupDetailsScreen: Error during refresh:', error);
       setDataError('Failed to refresh data. Please try again.');
@@ -219,7 +219,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       // The useGroupData hook should handle this, but let's ensure it's triggered
     }
   }, [groupId, group, groupLoading]);
-        
+
   // Refresh group data when screen comes into focus (e.g., after accepting invitation)
   useFocusEffect(
     useCallback(() => {
@@ -235,23 +235,23 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   // Calculate current user balance
   const currentUserBalance = useMemo(() => {
     if (!currentUser?.id || realGroupBalances.length === 0) return null;
-    
+
     // Try multiple ways to find the current user's balance
     const currentUserId = String(currentUser.id);
     let balance = realGroupBalances.find((b: Balance) => b.userId === currentUserId);
-    
+
     if (!balance) {
       // Try with numeric ID
       balance = realGroupBalances.find((b: Balance) => b.userId === String(Number(currentUserId)));
     }
-    
+
     if (!balance) {
       // Try finding by user name if it contains "You" or matches current user name
-      balance = realGroupBalances.find((b: Balance) => 
+      balance = realGroupBalances.find((b: Balance) =>
         b.userName === 'You' || b.userName === currentUser.name || b.userName === currentUser.email
       );
     }
-    
+
     return balance;
   }, [realGroupBalances, currentUser?.id, currentUser?.name, currentUser?.email]);
 
@@ -296,7 +296,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         totalAmountUSD = expensesByCurrency.reduce((sum, exp) => {
           const currency = exp.currency || 'SOL';
           const amount = exp.total_amount || 0;
-          
+
           // Simple conversion rates for display
           const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
           return sum + (amount * rate);
@@ -312,15 +312,15 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       // Calculate total amount the current user actually paid
       if (currentUser?.id && individualExpenses.length > 0) {
         const currentUserId = String(currentUser.id);
-        const userPaidExpenses = individualExpenses.filter(expense => 
+        const userPaidExpenses = individualExpenses.filter(expense =>
           expense && String(expense.paid_by) === currentUserId
         );
-        
+
         userPaidUSD = userPaidExpenses.reduce((sum, expense) => {
           if (!expense || expense.amount === undefined) return sum;
           const currency = expense.currency || 'SOL';
           const amount = expense.amount || 0;
-          
+
           // Convert to USD for display
           const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
           return sum + (amount * rate);
@@ -336,10 +336,10 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
           return sum + (amount * rate);
         }, 0);
-        
+
         const memberCount = group.member_count || 1;
         const sharePerPerson = totalExpenseAmount / memberCount;
-        
+
         // If user paid more than their share, they don't owe anything
         if (userPaidUSD > sharePerPerson) {
           userOwesUSD = 0;
@@ -383,18 +383,114 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       };
     }
   }, [
-    group?.expenses_by_currency, 
-    group?.member_count, 
-    group?.expense_count, 
-    currentUserBalance?.amount, 
-    currentUserBalance?.currency, 
-    loadingBalances, 
-    loadingExpenses, 
-    realGroupBalances.length, 
-    currentUser?.id, 
+    group?.expenses_by_currency,
+    group?.member_count,
+    group?.expense_count,
+    currentUserBalance?.amount,
+    currentUserBalance?.currency,
+    loadingBalances,
+    loadingExpenses,
+    realGroupBalances.length,
+    currentUser?.id,
     currentUser?.name,
     individualExpenses
   ]);
+
+  // Function to get user avatar for expense
+  const getUserAvatarForExpense = useCallback((expense: Expense) => {
+    if (!expense || !expense.paid_by) return null;
+
+    // First, try to find the user in realMembers
+    const paidByUser = realMembers.find(member => String(member.id) === String(expense.paid_by));
+    if (paidByUser && paidByUser.avatar && paidByUser.avatar.trim() !== '') {
+      return paidByUser.avatar;
+    }
+
+    // If not found in realMembers, try to find in group members
+    if (group?.members) {
+      const groupMember = group.members.find(member => String(member.id) === String(expense.paid_by));
+      if (groupMember && groupMember.avatar && groupMember.avatar.trim() !== '') {
+        return groupMember.avatar;
+      }
+    }
+
+    return null;
+  }, [realMembers, group?.members]);
+
+  // Function to get user name for expense
+  const getUserNameForExpense = useCallback((expense: Expense) => {
+    if (!expense || !expense.paid_by) return 'Someone';
+
+    // First, try to find the user in realMembers
+    const paidByUser = realMembers.find(member => String(member.id) === String(expense.paid_by));
+    if (paidByUser) {
+      return paidByUser.name || 'Someone';
+    }
+
+    // If not found in realMembers, try to find in group members
+    if (group?.members) {
+      const groupMember = group.members.find(member => String(member.id) === String(expense.paid_by));
+      if (groupMember) {
+        return groupMember.name || 'Someone';
+      }
+    }
+
+    return expense.paid_by_name || 'Someone';
+  }, [realMembers, group?.members]);
+
+  // Function to render avatar for expense
+  const renderExpenseAvatar = useCallback((expense: Expense) => {
+    const avatar = getUserAvatarForExpense(expense);
+    const userName = getUserNameForExpense(expense);
+
+    if (avatar) {
+      return (
+        <Image
+          source={{ uri: avatar }}
+          style={styles.expenseAvatarImage}
+          defaultSource={require('../../../assets/user.png')}
+        />
+      );
+    }
+
+    // Fallback to icon with user initial
+    return (
+      <View style={styles.expenseAvatar}>
+        <Text style={styles.expenseAvatarText}>
+          {userName.charAt(0).toUpperCase()}
+        </Text>
+      </View>
+    );
+  }, [getUserAvatarForExpense, getUserNameForExpense]);
+
+  // Function to render dynamic balance avatar based on balance status
+  const renderBalanceAvatar = useCallback((balance: Balance, isCurrentUser: boolean = false) => {
+    // Get user avatar if available
+    const user = realMembers.find(member => String(member.id) === String(balance.userId));
+    const avatar = user?.avatar;
+    const userName = user?.name || balance.userName || 'User';
+
+    if (avatar && avatar.trim() !== '') {
+      return (
+        <View style={styles.memberBalanceAvatar}>
+          <Image
+            source={{ uri: avatar }}
+            style={styles.memberBalanceAvatarImage}
+            defaultSource={require('../../../assets/user.png')}
+          />
+        </View>
+      );
+    }
+
+    // Fallback to initial with neutral color
+    return (
+      <View style={styles.memberBalanceAvatar}>
+        <Text style={styles.memberBalanceAvatarText}>
+          {userName.charAt(0).toUpperCase()}
+        </Text>
+      </View>
+    );
+  }, [realMembers]);
 
   // Show loading state while group is loading or if we don't have group data yet
   if (groupLoading || !group) {
@@ -417,8 +513,8 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Failed to Load Group</Text>
           <Text style={styles.errorMessage}>{groupError}</Text>
-          <TouchableOpacity 
-            style={styles.retryButton} 
+          <TouchableOpacity
+            style={styles.retryButton}
             onPress={() => {
               setHasLoadedData(false);
               setDataError(null);
@@ -439,8 +535,8 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Group Not Found</Text>
           <Text style={styles.errorMessage}>The group you're looking for doesn't exist or you don't have access to it.</Text>
-          <TouchableOpacity 
-            style={styles.retryButton} 
+          <TouchableOpacity
+            style={styles.retryButton}
             onPress={() => navigation.goBack()}
           >
             <Text style={styles.retryButtonText}>Go Back</Text>
@@ -460,8 +556,8 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           <Text style={styles.errorMessage}>
             This group has no members. Please add members to get started.
           </Text>
-          <TouchableOpacity 
-            style={styles.retryButton} 
+          <TouchableOpacity
+            style={styles.retryButton}
             onPress={() => navigation.navigate('AddMembers', { groupId })}
           >
             <Text style={styles.retryButtonText}>Add Members</Text>
@@ -475,20 +571,20 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-      <TouchableOpacity onPress={() => navigation.navigate('Dashboard')} style={styles.backButton}>
+        <TouchableOpacity onPress={() => navigation.navigate('Dashboard')} style={styles.backButton}>
           <Image
             source={require('../../../assets/arrow-left.png')}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
-      <Text style={styles.headerTitle}>Group details</Text>
+        <Text style={styles.headerTitle}>Group details</Text>
         <TouchableOpacity onPress={() => navigation.navigate('GroupSettings', { groupId })}>
           <Icon name="settings" size={24} color="#FFF" />
         </TouchableOpacity>
       </View>
 
       {/* Main Content with RefreshControl */}
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         refreshControl={
           <RefreshControl
@@ -499,7 +595,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           />
         }
       >
- 
+
 
         {/* Total Spending Card */}
         <View style={styles.totalSpendingCard}>
@@ -508,7 +604,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
             <View style={styles.activeStatusDot} />
             <Text style={styles.activeStatusText}>Active</Text>
           </View>
-          
+
           {/* Group Icon Badge */}
           <View style={styles.groupIconBadgeContainer}>
             <GroupIcon
@@ -517,10 +613,10 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
               size={48}
             />
           </View>
-          
+
           {/* Event Name */}
           <Text style={styles.eventName}>{group.name}</Text>
-          
+
           {/* Spending and Progress Row */}
           <View style={styles.spendingProgressRow}>
             {/* Left side - Total spending */}
@@ -533,7 +629,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
                 </Text>
               </View>
             </View>
-            
+
             {/* Right side - Circular progress */}
             <View style={styles.circularProgressContainer}>
               <View style={styles.circularProgress}>
@@ -554,65 +650,186 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* Balance Cards */}
-        <View style={styles.balanceCards}>
-          <View style={styles.balanceCard}>
-            <Text style={styles.balanceLabel}>Total you paid</Text>
-            <Text style={styles.balanceAmount}>
-              ${(getGroupSummary.userPaidUSD || 0).toFixed(2)}
-            </Text>
+        {/* Balance Cards and Progress Bar - Unified Design */}
+        <View style={styles.balanceProgressContainer}>
+          <View style={styles.balanceCards}>
+            <View style={styles.balanceCard}>
+              <Text style={styles.balanceLabel}>Total you paid</Text>
+              <Text style={styles.balanceAmount}>
+                ${(getGroupSummary.userPaidUSD || 0).toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.balanceCardLeft}>
+              <Text style={styles.balanceLabel}>You owe</Text>
+              <Text style={styles.balanceAmount}>
+                ${(getGroupSummary.userOwesUSD || 0).toFixed(2)}
+              </Text>
+            </View>
           </View>
-          <View style={styles.balanceCard}>
-            <Text style={styles.balanceLabel}>You owe</Text>
-            <Text style={styles.balanceAmount}>
-              ${(getGroupSummary.userOwesUSD || 0).toFixed(2)}
-            </Text>
+
+          {/* Progress Bar */}
+          <View style={styles.progressBarContainer}>
+            <View style={styles.progressBar}>
+              {/* Green section for "Total you paid" */}
+              {getGroupSummary.userPaidUSD > 0 && (
+                <View
+                  style={[
+                    styles.progressBarFillGreen,
+                    {
+                      width: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100)) || 0}%`
+                    }
+                  ]}
+                />
+              )}
+              {/* Red section for "You owe" */}
+              {getGroupSummary.userOwesUSD > 0 && (
+                <View
+                  style={[
+                    styles.progressBarFillRed,
+                    {
+                      width: `${Math.min(100, Math.max(0, (getGroupSummary.userOwesUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100)) || 0}%`,
+                      left: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100)) || 0}%`
+                    }
+                  ]}
+                />
+              )}
+              {/* White slider positioned at the boundary between green and red */}
+              {(getGroupSummary.userPaidUSD > 0 || getGroupSummary.userOwesUSD > 0) && (
+                <View
+                  style={[
+                    styles.progressBarThumb,
+                    {
+                      left: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100)) || 0}%`
+                    }
+                  ]}
+                />
+              )}
+            </View>
           </View>
         </View>
 
-        {/* Progress Bar */}
-        <View style={styles.progressBarContainer}>
-          <View style={styles.progressBar}>
-            {/* Green section for "Total you paid" */}
-            {getGroupSummary.userPaidUSD > 0 && (
-            <View 
-              style={[
-                  styles.progressBarFillGreen, 
-                { 
-                    width: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100)) || 0}%` 
-                }
-              ]} 
-            />
-            )}
-            {/* Red section for "You owe" */}
-            {getGroupSummary.userOwesUSD > 0 && (
-              <View 
-                style={[
-                  styles.progressBarFillRed, 
-                  { 
-                    width: `${Math.min(100, Math.max(0, (getGroupSummary.userOwesUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100)) || 0}%`,
-                    left: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100)) || 0}%`
-                  }
-                ]} 
-              />
-            )}
-            {/* White slider positioned at the boundary between green and red */}
-            {(getGroupSummary.userPaidUSD > 0 || getGroupSummary.userOwesUSD > 0) && (
-            <View 
-              style={[
-                styles.progressBarThumb,
-                { 
-                    left: `${Math.min(100, Math.max(0, (getGroupSummary.userPaidUSD / Math.max(1, getGroupSummary.userPaidUSD + getGroupSummary.userOwesUSD)) * 100)) || 0}%` 
-                }
-              ]} 
-            />
+        {/* Settlement Cards - New Design */}
+        {(getGroupSummary.userOwesUSD > 0 || getGroupSummary.userPaidUSD > 0) && (
+          <View style={styles.settlementCardsContainer}>
+            {/* Case 1: Both conditions (You owe AND We owe you) - Show 2 cards side by side */}
+            {getGroupSummary.userOwesUSD > 0 && getGroupSummary.userPaidUSD > 0 ? (
+              <View style={styles.settlementCardsRow}>
+                {/* Card 1: You owe money */}
+                <TouchableOpacity
+                  style={styles.settlementCardGreen}
+                  onPress={() => setSettleUpModalVisible(true)}
+                >
+                  <View style={styles.settlementCardInfos}>
+                    <View style={styles.settlementCardIcon}>
+                      <Image source={require('../../../assets/icon-send.png')} style={{ width: 20, height: 20 }} />
+
+                    </View>
+                    <View style={styles.settlementCardContent}>
+                      <Text style={styles.settlementCardTitleBlack}>
+                        You owe ${getGroupSummary.userOwesUSD.toFixed(2)}
+                      </Text>
+                      <Text style={styles.settlementCardSubtitleBlack}>
+                        See how you need to settle
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.settlementCardButton}
+                    onPress={() => setSettleUpModalVisible(true)}
+                  >
+                    <Text style={styles.settlementCardButtonText}>Settle</Text>
+                    <Icon name="chevron-right" size={16} color="#FFF" />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+
+                {/* Card 2: We owe you money */}
+                <TouchableOpacity
+                  style={styles.settlementCardGrey}
+                  onPress={() => setSettleUpModalVisible(true)}
+                >
+                  <View style={styles.settlementCardInfos}>
+                    <View style={styles.settlementCardIcon}>
+                      <Image source={require('../../../assets/icon-receive.png')} style={{ width: 20, height: 20 }} />
+
+                    </View>
+                    <View style={styles.settlementCardContent}>
+                      <Text style={styles.settlementCardTitle}>
+                        We owe you ${getGroupSummary.userPaidUSD.toFixed(2)}
+                      </Text>
+                      <Text style={styles.settlementCardSubtitle}>
+                        Remind your friends
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.settlementCardButton}
+                    onPress={() => setSettleUpModalVisible(true)}
+                  >
+                    <Text style={styles.settlementCardButtonText}>Settle</Text>
+                    <Icon name="chevron-right" size={16} color="#FFF" />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              /* Case 2: Single condition - Use current design */
+              <>
+                {/* Card 1: You owe money */}
+                {getGroupSummary.userOwesUSD > 0 && (
+                  <TouchableOpacity
+                    style={styles.settlementCard}
+                    onPress={() => setSettleUpModalVisible(true)}
+                  >
+                    <View style={styles.settlementCardSmallInfos}>
+                    <View style={styles.settlementAvatar}>
+                      <Image source={require('../../../assets/icon-send.png')} style={{ width: 20, height: 20 }} />
+                    </View>
+                    <View style={styles.settlementInfo}>
+                      <Text style={styles.settlementTitleBlack}>
+                        You owe ${getGroupSummary.userOwesUSD.toFixed(2)}
+                      </Text>
+                      <Text style={styles.settlementSubtitleBlack}>Tap to see settlement options</Text>
+                    </View>
+                    </View>
+
+                    <View>
+                      <Icon name="chevron-right" size={20} color="#000" />
+                    </View>
+                  </TouchableOpacity>
+                )}
+
+                {/* Card 2: We owe you money */}
+                {getGroupSummary.userPaidUSD > 0 && (
+                  <TouchableOpacity
+                    style={styles.settlementCardSmallGrey}
+                    onPress={() => setSettleUpModalVisible(true)}
+                  >
+                    <View style={styles.settlementCardSmallInfos}>
+                      <View style={styles.settlementAvatar}>
+                        <Image source={require('../../../assets/icon-receive.png')} style={{ width: 20, height: 20 }} />
+                      </View>
+                      <View style={styles.settlementInfo}>
+                        <Text style={styles.settlementTitle}>
+                          You're owed ${getGroupSummary.userPaidUSD.toFixed(2)}
+                        </Text>
+                        <Text style={styles.settlementSubtitle}>Tap to send payment reminders</Text>
+                      </View>
+                    </View>
+
+                    <View>
+                      <Icon name="chevron-right" size={20} color="#FFF" />
+                    </View>
+                  </TouchableOpacity>
+                )}
+              </>
             )}
           </View>
-        </View>
+        )}
 
         {/* Tab Navigation */}
         <View style={styles.tabNavigation}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.tab, activeTab === 'expenses' && styles.activeTab]}
             onPress={() => setActiveTab('expenses')}
           >
@@ -620,12 +837,12 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
               Expenses
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.tab, activeTab === 'settleup' && styles.activeTab]}
             onPress={() => setActiveTab('settleup')}
           >
             <Text style={[styles.tabText, activeTab === 'settleup' && styles.activeTabText]}>
-              Settleup
+              Balance
             </Text>
           </TouchableOpacity>
         </View>
@@ -635,7 +852,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           {activeTab === 'expenses' ? (
             <View style={styles.expensesContent}>
               <Text style={styles.todayLabel}>Today</Text>
-              
+
               {loadingExpenses ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="small" color="#A5EA15" />
@@ -659,12 +876,10 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
                     navigation.navigate('EditExpense', { groupId, expenseId: expense.id });
                   }}>
                     <View style={styles.expenseItem}>
-                      <View style={styles.expenseAvatar}>
-                        <Icon name="user" size={20} color="#A5EA15" />
-                      </View>
+                      {renderExpenseAvatar(expense)}
                       <View style={styles.expenseDetails}>
                         <Text style={styles.expenseDescription}>
-                          {expense.paid_by_name || 'Someone'} paid {expense.currency} {expense.amount.toFixed(2)}
+                          {getUserNameForExpense(expense)} paid {expense.currency} {expense.amount.toFixed(2)}
                         </Text>
                         <Text style={styles.expenseCategory}>
                           {expense.description}
@@ -678,7 +893,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
                           styles.expenseUserAmount,
                           expense.paid_by === currentUser?.id ? styles.positiveAmount : styles.negativeAmount
                         ]}>
-                          {expense.paid_by === currentUser?.id ? '+' : ''}{expense.amount.toFixed(2)}
+                          {expense.paid_by === currentUser?.id ? '$' : '$'}{expense.amount.toFixed(2)}
                         </Text>
                       </View>
                     </View>
@@ -696,173 +911,65 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           ) : (
             <View style={styles.settleupContent}>
               {/* Debug info in development */}
-             
-              
-              {/* Settlement content based on balance - show USD amounts */}
-              {getGroupSummary.userOwesUSD > 0 ? (
-                <TouchableOpacity 
-                  style={styles.settlementCard}
-                  onPress={() => setSettleUpModalVisible(true)}
-                >
-                  <View style={styles.settlementAvatar} />
-                  <View style={styles.settlementInfo}>
-                    <Text style={styles.settlementTitle}>
-                      You owe ${getGroupSummary.userOwesUSD.toFixed(2)}
-                    </Text>
-                    <Text style={styles.settlementSubtitle}>Tap to see settlement options</Text>
-                  </View>
-                  <View>
-                    <Icon name="chevron-right" size={20} color="#FFF" />
-                  </View>
-                </TouchableOpacity>
-              ) : getGroupSummary.userPaidUSD > 0 ? (
-                <TouchableOpacity 
-                  style={styles.settlementCard}
-                  onPress={() => setSettleUpModalVisible(true)}
-                >
-                  <View style={styles.settlementAvatar} />
-                  <View style={styles.settlementInfo}>
-                    <Text style={styles.settlementTitle}>
-                      You're owed ${getGroupSummary.userPaidUSD.toFixed(2)}
-                    </Text>
-                    <Text style={styles.settlementSubtitle}>Tap to send payment reminders</Text>
-                  </View>
-                  <View>
-                    <Icon name="chevron-right" size={20} color="#FFF" />
-                  </View>
-                </TouchableOpacity>
-              ) : currentUserBalance && Math.abs(currentUserBalance.amount) > 0.01 ? (
-                // Fallback: show settlement options using original currency if USD conversion failed
-                <TouchableOpacity 
-                  style={styles.settlementCard}
-                  onPress={() => setSettleUpModalVisible(true)}
-                >
-                  <View style={styles.settlementAvatar} />
-                  <View style={styles.settlementInfo}>
-                    <Text style={styles.settlementTitle}>
-                      {currentUserBalance.amount > 0 
-                        ? `You're owed ${currentUserBalance.currency} ${currentUserBalance.amount.toFixed(2)}`
-                        : `You owe ${currentUserBalance.currency} ${Math.abs(currentUserBalance.amount).toFixed(2)}`
-                      }
-                    </Text>
-                    <Text style={styles.settlementSubtitle}>
-                      {currentUserBalance.amount > 0 
-                        ? 'Tap to send payment reminders' 
-                        : 'Tap to see settlement options'
-                      }
-                    </Text>
-                  </View>
-                  <View>
-                    <Icon name="chevron-right" size={20} color="#FFF" />
-                  </View>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.settledState}>
-                  <Text style={styles.settledText}>All settled up!</Text>
-                  <Text style={styles.expenseCategory}>
-                    {getGroupSummary.expenseCount > 0 
-                      ? 'No outstanding balances in this group' 
-                      : 'Add some expenses to see settlement options'}
-                  </Text>
-                </View>
-              )}
+
 
               {/* Balance Section */}
               <View style={styles.balanceSection}>
-                <Text style={styles.balanceSectionTitle}>Balance</Text>
-                
                 {/* Show current user's balance in USD */}
-                <View style={styles.memberBalanceItem}>
-                  <View style={styles.memberBalanceAvatar} />
-                  <View style={styles.memberBalanceInfo}>
-                    <Text style={styles.memberBalanceName}>You</Text>
+                {currentUserBalance && (
+                  <View style={styles.memberBalanceItem}>
+                    {renderBalanceAvatar(currentUserBalance, true)}
+                    <View style={styles.memberBalanceInfo}>
+                      <Text style={styles.memberBalanceName}>You</Text>
+                    </View>
+                    <Text style={[
+                      styles.memberBalanceAmount,
+                      currentUserBalance.amount > 0.01 ? styles.memberBalanceAmountPositive :
+                      currentUserBalance.amount < -0.01 ? styles.memberBalanceAmountNegative :
+                      styles.memberBalanceAmountNeutral
+                    ]}>
+                      {currentUserBalance.amount > 0
+                        ? `+$${Math.abs(currentUserBalance.amount).toFixed(2)}`
+                        : currentUserBalance.amount < 0
+                          ? `-$${Math.abs(currentUserBalance.amount).toFixed(2)}`
+                          : '$0.00'}
+                    </Text>
                   </View>
-                  <Text style={styles.memberBalanceAmount}>
-                    {getGroupSummary.userPaidUSD > 0 
-                      ? `+$${getGroupSummary.userPaidUSD.toFixed(2)}` 
-                      : getGroupSummary.userOwesUSD > 0 
-                      ? `-$${getGroupSummary.userOwesUSD.toFixed(2)}` 
-                      : '$0.00'}
-                  </Text>
-                </View>
-                
+                )}
+
                 {/* Show other members' balances in USD */}
                 {realGroupBalances
                   .filter((balance: Balance) => balance.userId !== String(currentUser?.id))
                   .map((balance: Balance, index: number) => {
-                    // Convert balance to USD for display using the same rate as group total
-                    let balanceUSD = Math.abs(balance.amount);
-                    if (balance.currency !== 'USDC' && group?.expenses_by_currency) {
-                      // Calculate the actual conversion rate from group data
-                      const currencyData = group.expenses_by_currency.find(exp => exp.currency === balance.currency);
-                      if (currencyData && currencyData.total_amount > 0) {
-                        // Use the real rate from the total spending conversion
-                        const realRate = getGroupSummary.totalAmountUSD / currencyData.total_amount;
-                        balanceUSD = Math.abs(balance.amount) * realRate;
-                      } else {
-                        // Fallback to market rate
-                        const rate = balance.currency === 'SOL' ? 200 : 1;
-                        balanceUSD = Math.abs(balance.amount) * rate;
-                      }
-                    }
-                    
                     return (
                       <View key={balance.userId || index} style={styles.memberBalanceItem}>
-                        <View style={styles.memberBalanceAvatar} />
+                        {renderBalanceAvatar(balance)}
                         <View style={styles.memberBalanceInfo}>
                           <Text style={styles.memberBalanceName}>{balance.userName}</Text>
-                          <Text style={styles.expenseCategory}>
-                            {balance.status === 'owes' ? 'Owes money' : 
-                                balance.status === 'gets_back' ? 'Is owed money' : 
-                                'Settled up'}
-                          </Text>
                         </View>
-                        <Text style={styles.memberBalanceAmount}>
-                          {balance.amount > 0 
-                            ? `+$${balanceUSD.toFixed(2)}` 
-                            : balance.amount < 0 
-                            ? `-$${balanceUSD.toFixed(2)}` 
-                            : '$0.00'}
+                        <Text style={[
+                          styles.memberBalanceAmount,
+                          balance.amount > 0.01 ? styles.memberBalanceAmountPositive :
+                          balance.amount < -0.01 ? styles.memberBalanceAmountNegative :
+                          styles.memberBalanceAmountNeutral
+                        ]}>
+                          {balance.amount > 0
+                            ? `+$${Math.abs(balance.amount).toFixed(2)}`
+                            : balance.amount < 0
+                              ? `-$${Math.abs(balance.amount).toFixed(2)}`
+                              : '$0.00'}
                         </Text>
                       </View>
                     );
                   })}
-
-                {/* Group summary info */}
-                {getGroupSummary.expenseCount > 0 && (
-                  <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#333' }}>
-                    <Text style={styles.expenseCategory}>
-                      Total group spending: {getGroupSummary.totalAmountDisplay}
-                    </Text>
-                    <Text style={styles.expenseCategory}>
-                      {getGroupSummary.expenseCount} expense{getGroupSummary.expenseCount !== 1 ? 's' : ''} • {getGroupSummary.memberCount} member{getGroupSummary.memberCount !== 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                )}
               </View>
-
-              {/* Quick settle action button */}
-              <TouchableOpacity 
-                style={styles.addExpenseButton}
-                onPress={() => setSettleUpModalVisible(true)}
-              >
-                <Text style={styles.addExpenseButtonText}>
-                  {getGroupSummary.userOwesUSD > 0 
-                    ? 'Settle up now' 
-                    : getGroupSummary.userPaidUSD > 0 
-                    ? 'Send payment reminders' 
-                    : currentUserBalance && Math.abs(currentUserBalance.amount) > 0.01
-                    ? (currentUserBalance.amount > 0 ? 'Send payment reminders' : 'Settle up now')
-                    : 'View settlement details'}
-                </Text>
-              </TouchableOpacity>
             </View>
           )}
         </View>
       </ScrollView>
 
       {/* Add Expense Button */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.addExpenseButton}
         onPress={() => navigation.navigate('AddExpense', { groupId })}
       >

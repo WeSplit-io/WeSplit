@@ -57,7 +57,7 @@ export const styles = StyleSheet.create({
   groupInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.screenPadding,
+    paddingHorizontal: spacing.lg,
     marginBottom: spacing.lg,
   },
   groupIconContainer: {
@@ -198,35 +198,43 @@ export const styles = StyleSheet.create({
   },
 
   // Balance Cards
+  balanceProgressContainer: {
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: 18,
+    marginHorizontal: spacing.screenPadding,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   balanceCards: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.screenPadding,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     gap: spacing.sm,
   },
   balanceCard: {
     flex: 1,
-    backgroundColor: colors.white10,
-    borderRadius: spacing.radiusMd,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+
+  },
+  balanceCardLeft: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
   balanceLabel: {
-    fontSize: typography.fontSize.sm,
+    fontSize: 14,
     color: colors.white70,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   balanceAmount: {
-    fontSize: typography.fontSize.xl,
+    fontSize: 22,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
   },
   
   // Progress Bar Styles
   progressBarContainer: {
-    paddingHorizontal: spacing.screenPadding,
-    marginBottom: spacing.lg,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
   },
   progressBar: {
     height: 8,
@@ -257,29 +265,137 @@ export const styles = StyleSheet.create({
     transform: [{ translateX: -6 }],
   },
 
+  // Settlement Cards - New Design
+  settlementCardsContainer: {
+    paddingHorizontal: spacing.screenPadding,
+    marginBottom: spacing.lg,
+    gap: spacing.md,
+  },
+  settlementCardsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  settlementCardGreen: {
+    flex: 1,
+    backgroundColor: '#A5EA15',
+    borderRadius: 16,
+    padding: spacing.md,
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    position: 'relative',
+  },
+  settlementCardGrey: {
+    flex: 1,
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: spacing.md,
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    borderWidth: 1,
+    borderColor: colors.white50,
+    position: 'relative',
+  },
+  settlementCardInfos: {
+    flex: 1,
+    alignItems: 'flex-start',
+    marginBottom: spacing.sm,
+    width: '100%',
+  },
+  settlementCardIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 20,
+    backgroundColor: colors.black,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    position: 'relative',
+  },
+
+  settlementCardContent: {
+    flex: 1,
+  },
+  settlementCardTitleBlack: {
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.black,
+    marginBottom: spacing.xs,
+    lineHeight: 20,
+  },
+  settlementCardTitle: {
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.white,
+    marginBottom: spacing.xs,
+    lineHeight: 20,
+  },
+  settlementCardSubtitleBlack: {
+    fontSize: 14,
+    color: colors.black,
+  },
+  settlementCardSubtitle: {
+    fontSize: 14,
+    color: colors.white70,
+  },
+  settlementCardButton: {
+    backgroundColor: colors.black,
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  settlementCardButtonText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.white,
+  },
+  settlementCardSmallGrey: {
+    flex: 1,
+    backgroundColor: colors.white10,
+    borderWidth: 1,
+    borderColor: colors.white50,
+    borderRadius: 16,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    width: '100%',
+  },
+
   // Tab Navigation
   tabNavigation: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.screenPadding,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.green10,
+    borderRadius: 16,
+    marginHorizontal: spacing.screenPadding,
+    borderWidth: 1,
+    borderColor: colors.white10,
+    padding: 4,
     marginBottom: spacing.md,
   },
   tab: {
     flex: 1,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    justifyContent: 'center',
   },
   activeTab: {
-    borderBottomColor: '#A5EA15',
+    backgroundColor: colors.green,
   },
   tabText: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   activeTabText: {
-    color: '#A5EA15',
+    color: colors.black,
   },
 
   // Tab Content
@@ -302,8 +418,11 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    width: '100%',
   },
   expenseAvatar: {
     width: 40,
@@ -311,6 +430,18 @@ export const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: colors.darkGray,
     marginRight: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expenseAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  expenseAvatarText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
   },
   expenseDetails: {
     flex: 1,
@@ -318,28 +449,28 @@ export const styles = StyleSheet.create({
   expenseDescription: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textLight,
+    color: colors.white,
     marginBottom: spacing.xs / 2,
   },
   expenseCategory: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
+    color: colors.white70,
   },
   expenseAmounts: {
     alignItems: 'flex-end',
   },
   expenseUserStatus: {
     color: '#A89B9B',
-    fontSize: 10,
+    fontSize: 12,
     textAlign: 'right',
   },
   expenseUserAmount: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     marginTop: 2,
   },
   positiveAmount: {
-    color: '#A5EA15',
+    color: colors.green,
   },
   negativeAmount: {
     color: '#FF4D4F',
@@ -350,23 +481,37 @@ export const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   settlementCard: {
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.radiusMd,
-    padding: spacing.lg,
+    flex: 1,
+    backgroundColor: colors.green,
     borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
+    borderColor: colors.white50,
+    borderRadius: 16,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    width: '100%',
+
   },
   settlementTitle: {
-    fontSize: typography.fontSize.lg,
+    fontSize: 16,
     fontWeight: typography.fontWeight.semibold,
     color: colors.textLight,
     marginBottom: spacing.xs,
   },
   settlementSubtitle: {
     fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing.lg,
+    color: colors.white70,
+  },
+  settlementTitleBlack: {
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.black,
+    marginBottom: spacing.xs,
+  },
+  settlementSubtitleBlack: {
+    fontSize: typography.fontSize.sm,
+    color: colors.black,
   },
   settlementActions: {
     flexDirection: 'row',
@@ -410,16 +555,18 @@ export const styles = StyleSheet.create({
 
   // Add Expense Button
   addExpenseButton: {
-    backgroundColor: '#A5EA15',
-    borderRadius: spacing.radiusMd,
+    backgroundColor: colors.green,
+    borderRadius: 16,
     paddingVertical: spacing.md,
     alignItems: 'center',
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
   },
   addExpenseButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    color: '#212121',
+    color: colors.black,
   },
 
   // Empty States
@@ -434,14 +581,22 @@ export const styles = StyleSheet.create({
 
   // Settleup specific styles
   settlementAvatar: {
-    width: 40,
-    height: 40,
+    width: 32,
+    height: 32,
     borderRadius: 20,
-    backgroundColor: colors.darkGray,
+    backgroundColor: colors.black,
     marginRight: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   settlementInfo: {
     flex: 1,
+  },
+  settlementCardSmallInfos: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
   },
 
   // Balance section
@@ -458,15 +613,30 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    width: '100%',
   },
   memberBalanceAvatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.darkGray,
     marginRight: spacing.md,
+    backgroundColor: colors.white10,
+  },
+  memberBalanceAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  memberBalanceAvatarText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+    textAlign: 'center',
+    lineHeight: 32,
   },
   memberBalanceInfo: {
     flex: 1,
@@ -479,6 +649,15 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
     color: colors.textLight,
+  },
+  memberBalanceAmountPositive: {
+    color: colors.green,
+  },
+  memberBalanceAmountNegative: {
+    color: '#FF4D4F',
+  },
+  memberBalanceAmountNeutral: {
+    color: colors.textSecondary,
   },
 
   // Error and Empty States
