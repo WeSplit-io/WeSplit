@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, SafeAreaView, Share, ActivityIndicator, Platform, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, SafeAreaView, Share, ActivityIndicator, Platform, Modal, Image } from 'react-native';
 import { TextInput } from 'react-native-gesture-handler';
 import QRCode from 'react-native-qrcode-svg';
 import Icon from '../../components/Icon';
@@ -111,52 +111,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     '#85C1E9', '#F8C471', '#82E0AA', '#F1948A'
   ];
 
-  // Calculate member balance based on real expense data
-  // REPLACED: Now using centralized getGroupBalances for multi-currency support
-  const [groupBalances, setGroupBalances] = useState<any[]>([]);
 
-  // Load group balances
-  useEffect(() => {
-    const loadBalances = async () => {
-      try {
-        const balances = await getGroupBalances(groupId);
-        setGroupBalances(balances);
-      } catch (error) {
-        console.error('❌ GroupSettingsScreen: Error loading balances:', error);
-        setGroupBalances([]);
-      }
-    };
-
-    if (groupId) {
-      loadBalances();
-    }
-  }, [groupId]); // Remove getGroupBalances dependency to prevent infinite loops
-
-  // Get member balance display data using centralized calculations
-  const getMemberBalance = (memberId: number | string) => {
-    const balance = groupBalances.find((b: any) => String(b.userId) === String(memberId));
-    if (!balance) return { type: 'settled', amount: 0, currency: 'SOL' };
-
-    const currentUserId = String(currentUser?.id);
-    
-    if (balance.status === 'settled') {
-      return { type: 'settled', amount: 0, currency: balance.currency };
-    } else if (balance.status === 'gets_back') {
-      // Member is owed money
-      if (String(memberId) === currentUserId) {
-        return { type: 'you_get_back', amount: balance.amount, currency: balance.currency };
-      } else {
-        return { type: 'gets_back', amount: balance.amount, currency: balance.currency };
-      }
-    } else {
-      // Member owes money (status === 'owes')
-      if (String(memberId) === currentUserId) {
-        return { type: 'you_owe', amount: Math.abs(balance.amount), currency: balance.currency };
-      } else {
-        return { type: 'owes', amount: Math.abs(balance.amount), currency: balance.currency };
-      }
-    }
-  };
 
   // Handle sharing invite link with native apps
   const handleShareInviteLink = async () => {
@@ -242,17 +197,9 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
 
       const groupId = String(group.id);
       const isOnlyMember = members.length === 1;
-      const userBalance = getMemberBalance(currentUser.id);
 
-      // Check if user has outstanding balance
-      if (userBalance.type === 'you_owe' && userBalance.amount > 0) {
-        Alert.alert(
-          'Outstanding Balance',
-          `You owe ${userBalance.currency} ${userBalance.amount.toFixed(2)}. Please settle your balance before leaving the group.`,
-          [{ text: 'OK' }]
-        );
-        return;
-      }
+
+
 
       if (isOnlyMember) {
         // If user is the only member, delete the group
@@ -384,17 +331,23 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Header - Same as NotificationsScreen */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-back" size={24} color="#FFF" />
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Group settings</Text>
         <TouchableOpacity 
           style={styles.qrButton}
           onPress={() => setShowQRModal(true)}
         >
-          <Icon name="qr-code" type="ionicons" size={24} color="#A5EA15" />
+          <Image
+            source={require('../../../assets/qr-code-scan.png')}
+            style={styles.qrIcon}
+          />
         </TouchableOpacity>
       </View>
 
@@ -411,7 +364,10 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
             <Text style={styles.groupCategory}>{group?.category}</Text>
           </View>
           <TouchableOpacity style={styles.editButton} onPress={handleEditGroup}>
-            <Icon name="create" size={20} color="#A89B9B" />
+            <Image
+              source={require('../../../assets/icon-edit-white70.png')}
+              style={styles.iconWrapper}
+            />
           </TouchableOpacity>
         </View>
 
@@ -420,7 +376,10 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
           style={styles.actionButton}
           onPress={() => navigation.navigate('AddMembers', { groupId })}
         >
-          <Icon name="person-add" size={20} color="#A5EA15" />
+          <Image
+            source={require('../../../assets/person-add.png')}
+            style={[styles.iconWrapper, { tintColor: '#A5EA15' }]}
+          />
           <Text style={styles.actionButtonText}>Add new members</Text>
         </TouchableOpacity>
 
@@ -442,7 +401,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
           </View>
         ) : (
           members.map((member: GroupMember, index: number) => {
-            const balance = getMemberBalance(member.id);
+
             const isInvited = member.invitation_status === 'pending';
             const isCurrentUser = String(member.id) === String(currentUser?.id);
             const canRemoveMember = isAdmin && !isCurrentUser && !isInvited;
@@ -492,23 +451,15 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
                 </View>
                 {!isInvited && (
                   <View style={styles.memberBalance}>
-                    <Text style={[
-                      styles.memberBalanceText,
-                      (balance.type === 'gets_back' || balance.type === 'you_get_back') ? styles.memberBalancePositive :
-                      (balance.type === 'you_owe' || balance.type === 'owes') ? styles.memberBalanceNegative : styles.memberBalanceNeutral
-                    ]}>
-                      {balance.type === 'gets_back' ? 'gets back' : 
-                       balance.type === 'you_get_back' ? 'you get back' :
-                       balance.type === 'you_owe' ? 'you owe' : 
-                       balance.type === 'owes' ? 'owes' : 'settled'}
-                    </Text>
-                    <Text style={[
-                      styles.memberBalanceAmount,
-                      balance.type === 'gets_back' ? styles.memberBalancePositive :
-                      balance.type === 'you_owe' ? styles.memberBalanceNegative : styles.memberBalanceNeutral
-                    ]}>
-                      {balance.amount > 0 ? `${balance.currency} ${balance.amount.toFixed(2)}` : ''}
-                    </Text>
+                    {String(member.id) === String(group?.created_by) ? (
+                      <Text style={styles.memberBalancePositive}>Owner</Text>
+                    ) : String(member.id) !== String(currentUser?.id) ? (
+                      <TouchableOpacity
+                        onPress={() => handleRemoveMember(member.id, member.name)}
+                      >
+                        <Text style={styles.memberBalanceNegative}>Remove</Text>
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                 )}
                 {isInvited && (

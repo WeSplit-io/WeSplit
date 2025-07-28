@@ -6,6 +6,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.darkBackground,
   },
+  // Header - Same as NotificationsScreen
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -18,19 +19,38 @@ export const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
+  iconWrapper: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#FFF',
+    flex: 1,
+    textAlign: 'center',
+    marginLeft: -24, // Compensate for the back button width
+    marginRight: -24, // Compensate for the QR button width
   },
   qrButton: {
     padding: 8,
   },
+  qrIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
+    tintColor: '#A5EA15',
+  },
+  placeholder: {
+    width: 24,
+  },
+  
   scrollContent: {
     flex: 1,
     paddingHorizontal: 24,
   },
-  // Group Info Card
+  // Group Info Card - Updated to match image
   groupInfoCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -52,6 +72,7 @@ export const styles = StyleSheet.create({
   },
   groupInfoContent: {
     flex: 1,
+    paddingLeft: 10,
   },
   groupName: {
     fontSize: 18,
@@ -67,16 +88,11 @@ export const styles = StyleSheet.create({
   editButton: {
     padding: 8,
   },
-  // Action Buttons
+  // Action Buttons - Updated to match image
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2A2A2A',
-    borderRadius: 16,
-    padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#404040',
   },
   actionButtonText: {
     color: '#A5EA15',
@@ -84,7 +100,7 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 12,
   },
-  // Members Section
+  // Members Section - Updated to match image
   membersTitle: {
     fontSize: 16,
     color: '#FFF',
@@ -135,6 +151,7 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 2,
+    color: '#A89B9B',
   },
   memberBalanceAmount: {
     fontSize: 16,
@@ -183,7 +200,7 @@ export const styles = StyleSheet.create({
     padding: 8,
     marginLeft: 8,
   },
-  // Bottom Action Buttons
+  // Bottom Action Buttons - Updated to match image
   leaveButton: {
     backgroundColor: 'transparent',
     borderRadius: 16,
