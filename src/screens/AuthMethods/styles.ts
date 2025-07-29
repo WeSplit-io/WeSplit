@@ -59,6 +59,9 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
     color: colors.darkBackground,
   },
+  socialButtonDisabled: {
+    opacity: 0.6,
+  },
   separator: {
     flexDirection: 'row',
     alignItems: 'center',

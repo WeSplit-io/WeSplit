@@ -27,7 +27,7 @@ export interface Notification {
   user_id?: string | number; // Legacy field for compatibility
   title: string;
   message: string;
-  type: 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'payment_reminder' | 'general' | 'expense_added' | 'group_invite';
+  type: 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'payment_reminder' | 'general' | 'expense_added' | 'group_invite' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification';
   data?: any; // Additional data for the notification
   is_read: boolean;
   created_at: string;
@@ -151,7 +151,7 @@ export async function sendNotificationsToUsers(
 // Get notifications for a user
 export async function getUserNotifications(userId: string | number, limitCount: number = 50): Promise<Notification[]> {
   try {
-    console.log('🔥 Getting notifications for user:', userId);
+    // Removed excessive logging for cleaner console
     
     const notificationsRef = collection(db, 'notifications');
     
@@ -164,24 +164,15 @@ export async function getUserNotifications(userId: string | number, limitCount: 
         limit(limitCount)
       );
       
-      console.log('🔥 Executing notifications query for user:', String(userId));
+      // Removed excessive logging for cleaner console
       const querySnapshot = await getDocs(notificationsQuery);
-      console.log('🔥 Query returned', querySnapshot.size, 'notifications');
+      // Removed excessive logging for cleaner console
       
       const notifications = querySnapshot.docs.map(doc => 
         notificationTransformers.firestoreToNotification(doc)
       );
       
-      console.log('🔥 Retrieved notifications:', notifications.length);
-      notifications.forEach((notification, index) => {
-        console.log(`🔥 Notification ${index + 1}:`, {
-          id: notification.id,
-          type: notification.type,
-          title: notification.title,
-          is_read: notification.is_read,
-          created_at: notification.created_at
-        });
-      });
+      // Removed excessive logging for cleaner console
       
       return notifications;
     } catch (queryError) {

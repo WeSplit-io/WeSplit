@@ -12,6 +12,7 @@ interface WalletInfo {
 }
 import { solanaService, SolanaTransactionParams, SolanaTransactionResult } from '../services/solanaTransactionService';
 import { solanaAppKitService } from '../services/solanaAppKitService';
+import { externalWalletAuthService, ExternalWalletAuthResult } from '../services/externalWalletAuthService';
 
 interface TransactionParams {
   to: string;
@@ -38,26 +39,36 @@ interface StoredWallet {
 
 interface WalletContextType {
   // State
-  isConnected: boolean;
-  address: string | null;
-  balance: number | null;
-  walletInfo: ExtendedWalletInfo | null;
-  walletName: string | null;
+  isConnected: boolean; // External wallet connection status
+  address: string | null; // External wallet address
+  balance: number | null; // External wallet balance
+  walletInfo: ExtendedWalletInfo | null; // External wallet info
+  walletName: string | null; // External wallet name
   chainId: string | null;
   secretKey: string | null;
   isLoading: boolean;
   availableWallets: StoredWallet[];
   currentWalletId: string | null;
   
+  // App Wallet State (separate from external wallet)
+  appWalletAddress: string | null;
+  appWalletBalance: number | null;
+  appWalletConnected: boolean;
+  
   // Actions
-  connectWallet: () => Promise<void>;
+  connectWallet: () => Promise<void>; // Connect external wallet
   connectToExternalWallet: (providerKey: string) => Promise<void>;
-  disconnectWallet: () => Promise<void>;
+  connectExternalWalletWithAuth: (providerName: string) => Promise<ExternalWalletAuthResult>; // New method
+  disconnectWallet: () => Promise<void>; // Disconnect external wallet
   switchWallet: (walletId: string) => Promise<void>;
   importNewWallet: (secretKey: string, name?: string) => Promise<void>;
   removeWallet: (walletId: string) => Promise<void>;
   sendTransaction: (params: TransactionParams) => Promise<{ signature: string; txId: string }>;
   refreshBalance: () => Promise<void>;
+  
+  // App Wallet Actions
+  ensureAppWallet: (userId: string) => Promise<void>;
+  getAppWalletBalance: (userId: string) => Promise<number>;
   
   // Provider methods
   getAvailableProviders: () => any[];
@@ -79,6 +90,7 @@ interface WalletProviderProps {
 }
 
 export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
+  // External wallet state
   const [isConnected, setIsConnected] = useState(false);
   const [address, setAddress] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
@@ -89,10 +101,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [availableWallets, setAvailableWallets] = useState<StoredWallet[]>([]);
   const [currentWalletId, setCurrentWalletId] = useState<string | null>(null);
+  
+  // App wallet state (separate from external wallet)
+  const [appWalletAddress, setAppWalletAddress] = useState<string | null>(null);
+  const [appWalletBalance, setAppWalletBalance] = useState<number | null>(null);
+  const [appWalletConnected, setAppWalletConnected] = useState(false);
 
   useEffect(() => {
-    if (__DEV__) { console.log('WalletProvider mounted successfully'); }
-    if (__DEV__) { console.log('Current wallet state:', { address, isConnected, chainId, balance, walletName, currentWalletId }); }
+          if (__DEV__) { console.log('WalletProvider mounted successfully'); }
   }, [address, isConnected, chainId, balance, walletName, currentWalletId]);
 
   // Load stored wallets from AsyncStorage
@@ -133,38 +149,46 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     }
   };
 
-  // Check initial wallet connection status
+  // Check initial wallet connection status - runs after wallets are loaded
   useEffect(() => {
     const checkInitialConnection = async () => {
       try {
+        // Only check for external wallet connections (Phantom, etc.)
+        // App wallet is handled separately when user logs in
         const info = await solanaAppKitService.getWalletInfo();
+        
         if (info && info.isConnected) {
           setIsConnected(true);
           setAddress(info.address);
           setBalance(info.balance || null);
-          setWalletInfo(info as ExtendedWalletInfo);
-          setWalletName(info.walletName || null);
+          setWalletInfo({
+            ...info,
+            walletType: 'external'
+          } as ExtendedWalletInfo);
+          setWalletName(info.walletName || 'External Wallet');
           setChainId(process.env.NODE_ENV === 'production' ? 'solana:mainnet' : 'solana:devnet');
-          // Expose secret key if available
-          if (info && (info as any).secretKey) {
-            setSecretKey((info as any).secretKey);
-          } else {
-            setSecretKey(null);
-          }
-          if (__DEV__) { console.log('Found existing wallet connection:', info.address, 'using', info.walletName); }
           
-          // Refresh balance after initial connection
+          if (__DEV__) { console.log('External wallet connected:', info.address, 'using', info.walletName); }
+          
+          // Refresh external wallet balance
           setTimeout(() => {
             refreshBalance();
-          }, 1000); // Small delay to ensure everything is set up
+          }, 1000);
         }
       } catch (error) {
-        console.error('Error checking initial connection:', error);
+        // This is expected when no external wallet is connected - not an error
+        if (__DEV__) {
+          console.warn('No external wallet connected (this is normal):', error);
+        }
+        // Don't auto-connect on error - let user manually connect
       }
     };
 
-    checkInitialConnection();
-  }, []);
+    // Only run after wallets are loaded
+    if (availableWallets.length > 0 || !isConnected) {
+      checkInitialConnection();
+    }
+  }, [availableWallets]); // Depend on availableWallets so it runs after they're loaded
 
   // Connect to a specific wallet
   const connectToWallet = async (wallet: StoredWallet) => {
@@ -211,7 +235,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Refresh balance after connecting
       await refreshBalance();
       
-      if (__DEV__) { console.log('Connected to wallet:', wallet.name, wallet.address); }
+
       
     } catch (error) {
       console.error('Error connecting to wallet:', error);
@@ -248,7 +272,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Refresh balance after connecting
       await refreshBalance();
       
-      if (__DEV__) { console.log('Connected to external wallet:', walletInfo.walletName, walletInfo.address); }
+
       
     } catch (error) {
       console.error('Error connecting to external wallet:', error);
@@ -334,7 +358,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Refresh balance after connecting
       await refreshBalance();
       
-      if (__DEV__) { console.log('Solana wallet connected successfully:', wallet.address, 'using Generated Wallet'); }
+
       
     } catch (error) {
       console.error('Error in connectWallet:', error);
@@ -424,7 +448,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Refresh balance after importing
       await refreshBalance();
       
-      if (__DEV__) { console.log('Imported and connected to new wallet:', newWallet.name); }
+
       
     } catch (error) {
       console.error('Error importing wallet:', error);
@@ -456,19 +480,49 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   // Listen for wallet connection events
   useEffect(() => {
-    if (__DEV__) { console.log('WalletProvider: Setting up event listeners'); }
-    
-    if (isConnected && address) {
-      if (__DEV__) { console.log('Wallet connected:', { address, chainId, balance, walletName, currentWalletId }); }
-    } else if (!isConnected) {
-      if (__DEV__) { console.log('Wallet disconnected'); }
-    }
+          if (__DEV__) { console.log('WalletProvider: Setting up event listeners'); }
   }, [isConnected, address, chainId, balance, walletName, currentWalletId]);
+
+  // App wallet methods
+  const ensureAppWallet = async (userId: string) => {
+    try {
+      // Import userWalletService to ensure app wallet
+      const { userWalletService } = await import('../services/userWalletService');
+      const walletResult = await userWalletService.ensureUserWallet(userId);
+      
+      if (walletResult.success && walletResult.wallet) {
+        setAppWalletAddress(walletResult.wallet.address);
+        setAppWalletConnected(true);
+      } else {
+        console.error('🔍 WalletProvider: Failed to ensure app wallet:', walletResult.error);
+        setAppWalletConnected(false);
+      }
+    } catch (error) {
+      console.error('🔍 WalletProvider: Error ensuring app wallet:', error);
+      setAppWalletConnected(false);
+    }
+  };
+
+  const getAppWalletBalance = async (userId: string): Promise<number> => {
+    try {
+      // Import userWalletService to get app wallet balance
+      const { userWalletService } = await import('../services/userWalletService');
+      const balance = await userWalletService.getUserWalletBalance(userId);
+      
+      const totalUSD = balance?.totalUSD || 0;
+      setAppWalletBalance(totalUSD);
+      
+      return totalUSD;
+    } catch (error) {
+      console.error('🔍 WalletProvider: Error getting app wallet balance:', error);
+      return 0;
+    }
+  };
 
   const handleSendTransaction = async (params: TransactionParams): Promise<{ signature: string; txId: string }> => {
     try {
       if (!isConnected || !address) {
-        throw new Error('Wallet not connected');
+        throw new Error('External wallet not connected');
       }
 
       if (__DEV__) { console.log('Sending transaction:', params); }
@@ -533,14 +587,55 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     isLoading,
     availableWallets,
     currentWalletId,
+    // App wallet state
+    appWalletAddress,
+    appWalletBalance,
+    appWalletConnected,
+    // Actions
     connectWallet: handleConnectWallet,
     connectToExternalWallet,
+    connectExternalWalletWithAuth: async (providerName: string) => {
+      try {
+        setIsLoading(true);
+        const result = await externalWalletAuthService.connectWithAuthentication(providerName);
+        
+        if (result.success && result.walletAddress) {
+          setIsConnected(true);
+          setAddress(result.walletAddress);
+          setBalance(result.balance || null);
+          setWalletInfo({
+            publicKey: result.walletAddress, // Use address as public key for external wallets
+            address: result.walletAddress,
+            isConnected: true,
+            balance: result.balance,
+            walletName: result.walletName || 'External Wallet',
+            walletType: 'external'
+          });
+          setWalletName(result.walletName || 'External Wallet');
+          setChainId(process.env.NODE_ENV === 'production' ? 'solana:mainnet' : 'solana:devnet');
+          setSecretKey(null); // External wallets don't expose secret keys
+          setCurrentWalletId(`external_${providerName}`);
+          await refreshBalance();
+        }
+        
+        return result;
+      } catch (error) {
+        console.error('Error connecting external wallet with auth:', error);
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
     disconnectWallet: handleDisconnectWallet,
     switchWallet,
     importNewWallet,
     removeWallet,
     sendTransaction: handleSendTransaction,
     refreshBalance,
+    // App wallet actions
+    ensureAppWallet,
+    getAppWalletBalance,
+    // Provider methods
     getAvailableProviders,
     isProviderAvailable,
   };

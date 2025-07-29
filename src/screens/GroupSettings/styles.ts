@@ -346,6 +346,7 @@ export const styles = StyleSheet.create({
     padding: 24,
     width: '90%',
     maxWidth: 400,
+    maxHeight: '80%',
   },
   editModalHeader: {
     flexDirection: 'row',
@@ -362,19 +363,20 @@ export const styles = StyleSheet.create({
     marginBottom: 20,
   },
   inputLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#FFF',
-    marginBottom: 8,
+    fontSize: typography.fontSize.lg,
+    color: colors.white,
+    marginBottom: spacing.md,
+    fontWeight: typography.fontWeight.medium,
   },
   textInput: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#FFF',
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: spacing.md,
+    fontSize: typography.fontSize.md,
+    color: colors.white,
     borderWidth: 1,
-    borderColor: '#404040',
+    borderColor: colors.white50,
+    marginBottom: spacing.md,
   },
   editModalActions: {
     flexDirection: 'row',
@@ -451,6 +453,40 @@ export const styles = StyleSheet.create({
   },
   selectedColorOption: {
     borderColor: '#FFF',
+    borderWidth: 3,
+  },
+  
+  // Category Selection Styles (matching CreateGroupScreen)
+  categoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  categoryOption: {
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: 16,
+    backgroundColor: colors.white,
+    minWidth: 70,
+    minHeight: 70,
+    justifyContent: 'center',
+  },
+  categoryImage: {
+    width: 32,
+    height: 32,
+    resizeMode: 'contain',
+  },
+  
+  // Color Selection Styles (matching CreateGroupScreen)
+  colorRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  colorSelected: {
+    borderColor: colors.textLight,
     borderWidth: 3,
   },
 }); 

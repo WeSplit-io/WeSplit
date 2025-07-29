@@ -2,6 +2,9 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 
+// Import MoonPay functions
+const moonpayFunctions = require('./moonpay.js');
+
 // Initialize Firebase Admin
 admin.initializeApp();
 
@@ -385,3 +388,9 @@ exports.cleanupRateLimits = functions.pubsub
       return null;
     }
   }); 
+
+// Export MoonPay functions
+exports.createMoonPayURL = moonpayFunctions.createMoonPayURL;
+exports.moonpayWebhook = moonpayFunctions.moonpayWebhook;
+exports.getMoonPayTransactionStatus = moonpayFunctions.getMoonPayTransactionStatus;
+exports.getUserMoonPayTransactions = moonpayFunctions.getUserMoonPayTransactions; 

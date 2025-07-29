@@ -101,12 +101,18 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const { state } = useApp();
   const { currentUser } = state;
   const { 
-    sendTransaction, 
-    isConnected, 
-    address, 
-    balance, 
-    isLoading: walletLoading,
-    connectWallet
+    // External wallet state (for destination)
+    isConnected: externalWalletConnected,
+    address: externalWalletAddress, 
+    balance: externalWalletBalance,
+    // App wallet state (for sending)
+    appWalletAddress,
+    appWalletBalance,
+    appWalletConnected,
+    ensureAppWallet,
+    getAppWalletBalance,
+    sendTransaction,
+    isLoading: walletLoading
   } = useWallet();
   
   const [signing, setSigning] = useState(false);
@@ -119,13 +125,18 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const safeTotalWithdraw = totalWithdraw || 0;
 
   const handleSignTransaction = async () => {
-    if (!isConnected && !__DEV__) {
-      Alert.alert('Wallet Error', 'Please connect your wallet first');
+    if (!appWalletConnected && !__DEV__) {
+      Alert.alert('App Wallet Error', 'Please ensure your app wallet is connected first');
       return;
     }
 
-    if (balance !== null && amount > balance && !__DEV__) {
-      Alert.alert('Insufficient Balance', 'You do not have enough balance to complete this withdrawal');
+    if (!externalWalletConnected && !__DEV__) {
+      Alert.alert('External Wallet Error', 'Please connect your external wallet to receive the withdrawal');
+      return;
+    }
+
+    if (appWalletBalance !== null && amount > appWalletBalance && !__DEV__) {
+      Alert.alert('Insufficient Balance', 'You do not have enough balance in your app wallet to complete this withdrawal');
       return;
     }
 
@@ -134,9 +145,9 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     try {
       let transactionResult;
       
-      if (__DEV__ && !isConnected) {
+      if (__DEV__ && !appWalletConnected) {
         // Dev mode: Simulate transaction for testing
-        console.log('🧪 DEV MODE: Simulating withdrawal transaction');
+        console.log('🧪 DEV MODE: Simulating withdrawal transaction from app wallet to external wallet');
         await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate 2 second delay
         
         transactionResult = {
@@ -144,12 +155,18 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           txId: `DEV_${transactionId}`
         };
       } else {
-        // Send the actual withdrawal transaction using wallet context
+        // Send the actual withdrawal transaction from app wallet to external wallet
+        console.log('🔍 WithdrawConfirmation: Sending from app wallet to external wallet:', {
+          from: appWalletAddress,
+          to: externalWalletAddress || walletAddress,
+          amount: safeTotalWithdraw
+        });
+
         transactionResult = await sendTransaction({
-          to: walletAddress,
+          to: externalWalletAddress || walletAddress, // Send to external wallet
           amount: safeTotalWithdraw, // Send the amount after fees
           currency: 'USDC',
-          memo: description || 'Withdrawal from WeSplit'
+          memo: description || 'Withdrawal from WeSplit app wallet'
         });
       }
 
@@ -160,7 +177,7 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         amount: safeTotalWithdraw,
         withdrawalFee: safeWithdrawalFee,
         totalWithdraw: safeTotalWithdraw,
-        walletAddress,
+        walletAddress: externalWalletAddress || walletAddress,
         description,
         transactionId: transactionResult.signature || transactionId,
         txId: transactionResult.txId || transactionId,
@@ -180,7 +197,7 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   // Check if user has sufficient balance
-  const hasSufficientBalance = balance === null || balance >= amount;
+  const hasSufficientBalance = appWalletBalance === null || appWalletBalance >= amount;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -208,7 +225,7 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         keyboardShouldPersistTaps="handled"
       >
         {/* Wallet Connection Status */}
-        {!isConnected && (
+        {!appWalletConnected && (
           <View style={styles.alertContainer}>
             <Icon name="alert-triangle" size={20} color="#FFF" />
             <Text style={styles.alertText}>
@@ -228,11 +245,11 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         )}
 
         {/* Balance Warning */}
-        {isConnected && balance !== null && amount > balance && (
+        {appWalletConnected && appWalletBalance !== null && amount > appWalletBalance && (
           <View style={styles.alertContainer}>
             <Icon name="alert-triangle" size={20} color="#FFF" />
             <Text style={styles.alertText}>
-              Insufficient balance ({balance.toFixed(4)} USDC available)
+              Insufficient balance ({appWalletBalance.toFixed(4)} USDC available)
             </Text>
           </View>
         )}
@@ -269,11 +286,16 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         </View>
 
         {/* Wallet Info */}
-        {isConnected && address && (
+        {appWalletConnected && appWalletAddress && (
           <View style={styles.walletInfoContainer}>
             <Text style={styles.walletInfoText}>
-              From: {formatWalletAddress(address)}
+              From App Wallet: {formatWalletAddress(appWalletAddress)}
             </Text>
+            {externalWalletConnected && externalWalletAddress && (
+              <Text style={styles.walletInfoText}>
+                To External Wallet: {formatWalletAddress(externalWalletAddress)}
+              </Text>
+            )}
           </View>
         )}
       </ScrollView>
@@ -285,7 +307,7 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         </Text>
         <AppleSlider
           onSlideComplete={handleSignTransaction}
-          disabled={signing || !isConnected || !hasSufficientBalance || walletLoading}
+          disabled={signing || !appWalletConnected || !hasSufficientBalance || walletLoading}
           loading={signing || walletLoading}
           text="Sign transaction"
         />

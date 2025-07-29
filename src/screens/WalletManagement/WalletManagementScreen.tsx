@@ -33,11 +33,25 @@ const WalletManagementScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { state } = useApp();
   const currentUser = state.currentUser;
-  const { walletInfo, isConnected, address, balance, walletName, chainId } = useWallet();
+  const { 
+    // External wallet state (for funding/withdrawals)
+    walletInfo, 
+    isConnected: externalWalletConnected, 
+    address: externalWalletAddress, 
+    balance: externalWalletBalance, 
+    walletName: externalWalletName, 
+    chainId,
+    // App wallet state (for internal transactions)
+    appWalletAddress,
+    appWalletBalance,
+    appWalletConnected,
+    ensureAppWallet,
+    getAppWalletBalance
+  } = useWallet();
   const { walletExists, walletAddress, isLoading: walletLoading, ensureWallet } = useWalletCreation();
 
   // Local state
-  const [appWalletBalance, setAppWalletBalance] = useState<UserWalletBalance | null>(null);
+  const [localAppWalletBalance, setLocalAppWalletBalance] = useState<UserWalletBalance | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [multiSignEnabled, setMultiSignEnabled] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'transactions'>('overview');
@@ -82,15 +96,20 @@ const WalletManagementScreen: React.FC = () => {
       try {
         setIsLoading(true);
 
-        // Ensure user has a wallet first
+        // Initialize app wallet for the user
+        console.log('🔍 WalletManagement: Initializing app wallet for user:', currentUser.id);
+        await ensureAppWallet(currentUser.id.toString());
+        await getAppWalletBalance(currentUser.id.toString());
+
+        // Also ensure user has a wallet for backward compatibility
         const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
 
         if (walletResult.success && walletResult.wallet) {
           if (__DEV__) { console.log('✅ Wallet ensured for user:', walletResult.wallet.address); }
 
-          // Load app wallet balance
+          // Load app wallet balance for local state
           const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
-          setAppWalletBalance(balance);
+          setLocalAppWalletBalance(balance);
 
           // Load transactions
           const userTransactions = await firebaseDataService.transaction.getUserTransactions(
@@ -113,11 +132,11 @@ const WalletManagementScreen: React.FC = () => {
         } else {
           console.error('❌ Failed to ensure wallet:', walletResult.error);
           // Show error state
-          setAppWalletBalance(null);
+          setLocalAppWalletBalance(null);
         }
       } catch (error) {
         console.error('Error loading wallet info:', error);
-        setAppWalletBalance(null);
+        setLocalAppWalletBalance(null);
       } finally {
         setIsLoading(false);
       }
@@ -248,13 +267,20 @@ const WalletManagementScreen: React.FC = () => {
     try {
       if (!currentUser?.id) return;
 
-      // Ensure user has a seed phrase before navigating
+      console.log('🔍 WalletManagement: Preparing seed phrase for app wallet...');
+
+      // First ensure the app wallet is initialized
+      await ensureAppWallet(currentUser.id.toString());
+
+      // Ensure user has a seed phrase for the app wallet
       await userWalletService.ensureUserSeedPhrase(currentUser.id.toString());
+
+      console.log('🔍 WalletManagement: App wallet seed phrase prepared successfully');
 
       navigation.navigate('SeedPhraseView');
     } catch (error) {
-      console.error('Error ensuring seed phrase:', error);
-      Alert.alert('Error', 'Failed to prepare seed phrase. Please try again.');
+      console.error('Error ensuring app wallet seed phrase:', error);
+      Alert.alert('Error', 'Failed to prepare app wallet seed phrase. Please try again.');
     }
   };
 
@@ -278,7 +304,7 @@ const WalletManagementScreen: React.FC = () => {
       if (walletResult.success && walletResult.wallet) {
         // Refresh app wallet balance
         const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
-        setAppWalletBalance(balance);
+        setLocalAppWalletBalance(balance);
 
         // Refresh transactions with enhanced data
         const userTransactions = await firebaseDataService.transaction.getUserTransactions(
@@ -537,29 +563,59 @@ const WalletManagementScreen: React.FC = () => {
 
   // Get display balance based on active wallet
   const getDisplayBalance = () => {
-    if (isConnected && balance !== null) {
-      return balance;
+    // For wallet management, show app wallet balance as primary
+    if (appWalletBalance !== null) {
+      return appWalletBalance;
     }
-    if (appWalletBalance) {
-      return appWalletBalance.totalUSD;
+    // Fallback to external wallet balance if app wallet not available
+    if (externalWalletConnected && externalWalletBalance !== null) {
+      return externalWalletBalance;
     }
     return 0;
   };
 
   const renderWalletOverview = () => (
     <View>
-      {/* External Wallet Section - Match mockup exactly */}
+      {/* App Wallet Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>App wallet</Text>
+        </View>
+
+        {appWalletConnected && appWalletAddress ? (
+          <View style={styles.externalWalletCard}>
+            <View style={styles.externalWalletAddress}>
+              <View style={styles.optionLeft}>
+                <Image source={require('../../../assets/wallet-icon-white.png')} style={styles.optionIcon} />
+                <Text style={styles.externalWalletAddressText}>
+                  {formatAddress(appWalletAddress)}
+                </Text>
+              </View>
+            </View>
+           
+          </View>
+        ) : (
+          <View style={styles.linkWalletButton}>
+            <View style={styles.optionLeft}>
+              <Image source={require('../../../assets/wallet-icon-white.png')} style={styles.optionIcon} />
+              <Text style={styles.linkWalletText}>App wallet not connected</Text>
+            </View>
+          </View>
+        )}
+      </View>
+
+      {/* External Wallet Section - For funding/withdrawals */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>External wallet</Text>
-          {isConnected && walletInfo && (
+          {externalWalletConnected && walletInfo && (
             <TouchableOpacity onPress={handleChangeExternalWallet}>
               <Text style={styles.changeButton}>Change</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {isConnected && walletInfo ? (
+        {externalWalletConnected && walletInfo ? (
           <View style={styles.externalWalletCard}>
             <View style={styles.externalWalletAddress}>
               <View style={styles.optionLeft}>
@@ -568,14 +624,17 @@ const WalletManagementScreen: React.FC = () => {
                 {formatAddress(walletInfo.address)}
               </Text>
               </View>
-
-
+            </View>
+            <View style={{ marginTop: 8 }}>
+              <Text style={{ color: colors.textLightSecondary, fontSize: 12 }}>
+                Balance: ${(externalWalletBalance || 0).toFixed(2)} USDC
+              </Text>
             </View>
           </View>
         ) : (
           <TouchableOpacity
             style={styles.linkWalletButton}
-            onPress={handleLinkExternalWallet}
+            onPress={() => navigation.navigate('ExternalWalletConnection')}
           >
             <View style={styles.optionLeft}>
               <Image source={require('../../../assets/wallet-icon-white.png')} style={styles.optionIcon} />
@@ -754,6 +813,19 @@ const WalletManagementScreen: React.FC = () => {
     </View>
   );
 
+  const handleExternalWalletConnectionSuccess = (result: any) => {
+    console.log('🔐 WalletManagement: External wallet connected successfully:', result);
+    
+    Alert.alert(
+      'External Wallet Connected',
+      `Successfully connected to your external wallet!\n\nYou can now transfer funds to your app wallet.`,
+      [{ text: 'OK' }]
+    );
+    
+    // Refresh the wallet data
+    handleRefresh();
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -782,7 +854,7 @@ const WalletManagementScreen: React.FC = () => {
         {/* Balance Card */}
         <View style={styles.balanceCard}>
           <View style={styles.balanceHeader}>
-            <Text style={styles.balanceLabel}>Your Balance</Text>
+            <Text style={styles.balanceLabel}>App Wallet Balance</Text>
             <TouchableOpacity style={styles.qrCodeIcon} onPress={() => setQrCodeModalVisible(true)}>
               <Image
                 source={require('../../../assets/qr-code-scan.png')}
@@ -791,7 +863,7 @@ const WalletManagementScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
           <Text style={styles.balanceAmount}>
-            ${getDisplayBalance() !== null ? getDisplayBalance().toFixed(2) : '0.00'}
+            ${(appWalletBalance || 0).toFixed(2)}
           </Text>
           <Text style={styles.balanceLimitText}>Balance Limit $1000</Text>
         </View>

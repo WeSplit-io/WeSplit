@@ -34,6 +34,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [detailedGroupSummaries, setDetailedGroupSummaries] = useState<Record<string, { expenseCount: number; totalAmount: number; memberCount: number }>>({});
 
   const loadTransactions = useCallback(async () => {
     if (!currentUser?.id) {
@@ -63,6 +64,22 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
     try {
       const userGroups = await firebaseDataService.group.getUserGroups(currentUser.id.toString());
       setGroups(userGroups);
+      
+      // Load detailed summaries for groups
+      const detailedSummaries: Record<string, { expenseCount: number; totalAmount: number; memberCount: number }> = {};
+      
+      for (const group of userGroups) {
+        try {
+          const summary = await getDetailedGroupSummary(group);
+          detailedSummaries[group.id.toString()] = summary;
+        } catch (error) {
+          console.error(`Error loading detailed summary for group ${group.id}:`, error);
+          // Use basic summary as fallback
+          detailedSummaries[group.id.toString()] = getGroupSummary(group);
+        }
+      }
+      
+      setDetailedGroupSummaries(detailedSummaries);
     } catch (error) {
       console.error('Error loading groups:', error);
     }
@@ -96,12 +113,90 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const getGroupSummary = (group: Group) => {
-    // Simuler un résumé de groupe (dans une vraie app, ceci viendrait de la base de données)
+    // Use real data from the group instead of random values
+    let totalAmount = 0;
+    let memberCount = group.member_count || 0;
+    let expenseCount = group.expense_count || 0;
+
+    // Calculate total amount from expenses_by_currency
+    if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency) && group.expenses_by_currency.length > 0) {
+      totalAmount = group.expenses_by_currency.reduce((sum, expense) => {
+        return sum + (expense.total_amount || 0);
+      }, 0);
+    }
+
+    // If expenses_by_currency is empty but we have expense_count, try to fetch individual expenses
+    if (totalAmount === 0 && expenseCount > 0) {
+      // For now, use a fallback calculation based on expense count
+      // In a real implementation, you would fetch individual expenses here
+      totalAmount = expenseCount * 25; // Fallback: assume average $25 per expense
+    }
+
     return {
-      expenseCount: Math.floor(Math.random() * 5) + 1,
-      totalAmount: Math.random() * 100 + 10,
-      memberCount: group.member_count || 1
+      expenseCount,
+      totalAmount,
+      memberCount
     };
+  };
+
+  // Enhanced function to get detailed group summary with individual expenses
+  const getDetailedGroupSummary = async (group: Group) => {
+    try {
+      let totalAmount = 0;
+      let memberCount = group.member_count || 0;
+      let expenseCount = group.expense_count || 0;
+
+      // First try to use expenses_by_currency data
+      if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency) && group.expenses_by_currency.length > 0) {
+        totalAmount = group.expenses_by_currency.reduce((sum, expense) => {
+          return sum + (expense.total_amount || 0);
+        }, 0);
+      }
+
+      // If no expenses_by_currency data but we have expense_count, fetch individual expenses
+      if (totalAmount === 0 && expenseCount > 0) {
+        try {
+          const { firebaseDataService } = await import('../../services/firebaseDataService');
+          const individualExpenses = await firebaseDataService.expense.getGroupExpenses(group.id.toString());
+          
+          if (individualExpenses.length > 0) {
+            // Calculate total from individual expenses
+            const currencyTotals: Record<string, number> = {};
+            
+            individualExpenses.forEach(expense => {
+              const currency = expense.currency || 'SOL';
+              const amount = expense.amount || 0;
+              
+              if (!currencyTotals[currency]) {
+                currencyTotals[currency] = 0;
+              }
+              currencyTotals[currency] += amount;
+            });
+            
+            // Convert to USD for display
+            totalAmount = Object.entries(currencyTotals).reduce((sum, [currency, total]) => {
+              const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
+              return sum + (total * rate);
+            }, 0);
+            
+            console.log(`🔧 TransactionHistory: Calculated total from individual expenses for group "${group.name}": $${(totalAmount || 0).toFixed(2)}`);
+          }
+        } catch (error) {
+          console.error(`Error fetching individual expenses for group ${group.id}:`, error);
+          // Fallback to expense count calculation
+          totalAmount = expenseCount * 25;
+        }
+      }
+
+      return {
+        expenseCount,
+        totalAmount,
+        memberCount
+      };
+    } catch (error) {
+      console.error(`Error getting detailed group summary for ${group.id}:`, error);
+      return getGroupSummary(group); // Fallback to basic summary
+    }
   };
 
   const getTransactionIcon = (transaction: Transaction) => {
@@ -159,28 +254,212 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
     };
   };
 
-  const renderTransactionItem = (transaction: Transaction) => {
-    const transactionTime = new Date(transaction.created_at).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
+  // Create unified transaction list that includes both real transactions and group transactions
+  const createUnifiedTransactionList = useCallback(async () => {
+    const unifiedTransactions: Array<{
+      id: string;
+      type: 'send' | 'receive' | 'deposit' | 'withdraw';
+      amount: number;
+      currency: string;
+      title: string;
+      source: string;
+      time: string;
+      isRealTransaction: boolean;
+      originalTransaction?: Transaction;
+      originalGroup?: Group;
+    }> = [];
+
+    // Add real transactions from Firebase
+    transactions.forEach(transaction => {
+      unifiedTransactions.push({
+        id: transaction.id,
+        type: transaction.type,
+        amount: transaction.amount,
+        currency: transaction.currency,
+        title: getTransactionTitle(transaction),
+        source: getTransactionSource(transaction),
+        time: new Date(transaction.created_at).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }),
+        isRealTransaction: true,
+        originalTransaction: transaction
+      });
     });
 
-    const { amount, color } = getTransactionAmount(transaction);
+    // Add ALL individual expenses from ALL groups
+    for (const group of groups) {
+      try {
+        // Get individual expenses for this group
+        let individualExpenses: any[] = [];
+        try {
+          const { firebaseDataService } = await import('../../services/firebaseDataService');
+          individualExpenses = await firebaseDataService.expense.getGroupExpenses(group.id.toString());
+          
+          // Add group info to each expense
+          const expensesWithGroupInfo = individualExpenses.map(expense => ({
+            ...expense,
+            groupName: group.name,
+            groupId: group.id,
+            groupCategory: group.category,
+            groupColor: group.color
+          }));
+          
+          // Add all expenses from this group to unified transactions
+          for (const expense of expensesWithGroupInfo) {
+            const expenseTime = new Date(expense.created_at).toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true
+            });
+
+            // Get the actual user name who paid this expense
+            let payerName = 'Member';
+            if (String(expense.paid_by) === String(currentUser?.id)) {
+              payerName = 'You';
+            } else if (expense.paid_by_name) {
+              payerName = expense.paid_by_name;
+            } else {
+              // Try to get user name from group members or contacts
+              try {
+                const { firebaseDataService } = await import('../../services/firebaseDataService');
+                const groupMembers = await firebaseDataService.group.getGroupMembers(expense.groupId.toString());
+                const payerMember = groupMembers.find(member => String(member.id) === String(expense.paid_by));
+                if (payerMember) {
+                  payerName = payerMember.name || payerMember.email?.split('@')[0] || 'Member';
+                }
+              } catch (error) {
+                console.error(`Error fetching payer details for expense ${expense.id}:`, error);
+              }
+            }
+
+            // Determine if current user paid this expense
+            const isCurrentUserPaid = String(expense.paid_by) === String(currentUser?.id);
+            const transactionType = isCurrentUserPaid ? 'send' : 'receive';
+            
+            // Use "add an expense" for group expenses, "paid" for actual payments
+            const actionText = 'add an expense';
+            const transactionTitle = isCurrentUserPaid 
+              ? `You ${actionText} ${expense.description || 'expense'}`
+              : `${payerName} ${actionText} ${expense.description || 'expense'}`;
+            
+            const transactionSource = `${expense.groupName} • ${expense.currency || 'USDC'}`;
+
+            unifiedTransactions.push({
+              id: `expense_${expense.groupId}_${expense.id}`,
+              type: transactionType,
+              amount: expense.amount || 0,
+              currency: expense.currency || 'USDC',
+              title: transactionTitle,
+              source: transactionSource,
+              time: expenseTime,
+              isRealTransaction: false,
+              originalGroup: group
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching individual expenses for group ${group.id}:`, error);
+        }
+      } catch (error) {
+        console.error(`Error creating unified transaction for group ${group.id}:`, error);
+      }
+    }
+
+    // Sort by time (most recent first)
+    unifiedTransactions.sort((a, b) => {
+      const timeA = new Date(a.isRealTransaction ? a.originalTransaction!.created_at : a.originalGroup!.updated_at || a.originalGroup!.created_at).getTime();
+      const timeB = new Date(b.isRealTransaction ? b.originalTransaction!.created_at : b.originalGroup!.updated_at || b.originalGroup!.created_at).getTime();
+      return timeB - timeA;
+    });
+
+    return unifiedTransactions;
+  }, [transactions, groups, detailedGroupSummaries]);
+
+  // Filter transactions based on active tab
+  const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
+  const [loadingFilteredTransactions, setLoadingFilteredTransactions] = useState(true);
+
+  // Load filtered transactions when dependencies change
+  useEffect(() => {
+    const loadFilteredTransactions = async () => {
+      setLoadingFilteredTransactions(true);
+      try {
+        const unifiedTransactions = await createUnifiedTransactionList();
+        
+        let filtered = unifiedTransactions;
+        if (activeTab === 'income') {
+          filtered = unifiedTransactions.filter(transaction => 
+            transaction.type === 'receive' || transaction.type === 'deposit'
+          );
+        } else if (activeTab === 'expenses') {
+          filtered = unifiedTransactions.filter(transaction => 
+            transaction.type === 'send' || transaction.type === 'withdraw'
+          );
+        }
+        
+        setFilteredTransactions(filtered);
+      } catch (error) {
+        console.error('Error loading filtered transactions:', error);
+        setFilteredTransactions([]);
+      } finally {
+        setLoadingFilteredTransactions(false);
+      }
+    };
+
+    loadFilteredTransactions();
+  }, [createUnifiedTransactionList, activeTab]);
+  console.log('🔍 Filtered transactions:', filteredTransactions.length, 'Active tab:', activeTab);
+  console.log('👥 Groups:', groups.length);
+
+  // Render unified transaction item
+  const renderUnifiedTransactionItem = (transaction: any) => {
     const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
+    const { amount } = getTransactionAmount({
+      type: transaction.type,
+      amount: transaction.amount,
+      currency: transaction.currency
+    } as Transaction);
 
     return (
       <TouchableOpacity
         key={transaction.id}
         style={styles.transactionItem}
-        onPress={() => handleTransactionPress(transaction)}
+        onPress={() => {
+          if (transaction.isRealTransaction) {
+            handleTransactionPress(transaction.originalTransaction!);
+          } else {
+            // Create mock transaction for group
+            const mockTransaction: Transaction = {
+              id: transaction.id,
+              type: transaction.type,
+              amount: transaction.amount,
+              currency: transaction.currency,
+              from_user: currentUser?.id?.toString() || '',
+              to_user: transaction.originalGroup?.name || '',
+              from_wallet: currentUser?.wallet_address || '',
+              to_wallet: transaction.originalGroup?.name || '',
+              tx_hash: `group_${transaction.originalGroup?.id}_${Date.now()}`,
+              note: transaction.source,
+              created_at: transaction.originalGroup?.updated_at || transaction.originalGroup?.created_at || new Date().toISOString(),
+              updated_at: transaction.originalGroup?.updated_at || transaction.originalGroup?.created_at || new Date().toISOString(),
+              status: 'completed'
+            };
+            setSelectedTransaction(mockTransaction);
+            setModalVisible(true);
+          }
+        }}
       >
         <View style={[
           styles.transactionIconContainer,
           isIncome && styles.transactionIconContainerIncome
         ]}>
           <Image
-            source={getTransactionIcon(transaction)}
+            source={getTransactionIcon({
+              type: transaction.type,
+              amount: transaction.amount,
+              currency: transaction.currency
+            } as Transaction)}
             style={[
               styles.transactionIcon,
               isIncome && styles.transactionIconIncome
@@ -189,10 +468,10 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
         </View>
         <View style={styles.transactionContent}>
           <Text style={styles.transactionTitle}>
-            {getTransactionTitle(transaction)}
+            {transaction.title}
           </Text>
           <Text style={styles.transactionSource}>
-            {getTransactionSource(transaction)}
+            {transaction.source} • {transaction.time}
           </Text>
         </View>
         <View style={styles.transactionAmountContainer}>
@@ -200,91 +479,14 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
             styles.transactionAmount,
             isIncome ? styles.transactionAmountIncome : styles.transactionAmountExpense
           ]}>
-            {amount}
+            {isIncome ? '+' : '-'}{amount}
           </Text>
           <Text style={styles.transactionTime}>
-            {transactionTime}
+            {transaction.time}
           </Text>
         </View>
       </TouchableOpacity>
     );
-  };
-
-  const renderGroupTransaction = (group: Group) => {
-    try {
-      const summary = getGroupSummary(group);
-      const recentDate = group.updated_at || group.created_at || new Date().toISOString();
-      
-      const transactionType = summary.expenseCount > 0 ? 'send' : 'request';
-      const transactionTitle = summary.expenseCount > 0 ? `Send to ${group.name}` : `Request to ${group.name}`;
-      const transactionNote = summary.expenseCount > 0 ? `Group expenses` : `Group activity`;
-      const transactionTime = new Date(recentDate).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      });
-
-      return (
-        <TouchableOpacity
-          key={group.id}
-          style={styles.requestItemNew}
-          onPress={() => {
-            // Open transaction modal for group details without navigation
-            const mockTransaction: Transaction = {
-              id: group.id.toString(),
-              type: transactionType === 'send' ? 'send' : 'receive',
-              amount: summary.totalAmount || 0,
-              currency: 'USDC',
-              from_user: currentUser?.id?.toString() || '',
-              to_user: group.name,
-              from_wallet: currentUser?.wallet_address || '',
-              to_wallet: group.name,
-              tx_hash: `group_${group.id}_${Date.now()}`,
-              note: transactionNote,
-              created_at: recentDate,
-              updated_at: recentDate,
-              status: 'completed'
-            };
-            setSelectedTransaction(mockTransaction);
-            setModalVisible(true);
-          }}
-        >
-          <View style={styles.transactionAvatarNew}>
-            <Image
-              source={
-                transactionType === 'send' 
-                  ? require('../../../assets/icon-send.png')
-                  : require('../../../assets/icon-receive.png')
-              }
-              style={styles.transactionIconNew}
-            />
-          </View>
-          <View style={styles.requestContent}>
-            <Text style={styles.requestMessageWithAmount}>
-              <Text style={styles.requestSenderName}>{transactionTitle}</Text>
-            </Text>
-            <Text style={styles.requestSource}>
-              {transactionNote} • {transactionTime}
-            </Text>
-          </View>
-          <Text style={styles.requestAmountGreen}>
-            {(summary.totalAmount || 0).toFixed(2)} USDC
-          </Text>
-        </TouchableOpacity>
-      );
-    } catch (error) {
-      console.error(`Error rendering transaction for group ${group.id}:`, error);
-      return (
-        <View key={group.id} style={styles.requestItemNew}>
-          <View style={styles.transactionAvatarNew}>
-            <Text style={{ color: colors.white, fontSize: 16, fontWeight: 'bold' }}>E</Text>
-          </View>
-          <View style={styles.requestContent}>
-            <Text style={styles.requestSenderName}>Error loading transaction</Text>
-          </View>
-        </View>
-      );
-    }
   };
 
   const renderEmptyState = () => (
@@ -307,24 +509,6 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
       </Text>
     </TouchableOpacity>
   );
-
-  // Filtrer les transactions selon le tab actif
-  const getFilteredTransactions = () => {
-    if (activeTab === 'all') return transactions;
-    
-    return transactions.filter(transaction => {
-      if (activeTab === 'income') {
-        return transaction.type === 'receive' || transaction.type === 'deposit';
-      } else if (activeTab === 'expenses') {
-        return transaction.type === 'send' || transaction.type === 'withdraw';
-      }
-      return true;
-    });
-  };
-
-  const filteredTransactions = getFilteredTransactions();
-  console.log('🔍 Filtered transactions:', filteredTransactions.length, 'Active tab:', activeTab);
-  console.log('👥 Groups:', groups.length);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -359,18 +543,14 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {loading ? (
+        {loading || loadingFilteredTransactions ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primaryGreen} />
             <Text style={styles.loadingText}>Loading transactions...</Text>
           </View>
         ) : filteredTransactions.length > 0 ? (
           <View style={styles.transactionsList}>
-            {filteredTransactions.map(renderTransactionItem)}
-          </View>
-        ) : groups.length > 0 ? (
-          <View style={styles.transactionsList}>
-            {groups.map(renderGroupTransaction)}
+            {filteredTransactions.map(renderUnifiedTransactionItem)}
           </View>
         ) : (
           renderEmptyState()
@@ -382,6 +562,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
         visible={modalVisible}
         transaction={selectedTransaction}
         onClose={handleCloseModal}
+        navigation={navigation}
       />
     </SafeAreaView>
   );

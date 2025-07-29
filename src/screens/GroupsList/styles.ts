@@ -59,6 +59,23 @@ export const styles = StyleSheet.create({
   prominentGroupsContainer: {
     marginBottom: spacing.lg,
   },
+  sectionTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textLight,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.screenPadding,
+  },
+  sectionSubtitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.normal,
+    color: colors.white70,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.screenPadding,
+  },
+  allGroupsContainer: {
+    marginBottom: spacing.md,
+  },
 
   // Grid layout for prominent groups (horizontal scroll)
   prominentGroupsGrid: {
@@ -315,11 +332,35 @@ export const styles = StyleSheet.create({
   groupInfo: {
     flex: 1,
   },
+  groupInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
   groupName: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
     marginBottom: spacing.xs,
+  },
+  ownerLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.green,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: spacing.xs,
+  },
+  ownerLabelIcon: {
+    width: 12,
+    height: 12,
+  },
+  ownerLabelText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.black,
   },
 
   // Member status row
@@ -537,6 +578,7 @@ export const styles = StyleSheet.create({
   groupBalance: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
+    color: colors.white70,
     marginTop: spacing.xs,
   },
   positiveBalance: {

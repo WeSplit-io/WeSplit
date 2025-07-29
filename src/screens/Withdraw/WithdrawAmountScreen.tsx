@@ -1,20 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, TextInput, SafeAreaView, Alert, ScrollView, Image } from 'react-native';
-import Icon from '../../components/Icon';
+import { View, Text, TouchableOpacity, TextInput, SafeAreaView, ScrollView, Alert, Image } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
+import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import { spacing } from '../../theme/spacing';
 
 const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const { state } = useApp();
   const { currentUser } = state;
   const { 
-    isConnected, 
-    address, 
-    balance, 
-    isLoading: walletLoading,
-    connectWallet
+    // External wallet state (for destination)
+    isConnected: externalWalletConnected,
+    address: externalWalletAddress, 
+    // App wallet state (for sending)
+    appWalletAddress,
+    appWalletBalance,
+    appWalletConnected,
+    ensureAppWallet,
+    getAppWalletBalance,
+    isLoading: walletLoading
   } = useWallet();
 
   const amountInputRef = useRef<TextInput>(null);
@@ -25,15 +32,17 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Check wallet connection on mount
   useEffect(() => {
-    if (!isConnected && !__DEV__) {
+    if (!appWalletConnected && !__DEV__) {
       Alert.alert(
-        'Wallet Not Connected',
-        'Please connect your external wallet to withdraw funds.',
+        'App Wallet Not Connected',
+        'Please connect your app wallet to withdraw funds.',
         [
           {
             text: 'Connect Wallet',
             onPress: () => {
-              connectWallet();
+              if (currentUser?.id) {
+                ensureAppWallet(currentUser.id.toString());
+              }
             }
           },
           {
@@ -44,27 +53,43 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
         ]
       );
     }
-  }, [isConnected, navigation]);
+  }, [appWalletConnected, navigation]);
 
   const handlePercentagePress = (percentage: number) => {
-    if (balance !== null) {
-      const calculatedAmount = (balance * percentage) / 100;
+    if (appWalletBalance !== null) {
+      const calculatedAmount = (appWalletBalance * percentage) / 100;
       setAmount(calculatedAmount.toFixed(2));
     }
   };
 
   const handleMaxPress = () => {
-    if (balance !== null) {
-      setAmount(balance.toFixed(2));
+    if (appWalletBalance !== null) {
+      setAmount(appWalletBalance.toFixed(2));
     }
   };
 
   const handleSendToConnectedWallet = () => {
-    if (address) {
-      setWalletAddress(address);
+    if (externalWalletAddress) {
+      setWalletAddress(externalWalletAddress);
     } else {
-      Alert.alert('Error', 'No connected wallet address available');
+      Alert.alert('Error', 'No external wallet connected. Please connect your external wallet to receive the withdrawal.');
     }
+  };
+
+  const handleExternalWalletConnectionSuccess = (result: any) => {
+    console.log('🔐 WithdrawAmount: External wallet connected successfully:', result);
+    
+    Alert.alert(
+      'External Wallet Connected',
+      `Successfully connected to your external wallet!\n\nYou can now withdraw funds to your external wallet.`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleConnectExternalWallet = () => {
+    navigation.navigate('ExternalWalletConnection', {
+      onSuccess: handleExternalWalletConnectionSuccess
+    });
   };
 
   // Function to format wallet address for display
@@ -86,7 +111,7 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
       return;
     }
 
-    if (balance !== null && numAmount > balance) {
+    if (appWalletBalance !== null && numAmount > appWalletBalance) {
       Alert.alert('Insufficient Balance', 'You do not have enough balance to withdraw this amount');
       return;
     }
@@ -124,19 +149,26 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.placeholder} />
       </View>
 
-      <View style={styles.mainContainer}>
-        <ScrollView 
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+      <ScrollView 
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.xxl,
+          flexGrow: 1,
+          minHeight: '100%'
+        }}
+        showsVerticalScrollIndicator={true}
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bounces={true}
+        alwaysBounceVertical={true}
+      >
           {/* Wallet Connection Status */}
-          {!isConnected && (
+          {!appWalletConnected && (
             <View style={styles.alertContainer}>
               <Icon name="alert-triangle" size={20} color="#FFF" />
               <Text style={styles.alertText}>
-                {__DEV__ ? 'Wallet not connected (DEV MODE - can still test)' : 'Wallet not connected'}
+                {__DEV__ ? 'App Wallet not connected (DEV MODE - can still test)' : 'App Wallet not connected'}
               </Text>
             </View>
           )}
@@ -182,7 +214,7 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
               />
             </TouchableOpacity>
             <Text style={styles.availableBalance}>
-              Available in your balance: {balance?.toFixed(2) || '0.00'} USDC
+              Available in your app wallet: {appWalletBalance?.toFixed(2) || '0.00'} USDC
             </Text>
             
             {/* Quick Amount Buttons */}
@@ -232,16 +264,28 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
             </View>
             
             {/* Send to Connected Wallet Button */}
-            {isConnected && address && (
-              <TouchableOpacity 
-                style={styles.sendToConnectedWalletButton}
-                onPress={handleSendToConnectedWallet}
-              >
-                <Icon name="send" size={16} color={colors.black} style={{ marginRight: 8 }} />
-                <Text style={styles.sendToConnectedWalletText}>
-                  Send to Connected Wallet ({formatWalletAddress(address)})
-                </Text>
-              </TouchableOpacity>
+            {appWalletConnected && appWalletAddress && (
+              externalWalletConnected && externalWalletAddress ? (
+                <TouchableOpacity 
+                  style={styles.sendToConnectedWalletButton}
+                  onPress={handleSendToConnectedWallet}
+                >
+                  <Icon name="send" size={16} color={colors.black} style={{ marginRight: 8 }} />
+                  <Text style={styles.sendToConnectedWalletText}>
+                    Send to External Wallet ({formatWalletAddress(externalWalletAddress)})
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.sendToConnectedWalletButton}
+                  onPress={handleConnectExternalWallet}
+                >
+                  <Icon name="link" size={16} color={colors.black} style={{ marginRight: 8 }} />
+                  <Text style={styles.sendToConnectedWalletText}>
+                    Connect External Wallet
+                  </Text>
+                </TouchableOpacity>
+              )
             )}
           </View>
 
@@ -323,6 +367,9 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
               </View>
             </View>
           )}
+
+          {/* Spacer to ensure scrolling works */}
+          <View style={{ height: 100 }} />
         </ScrollView>
 
         {/* Continue Button - Fixed at bottom */}
@@ -333,7 +380,7 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
               isAmountValid && styles.continueButtonActive,
             ]}
             onPress={handleContinue}
-            disabled={!isAmountValid || (!isConnected && !__DEV__)}
+            disabled={!isAmountValid || (!appWalletConnected && !__DEV__)}
           >
             <Text style={[
               styles.continueButtonText,
@@ -343,9 +390,8 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
-    </SafeAreaView>
-  );
+      </SafeAreaView>
+    );
 };
 
 export default WithdrawAmountScreen; 

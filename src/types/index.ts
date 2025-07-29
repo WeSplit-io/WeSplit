@@ -160,7 +160,7 @@ export interface Notification {
   id: string | number; // Support both SQLite (number) and Firebase (string) IDs
   user_id?: number | string; // Legacy field for SQLite compatibility
   userId?: string; // Firebase field
-  type: 'expense_added' | 'payment_reminder' | 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'general' | 'group_invite';
+  type: 'expense_added' | 'payment_reminder' | 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'general' | 'group_invite' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification';
   title: string;
   message: string;
   data?: any;
@@ -224,7 +224,7 @@ export interface AppState {
   // User state
   currentUser: User | null;
   isAuthenticated: boolean;
-  authMethod: 'wallet' | 'email' | 'guest' | null;
+  authMethod: 'wallet' | 'email' | 'guest' | 'social' | null;
   
   // Data state
   groups: GroupWithDetails[];
@@ -246,7 +246,7 @@ export interface AppState {
 
 export type AppAction =
   | { type: 'SET_CURRENT_USER'; payload: User }
-  | { type: 'AUTHENTICATE_USER'; payload: { user: User; method: 'wallet' | 'email' | 'guest' } }
+  | { type: 'AUTHENTICATE_USER'; payload: { user: User; method: 'wallet' | 'email' | 'guest' | 'social' } }
   | { type: 'LOGOUT_USER' }
   | { type: 'SET_GROUPS'; payload: GroupWithDetails[] }
   | { type: 'ADD_GROUP'; payload: GroupWithDetails }

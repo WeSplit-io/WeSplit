@@ -14,7 +14,7 @@ import { styles } from './styles';
 
 const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId } = route.params;
-  const { state, getGroupBalances, updateGroup, deleteGroup, leaveGroup } = useApp();
+  const { state, getGroupBalances, updateGroup, deleteGroup, leaveGroup, startGroupListener, stopGroupListener } = useApp();
   const { currentUser } = state;
 
   // Use the efficient hook that provides cached data and smart loading
@@ -31,8 +31,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   const [inviteLink, setInviteLink] = useState<string>('');
   const [updating, setUpdating] = useState(false);
   const [editGroupName, setEditGroupName] = useState('');
-  const [editGroupCategory, setEditGroupCategory] = useState('');
-  const [editGroupIcon, setEditGroupIcon] = useState('people');
+  const [editGroupCategory, setEditGroupCategory] = useState('trip');
   const [editGroupColor, setEditGroupColor] = useState('#A5EA15');
 
   // State for real members data
@@ -43,14 +42,43 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     groupId,
     groupExists: !!group,
     groupName: group?.name,
+    groupCategory: group?.category,
+    groupColor: group?.color,
+    groupIcon: group?.icon,
     groupMembers: group?.members?.length || 0,
     realMembersLength: realMembers.length,
     loading,
     error
   });
 
+  // Debug logging for real-time updates
+  useEffect(() => {
+    if (group) {
+      console.log('🔄 GroupSettingsScreen: Group data updated via real-time listener:', {
+        name: group.name,
+        category: group.category,
+        color: group.color,
+        icon: group.icon
+      });
+    }
+  }, [group?.name, group?.category, group?.color, group?.icon]);
+
   // Check if current user is admin (group creator)
   const isAdmin = group?.created_by === currentUser?.id;
+
+  // Start group listener when component mounts
+  useEffect(() => {
+    if (groupId) {
+      console.log('🔄 GroupSettingsScreen: Starting group listener for:', groupId);
+      startGroupListener(groupId.toString());
+      
+      // Cleanup function to stop listener when component unmounts
+      return () => {
+        console.log('🔄 GroupSettingsScreen: Stopping group listener for:', groupId);
+        stopGroupListener(groupId.toString());
+      };
+    }
+  }, [groupId, startGroupListener, stopGroupListener]);
 
   // Load real member data from backend
   useEffect(() => {
@@ -98,17 +126,27 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     generateInvite();
   }, [group?.id, currentUser?.id, group?.name]);
 
-  // Predefined icon and color options
-  const iconOptions = [
-    'people', 'restaurant', 'car', 'home', 'airplane', 'business', 
-    'school', 'fitness-center', 'local-movies', 'shopping-cart', 
-    'beach-access', 'pets', 'sports-soccer', 'music-note'
+  // Category options matching CreateGroupScreen
+  const CATEGORIES = [
+    { id: 'trip', imageKey: 'trip' },
+    { id: 'food', imageKey: 'food' },
+    { id: 'home', imageKey: 'home' },
+    { id: 'event', imageKey: 'event' },
+    { id: 'rocket', imageKey: 'rocket' }
   ];
 
-  const colorOptions = [
-    '#A5EA15', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', 
-    'FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE',
-    '#85C1E9', '#F8C471', '#82E0AA', '#F1948A'
+  // Image mapping for static require calls
+  const CATEGORY_IMAGES: { [key: string]: any } = {
+    trip: require('../../../assets/trip-icon-black.png'),
+    food: require('../../../assets/food-icon-black.png'),
+    home: require('../../../assets/house-icon-black.png'),
+    event: require('../../../assets/event-icon-black.png'),
+    rocket: require('../../../assets/rocket-icon-black.png'),
+  };
+
+  // Color options matching CreateGroupScreen - all green shades
+  const COLORS = [
+    '#A5EA15', '#4CAF50', '#66BB6A', '#C0F05B', '#D3F48A', '#E4F8B8'
   ];
 
 
@@ -265,8 +303,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     }
 
     setEditGroupName(group?.name || '');
-    setEditGroupCategory(group?.category || '');
-    setEditGroupIcon(group?.icon || 'people');
+    setEditGroupCategory(group?.category || 'trip');
     setEditGroupColor(group?.color || '#A5EA15');
     setShowEditModal(true);
   };
@@ -290,15 +327,28 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     try {
       setUpdating(true);
 
-      await updateGroup(groupId, {
+      const updateData = {
         name: editGroupName.trim(),
-        category: editGroupCategory.trim() || 'general',
-        icon: editGroupIcon,
+        category: editGroupCategory.trim() || 'trip',
+        icon: editGroupCategory, // Use category as icon
         color: editGroupColor
-      });
+      };
 
-      // Refresh group data to get the latest updates
-      await refresh();
+      console.log('🔄 GroupSettingsScreen: Updating group with data:', updateData);
+
+      await updateGroup(groupId, updateData);
+
+      console.log('🔄 GroupSettingsScreen: Group updated successfully, real-time listener will update state...');
+
+      // The real-time listener will automatically update the group data
+      // No need to manually refresh since the listener will handle it
+
+      console.log('🔄 GroupSettingsScreen: Group data refreshed, new group data:', {
+        name: group?.name,
+        category: group?.category,
+        color: group?.color,
+        icon: group?.icon
+      });
 
       setShowEditModal(false);
       Alert.alert('Success', 'Group updated successfully');
@@ -313,8 +363,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   const handleCancelEdit = () => {
     setShowEditModal(false);
     setEditGroupName('');
-    setEditGroupCategory('');
-    setEditGroupIcon('people');
+    setEditGroupCategory('trip');
     setEditGroupColor('#A5EA15');
   };
 
@@ -530,83 +579,67 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
               </TouchableOpacity>
             </View>
             
-            {/* Group Name Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Group Name</Text>
-              <TextInput
-                style={styles.textInput}
-                value={editGroupName}
-                onChangeText={setEditGroupName}
-                placeholder="Enter group name"
-                placeholderTextColor="#A89B9B"
-                maxLength={50}
-                editable={!updating}
-              />
-            </View>
-            
-            {/* Category Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Category</Text>
-              <TextInput
-                style={styles.textInput}
-                value={editGroupCategory}
-                onChangeText={setEditGroupCategory}
-                placeholder="Enter category (e.g., travel, food, general)"
-                placeholderTextColor="#A89B9B"
-                maxLength={30}
-                editable={!updating}
-              />
-            </View>
-            
-            {/* Icon Selection */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Icon</Text>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                style={styles.iconScrollContainer}
-                contentContainerStyle={styles.iconScrollContent}
-              >
-                {iconOptions.map((iconName) => (
-                  <TouchableOpacity
-                    key={iconName}
-                    style={[
-                      styles.iconOption,
-                      { backgroundColor: editGroupColor },
-                      editGroupIcon === iconName && styles.selectedIconOption
-                    ]}
-                    onPress={() => setEditGroupIcon(iconName)}
-                    disabled={updating}
-                  >
-                    <Icon name={iconName} size={20} color="#212121" />
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-            
-            {/* Color Selection */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Color</Text>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                style={styles.colorScrollContainer}
-                contentContainerStyle={styles.colorScrollContent}
-              >
-                {colorOptions.map((colorValue) => (
-                  <TouchableOpacity
-                    key={colorValue}
-                    style={[
-                      styles.colorOption,
-                      { backgroundColor: colorValue },
-                      editGroupColor === colorValue && styles.selectedColorOption
-                    ]}
-                    onPress={() => setEditGroupColor(colorValue)}
-                    disabled={updating}
-                  />
-                ))}
-              </ScrollView>
-            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Group Name Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Group Name</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editGroupName}
+                  onChangeText={setEditGroupName}
+                  placeholder="Enter group name"
+                  placeholderTextColor="#A89B9B"
+                  maxLength={50}
+                  editable={!updating}
+                />
+              </View>
+              
+              {/* Category Selection */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Category</Text>
+                <View style={styles.categoryRow}>
+                  {CATEGORIES.map((category) => (
+                    <TouchableOpacity
+                      key={category.id}
+                      style={[
+                        styles.categoryOption,
+                        editGroupCategory === category.id && {
+                          backgroundColor: editGroupColor,
+                          borderWidth: 1,
+                          borderColor: colors.green,
+                        }
+                      ]}
+                      onPress={() => setEditGroupCategory(category.id)}
+                      disabled={updating}
+                    >
+                      <Image
+                        source={CATEGORY_IMAGES[category.imageKey]}
+                        style={styles.categoryImage}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              
+              {/* Color Selection */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Color</Text>
+                <View style={styles.colorRow}>
+                  {COLORS.map((color) => (
+                    <TouchableOpacity
+                      key={color}
+                      style={[
+                        styles.colorOption,
+                        { backgroundColor: color },
+                        editGroupColor === color && styles.colorSelected
+                      ]}
+                      onPress={() => setEditGroupColor(color)}
+                      disabled={updating}
+                    />
+                  ))}
+                </View>
+              </View>
+            </ScrollView>
             
             {/* Action Buttons */}
             <View style={styles.editModalActions}>

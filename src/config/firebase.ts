@@ -11,7 +11,11 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithCredential,
+  OAuthProvider,
+  TwitterAuthProvider
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -28,6 +32,7 @@ import {
 } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { initializeFirebaseAuth } from './firebasePersistence';
 
 // Get environment variables from Expo Constants
 const getEnvVar = (key: string): string => {
@@ -86,8 +91,8 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Authentication and get a reference to the service
-export const auth = getAuth(app);
+// Initialize Firebase Authentication with persistence
+export const auth = initializeFirebaseAuth(app);
 
 // Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app);
@@ -196,6 +201,47 @@ export const firebaseAuth = {
   // Check if email is verified
   isEmailVerified(user: FirebaseUser): boolean {
     return user.emailVerified;
+  },
+
+  // Social Authentication Methods
+  // Google Sign In
+  async signInWithGoogle(idToken: string) {
+    try {
+      const credential = GoogleAuthProvider.credential(idToken);
+      const result = await signInWithCredential(auth, credential);
+      return result.user;
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      throw error;
+    }
+  },
+
+  // Apple Sign In
+  async signInWithApple(idToken: string, nonce: string) {
+    try {
+      const provider = new OAuthProvider('apple.com');
+      const credential = provider.credential({
+        idToken,
+        rawNonce: nonce,
+      });
+      const result = await signInWithCredential(auth, credential);
+      return result.user;
+    } catch (error) {
+      console.error('Error signing in with Apple:', error);
+      throw error;
+    }
+  },
+
+  // Twitter Sign In
+  async signInWithTwitter(accessToken: string, secret: string) {
+    try {
+      const credential = TwitterAuthProvider.credential(accessToken, secret);
+      const result = await signInWithCredential(auth, credential);
+      return result.user;
+    } catch (error) {
+      console.error('Error signing in with Twitter:', error);
+      throw error;
+    }
   },
 
   // Listen to auth state changes

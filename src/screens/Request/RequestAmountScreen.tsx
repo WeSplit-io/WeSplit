@@ -4,9 +4,14 @@ import { View, Text, TouchableOpacity, TextInput, SafeAreaView, Alert, ScrollVie
 import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import { useApp } from '../../context/AppContext';
+import { firebaseDataService } from '../../services/firebaseDataService';
+import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
 
 const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, groupId } = route.params || {};
+  const { state } = useApp();
+  const { currentUser } = state;
   const [amount, setAmount] = useState('0');
   const [showAddNote, setShowAddNote] = useState(false);
   const [note, setNote] = useState('');
@@ -48,7 +53,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
     setAmount(cleaned || '0');
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
@@ -60,14 +65,52 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
       return;
     }
 
-    // Navigate directly to success screen (backend will handle the request creation)
+    try {
+      console.log('💰 RequestAmount: Creating payment request...', {
+        senderId: currentUser?.id,
+        recipientId: contact.id,
+        amount: numAmount,
+        description: note.trim(),
+        groupId
+      });
+
+      // Create the payment request using Firebase service
+      const paymentRequest = await createPaymentRequest(
+        currentUser?.id || '',
+        contact.id,
+        numAmount,
+        'USDC',
+        note.trim(),
+        groupId
+      );
+
+      console.log('✅ RequestAmount: Payment request created successfully:', paymentRequest);
+
+      // Navigate to success screen with the actual request data
     navigation.navigate('RequestSuccess', {
       contact,
       amount: numAmount,
       description: note.trim(),
       groupId,
-      requestId: `REQ_${Date.now()}`, // Temporary ID for UI
-    });
+        requestId: paymentRequest.id,
+        paymentRequest
+      });
+    } catch (error) {
+      console.error('❌ RequestAmount: Error creating payment request:', error);
+      
+      // More detailed error logging
+      if (error instanceof Error) {
+        console.error('❌ RequestAmount: Error details:', {
+          message: error.message,
+          stack: error.stack
+        });
+      }
+      
+      Alert.alert(
+        'Error', 
+        `Failed to create payment request: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
   };
 
   const formatWalletAddress = (address: string) => {

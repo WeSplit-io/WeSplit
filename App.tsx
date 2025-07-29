@@ -4,9 +4,13 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WalletProvider } from './src/context/WalletContext';
 import { AppProvider } from './src/context/AppContext';
+import { WalletLinkingProvider } from './src/context/WalletLinkingContext';
 import { Text, View } from 'react-native';
 import { styles } from './App.styles';
 import NavigationWrapper from './src/components/NavigationWrapper';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import { environmentValidator } from './src/services/environmentValidationService';
+import { logger } from './src/services/loggingService';
 
 // Import Firebase configuration
 import './src/config/firebase';
@@ -30,7 +34,7 @@ import AuthMethodsScreen from './src/screens/AuthMethods/AuthMethodsScreen';
 import VerificationScreen from './src/screens/Verification/VerificationScreen';
 import CreateProfileScreen from './src/screens/CreateProfile/CreateProfileScreen';
 import OnboardingScreen from './src/screens/Onboarding/OnboardingScreen';
-import EditExpenseScreen from './src/screens/EditExpense/EditExpenseScreen';
+
 import DepositScreen from './src/screens/Deposit/DepositScreen';
 import CryptoTransferScreen from './src/screens/Deposit/CryptoTransferScreen';
 import MoonPayWebViewScreen from './src/screens/Deposit/MoonPayWebViewScreen';
@@ -56,6 +60,7 @@ import SeedPhraseVerifyScreen from './src/screens/WalletManagement/SeedPhraseVer
 import { ContactsScreen } from './src/screens/Contacts';
 import ContactActionScreen from './src/screens/ContactAction/ContactActionScreen';
 import TransactionHistoryScreen from './src/screens/TransactionHistory/TransactionHistoryScreen';
+import ExternalWalletConnectionScreen from './src/screens/ExternalWalletConnection';
 
 
 const Stack = createStackNavigator();
@@ -68,7 +73,7 @@ const LoadingScreen = () => (
   </View>
 );
 
-if (__DEV__) { console.log('App.tsx loaded - initializing Firebase and Solana wallet system'); }
+// App.tsx loaded - initializing Firebase and Solana wallet system
 
 export default function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -77,25 +82,31 @@ export default function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        if (__DEV__) { console.log('Initializing app with Firebase and Solana wallet system...'); }
-        
+        // Validate environment configuration (non-blocking in development)
+        const configValid = environmentValidator.validateAll();
+        if (!configValid && process.env.NODE_ENV === 'production') {
+          throw new Error('Environment configuration validation failed');
+        }
+
         // Firebase is automatically initialized when the config file is imported
-        if (__DEV__) { console.log('Firebase initialized successfully'); }
         
         // Check Firebase configuration
         const firebaseCheck = checkFirebaseConfiguration();
-        if (__DEV__) { 
-          console.log('Firebase configuration check:', firebaseCheck.isConfigured ? '✅ PASSED' : '❌ FAILED');
-        }
         
         // Initialize Solana wallet system
-        if (__DEV__) { console.log('Solana wallet system initialized successfully'); }
+        logger.info('App initialized successfully', null, 'App');
         setIsInitialized(true);
       } catch (error) {
-        console.error('Failed to initialize app:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        setError(errorMessage);
-        setIsInitialized(true);
+        // In development, log as warning instead of error
+        if (process.env.NODE_ENV === 'development') {
+          logger.warn('App initialization warnings (non-blocking in development)', error, 'App');
+          setIsInitialized(true);
+        } else {
+          logger.error('Failed to initialize app', error, 'App');
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          setError(errorMessage);
+          setIsInitialized(true);
+        }
       }
     };
 
@@ -106,11 +117,11 @@ export default function App() {
   useEffect(() => {
     if (isInitialized) {
       // This will be set up in the NavigationContainer
-      if (__DEV__) { console.log('Deep link system ready'); }
+      // Deep link system ready
     }
   }, [isInitialized]);
 
-  if (__DEV__) { console.log('App component rendered, initialized:', isInitialized, 'error:', error); }
+  // App component rendered
 
   if (!isInitialized) {
     return <LoadingScreen />;
@@ -128,66 +139,71 @@ export default function App() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <WalletProvider>
-        <AppProvider>
-          <NavigationWrapper>
-            <Stack.Navigator 
-              initialRouteName="Splash"
-              screenOptions={{
-                headerShown: false,
-              }}
-            >
-              <Stack.Screen name="Splash" component={SplashScreen} /> 
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <WalletProvider>
+          <AppProvider>
+            <WalletLinkingProvider>
+              <NavigationWrapper>
+              <Stack.Navigator 
+                initialRouteName="Splash"
+                screenOptions={{
+                  headerShown: false,
+                }}
+              >
+                <Stack.Screen name="Splash" component={SplashScreen} /> 
 
 
-              <Stack.Screen name="GetStarted" component={GetStartedScreen} />
-              <Stack.Screen name="AuthMethods" component={AuthMethodsScreen} />
-              <Stack.Screen name="Verification" component={VerificationScreen} />
-              <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
-              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-              <Stack.Screen name="Dashboard" component={DashboardScreen} />
-              <Stack.Screen name="AddExpense" component={AddExpenseScreen} />
-              <Stack.Screen name="ExpenseSuccess" component={ExpenseSuccessScreen} />
-              <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
-              <Stack.Screen name="GroupCreated" component={GroupCreatedScreen} />
-              <Stack.Screen name="AddMembers" component={AddMembersScreen} />
-              <Stack.Screen name="Balance" component={BalanceScreen} />
-              <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
-              <Stack.Screen name="EditExpense" component={EditExpenseScreen} />
-              <Stack.Screen name="SettleUpModal" component={SettleUpModal} />
-              <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} />
-              <Stack.Screen name="Profile" component={ProfileScreen} />
-              <Stack.Screen name="Deposit" component={DepositScreen} />
-              <Stack.Screen name="CryptoTransfer" component={CryptoTransferScreen} />
-              <Stack.Screen name="MoonPayWebView" component={MoonPayWebViewScreen} />
-              <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
-              <Stack.Screen name="Premium" component={PremiumScreen} />
-              <Stack.Screen name="Notifications" component={NotificationsScreen} />
-              <Stack.Screen name="Language" component={LanguageScreen} />
-              <Stack.Screen name="Contacts" component={ContactsScreen} />
-              <Stack.Screen name="ContactAction" component={ContactActionScreen} />
-              <Stack.Screen name="Send" component={SendScreen} />
-              <Stack.Screen name="SendAmount" component={SendAmountScreen} />
-              <Stack.Screen name="SendConfirmation" component={SendConfirmationScreen} />
-              <Stack.Screen name="SendSuccess" component={SendSuccessScreen} />
-              <Stack.Screen name="RequestContacts" component={RequestContactsScreen} />
-              <Stack.Screen name="RequestAmount" component={RequestAmountScreen} />
-              <Stack.Screen name="RequestConfirmation" component={RequestConfirmationScreen} />
-              <Stack.Screen name="RequestSuccess" component={RequestSuccessScreen} />
-              <Stack.Screen name="GroupsList" component={GroupsListScreen} />
-              <Stack.Screen name="WithdrawAmount" component={WithdrawAmountScreen} />
-              <Stack.Screen name="WithdrawConfirmation" component={WithdrawConfirmationScreen} />
-              <Stack.Screen name="WithdrawSuccess" component={WithdrawSuccessScreen} />
-              <Stack.Screen name="WalletManagement" component={WalletManagementScreen} />
-              <Stack.Screen name="SeedPhraseView" component={SeedPhraseViewScreen} />
-              <Stack.Screen name="SeedPhraseVerify" component={SeedPhraseVerifyScreen} />
-              <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
-            </Stack.Navigator>
-          </NavigationWrapper>
-        </AppProvider>
-      </WalletProvider>
-    </QueryClientProvider>
+                <Stack.Screen name="GetStarted" component={GetStartedScreen} />
+                <Stack.Screen name="AuthMethods" component={AuthMethodsScreen} />
+                <Stack.Screen name="Verification" component={VerificationScreen} />
+                <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
+                <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                <Stack.Screen name="Dashboard" component={DashboardScreen} />
+                <Stack.Screen name="AddExpense" component={AddExpenseScreen} />
+                <Stack.Screen name="ExpenseSuccess" component={ExpenseSuccessScreen} />
+                <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
+                <Stack.Screen name="GroupCreated" component={GroupCreatedScreen} />
+                <Stack.Screen name="AddMembers" component={AddMembersScreen} />
+                <Stack.Screen name="Balance" component={BalanceScreen} />
+                <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
+        
+                <Stack.Screen name="SettleUpModal" component={SettleUpModal} />
+                <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} />
+                <Stack.Screen name="Profile" component={ProfileScreen} />
+                <Stack.Screen name="Deposit" component={DepositScreen} />
+                <Stack.Screen name="CryptoTransfer" component={CryptoTransferScreen} />
+                <Stack.Screen name="MoonPayWebView" component={MoonPayWebViewScreen} />
+                <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+                <Stack.Screen name="Premium" component={PremiumScreen} />
+                <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                <Stack.Screen name="Language" component={LanguageScreen} />
+                <Stack.Screen name="Contacts" component={ContactsScreen} />
+                <Stack.Screen name="ContactAction" component={ContactActionScreen} />
+                <Stack.Screen name="Send" component={SendScreen} />
+                <Stack.Screen name="SendAmount" component={SendAmountScreen} />
+                <Stack.Screen name="SendConfirmation" component={SendConfirmationScreen} />
+                <Stack.Screen name="SendSuccess" component={SendSuccessScreen} />
+                <Stack.Screen name="RequestContacts" component={RequestContactsScreen} />
+                <Stack.Screen name="RequestAmount" component={RequestAmountScreen} />
+                <Stack.Screen name="RequestConfirmation" component={RequestConfirmationScreen} />
+                <Stack.Screen name="RequestSuccess" component={RequestSuccessScreen} />
+                <Stack.Screen name="GroupsList" component={GroupsListScreen} />
+                <Stack.Screen name="WithdrawAmount" component={WithdrawAmountScreen} />
+                <Stack.Screen name="WithdrawConfirmation" component={WithdrawConfirmationScreen} />
+                <Stack.Screen name="WithdrawSuccess" component={WithdrawSuccessScreen} />
+                <Stack.Screen name="WalletManagement" component={WalletManagementScreen} />
+                <Stack.Screen name="SeedPhraseView" component={SeedPhraseViewScreen} />
+                <Stack.Screen name="SeedPhraseVerify" component={SeedPhraseVerifyScreen} />
+                <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
+                <Stack.Screen name="ExternalWalletConnection" component={ExternalWalletConnectionScreen} />
+              </Stack.Navigator>
+              </NavigationWrapper>
+            </WalletLinkingProvider>
+          </AppProvider>
+        </WalletProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

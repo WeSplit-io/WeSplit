@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, SafeAreaView, Image } from 'react-native';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import Icon from '../../components/Icon';
-import { createMoonPayURL } from '../../services/moonpayService';
+import MoonPayWidget from '../../components/MoonPayWidget';
 import styles from './styles';
 
 interface DepositParams {
@@ -18,17 +18,25 @@ interface DepositParams {
 }
 
 const DepositScreen: React.FC<any> = ({ navigation, route }) => {
-  const { address } = useWallet();
+  const { 
+    // App wallet state (for deposits)
+    appWalletAddress,
+    appWalletConnected,
+    // External wallet state (for fallback)
+    address: externalWalletAddress 
+  } = useWallet();
   const { state } = useApp();
   const { currentUser } = state;
+  const [showMoonPayWidget, setShowMoonPayWidget] = useState(false);
   
   const params: DepositParams = route?.params || {};
   const isGroupWallet = params.targetWallet?.type === 'group';
   
-  // Use target wallet if provided, otherwise use user's personal wallet
+  // Use target wallet if provided, otherwise use app wallet (not external wallet)
   const depositAddress = params.targetWallet?.address || 
+                         appWalletAddress || 
                          currentUser?.wallet_address || 
-                         address;
+                         externalWalletAddress;
   
   const walletName = params.targetWallet?.name || 'Your Wallet';
 
@@ -36,25 +44,48 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
     return 'Top Up';
   };
 
-  const handleCreditDebitCard = async () => {
-    if (!depositAddress) {
-      Alert.alert('Error', 'No wallet address available for funding.');
+  const handleCreditDebitCard = () => {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'Please log in to fund your wallet.');
       return;
     }
 
-    try {
-      const amount = params.prefillAmount;
-      const moonpayResponse = await createMoonPayURL(depositAddress, amount);
-      
-      // Navigate to MoonPay WebView
-      navigation.navigate('MoonPayWebView', {
-        url: moonpayResponse.url,
-        targetWallet: params.targetWallet,
-        onSuccess: params.onSuccess
-      });
-    } catch (e) {
-      Alert.alert('Error', 'Failed to open MoonPay. Please try again.');
+    // Verify app wallet is available
+    console.log('🔍 DepositScreen: Checking app wallet availability:', {
+      appWalletAddress,
+      appWalletConnected: !!appWalletAddress,
+      currentUserWallet: currentUser?.wallet_address,
+      depositAddress
+    });
+
+    if (!appWalletAddress) {
+      Alert.alert(
+        'App Wallet Not Available', 
+        'Your app wallet is not initialized. Please ensure your app wallet is set up before funding.'
+      );
+      return;
     }
+
+    if (!depositAddress) {
+      Alert.alert('Error', 'No app wallet address available for funding. Please ensure your app wallet is initialized.');
+      return;
+    }
+
+    // Verify we're using the app wallet (not external wallet)
+    if (depositAddress !== appWalletAddress) {
+      console.warn('🔍 DepositScreen: Warning - Using non-app wallet for deposit:', {
+        appWalletAddress,
+        depositAddress,
+        isAppWallet: depositAddress === appWalletAddress
+      });
+    }
+
+    console.log('🔍 DepositScreen: Opening MoonPay widget with app wallet:', {
+      appWalletAddress,
+      depositAddress,
+      userId: currentUser.id
+    });
+    setShowMoonPayWidget(true);
   };
 
   const handleCryptoTransfer = () => {
@@ -105,6 +136,8 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
             </Text>
           </TouchableOpacity>
 
+
+
           {/* Crypto Transfer Option */}
           <TouchableOpacity 
             style={styles.paymentMethodCard}
@@ -124,7 +157,20 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
         </View>
         </View>
         
-       
+        {/* MoonPay Widget */}
+        <MoonPayWidget
+          isVisible={showMoonPayWidget}
+          onClose={() => setShowMoonPayWidget(false)}
+          onSuccess={() => {
+            setShowMoonPayWidget(false);
+            params.onSuccess?.();
+          }}
+          onError={(error) => {
+            console.error('🔍 DepositScreen: MoonPay error:', error);
+          }}
+          amount={params.prefillAmount}
+          navigation={navigation}
+        />
       </View>
     </SafeAreaView>
   );

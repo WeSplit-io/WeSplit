@@ -101,7 +101,7 @@ const GroupLifecycleTest: React.FC = () => {
 
         // Create notification for invited user
         await firebaseDataService.notification.createNotification({
-          user_id: testMemberEmail,
+          userId: String(testMemberEmail),
           type: 'group_invite',
           title: 'Group Invitation',
           message: `${currentUser.name} invited you to join "${testGroupName}"`,

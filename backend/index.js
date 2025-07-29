@@ -1071,8 +1071,8 @@ app.post('/api/moonpay/create-url', async (req, res) => {
 
   try {
     // MoonPay configuration
-    const MOONPAY_API_KEY = process.env.MOONPAY_API_KEY || 'pk_test_1234567890abcdef'; // Replace with your actual MoonPay API key
-    const MOONPAY_BASE_URL = 'https://buy.moonpay.com';
+    const MOONPAY_API_KEY = process.env.MOONPAY_API_KEY || 'YOUR_MOONPAY_PUBLIC_KEY'; // Replace with your actual MoonPay public key
+    const MOONPAY_BASE_URL = 'https://buy-sandbox.moonpay.com'; // Use https://buy.moonpay.com for production
     
     // Build MoonPay URL with parameters
     const params = new URLSearchParams({
@@ -1107,8 +1107,8 @@ app.get('/api/moonpay/status/:transactionId', async (req, res) => {
   
   try {
     // MoonPay API configuration
-    const MOONPAY_API_KEY = process.env.MOONPAY_API_KEY || 'pk_test_1234567890abcdef';
-    const MOONPAY_SECRET_KEY = process.env.MOONPAY_SECRET_KEY || 'sk_test_1234567890abcdef';
+    const MOONPAY_API_KEY = process.env.MOONPAY_API_KEY || 'YOUR_MOONPAY_PUBLIC_KEY';
+    const MOONPAY_SECRET_KEY = process.env.MOONPAY_SECRET_KEY || 'YOUR_MOONPAY_SECRET_KEY';
     
     // In a real implementation, you would call MoonPay's API to check transaction status
     // For now, return a mock response

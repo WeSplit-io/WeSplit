@@ -18,6 +18,7 @@ import {
   TOKEN_PROGRAM_ID,
   getAccount
 } from '@solana/spl-token';
+import { walletLogoService } from './walletLogoService';
 
 // Solana RPC endpoints
 const SOLANA_RPC_ENDPOINTS = {
@@ -74,6 +75,7 @@ export interface MultiSigTransaction {
 export interface WalletProvider {
   name: string;
   icon: string;
+  logoUrl: string;
   isAvailable: boolean;
   connect(): Promise<WalletInfo>;
   disconnect(): Promise<void>;
@@ -113,7 +115,6 @@ export const SUPPORTED_WALLET_PROVIDERS = {
   BLOCTO: 'blocto',
   PEAK: 'peak',
   NIGHTLY: 'nightly',
-  NIGHTLY_CONNECT: 'nightly-connect',
   CLOVER: 'clover',
   CLOVER_CONNECT: 'clover-connect',
   WALLET_CONNECT: 'wallet-connect',
@@ -162,30 +163,169 @@ export class SolanaAppKitService {
   }
 
   // Initialize available wallet providers
-  private initializeWalletProviders() {
-    // Initialize wallet providers - in production, these would be actual wallet adapters
-    // For now, we'll leave the providers map empty until real wallet integration is implemented
-    if (__DEV__) {
-      console.log('🔧 SolanaAppKitService: Wallet providers initialized (no mock providers)');
+  private async initializeWalletProviders() {
+    console.log('🔧 SolanaAppKitService: initializeWalletProviders called');
+    
+    try {
+      // Get available wallets from the logo service
+      const availableWallets = await walletLogoService.getAvailableWallets();
+      
+      // Create wallet providers from the available wallets
+      const providers: WalletProvider[] = availableWallets.map(wallet => ({
+        name: wallet.name,
+        icon: wallet.fallbackIcon,
+        logoUrl: wallet.logoUrl,
+        isAvailable: wallet.isAvailable,
+        connect: async () => this.mockConnectProvider(wallet.name),
+        disconnect: async () => this.mockDisconnectProvider(),
+        signTransaction: async (transaction) => this.mockSignTransaction(transaction),
+        signMessage: async (message) => this.mockSignMessage(message)
+      }));
+
+      // Add all providers to the available providers map
+      providers.forEach(provider => {
+        this.availableProviders.set(provider.name.toLowerCase(), provider);
+      });
+
+      console.log('🔧 SolanaAppKitService: Providers added to map:', this.availableProviders.size);
+      console.log('🔧 SolanaAppKitService: Provider keys:', Array.from(this.availableProviders.keys()));
+
+      if (__DEV__) {
+        console.log('🔧 SolanaAppKitService: Initialized', providers.length, 'wallet providers');
+      }
+    } catch (error) {
+      console.error('Error initializing wallet providers:', error);
+      // Fallback to basic providers if logo service fails
+      this.initializeFallbackProviders();
     }
+  }
+
+  // Initialize fallback providers if logo service fails
+  private initializeFallbackProviders() {
+    console.log('🔧 SolanaAppKitService: Using fallback providers');
+    
+    const fallbackProviders: WalletProvider[] = [
+      {
+        name: 'Phantom',
+        icon: '👻',
+        logoUrl: 'https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/icons/phantom.png',
+        isAvailable: true,
+        connect: async () => this.mockConnectProvider('Phantom'),
+        disconnect: async () => this.mockDisconnectProvider(),
+        signTransaction: async (transaction) => this.mockSignTransaction(transaction),
+        signMessage: async (message) => this.mockSignMessage(message)
+      },
+      {
+        name: 'Solflare',
+        icon: '🔥',
+        logoUrl: 'https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/icons/solflare.png',
+        isAvailable: true,
+        connect: async () => this.mockConnectProvider('Solflare'),
+        disconnect: async () => this.mockDisconnectProvider(),
+        signTransaction: async (transaction) => this.mockSignTransaction(transaction),
+        signMessage: async (message) => this.mockSignMessage(message)
+      },
+      {
+        name: 'Backpack',
+        icon: '🎒',
+        logoUrl: 'https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/icons/backpack.png',
+        isAvailable: true,
+        connect: async () => this.mockConnectProvider('Backpack'),
+        disconnect: async () => this.mockDisconnectProvider(),
+        signTransaction: async (transaction) => this.mockSignTransaction(transaction),
+        signMessage: async (message) => this.mockSignMessage(message)
+      }
+    ];
+
+    // Add fallback providers to the map
+    fallbackProviders.forEach(provider => {
+      this.availableProviders.set(provider.name.toLowerCase(), provider);
+    });
   }
 
   // Get available wallet providers
   getAvailableProviders(): WalletProvider[] {
-    return Array.from(this.availableProviders.values());
+    const providers = Array.from(this.availableProviders.values());
+    console.log('🔧 SolanaAppKitService: getAvailableProviders called');
+    console.log('🔧 SolanaAppKitService: Available providers count:', providers.length);
+    console.log('🔧 SolanaAppKitService: Provider names:', providers.map(p => p.name));
+    
+    // Fallback: if no providers are available, return some basic ones
+    if (providers.length === 0) {
+      console.log('🔧 SolanaAppKitService: No providers found, creating fallback providers');
+      const fallbackProviders: WalletProvider[] = [
+        {
+          name: 'Phantom',
+          icon: '👻',
+          logoUrl: 'https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/icons/phantom.png',
+          isAvailable: true,
+          connect: async () => this.mockConnectProvider('Phantom'),
+          disconnect: async () => this.mockDisconnectProvider(),
+          signTransaction: async (transaction) => this.mockSignTransaction(transaction),
+          signMessage: async (message) => this.mockSignMessage(message)
+        },
+        {
+          name: 'Solflare',
+          icon: '🔥',
+          logoUrl: 'https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/icons/solflare.png',
+          isAvailable: true,
+          connect: async () => this.mockConnectProvider('Solflare'),
+          disconnect: async () => this.mockDisconnectProvider(),
+          signTransaction: async (transaction) => this.mockSignTransaction(transaction),
+          signMessage: async (message) => this.mockSignMessage(message)
+        },
+        {
+          name: 'Backpack',
+          icon: '🎒',
+          logoUrl: 'https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/icons/backpack.png',
+          isAvailable: true,
+          connect: async () => this.mockConnectProvider('Backpack'),
+          disconnect: async () => this.mockDisconnectProvider(),
+          signTransaction: async (transaction) => this.mockSignTransaction(transaction),
+          signMessage: async (message) => this.mockSignMessage(message)
+        }
+      ];
+      
+      // Add fallback providers to the map
+      fallbackProviders.forEach(provider => {
+        this.availableProviders.set(provider.name.toLowerCase(), provider);
+      });
+      
+      console.log('🔧 SolanaAppKitService: Fallback providers added');
+      return fallbackProviders;
+    }
+    
+    return providers;
   }
 
   // Connect to a specific wallet provider
   async connectToProvider(providerKey: string): Promise<WalletInfo> {
     try {
-    const provider = this.availableProviders.get(providerKey);
-    if (!provider) {
-        throw new Error(`Provider ${providerKey} not found`);
-    }
+      // Try to find provider by exact name first
+      let provider = this.availableProviders.get(providerKey);
+      
+      // If not found, try by lowercase name
+      if (!provider) {
+        provider = this.availableProviders.get(providerKey.toLowerCase());
+      }
+      
+      // If still not found, try to find by partial match
+      if (!provider) {
+        for (const [key, prov] of this.availableProviders.entries()) {
+          if (key.includes(providerKey.toLowerCase()) || prov.name.toLowerCase().includes(providerKey.toLowerCase())) {
+            provider = prov;
+            break;
+          }
+        }
+      }
 
-    if (!provider.isAvailable) {
+      if (!provider) {
+        throw new Error(`Provider ${providerKey} not found. Available providers: ${Array.from(this.availableProviders.keys()).join(', ')}`);
+      }
+
+      if (!provider.isAvailable) {
         throw new Error(`${provider.name} is not available`);
-    }
+      }
 
       const walletInfo = await provider.connect();
       this.connectedProvider = provider;
@@ -1064,12 +1204,65 @@ export class SolanaAppKitService {
     return this.connectedProvider;
   }
 
-  // Check if a specific provider is available
+  // Check if a provider is available
   isProviderAvailable(providerKey: string): boolean {
-    const provider = this.availableProviders.get(providerKey);
+    const provider = this.availableProviders.get(providerKey.toLowerCase());
     return provider ? provider.isAvailable : false;
+  }
+
+  // Mock methods for development
+  private async mockConnectProvider(name: string): Promise<WalletInfo> {
+    if (__DEV__) {
+      console.log(`Mock connecting to ${name}...`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+    const mockKeypair = Keypair.generate();
+    const address = mockKeypair.publicKey.toBase58();
+    const balance = await this.connection.getBalance(mockKeypair.publicKey);
+    const usdcBalance = await this.getUsdcBalance(mockKeypair.publicKey);
+    return {
+      address,
+      publicKey: address,
+      balance: balance / LAMPORTS_PER_SOL,
+      usdcBalance,
+      isConnected: true,
+      walletName: name,
+      walletType: 'external'
+    };
+  }
+
+  private async mockDisconnectProvider(): Promise<void> {
+    if (__DEV__) {
+      console.log('Mock disconnecting provider...');
+    }
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+    this.connectedProvider = null;
+    this.keypair = null;
+  }
+
+  private async mockSignTransaction(transaction: Transaction): Promise<Transaction> {
+    if (__DEV__) {
+      console.log('Mock signing transaction...');
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+    if (this.keypair) {
+      transaction.sign(this.keypair);
+    }
+    return transaction;
+  }
+
+  private async mockSignMessage(message: Uint8Array): Promise<Uint8Array> {
+    if (__DEV__) {
+      console.log('Mock signing message...');
+    }
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+    return message; // Mock signing is a no-op for now
   }
 }
 
 // Export singleton instance
-export const solanaAppKitService = new SolanaAppKitService(); 
+export const solanaAppKitService = new SolanaAppKitService();
+
+// Ensure providers are initialized
+console.log('🔧 SolanaAppKitService: Singleton instance created');
+console.log('🔧 SolanaAppKitService: Available providers after initialization:', solanaAppKitService.getAvailableProviders().length); 

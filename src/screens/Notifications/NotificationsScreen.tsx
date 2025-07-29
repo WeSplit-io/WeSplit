@@ -147,12 +147,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           throw new Error('Missing group data in notification');
         }
 
-        console.log('🔄 NotificationsScreen: Processing group invitation:', {
-          notificationId,
-          groupId,
-          inviteLink,
-          notificationData: notification.data
-        });
+
 
         // Get the current user ID
         const currentUserId = state.currentUser?.id;
@@ -169,7 +164,6 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             const inviteMatch = inviteLink.match(/invite_([^_]+)_(\d+)_([a-zA-Z0-9]+)/);
             if (inviteMatch) {
               inviteId = inviteMatch[1]; // Use the groupId part as inviteId
-              console.log('🔄 NotificationsScreen: Extracted inviteId from inviteLink:', inviteId);
             }
           }
 
@@ -179,7 +173,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             currentUserId.toString()
           );
 
-          console.log('🔄 NotificationsScreen: Successfully joined group:', result);
+
 
           // Update action state
           setActionStates(prev => ({
@@ -238,7 +232,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                     invited_by: currentUserId.toString()
                   });
                   
-                  console.log('🔄 NotificationsScreen: Successfully added user to group via direct method');
+
                   
                   // Update action state
                   setActionStates(prev => ({
@@ -274,10 +268,8 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                       avatar: userData.avatar || ''
                     });
                     
-                    console.log('🔄 NotificationsScreen: Updated user status to accepted');
                     showToast('Successfully joined the group!');
                   } else {
-                    console.log('🔄 NotificationsScreen: User is already a member of this group');
                     showToast('You are already a member of this group');
                   }
                   
@@ -332,6 +324,118 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             duration: 300,
             useNativeDriver: true,
           }).start();
+        }
+
+      } else if (notification.type === 'payment_received') {
+        // Handle payment received notification
+        const transactionId = notification.data?.transactionId;
+        
+        if (transactionId) {
+          // Navigate to transaction details
+          navigation.navigate('TransactionHistory', { 
+            transactionId: transactionId 
+          });
+          
+          // Mark as completed
+          setActionStates(prev => ({
+            ...prev,
+            [notificationId]: 'completed'
+          }));
+
+          // Fade animation
+          Animated.timing(fadeAnimations[notificationId], {
+            toValue: 0.6,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+        }
+
+      } else if (notification.type === 'group_payment_request') {
+        // Handle group payment request notification
+        const sender = notification.data?.sender;
+        const amount = notification.data?.amount;
+        const currency = notification.data?.currency;
+        const groupId = notification.data?.groupId;
+        
+        if (sender && amount && currency) {
+          // Navigate to send payment screen
+          navigation.navigate('Send', { 
+            recipient: sender,
+            amount: amount,
+            currency: currency,
+            groupId: groupId,
+            fromNotification: true,
+            notificationId: notificationId
+          });
+          
+          // Mark as completed
+          setActionStates(prev => ({
+            ...prev,
+            [notificationId]: 'completed'
+          }));
+
+          // Fade animation
+          Animated.timing(fadeAnimations[notificationId], {
+            toValue: 0.6,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+        }
+
+      } else if (notification.type === 'group_added') {
+        // Handle group added notification
+        const groupId = notification.data?.groupId;
+        
+        if (groupId) {
+          // Navigate to group details
+          navigation.navigate('GroupDetails', { 
+            groupId: groupId 
+          });
+          
+          // Mark as completed
+          setActionStates(prev => ({
+            ...prev,
+            [notificationId]: 'completed'
+          }));
+
+          // Fade animation
+          Animated.timing(fadeAnimations[notificationId], {
+            toValue: 0.6,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+        }
+
+      } else if (notification.type === 'system_warning') {
+        // Handle system warning notification
+        try {
+          // Dismiss system warning by marking as read
+          await firebaseDataService.notification.markNotificationAsRead(notificationId);
+          
+          // Mark as completed
+          setActionStates(prev => ({
+            ...prev,
+            [notificationId]: 'completed'
+          }));
+
+          // Fade animation
+          Animated.timing(fadeAnimations[notificationId], {
+            toValue: 0.6,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+          
+          showToast('Warning dismissed', 'success');
+        } catch (error) {
+          console.error('❌ NotificationsScreen: Error dismissing system warning:', error);
+          
+          // Set action state to error
+          setActionStates(prev => ({
+            ...prev,
+            [notificationId]: 'error'
+          }));
+          
+          showToast('Failed to dismiss warning', 'error');
         }
 
       } else if (notification.type === 'settlement_request') {

@@ -1,10 +1,10 @@
 import { apiRequest } from '../config/api';
 
-// MoonPay direct URL parameters (for fallback when backend is unavailable)
+// MoonPay direct URL parameters (using your real API key)
 const MOONPAY_DIRECT_CONFIG = {
-  baseUrl: 'https://buy-sandbox.moonpay.com',
-  apiKey: 'pk_test_123', // Replace with your actual sandbox API key
-  currency: 'SOL',
+  baseUrl: 'https://buy-sandbox.moonpay.com', // Use https://buy.moonpay.com for production
+  apiKey: 'pk_live_37P9eF61y7Q7PZZp95q2kozulpBHYv7P', // Your real MoonPay public key
+  currency: 'USDC',
   network: 'solana'
 };
 
@@ -23,55 +23,70 @@ export interface MoonPayStatusResponse {
   timestamp: string;
 }
 
-function createDirectMoonPayURL(walletAddress: string, amount?: number, currency: string = 'SOL'): string {
-  const params = new URLSearchParams({
+function createDirectMoonPayURL(walletAddress: string, amount?: number, currency: string = 'USDC'): string {
+  // Validate inputs
+  if (!walletAddress || typeof walletAddress !== 'string') {
+    throw new Error('Invalid wallet address: must be a non-empty string');
+  }
+  
+  if (amount !== undefined && (typeof amount !== 'number' || amount <= 0)) {
+    throw new Error('Invalid amount: must be a positive number');
+  }
+  
+  if (!currency || typeof currency !== 'string') {
+    throw new Error('Invalid currency: must be a non-empty string');
+  }
+  
+  console.log('🔍 MoonPay: Creating URL with params:', {
     apiKey: MOONPAY_DIRECT_CONFIG.apiKey,
     currencyCode: currency,
     walletAddress: walletAddress,
-    colorCode: '%23A5EA15', // WeSplit green color
+    amount
+  });
+  
+  const params = new URLSearchParams({
+    apiKey: MOONPAY_DIRECT_CONFIG.apiKey,
+    currencyCode: currency.toLowerCase(), // MoonPay expects lowercase
+    walletAddress: walletAddress,
     ...(amount && { baseCurrencyAmount: amount.toString() })
   });
   
-  return `${MOONPAY_DIRECT_CONFIG.baseUrl}?${params.toString()}`;
+  // Add additional MoonPay parameters
+  params.append('redirectURL', 'wesplit://moonpay-success');
+  params.append('failureRedirectURL', 'wesplit://moonpay-failure');
+  
+  const url = `${MOONPAY_DIRECT_CONFIG.baseUrl}?${params.toString()}`;
+  console.log('🔍 MoonPay: Generated URL:', url);
+  
+  return url;
 }
 
-export async function createMoonPayURL(walletAddress: string, amount?: number, currency: string = 'SOL'): Promise<MoonPayURLResponse> {
-  if (__DEV__) { console.log('Creating MoonPay URL for wallet:', walletAddress, 'amount:', amount); }
+export async function createMoonPayURL(walletAddress: string, amount?: number, currency: string = 'USDC'): Promise<MoonPayURLResponse> {
+  if (__DEV__) { console.log('🔍 MoonPay: Creating URL for app wallet:', walletAddress, 'amount:', amount, 'currency:', currency); }
   
-  // First try to use the backend API
+  // Validate wallet address
+  if (!walletAddress || walletAddress.length < 32) {
+    throw new Error('Invalid wallet address provided');
+  }
+  
+  // Always use direct MoonPay URL since backend is not available
   try {
-    const data = await apiRequest<MoonPayURLResponse>('/api/moonpay/create-url', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        walletAddress,
-        amount,
-        currency
-      }),
-    });
-
-      if (__DEV__) { console.log('MoonPay URL created successfully via backend:', data); }
-      return data;
-  } catch (backendError) {
-    console.warn('Backend unavailable, using direct MoonPay URL:', backendError);
-    
-    // Fallback to direct MoonPay URL
-    try {
+    console.log('🔍 MoonPay: Creating direct URL with real API key...');
       const directUrl = createDirectMoonPayURL(walletAddress, amount, currency);
-      if (__DEV__) { console.log('Created direct MoonPay URL:', directUrl); }
+    if (__DEV__) { console.log('🔍 MoonPay: Created direct URL:', directUrl); }
       
-      return {
+    const response = {
         url: directUrl,
         walletAddress,
         currency,
         amount
       };
+    
+    console.log('🔍 MoonPay: Returning direct URL response:', response);
+    return response;
     } catch (directError) {
-      console.error('Failed to create direct MoonPay URL:', directError);
+    console.error('🔍 MoonPay: Failed to create direct URL:', directError);
       throw new Error('Failed to create MoonPay URL. Please check your internet connection and try again.');
-    }
   }
 }
 

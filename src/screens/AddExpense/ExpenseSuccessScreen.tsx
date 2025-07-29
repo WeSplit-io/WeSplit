@@ -41,8 +41,22 @@ const ExpenseSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   });
 
   const handleGoBack = () => {
-    // Navigate back to the group
-    navigation.navigate('GroupDetails', { groupId: route.params.groupId });
+    // Navigate back to the group using the group object passed from AddExpenseScreen
+    const groupId = route.params.group?.id || route.params.groupId;
+    
+    console.log('🔍 ExpenseSuccessScreen: Navigating back with groupId:', groupId);
+    console.log('🔍 ExpenseSuccessScreen: Route params:', route.params);
+    
+    if (groupId) {
+      // Ensure groupId is properly converted to string for navigation
+      const groupIdString = String(groupId);
+      console.log('🔍 ExpenseSuccessScreen: Navigating to GroupDetails with groupId:', groupIdString);
+      navigation.navigate('GroupDetails', { groupId: groupIdString });
+    } else {
+      // Fallback: go back to the previous screen
+      console.warn('⚠️ ExpenseSuccessScreen: No groupId found, going back');
+      navigation.goBack();
+    }
   };
 
   // Format current date

@@ -15,6 +15,7 @@ import { styles } from './styles';
 import { useWallet } from '../../context/WalletContext';
 import { solanaAppKitService } from '../../services/solanaAppKitService';
 import { firebaseDataService } from '../../services/firebaseDataService';
+import { userWalletService } from '../../services/userWalletService';
 import { useApp } from '../../context/AppContext';
 
 const SeedPhraseViewScreen: React.FC = () => {
@@ -26,7 +27,14 @@ const SeedPhraseViewScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const { walletInfo, secretKey } = useWallet();
+  const { 
+    // App wallet state (for seed phrase)
+    appWalletAddress,
+    appWalletConnected,
+    // External wallet state (for fallback)
+    walletInfo, 
+    secretKey 
+  } = useWallet();
 
   // Get actual seed phrase from wallet
   useEffect(() => {
@@ -34,6 +42,17 @@ const SeedPhraseViewScreen: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
+        
+        // First ensure the app wallet is initialized
+        if (currentUser?.id) {
+          console.log('🔍 SeedPhraseView: Ensuring app wallet is initialized...');
+          try {
+            await userWalletService.ensureUserWallet(currentUser.id.toString());
+            console.log('🔍 SeedPhraseView: App wallet ensured successfully');
+          } catch (ensureError) {
+            console.error('🔍 SeedPhraseView: Error ensuring app wallet:', ensureError);
+          }
+        }
         
         // Try to get seed phrase from Firebase first
         if (currentUser?.id) {
@@ -74,22 +93,28 @@ const SeedPhraseViewScreen: React.FC = () => {
           }
         }
         
-        // Fallback: Try to get seed phrase from the wallet service
-        if (secretKey) {
+        // Fallback: Try to get seed phrase from the app wallet
+        if (appWalletConnected && appWalletAddress) {
+          console.log('🔍 SeedPhraseView: App wallet connected, checking for seed phrase...');
+          
           // For app-generated wallets, we can derive the seed phrase
           // Note: This is a simplified approach - in production you'd want more secure handling
           const walletData = await solanaAppKitService.getWalletInfo();
           
           // Check if this is an app-generated wallet that might have a mnemonic
-          if (walletData.walletType === 'app-generated') {
+          if (walletData && walletData.walletType === 'app-generated') {
             // For now, we'll show a message that seed phrases are not yet implemented
             // In a real implementation, you'd store the mnemonic when creating the wallet
             setError('Seed phrase feature not yet implemented for app-generated wallets. This feature will be available in a future update.');
           } else {
             setError('Seed phrase not available for external wallets. External wallets manage their own seed phrases.');
           }
+        } else if (secretKey) {
+          // Fallback to external wallet if app wallet not available
+          console.log('🔍 SeedPhraseView: Using external wallet as fallback...');
+          setError('Seed phrase not available for external wallets. External wallets manage their own seed phrases.');
         } else {
-          setError('No wallet connected. Please ensure you have a wallet set up.');
+          setError('No app wallet connected. Please ensure you have an app wallet set up.');
         }
       } catch (err) {
         console.error('Error getting seed phrase:', err);

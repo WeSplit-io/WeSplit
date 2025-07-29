@@ -50,13 +50,13 @@ class SolanaWalletManager {
   // Generate a new wallet
   async generateWallet(): Promise<WalletInfo> {
     try {
-      if (__DEV__) { console.log('Generating new Solana wallet...'); }
+      // Generating new Solana wallet
       
       this.keypair = Keypair.generate();
       this.publicKey = this.keypair.publicKey;
       this.isConnected = true;
       
-      if (__DEV__) { console.log('Wallet generated successfully'); }
+      // Wallet generated successfully
       
       return {
         publicKey: this.publicKey,
@@ -75,14 +75,14 @@ class SolanaWalletManager {
   // Import wallet from secret key
   async importWallet(secretKey: string): Promise<WalletInfo> {
     try {
-      if (__DEV__) { console.log('Importing wallet from secret key...'); }
+      // Importing wallet from secret key
       
       const secretKeyBytes = new Uint8Array(Buffer.from(secretKey, 'hex'));
       this.keypair = Keypair.fromSecretKey(secretKeyBytes);
       this.publicKey = this.keypair.publicKey;
       this.isConnected = true;
       
-      if (__DEV__) { console.log('Wallet imported successfully'); }
+      // Wallet imported successfully
       
       return {
         publicKey: this.publicKey,
@@ -100,13 +100,13 @@ class SolanaWalletManager {
 
   async disconnect(): Promise<void> {
     try {
-      if (__DEV__) { console.log('Disconnecting Solana wallet...'); }
+      // Disconnecting Solana wallet
       
       this.keypair = null;
       this.publicKey = null;
       this.isConnected = false;
       
-      if (__DEV__) { console.log('Solana wallet disconnected successfully'); }
+      // Solana wallet disconnected successfully
     } catch (error) {
       console.error('Failed to disconnect wallet:', error);
       throw error;
@@ -121,19 +121,16 @@ class SolanaWalletManager {
     try {
       let balance = 0;
       try {
-        if (__DEV__) { console.log('Fetching balance for address:', this.publicKey.toString()); }
+        // Fetching balance for address
         balance = await connection.getBalance(this.publicKey);
-        if (__DEV__) { console.log('Raw balance from network:', balance, 'lamports'); }
+        // Raw balance from network
       } catch (balanceError) {
-        if (__DEV__) { 
-          console.log('Could not retrieve balance from network:', balanceError);
-          console.log('Using fallback balance of 0');
-        }
+        // Could not retrieve balance from network, using fallback balance of 0
         balance = 0;
       }
       
       const solBalance = balance / LAMPORTS_PER_SOL;
-      if (__DEV__) { console.log('Converted balance:', solBalance, 'SOL'); }
+      // Converted balance
       
       return {
         publicKey: this.publicKey,
@@ -154,9 +151,9 @@ class SolanaWalletManager {
     }
 
     try {
-      if (__DEV__) { console.log('Signing transaction...'); }
+      // Signing transaction
       transaction.sign(this.keypair);
-      if (__DEV__) { console.log('Transaction signed successfully'); }
+      // Transaction signed successfully
       return transaction;
     } catch (error) {
       console.error('Failed to sign transaction:', error);
@@ -170,7 +167,7 @@ class SolanaWalletManager {
     }
 
     try {
-      if (__DEV__) { console.log('Sending transaction...'); }
+      // Sending transaction
       
       // Sign the transaction
       const signedTransaction = await this.signTransaction(transaction);
@@ -178,7 +175,7 @@ class SolanaWalletManager {
       // Send the transaction
       const signature = await connection.sendRawTransaction(signedTransaction.serialize());
       
-      if (__DEV__) { console.log('Transaction sent successfully:', signature); }
+      // Transaction sent successfully
       return signature;
     } catch (error) {
       console.error('Failed to send transaction:', error);
@@ -257,7 +254,7 @@ export const connectWallet = async (): Promise<WalletInfo> => {
 };
 
 export const connectToSpecificWallet = async (walletName: string): Promise<WalletInfo> => {
-  console.warn('connectToSpecificWallet is deprecated, using generateWallet instead');
+  // connectToSpecificWallet is deprecated, using generateWallet instead
   return await generateWallet();
 };
 

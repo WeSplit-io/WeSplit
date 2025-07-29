@@ -229,4 +229,17 @@ export const styles = StyleSheet.create({
     marginTop: spacing.xs,
     textAlign: 'center',
   },
+
+  // Scroll to close hint
+  scrollToCloseHint: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    marginTop: spacing.md,
+  },
+  scrollToCloseText: {
+    color: colors.white50,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+
 }); 

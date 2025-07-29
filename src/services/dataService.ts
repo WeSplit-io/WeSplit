@@ -130,7 +130,7 @@ const makeApiRequest = async <T>(
   const timeSinceLastRequest = now - lastRequest;
   
   if (timeSinceLastRequest < RATE_LIMIT_PROTECTION) {
-    console.log(`⏳ Rate limit protection: waiting ${RATE_LIMIT_PROTECTION - timeSinceLastRequest}ms before next request to ${endpoint}`);
+    // Rate limit protection: waiting before next request
     await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_PROTECTION - timeSinceLastRequest));
   }
   
@@ -138,7 +138,7 @@ const makeApiRequest = async <T>(
   if (options.method !== 'POST' && options.method !== 'PUT' && options.method !== 'DELETE' && useCache) {
     const cached = getFromCache<T>(cacheKey);
     if (cached) {
-      console.log(`📦 Using cached data for: ${endpoint}`);
+      // Using cached data
       return cached;
     }
   }
@@ -160,7 +160,7 @@ const makeApiRequest = async <T>(
     if (error instanceof Error && error.message.includes('Rate limit')) {
       const cached = getFromCache<T>(cacheKey);
       if (cached) {
-        console.log(`📦 Returning cached data due to rate limit for: ${endpoint}`);
+        // Returning cached data due to rate limit
         return cached;
       }
     }

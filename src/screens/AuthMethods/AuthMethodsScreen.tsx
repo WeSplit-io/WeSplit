@@ -24,6 +24,7 @@ import { db } from '../../config/firebase';
 import { solanaAppKitService } from '../../services/solanaAppKitService';
 import { userWalletService } from '../../services/userWalletService';
 import { unifiedUserService } from '../../services/unifiedUserService';
+import { SocialAuthService } from '../../services/socialAuthService';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
@@ -242,7 +243,7 @@ const AuthMethodsScreen: React.FC = () => {
                   if (createError.code === 'auth/email-already-in-use') {
                     // User already exists in Firebase Auth, we need to handle this
                     // For now, we'll use the existing user data and skip Firebase Auth
-                    if (__DEV__) { console.log('⚠️ User exists in Firebase Auth but we can\'t sign in without password'); }
+                    if (__DEV__) { console.warn('⚠️ User exists in Firebase Auth but we can\'t sign in without password (this is normal)'); }
 
                     // Check if existing user should skip onboarding
                     const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
@@ -362,33 +363,109 @@ const AuthMethodsScreen: React.FC = () => {
         // Navigate to verification screen
         navigation.navigate('Verification', { email: sanitizedEmail });
       }
-    } catch (error: any) {
-      console.error('Error in email authentication:', error);
+          } catch (error: any) {
+        // Convert expected errors to warnings
+        if (error.code === 'auth/email-already-in-use') {
+          if (__DEV__) {
+            console.warn('Expected Firebase Auth error (user already exists):', error.message);
+          }
+          // Continue with the flow since we handle this case above
+        } else {
+          console.error('Error in email authentication:', error);
 
-      if (error.code === 'auth/too-many-requests') {
-        Alert.alert(
-          'Too Many Requests',
-          'Too many attempts. Please wait a few minutes before trying again.'
-        );
-      } else if (error.code === 'auth/invalid-email') {
-        Alert.alert('Invalid Email', 'Please enter a valid email address.');
-      } else {
-        Alert.alert(
-          'Authentication Error',
-          error.message || 'Failed to authenticate. Please try again.'
-        );
+          if (error.code === 'auth/too-many-requests') {
+            Alert.alert(
+              'Too Many Requests',
+              'Too many attempts. Please wait a few minutes before trying again.'
+            );
+          } else if (error.code === 'auth/invalid-email') {
+            Alert.alert('Invalid Email', 'Please enter a valid email address.');
+          } else {
+            Alert.alert(
+              'Authentication Error',
+              error.message || 'Failed to authenticate. Please try again.'
+            );
+          }
+        }
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Handle social authentication
-  const handleSocialAuth = (provider: 'google' | 'twitter' | 'apple') => {
-    Alert.alert(
-      'Coming Soon',
-      `${provider.charAt(0).toUpperCase() + provider.slice(1)} authentication will be available soon. Please use email authentication for now.`
-    );
+  const handleSocialAuth = async (provider: 'google' | 'twitter' | 'apple') => {
+    setLoading(true);
+    
+    try {
+      let authResult;
+      
+      switch (provider) {
+        case 'google':
+          authResult = await SocialAuthService.signInWithGoogle();
+          break;
+        case 'twitter':
+          authResult = await SocialAuthService.signInWithTwitter();
+          break;
+        case 'apple':
+          authResult = await SocialAuthService.signInWithApple();
+          break;
+        default:
+          throw new Error('Unsupported provider');
+      }
+
+      if (authResult.success && authResult.user) {
+        // Transform to app user format
+        const appUser = {
+          id: authResult.user.id,
+          name: authResult.user.name,
+          email: authResult.user.email,
+          wallet_address: authResult.user.wallet_address || '',
+          wallet_public_key: authResult.user.wallet_public_key || '',
+          created_at: authResult.user.created_at,
+          avatar: authResult.user.avatar || '',
+          hasCompletedOnboarding: authResult.user.hasCompletedOnboarding || false
+        };
+
+        // Authenticate user with social provider
+        authenticateUser(appUser, 'social');
+
+        // Check if user needs to create a profile (has no name/pseudo)
+        const needsProfile = !appUser.name || appUser.name.trim() === '';
+
+        if (needsProfile) {
+          console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'CreateProfile', params: { email: appUser.email } }],
+          });
+        } else if (appUser.hasCompletedOnboarding) {
+          console.log('✅ User completed onboarding, navigating to Dashboard');
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Dashboard' }],
+          });
+        } else {
+          console.log('🔄 User needs onboarding, navigating to Onboarding');
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Onboarding' }],
+          });
+        }
+      } else {
+        Alert.alert(
+          'Authentication Failed',
+          authResult.error || 'Failed to authenticate with social provider. Please try again.'
+        );
+      }
+    } catch (error) {
+      console.error('Social authentication error:', error);
+      Alert.alert(
+        'Authentication Error',
+        error instanceof Error ? error.message : 'Failed to authenticate. Please try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -409,27 +486,36 @@ const AuthMethodsScreen: React.FC = () => {
           {/* Social Login Buttons */}
           <View style={styles.socialSection}>
             <TouchableOpacity
-              style={styles.socialButton}
+              style={[styles.socialButton, loading && styles.socialButtonDisabled]}
               onPress={() => handleSocialAuth('google')}
+              disabled={loading}
             >
               <Image source={require('../../../assets/google.png')} style={styles.socialIcon} />
-              <Text style={styles.socialButtonText}>Continue with Google</Text>
+              <Text style={styles.socialButtonText}>
+                {loading ? 'Signing in...' : 'Continue with Google'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.socialButton}
+              style={[styles.socialButton, loading && styles.socialButtonDisabled]}
               onPress={() => handleSocialAuth('twitter')}
+              disabled={loading}
             >
               <Image source={require('../../../assets/twitter.png')} style={styles.socialIcon} />
-              <Text style={styles.socialButtonText}>Continue with Twitter</Text>
+              <Text style={styles.socialButtonText}>
+                {loading ? 'Signing in...' : 'Continue with Twitter'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.socialButton}
+              style={[styles.socialButton, loading && styles.socialButtonDisabled]}
               onPress={() => handleSocialAuth('apple')}
+              disabled={loading}
             >
               <Image source={require('../../../assets/apple.png')} style={styles.socialIcon} />
-              <Text style={styles.socialButtonText}>Continue with Apple</Text>
+              <Text style={styles.socialButtonText}>
+                {loading ? 'Signing in...' : 'Continue with Apple'}
+              </Text>
             </TouchableOpacity>
           </View>
 

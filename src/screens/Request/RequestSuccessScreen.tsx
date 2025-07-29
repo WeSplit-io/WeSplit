@@ -5,7 +5,17 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 
 const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
-  const { contact, amount, description, groupId, requestId } = route.params || {};
+  const { contact, amount, description, groupId, requestId, paymentRequest } = route.params || {};
+
+  // Debug logging
+  console.log('✅ RequestSuccess: Route params:', {
+    contact: contact?.name,
+    amount,
+    description,
+    groupId,
+    requestId,
+    paymentRequest: paymentRequest?.id
+  });
 
   const handleBackHome = () => {
     // Navigate back to the appropriate screen
@@ -27,7 +37,7 @@ const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
     return date.toLocaleDateString('en-US', options);
   };
 
-  return (
+    return (
     <SafeAreaView style={{flex: 1, backgroundColor: colors.darkBackground}}>
       <View style={[styles.mockupSuccessContainer, {flex: 1, justifyContent: 'space-between', paddingBottom: 0}]}>  
         <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
@@ -48,9 +58,33 @@ const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
           <Text style={[styles.mockupSuccessDate, {
             fontSize: 16,
             marginBottom: 40,
-          }]}>{getCurrentDate()}</Text>
+          }]}>
+            {getCurrentDate()}
+          </Text>
 
-         </View>
+          {/* Additional Info */}
+          {contact && (
+            <Text style={[styles.mockupSuccessDate, {
+              fontSize: 14,
+              marginBottom: 20,
+              color: colors.textSecondary,
+            }]}>
+              Sent to {contact.name || contact.email || 'Unknown'}
+            </Text>
+          )}
+
+          {amount && (
+            <Text style={[styles.mockupSuccessDate, {
+              fontSize: 16,
+              marginBottom: 10,
+              color: colors.primaryGreen,
+              fontWeight: '600',
+            }]}>
+              ${amount} USDC
+            </Text>
+          )}
+
+         </View>
         {/* Back Home Button collé en bas */}
         <View style={{width: '100%', paddingBottom: 24, alignItems: 'center'}}>
           <TouchableOpacity 

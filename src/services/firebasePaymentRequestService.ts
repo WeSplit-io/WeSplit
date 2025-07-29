@@ -139,7 +139,7 @@ export async function createPaymentRequest(
 // Get payment requests for a user (received)
 export async function getReceivedPaymentRequests(userId: string | number, limitCount: number = 50): Promise<PaymentRequest[]> {
   try {
-    if (__DEV__) { console.log('🔥 Getting received payment requests for user:', userId); }
+    // Removed excessive logging for cleaner console
     
     const requestsRef = collection(db, 'paymentRequests');
     const requestsQuery = query(
@@ -155,7 +155,7 @@ export async function getReceivedPaymentRequests(userId: string | number, limitC
       paymentRequestTransformers.firestoreToPaymentRequest(doc)
     );
     
-    if (__DEV__) { console.log('🔥 Retrieved received payment requests:', requests.length); }
+    // Removed excessive logging for cleaner console
     
     return requests;
   } catch (error) {
@@ -167,7 +167,7 @@ export async function getReceivedPaymentRequests(userId: string | number, limitC
 // Get payment requests sent by a user
 export async function getSentPaymentRequests(userId: string | number, limitCount: number = 50): Promise<PaymentRequest[]> {
   try {
-    if (__DEV__) { console.log('🔥 Getting sent payment requests for user:', userId); }
+    // Removed excessive logging for cleaner console
     
     const requestsRef = collection(db, 'paymentRequests');
     const requestsQuery = query(
@@ -182,7 +182,7 @@ export async function getSentPaymentRequests(userId: string | number, limitCount
       paymentRequestTransformers.firestoreToPaymentRequest(doc)
     );
     
-    if (__DEV__) { console.log('🔥 Retrieved sent payment requests:', requests.length); }
+    // Removed excessive logging for cleaner console
     
     return requests;
   } catch (error) {

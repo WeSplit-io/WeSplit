@@ -33,16 +33,7 @@ export async function calculateGroupBalances(
     currentUserId
   } = options;
 
-  if (__DEV__) {
-    console.log('💰 calculateGroupBalances: Starting calculation for group:', {
-      groupName: group.name,
-      membersCount: group.members?.length || 0,
-      expensesCount: group.expenses?.length || 0,
-      expensesByCurrencyCount: group.expenses_by_currency?.length || 0,
-      normalizeToUSDC,
-      includeZeroBalances
-    });
-  }
+  // Starting calculation for group
 
   // If we have individual expenses and members, use detailed calculation
   if (group.expenses && group.expenses.length > 0 && group.members && group.members.length > 0) {
@@ -85,15 +76,7 @@ async function calculateBalancesFromExpenses(
     const amount = expense.amount || 0;
     const paidBy = expense.paid_by ? String(expense.paid_by) : null;
     
-    if (__DEV__) {
-      console.log('💰 Processing expense:', {
-        id: expense.id,
-        currency,
-        amount,
-        paidBy,
-        splitData: expense.splitData
-      });
-    }
+    // Processing expense
 
     // Parse split data
     let splitData: any = null;
@@ -104,7 +87,7 @@ async function calculateBalancesFromExpenses(
         splitData = expense.splitData;
       }
     } catch (e) {
-      console.warn('Failed to parse split data:', expense.splitData);
+      // Failed to parse split data
       splitData = null;
     }
 
@@ -195,9 +178,7 @@ async function calculateBalancesFromExpenses(
     }
   }
 
-  if (__DEV__) {
-    console.log('💰 calculateBalancesFromExpenses: Final balances:', balances);
-  }
+  // Final balances calculated
 
   return balances;
 }
@@ -224,14 +205,7 @@ async function calculateBalancesFromSummary(
   const actualMemberCount = group.member_count || 2;
   const sharePerPerson = totalAmount / actualMemberCount;
 
-  if (__DEV__) {
-    console.log('💰 calculateBalancesFromSummary: Calculation data:', {
-      primaryCurrency: primaryCurrencyEntry.currency,
-      totalAmount,
-      actualMemberCount,
-      sharePerPerson
-    });
-  }
+  // Calculation data prepared
 
   const balances: CalculatedBalance[] = [];
 
@@ -308,9 +282,7 @@ async function calculateBalancesFromSummary(
     }
   }
 
-  if (__DEV__) {
-    console.log('💰 calculateBalancesFromSummary: Final balances:', balances);
-  }
+  // Final balances calculated
 
   return balances;
 }
@@ -348,9 +320,7 @@ function createZeroBalances(
     }
   });
 
-  if (__DEV__) {
-    console.log('💰 createZeroBalances: Created zero balances for', balances.length, 'members');
-  }
+  // Created zero balances for members
 
   return balances;
 }

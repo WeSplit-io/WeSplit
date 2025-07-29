@@ -475,6 +475,9 @@ export const styles = StyleSheet.create({
   negativeAmount: {
     color: '#FF4D4F',
   },
+  neutralAmount: {
+    color: colors.white70,
+  },
 
   // Settleup Content
   settleupContent: {

@@ -32,6 +32,12 @@ export interface NotificationData {
     invitedBy?: string;
     invitedByName?: string;
     expiresAt?: string;
+    transactionId?: string;
+    senderName?: string;
+    recipientName?: string;
+    status?: string;
+    warningType?: string;
+    severity?: string;
   };
 }
 
@@ -145,6 +151,31 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       return require('../../assets/user-icon-black.png');
     }
     
+    // For payment received, use wallet icon
+    if (notification.type === 'payment_received') {
+      return require('../../assets/wallet-icon-default.png');
+    }
+    
+    // For group payment requests, use user icon
+    if (notification.type === 'group_payment_request') {
+      return require('../../assets/user-icon-black.png');
+    }
+    
+    // For group added, use folder icon
+    if (notification.type === 'group_added') {
+      return require('../../assets/folder-icon-default.png');
+    }
+    
+    // For system warnings, use warning icon
+    if (notification.type === 'system_warning') {
+      return require('../../assets/warning-icon.png');
+    }
+    
+    // For system notifications, use info icon
+    if (notification.type === 'system_notification') {
+      return require('../../assets/info-icon.png');
+    }
+    
     // Default fallback
     return require('../../assets/user-icon-black.png');
   };
@@ -166,6 +197,16 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
         return colors.green;
       case 'general':
         return '#A89B9B';
+      case 'payment_received':
+        return '#A5EA15';
+      case 'group_payment_request':
+        return '#A5EA15';
+      case 'group_added':
+        return colors.green;
+      case 'system_warning':
+        return '#FF6B6B';
+      case 'system_notification':
+        return '#45B7D1';
       default:
         return '#A89B9B';
     }
@@ -220,6 +261,46 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
           textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
         };
       case 'general':
+        return {
+          show: false,
+          text: '',
+          disabled: false,
+          backgroundColor: colors.green,
+          textColor: colors.black
+        };
+      case 'payment_received':
+        return {
+          show: true,
+          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'group_payment_request':
+        return {
+          show: true,
+          text: isPaid || isCompleted ? 'Done' : isPending ? 'Processing...' : 'Send',
+          disabled: isPaid || isCompleted || isPending,
+          backgroundColor: isPaid || isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isPaid || isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'group_added':
+        return {
+          show: true,
+          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'system_warning':
+        return {
+          show: true,
+          text: isCompleted ? 'Dismissed' : isPending ? 'Dismissing...' : 'Dismiss',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : '#FF6B6B',
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : '#FFF'
+        };
+      case 'system_notification':
         return {
           show: false,
           text: '',

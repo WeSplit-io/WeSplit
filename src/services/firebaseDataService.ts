@@ -506,10 +506,10 @@ export const firebaseUserService = {
 export const firebaseGroupService = {
   getUserGroups: async (userId: string, forceRefresh: boolean = false): Promise<GroupWithDetails[]> => {
     try {
-      if (__DEV__) { console.log('🔥 Firebase: Getting groups for user:', userId, 'forceRefresh:', forceRefresh); }
+      // Removed excessive logging for cleaner console
       
       // Query groupMembers collection for this user
-      if (__DEV__) { console.log('🔥 Firebase: Querying groupMembers collection for user:', userId); }
+      // Removed excessive logging for cleaner console
       const groupMembersRef = collection(db, 'groupMembers');
       const memberQuery = query(
         groupMembersRef,
@@ -517,59 +517,49 @@ export const firebaseGroupService = {
       );
       const memberDocs = await getDocs(memberQuery);
       
-      if (__DEV__) { console.log('🔥 Firebase: Found', memberDocs.docs.length, 'total member records for user', userId); }
+      // Removed excessive logging for cleaner console
       
       // Process member records to get accepted groups
       const acceptedMembers = memberDocs.docs.filter(doc => {
         const data = doc.data();
         const isAccepted = data.invitation_status === 'accepted';
-        if (__DEV__) { 
-          console.log('🔥 Firebase: Member record:', {
-            group_id: data.group_id,
-            invitation_status: data.invitation_status,
-            isAccepted: isAccepted,
-            user_id: data.user_id
-          }); 
-        }
+        // Removed excessive logging for cleaner console
         return isAccepted;
       });
       
       const groupIds = acceptedMembers.map(doc => doc.data().group_id);
-      if (__DEV__) { console.log('🔥 Firebase: Found', groupIds.length, 'groups where user is accepted member'); }
-      if (__DEV__) { console.log('🔥 Firebase: Accepted member group IDs:', groupIds); }
+      // Removed excessive logging for cleaner console
       
       // Query groups collection for groups where user is creator
-      if (__DEV__) { console.log('🔥 Firebase: Querying groups collection for creator:', userId); }
+      // Removed excessive logging for cleaner console
       const groupsRef = collection(db, 'groups');
       const creatorQuery = query(groupsRef, where('created_by', '==', userId));
       const creatorDocs = await getDocs(creatorQuery);
       
-      if (__DEV__) { console.log('🔥 Firebase: Found', creatorDocs.docs.length, 'groups where user is creator'); }
+      // Removed excessive logging for cleaner console
       
       const creatorGroupIds = creatorDocs.docs.map(doc => doc.id);
-      if (__DEV__) { console.log('🔥 Firebase: Creator group IDs:', creatorGroupIds); }
+      // Removed excessive logging for cleaner console
       
       // Combine and deduplicate group IDs
       const allGroupIds = Array.from(new Set([...groupIds, ...creatorGroupIds]));
-      if (__DEV__) { console.log('🔥 Firebase: Total unique groups:', allGroupIds.length); }
-      if (__DEV__) { console.log('🔥 Firebase: All group IDs to fetch:', allGroupIds); }
+      // Removed excessive logging for cleaner console
       
       // Fetch group details individually to avoid Firebase 'in' query limit
       const groupIdsToFetch = allGroupIds;
-      if (__DEV__) { console.log('🔥 Firebase: Group IDs to fetch:', groupIdsToFetch); }
-      if (__DEV__) { console.log('🔥 Firebase: Starting to fetch', groupIdsToFetch.length, 'groups individually'); }
+      // Removed excessive logging for cleaner console
       
       const results: GroupWithDetails[] = [];
       
       for (const groupId of groupIdsToFetch) {
-        if (__DEV__) { console.log('🔥 Firebase: Fetching group:', groupId); }
+        // Removed excessive logging for cleaner console
         
         try {
           const groupDoc = await getDoc(doc(db, 'groups', groupId));
           
           if (groupDoc.exists()) {
             const groupData = groupDoc.data();
-            if (__DEV__) { console.log('🔥 Firebase: Successfully fetched group:', groupData.name, '(', groupId, ')'); }
+            // Removed excessive logging for cleaner console
             
             // Get member count for this group
             const groupMembersQuery = query(
@@ -580,7 +570,7 @@ export const firebaseGroupService = {
             const groupMembersDocs = await getDocs(groupMembersQuery);
             const memberCount = groupMembersDocs.docs.length;
             
-            if (__DEV__) { console.log('🔥 Firebase: Group', groupData.name, 'has', memberCount, 'accepted members'); }
+            // Removed excessive logging for cleaner console
             
             const group: GroupWithDetails = {
               id: groupDoc.id,
@@ -647,24 +637,16 @@ export const firebaseGroupService = {
             group.userBalance = userBalance;
             
             results.push(group);
-            if (__DEV__) { console.log('🔥 Firebase: Added group to results:', {
-              id: group.id,
-              name: group.name,
-              membersCount: group.members.length,
-              expensesCount: group.expenses.length,
-              totalAmount: group.totalAmount,
-              userBalance: group.userBalance
-            }); }
+            // Removed excessive logging for cleaner console
           } else {
-            if (__DEV__) { console.log('🔥 Firebase: Group', groupId, 'not found in Firestore'); }
+            // Removed excessive logging for cleaner console
           }
         } catch (error) {
           if (__DEV__) { console.error('🔥 Firebase: Error fetching group', groupId, ':', error); }
         }
       }
       
-      if (__DEV__) { console.log('🔥 Firebase: Successfully processed', results.length, 'out of', groupIdsToFetch.length, 'groups'); }
-      if (__DEV__) { console.log('🔥 Firebase: Returning', results.length, 'groups with details'); }
+      // Removed excessive logging for cleaner console
       
       return results;
       } catch (error) {
@@ -709,13 +691,13 @@ export const firebaseGroupService = {
   // Helper function to clean up phantom members
   cleanupPhantomMembers: async (groupId: string): Promise<void> => {
     try {
-      console.log('🔥 cleanupPhantomMembers: Starting cleanup for group:', groupId);
+      // Removed excessive logging for cleaner console
       
       const groupDoc = await getDoc(doc(db, 'groups', groupId));
       if (!groupDoc.exists()) return;
       
       const groupName = groupDoc.data()?.name;
-      console.log('🔥 cleanupPhantomMembers: Group name:', groupName);
+              // Removed excessive logging for cleaner console
       
       const groupMembersRef = collection(db, 'groupMembers');
       
@@ -726,7 +708,7 @@ export const firebaseGroupService = {
       );
       const allMembersDocs = await getDocs(allMembersQuery);
       
-      console.log('🔥 cleanupPhantomMembers: Found members before cleanup:', allMembersDocs.docs.length);
+              // Removed excessive logging for cleaner console
       
       const membersToDelete: any[] = [];
       
@@ -801,7 +783,7 @@ export const firebaseGroupService = {
           console.log('🔥 Cleaned up phantom members:', membersToDelete.length);
         }
       } else {
-        console.log('🔥 cleanupPhantomMembers: No members to delete');
+        // Removed excessive logging for cleaner console
       }
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error cleaning up phantom members:', error); }
@@ -810,7 +792,7 @@ export const firebaseGroupService = {
 
   getGroupMembers: async (groupId: string, forceRefresh: boolean = false, currentUserId?: string): Promise<GroupMember[]> => {
     try {
-      console.log('🔥 getGroupMembers: Starting for group:', groupId, 'currentUserId:', currentUserId);
+      // Removed excessive logging for cleaner console
       
       // First, clean up any phantom members
       await firebaseDataService.group.cleanupPhantomMembers(groupId);
@@ -825,18 +807,18 @@ export const firebaseGroupService = {
       const memberDocs = await getDocs(memberQuery);
       let members = memberDocs.docs.map(doc => firebaseDataTransformers.firestoreToGroupMember(doc));
 
-      console.log('🔥 getGroupMembers: Found all members before filtering:', members.length, members.map(m => ({ id: m.id, name: m.name, email: m.email, invitation_status: m.invitation_status })));
+      // Removed excessive logging for cleaner console
 
       // Filter to only accepted members on the client side
       members = members.filter(member => member.invitation_status === 'accepted');
 
-      console.log('🔥 getGroupMembers: Found accepted members after filtering:', members.length, members.map(m => ({ id: m.id, name: m.name, email: m.email })));
+      // Removed excessive logging for cleaner console
 
       // Get group info to filter out phantom members
       const groupDoc = await getDoc(doc(db, 'groups', groupId));
       const groupName = groupDoc.exists() ? groupDoc.data()?.name : '';
 
-      console.log('🔥 getGroupMembers: Group name for filtering:', groupName);
+      // Removed excessive logging for cleaner console
 
       // Filter out phantom members (members with the same name as the group or "Unknown User")
       members = members.filter(member => {
@@ -855,7 +837,7 @@ export const firebaseGroupService = {
         return true;
       });
 
-      console.log('🔥 getGroupMembers: Members after phantom filtering:', members.length, members.map(m => ({ id: m.id, name: m.name, email: m.email })));
+      // Removed excessive logging for cleaner console
 
       // If currentUserId is provided and not in members, add them
       if (currentUserId && !members.some(m => String(m.id) === String(currentUserId))) {
@@ -926,7 +908,7 @@ export const firebaseGroupService = {
       }
       
       if (__DEV__) {
-        console.log('🔥 getGroupMembers returning members:', members.map(m => ({ id: m.id, name: m.name, email: m.email })));
+        // Removed excessive logging for cleaner console
       }
       
       return members;
@@ -1634,7 +1616,7 @@ export const firebaseGroupService = {
   // Real-time listeners
   listenToUserGroups: (userId: string, callback: (groups: GroupWithDetails[]) => void, onError?: (error: any) => void) => {
     try {
-      if (__DEV__) { console.log('🔥 Setting up real-time listener for user groups:', userId); }
+      // Removed excessive logging for cleaner console
       
       // Listen to groupMembers collection for this user
       const membersRef = collection(db, 'groupMembers');
@@ -1649,7 +1631,7 @@ export const firebaseGroupService = {
           const memberDocs = snapshot.docs;
           const groupIds = memberDocs.map(doc => doc.data().group_id);
           
-          if (__DEV__) { console.log('🔥 Real-time update: Found', groupIds.length, 'groups for user'); }
+          // Removed excessive logging for cleaner console
           
           // Fetch group details for all groups
           const groups: GroupWithDetails[] = [];
@@ -1756,6 +1738,93 @@ export const firebaseGroupService = {
       if (__DEV__) { console.error('🔥 Error setting up group real-time listener:', error); }
       if (onError) onError(error);
       return () => {}; // Return empty unsubscribe function
+    }
+  },
+
+  // Send group payment request notification
+  sendGroupPaymentRequest: async (
+    groupId: string,
+    senderId: string,
+    recipientId: string,
+    amount: number,
+    currency: string,
+    description?: string
+  ): Promise<void> => {
+    try {
+      if (__DEV__) { console.log('🔥 Sending group payment request notification:', { groupId, senderId, recipientId, amount, currency, description }); }
+      
+      // Get group and user data
+      const [groupDoc, senderDoc, recipientDoc] = await Promise.all([
+        getDoc(doc(db, 'groups', groupId)),
+        getDoc(doc(db, 'users', senderId)),
+        getDoc(doc(db, 'users', recipientId))
+      ]);
+      
+      const groupName = groupDoc.exists() ? groupDoc.data().name : 'Group';
+      const senderName = senderDoc.exists() ? senderDoc.data().name : 'Unknown';
+      
+      // Send notification to recipient
+      await sendNotification(
+        recipientId,
+        'Group Payment Request',
+        `${senderName} has requested ${amount} ${currency} in ${groupName}${description ? ` for ${description}` : ''}`,
+        'group_payment_request',
+        {
+          groupId,
+          groupName,
+          senderId,
+          senderName,
+          amount,
+          currency,
+          description,
+          status: 'pending'
+        }
+      );
+      
+      if (__DEV__) { console.log('🔥 Group payment request notification sent successfully'); }
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error sending group payment request notification:', error); }
+      throw error;
+    }
+  },
+
+  // Send group added notification
+  sendGroupAddedNotification: async (
+    groupId: string,
+    addedUserId: string,
+    addedByUserId: string
+  ): Promise<void> => {
+    try {
+      if (__DEV__) { console.log('🔥 Sending group added notification:', { groupId, addedUserId, addedByUserId }); }
+      
+      // Get group and user data
+      const [groupDoc, addedByDoc] = await Promise.all([
+        getDoc(doc(db, 'groups', groupId)),
+        getDoc(doc(db, 'users', addedByUserId))
+      ]);
+      
+      const groupName = groupDoc.exists() ? groupDoc.data().name : 'Group';
+      const addedByName = addedByDoc.exists() ? addedByDoc.data().name : 'Unknown';
+      
+      // Send notification to added user
+      await sendNotification(
+        addedUserId,
+        'Added to Group',
+        `${addedByName} has added you to the group "${groupName}"`,
+        'group_added',
+        {
+          groupId,
+          groupName,
+          addedBy: addedByUserId,
+          addedByName,
+          status: 'active'
+        }
+      );
+      
+      if (__DEV__) { console.log('🔥 Group added notification sent successfully'); }
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error sending group added notification:', error); }
+      throw error;
     }
   }
 };
@@ -1938,7 +2007,7 @@ export const firebaseExpenseService = {
 export const firebaseTransactionService = {
   getUserTransactions: async (userId: string): Promise<Transaction[]> => {
     try {
-      console.log('🔥 firebaseTransactionService.getUserTransactions called with userId:', userId);
+      // Removed excessive logging for cleaner console
       
       const transactionsRef = collection(db, 'transactions');
       
@@ -1948,9 +2017,9 @@ export const firebaseTransactionService = {
         where('from_user', '==', userId),
         orderBy('created_at', 'desc')
       );
-      console.log('🔥 Querying transactions where from_user ==', userId);
+      // Removed excessive logging for cleaner console
       const fromDocs = await getDocs(fromQuery);
-      console.log('🔥 Found', fromDocs.docs.length, 'transactions where user is sender');
+      // Removed excessive logging for cleaner console
       
       // Query for transactions where user is the receiver
       const toQuery = query(
@@ -1958,19 +2027,19 @@ export const firebaseTransactionService = {
         where('to_user', '==', userId),
         orderBy('created_at', 'desc')
       );
-      console.log('🔥 Querying transactions where to_user ==', userId);
+      // Removed excessive logging for cleaner console
       const toDocs = await getDocs(toQuery);
-      console.log('🔥 Found', toDocs.docs.length, 'transactions where user is receiver');
+      // Removed excessive logging for cleaner console
       
       const allTransactions = [
         ...fromDocs.docs.map(doc => {
           const transaction = firebaseDataTransformers.firestoreToTransaction(doc);
-          console.log('🔥 Sender transaction:', transaction);
+          // Removed excessive logging for cleaner console
           return transaction;
         }),
         ...toDocs.docs.map(doc => {
           const transaction = firebaseDataTransformers.firestoreToTransaction(doc);
-          console.log('🔥 Receiver transaction:', transaction);
+          // Removed excessive logging for cleaner console
           return transaction;
         })
       ];
@@ -1980,8 +2049,7 @@ export const firebaseTransactionService = {
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       
-      console.log('🔥 Total transactions found:', sortedTransactions.length);
-      console.log('🔥 All transactions:', sortedTransactions);
+      // Removed excessive logging for cleaner console
       
       return sortedTransactions;
     } catch (error) {
@@ -2013,6 +2081,48 @@ export const firebaseTransactionService = {
     }
     
     await updateDoc(transactionRef, updateData);
+  },
+
+  // Send payment received notification
+  sendPaymentReceivedNotification: async (
+    recipientId: string,
+    senderId: string,
+    amount: number,
+    currency: string,
+    transactionId: string
+  ): Promise<void> => {
+    try {
+      if (__DEV__) { console.log('🔥 Sending payment received notification:', { recipientId, senderId, amount, currency, transactionId }); }
+      
+      // Get sender and recipient data
+      const [senderDoc, recipientDoc] = await Promise.all([
+        getDoc(doc(db, 'users', senderId)),
+        getDoc(doc(db, 'users', recipientId))
+      ]);
+      
+      const senderName = senderDoc.exists() ? senderDoc.data().name : 'Unknown';
+      
+      // Send notification to recipient
+      await sendNotification(
+        recipientId,
+        'Payment Received',
+        `You received ${amount} ${currency} from ${senderName}`,
+        'payment_received',
+        {
+          transactionId,
+          senderId,
+          senderName,
+          amount,
+          currency,
+          status: 'completed'
+        }
+      );
+      
+      if (__DEV__) { console.log('🔥 Payment received notification sent successfully'); }
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error sending payment received notification:', error); }
+      throw error;
+    }
   }
 };
 
@@ -2075,6 +2185,64 @@ const calculateUserBalance = (expenses: Expense[], members: GroupMember[], userI
   });
   
   return balance;
+};
+
+// System notification services
+export const firebaseSystemService = {
+  sendSystemWarning: async (
+    userId: string,
+    warningType: 'low_balance' | 'payment_failed' | 'network_error' | 'security_alert',
+    message: string,
+    data?: any
+  ): Promise<void> => {
+    try {
+      if (__DEV__) { console.log('🔥 Sending system warning:', { userId, warningType, message }); }
+      
+      await sendNotification(
+        userId,
+        'System Warning',
+        message,
+        'system_warning',
+        {
+          warningType,
+          data,
+          severity: 'warning'
+        }
+      );
+      
+      if (__DEV__) { console.log('🔥 System warning sent successfully'); }
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error sending system warning:', error); }
+      throw error;
+    }
+  },
+
+  sendSystemNotification: async (
+    userId: string,
+    title: string,
+    message: string,
+    data?: any
+  ): Promise<void> => {
+    try {
+      if (__DEV__) { console.log('🔥 Sending system notification:', { userId, title, message }); }
+      
+      await sendNotification(
+        userId,
+        title,
+        message,
+        'system_notification',
+        {
+          data,
+          severity: 'info'
+        }
+      );
+      
+      if (__DEV__) { console.log('🔥 System notification sent successfully'); }
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error sending system notification:', error); }
+      throw error;
+    }
+  }
 };
 
 // Settlement services (Firebase implementations)
@@ -2282,6 +2450,215 @@ export const firebaseSettlementService = {
       return status;
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error in getReminderStatus:', error); }
+      throw error;
+    }
+  },
+
+  sendPaymentReminder: async (
+    groupId: string,
+    senderId: string,
+    recipientId: string,
+    amount: number
+  ): Promise<{ success: boolean; message: string; recipientName: string; amount: number }> => {
+    try {
+      if (__DEV__) { console.log('🔥 Sending payment reminder:', { groupId, senderId, recipientId, amount }); }
+      
+      // Get sender and recipient data
+      const [senderDoc, recipientDoc, groupDoc] = await Promise.all([
+        getDoc(doc(db, 'users', senderId)),
+        getDoc(doc(db, 'users', recipientId)),
+        getDoc(doc(db, 'groups', groupId))
+      ]);
+      
+      if (!senderDoc.exists() || !recipientDoc.exists() || !groupDoc.exists()) {
+        throw new Error('User or group not found');
+      }
+      
+      const senderData = senderDoc.data();
+      const recipientData = recipientDoc.data();
+      const groupData = groupDoc.data();
+      
+      // Check if reminder was sent recently (24-hour cooldown)
+      const remindersRef = collection(db, 'reminders');
+      const recentReminderQuery = query(
+        remindersRef,
+        where('group_id', '==', groupId),
+        where('sender_id', '==', senderId),
+        where('recipient_id', '==', recipientId),
+        where('sent_at', '>', new Date(Date.now() - 24 * 60 * 60 * 1000))
+      );
+      
+      const recentReminders = await getDocs(recentReminderQuery);
+      
+      if (!recentReminders.empty) {
+        const lastSent = recentReminders.docs[0].data().sent_at?.toDate() || new Date();
+        const nextAllowed = new Date(lastSent.getTime() + 24 * 60 * 60 * 1000);
+        const timeRemaining = Math.ceil((nextAllowed.getTime() - Date.now()) / (1000 * 60 * 60));
+        
+        throw new Error(`Reminder cooldown active. You can send another reminder in ${timeRemaining} hours.`);
+      }
+      
+      // Record the reminder
+      const reminderData = {
+        group_id: groupId,
+        sender_id: senderId,
+        recipient_id: recipientId,
+        amount: amount,
+        reminder_type: 'individual',
+        sent_at: serverTimestamp(),
+        created_at: serverTimestamp()
+      };
+      
+      await addDoc(collection(db, 'reminders'), reminderData);
+      
+      // Send notification to recipient
+      await sendNotification(
+        recipientId,
+        'Payment Reminder',
+        `${senderData.name} is reminding you about a $${amount.toFixed(2)} payment in ${groupData.name}`,
+        'payment_reminder',
+        {
+          groupId: groupId,
+          groupName: groupData.name,
+          senderId: senderId,
+          senderName: senderData.name,
+          amount: amount,
+          currency: 'USDC'
+        }
+      );
+      
+      if (__DEV__) { console.log('🔥 Payment reminder sent successfully'); }
+      
+      return {
+        success: true,
+        message: `Reminder sent to ${recipientData.name}`,
+        recipientName: recipientData.name,
+        amount: amount
+      };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error sending payment reminder:', error); }
+      throw error;
+    }
+  },
+
+  sendBulkPaymentReminders: async (
+    groupId: string,
+    senderId: string,
+    debtors: Array<{ recipientId: string; amount: number; name: string }>
+  ): Promise<{ 
+    success: boolean; 
+    message: string; 
+    results: { recipientId: string; recipientName: string; amount: number; success: boolean }[];
+    totalAmount: number;
+  }> => {
+    try {
+      if (__DEV__) { console.log('🔥 Sending bulk payment reminders:', { groupId, senderId, debtorsCount: debtors.length }); }
+      
+      // Get sender and group data
+      const [senderDoc, groupDoc] = await Promise.all([
+        getDoc(doc(db, 'users', senderId)),
+        getDoc(doc(db, 'groups', groupId))
+      ]);
+      
+      if (!senderDoc.exists() || !groupDoc.exists()) {
+        throw new Error('User or group not found');
+      }
+      
+      const senderData = senderDoc.data();
+      const groupData = groupDoc.data();
+      
+      // Check bulk reminder cooldown
+      const remindersRef = collection(db, 'reminders');
+      const bulkReminderQuery = query(
+        remindersRef,
+        where('group_id', '==', groupId),
+        where('sender_id', '==', senderId),
+        where('reminder_type', '==', 'bulk'),
+        where('sent_at', '>', new Date(Date.now() - 24 * 60 * 60 * 1000))
+      );
+      
+      const bulkReminders = await getDocs(bulkReminderQuery);
+      
+      if (!bulkReminders.empty) {
+        const lastSent = bulkReminders.docs[0].data().sent_at?.toDate() || new Date();
+        const nextAllowed = new Date(lastSent.getTime() + 24 * 60 * 60 * 1000);
+        const timeRemaining = Math.ceil((nextAllowed.getTime() - Date.now()) / (1000 * 60 * 60));
+        
+        throw new Error(`Bulk reminder cooldown active. You can send bulk reminders again in ${timeRemaining} hours.`);
+      }
+      
+      const results = [];
+      const batch = writeBatch(db);
+      
+      // Send reminders to all debtors
+      for (const debtor of debtors) {
+        try {
+          // Record the reminder
+          const reminderData = {
+            group_id: groupId,
+            sender_id: senderId,
+            recipient_id: debtor.recipientId,
+            amount: debtor.amount,
+            reminder_type: 'bulk',
+            sent_at: serverTimestamp(),
+            created_at: serverTimestamp()
+          };
+          
+          const reminderRef = doc(collection(db, 'reminders'));
+          batch.set(reminderRef, reminderData);
+          
+          // Send notification
+          await sendNotification(
+            debtor.recipientId,
+            'Payment Reminder',
+            `${senderData.name} is reminding you about a $${debtor.amount.toFixed(2)} payment in ${groupData.name}`,
+            'payment_reminder',
+            {
+              groupId: groupId,
+              groupName: groupData.name,
+              senderId: senderId,
+              senderName: senderData.name,
+              amount: debtor.amount,
+              currency: 'USDC',
+              isPartOfBulk: true
+            }
+          );
+          
+          results.push({
+            recipientId: debtor.recipientId,
+            recipientName: debtor.name,
+            amount: debtor.amount,
+            success: true
+          });
+          
+        } catch (error) {
+          console.error(`Error sending reminder to ${debtor.name}:`, error);
+          results.push({
+            recipientId: debtor.recipientId,
+            recipientName: debtor.name,
+            amount: debtor.amount,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+      
+      // Commit all reminder records
+      await batch.commit();
+      
+      const successCount = results.filter(r => r.success).length;
+      const totalAmount = debtors.reduce((sum, d) => sum + d.amount, 0);
+      
+      if (__DEV__) { console.log('🔥 Bulk payment reminders sent successfully'); }
+      
+      return {
+        success: true,
+        message: `Reminders sent to ${successCount} members about $${totalAmount.toFixed(2)} total`,
+        results: results,
+        totalAmount: totalAmount
+      };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error sending bulk payment reminders:', error); }
       throw error;
     }
   }

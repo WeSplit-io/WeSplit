@@ -2,6 +2,8 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 import { firebaseDataService } from './firebaseDataService';
 import { solanaAppKitService } from './solanaAppKitService';
+import { secureStorageService } from './secureStorageService';
+import { logger } from './loggingService';
 
 // Solana RPC endpoints
 const SOLANA_RPC_ENDPOINTS = {
@@ -50,18 +52,14 @@ export class UserWalletService {
   // Ensure user has a wallet - create if missing
   async ensureUserWallet(userId: string): Promise<WalletCreationResult> {
     try {
-      if (__DEV__) {
-        console.log('🔧 Ensuring wallet exists for user:', userId);
-      }
+      // Ensuring wallet exists for user
 
       // Get current user data
       const user = await firebaseDataService.user.getCurrentUser(userId);
       
       // Check if user already has a wallet
       if (user && user.wallet_address && user.wallet_address.trim() !== '') {
-        if (__DEV__) {
-          console.log('✅ User already has wallet:', user.wallet_address);
-        }
+        // User already has wallet
         return {
           success: true,
           wallet: {
@@ -72,9 +70,6 @@ export class UserWalletService {
       }
 
       // User doesn't have a wallet, create one
-      if (__DEV__) {
-        console.log('🔄 Creating new wallet for user:', userId);
-      }
 
       const walletResult = await this.createWalletForUser(userId);
       
@@ -82,29 +77,23 @@ export class UserWalletService {
       await this.ensureUserSeedPhrase(userId);
       
       if (walletResult.success && walletResult.wallet) {
-        if (__DEV__) {
-          console.log('✅ Wallet created successfully:', walletResult.wallet.address);
-        }
+        // Wallet created successfully
         
         // Request airdrop in background for development
         if (process.env.NODE_ENV !== 'production') {
           this.requestAirdrop(walletResult.wallet.address)
             .then(() => {
-              if (__DEV__) {
-                console.log('✅ Background airdrop successful: 1 SOL added to wallet');
-              }
+              logger.info('Background airdrop successful: 1 SOL added to wallet', null, 'UserWalletService');
             })
             .catch((airdropError) => {
-              if (__DEV__) {
-                console.log('⚠️ Background airdrop failed (this is normal):', airdropError.message);
-              }
+              logger.warn('Background airdrop failed (this is normal)', airdropError, 'UserWalletService');
             });
         }
       }
 
       return walletResult;
     } catch (error) {
-      console.error('Error ensuring user wallet:', error);
+      logger.error('Error ensuring user wallet', error, 'UserWalletService');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to ensure user wallet'
@@ -131,22 +120,13 @@ export class UserWalletService {
 
       // Save seed phrase if available
       if (result.mnemonic) {
-        const seedPhrase = result.mnemonic.split(' ');
-        await firebaseDataService.user.saveUserSeedPhrase(userId, seedPhrase);
+        const seedPhrase = result.mnemonic;
+        await secureStorageService.storeSeedPhrase(userId, seedPhrase);
         
-        if (__DEV__) {
-          console.log('✅ Seed phrase saved for user:', userId);
-        }
+        logger.info('Seed phrase stored securely for user', { userId }, 'UserWalletService');
       }
 
-      if (__DEV__) {
-        console.log('✅ Wallet created and saved for user:', {
-          userId,
-          address: wallet.address,
-          publicKey: wallet.publicKey,
-          hasSeedPhrase: !!result.mnemonic
-        });
-      }
+      // Wallet created and saved for user
 
       return {
         success: true,
@@ -157,7 +137,7 @@ export class UserWalletService {
         }
       };
     } catch (error) {
-      console.error('Error creating wallet for user:', error);
+      logger.error('Error creating wallet for user', error, 'UserWalletService');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to create wallet'
@@ -172,13 +152,9 @@ export class UserWalletService {
       const signature = await this.connection.requestAirdrop(publicKey, amount * LAMPORTS_PER_SOL);
       await this.connection.confirmTransaction(signature);
       
-      if (__DEV__) {
-        console.log('✅ Airdrop successful:', signature);
-      }
+      logger.info('Airdrop successful', { signature }, 'UserWalletService');
     } catch (error) {
-      if (__DEV__) {
-        console.log('⚠️ Airdrop failed (this is normal in production):', error);
-      }
+      logger.warn('Airdrop failed (this is normal in production)', error, 'UserWalletService');
       throw error;
     }
   }
@@ -186,21 +162,21 @@ export class UserWalletService {
   // Ensure user has a seed phrase
   async ensureUserSeedPhrase(userId: string): Promise<boolean> {
     try {
-      // Check if user already has a seed phrase
-      const existingSeedPhrase = await firebaseDataService.user.getUserSeedPhrase(userId);
-      if (existingSeedPhrase && existingSeedPhrase.length > 0) {
-        if (__DEV__) { console.log('✅ User already has seed phrase'); }
+      // Check if user already has a seed phrase in secure storage
+      const existingSeedPhrase = await secureStorageService.getSeedPhrase(userId);
+      if (existingSeedPhrase) {
+        // User already has seed phrase
         return true;
       }
 
       // Generate and save a new seed phrase
-      const newSeedPhrase = solanaAppKitService.generateMnemonic().split(' ');
-      await firebaseDataService.user.saveUserSeedPhrase(userId, newSeedPhrase);
+      const newSeedPhrase = solanaAppKitService.generateMnemonic();
+      await secureStorageService.storeSeedPhrase(userId, newSeedPhrase);
       
-      if (__DEV__) { console.log('✅ Seed phrase generated and saved for user:', userId); }
+      logger.info('Seed phrase generated and saved securely for user', { userId }, 'UserWalletService');
       return true;
     } catch (error) {
-      console.error('Error ensuring user seed phrase:', error);
+      logger.error('Error ensuring user seed phrase', error, 'UserWalletService');
       return false;
     }
   }
@@ -212,15 +188,13 @@ export class UserWalletService {
       const walletResult = await this.ensureUserWallet(userId);
       
       if (!walletResult.success || !walletResult.wallet) {
-        if (__DEV__) {
-          console.log('❌ Failed to ensure wallet for user:', userId);
-        }
+        // Failed to ensure wallet for user
         return null;
       }
 
       const walletAddress = walletResult.wallet.address;
       
-      if (__DEV__) { console.log('Fetching balance for user wallet:', walletAddress); }
+      // Fetching balance for user wallet
 
       // Get SOL balance
       const publicKey = new PublicKey(walletAddress);
@@ -236,21 +210,13 @@ export class UserWalletService {
         usdcBalance = Number(accountInfo.amount) / 1000000; // USDC has 6 decimals
       } catch (error) {
         // Token account doesn't exist, balance is 0
-        if (__DEV__) { console.log('USDC token account does not exist for wallet:', walletAddress); }
       }
 
       // Calculate total USD value (simplified conversion)
       const solToUSD = 200; // Approximate SOL to USD rate
       const totalUSD = (solBalanceInSol * solToUSD) + usdcBalance;
 
-      if (__DEV__) { 
-        console.log('User wallet balance:', {
-          address: walletAddress,
-          solBalance: solBalanceInSol,
-          usdcBalance,
-          totalUSD
-        });
-      }
+      // User wallet balance calculated
 
       return {
         solBalance: solBalanceInSol,
@@ -270,11 +236,11 @@ export class UserWalletService {
   async getWalletBalanceByAddress(walletAddress: string): Promise<UserWalletBalance | null> {
     try {
       if (!walletAddress) {
-        if (__DEV__) { console.log('No wallet address provided'); }
+        // No wallet address provided
         return null;
       }
 
-      if (__DEV__) { console.log('Fetching balance for wallet address:', walletAddress); }
+      // Fetching balance for wallet address
 
       // Get SOL balance
       const publicKey = new PublicKey(walletAddress);
@@ -290,7 +256,6 @@ export class UserWalletService {
         usdcBalance = Number(accountInfo.amount) / 1000000; // USDC has 6 decimals
       } catch (error) {
         // Token account doesn't exist, balance is 0
-        if (__DEV__) { console.log('USDC token account does not exist for wallet:', walletAddress); }
       }
 
       // Calculate total USD value (simplified conversion)

@@ -338,8 +338,21 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
         const membersToNotify = selectedGroup.members.filter(member => member.id !== paidBy);
         
         for (const member of membersToNotify) {
+          // Ensure member.id is valid before creating notification
+          if (!member.id) {
+            console.warn('⚠️ AddExpenseScreen: Skipping notification for member without ID:', member);
+            continue;
+          }
+          
+          // Debug logging for notification creation
+          console.log('🔄 AddExpenseScreen: Creating notification for member:', {
+            memberId: member.id,
+            memberName: member.name,
+            userId: String(member.id)
+          });
+          
           await firebaseDataService.notification.createNotification({
-            user_id: member.id,
+            userId: String(member.id),
             type: 'expense_added',
             title: 'New Expense Added',
             message: `${currentUser?.name || 'Someone'} added a new expense: ${description}`,
@@ -362,13 +375,21 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
       }
 
       // Navigate to success screen
-      navigation.navigate('ExpenseSuccess', {
+      const successParams = {
         expense: result,
         group: selectedGroup,
         amount: parseFloat(amount),
         currency: selectedCurrency.symbol,
         convertedAmount: convertedAmount
+      };
+      
+      console.log('🔄 AddExpenseScreen: Navigating to ExpenseSuccess with params:', {
+        groupId: selectedGroup?.id,
+        groupName: selectedGroup?.name,
+        expenseId: result?.id
       });
+      
+      navigation.navigate('ExpenseSuccess', successParams);
 
     } catch (error) {
       console.error('❌ AddExpenseScreen: Error creating expense:', error);

@@ -9,7 +9,6 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.black,
   },
   content: {
-    flex: 1,
     paddingHorizontal: spacing.lg,
   },
   mainContainer: {
@@ -21,6 +20,8 @@ export const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
+    flexGrow: 1,
+    minHeight: '100%',
   },
 
   // ===== HEADER STYLES =====

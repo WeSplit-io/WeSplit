@@ -12,13 +12,12 @@ export default StyleSheet.create({
     padding: 8,
   },
   content: {
-    flex: 1,
     paddingHorizontal: 20,
-    justifyContent: 'space-between',
+    paddingBottom: 40,
   },
   mainContent: {
-    flex: 1,
     marginTop: spacing.md,
+    paddingBottom: spacing.xl,
   },
   scrollContent: {
     alignItems: 'center',
@@ -410,5 +409,101 @@ export default StyleSheet.create({
     color: colors.green,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold as any,
+  },
+  // Transfer section styles
+  transferSection: {
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    width: '100%',
+  },
+  sectionTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold as any,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  sectionDescription: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+    lineHeight: 20,
+  },
+  externalWalletInfo: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  appWalletInfo: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  walletLabel: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    marginBottom: 4,
+    fontWeight: typography.fontWeight.medium as any,
+  },
+  walletAddress: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontFamily: 'monospace',
+    marginBottom: 4,
+  },
+  balanceText: {
+    color: colors.green,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium as any,
+  },
+  transferAmountInput: {
+    marginBottom: spacing.lg,
+  },
+  transferAmountLabel: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    marginBottom: spacing.sm,
+    fontWeight: typography.fontWeight.medium as any,
+  },
+  input: {
+    backgroundColor: '#2A2A2A',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.green,
+    padding: 12,
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    textAlign: 'center',
+  },
+  transferButton: {
+    backgroundColor: colors.green,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    width: '100%',
+  },
+  transferButtonDisabled: {
+    opacity: 0.5,
+  },
+  transferButtonText: {
+    color: colors.black,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold as any,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.white10,
+    marginVertical: spacing.lg,
+    width: '100%',
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.xl,
+    minHeight: '100%',
   },
 }); 

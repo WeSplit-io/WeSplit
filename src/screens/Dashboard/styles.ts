@@ -558,7 +558,39 @@ export const styles = StyleSheet.create({
   requestSendButtonTextNew: {
     color: colors.black,
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.semibold,
+  },
+
+  // Request preview item (3rd request with overlay)
+  requestPreviewItem: {
+    position: 'relative',
+    opacity: 0.8,
+  },
+
+  // Request preview content (blurred)
+  requestPreviewContent: {
+    filter: 'blur(1px)',
+  },
+
+  // Request preview overlay
+  requestPreviewOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.black ,
+    borderRadius: spacing.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Request preview text
+  requestPreviewText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    
   },
 
   // === GROUPS SECTION ===

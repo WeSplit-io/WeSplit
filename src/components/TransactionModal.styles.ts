@@ -19,7 +19,7 @@ export const styles = StyleSheet.create({
     paddingBottom: 40,
     paddingTop: 24,
     maxHeight: '85%',
-    minHeight: 700,
+    minHeight: 600,
   },
   transactionHandle: {
     width: 40,
@@ -40,8 +40,7 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   transactionContentContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
+    paddingBottom: 32,
   },
   transactionIconContainer: {
     backgroundColor: colors.green,
@@ -137,5 +136,18 @@ export const styles = StyleSheet.create({
     color: colors.green,
     fontSize: 20,
     fontWeight: 'semibold',
+  },
+  groupNavigationButton: {
+    backgroundColor: colors.green,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  groupNavigationButtonText: {
+    color: colors.black,
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 

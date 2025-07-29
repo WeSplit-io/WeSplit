@@ -22,10 +22,25 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
   const sliderValue = useRef(new Animated.Value(0)).current;
   const [isSliderActive, setIsSliderActive] = useState(false);
 
+  // Debug logging for slider props
+  console.log('🔍 AppleSlider: Props debug:', {
+    disabled,
+    loading,
+    text,
+    onSlideComplete: !!onSlideComplete
+  });
+
   const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => !disabled && !loading,
-    onMoveShouldSetPanResponder: () => !disabled && !loading,
+    onStartShouldSetPanResponder: () => {
+      console.log('🔍 AppleSlider: onStartShouldSetPanResponder called, disabled:', disabled, 'loading:', loading);
+      return !disabled && !loading;
+    },
+    onMoveShouldSetPanResponder: () => {
+      console.log('🔍 AppleSlider: onMoveShouldSetPanResponder called, disabled:', disabled, 'loading:', loading);
+      return !disabled && !loading;
+    },
     onPanResponderGrant: () => {
+      console.log('🔍 AppleSlider: onPanResponderGrant - slider activated');
       setIsSliderActive(true);
     },
     onPanResponderMove: (_, gestureState) => {
@@ -39,6 +54,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
           duration: 200,
           useNativeDriver: false,
         }).start(() => {
+          console.log('🔍 AppleSlider: Slide completed, calling onSlideComplete');
           if (onSlideComplete) onSlideComplete();
           setTimeout(() => {
             sliderValue.setValue(0);
@@ -125,14 +141,37 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     isConnected,
     address,
     balance,
-    isLoading: walletLoading
+    isLoading: walletLoading,
+    availableWallets,
+    connectWallet,
+    // App wallet state and actions
+    appWalletConnected,
+    appWalletBalance,
+    ensureAppWallet
   } = useWallet();
   const [sending, setSending] = useState(false);
 
   const handleConfirmSend = async () => {
-    if (!isConnected) {
-      Alert.alert('Wallet Error', 'Please connect your wallet first');
-      return;
+    // For send transactions, we use the app wallet (not external wallet)
+    // The app wallet should be automatically connected when user logs in
+    if (!appWalletConnected) {
+      console.log('🔍 SendConfirmation: App wallet not connected, attempting to ensure...');
+      
+      try {
+        if (currentUser?.id) {
+          console.log('🔍 SendConfirmation: Ensuring app wallet for user:', currentUser.id);
+          await ensureAppWallet(currentUser.id.toString());
+          console.log('🔍 SendConfirmation: App wallet ensured successfully');
+        } else {
+          console.log('🔍 SendConfirmation: No current user found');
+          Alert.alert('Wallet Error', 'User not authenticated');
+          return;
+        }
+      } catch (autoConnectError) {
+        console.error('🔍 SendConfirmation: App wallet ensure failed:', autoConnectError);
+        Alert.alert('Wallet Error', 'Failed to initialize app wallet');
+        return;
+      }
     }
 
     if (!contact?.wallet_address) {
@@ -140,8 +179,8 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       return;
     }
 
-    if (balance !== null && balance < amount) {
-      Alert.alert('Insufficient Balance', 'You do not have enough balance to complete this transaction');
+    if (appWalletBalance !== null && appWalletBalance < amount) {
+      Alert.alert('Insufficient Balance', 'You do not have enough balance in your app wallet to complete this transaction');
       return;
     }
 
@@ -203,7 +242,19 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const transactionId = 'ZIEZHFIZENBAO'; // Replace with real tx id if available
 
   // Check if user has sufficient balance
-  const hasSufficientBalance = balance === null || balance >= amount;
+  const hasSufficientBalance = appWalletBalance === null || appWalletBalance >= amount;
+
+  // Debug logging for slider state
+  console.log('🔍 SendConfirmation: Slider state debug:', {
+    sending,
+    appWalletConnected,
+    hasSufficientBalance,
+    walletLoading,
+    appWalletBalance,
+    amount,
+    availableWallets: availableWallets.length,
+    disabled: sending || !appWalletConnected || !hasSufficientBalance || walletLoading
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -300,7 +351,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         </Text>
         <AppleSlider
           onSlideComplete={handleConfirmSend}
-          disabled={sending || !isConnected || !hasSufficientBalance || walletLoading}
+          disabled={__DEV__ ? false : (sending || !appWalletConnected || !hasSufficientBalance || walletLoading)}
           loading={sending || walletLoading}
           text="Sign transaction"
         />

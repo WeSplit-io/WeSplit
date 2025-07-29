@@ -326,7 +326,7 @@ interface AppContextType {
   deleteExpense: (groupId: number, expenseId: number) => Promise<void>;
   
   // User operations
-  authenticateUser: (user: User, method: 'wallet' | 'email' | 'guest') => void;
+  authenticateUser: (user: User, method: 'wallet' | 'email' | 'guest' | 'social') => void;
   updateUser: (updates: Partial<User>) => Promise<void>;
   logoutUser: () => void;
   
@@ -467,16 +467,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       changes.forEach((change) => {
         if (change.type === 'added' || change.type === 'removed') {
           hasChanges = true;
-          console.log('🔄 AppContext: Group membership change detected:', {
-            type: change.type,
-            groupId: change.doc.data()?.group_id,
-            userId: change.doc.data()?.user_id
-    });
+                  // Removed excessive logging for cleaner console
   }
       });
 
       if (hasChanges && state.currentUser?.id) {
-        console.log('🔄 AppContext: Group membership changed, refreshing groups...');
+        // Removed excessive logging for cleaner console
         // Force refresh user groups to reflect membership changes
         if (userGroupsListenerRef.current) {
           userGroupsListenerRef.current();
@@ -534,13 +530,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return;
     }
     
-    if (__DEV__) { console.log('🔄 AppContext: loadUserGroups called with forceRefresh:', forceRefresh); }
+    // Removed excessive logging for cleaner console
     
     try {
       // Actually load groups from Firebase if real-time listeners aren't working
       const userGroups = await firebaseDataService.group.getUserGroups(state.currentUser.id.toString(), forceRefresh);
       
-      if (__DEV__) { console.log('🔄 AppContext: Loaded groups from Firebase:', userGroups.length); }
+      // Removed excessive logging for cleaner console
       
       // Update state with loaded groups
       dispatch({ type: 'SET_GROUPS', payload: userGroups });
@@ -548,13 +544,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Also ensure real-time listeners are started
       if (userGroupsListenerRef.current) {
         // Real-time listener is already active
-        if (__DEV__) { console.log('🔄 AppContext: Real-time listener already active'); }
+        // Removed excessive logging for cleaner console
       } else {
         // Start real-time listener
-        if (__DEV__) { console.log('🔄 AppContext: Starting real-time listener for groups'); }
+        // Removed excessive logging for cleaner console
         try {
           firebaseDataService.group.listenToUserGroups(state.currentUser.id.toString(), (updatedGroups: GroupWithDetails[]) => {
-            if (__DEV__) { console.log('🔄 AppContext: Real-time groups update:', updatedGroups.length); }
+            // Removed excessive logging for cleaner console
             dispatch({ type: 'SET_GROUPS', payload: updatedGroups });
           }, (error: any) => {
             if (__DEV__) { console.error('❌ AppContext: Real-time listener error:', error); }
@@ -801,7 +797,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   // User operations
-  const authenticateUser = useCallback((user: User, method: 'wallet' | 'email' | 'guest') => {
+  const authenticateUser = useCallback((user: User, method: 'wallet' | 'email' | 'guest' | 'social') => {
     dispatch({ type: 'AUTHENTICATE_USER', payload: { user, method } });
   }, []);
 
@@ -923,9 +919,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return; // Use cached notifications
     }
     try {
-      if (__DEV__) { console.log('🔥 Loading notifications for user:', state.currentUser.id); }
+      // Removed excessive logging for cleaner console
       const notifications = await getUserNotifications(state.currentUser.id);
-      if (__DEV__) { console.log('🔥 Loaded notifications:', notifications.length); }
+              // Removed excessive logging for cleaner console
       dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications, timestamp: now } });
     } catch (error) {
       console.error('Error loading notifications:', error);

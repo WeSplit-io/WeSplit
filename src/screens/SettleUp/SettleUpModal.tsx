@@ -17,12 +17,28 @@ interface SettleUpModalProps {
   navigation: any;
   route?: any;
   realBalances?: Balance[]; // Optional prop for real member balances
+  optimizedTransactions?: any[]; // Optimized settlement transactions
+  userTransactions?: any[]; // Current user's settlement transactions
+  userTotalOwed?: number; // Total amount user owes
+  userTotalOwedTo?: number; // Total amount user is owed
   onSettlementComplete?: () => void;
 }
 
 const { height: SCREEN_HEIGHT } = require('react-native').Dimensions.get('window');
 
-const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, groupId, navigation, route, realBalances, onSettlementComplete }) => {
+const SettleUpModal: React.FC<SettleUpModalProps> = ({ 
+  visible = true, 
+  onClose, 
+  groupId, 
+  navigation, 
+  route, 
+  realBalances, 
+  optimizedTransactions = [],
+  userTransactions = [],
+  userTotalOwed = 0,
+  userTotalOwedTo = 0,
+  onSettlementComplete 
+}) => {
   const actualGroupId = groupId || route?.params?.groupId;
 
   // Animation refs
@@ -30,11 +46,30 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
   const opacity = useRef(new Animated.Value(0)).current;
 
   const handleClose = () => {
-    if (onClose) {
-      onClose();
-    } else {
-      navigation.goBack();
-    }
+    // Animate out first, then close
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Reset values after animation
+      translateY.setValue(0);
+      opacity.setValue(0);
+      
+      // Then close the modal
+      if (onClose) {
+        onClose();
+      } else {
+        navigation.goBack();
+      }
+    });
   };
 
   // Handle gesture events for slide down to close
@@ -51,7 +86,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
       opacity.setValue(1);
     } else if (state === 4 || state === 5) { // END or CANCELLED
       if (translationY > 100) { // Threshold to close modal
-        // Close modal
+        // Animate out and close modal
         Animated.parallel([
           Animated.timing(translateY, {
             toValue: SCREEN_HEIGHT,
@@ -64,10 +99,16 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
             useNativeDriver: true,
           }),
         ]).start(() => {
-          handleClose();
           // Reset values
           translateY.setValue(0);
           opacity.setValue(0);
+          
+          // Then close the modal
+          if (onClose) {
+            onClose();
+          } else {
+            navigation.goBack();
+          }
         });
       } else {
         // Reset to original position
@@ -99,6 +140,20 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
         }),
         Animated.timing(opacity, {
           toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Animate out when modal becomes invisible
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: SCREEN_HEIGHT,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0,
           duration: 300,
           useNativeDriver: true,
         }),
@@ -557,11 +612,17 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
             try {
               setReminderLoading(true);
 
-              // Note: These methods don't exist in the current firebaseDataService
-              // You'll need to implement them or use alternative methods
+              // Send payment reminder using Firebase service
+              const result = await firebaseDataService.settlement.sendPaymentReminder(
+                actualGroupId.toString(),
+                currentUser.id.toString(),
+                memberData.memberId,
+                memberData.amount
+              );
+
               Alert.alert(
                 'Reminder Sent',
-                `Payment reminder sent to ${memberData.name} for ${memberData.currency} ${memberData.amount.toFixed(2)}.`,
+                result.message,
                 [
                   {
                     text: 'OK',
@@ -630,11 +691,22 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
             try {
               setReminderLoading(true);
 
-              // Note: These methods don't exist in the current firebaseDataService
-              // You'll need to implement them or use alternative methods
+              // Send bulk payment reminders using Firebase service
+              const debtors = owedData.map(item => ({
+                recipientId: item.memberId,
+                amount: item.amount,
+                name: item.name
+              }));
+
+              const result = await firebaseDataService.settlement.sendBulkPaymentReminders(
+                actualGroupId.toString(),
+                currentUser.id.toString(),
+                debtors
+              );
+
               Alert.alert(
                 'Reminders Sent',
-                `Payment reminders sent to ${owedData.length} members about ${primaryCurrency} ${totalOwedUSD.toFixed(2)} total.`,
+                result.message,
                 [
                   {
                     text: 'OK',
@@ -707,6 +779,39 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
                   style={styles.content}
                   contentContainerStyle={styles.contentContainer}
                   showsVerticalScrollIndicator={false}
+                  onScroll={(event) => {
+                    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+                    const paddingToBottom = 20;
+                    const isCloseToBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - paddingToBottom;
+                    
+                    if (isCloseToBottom) {
+                      // Animate out and close modal when scrolled to bottom
+                      Animated.parallel([
+                        Animated.timing(translateY, {
+                          toValue: SCREEN_HEIGHT,
+                          duration: 300,
+                          useNativeDriver: true,
+                        }),
+                        Animated.timing(opacity, {
+                          toValue: 0,
+                          duration: 300,
+                          useNativeDriver: true,
+                        }),
+                      ]).start(() => {
+                        // Reset values
+                        translateY.setValue(0);
+                        opacity.setValue(0);
+                        
+                        // Then close the modal
+                        if (onClose) {
+                          onClose();
+                        } else {
+                          navigation.goBack();
+                        }
+                      });
+                    }
+                  }}
+                  scrollEventThrottle={16}
                 >
                   {/* Show content only if there are debts to display */}
                   {(isOweSection || !isOweSection) && (currentSectionData.length > 0) ? (
@@ -726,6 +831,8 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
                           </Text>
                         </View>
                       </View>
+
+
 
                       {/* Settlement Cards - matching the image design */}
                       <View style={styles.settlementCards}>
@@ -806,6 +913,13 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({ visible = true, onClose, 
                             </View>
                           );
                         })}
+                      </View>
+
+                      {/* Scroll to close hint */}
+                      <View style={styles.scrollToCloseHint}>
+                        <Text style={styles.scrollToCloseText}>
+                          Scroll down to close
+                        </Text>
                       </View>
                     </>
                   ) : (
