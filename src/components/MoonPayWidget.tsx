@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, Modal, StyleSheet, TextInput, Clipboard } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, Alert, Modal, StyleSheet, TextInput, Clipboard, Dimensions, TouchableWithoutFeedback } from 'react-native';
+import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+import { Animated } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { useWallet } from '../context/WalletContext';
 import { firebaseMoonPayService } from '../services/firebaseMoonPayService';
+import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
 
 interface MoonPayWidgetProps {
   isVisible: boolean;
@@ -12,6 +16,8 @@ interface MoonPayWidgetProps {
   amount?: number;
   navigation?: any; // Add navigation prop for WebView navigation
 }
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
   isVisible,
@@ -25,6 +31,78 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
   const { appWalletAddress, getAppWalletBalance } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   const [amount, setAmount] = useState(initialAmount?.toString() || '100');
+
+  // Animation refs
+  const translateY = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  const handleGestureEvent = Animated.event(
+    [{ nativeEvent: { translationY: translateY } }],
+    { useNativeDriver: true }
+  );
+
+  const handleStateChange = (event: PanGestureHandlerGestureEvent) => {
+    const { translationY, state } = event.nativeEvent;
+
+    if (state === 2) { // BEGAN
+      // Reset opacity animation
+      opacity.setValue(1);
+    } else if (state === 4 || state === 5) { // END or CANCELLED
+      if (translationY > 100) { // Threshold to close modal
+        // Close modal
+        Animated.parallel([
+          Animated.timing(translateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          onClose();
+          // Reset values
+          translateY.setValue(0);
+          opacity.setValue(0);
+        });
+      } else {
+        // Reset to original position
+        Animated.parallel([
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }
+  };
+
+  // Animate in when modal becomes visible
+  React.useEffect(() => {
+    if (isVisible) {
+      opacity.setValue(0);
+      translateY.setValue(SCREEN_HEIGHT);
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isVisible]);
 
   const handleOpenMoonPay = async () => {
     try {
@@ -178,59 +256,79 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
   return (
     <Modal
       visible={isVisible}
-      animationType="slide"
+      animationType="fade"
       transparent={true}
       onRequestClose={handleClose}
+      statusBarTranslucent={true}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Top Up Your Wallet</Text>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.content}>
-            <Text style={styles.description}>
-              Purchase USDC using your credit or debit card
-            </Text>
-
-            <View style={styles.walletInfo}>
-              <Text style={styles.walletLabel}>Wallet Address:</Text>
-              <Text style={styles.walletAddress}>
-                {appWalletAddress ? `${appWalletAddress.slice(0, 8)}...${appWalletAddress.slice(-8)}` : 'Not available'}
-              </Text>
-            </View>
-
-            <View style={styles.amountInput}>
-              <Text style={styles.amountLabel}>Amount (USDC):</Text>
-              <TextInput
-                style={styles.input}
-                value={amount}
-                onChangeText={setAmount}
-                placeholder="Enter amount"
-                keyboardType="numeric"
-                editable={!isLoading}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={[styles.purchaseButton, isLoading && styles.purchaseButtonDisabled]}
-              onPress={handleOpenMoonPay}
-              disabled={isLoading}
+      <Animated.View style={[styles.modalOverlay, { opacity }]}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            activeOpacity={1}
+            onPress={handleClose}
+          />
+          
+          <PanGestureHandler
+            onGestureEvent={handleGestureEvent}
+            onHandlerStateChange={handleStateChange}
+          >
+            <Animated.View
+              style={[
+                styles.modalContent,
+                {
+                  transform: [{ translateY }],
+                },
+              ]}
             >
-              <Text style={styles.purchaseButtonText}>
-                {isLoading ? 'Processing...' : `Purchase ${amount} USDC`}
-              </Text>
-            </TouchableOpacity>
+              {/* Handle bar for slide down */}
+              <View style={styles.handle} />
 
-            <Text style={styles.disclaimer}>
-              By proceeding, you agree to MoonPay's terms of service and privacy policy.
-            </Text>
-          </View>
+              {/* Title */}
+              <Text style={styles.title}>Top Up Your Wallet</Text>
+
+              <View style={styles.content}>
+                <Text style={styles.description}>
+                  Purchase USDC using your credit or debit card
+                </Text>
+
+                <View style={styles.walletInfo}>
+                  <Text style={styles.walletLabel}>Wallet Address:</Text>
+                  <Text style={styles.input}>
+                    {appWalletAddress ? `${appWalletAddress.slice(0, 8)}...${appWalletAddress.slice(-8)}` : 'Not available'}
+                  </Text>
+                </View>
+
+                <View style={styles.amountInput}>
+                  <Text style={styles.amountLabel}>Amount (USDC):</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={amount}
+                    onChangeText={setAmount}
+                    placeholder="Enter amount"
+                    keyboardType="numeric"
+                    editable={!isLoading}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.purchaseButton, isLoading && styles.purchaseButtonDisabled]}
+                  onPress={handleOpenMoonPay}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.purchaseButtonText}>
+                    {isLoading ? 'Processing...' : `Purchase ${amount} USDC`}
+                  </Text>
+                </TouchableOpacity>
+
+                <Text style={styles.disclaimer}>
+                  By proceeding, you agree to MoonPay's terms of service and privacy policy.
+                </Text>
+              </View>
+            </Animated.View>
+          </PanGestureHandler>
         </View>
-      </View>
+      </Animated.View>
     </Modal>
   );
 };
@@ -239,46 +337,36 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 16,
+    backgroundColor: colors.black,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     padding: 24,
-    margin: 20,
-    width: '90%',
-    maxWidth: 400,
+    paddingTop: 16,
+    maxHeight: '80%',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.white70,
+    borderRadius: 2,
+    alignSelf: 'center',
     marginBottom: 20,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
-  },
-  closeButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    fontSize: 16,
-    color: '#666',
+    color: colors.white,
+    textAlign: 'center',
+    marginBottom: 20,
   },
   content: {
     alignItems: 'center',
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: colors.white70,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -288,14 +376,13 @@ const styles = StyleSheet.create({
   },
   walletLabel: {
     fontSize: 14,
-    color: '#666',
+    color: colors.white,
     marginBottom: 5,
   },
   walletAddress: {
     fontSize: 12,
-    color: '#333',
-    fontFamily: 'monospace',
-    backgroundColor: '#f5f5f5',
+    color: colors.white,
+    backgroundColor: colors.white10,
     padding: 8,
     borderRadius: 4,
   },
@@ -305,49 +392,38 @@ const styles = StyleSheet.create({
   },
   amountLabel: {
     fontSize: 14,
-    color: '#666',
+    color: colors.white,
     marginBottom: 5,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: colors.white50,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#333',
-    backgroundColor: '#f9f9f9',
+    color: colors.white,
+    backgroundColor: colors.white10,
   },
   purchaseButton: {
-    backgroundColor: '#A5EA15',
-    paddingVertical: 12,
+    backgroundColor: colors.green,
+    paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 16,
     marginBottom: 10,
     width: '100%',
   },
   purchaseButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.white10,
   },
   purchaseButtonText: {
-    color: 'white',
+    color: colors.black,
     fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  cancelButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    width: '100%',
-  },
-  cancelButtonText: {
-    color: '#666',
-    fontSize: 16,
+    fontWeight: typography.fontWeight.semibold,
     textAlign: 'center',
   },
   disclaimer: {
     fontSize: 12,
-    color: '#666',
+      color: colors.white70,
     textAlign: 'center',
     marginTop: 10,
   },

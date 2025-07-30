@@ -24,6 +24,11 @@ export const styles = StyleSheet.create({
     height: 20,
     resizeMode: 'contain',
   },
+  editIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -37,8 +42,8 @@ export const styles = StyleSheet.create({
     padding: 8,
   },
   qrIcon: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
     resizeMode: 'contain',
     tintColor: '#A5EA15',
   },
@@ -124,6 +129,8 @@ export const styles = StyleSheet.create({
     borderRadius: 20,
     marginRight: 16,
     backgroundColor: '#A5EA15',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   memberInfo: {
     flex: 1,
@@ -333,20 +340,30 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  // Edit Group Modal
-  editModalContainer: {
+  // Edit Group Modal - Animated
+  editModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   editModalContent: {
     backgroundColor: colors.darkBackground,
-    borderRadius: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 24,
-    width: '90%',
-    maxWidth: 400,
-    maxHeight: '80%',
+    maxHeight: '90%',
+    minHeight: 600,
+  },
+  editModalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#A89B9B',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  editModalScrollContent: {
+    flex: 1,
+    minHeight: 300,
   },
   editModalHeader: {
     flexDirection: 'row',
@@ -444,10 +461,9 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   colorOption: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginHorizontal: 4,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: 'transparent',
   },
@@ -461,20 +477,19 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: spacing.lg,
-    paddingHorizontal: spacing.lg,
   },
   categoryOption: {
     alignItems: 'center',
     padding: spacing.md,
     borderRadius: 16,
     backgroundColor: colors.white,
-    minWidth: 70,
-    minHeight: 70,
+    minWidth: 60,
+    minHeight: 60,
     justifyContent: 'center',
   },
   categoryImage: {
-    width: 32,
-    height: 32,
+    width: 24,
+    height: 24,
     resizeMode: 'contain',
   },
   
@@ -483,10 +498,15 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: spacing.lg,
-    paddingHorizontal: spacing.lg,
   },
   colorSelected: {
     borderColor: colors.textLight,
     borderWidth: 3,
+  },
+  // Bottom Action Container - Fixed at bottom
+  bottomActionContainer: {
+    paddingHorizontal: spacing.screenPaddingHorizontal,
+    paddingBottom: 32,
+    backgroundColor: colors.darkBackground,
   },
 }); 

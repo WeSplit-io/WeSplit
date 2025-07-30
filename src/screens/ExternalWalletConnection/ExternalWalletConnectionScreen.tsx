@@ -261,7 +261,10 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+        <TouchableOpacity onPress={() => {
+          console.log('Back button pressed');
+          navigation.goBack();
+        }} style={styles.backButton}>
           <Image
             source={require('../../../assets/arrow-left.png')}
             style={styles.iconWrapper}

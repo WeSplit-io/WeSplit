@@ -81,3 +81,12 @@ export const formatCryptoAmount = (amount: number, symbol: string): string => {
     maximumFractionDigits: crypto.decimals 
   })} ${symbol}`;
 }; 
+
+export const hashWalletAddress = (address: string): string => {
+  if (!address) return '';
+  
+  // Simple hash function - take first 6 and last 4 characters
+  if (address.length <= 10) return address;
+  
+  return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+};

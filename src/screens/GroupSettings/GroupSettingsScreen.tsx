@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, SafeAreaView, Share, ActivityIndicator, Platform, Modal, Image } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Alert, SafeAreaView, Share, ActivityIndicator, Platform, Modal, Image, Dimensions, TouchableWithoutFeedback } from 'react-native';
 import { TextInput } from 'react-native-gesture-handler';
+import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+import { Animated } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import Icon from '../../components/Icon';
 import GroupIcon from '../../components/GroupIcon';
@@ -9,13 +11,20 @@ import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
 import { GroupMember, Expense } from '../../types';
 import { firebaseDataService } from '../../services/firebaseDataService';
+import { getUserProfile } from '../../services/firebaseAuthService';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import { hashWalletAddress } from '../../utils/cryptoUtils';
 
 const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId } = route.params;
   const { state, getGroupBalances, updateGroup, deleteGroup, leaveGroup, startGroupListener, stopGroupListener } = useApp();
   const { currentUser } = state;
+
+  // Animation refs for edit modal
+  const translateY = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
   // Use the efficient hook that provides cached data and smart loading
   const { 
@@ -37,6 +46,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   // State for real members data
   const [realMembers, setRealMembers] = useState<GroupMember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
+  const [profileImages, setProfileImages] = useState<{ [key: string]: string }>({});
 
   console.log('🔄 GroupSettingsScreen: Group data:', {
     groupId,
@@ -92,6 +102,31 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
         const members = await firebaseDataService.group.getGroupMembers(groupId.toString(), false, currentUser?.id ? String(currentUser.id) : undefined);
         console.log('🔄 GroupSettingsScreen: Loaded members:', members.length, members.map(m => ({ id: m.id, name: m.name, email: m.email })));
         setRealMembers(members);
+        
+        // Fetch profile images for members from database
+        const imagePromises = members.map(async (member) => {
+          if (member.id) {
+            try {
+              // Get user profile from database
+              const userProfile = await getUserProfile(member.id.toString());
+              if (userProfile?.profile_picture) {
+                return { id: member.id, url: userProfile.profile_picture };
+              }
+            } catch (error) {
+              console.error('❌ GroupSettingsScreen: Error fetching profile image for member:', member.id, error);
+            }
+          }
+          return null;
+        });
+        
+        const imageResults = await Promise.all(imagePromises);
+        const imagesMap: { [key: string]: string } = {};
+        imageResults.forEach(result => {
+          if (result) {
+            imagesMap[result.id] = result.url;
+          }
+        });
+        setProfileImages(imagesMap);
         
       } catch (error) {
         console.error('❌ GroupSettingsScreen: Error loading members:', error);
@@ -360,6 +395,74 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     }
   };
 
+  // Gesture handler for edit modal
+  const handleEditGestureEvent = Animated.event(
+    [{ nativeEvent: { translationY: translateY } }],
+    { useNativeDriver: true }
+  );
+
+  const handleEditStateChange = (event: PanGestureHandlerGestureEvent) => {
+    const { translationY, state } = event.nativeEvent;
+
+    if (state === 2) { // BEGAN
+      opacity.setValue(1);
+    } else if (state === 4 || state === 5) { // END or CANCELLED
+      if (translationY > 100) { // Threshold to close modal
+        // Close modal
+        Animated.parallel([
+          Animated.timing(translateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          handleCancelEdit();
+          // Reset values
+          translateY.setValue(0);
+          opacity.setValue(0);
+        });
+      } else {
+        // Reset to original position
+        Animated.parallel([
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }
+  };
+
+  // Animate in when edit modal becomes visible
+  useEffect(() => {
+    if (showEditModal) {
+      opacity.setValue(0);
+      translateY.setValue(SCREEN_HEIGHT);
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showEditModal]);
+
   const handleCancelEdit = () => {
     setShowEditModal(false);
     setEditGroupName('');
@@ -382,7 +485,14 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       {/* Header - Same as NotificationsScreen */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => {
+          console.log('🔄 GroupSettingsScreen: Back button pressed');
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            navigation.navigate('GroupsList');
+          }
+        }} style={styles.backButton}>
           <Image
             source={require('../../../assets/arrow-left.png')}
             style={styles.iconWrapper}
@@ -415,7 +525,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
           <TouchableOpacity style={styles.editButton} onPress={handleEditGroup}>
             <Image
               source={require('../../../assets/icon-edit-white70.png')}
-              style={styles.iconWrapper}
+              style={styles.editIcon}
             />
           </TouchableOpacity>
         </View>
@@ -436,7 +546,10 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
           style={styles.actionButton}
           onPress={handleShareInviteLink}
         >
-          <Icon name="link" size={20} color="#A5EA15" />
+          <Image
+            source={require('../../../assets/link-icon-green.png')}
+            style={[styles.iconWrapper, { tintColor: '#A5EA15' }]}
+          />
           <Text style={styles.actionButtonText}>Invite via link</Text>
         </TouchableOpacity>
 
@@ -473,8 +586,17 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
                   styles.memberAvatar,
                   isInvited && styles.memberAvatarInvited
                 ]}>
-                  {isInvited && (
+                  {isInvited ? (
                     <Icon name="clock" size={16} color="#A89B9B" />
+                  ) : profileImages[member.id] ? (
+                    <Image
+                      source={{ uri: profileImages[member.id] }}
+                      style={[styles.memberAvatar, { backgroundColor: 'transparent' }]}
+                    />
+                  ) : (
+                    <Text style={{ color: '#000000', fontSize: 16, fontWeight: 'bold' }}>
+                      {member.name?.charAt(0)?.toUpperCase() || '?'}
+                    </Text>
                   )}
                 </View>
                 <View style={styles.memberInfo}>
@@ -494,7 +616,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
                   </Text>
                   {!isInvited && member.wallet_address && (
                     <Text style={styles.memberWallet} numberOfLines={1} ellipsizeMode="middle">
-                      {member.wallet_address}
+                      {hashWalletAddress(member.wallet_address)}
                     </Text>
                   )}
                 </View>
@@ -516,20 +638,16 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
                     <Text style={styles.memberInviteStatusText}>Invited</Text>
                   </View>
                 )}
-                {canRemoveMember && (
-                  <TouchableOpacity
-                    style={styles.removeMemberButton}
-                    onPress={() => handleRemoveMember(member.id, member.name)}
-                  >
-                    <Icon name="remove-circle" size={20} color="#FF6B6B" />
-                  </TouchableOpacity>
-                )}
+
               </View>
             );
           })
         )}
 
-        {/* Bottom Action Buttons */}
+      </ScrollView>
+
+      {/* Bottom Action Buttons - Fixed at bottom */}
+      <View style={styles.bottomActionContainer}>
         <TouchableOpacity style={styles.leaveButton} onPress={handleLeaveGroup}>
           <Text style={styles.leaveButtonText}>Leave Group</Text>
         </TouchableOpacity>
@@ -549,7 +667,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
             {group?.created_by === currentUser?.id ? 'Delete Group' : 'Only creator can delete'}
           </Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
 
       {/* QR Code Modal */}
       <QRCodeModal
@@ -563,108 +681,136 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
         isGroup={true}
       />
 
-      {/* Edit Group Modal */}
+      {/* Edit Group Modal - Animated */}
       <Modal
         visible={showEditModal}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         onRequestClose={handleCancelEdit}
+        statusBarTranslucent={true}
       >
-        <View style={styles.editModalContainer}>
-          <View style={styles.editModalContent}>
-            <View style={styles.editModalHeader}>
-              <Text style={styles.editModalTitle}>Edit Group</Text>
-              <TouchableOpacity onPress={handleCancelEdit}>
-                <Icon name="close" size={24} color="#A89B9B" />
-              </TouchableOpacity>
-            </View>
+        <Animated.View style={[styles.editModalOverlay, { opacity }]}>
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <TouchableWithoutFeedback onPress={handleCancelEdit}>
+              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+            </TouchableWithoutFeedback>
             
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Group Name Input */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Group Name</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editGroupName}
-                  onChangeText={setEditGroupName}
-                  placeholder="Enter group name"
-                  placeholderTextColor="#A89B9B"
-                  maxLength={50}
-                  editable={!updating}
-                />
-              </View>
-              
-              {/* Category Selection */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Category</Text>
-                <View style={styles.categoryRow}>
-                  {CATEGORIES.map((category) => (
-                    <TouchableOpacity
-                      key={category.id}
-                      style={[
-                        styles.categoryOption,
-                        editGroupCategory === category.id && {
-                          backgroundColor: editGroupColor,
-                          borderWidth: 1,
-                          borderColor: colors.green,
-                        }
-                      ]}
-                      onPress={() => setEditGroupCategory(category.id)}
-                      disabled={updating}
-                    >
-                      <Image
-                        source={CATEGORY_IMAGES[category.imageKey]}
-                        style={styles.categoryImage}
-                      />
-                    </TouchableOpacity>
-                  ))}
+            <PanGestureHandler
+              onGestureEvent={handleEditGestureEvent}
+              onHandlerStateChange={handleEditStateChange}
+            >
+              <Animated.View
+                style={[
+                  styles.editModalContent,
+                  {
+                    transform: [{ translateY }],
+                  },
+                ]}
+              >
+                {/* Handle bar for slide down */}
+                <View style={styles.editModalHandle} />
+
+                {/* Header */}
+                <View style={styles.editModalHeader}>
+                  <Text style={styles.editModalTitle}>Edit Group</Text>
                 </View>
-              </View>
-              
-              {/* Color Selection */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Color</Text>
-                <View style={styles.colorRow}>
-                  {COLORS.map((color) => (
-                    <TouchableOpacity
-                      key={color}
-                      style={[
-                        styles.colorOption,
-                        { backgroundColor: color },
-                        editGroupColor === color && styles.colorSelected
-                      ]}
-                      onPress={() => setEditGroupColor(color)}
-                      disabled={updating}
+                
+                <ScrollView 
+                  style={styles.editModalScrollContent} 
+                  contentContainerStyle={{ paddingBottom: 20 }}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled={true}
+                  scrollEventThrottle={16}
+                >
+                  {/* Group Name Input */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Group Name</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editGroupName}
+                      onChangeText={setEditGroupName}
+                      placeholder="Enter group name"
+                      placeholderTextColor="#A89B9B"
+                      maxLength={50}
+                      editable={!updating}
                     />
-                  ))}
+                  </View>
+                  
+
+                  
+                  {/* Category Selection */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Category</Text>
+                    <View style={styles.categoryRow}>
+                      {CATEGORIES.map((category) => (
+                        <TouchableOpacity
+                          key={category.id}
+                          style={[
+                            styles.categoryOption,
+                            editGroupCategory === category.id && {
+                              backgroundColor: editGroupColor,
+                              borderWidth: 1,
+                              borderColor: colors.green,
+                            }
+                          ]}
+                          onPress={() => setEditGroupCategory(category.id)}
+                          disabled={updating}
+                        >
+                          <Image
+                            source={CATEGORY_IMAGES[category.imageKey]}
+                            style={styles.categoryImage}
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  
+                  {/* Color Selection */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Color</Text>
+                    <View style={styles.colorRow}>
+                      {COLORS.map((color) => (
+                        <TouchableOpacity
+                          key={color}
+                          style={[
+                            styles.colorOption,
+                            { backgroundColor: color },
+                            editGroupColor === color && styles.colorSelected
+                          ]}
+                          onPress={() => setEditGroupColor(color)}
+                          disabled={updating}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                </ScrollView>
+                
+                {/* Action Buttons */}
+                <View style={styles.editModalActions}>
+                  <TouchableOpacity 
+                    style={[styles.editCancelButton, updating && styles.disabledButton]}
+                    onPress={handleCancelEdit}
+                    disabled={updating}
+                  >
+                    <Text style={styles.editCancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.editSaveButton, updating && styles.disabledButton]}
+                    onPress={handleSaveGroupChanges}
+                    disabled={updating || !editGroupName.trim()}
+                  >
+                    {updating ? (
+                      <ActivityIndicator size="small" color="#212121" />
+                    ) : (
+                      <Text style={styles.editSaveButtonText}>Save</Text>
+                    )}
+                  </TouchableOpacity>
                 </View>
-              </View>
-            </ScrollView>
-            
-            {/* Action Buttons */}
-            <View style={styles.editModalActions}>
-              <TouchableOpacity 
-                style={[styles.editCancelButton, updating && styles.disabledButton]}
-                onPress={handleCancelEdit}
-                disabled={updating}
-              >
-                <Text style={styles.editCancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.editSaveButton, updating && styles.disabledButton]}
-                onPress={handleSaveGroupChanges}
-                disabled={updating || !editGroupName.trim()}
-              >
-                {updating ? (
-                  <ActivityIndicator size="small" color="#212121" />
-                ) : (
-                  <Text style={styles.editSaveButtonText}>Save</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+              </Animated.View>
+            </PanGestureHandler>
           </View>
-        </View>
+        </Animated.View>
       </Modal>
     </SafeAreaView>
   );
