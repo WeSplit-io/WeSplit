@@ -1108,7 +1108,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
-    paddingBottom: 100, // Add space for the fixed button at bottom
+    paddingBottom: 150, // Add space for the fixed button at bottom
   },
   requestQRTitle: {
     fontSize: 18,

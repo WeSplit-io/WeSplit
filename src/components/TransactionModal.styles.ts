@@ -16,7 +16,7 @@ export const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: spacing.lg,
-    paddingBottom: 40,
+    paddingBottom: spacing.bottomSafeArea,
     paddingTop: 24,
     maxHeight: '85%',
     minHeight: 600,
@@ -40,7 +40,7 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   transactionContentContainer: {
-    paddingBottom: 32,
+    paddingBottom: spacing.bottomSafeArea,
   },
   transactionIconContainer: {
     backgroundColor: colors.green,

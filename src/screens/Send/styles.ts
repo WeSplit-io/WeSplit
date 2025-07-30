@@ -1187,6 +1187,7 @@ export const styles = StyleSheet.create({
   // AppleSlider styles (adapted from WalletManagement)
   appleSliderContainerWrapper: {
     marginHorizontal: spacing.screenPaddingHorizontal,
+    paddingBottom: spacing.bottomSafeArea,
     // width: '100%', // supprimé pour éviter le débordement
   },
   appleSliderContainer: {

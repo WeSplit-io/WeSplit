@@ -278,7 +278,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           flexGrow: 1,
           justifyContent: 'center',
           alignItems: 'center',
-          paddingBottom: 100,
+          paddingBottom: 150,
         }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"

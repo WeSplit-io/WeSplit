@@ -308,7 +308,8 @@ export const styles = StyleSheet.create({
 
   // ===== APPLE SLIDER STYLES =====
   appleSliderContainerWrapper: {
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.screenPaddingHorizontal,
+    paddingBottom: spacing.bottomSafeArea,
   },
   appleSliderContainer: {
     flexDirection: 'row',

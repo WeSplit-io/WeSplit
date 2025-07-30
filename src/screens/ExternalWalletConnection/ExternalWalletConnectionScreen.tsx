@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   Alert,
   ScrollView,
@@ -12,9 +11,9 @@ import {
 } from 'react-native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
 import { externalWalletAuthService, WalletProvider } from '../../services/externalWalletAuthService';
 import { walletConnectionService } from '../../services/walletConnectionService';
+import { styles } from './styles';
 
 interface ExternalWalletConnectionScreenProps {
   navigation: any;
@@ -103,9 +102,9 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
 
     } catch (error) {
       console.error('Connection failed:', error);
-      
+
       const errorMessage = error instanceof Error ? error.message : 'Connection failed';
-      
+
       Alert.alert(
         'Connection Failed',
         `Failed to connect to ${provider.name}:\n\n${errorMessage}`,
@@ -134,20 +133,127 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
     }
   };
 
-  const renderWalletLogo = (provider: WalletProvider) => {
-    if (provider.logoUrl) {
-      return (
-        <Image
-          source={{ uri: provider.logoUrl }}
-          style={styles.walletLogo}
-          resizeMode="contain"
-        />
-      );
+    const renderWalletLogo = (provider: WalletProvider) => {
+    // Use specific logos for known providers, Phantom for others
+    let logoSource;
+    
+    switch (provider.name.toLowerCase()) {
+      case 'backpack':
+        logoSource = require('../../../assets/backpack-logo.png');
+        break;
+      case 'metamask':
+        logoSource = require('../../../assets/metamask-logo.png');
+        break;
+      case 'walletconnect':
+        logoSource = require('../../../assets/walletconnect-logo.png');
+        break;
+      case 'exodus':
+        logoSource = require('../../../assets/exodus-logo.png');
+        break;
+      case 'glow':
+        logoSource = require('../../../assets/glow-logo.png');
+        break;
+      case 'slope':
+        logoSource = require('../../../assets/slope-logo.png');
+        break;
+      case 'solflare':
+        logoSource = require('../../../assets/solflare-logo.png');
+        break;
+      case 'zerion':
+        logoSource = require('../../../assets/zerion-logo.png');
+        break;
+      case 'xdefi':
+        logoSource = require('../../../assets/xdefi-logo.png');
+        break;
+      case 'trust wallet':
+        logoSource = require('../../../assets/trustwallet-logo.png');
+        break;
+      case 'talisman':
+        logoSource = require('../../../assets/talisman-logo.png');
+        break;
+      case 'safepal':
+        logoSource = require('../../../assets/safepal-logo.png');
+        break;
+      case 'rainbow':
+        logoSource = require('../../../assets/raimbow-logo.png');
+        break;
+      case 'onto':
+        logoSource = require('../../../assets/onto-logo.png');
+        break;
+      case 'okx':
+        logoSource = require('../../../assets/okx-logo.png');
+        break;
+      case 'nightly':
+        logoSource = require('../../../assets/nightly-logo.png');
+        break;
+      case 'myria':
+        logoSource = require('../../../assets/myria-logo.png');
+        break;
+      case 'math wallet':
+        logoSource = require('../../../assets/mathwallet-logo.png');
+        break;
+      case 'magic eden':
+        logoSource = require('../../../assets/magiceden-logo.png');
+        break;
+      case 'kraken':
+        logoSource = require('../../../assets/kraken-logo.png');
+        break;
+      case 'imtoken':
+        logoSource = require('../../../assets/imtoken-logo.png');
+        break;
+      case 'huobi':
+        logoSource = require('../../../assets/huobi-logo.png');
+        break;
+      case 'gate.io':
+        logoSource = require('../../../assets/gate-logo.png');
+        break;
+      case 'coinbase':
+        logoSource = require('../../../assets/coinbase-logo.png');
+        break;
+      case 'coin98':
+        logoSource = require('../../../assets/coin98-logo.png');
+        break;
+      case 'clover':
+        logoSource = require('../../../assets/clover-logo.png');
+        break;
+      case 'bybit':
+        logoSource = require('../../../assets/bybit-logo.png');
+        break;
+      case 'bravos':
+        logoSource = require('../../../assets/bravos-logo.png');
+        break;
+      case 'brave':
+        logoSource = require('../../../assets/brave-logo.png');
+        break;
+      case 'blocto':
+        logoSource = require('../../../assets/blocto-logo.png');
+        break;
+      case 'bitget':
+        logoSource = require('../../../assets/bitget-logo.png');
+        break;
+      case 'binance':
+        logoSource = require('../../../assets/binance-logo.png');
+        break;
+      case 'argent':
+        logoSource = require('../../../assets/argent-logo.png');
+        break;
+      case 'ud':
+        logoSource = require('../../../assets/ud-logo.png');
+        break;
+      case 'tokenpocket':
+        logoSource = require('../../../assets/tokenpocket-logo.png');
+        break;
+      default:
+        logoSource = require('../../../assets/phantom-logo.png');
+        break;
     }
     
-    // Fallback to icon if logo URL is not available
     return (
-      <Text style={styles.walletIcon}>{provider.icon}</Text>
+      <Image
+        source={logoSource}
+        style={styles.walletLogo}
+        resizeMode="contain"
+      />
     );
   };
 
@@ -156,14 +262,17 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color={colors.white} />
+          <Image
+            source={require('../../../assets/arrow-left.png')}
+            style={styles.iconWrapper}
+          />
         </TouchableOpacity>
-        <Text style={styles.title}>Connect External Wallet</Text>
-        <View style={styles.headerSpacer} />
+        <Text style={styles.headerTitle}>Connect External Wallet</Text>
+        <View style={styles.placeholder} />
       </View>
 
       {/* Content */}
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={true}
         contentContainerStyle={styles.contentContainer}
@@ -182,7 +291,14 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
         )}
 
         {/* Provider buttons */}
-        {providers.map((provider, index) => (
+        {providers
+          .sort((a, b) => {
+            // Sort available providers first, then unavailable ones
+            if (a.isAvailable && !b.isAvailable) return -1;
+            if (!a.isAvailable && b.isAvailable) return 1;
+            return 0;
+          })
+          .map((provider, index) => (
           <TouchableOpacity
             key={index}
             style={[
@@ -193,12 +309,20 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
             disabled={!provider.isAvailable}
           >
             <View style={styles.providerInfo}>
+
               <View style={styles.providerHeader}>
                 <View style={styles.walletLogoContainer}>
                   {renderWalletLogo(provider)}
                 </View>
                 <View style={styles.providerNameContainer}>
-                  <Text style={styles.providerName}>{provider.name}</Text>
+                  <View style={styles.providerInfoHeader}>
+                    <Text style={styles.providerName}>{provider.name}</Text>
+                    {!provider.isAvailable && (
+                      <Text style={styles.providerUnavailable}>Not available</Text>
+                    )}
+
+
+                  </View>
                   {provider.isAvailable && (
                     <View style={styles.detectedBadge}>
                       <Text style={styles.detectedText}>Detected</Text>
@@ -206,14 +330,11 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
                   )}
                 </View>
               </View>
-              {!provider.isAvailable && (
-                <Text style={styles.providerUnavailable}>Not available</Text>
-              )}
             </View>
-            <Icon 
-              name="chevron-right" 
-              size={20} 
-              color={provider.isAvailable ? colors.white : colors.white} 
+            <Icon
+              name="chevron-right"
+              size={20}
+              color={provider.isAvailable ? colors.white : colors.white}
             />
           </TouchableOpacity>
         ))}
@@ -228,126 +349,5 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.white,
-  },
-  headerSpacer: {
-    width: 48, // Same width as back button for centering
-  },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  description: {
-    color: colors.textLight,
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: spacing.lg,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-  },
-  loadingText: {
-    color: colors.textLight,
-    marginTop: spacing.md,
-  },
-  providerButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.white10,
-    padding: spacing.lg,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.sm,
-  },
-  providerButtonDisabled: {
-    opacity: 0.5,
-  },
-  providerInfo: {
-    flex: 1,
-  },
-  providerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  walletLogoContainer: {
-    marginRight: spacing.sm,
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  walletLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-  },
-  walletIcon: {
-    fontSize: 24,
-  },
-  providerNameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  providerName: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  detectedBadge: {
-    backgroundColor: colors.primaryGreen,
-    borderRadius: 8,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    marginLeft: spacing.sm,
-  },
-  detectedText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  providerUnavailable: {
-    color: colors.textLightSecondary,
-    fontSize: 14,
-    marginTop: spacing.xs,
-  },
-  footer: {
-    padding: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  footerText: {
-    color: colors.textLightSecondary,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-});
 
 export default ExternalWalletConnectionScreen; 
