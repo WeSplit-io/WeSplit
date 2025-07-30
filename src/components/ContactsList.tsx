@@ -412,7 +412,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
           {/* Content */}
           <ScrollView
             style={styles.contactsScrollView}
-            contentContainerStyle={{ paddingBottom: 100 }}
+            contentContainerStyle={styles.scrollViewContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
@@ -452,7 +452,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                     {searchResults.map((user) => (
                       <View key={`search-${user.id}`} style={styles.contactRow}>
                         <TouchableOpacity
-                          style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+                          style={styles.searchContactRow}
                           onPress={() => onContactSelect({
                             id: user.id,
                             name: user.name,
@@ -543,9 +543,9 @@ const ContactsList: React.FC<ContactsListProps> = ({
           </ScrollView>
         </>
       ) : (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', height: 300, backgroundColor: colors.darkBackground, borderRadius: 16, margin: 16 }}>
+        <View style={styles.qrScannerPlaceholder}>
           {/* TODO: Remplacer par composant caméra/QR code */}
-          <Text style={{ color: colors.textLight, fontSize: 18 }}>[Camera QR Scanner Placeholder]</Text>
+          <Text style={styles.qrScannerPlaceholderText}>[Camera QR Scanner Placeholder]</Text>
         </View>
       )}
     </View>

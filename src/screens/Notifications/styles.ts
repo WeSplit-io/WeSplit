@@ -11,7 +11,7 @@ export default StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
     paddingTop: 24,
     paddingBottom: 16,
     backgroundColor: colors.darkBackground,
@@ -39,7 +39,7 @@ export default StyleSheet.create({
     height: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: spacing.xs,
   },
   unreadBadgeText: {
     color: '#FFF',
@@ -98,7 +98,7 @@ export default StyleSheet.create({
   // Content
   scrollView: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   // Section Headers
   sectionHeader: {

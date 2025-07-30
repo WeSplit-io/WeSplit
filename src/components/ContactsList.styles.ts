@@ -12,8 +12,8 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.black,
     borderRadius: 16,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
+    height: spacing.inputHeight,
     marginBottom: spacing.lg,
     borderWidth: spacing.borderWidthThin,
     borderColor: colors.white50,
@@ -23,6 +23,8 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     color: colors.textLight,
     marginLeft: spacing.sm,
+    height: '100%',
+    textAlignVertical: 'center',
   },
   searchIcon: {
     width: 20,
@@ -43,7 +45,7 @@ export const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
     paddingVertical: spacing.sm,
     borderRadius: 12,
     backgroundColor: 'transparent',
@@ -79,7 +81,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   avatar: {
     width: spacing.xxl + spacing.sm,
@@ -177,5 +179,26 @@ export const styles = StyleSheet.create({
     marginTop: 4,
     borderRadius: 2,
     width: '60%',
+  },
+  scrollViewContent: {
+    paddingBottom: spacing.bottomNavSpace,
+  },
+  searchContactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  qrScannerPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 300,
+    backgroundColor: colors.darkBackground,
+    borderRadius: 16,
+    margin: spacing.screenPaddingHorizontal,
+  },
+  qrScannerPlaceholderText: {
+    color: colors.textLight,
+    fontSize: 18,
   },
 }); 

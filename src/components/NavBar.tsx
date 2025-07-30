@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Platform } from 'react-native';
 import { colors } from '../theme';
 import NavIcon from './NavIcon';
 import { styles } from './NavBar.styles';
+import platformUtils from '../utils/platformUtils';
 
 // Fonction pour obtenir l'image selon le nom
 const getImageSource = (iconName: string) => {
@@ -107,6 +108,7 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
               key={index} 
               style={[styles.navItem, item.isSpecial && styles.specialNavItem]} 
               onPress={() => handleNavigation(item.route)}
+              activeOpacity={platformUtils.touchFeedback.activeOpacity}
             >
               {item.isSpecial ? (
                 <View style={styles.specialButton}>
@@ -140,7 +142,5 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
     </View>
   );
 };
-
-
 
 export default NavBar; 

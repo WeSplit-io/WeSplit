@@ -7,13 +7,12 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.darkBackground,
-    paddingHorizontal: spacing.lg,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
     backgroundColor: colors.darkBackground,
@@ -36,7 +35,7 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   scrollContent: {
     flexGrow: 1,
@@ -126,7 +125,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   balanceText: {
     color: colors.textSecondary,
@@ -351,7 +350,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     lineHeight: spacing.iconSize,
     fontSize: typography.fontSize.md,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   successRecipientCard: {
     backgroundColor: colors.darkBackground,
@@ -415,7 +414,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.brandGreen,
     borderRadius: spacing.lg,
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
     alignItems: 'center',
     marginVertical: spacing.sm,
     minWidth: '80%',
@@ -492,8 +491,8 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.darkBackground,
     borderRadius: spacing.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
+    height: spacing.inputHeight,
     borderWidth: spacing.borderWidthThin,
     borderColor: colors.textLight,
   },
@@ -502,6 +501,8 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     color: colors.textLight,
     marginLeft: spacing.sm,
+    height: '100%',
+    textAlignVertical: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -572,8 +573,8 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.black,
     borderRadius: 16,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
+    height: spacing.inputHeight,
     marginBottom: spacing.lg,
     borderWidth: spacing.borderWidthThin,
     borderColor: colors.textLight,
@@ -583,6 +584,8 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     color: colors.textLight,
     marginLeft: spacing.sm,
+    height: '100%',
+    textAlignVertical: 'center',
   },
   contactsScrollView: {
     flex: 1,
@@ -715,7 +718,7 @@ export const styles = StyleSheet.create({
   numberPad: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
     marginBottom: spacing.lg,
   },
   numberPadRow: {
@@ -761,7 +764,7 @@ export const styles = StyleSheet.create({
   mockupRecipientCard: {
     backgroundColor: colors.white10,
     borderRadius: spacing.lg,
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
     paddingVertical: 15,
     flexDirection: 'row',
     alignItems: 'center',
@@ -960,7 +963,7 @@ export const styles = StyleSheet.create({
   mockupSuccessNoteContainer: {
     alignItems: 'center',
     marginBottom: spacing.xxxl,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   mockupSuccessNoteText: {
     color: colors.textLight,
@@ -987,7 +990,8 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: colors.darkBackground,
     borderRadius: spacing.lg,
-    margin: spacing.lg,
+    marginHorizontal: spacing.screenPaddingHorizontal,
+    marginVertical: spacing.lg,
     padding: spacing.xs,
     borderWidth: spacing.borderWidthThin,
     borderColor: colors.textLight,
@@ -1176,13 +1180,13 @@ export const styles = StyleSheet.create({
     paddingTop: 8,
     alignItems: 'center',
     borderTopWidth: 0,
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.screenPaddingHorizontal,
 
   },
 
   // AppleSlider styles (adapted from WalletManagement)
   appleSliderContainerWrapper: {
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.screenPaddingHorizontal,
     // width: '100%', // supprimé pour éviter le débordement
   },
   appleSliderContainer: {

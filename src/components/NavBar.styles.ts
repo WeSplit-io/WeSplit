@@ -1,18 +1,20 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { colors, spacing, typography } from '../theme';
-import { GREEN } from '../screens/Dashboard/styles';
+import platformUtils from '../utils/platformUtils';
 
 /**
  * =======================================================================
- * NAVBAR COMPONENT STYLES
+ * NAVBAR COMPONENT STYLES - HARMONIZED FOR iOS & ANDROID
  * =======================================================================
- * Bottom navigation bar styles for consistent navigation throughout the app
+ * Bottom navigation bar styles optimized for consistent display across platforms
  * 
  * DESIGN NOTES:
- * - Fixed bottom positioning with dark background
- * - Special center button with green circular background
- * - Active state indicators with green color
- * - Responsive layout with equal spacing
+ * - Platform-specific safe area handling
+ * - Consistent shadow rendering across platforms
+ * - Optimized spacing and alignment
+ * - Cross-platform font handling
+ * - Consistent icon sizes and alignment
+ * - Bottom-aligned icons with text on same line
  * 
  * FIGMA REFERENCE: Navigation bar component
  * =======================================================================
@@ -21,7 +23,7 @@ import { GREEN } from '../screens/Dashboard/styles';
 export const styles = StyleSheet.create({
   // === MAIN CONTAINER ===
   container: {
-    paddingBottom: spacing.lg,
+    paddingBottom: platformUtils.navBar.paddingBottom,
     borderRadius: 25,
     backgroundColor: colors.black,
     borderWidth: 0.5,
@@ -30,70 +32,91 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 95,
+    height: platformUtils.navBar.height,
+    // Platform-specific shadow handling
+    ...platformUtils.shadows.large,
   },
 
   // === SCROLL CONTENT ===
   scrollContent: {
     paddingHorizontal: spacing.xl,
-    alignItems: 'flex-end',
+    alignItems: 'flex-end', // Align items to bottom
     justifyContent: 'space-around',
     flexDirection: 'row',
     flex: 1,
+    paddingTop: platformUtils.navBar.contentPaddingTop,
+    paddingBottom: platformUtils.navBar.contentPaddingBottom,
   },
 
   // === NAV ITEMS ===
   navItem: {
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    justifyContent: 'flex-end', // Align content to bottom
     minWidth: 72,
     flex: 1,
+    height: '100%', // Take full height
+    paddingVertical: 0,
   },
 
   // === NAV LABELS ===
   navLabel: {
     fontSize: typography.fontSize.xs,
     color: colors.white70,
-    marginTop: 2,
+    marginTop: platformUtils.navBar.labelMarginTop,
     textAlign: 'center',
+    fontFamily: platformUtils.typography.fontFamily,
+    fontWeight: '500' as const,
+    letterSpacing: platformUtils.typography.letterSpacing.small,
+    lineHeight: platformUtils.typography.lineHeight.navLabel,
   },
   navLabelActive: {
     color: colors.green,
+    fontWeight: '600' as const,
   },
 
   // === SPECIAL BUTTON (CENTER GROUPS BUTTON) ===
   specialNavItem: {
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end', // Align to bottom like other items
+    height: '100%', // Take full height
+    marginBottom: 0,
   },
   specialButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: platformUtils.navBar.specialButtonSize,
+    height: platformUtils.navBar.specialButtonSize,
+    borderRadius: platformUtils.navBar.specialButtonSize / 2,
     backgroundColor: colors.green,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.green,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-    marginBottom: 5,
+    // Platform-specific shadow for special button
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.green,
+        shadowOffset: {
+          width: 0,
+          height: 2,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+    marginBottom: 0, // Remove margin for better alignment
   },
   specialButtonImage: {
-    width: 24,
-    height: 24,
+    width: platformUtils.iconSizes.specialButtonIcon,
+    height: platformUtils.iconSizes.specialButtonIcon,
     tintColor: colors.black,
+    resizeMode: 'contain' as const,
   },
   navIcon: {
-    width: 40,
-    height: 40,
-    padding: 7,
-    objectFit: 'contain',
+    width: platformUtils.iconSizes.navIcon,
+    height: platformUtils.iconSizes.navIcon,
     tintColor: colors.white70,
+    resizeMode: 'contain' as const,
+    // Remove padding to ensure consistent sizing
   },
   navIconActive: {
     tintColor: colors.green,

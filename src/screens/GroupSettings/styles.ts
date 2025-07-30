@@ -11,7 +11,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
     paddingTop: 24,
     paddingBottom: 16,
     backgroundColor: colors.darkBackground,
@@ -48,7 +48,7 @@ export const styles = StyleSheet.create({
   
   scrollContent: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   // Group Info Card - Updated to match image
   groupInfoCard: {
