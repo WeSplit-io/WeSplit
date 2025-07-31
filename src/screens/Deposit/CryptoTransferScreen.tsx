@@ -7,6 +7,7 @@ import Icon from '../../components/Icon';
 import { Clipboard } from 'react-native';
 import styles from './styles';
 import { colors } from '../../theme';
+import { generateTransferLink } from '../../services/deepLinkHandler';
 
 interface CryptoTransferParams {
   targetWallet?: {
@@ -66,19 +67,29 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
 
   const handleCopy = () => {
     if (depositAddress) {
-      Clipboard.setString(depositAddress);
-      Alert.alert('Copied', 'Wallet address copied to clipboard!');
+      const transferLink = generateTransferLink(
+        depositAddress,
+        currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
+        currentUser?.email
+      );
+      Clipboard.setString(transferLink);
+      Alert.alert('Copied', 'Transfer link copied to clipboard!');
     }
   };
 
   const handleShare = async () => {
     if (depositAddress) {
       try {
+        const transferLink = generateTransferLink(
+          depositAddress,
+          currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
+          currentUser?.email
+        );
         await Share.share({
-          message: `Send funds to ${isGroupWallet ? 'our group' : 'my'} Solana wallet: ${depositAddress}`,
+          message: `Transfer funds to ${isGroupWallet ? 'our group' : 'my'} app wallet using this link: ${transferLink}`,
         });
       } catch (e) {
-        Alert.alert('Error', 'Could not share address.');
+        Alert.alert('Error', 'Could not share transfer link.');
       }
     }
   };
@@ -156,6 +167,8 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
     navigation.goBack();
   };
 
+
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
@@ -191,17 +204,21 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
           {/* Divider */}
           {externalWalletConnected && <View style={styles.divider} />}
 
-          {/* QR Code Section for Manual Transfers */}
+          {/* QR Code Section for External Wallet Transfers */}
           <View style={styles.qrSection}>
-            <Text style={styles.sectionTitle}>Manual Transfer</Text>
+            <Text style={styles.sectionTitle}>External Wallet Transfer</Text>
             <Text style={styles.sectionDescription}>
-              Share your app wallet address to receive funds from any external wallet
+              Share this QR code to trigger external wallet transfers (Phantom, Metamask, etc.) to your app wallet
             </Text>
             
             {depositAddress ? (
               <View style={styles.qrContainer}>
                 <QRCode
-                  value={depositAddress}
+                  value={generateTransferLink(
+                    depositAddress,
+                    currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
+                    currentUser?.email
+                  )}
                   size={200}
                   backgroundColor={colors.white}
                   color="#000"
@@ -218,7 +235,7 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
             )}
           </View>
 
-          {/* Address Display */}
+          {/* Wallet Address Display */}
           {depositAddress && (
             <View style={styles.addressDisplay}>
               <Text style={styles.addressLabel}>App Wallet Address</Text>
@@ -233,22 +250,24 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity style={styles.actionButton} onPress={handleCopy}>
                 <Icon name="copy" size={18} color="#212121" />
-                <Text style={styles.actionButtonText}>Copy</Text>
+                <Text style={styles.actionButtonText}>Copy Link</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
                 <Icon name="share-2" size={18} color="#212121" />
-                <Text style={styles.actionButtonText}>Share</Text>
+                <Text style={styles.actionButtonText}>Share Link</Text>
               </TouchableOpacity>
             </View>
           )}
+
+
 
           {/* Tip Section */}
           <View style={styles.tipBox}>
             <Text style={styles.tipTitle}>Tip</Text>
             <Text style={styles.tipText}>
               {isGroupWallet
-                ? 'Send funds to the shared group wallet. All members can use these funds for automatic expense settlement.'
-                : 'Only send Solana (SOL) or Solana-based tokens to this address. Sending unsupported assets may result in loss of funds.'
+                ? 'Share this QR code to trigger external wallet transfers to the shared group wallet.'
+                : 'Share this QR code to trigger external wallet transfers (Phantom, Metamask, etc.) to your app wallet. Only send Solana (SOL) or Solana-based tokens.'
               }
             </Text>
           </View>

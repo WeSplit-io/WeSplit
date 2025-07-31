@@ -99,7 +99,6 @@ const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
       [SUPPORTED_WALLET_PROVIDERS.IMTOKEN]: 'imtoken',
       [SUPPORTED_WALLET_PROVIDERS.COIN98]: 'coin98',
       [SUPPORTED_WALLET_PROVIDERS.BLOCTO]: 'blocto',
-      [SUPPORTED_WALLET_PROVIDERS.PEAK]: 'peak',
       [SUPPORTED_WALLET_PROVIDERS.NIGHTLY]: 'nightly',
       [SUPPORTED_WALLET_PROVIDERS.CLOVER]: 'clover',
       [SUPPORTED_WALLET_PROVIDERS.WALLET_CONNECT]: 'wallet-connect',

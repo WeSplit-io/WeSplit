@@ -23,6 +23,7 @@ interface QRCodeModalProps {
   displayIcon?: string; // Icon name for group (optional)
   displayColor?: string; // Color for group icon (optional)
   isGroup?: boolean; // Whether this is for a group or user
+  rawAddress?: string; // Optional: raw wallet address to display below QR
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -45,6 +46,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
   displayIcon = 'trip',
   displayColor = colors.primaryGreen,
   isGroup = false,
+  rawAddress,
 }) => {
   const translateY = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -179,15 +181,59 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
                         />
                       </View>
                       <Text style={styles.qrUserName}>{displayName}</Text>
+                      {/* Show raw address if provided (for group) */}
+                      {rawAddress && (
+                        <Text style={[styles.qrWalletAddress, { fontSize: 13, color: colors.textLightSecondary, marginTop: 4 }]}>
+                          {rawAddress}
+                        </Text>
+                      )}
                     </View>
                   ) : (
                     // User display
-                    <Text style={styles.qrUserName}>{displayName}</Text>
+                    <>
+                      <Text style={styles.qrUserName}>{displayName}</Text>
+                      {/* Show raw address if provided (for user) */}
+                      {rawAddress && (
+                        <Text style={[styles.qrWalletAddress, { fontSize: 13, color: colors.textLightSecondary, marginTop: 4 }]}>
+                          {rawAddress}
+                        </Text>
+                      )}
+                    </>
                   )}
                   <Text style={styles.qrWalletAddress}>
-                    {isGroup ? 
+                    {isGroup ?
                       'Group invite link' :
-                      qrValue ? 
+                      qrValue && qrValue.startsWith('wesplit://profile/') ?
+                        (() => {
+                          // Extract wallet address from profile QR code
+                          const parts = qrValue.split('/');
+                          const walletAddress = parts[parts.length - 1];
+                          if (walletAddress && walletAddress.length > 12) {
+                            return `${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 6)}`;
+                          }
+                          return 'Profile QR code for adding contact';
+                        })() :
+                      qrValue && qrValue.startsWith('wesplit://send/') ?
+                        (() => {
+                          // Extract wallet address from send QR code
+                          const parts = qrValue.split('/');
+                          const walletAddress = parts[2]; // send/walletAddress/...
+                          if (walletAddress && walletAddress.length > 12) {
+                            return `${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 6)}`;
+                          }
+                          return 'Send money QR code';
+                        })() :
+                      qrValue && qrValue.startsWith('wesplit://transfer/') ?
+                        (() => {
+                          // Extract wallet address from transfer QR code
+                          const parts = qrValue.split('/');
+                          const walletAddress = parts[2]; // transfer/walletAddress/...
+                          if (walletAddress && walletAddress.length > 12) {
+                            return `${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 6)}`;
+                          }
+                          return 'External wallet transfer QR code';
+                        })() :
+                      qrValue ?
                         `${qrValue.substring(0, 6)}...${qrValue.substring(qrValue.length - 6)}` :
                         'No wallet connected'
                     }

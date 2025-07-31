@@ -59,6 +59,47 @@ export const styles = StyleSheet.create({
   prominentGroupsContainer: {
     marginBottom: spacing.lg,
   },
+  stickyProminentContainer: {
+    backgroundColor: colors.darkBackground,
+    zIndex: 1000,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  stickyHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.darkBackground,
+    zIndex: 1001,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.screenPadding,
+    paddingBottom: spacing.sm,
+  },
+  stickyHeaderTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textLight,
+    marginBottom: spacing.sm,
+  },
+  stickyFiltersContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.green10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.white10,
+    padding: 4,
+  },
   sectionTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
@@ -284,6 +325,7 @@ export const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.screenPadding,
     paddingBottom: spacing.xl * 3, // Add extra padding for navbar safety
+    paddingTop: spacing.sm, // Add some top padding
   },
 
   // Regular Group Cards - Updated to match image design

@@ -9,6 +9,7 @@ import { styles } from './styles';
 import { colors } from '../../theme/colors';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { User } from '../../types';
+import { generateSendLink } from '../../services/deepLinkHandler';
 
 const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId } = route.params || {};
@@ -63,9 +64,15 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
     }
   };
 
-  // User wallet address for QR code
-  const userWalletAddress = currentUser?.wallet_address || address;
+  // Generate send QR code for receiving money
+  const sendQRCode = generateSendLink(
+    currentUser?.wallet_address || '',
+    currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
+    currentUser?.email
+  );
   const userName = currentUser?.name || currentUser?.email?.split('@')[0] || 'User';
+
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -128,39 +135,41 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
           />
         </View>
       ) : (
-        <View style={styles.requestQRContainer}>
-          <Text style={styles.requestQRTitle}>Show this QR code to your friend</Text>
+                  <View style={styles.requestQRContainer}>
+            <Text style={styles.requestQRTitle}>Show this QR code to your friend</Text>
 
-          <View style={styles.requestQRCodeContent}>
-            <View style={styles.requestQRCodeContainerWrapper}>
-              <View style={styles.requestQRCodeContainer}>
-                {userWalletAddress ? (
-                  <QRCode
-                    value={userWalletAddress}
-                    size={160}
-                    backgroundColor={colors.white}
-                    color={colors.black}
-                  />
-                ) : (
-                  <View style={styles.requestQRCodePlaceholder}>
-                    <Text style={styles.requestQRCodePlaceholderText}>No wallet address</Text>
-                  </View>
-                )}
+            <View style={styles.requestQRCodeContent}>
+              <View style={styles.requestQRCodeContainerWrapper}>
+                <View style={styles.requestQRCodeContainer}>
+                  {currentUser?.wallet_address ? (
+                    <QRCode
+                      value={sendQRCode}
+                      size={160}
+                      backgroundColor={colors.white}
+                      color={colors.black}
+                    />
+                  ) : (
+                    <View style={styles.requestQRCodePlaceholder}>
+                      <Text style={styles.requestQRCodePlaceholderText}>No wallet address</Text>
+                    </View>
+                  )}
+                </View>
+
+              </View>
+              <View style={styles.requestQRUserInfo}>
+                <Text style={styles.requestQRUserName}>{userName}</Text>
+                <Text style={styles.requestQRUserWallet}>{currentUser?.wallet_address ? `${currentUser.wallet_address.substring(0, 6)}...${currentUser.wallet_address.substring(currentUser.wallet_address.length - 6)}` : 'No wallet connected'}</Text>
+
               </View>
 
             </View>
-            <View style={styles.requestQRUserInfo}>
-              <Text style={styles.requestQRUserName}>{userName}</Text>
-              <Text style={styles.requestQRUserWallet}>{userWalletAddress ? `${userWalletAddress.substring(0, 6)}...${userWalletAddress.substring(userWalletAddress.length - 6)}` : 'No wallet connected'}</Text>
-
-            </View>
-
-          </View>
 
 
           <TouchableOpacity style={styles.requestDoneButton} onPress={() => navigation.goBack()}>
             <Text style={styles.requestDoneButtonText}>Done</Text>
           </TouchableOpacity>
+
+
         </View>
 
 

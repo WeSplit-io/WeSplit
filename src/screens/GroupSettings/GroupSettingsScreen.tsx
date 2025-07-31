@@ -1,19 +1,35 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, SafeAreaView, Share, ActivityIndicator, Platform, Modal, Image, Dimensions, TouchableWithoutFeedback } from 'react-native';
-import { TextInput } from 'react-native-gesture-handler';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  SafeAreaView,
+  ScrollView,
+  Alert,
+  Share,
+  TextInput,
+  Modal,
+  Animated,
+  TouchableWithoutFeedback,
+  Image,
+  ActivityIndicator,
+  RefreshControl,
+  Dimensions,
+} from 'react-native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
-import { Animated } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import Icon from '../../components/Icon';
-import GroupIcon from '../../components/GroupIcon';
-import QRCodeModal from '../../components/QRCodeModal';
+
 import { useApp } from '../../context/AppContext';
-import { useGroupData } from '../../hooks/useGroupData';
-import { GroupMember, Expense } from '../../types';
 import { firebaseDataService } from '../../services/firebaseDataService';
-import { getUserProfile } from '../../services/firebaseAuthService';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import QRCodeModal from '../../components/QRCodeModal';
+import NavBar from '../../components/NavBar';
+import Icon from '../../components/Icon';
+import GroupIcon from '../../components/GroupIcon';
+import { useGroupData } from '../../hooks/useGroupData';
+
+import { GroupMember, Expense } from '../../types';
 import { hashWalletAddress } from '../../utils/cryptoUtils';
 
 const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
@@ -108,9 +124,9 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
           if (member.id) {
             try {
               // Get user profile from database
-              const userProfile = await getUserProfile(member.id.toString());
-              if (userProfile?.profile_picture) {
-                return { id: member.id, url: userProfile.profile_picture };
+              const userProfile = await firebaseDataService.user.getCurrentUser(member.id.toString());
+              if (userProfile?.avatar) {
+                return { id: member.id, url: userProfile.avatar };
               }
             } catch (error) {
               console.error('❌ GroupSettingsScreen: Error fetching profile image for member:', member.id, error);
@@ -137,7 +153,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     };
 
     loadRealMembers();
-  }, [groupId, group, currentUser]);
+  }, [groupId, currentUser?.id]); // Removed 'group' from dependencies to prevent infinite loading
 
   // Get computed values from real member data
   const members = realMembers;
@@ -151,9 +167,11 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
           // Use the hybrid service instead of the old groupService
           const inviteData = await firebaseDataService.group.generateInviteLink(group.id.toString(), currentUser.id.toString());
           setInviteLink(inviteData.inviteLink);
+          console.log('✅ GroupSettingsScreen: Generated invite link:', inviteData.inviteLink);
         } catch (error) {
           console.error('❌ GroupSettingsScreen: Error generating invite link for QR:', error);
-          setInviteLink(`wesplit://join/${group.id}`);
+          // Don't set a fallback link - let the QR code show empty if generation fails
+          setInviteLink('');
         }
       }
     };
@@ -215,6 +233,8 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     }
   };
 
+
+
   // Handle removing a member from the group (admin only)
   const handleRemoveMember = async (memberId: string | number, memberName: string) => {
     if (!isAdmin) {
@@ -271,9 +291,159 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
       const groupId = String(group.id);
       const isOnlyMember = members.length === 1;
 
+      // Check if user has outstanding balances
+      let hasOutstandingBalance = false;
+      let userBalance = 0;
+      let balanceDetails = '';
+      let owesMoney = false;
 
+      try {
+        console.log('🔄 GroupSettingsScreen: Checking balances before leaving group...');
+        
+        // Get group balances to check if user owes money or is owed money
+        const balances = await getGroupBalances(groupId);
+        console.log('🔄 GroupSettingsScreen: Retrieved balances:', balances);
+        
+        if (balances && Array.isArray(balances)) {
+          const userBalanceData = balances.find(balance => 
+            String(balance.userId) === String(currentUser.id)
+          );
+          
+          console.log('🔄 GroupSettingsScreen: User balance data:', userBalanceData);
+          
+          if (userBalanceData) {
+            userBalance = userBalanceData.amount || 0;
+            owesMoney = userBalance < -0.01; // User owes money if balance is negative
+            hasOutstandingBalance = Math.abs(userBalance) > 0.01; // Check if balance is significant
+            
+            console.log('🔄 GroupSettingsScreen: Balance analysis:', {
+              userBalance,
+              owesMoney,
+              hasOutstandingBalance,
+              currentUserId: currentUser.id
+            });
+            
+            if (hasOutstandingBalance) {
+              if (userBalance > 0) {
+                balanceDetails = `You are owed $${userBalance.toFixed(2)}`;
+              } else {
+                balanceDetails = `You owe $${Math.abs(userBalance).toFixed(2)}`;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ GroupSettingsScreen: Error checking balances:', error);
+        // Continue with leave process even if balance check fails
+      }
 
+      // If user owes money, prevent leaving and force settlement
+      if (owesMoney) {
+        Alert.alert(
+          'Cannot Leave Group',
+          `You owe $${Math.abs(userBalance).toFixed(2)} to other members.\n\nYou must settle all outstanding balances before leaving the group.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Settle Now',
+              style: 'default',
+              onPress: () => {
+                // Navigate to group details with settle up modal open
+                navigation.navigate('GroupDetails', { 
+                  groupId,
+                  showSettleUpModal: true,
+                  showSettleUpOnLeave: true,
+                  onSettlementComplete: () => {
+                    // After settlement, check balances again and proceed if settled
+                    checkBalancesAndLeave(groupId, isOnlyMember);
+                  }
+                });
+              }
+            }
+          ]
+        );
+        return;
+      }
 
+      // Show confirmation alert with balance information
+      const alertTitle = 'Leave Group';
+      const alertMessage = hasOutstandingBalance 
+        ? `Are you sure you want to leave "${group.name}"?\n\n${balanceDetails}\n\nYou can settle your balances before leaving.`
+        : `Are you sure you want to leave "${group.name}"?`;
+
+      Alert.alert(
+        alertTitle,
+        alertMessage,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: hasOutstandingBalance ? 'Settle & Leave' : 'Leave Group',
+            style: hasOutstandingBalance ? 'default' : 'destructive',
+            onPress: async () => {
+              try {
+                if (hasOutstandingBalance) {
+                  // Navigate to group details with settle up modal open
+                  navigation.navigate('GroupDetails', { 
+                    groupId,
+                    showSettleUpModal: true,
+                    showSettleUpOnLeave: true,
+                    onSettlementComplete: () => {
+                      // After settlement, check balances again and proceed if settled
+                      checkBalancesAndLeave(groupId, isOnlyMember);
+                    }
+                  });
+                } else {
+                  // Proceed directly with leaving group
+                  await proceedWithLeavingGroup(groupId, isOnlyMember);
+                }
+              } catch (error) {
+                console.error('❌ GroupSettingsScreen: Error in leave group process:', error);
+                Alert.alert('Error', 'Failed to leave group. Please try again.');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('❌ GroupSettingsScreen: Error leaving group:', error);
+      Alert.alert('Error', 'Failed to leave group. Please try again.');
+    }
+  };
+
+  // Helper function to check balances after settlement and proceed with leaving
+  const checkBalancesAndLeave = async (groupId: string, isOnlyMember: boolean) => {
+    try {
+      console.log('🔄 GroupSettingsScreen: Re-checking balances after settlement...');
+      
+      // Re-check balances after settlement
+      const balances = await getGroupBalances(groupId);
+      const userBalanceData = balances.find(balance => 
+        String(balance.userId) === String(currentUser?.id)
+      );
+      
+      const stillOwesMoney = userBalanceData && userBalanceData.amount < -0.01;
+      
+      if (stillOwesMoney) {
+        Alert.alert(
+          'Still Outstanding Balances',
+          `You still owe $${Math.abs(userBalanceData.amount).toFixed(2)} to other members.\n\nPlease complete all settlements before leaving.`,
+          [
+            { text: 'OK', style: 'default' }
+          ]
+        );
+        return;
+      }
+      
+      // If no longer owes money, proceed with leaving
+      await proceedWithLeavingGroup(groupId, isOnlyMember);
+    } catch (error) {
+      console.error('❌ GroupSettingsScreen: Error checking balances after settlement:', error);
+      Alert.alert('Error', 'Failed to verify settlement. Please try again.');
+    }
+  };
+
+  const proceedWithLeavingGroup = async (groupId: string, isOnlyMember: boolean) => {
+    try {
       if (isOnlyMember) {
         // If user is the only member, delete the group
         await deleteGroup(groupId);
@@ -289,6 +459,23 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     } catch (error) {
       console.error('❌ GroupSettingsScreen: Error leaving group:', error);
       Alert.alert('Error', 'Failed to leave group. Please try again.');
+    }
+  };
+
+  // Refresh members list
+  const refreshMembers = async () => {
+    if (!groupId) return;
+    
+    setLoadingMembers(true);
+    try {
+      console.log('🔄 GroupSettingsScreen: Refreshing members for group:', groupId);
+      const members = await firebaseDataService.group.getGroupMembers(groupId.toString(), true, currentUser?.id ? String(currentUser.id) : undefined);
+      console.log('🔄 GroupSettingsScreen: Refreshed members:', members.length);
+      setRealMembers(members);
+    } catch (error) {
+      console.error('❌ GroupSettingsScreen: Error refreshing members:', error);
+    } finally {
+      setLoadingMembers(false);
     }
   };
 
@@ -510,7 +697,18 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollContent} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={loadingMembers}
+            onRefresh={refreshMembers}
+            tintColor="#A5EA15"
+            colors={["#A5EA15"]}
+          />
+        }
+      >
         {/* Group Info Card */}
         <View style={styles.groupInfoCard}>
           <GroupIcon
@@ -552,6 +750,8 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
           />
           <Text style={styles.actionButtonText}>Invite via link</Text>
         </TouchableOpacity>
+
+
 
         {/* Members Section */}
         <Text style={styles.membersTitle}>{members.length} Members</Text>
@@ -673,7 +873,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
       <QRCodeModal
         visible={showQRModal}
         onClose={() => setShowQRModal(false)}
-        qrValue={inviteLink || `wesplit://join/${groupId?.toString()}?name=${encodeURIComponent(group?.name || 'Group')}`}
+        qrValue={inviteLink || ''}
         title="Show QR code to your friend"
         displayName={group?.name || 'Group'}
         displayIcon={group?.category || 'trip'}

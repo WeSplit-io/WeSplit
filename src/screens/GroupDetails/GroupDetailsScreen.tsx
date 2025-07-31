@@ -59,6 +59,10 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   const [transactionModalVisible, setTransactionModalVisible] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
+  // Check if we should show the settle up modal on load
+  const shouldShowSettleUpModal = route.params?.showSettleUpModal;
+  const onSettlementComplete = route.params?.onSettlementComplete;
+
   // State for optimized settlement transactions
   const [optimizedSettlementTransactions, setOptimizedSettlementTransactions] = useState<any[]>([]);
   const [userSettlementTransactions, setUserSettlementTransactions] = useState<any[]>([]);
@@ -246,6 +250,17 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       // The useGroupData hook should handle this, but let's ensure it's triggered
     }
   }, [groupId, group, groupLoading]);
+
+  // Track if modal was opened from route params to prevent reopening
+  const [modalOpenedFromParams, setModalOpenedFromParams] = useState(false);
+  
+  // Auto-open settle up modal if requested (only once)
+  useEffect(() => {
+    if (shouldShowSettleUpModal && !settleUpModalVisible && !modalOpenedFromParams) {
+      setSettleUpModalVisible(true);
+      setModalOpenedFromParams(true);
+    }
+  }, [shouldShowSettleUpModal, settleUpModalVisible, modalOpenedFromParams]);
 
   // Refresh group data when screen comes into focus (e.g., after accepting invitation)
   useFocusEffect(
@@ -1089,7 +1104,16 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       {/* SettleUp Modal */}
       <SettleUpModal
         visible={settleUpModalVisible}
-        onClose={() => setSettleUpModalVisible(false)}
+        onClose={() => {
+          setSettleUpModalVisible(false);
+          setModalOpenedFromParams(false);
+          // Clear the route parameters to prevent modal from reopening
+          navigation.setParams({
+            showSettleUpModal: undefined,
+            showSettleUpOnLeave: undefined,
+            onSettlementComplete: undefined
+          });
+        }}
         groupId={groupId}
         realBalances={realGroupBalances}
         optimizedTransactions={optimizedSettlementTransactions}
@@ -1097,6 +1121,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         userTotalOwed={userTotalOwed}
         userTotalOwedTo={userTotalOwedTo}
         navigation={navigation}
+        onSettlementComplete={onSettlementComplete}
       />
 
       {/* Transaction Modal for Expense Details */}

@@ -696,14 +696,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       await firebaseDataService.group.deleteGroup(String(groupId), String(state.currentUser.id));
       
-      // Real-time listener will automatically update the groups state
-      console.log('🔄 AppContext: Group deleted, real-time listener will update state');
+      // Remove the group from local state immediately
+      const updatedGroups = state.groups.filter(group => group.id !== groupId);
+      dispatch({ type: 'SET_GROUPS', payload: updatedGroups });
+      
+      // Stop the group listener since group is deleted
+      const unsubscribe = groupListenersRef.current.get(String(groupId));
+      if (unsubscribe) {
+        unsubscribe();
+        groupListenersRef.current.delete(String(groupId));
+      }
+      
+      console.log('🔄 AppContext: Group deleted, removed from local state and stopped listener');
       
     } catch (error) {
       console.error('Error deleting group:', error);
       throw error;
     }
-  }, [state.currentUser]);
+  }, [state.currentUser, state.groups]);
 
   const leaveGroup = useCallback(async (groupId: number | string): Promise<void> => {
     try {
@@ -713,14 +723,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       await firebaseDataService.group.leaveGroup(String(groupId), String(state.currentUser.id));
       
-      // Real-time listener will automatically update the groups state
-      console.log('🔄 AppContext: User left group, real-time listener will update state');
+      // Remove the group from local state immediately
+      const updatedGroups = state.groups.filter(group => group.id !== groupId);
+      dispatch({ type: 'SET_GROUPS', payload: updatedGroups });
+      
+      // Stop the group listener since user is no longer a member
+      const unsubscribe = groupListenersRef.current.get(String(groupId));
+      if (unsubscribe) {
+        unsubscribe();
+        groupListenersRef.current.delete(String(groupId));
+      }
+      
+      console.log('🔄 AppContext: User left group, removed from local state and stopped listener');
       
     } catch (error) {
       console.error('Error leaving group:', error);
       throw error;
     }
-  }, [state.currentUser]);
+  }, [state.currentUser, state.groups]);
 
   const selectGroup = useCallback((group: GroupWithDetails | null) => {
     dispatch({ type: 'SELECT_GROUP', payload: group });

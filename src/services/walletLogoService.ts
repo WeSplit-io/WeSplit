@@ -325,17 +325,7 @@ class WalletLogoService {
         playStoreId: 'com.blocto.app',
         websiteUrl: 'https://blocto.io'
       },
-      {
-        name: 'Peak',
-        logoUrl: 'https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/icons/peak.png',
-        fallbackIcon: '⛰️',
-        isAvailable: false,
-        detectionMethod: 'deep-link',
-        deepLinkScheme: 'peak://',
-        appStoreId: 'peak',
-        playStoreId: 'com.peak.wallet',
-        websiteUrl: 'https://peakwallet.com'
-      },
+
       {
         name: 'Nightly',
         logoUrl: 'https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/icons/nightly.png',

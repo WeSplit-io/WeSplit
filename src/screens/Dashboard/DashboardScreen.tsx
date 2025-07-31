@@ -31,6 +31,7 @@ import { getUserNotifications, sendNotification } from '../../services/firebaseN
 import { createPaymentRequest, getReceivedPaymentRequests } from '../../services/firebasePaymentRequestService';
 import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
 import { firebaseTransactionService } from '../../services/firebaseDataService';
+import { generateProfileLink } from '../../services/deepLinkHandler';
 
 
 
@@ -90,6 +91,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [loadingGroupTransactions, setLoadingGroupTransactions] = useState(false);
   const [loadingPaymentRequests, setLoadingPaymentRequests] = useState(false);
   const [initialRequestsLoaded, setInitialRequestsLoaded] = useState(false);
+
+
 
 
   // Memoized balance calculations to avoid expensive recalculations
@@ -1176,21 +1179,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                 </TouchableOpacity>
               )}
 
-                            {/* Wallet Selector Button */}
-                            <TouchableOpacity
-                style={{
-                  backgroundColor: colors.primaryGreen + '20',
-                  paddingHorizontal: 8,
-                  paddingVertical: 6,
-                  borderRadius: 8,
-                  marginLeft: 8,
-                }}
-                onPress={() => setWalletSelectorVisible(true)}
-              >
-                <Icon name="settings" size={14} color={colors.primaryGreen} />
-              </TouchableOpacity>
-
-              {/* QR Code Button for Deposits */}
+            
+              {/* QR Code Button for Profile Sharing */}
               <TouchableOpacity 
                 style={styles.qrCodeIcon} 
                 onPress={() => setQrCodeModalVisible(true)}
@@ -1200,6 +1190,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                   style={styles.qrCodeImage}
                 />
               </TouchableOpacity>
+
+
 
 
             </View>
@@ -1661,8 +1653,13 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       <QRCodeModal
         visible={qrCodeModalVisible}
         onClose={() => setQrCodeModalVisible(false)}
-        qrValue={currentUser?.wallet_address || ''}
-        title="Show QR code to your friend"
+        qrValue={generateProfileLink(
+          currentUser?.id?.toString() || '',
+          currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
+          currentUser?.email,
+          currentUser?.wallet_address
+        )}
+        title="Share your profile QR code"
         displayName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
         isGroup={false}
       />

@@ -1181,6 +1181,9 @@ export const firebaseGroupService = {
   },
 
   removeMemberFromGroup: async (groupId: string, memberId: string): Promise<{ message: string }> => {
+    try {
+      if (__DEV__) { console.log('🔥 Removing member from group:', { groupId, memberId }); }
+      
       const groupMembersRef = collection(db, 'groupMembers');
       const memberQuery = query(
         groupMembersRef,
@@ -1189,12 +1192,25 @@ export const firebaseGroupService = {
       );
       const memberDocs = await getDocs(memberQuery);
       
+      if (__DEV__) { console.log('🔥 Found member documents:', memberDocs.docs.length); }
+      
     if (!memberDocs.empty) {
-      await deleteDoc(doc(db, 'groupMembers', memberDocs.docs[0].id));
+        const memberDocId = memberDocs.docs[0].id;
+        if (__DEV__) { console.log('🔥 Deleting member document:', memberDocId); }
+        
+        await deleteDoc(doc(db, 'groupMembers', memberDocId));
       await updateGroupMemberCount(groupId);
+        
+        if (__DEV__) { console.log('🔥 Member removed successfully'); }
+      } else {
+        if (__DEV__) { console.log('🔥 No member found to remove'); }
     }
     
     return { message: 'Member removed successfully' };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error removing member from group:', error); }
+      throw error;
+    }
   },
 
   leaveGroup: async (groupId: string, userId: string): Promise<{ message: string }> => {

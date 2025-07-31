@@ -158,7 +158,6 @@ export default function App() {
                 <Stack.Screen name="Balance" component={BalanceScreen} />
                 <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
         
-                <Stack.Screen name="SettleUpModal" component={SettleUpModal} />
                 <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} />
                 <Stack.Screen name="Profile" component={ProfileScreen} />
                 <Stack.Screen name="Deposit" component={DepositScreen} />

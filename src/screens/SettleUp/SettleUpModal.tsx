@@ -22,6 +22,7 @@ interface SettleUpModalProps {
   userTotalOwed?: number; // Total amount user owes
   userTotalOwedTo?: number; // Total amount user is owed
   onSettlementComplete?: () => void;
+  showSettleUpOnLeave?: boolean; // Flag to indicate this is shown when leaving group
 }
 
 const { height: SCREEN_HEIGHT } = require('react-native').Dimensions.get('window');
@@ -37,15 +38,63 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
   userTransactions = [],
   userTotalOwed = 0,
   userTotalOwedTo = 0,
-  onSettlementComplete 
+  onSettlementComplete,
+  showSettleUpOnLeave = false
 }) => {
   const actualGroupId = groupId || route?.params?.groupId;
+  const isLeavingGroup = showSettleUpOnLeave || route?.params?.showSettleUpOnLeave;
+  const leaveGroupCallback = route?.params?.onSettlementComplete;
+  
+  // Check if this modal was opened from GroupDetailsScreen (not from leave group flow)
+  const isFromGroupDetails = route?.params?.showSettleUpModal;
 
   // Animation refs
   const translateY = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   const handleClose = () => {
+    // Always allow closing, but show warning if leaving group with outstanding balances
+    if (isLeavingGroup && oweData.length > 0) {
+      Alert.alert(
+        'Outstanding Balances',
+        'You still have outstanding balances to settle. You can close this modal and stay in the group.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Close Anyway', 
+            style: 'default',
+            onPress: () => {
+              // Animate out first, then close
+              Animated.parallel([
+                Animated.timing(translateY, {
+                  toValue: SCREEN_HEIGHT,
+                  duration: 300,
+                  useNativeDriver: true,
+                }),
+                Animated.timing(opacity, {
+                  toValue: 0,
+                  duration: 300,
+                  useNativeDriver: true,
+                }),
+              ]).start(() => {
+                // Reset values after animation
+                translateY.setValue(0);
+                opacity.setValue(0);
+                
+                // Then close the modal (user stays in group)
+                if (onClose) {
+                  onClose();
+                } else {
+                  navigation.goBack();
+                }
+              });
+            }
+          }
+        ]
+      );
+      return;
+    }
+
     // Animate out first, then close
     Animated.parallel([
       Animated.timing(translateY, {
@@ -66,6 +115,9 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
       // Then close the modal
       if (onClose) {
         onClose();
+      } else if (isLeavingGroup && leaveGroupCallback) {
+        // If this was opened for leaving group, call the callback
+        leaveGroupCallback();
       } else {
         navigation.goBack();
       }
@@ -103,9 +155,54 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
           translateY.setValue(0);
           opacity.setValue(0);
           
+          // Always allow closing, but show warning if leaving group with outstanding balances
+          if (isLeavingGroup && oweData.length > 0) {
+            Alert.alert(
+              'Outstanding Balances',
+              'You still have outstanding balances to settle. You can close this modal and stay in the group.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                  text: 'Close Anyway', 
+                  style: 'default',
+                  onPress: () => {
+                    // Animate out first, then close
+                    Animated.parallel([
+                      Animated.timing(translateY, {
+                        toValue: SCREEN_HEIGHT,
+                        duration: 300,
+                        useNativeDriver: true,
+                      }),
+                      Animated.timing(opacity, {
+                        toValue: 0,
+                        duration: 300,
+                        useNativeDriver: true,
+                      }),
+                    ]).start(() => {
+                      // Reset values after animation
+                      translateY.setValue(0);
+                      opacity.setValue(0);
+                      
+                      // Then close the modal (user stays in group)
+                      if (onClose) {
+                        onClose();
+                      } else {
+                        navigation.goBack();
+                      }
+                    });
+                  }
+                }
+              ]
+            );
+            return;
+          }
+          
           // Then close the modal
           if (onClose) {
             onClose();
+          } else if (isLeavingGroup && leaveGroupCallback) {
+            // If this was opened for leaving group, call the callback
+            leaveGroupCallback();
           } else {
             navigation.goBack();
           }
@@ -745,14 +842,100 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
       visible={visible}
       animationType="fade"
       transparent={true}
-      onRequestClose={handleClose}
+      onRequestClose={() => {
+        // Always allow closing, but show warning if leaving group with outstanding balances
+        if (isLeavingGroup && oweData.length > 0) {
+          Alert.alert(
+            'Outstanding Balances',
+            'You still have outstanding balances to settle. You can close this modal and stay in the group.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Close Anyway', 
+                style: 'default',
+                onPress: () => {
+                  // Animate out first, then close
+                  Animated.parallel([
+                    Animated.timing(translateY, {
+                      toValue: SCREEN_HEIGHT,
+                      duration: 300,
+                      useNativeDriver: true,
+                    }),
+                    Animated.timing(opacity, {
+                      toValue: 0,
+                      duration: 300,
+                      useNativeDriver: true,
+                    }),
+                  ]).start(() => {
+                    // Reset values after animation
+                    translateY.setValue(0);
+                    opacity.setValue(0);
+                    
+                    // Then close the modal (user stays in group)
+                    if (onClose) {
+                      onClose();
+                    } else {
+                      navigation.goBack();
+                    }
+                  });
+                }
+              }
+            ]
+          );
+          return;
+        }
+        handleClose();
+      }}
       statusBarTranslucent={true}
     >
       <Animated.View style={[styles.modalContainer, { opacity }]}>
         <TouchableOpacity
           style={styles.modalOverlayTouchable}
           activeOpacity={1}
-          onPress={handleClose}
+          onPress={() => {
+            // Always allow closing, but show warning if leaving group with outstanding balances
+            if (isLeavingGroup && oweData.length > 0) {
+              Alert.alert(
+                'Outstanding Balances',
+                'You still have outstanding balances to settle. You can close this modal and stay in the group.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { 
+                    text: 'Close Anyway', 
+                    style: 'default',
+                    onPress: () => {
+                      // Animate out first, then close
+                      Animated.parallel([
+                        Animated.timing(translateY, {
+                          toValue: SCREEN_HEIGHT,
+                          duration: 300,
+                          useNativeDriver: true,
+                        }),
+                        Animated.timing(opacity, {
+                          toValue: 0,
+                          duration: 300,
+                          useNativeDriver: true,
+                        }),
+                      ]).start(() => {
+                        // Reset values after animation
+                        translateY.setValue(0);
+                        opacity.setValue(0);
+                        
+                        // Then close the modal (user stays in group)
+                        if (onClose) {
+                          onClose();
+                        } else {
+                          navigation.goBack();
+                        }
+                      });
+                    }
+                  }
+                ]
+              );
+              return;
+            }
+            handleClose();
+          }}
         >
           <PanGestureHandler
             onGestureEvent={handleGestureEvent}
@@ -802,9 +985,54 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
                         translateY.setValue(0);
                         opacity.setValue(0);
                         
+                        // Always allow closing, but show warning if leaving group with outstanding balances
+                        if (isLeavingGroup && oweData.length > 0) {
+                          Alert.alert(
+                            'Outstanding Balances',
+                            'You still have outstanding balances to settle. You can close this modal and stay in the group.',
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              { 
+                                text: 'Close Anyway', 
+                                style: 'default',
+                                onPress: () => {
+                                  // Animate out first, then close
+                                  Animated.parallel([
+                                    Animated.timing(translateY, {
+                                      toValue: SCREEN_HEIGHT,
+                                      duration: 300,
+                                      useNativeDriver: true,
+                                    }),
+                                    Animated.timing(opacity, {
+                                      toValue: 0,
+                                      duration: 300,
+                                      useNativeDriver: true,
+                                    }),
+                                  ]).start(() => {
+                                    // Reset values after animation
+                                    translateY.setValue(0);
+                                    opacity.setValue(0);
+                                    
+                                    // Then close the modal (user stays in group)
+                                    if (onClose) {
+                                      onClose();
+                                    } else {
+                                      navigation.goBack();
+                                    }
+                                  });
+                                }
+                              }
+                            ]
+                          );
+                          return;
+                        }
+                        
                         // Then close the modal
                         if (onClose) {
                           onClose();
+                        } else if (isLeavingGroup && leaveGroupCallback) {
+                          // If this was opened for leaving group, call the callback
+                          leaveGroupCallback();
                         } else {
                           navigation.goBack();
                         }
@@ -816,6 +1044,21 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
                   {/* Show content only if there are debts to display */}
                   {(isOweSection || !isOweSection) && (currentSectionData.length > 0) ? (
                     <>
+                      {/* Leave Group Header - shown when leaving group */}
+                      {isLeavingGroup && (
+                        <View style={styles.leaveGroupHeader}>
+                          <Text style={styles.leaveGroupTitle}>
+                            Settle Balances Before Leaving
+                          </Text>
+                          <Text style={styles.leaveGroupSubtitle}>
+                            {oweData.length > 0 
+                              ? `You owe $${oweData.reduce((sum, item) => sum + item.amountUSD, 0).toFixed(2)} to other members. You must settle all balances before leaving.`
+                              : 'Please settle your outstanding balances before leaving the group'
+                            }
+                          </Text>
+                        </View>
+                      )}
+
                       {/* Amount Header - matching the image design */}
                       <View style={styles.amountHeader}>
                         <Text style={styles.amountHeaderText}>

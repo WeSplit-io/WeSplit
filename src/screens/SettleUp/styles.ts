@@ -242,4 +242,28 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  // Leave Group Header styles
+  leaveGroupHeader: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: colors.primaryGreen,
+    borderRadius: 12,
+  },
+  leaveGroupTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.black,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  leaveGroupSubtitle: {
+    fontSize: 14,
+    color: colors.textLightSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+
 }); 

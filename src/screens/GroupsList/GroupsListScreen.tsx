@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, SafeAreaView, Image, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, SafeAreaView, Image, Alert, Animated } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import GroupIcon from '../../components/GroupIcon';
@@ -32,6 +32,19 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
   const [groupAmountsInUSD, setGroupAmountsInUSD] = useState<Record<string | number, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [groupUserBalances, setGroupUserBalances] = useState<Record<string | number, { amount: number; currency: string }>>({});
+  const [scrollY] = useState(new Animated.Value(0));
+  const [showStickyHeader, setShowStickyHeader] = useState(false);
+
+  // Track scroll position to show/hide sticky header
+  useEffect(() => {
+    const listener = scrollY.addListener(({ value }) => {
+      // Show sticky header when scrolling down past the prominent groups section
+      const shouldShowSticky = value > 150; // Reduced threshold for earlier appearance
+      setShowStickyHeader(shouldShowSticky);
+    });
+
+    return () => scrollY.removeListener(listener);
+  }, [scrollY]);
 
   // Component mounted effect
   useEffect(() => {
@@ -430,9 +443,18 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Navigation Debug Component */}
+      {/* Sticky Header (appears when scrolling) */}
+      {showStickyHeader && prominentGroups.length > 0 && (
+        <Animated.View style={styles.stickyHeader}>
+          <Text style={styles.stickyHeaderTitle}>Groups You Own</Text>
+          <View style={styles.stickyFiltersContainer}>
+            {renderFilterButton('all', 'All')}
+            {renderFilterButton('active', 'Active')}
+            {renderFilterButton('closed', 'Closed')}
+          </View>
+        </Animated.View>
+      )}
 
-      
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Groups</Text>
@@ -445,114 +467,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Owner Groups Section */}
-      {prominentGroups.length > 0 && (
-        <View style={styles.prominentGroupsContainer}>
-          <Text style={styles.sectionTitle}>Groups You Own</Text>
-          <Text style={styles.sectionSubtitle}>These groups also appear in "All Groups" below</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.prominentGroupsGrid}
-          >
-            {prominentGroups.map((group, index) => {
-              const groupTotalAmountUSD = groupAmountsInUSD[group.id] || 0;
-              
-              // Rendering prominent group card
-
-              return (
-                <TouchableOpacity
-                  key={group.id}
-                  style={[
-                    styles.prominentGroupCard,
-                    index === 0 ? styles.prominentGroupCardLeft : styles.prominentGroupCardRight
-                  ]}
-                  onPress={() => handleGroupPress(group)}
-                >
-                {/* Background */}
-                <View style={styles.prominentGroupCardGradient} />
-                <View style={styles.prominentGroupCardGradientOverlay} />
-
-                {/* Header */}
-                <View style={styles.prominentGroupHeader}>
-                  <GroupIcon
-                    category={group.category || 'trip'}
-                    color={group.color || '#A5EA15'}
-                    size={40}
-                  />
-                  {/* Show USD-converted total */}
-                  <View style={styles.prominentGroupAmountContainer}>
-                    <Image
-                      source={require('../../../assets/usdc-logo-black.png')}
-                      style={styles.prominentUsdcLogo}
-                    />
-                    <Text style={styles.prominentGroupAmount}>
-                      {(groupAmountsInUSD[group.id] || 0).toFixed(2)}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Group Name */}
-                <Text style={styles.prominentGroupName}>{group.name}</Text>
-
-                {/* Role Container */}
-                <View style={styles.prominentGroupRoleContainer}>
-                  <Image source={require('../../../assets/award-icon-black.png')} style={styles.prominentGroupRoleIcon} />
-
-                  <Text style={styles.prominentGroupRole}>
-                    Owner
-                  </Text>
-                </View>
-
-                {/* Member Avatars */}
-                <View style={styles.prominentMemberAvatars}>
-                  {(group.members || []).slice(0, 3).map((member, index) => (
-                    <View key={member.id} style={styles.prominentMemberAvatar}>
-                      {member.avatar && member.avatar.trim() !== '' ? (
-                        <Image
-                          source={{ uri: member.avatar }}
-                          style={styles.prominentMemberAvatarImage}
-                        />
-                      ) : (
-                        <Text style={styles.prominentMemberAvatarText}>
-                          {((member.name || member.email || 'U') as string).charAt(0).toUpperCase()}
-                        </Text>
-                      )}
-                    </View>
-                  ))}
-                  {(group.members || []).length > 3 && (
-                    <View style={styles.prominentMemberAvatarMore}>
-                      <Text style={styles.prominentMemberAvatarMoreText}>
-                        +{(group.members || []).length - 3}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Navigation arrow */}
-                <View style={styles.prominentGroupArrow}>
-                  <Icon name="chevron-right" size={20} color={colors.black} />
-                </View>
-              </TouchableOpacity>
-            );
-            })}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Filter Tabs */}
-      <View style={styles.filtersContainer}>
-        {renderFilterButton('all', 'All')}
-        {renderFilterButton('active', 'Active')}
-        {renderFilterButton('closed', 'Closed')}
-      </View>
-
-      {/* All Groups Section */}
-      <View style={styles.allGroupsContainer}>
-        <Text style={styles.sectionTitle}>All Groups</Text>
-      </View>
-
-      {/* Groups List */}
+      {/* Main Scrollable Content */}
       <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
@@ -565,7 +480,118 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
           />
         }
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
       >
+        {/* Sticky Prominent Groups Section */}
+        {prominentGroups.length > 0 && (
+          <View style={styles.stickyProminentContainer}>
+            <Text style={styles.sectionTitle}>Groups You Own</Text>
+            <Text style={styles.sectionSubtitle}>These groups also appear in "All Groups" below</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.prominentGroupsGrid}
+            >
+              {prominentGroups.map((group, index) => {
+                const groupTotalAmountUSD = groupAmountsInUSD[group.id] || 0;
+                
+                return (
+                  <TouchableOpacity
+                    key={group.id}
+                    style={[
+                      styles.prominentGroupCard,
+                      index === 0 ? styles.prominentGroupCardLeft : styles.prominentGroupCardRight
+                    ]}
+                    onPress={() => handleGroupPress(group)}
+                  >
+                  {/* Background */}
+                  <View style={styles.prominentGroupCardGradient} />
+                  <View style={styles.prominentGroupCardGradientOverlay} />
+
+                  {/* Header */}
+                  <View style={styles.prominentGroupHeader}>
+                    <GroupIcon
+                      category={group.category || 'trip'}
+                      color={group.color || '#A5EA15'}
+                      size={40}
+                    />
+                    {/* Show USD-converted total */}
+                    <View style={styles.prominentGroupAmountContainer}>
+                      <Image
+                        source={require('../../../assets/usdc-logo-black.png')}
+                        style={styles.prominentUsdcLogo}
+                      />
+                      <Text style={styles.prominentGroupAmount}>
+                        {(groupAmountsInUSD[group.id] || 0).toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Group Name */}
+                  <Text style={styles.prominentGroupName}>{group.name}</Text>
+
+                  {/* Role Container */}
+                  <View style={styles.prominentGroupRoleContainer}>
+                    <Image source={require('../../../assets/award-icon-black.png')} style={styles.prominentGroupRoleIcon} />
+
+                    <Text style={styles.prominentGroupRole}>
+                      Owner
+                    </Text>
+                  </View>
+
+                  {/* Member Avatars */}
+                  <View style={styles.prominentMemberAvatars}>
+                    {(group.members || []).slice(0, 3).map((member, index) => (
+                      <View key={member.id} style={styles.prominentMemberAvatar}>
+                        {member.avatar && member.avatar.trim() !== '' ? (
+                          <Image
+                            source={{ uri: member.avatar }}
+                            style={styles.prominentMemberAvatarImage}
+                          />
+                        ) : (
+                          <Text style={styles.prominentMemberAvatarText}>
+                            {((member.name || member.email || 'U') as string).charAt(0).toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                    ))}
+                    {(group.members || []).length > 3 && (
+                      <View style={styles.prominentMemberAvatarMore}>
+                        <Text style={styles.prominentMemberAvatarMoreText}>
+                          +{(group.members || []).length - 3}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Navigation arrow */}
+                  <View style={styles.prominentGroupArrow}>
+                    <Icon name="chevron-right" size={20} color={colors.black} />
+                  </View>
+                </TouchableOpacity>
+              );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Filter Tabs */}
+        <View style={styles.filtersContainer}>
+          {renderFilterButton('all', 'All')}
+          {renderFilterButton('active', 'Active')}
+          {renderFilterButton('closed', 'Closed')}
+        </View>
+
+        {/* All Groups Section */}
+        <View style={styles.allGroupsContainer}>
+          <Text style={styles.sectionTitle}>All Groups</Text>
+        </View>
+
+        {/* Groups List */}
         {displayGroups.length === 0 ? (
           <View style={styles.emptyState}>
             <Image source={require('../../../assets/group-enpty-state.png')} style={styles.emptyStateIcon} />

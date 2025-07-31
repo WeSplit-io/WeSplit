@@ -28,6 +28,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
 import QRCodeModal from '../../components/QRCodeModal';
+import { generateProfileLink } from '../../services/deepLinkHandler';
 
 const WalletManagementScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -837,13 +838,7 @@ const WalletManagementScreen: React.FC = () => {
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Wallet</Text>
-        <TouchableOpacity onPress={handleRefresh} style={styles.backButton} disabled={refreshing}>
-          {refreshing ? (
-            <ActivityIndicator size="small" color={colors.white} />
-          ) : (
-            <Icon name="refresh-cw" size={20} color="#FFF" />
-          )}
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView
@@ -1023,8 +1018,13 @@ const WalletManagementScreen: React.FC = () => {
       <QRCodeModal
         visible={qrCodeModalVisible}
         onClose={() => setQrCodeModalVisible(false)}
-        qrValue={currentUser?.wallet_address || ''}
-        title="Show QR code to your friend"
+        qrValue={generateProfileLink(
+          currentUser?.id?.toString() || '',
+          currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
+          currentUser?.email,
+          currentUser?.wallet_address
+        )}
+        title="Share your profile QR code"
         displayName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
         isGroup={false}
       />
