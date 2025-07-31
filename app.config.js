@@ -38,7 +38,6 @@ export default {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
-      edgeToEdgeEnabled: true,
       jsEngine: "jsc",
       permissions: [
         "android.permission.CAMERA",
