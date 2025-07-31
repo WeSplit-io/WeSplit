@@ -7,11 +7,14 @@ import { Linking } from 'react-native';
 import { firebaseDataService } from './firebaseDataService';
 
 export interface DeepLinkData {
-  action: 'join' | 'invite' | 'moonpay-success' | 'moonpay-failure';
+  action: 'join' | 'invite' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback';
   inviteId?: string;
   groupId?: string;
   groupName?: string;
   transactionId?: string;
+  oauthProvider?: 'google' | 'twitter' | 'apple';
+  oauthCode?: string;
+  oauthError?: string;
 }
 
 /**
@@ -52,6 +55,14 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
         return {
           action: 'moonpay-failure',
           transactionId: params[0]
+        };
+      
+      case 'oauth-callback':
+        return {
+          action: 'oauth-callback',
+          oauthProvider: params[0] as 'google' | 'twitter' | 'apple',
+          oauthCode: params[1],
+          oauthError: params[2]
         };
       
       default:
@@ -138,6 +149,12 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
       case 'moonpay-failure':
         console.log('🔥 MoonPay failure, navigating to Dashboard');
         navigation.navigate('Dashboard');
+        break;
+      
+      case 'oauth-callback':
+        console.log('🔥 OAuth callback received:', linkData);
+        // Handle OAuth callback - this will be processed by the OAuth services
+        // The OAuth services will handle the code exchange and user authentication
         break;
       
       default:

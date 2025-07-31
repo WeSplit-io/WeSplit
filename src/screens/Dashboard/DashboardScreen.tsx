@@ -88,6 +88,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [groupTransactions, setGroupTransactions] = useState<any[]>([]);
   const [loadingGroupTransactions, setLoadingGroupTransactions] = useState(false);
+  const [loadingPaymentRequests, setLoadingPaymentRequests] = useState(false);
+  const [initialRequestsLoaded, setInitialRequestsLoaded] = useState(false);
 
 
   // Memoized balance calculations to avoid expensive recalculations
@@ -102,7 +104,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     }
 
     // For now, return simplified balance based on available summary data
-    // TODO: Implement proper balance calculation when full group details are available
+    // Note: Full balance calculation will be implemented when group details are available
     const userId = Number(currentUser.id);
     let totalSpentUSDC = 0;
     const balanceByCurrency: Record<string, number> = {};
@@ -161,31 +163,31 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     try {
       setLoadingUserWallet(true);
       
-              // First ensure the user has a wallet
-        const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
-        
-        if (walletResult.success && walletResult.wallet) {
-          // Update user's wallet information in app context if it's different
-          if (currentUser.wallet_address !== walletResult.wallet.address) {
-            try {
-              await updateUser({
-                wallet_address: walletResult.wallet.address,
-                wallet_public_key: walletResult.wallet.publicKey
-              });
-            } catch (updateError) {
+      // First ensure the user has a wallet
+      const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
+      
+      if (walletResult.success && walletResult.wallet) {
+        // Update user's wallet information in app context if it's different
+        if (currentUser.wallet_address !== walletResult.wallet.address) {
+          try {
+            await updateUser({
+              wallet_address: walletResult.wallet.address,
+              wallet_public_key: walletResult.wallet.publicKey
+            });
+          } catch (updateError) {
               // Keep error logging for debugging
-              console.error('Failed to update user wallet info in app context:', updateError);
-            }
+            console.error('Failed to update user wallet info in app context:', updateError);
           }
-          
-          // Now get the balance
-          const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
-          setUserCreatedWalletBalance(balance);
-        } else {
-          // Keep error logging for debugging
-          console.error('Failed to ensure wallet for dashboard:', walletResult.error);
-          setUserCreatedWalletBalance(null);
         }
+        
+        // Now get the balance
+        const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
+        setUserCreatedWalletBalance(balance);
+      } else {
+          // Keep error logging for debugging
+        console.error('Failed to ensure wallet for dashboard:', walletResult.error);
+        setUserCreatedWalletBalance(null);
+      }
     } catch (error) {
       // Keep error logging for debugging
       console.error('Error loading user created wallet balance:', error);
@@ -203,7 +205,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   // Reload app wallet balance when app wallet state changes (for consistency)
   useEffect(() => {
     if (currentUser?.id) {
-      loadUserCreatedWalletBalance();
+    loadUserCreatedWalletBalance();
     }
   }, [appWalletConnected, currentUser?.id, updateUser]); // Add updateUser dependency
 
@@ -257,8 +259,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
                   totalUSD += expense.amount * rate;
                 }
+                }
               }
-            }
           }
 
           usdAmounts[group.id] = totalUSD;
@@ -282,9 +284,28 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const loadPaymentRequests = useCallback(async () => {
     if (!currentUser?.id) return;
 
+    // Prevent duplicate calls
+    if (loadingPaymentRequests) return;
+
+    // Wait for notifications to be available
+    if (!notifications) {
+      console.log('⏳ Dashboard: Waiting for notifications to load...');
+      return;
+    }
+
+    // If we already have requests and this isn't a refresh, skip loading
+    if (initialRequestsLoaded && paymentRequests.length > 0 && notifications.length === 0) {
+      console.log('⏭️ Dashboard: Skipping payment requests load - already loaded and no new notifications');
+      return;
+    }
+
+    setLoadingPaymentRequests(true);
+
     try {
+      console.log('🔄 Dashboard: Loading payment requests...');
       // Get actual payment requests from Firebase
       const actualPaymentRequests = await getReceivedPaymentRequests(currentUser.id, 10);
+      console.log('📊 Dashboard: Firebase payment requests:', actualPaymentRequests.length);
 
       // Also include notifications of type 'payment_request', 'settlement_request' and 'payment_reminder'
       const notificationRequests = notifications ? notifications.filter(n =>
@@ -292,9 +313,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         n.type === 'settlement_request' ||
         n.type === 'payment_reminder'
       ) : [];
+      console.log('📊 Dashboard: Notification requests:', notificationRequests.length);
 
       // Create a map to track processed requests to avoid duplicates
       const processedRequestIds = new Set<string>();
+      const processedNotificationIds = new Set<string>();
       const allRequests: any[] = [];
 
       // First, add actual payment requests from Firebase
@@ -303,6 +326,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         .forEach(req => {
           const requestId = req.id;
           processedRequestIds.add(requestId);
+          console.log('📝 Dashboard: Added Firebase request:', requestId, req.senderName, req.amount);
           
           allRequests.push({
             id: req.id,
@@ -334,9 +358,20 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           // Check if this notification corresponds to a Firebase payment request
           const requestId = n.data?.requestId;
           if (requestId && processedRequestIds.has(requestId)) {
+            console.log('🚫 Dashboard: Skipping duplicate notification:', requestId, n.data?.senderName, amount);
             return false; // Skip this notification as we already have the Firebase request
           }
           
+          // Also check if we've already processed this notification ID
+          const notificationId = String(n.id);
+          if (processedNotificationIds.has(notificationId)) {
+            console.log('🚫 Dashboard: Skipping duplicate notification ID:', notificationId, n.data?.senderName, amount);
+            return false;
+          }
+          
+          // Add to processed set to prevent duplicates within notifications
+          processedNotificationIds.add(notificationId);
+          console.log('📝 Dashboard: Added notification request:', n.id, n.data?.senderName, amount);
           return true;
         })
         .forEach(n => {
@@ -352,7 +387,20 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
 
 
+      console.log('✅ Dashboard: Payment requests loaded successfully:', allRequests.length);
+      console.log('📋 Dashboard: Final requests:', allRequests.map(r => ({
+        id: r.id,
+        sender: r.data?.senderName || r.data?.fromUser,
+        amount: r.data?.amount,
+        type: r.type
+          })));
       setPaymentRequests(allRequests);
+      
+      // Mark as initially loaded if this is the first successful load
+      if (!initialRequestsLoaded) {
+        setInitialRequestsLoaded(true);
+        console.log('🎯 Dashboard: Initial payment requests loaded');
+      }
     } catch (error) {
       // Keep error logging for debugging
       console.error('Error loading payment requests:', error);
@@ -372,6 +420,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           });
         setPaymentRequests(requests);
       }
+    } finally {
+      setLoadingPaymentRequests(false);
     }
   }, [notifications, currentUser?.id]);
 
@@ -580,12 +630,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         // This handles the case where user logs out and comes back
         if (groups.length === 0 && !groupsLoading) {
           refreshGroups().then(() => {
-            loadPaymentRequests();
+            // Only load transactions here, payment requests will be loaded by the notifications effect
             loadRealTransactions(); // Load real transactions
           });
         } else {
-          // Just load payment requests and transactions if groups are already cached
-          loadPaymentRequests();
+          // Just load transactions if groups are already cached
+          // Payment requests will be loaded by the notifications effect
           loadRealTransactions(); // Load real transactions
         }
       }
@@ -596,11 +646,13 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   useEffect(() => {
     if (isAuthenticated && currentUser?.id) {
       loadNotifications().then(() => {
-        // Refresh payment requests after notifications are loaded
+        // Add a small delay to ensure notifications are fully processed
+        setTimeout(() => {
         loadPaymentRequests();
+        }, 500);
       });
     }
-  }, [isAuthenticated, currentUser?.id, loadNotifications, loadPaymentRequests]); // Add required dependencies
+  }, [isAuthenticated, currentUser?.id, loadNotifications]); // Remove loadPaymentRequests from dependencies to prevent infinite loops
 
   // Note: Group loading is now handled by useGroupList hook to prevent infinite loops
 
@@ -674,8 +726,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         loadRealTransactions(), // Refresh real transactions
       ]);
       
-      // Refresh payment requests after all other data is loaded
-      await loadPaymentRequests();
+      // Payment requests will be automatically refreshed when notifications are loaded
+      // No need to call loadPaymentRequests() here as it will be triggered by the notifications effect
     } catch (error) {
       // Keep error logging for debugging
       console.error('Error refreshing:', error);
@@ -1081,22 +1133,22 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
             </View>
           </View>
-
-          <TouchableOpacity
-            style={styles.bellContainer}
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            <Icon
-              name="bell"
-              color={colors.white}
-              style={styles.bellIcon}
-            />
-            {unreadNotifications > 0 && (
-              <View style={styles.bellBadge}>
-                <Text style={styles.bellBadgeText}>{unreadNotifications}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.bellContainer}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <Icon
+                name="bell"
+                color={colors.white}
+                style={styles.bellIcon}
+              />
+              {unreadNotifications > 0 && (
+                <View style={styles.bellBadge}>
+                  <Text style={styles.bellBadgeText}>{unreadNotifications}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
         </View>
 
         {/* Balance Card */}

@@ -9,7 +9,6 @@ import { Text, View } from 'react-native';
 import { styles } from './App.styles';
 import NavigationWrapper from './src/components/NavigationWrapper';
 import ErrorBoundary from './src/components/ErrorBoundary';
-import { environmentValidator } from './src/services/environmentValidationService';
 import { logger } from './src/services/loggingService';
 
 // Import Firebase configuration
@@ -82,16 +81,7 @@ export default function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Validate environment configuration (non-blocking in development)
-        const configValid = environmentValidator.validateAll();
-        if (!configValid && process.env.NODE_ENV === 'production') {
-          throw new Error('Environment configuration validation failed');
-        }
-
         // Firebase is automatically initialized when the config file is imported
-        
-        // Check Firebase configuration
-        const firebaseCheck = checkFirebaseConfiguration();
         
         // Initialize Solana wallet system
         logger.info('App initialized successfully', null, 'App');
@@ -140,11 +130,11 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <WalletProvider>
-          <AppProvider>
-            <WalletLinkingProvider>
-              <NavigationWrapper>
+    <QueryClientProvider client={queryClient}>
+      <WalletProvider>
+        <AppProvider>
+          <WalletLinkingProvider>
+            <NavigationWrapper>
               <Stack.Navigator 
                 initialRouteName="Splash"
                 screenOptions={{
@@ -198,11 +188,11 @@ export default function App() {
                 <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
                 <Stack.Screen name="ExternalWalletConnection" component={ExternalWalletConnectionScreen} />
               </Stack.Navigator>
-              </NavigationWrapper>
-            </WalletLinkingProvider>
-          </AppProvider>
-        </WalletProvider>
-      </QueryClientProvider>
+            </NavigationWrapper>
+          </WalletLinkingProvider>
+        </AppProvider>
+      </WalletProvider>
+    </QueryClientProvider>
     </ErrorBoundary>
   );
 }

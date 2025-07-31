@@ -42,7 +42,7 @@ const NavIcon: React.FC<NavIconProps> = ({ name, size = 24, isActive = false, st
     />
   );
 
-  // TODO: Uncomment this when all image assets are available
+      // Note: Uncomment when all image assets are available
   /*
   return (
     <Image

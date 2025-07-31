@@ -3,388 +3,304 @@
  * Uses Firebase Auth and Firestore for email verification without passwords
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth, firebaseAuth, firestoreService } from '../config/firebase';
-import { User as FirebaseUser } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { GoogleAuthProvider, signInWithCredential, User } from 'firebase/auth';
+import { auth } from '../config/firebase';
+import { Platform } from 'react-native';
+import * as AuthSession from 'expo-auth-session';
+import { logger } from './loggingService';
+import Constants from 'expo-constants';
 
-export interface AuthResponse {
-  success: boolean;
-  message?: string;
-  error?: string;
-  user?: {
-    id: string;
-    email: string;
-    name: string;
-    walletAddress: string;
-    walletPublicKey: string;
-    avatar?: string;
-    createdAt: string;
-    hasCompletedOnboarding?: boolean;
-  };
-  accessToken?: string;
-  refreshToken?: string;
-}
-
-export interface VerificationResponse {
-  success: boolean;
-  message?: string;
-  error?: string;
-}
+// Environment variable helper
+const getEnvVar = (key: string): string => {
+  // Check process.env first
+  if (process.env[key]) return process.env[key]!;
+  // Check EXPO_PUBLIC_ prefix
+  if (process.env[`EXPO_PUBLIC_${key}`]) return process.env[`EXPO_PUBLIC_${key}`]!;
+  // Check Constants.expoConfig.extra
+  if (Constants.expoConfig?.extra?.[key]) return Constants.expoConfig.extra[key];
+  if (Constants.expoConfig?.extra?.[`EXPO_PUBLIC_${key}`]) return Constants.expoConfig.extra[`EXPO_PUBLIC_${key}`];
+  // Check Constants.manifest.extra
+  if ((Constants.manifest as any)?.extra?.[key]) return (Constants.manifest as any).extra[key];
+  if ((Constants.manifest as any)?.extra?.[`EXPO_PUBLIC_${key}`]) return (Constants.manifest as any).extra[`EXPO_PUBLIC_${key}`];
+  return '';
+};
 
 /**
- * Generate a random 4-digit verification code
+ * Get Google Client ID for current platform
  */
-function generateVerificationCode(): string {
-  return Math.floor(1000 + Math.random() * 9000).toString();
-}
-
-/**
- * Send verification code to email using Firebase
- */
-export async function sendVerificationCode(email: string): Promise<VerificationResponse> {
-  // Sanitize email by trimming whitespace and newlines
-  const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
-  
-  if (__DEV__) { console.log('=== Firebase sendVerificationCode called ==='); }
-  if (__DEV__) { console.log('Original Email:', email); }
-  if (__DEV__) { console.log('Sanitized Email:', sanitizedEmail); }
-  
-  try {
-    // Generate a 4-digit verification code
-    const code = generateVerificationCode();
-    
-    // Set expiration time (10 minutes from now)
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    
-    // Store the verification code in Firestore
-    // This will trigger the onVerificationCodeCreated function to send the email
-    await firestoreService.storeVerificationCode(sanitizedEmail, code, expiresAt);
-    
-    if (__DEV__) { 
-      console.log('Verification code stored in Firestore, email will be sent via trigger');
-    }
-    
-    return { 
-      success: true, 
-      message: 'Verification code sent successfully',
-      // In development, include the code for testing
-      ...(__DEV__ && { code })
-    };
-    
-  } catch (error) {
-    console.error('=== Error in Firebase sendVerificationCode ===');
-    console.error('Error type:', typeof error);
-    console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
-    console.error('Full error:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to send verification code' 
-    };
+const getGoogleClientId = (): string => {
+  // For development with Expo Go, use web client
+  if (__DEV__) {
+    return getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID') || getEnvVar('GOOGLE_CLIENT_ID');
   }
+  
+  // For production builds, prioritize platform-specific IDs
+  switch (Platform.OS) {
+    case 'android':
+      return getEnvVar('ANDROID_GOOGLE_CLIENT_ID') || getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID') || getEnvVar('GOOGLE_CLIENT_ID');
+    case 'ios':
+      return getEnvVar('IOS_GOOGLE_CLIENT_ID') || getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID') || getEnvVar('GOOGLE_CLIENT_ID');
+    case 'web':
+      return getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID') || getEnvVar('GOOGLE_CLIENT_ID');
+    default:
+      return getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID') || getEnvVar('GOOGLE_CLIENT_ID');
+  }
+};
+
+/**
+ * Get the appropriate redirect URI based on platform and environment
+ */
+const getRedirectUri = (): string => {
+  // For development with Expo Go, use Expo proxy (Google Cloud Console compatible)
+  if (__DEV__) {
+    // Use the Expo proxy URL that Google Cloud Console accepts
+    return 'https://auth.expo.io/@devadmindappzy/WeSplit';
+  }
+  
+  const clientId = getGoogleClientId();
+  const isUsingAndroidClient = clientId.includes('q8ucda9'); // Android client ID
+  const isUsingIOSClient = clientId.includes('ldm3rb2'); // iOS client ID
+  
+  // For Android with Android client, use custom scheme
+  if (Platform.OS === 'android' && isUsingAndroidClient) {
+    return 'wesplit://auth';
+  }
+  
+  // For iOS with iOS client, use custom scheme
+  if (Platform.OS === 'ios' && isUsingIOSClient) {
+    return 'wesplit://auth';
+  }
+  
+  // For production builds, use custom scheme
+  return 'wesplit://auth';
+};
+
+export interface GoogleSignInResult {
+  success: boolean;
+  user?: User;
+  error?: string;
 }
 
 /**
- * Verify code and authenticate user using Firebase Functions
+ * Sign in with Google using Firebase Authentication
+ * 
+ * @returns Promise<GoogleSignInResult> - Result of the sign-in attempt
  */
-export async function verifyCode(email: string, code: string): Promise<AuthResponse> {
-  // Sanitize email by trimming whitespace and newlines
-  const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
-  
+export const loginWithGoogle = async (): Promise<GoogleSignInResult> => {
   try {
-    if (__DEV__) { console.log('🔐 Firebase Functions verifying code:', code, 'for original email:', email); }
-    if (__DEV__) { console.log('🔐 Firebase Functions verifying code:', code, 'for sanitized email:', sanitizedEmail); }
+    const clientId = getGoogleClientId();
+    const redirectUri = getRedirectUri();
+
+    logger.info('🔄 Starting Google Sign-In', {
+      platform: Platform.OS,
+      clientId: clientId ? `${clientId.substring(0, 20)}...` : 'NOT_SET',
+      redirectUri,
+      isDevelopment: __DEV__
+    }, 'FirebaseAuth');
+
+    // Validate configuration
+    if (!clientId) {
+      const error = 'Google Client ID not configured for this platform';
+      logger.error('❌ Configuration error', { error, platform: Platform.OS }, 'FirebaseAuth');
+      return { success: false, error };
+    }
+
+    // Create OAuth request
+    const request = new AuthSession.AuthRequest({
+      clientId,
+      redirectUri,
+      scopes: ['openid', 'profile', 'email'],
+      responseType: AuthSession.ResponseType.Code,
+      extraParams: {
+        access_type: 'offline',
+        prompt: 'select_account'
+      },
+      usePKCE: true,
+      codeChallengeMethod: AuthSession.CodeChallengeMethod.S256
+    });
+
+    logger.info('🔄 OAuth request created', {
+      hasClientId: !!clientId,
+      redirectUri,
+      platform: Platform.OS
+    }, 'FirebaseAuth');
+
+    // Prompt user for Google sign-in
+    logger.info('🔄 Opening Google sign-in prompt...', null, 'FirebaseAuth');
     
-    // Try to use Firebase Functions for verification
-    try {
-      const functions = getFunctions();
-      const verifyCodeFunction = httpsCallable(functions, 'verifyCode');
-      const result = await verifyCodeFunction({ email: sanitizedEmail, code });
-      
-      if (__DEV__) { console.log('🔍 Firebase Functions verification result:', result); }
-      
-      const data = result.data as any;
-      
-      if (data.success && data.user) {
-        // Update last verification timestamp
-        await firestoreService.updateLastVerifiedAt(sanitizedEmail);
-        
-        // Generate tokens (use custom token if available, otherwise generate local ones)
-        const accessToken = data.customToken || `firebase_${data.user.id}_${Date.now()}`;
-        const refreshToken = `refresh_${data.user.id}_${Date.now()}`;
-        
-        // Store tokens securely
-        await AsyncStorage.setItem('accessToken', accessToken);
-        await AsyncStorage.setItem('refreshToken', refreshToken);
-        await AsyncStorage.setItem('user', JSON.stringify(data.user));
-        await AsyncStorage.setItem('firebaseUser', JSON.stringify({
-          uid: data.user.id,
-          email: data.user.email,
-          emailVerified: true
-        }));
-        
-        if (__DEV__) { console.log('✅ Firebase Functions authentication successful:', data.user); }
+    const result = await request.promptAsync({
+      authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth'
+    });
+    
+    logger.info('🔄 Google sign-in prompt completed', {
+      type: result.type,
+      hasCode: result.type === 'success' && 'params' in result && !!result.params?.code,
+      hasError: result.type === 'success' && 'params' in result && !!result.params?.error,
+      platform: Platform.OS
+    }, 'FirebaseAuth');
+
+    // Handle user cancellation
+    if (result.type === 'cancel') {
+      logger.info('❌ Google sign-in cancelled by user', { platform: Platform.OS }, 'FirebaseAuth');
+      return { success: false, error: 'Sign-in was cancelled by user' };
+    }
+
+    // Handle OAuth errors
+    if (result.type === 'success' && 'params' in result && result.params?.error) {
+      const error = `OAuth error: ${result.params.error}`;
+      logger.error('❌ OAuth error received', { error: result.params.error, platform: Platform.OS }, 'FirebaseAuth');
+      return { success: false, error };
+    }
+
+    // Handle successful OAuth flow
+    if (result.type === 'success' && 'params' in result && result.params.code) {
+      logger.info('✅ OAuth code received, exchanging for tokens...', null, 'FirebaseAuth');
+
+      // Exchange code for tokens
+      const tokenResponse = await AuthSession.exchangeCodeAsync(
+        {
+          clientId,
+          code: result.params.code,
+          redirectUri,
+          extraParams: {
+            code_verifier: request.codeChallenge || '',
+          },
+        },
+        {
+          tokenEndpoint: 'https://oauth2.googleapis.com/token',
+        }
+      );
+
+      logger.info('Token exchange completed', {
+        hasAccessToken: !!tokenResponse.accessToken,
+        hasIdToken: !!tokenResponse.idToken,
+        accessTokenLength: tokenResponse.accessToken?.length || 0,
+        idTokenLength: tokenResponse.idToken?.length || 0,
+        platform: Platform.OS
+      }, 'FirebaseAuth');
+
+      if (tokenResponse.accessToken && tokenResponse.idToken) {
+        logger.info('✅ Tokens received, signing in to Firebase...', null, 'FirebaseAuth');
+
+        try {
+          // Create Firebase credential
+          const credential = GoogleAuthProvider.credential(tokenResponse.idToken, tokenResponse.accessToken);
+          
+          // Sign in to Firebase
+          const firebaseResult = await signInWithCredential(auth, credential);
+
+          logger.info('✅ Google Sign-In successful', {
+            uid: firebaseResult.user.uid,
+            email: firebaseResult.user.email,
+            displayName: firebaseResult.user.displayName,
+            platform: Platform.OS
+          }, 'FirebaseAuth');
         
         return {
           success: true,
-          message: data.message || 'Authentication successful',
-          user: data.user,
-          accessToken,
-          refreshToken
-        };
-      } else {
-        throw new Error(data.error || 'Authentication failed');
-      }
-    } catch (functionError) {
-      // Log the actual Firebase Functions error
-      if (__DEV__) { 
-        console.log('❌ Firebase Functions error:', functionError);
-        console.log('Error details:', {
-          message: functionError instanceof Error ? functionError.message : 'Unknown error',
-          code: (functionError as any)?.code,
-          details: (functionError as any)?.details
-        });
-      }
-      
-      // Fallback to local verification if Firebase Functions is not available
-      if (__DEV__) { console.log('Firebase Functions failed, using local verification'); }
-      
-      // Verify the code from Firestore
-      if (__DEV__) { console.log('🔍 Verifying code in Firestore...'); }
-      const isValidCode = await firestoreService.verifyCode(sanitizedEmail, code);
-      
-      if (__DEV__) { console.log('🔍 Code verification result:', isValidCode); }
-      
-      if (!isValidCode) {
-        throw new Error('Invalid or expired verification code');
-      }
-      
-      // Check if user already exists in Firebase Auth
-      let firebaseUser: FirebaseUser | null = null;
-      
-      try {
-        // Check if user already exists
-        const existingUser = auth.currentUser;
-        if (existingUser && existingUser.email === sanitizedEmail) {
-          firebaseUser = existingUser;
-        } else {
-          // Create new user with a secure temporary password
-          const tempPassword = `WeSplit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            user: firebaseResult.user
+          };
+        } catch (firebaseError: any) {
+          logger.error('❌ Firebase sign-in failed', {
+            error: firebaseError.message,
+            code: firebaseError.code,
+            platform: Platform.OS
+          }, 'FirebaseAuth');
+
+          // Handle specific Firebase auth errors
+          let errorMessage = 'Firebase authentication failed';
           
-          try {
-            // Try to sign in first (user might already exist)
-            const userCredential = await firebaseAuth.signInWithEmail(sanitizedEmail, tempPassword);
-            firebaseUser = userCredential;
-          } catch (signInError) {
-            // User doesn't exist, create new user
-            firebaseUser = await firebaseAuth.createUserWithEmail(sanitizedEmail, tempPassword);
-            
-            // Send email verification
-            if (firebaseUser) {
-              await firebaseAuth.sendEmailVerification(firebaseUser);
-            }
+          switch (firebaseError.code) {
+            case 'auth/account-exists-with-different-credential':
+              errorMessage = 'An account already exists with the same email address but different sign-in credentials';
+              break;
+            case 'auth/email-already-in-use':
+              errorMessage = 'An account already exists with this email address';
+              break;
+            case 'auth/operation-not-allowed':
+              errorMessage = 'Google Sign-In is not enabled in Firebase Console';
+              break;
+            case 'auth/invalid-credential':
+              errorMessage = 'Invalid Google credentials';
+              break;
+            case 'auth/user-disabled':
+              errorMessage = 'This account has been disabled';
+              break;
+            default:
+              errorMessage = `Firebase authentication failed: ${firebaseError.message}`;
           }
+
+          return { success: false, error: errorMessage };
         }
-      } catch (authError) {
-        console.error('Firebase Auth error:', authError);
-        
-        // Provide more specific error messages
-        if (authError instanceof Error) {
-          if (authError.message.includes('email-already-in-use')) {
-            throw new Error('An account with this email already exists. Please try signing in.');
-          } else if (authError.message.includes('invalid-email')) {
-            throw new Error('Invalid email address. Please check your email and try again.');
-          } else if (authError.message.includes('weak-password')) {
-            throw new Error('Password is too weak. Please try again.');
           } else {
-            throw new Error(`Authentication failed: ${authError.message}`);
-          }
-        }
-        
-        throw new Error('Failed to create or authenticate user');
+        const error = 'Failed to exchange OAuth code for tokens';
+        logger.error('❌ Token exchange failed', {
+          hasAccessToken: !!tokenResponse.accessToken,
+          hasIdToken: !!tokenResponse.idToken,
+          platform: Platform.OS
+        }, 'FirebaseAuth');
+        return { success: false, error };
       }
-      
-      if (!firebaseUser) {
-        throw new Error('Failed to create or authenticate user');
-      }
-      
-      // Create or update user document in Firestore
-      const userData = await firestoreService.createUserDocument(firebaseUser);
-      
-      // Update last verification timestamp
-      await firestoreService.updateLastVerifiedAt(email);
-      
-      // Generate custom tokens (in production, you'd use Firebase Functions)
-      const accessToken = `firebase_${firebaseUser.uid}_${Date.now()}`;
-      const refreshToken = `refresh_${firebaseUser.uid}_${Date.now()}`;
-      
-      // Store tokens securely
-      await AsyncStorage.setItem('accessToken', accessToken);
-      await AsyncStorage.setItem('refreshToken', refreshToken);
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
-      await AsyncStorage.setItem('firebaseUser', JSON.stringify({
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        emailVerified: firebaseUser.emailVerified
-      }));
-      
-      if (__DEV__) { console.log('✅ Local Firebase authentication successful:', userData); }
-      
-      return {
-        success: true,
-        message: 'Authentication successful',
-        user: {
-          id: userData.id,
-          email: userData.email,
-          name: userData.name,
-          walletAddress: userData.wallet_address,
-          walletPublicKey: userData.wallet_public_key,
-          createdAt: userData.created_at,
-          avatar: userData.avatar,
-          hasCompletedOnboarding: userData.hasCompletedOnboarding || false
-        },
-        accessToken,
-        refreshToken
-      };
+    } else {
+      const error = 'OAuth flow failed - no authorization code received';
+      logger.error('❌ OAuth flow failed', {
+        type: result.type,
+        hasParams: 'params' in result,
+        params: 'params' in result ? Object.keys(result.params) : [],
+        platform: Platform.OS
+      }, 'FirebaseAuth');
+      return { success: false, error };
     }
+  } catch (error: any) {
+    const errorMessage = error.message || 'Google Sign-In failed';
+    logger.error('❌ Google Sign-In error', {
+      error: error.message,
+      code: error.code,
+      platform: Platform.OS
+    }, 'FirebaseAuth');
     
-  } catch (error) {
-    console.error('❌ Firebase verification failed:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to verify code'
-    };
+    return { success: false, error: errorMessage };
   }
-}
+};
 
 /**
- * Get current Firebase user
+ * Get current authentication configuration for debugging
  */
-export async function getCurrentUser(): Promise<FirebaseUser | null> {
-  return auth.currentUser;
-}
+export const getAuthConfig = () => {
+  const clientId = getGoogleClientId();
+  const redirectUri = getRedirectUri();
+
+  return {
+    platform: Platform.OS,
+    clientId: clientId ? `${clientId.substring(0, 20)}...` : 'NOT_SET',
+    redirectUri,
+    isDevelopment: __DEV__,
+    hasClientId: !!clientId
+  };
+};
 
 /**
- * Check if user is authenticated
+ * Test authentication configuration
  */
-export async function isAuthenticated(): Promise<boolean> {
-  try {
-    const currentUser = auth.currentUser;
-    const accessToken = await AsyncStorage.getItem('accessToken');
-    return !!(currentUser && accessToken);
-  } catch (error) {
-    console.error('Error checking authentication:', error);
-    return false;
+export const testAuthConfiguration = (): { valid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  const clientId = getGoogleClientId();
+
+  if (!clientId) {
+    errors.push('Google Client ID not configured');
   }
-}
 
-/**
- * Get stored user data
- */
-export async function getStoredUser(): Promise<any | null> {
-  try {
-    const userString = await AsyncStorage.getItem('user');
-    return userString ? JSON.parse(userString) : null;
-  } catch (error) {
-    console.error('Error getting stored user:', error);
-    return null;
+  if (clientId && clientId.length < 20) {
+    errors.push('Google Client ID appears to be invalid (too short)');
   }
-}
 
-/**
- * Get access token
- */
-export async function getAccessToken(): Promise<string | null> {
-  try {
-    return await AsyncStorage.getItem('accessToken');
-  } catch (error) {
-    console.error('Error getting access token:', error);
-    return null;
+  // Check if client ID is numeric (wrong format)
+  if (clientId && /^\d+$/.test(clientId)) {
+    errors.push('Google Client ID is numeric - should be in format: 123456789-abcdefghijklmnop.apps.googleusercontent.com');
   }
-}
 
-/**
- * Refresh access token (Firebase handles this automatically)
- */
-export async function refreshAccessToken(): Promise<string | null> {
-  try {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      throw new Error('No authenticated user');
-    }
-    
-    // Firebase automatically handles token refresh
-    const token = await currentUser.getIdToken(true);
-    await AsyncStorage.setItem('accessToken', token);
-    return token;
-  } catch (error) {
-    console.error('Error refreshing token:', error);
-    return null;
-  }
-}
-
-/**
- * Logout user
- */
-export async function logout(): Promise<void> {
-  try {
-    // Sign out from Firebase Auth
-    await firebaseAuth.signOut();
-    
-    // Clear stored data
-    await AsyncStorage.multiRemove([
-      'accessToken', 
-      'refreshToken', 
-      'user', 
-      'firebaseUser',
-      'emailForSignIn'
-    ]);
-    
-    console.log('User logged out successfully');
-  } catch (error) {
-    console.error('Error logging out:', error);
-    throw error;
-  }
-}
-
-/**
- * Update user profile
- */
-export async function updateUserProfile(userId: string, profileData: any): Promise<void> {
-  try {
-    await firestoreService.updateUserDocument(userId, profileData);
-  } catch (error) {
-    console.error('Error updating user profile:', error);
-    throw error;
-  }
-}
-
-/**
- * Get user profile
- */
-export async function getUserProfile(userId: string): Promise<any | null> {
-  try {
-    return await firestoreService.getUserDocument(userId);
-  } catch (error) {
-    console.error('Error getting user profile:', error);
-    return null;
-  }
-}
-
-/**
- * Listen to authentication state changes
- */
-export function onAuthStateChanged(callback: (user: FirebaseUser | null) => void) {
-  return firebaseAuth.onAuthStateChanged(callback);
-}
-
-/**
- * Clean up expired verification codes (call this periodically)
- */
-export async function cleanupExpiredCodes(): Promise<void> {
-  try {
-    await firestoreService.cleanupExpiredCodes();
-  } catch (error) {
-    console.error('Error cleaning up expired codes:', error);
-  }
-} 
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}; 

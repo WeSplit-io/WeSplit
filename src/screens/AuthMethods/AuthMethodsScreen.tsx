@@ -18,13 +18,16 @@ import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseAuth, firestoreService, auth } from '../../config/firebase';
-import { sendVerificationCode } from '../../services/firebaseAuthService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { solanaAppKitService } from '../../services/solanaAppKitService';
 import { userWalletService } from '../../services/userWalletService';
 import { unifiedUserService } from '../../services/unifiedUserService';
-import { SocialAuthService } from '../../services/socialAuthService';
+import { socialAuthService } from '../../services/socialAuthService';
+import { userDataService } from '../../services/userDataService';
+import * as AuthSession from 'expo-auth-session';
+import { loginWithGoogle, getAuthConfig, testAuthConfiguration } from '../../services/firebaseAuthService';
+import { sendVerificationCode } from '../../services/emailAuthService';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
@@ -48,13 +51,13 @@ const AuthMethodsScreen: React.FC = () => {
   // State management
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<'google' | 'twitter' | 'apple' | null>(null);
   const [hasCheckedMonthlyVerification, setHasCheckedMonthlyVerification] = useState(false);
   const [hasHandledAuthState, setHasHandledAuthState] = useState(false);
 
   // Check if user is already authenticated
   useEffect(() => {
     if (hasHandledAuthState) {
-      if (__DEV__) { console.log('🔄 Auth state already handled, skipping...'); }
       return;
     }
 
@@ -108,8 +111,6 @@ const AuthMethodsScreen: React.FC = () => {
 
       // Ensure user has a wallet using the centralized wallet service
       if (!appUser.wallet_address) {
-        if (__DEV__) { console.log('🔄 Ensuring wallet exists for user...'); }
-
         try {
           const walletResult = await userWalletService.ensureUserWallet(appUser.id);
 
@@ -117,29 +118,18 @@ const AuthMethodsScreen: React.FC = () => {
             // Update app user with wallet info
             appUser.wallet_address = walletResult.wallet.address;
             appUser.wallet_public_key = walletResult.wallet.publicKey;
-
-            if (__DEV__) { console.log('✅ Wallet ensured successfully:', walletResult.wallet.address); }
-
-            // Update user in AppContext to reflect wallet info
-            try {
-              await updateUser({
-                wallet_address: walletResult.wallet.address,
-                wallet_public_key: walletResult.wallet.publicKey
-              });
-              if (__DEV__) { console.log('✅ Updated user in AppContext with wallet info'); }
-            } catch (updateError) {
-              console.error('❌ Failed to update user in AppContext:', updateError);
-            }
+            
+            // Update user in AppContext
+            updateUser(appUser);
           } else {
-            console.error('❌ Failed to ensure wallet:', walletResult.error);
-            // Continue without wallet - user can still use the app
+            console.error('Failed to ensure user wallet:', walletResult.error);
           }
         } catch (error) {
-          console.error('❌ Wallet creation failed:', error);
-          // Continue without wallet - user can still use the app
+          console.error('Error ensuring user wallet:', error);
         }
       } else {
-        if (__DEV__) { console.log('✅ User already has wallet:', appUser.wallet_address); }
+        // User already has wallet, just update AppContext
+        updateUser(appUser);
       }
 
       // Authenticate user with updated data (including wallet if created)
@@ -149,19 +139,16 @@ const AuthMethodsScreen: React.FC = () => {
       const needsProfile = !appUser.name || appUser.name.trim() === '';
 
       if (needsProfile) {
-        console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
         navigation.reset({
           index: 0,
           routes: [{ name: 'CreateProfile', params: { email: appUser.email } }],
         });
       } else if (appUser.hasCompletedOnboarding) {
-        console.log('✅ User completed onboarding, navigating to Dashboard');
         navigation.reset({
           index: 0,
           routes: [{ name: 'Dashboard' }],
         });
       } else {
-        console.log('🔄 User needs onboarding, navigating to Onboarding');
         navigation.reset({
           index: 0,
           routes: [{ name: 'Onboarding' }],
@@ -392,79 +379,102 @@ const AuthMethodsScreen: React.FC = () => {
       }
   };
 
-  // Handle social authentication
+  // Handle social authentication with improved error handling and user data management
   const handleSocialAuth = async (provider: 'google' | 'twitter' | 'apple') => {
-    setLoading(true);
+    setSocialLoading(provider);
     
     try {
       let authResult;
       
       switch (provider) {
         case 'google':
-          authResult = await SocialAuthService.signInWithGoogle();
+          authResult = await loginWithGoogle();
           break;
         case 'twitter':
-          authResult = await SocialAuthService.signInWithTwitter();
+          authResult = await socialAuthService.signInWithTwitter();
           break;
         case 'apple':
-          authResult = await SocialAuthService.signInWithApple();
+          authResult = await socialAuthService.signInWithApple();
           break;
         default:
           throw new Error('Unsupported provider');
       }
 
       if (authResult.success && authResult.user) {
-        // Transform to app user format
-        const appUser = {
-          id: authResult.user.id,
-          name: authResult.user.name,
-          email: authResult.user.email,
-          wallet_address: authResult.user.wallet_address || '',
-          wallet_public_key: authResult.user.wallet_public_key || '',
-          created_at: authResult.user.created_at,
-          avatar: authResult.user.avatar || '',
-          hasCompletedOnboarding: authResult.user.hasCompletedOnboarding || false
-        };
+        // Save user data to Firestore using the new user data service
+        const userDataResult = await userDataService.saveUserDataAfterSSO(authResult.user, provider);
 
-        // Authenticate user with social provider
-        authenticateUser(appUser, 'social');
+        if (userDataResult.success && userDataResult.userData) {
+          // Transform to app user format
+          const appUser = {
+            id: userDataResult.userData.id,
+            name: userDataResult.userData.name,
+            email: userDataResult.userData.email,
+            wallet_address: userDataResult.userData.wallet_address || '',
+            wallet_public_key: userDataResult.userData.wallet_public_key || '',
+            created_at: userDataResult.userData.created_at,
+            avatar: userDataResult.userData.avatar || '',
+            hasCompletedOnboarding: userDataResult.userData.hasCompletedOnboarding
+          };
 
-        // Check if user needs to create a profile (has no name/pseudo)
-        const needsProfile = !appUser.name || appUser.name.trim() === '';
+          // Authenticate user with social provider
+          authenticateUser(appUser, 'social');
 
-        if (needsProfile) {
-          console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'CreateProfile', params: { email: appUser.email } }],
-          });
-        } else if (appUser.hasCompletedOnboarding) {
-          console.log('✅ User completed onboarding, navigating to Dashboard');
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Dashboard' }],
-          });
+          // Check if user needs to create a profile (has no name/pseudo)
+          const needsProfile = !appUser.name || appUser.name.trim() === '';
+
+          if (needsProfile) {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'CreateProfile', params: { email: appUser.email } }],
+            });
+          } else if (appUser.hasCompletedOnboarding) {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Dashboard' }],
+            });
+          } else {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Onboarding' }],
+            });
+          }
         } else {
-          console.log('🔄 User needs onboarding, navigating to Onboarding');
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Onboarding' }],
-          });
+          console.error(`Failed to save user data for ${provider}:`, userDataResult.error);
+          Alert.alert(
+            'Authentication Failed',
+            userDataResult.error || 'Failed to save user data. Please try again.'
+          );
         }
       } else {
+        console.error(`${provider} authentication failed:`, authResult.error);
         Alert.alert(
           'Authentication Failed',
           authResult.error || 'Failed to authenticate with social provider. Please try again.'
         );
       }
     } catch (error) {
-      console.error('Social authentication error:', error);
+      console.error(`${provider} authentication error:`, error);
       Alert.alert(
         'Authentication Error',
         error instanceof Error ? error.message : 'Failed to authenticate. Please try again.'
       );
     } finally {
-      setLoading(false);
+      setSocialLoading(null);
+    }
+  };
+
+  // Get loading text for social buttons
+  const getSocialLoadingText = (provider: 'google' | 'twitter' | 'apple') => {
+    switch (provider) {
+      case 'google':
+        return 'Signing in with Google...';
+      case 'twitter':
+        return 'Signing in with Twitter...';
+      case 'apple':
+        return 'Signing in with Apple...';
+      default:
+        return 'Signing in...';
     }
   };
 
@@ -486,35 +496,44 @@ const AuthMethodsScreen: React.FC = () => {
           {/* Social Login Buttons */}
           <View style={styles.socialSection}>
             <TouchableOpacity
-              style={[styles.socialButton, loading && styles.socialButtonDisabled]}
+              style={[
+                styles.socialButton, 
+                (loading || socialLoading === 'google') && styles.socialButtonDisabled
+              ]}
               onPress={() => handleSocialAuth('google')}
-              disabled={loading}
+              disabled={loading || socialLoading !== null}
             >
               <Image source={require('../../../assets/google.png')} style={styles.socialIcon} />
               <Text style={styles.socialButtonText}>
-                {loading ? 'Signing in...' : 'Continue with Google'}
+                {socialLoading === 'google' ? getSocialLoadingText('google') : 'Continue with Google'}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.socialButton, loading && styles.socialButtonDisabled]}
+              style={[
+                styles.socialButton, 
+                (loading || socialLoading === 'twitter') && styles.socialButtonDisabled
+              ]}
               onPress={() => handleSocialAuth('twitter')}
-              disabled={loading}
+              disabled={loading || socialLoading !== null}
             >
               <Image source={require('../../../assets/twitter.png')} style={styles.socialIcon} />
               <Text style={styles.socialButtonText}>
-                {loading ? 'Signing in...' : 'Continue with Twitter'}
+                {socialLoading === 'twitter' ? getSocialLoadingText('twitter') : 'Continue with Twitter'}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.socialButton, loading && styles.socialButtonDisabled]}
+              style={[
+                styles.socialButton, 
+                (loading || socialLoading === 'apple') && styles.socialButtonDisabled
+              ]}
               onPress={() => handleSocialAuth('apple')}
-              disabled={loading}
+              disabled={loading || socialLoading !== null}
             >
               <Image source={require('../../../assets/apple.png')} style={styles.socialIcon} />
               <Text style={styles.socialButtonText}>
-                {loading ? 'Signing in...' : 'Continue with Apple'}
+                {socialLoading === 'apple' ? getSocialLoadingText('apple') : 'Continue with Apple'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -542,9 +561,9 @@ const AuthMethodsScreen: React.FC = () => {
           </View>
           {/* Next Button */}
           <TouchableOpacity
-            style={[styles.nextButton, (!email || loading) && styles.nextButtonDisabled]}
+            style={[styles.nextButton, (!email || loading || socialLoading !== null) && styles.nextButtonDisabled]}
             onPress={handleEmailAuth}
-            disabled={!email || loading}
+            disabled={!email || loading || socialLoading !== null}
           >
             {loading ? (
               <ActivityIndicator color={colors.black} />
@@ -554,9 +573,6 @@ const AuthMethodsScreen: React.FC = () => {
           </TouchableOpacity>
 
         </View>
-
-
-
 
         {/* Help Link */}
         <View style={styles.helpSection}>

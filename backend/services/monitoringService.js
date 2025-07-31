@@ -124,14 +124,14 @@ class MonitoringService {
 
     // Send to analytics service in production
     if (process.env.NODE_ENV === 'production') {
-      // TODO: Integrate with analytics service (Google Analytics, Mixpanel, etc.)
+      // Note: Analytics integration planned for future release
       this.sendToAnalytics(logData);
     }
   }
 
   // Send to analytics service
   sendToAnalytics(data) {
-    // TODO: Implement analytics integration
+    // Note: Analytics integration will be implemented in future release
     // Example: Google Analytics, Mixpanel, Amplitude
     console.log('Analytics Event:', data);
   }

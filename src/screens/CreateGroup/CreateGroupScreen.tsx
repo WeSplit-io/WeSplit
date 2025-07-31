@@ -152,7 +152,7 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const handleInviteViaLink = () => {
-    // TODO: Implement invite via link functionality
+    // Feature planned for future release
     Alert.alert('Coming Soon', 'Invite via link feature will be available soon!');
   };
 

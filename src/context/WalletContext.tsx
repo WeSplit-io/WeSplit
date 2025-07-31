@@ -108,7 +108,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [appWalletConnected, setAppWalletConnected] = useState(false);
 
   useEffect(() => {
-          if (__DEV__) { console.log('WalletProvider mounted successfully'); }
+    if (__DEV__) { console.log('WalletProvider mounted successfully'); }
   }, [address, isConnected, chainId, balance, walletName, currentWalletId]);
 
   // Load stored wallets from AsyncStorage
@@ -480,7 +480,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   // Listen for wallet connection events
   useEffect(() => {
-          if (__DEV__) { console.log('WalletProvider: Setting up event listeners'); }
+    if (__DEV__) { console.log('WalletProvider: Setting up event listeners'); }
   }, [isConnected, address, chainId, balance, walletName, currentWalletId]);
 
   // App wallet methods

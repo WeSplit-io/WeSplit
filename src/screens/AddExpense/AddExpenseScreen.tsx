@@ -132,8 +132,9 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
 
     // Validate split method
     if (splitType === 'manual') {
-      const totalSplitAmount = selectedMembers.reduce((sum, memberId) => {
-        const memberAmount = parseFloat(customAmounts[String(memberId)] || '0');
+      const totalSplitAmount = selectedMembers.reduce((sum: number, memberId) => {
+        const memberKey = String(memberId);
+        const memberAmount = parseFloat(customAmounts[memberKey] || '0');
         return sum + (isNaN(memberAmount) ? 0 : memberAmount);
       }, 0);
       
@@ -192,8 +193,9 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
     if (splitType === 'equal') {
       return parseFloat(amount) || 0;
     } else {
-      return selectedMembers.reduce((sum, memberId) => {
-        const memberAmount = parseFloat(customAmounts[String(memberId)] || '0');
+      return selectedMembers.reduce((sum: number, memberId) => {
+        const memberKey = String(memberId);
+        const memberAmount = parseFloat(customAmounts[memberKey] || '0');
         return sum + (isNaN(memberAmount) ? 0 : memberAmount);
       }, 0);
     }
@@ -201,7 +203,8 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
 
   const getAmountPerPerson = () => {
     const total = parseFloat(amount) || 0;
-    return selectedMembers.length > 0 ? total / selectedMembers.length : 0;
+    const memberCount = selectedMembers.length;
+    return memberCount > 0 ? total / memberCount : 0;
   };
 
   const formatDate = (date: Date) => {
@@ -403,6 +406,10 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
           errorMessage = 'You do not have permission to add expenses to this group.';
         } else if (error.message.includes('validation')) {
           errorMessage = 'Invalid expense data. Please check your inputs.';
+        } else if (error.message.includes('offline')) {
+          errorMessage = 'You are currently offline. Please check your connection and try again.';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Request timed out. Please try again.';
         }
       }
       

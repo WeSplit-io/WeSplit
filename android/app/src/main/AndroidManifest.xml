@@ -32,6 +32,7 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="com.wesplit.app"/>
         <data android:scheme="exp+wesplit"/>
+        <data android:scheme="wesplit"/>
       </intent-filter>
     </activity>
   </application>

@@ -14,10 +14,14 @@
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
+    "@invertase/react-native-apple-authentication": "^2.4.1",
     "@moonpay/react-native-moonpay-sdk": "^1.1.4",
-    "@react-native-async-storage/async-storage": "^1.24.0",
-    "@react-native-community/datetimepicker": "^8.4.2",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-community/datetimepicker": "8.2.0",
     "@react-native-community/netinfo": "^11.4.1",
+    "@react-native-firebase/app": "^22.4.0",
+    "@react-native-firebase/auth": "^22.4.0",
+    "@react-native-google-signin/google-signin": "^15.0.0",
     "@react-native/metro-config": "^0.80.1",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
@@ -35,9 +39,10 @@
     "dotenv": "^17.0.1",
     "expo": "~52.0.0",
     "expo-application": "~6.0.2",
-    "expo-auth-session": "^6.2.1",
-    "expo-clipboard": "^7.1.5",
+    "expo-auth-session": "~6.0.3",
+    "expo-clipboard": "~7.0.1",
     "expo-constants": "~17.0.3",
+    "expo-crypto": "~14.0.2",
     "expo-dev-client": "~5.0.20",
     "expo-image-picker": "~16.0.6",
     "expo-linking": "~7.0.2",
@@ -68,7 +73,7 @@
     "react-native-svg": "^15.8.0",
     "react-native-url-polyfill": "^2.0.0",
     "react-native-vector-icons": "^10.2.0",
-    "react-native-webview": "^13.15.0"
+    "react-native-webview": "13.12.5"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

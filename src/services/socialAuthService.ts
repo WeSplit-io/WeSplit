@@ -1,286 +1,413 @@
-import * as WebBrowser from 'expo-web-browser';
-import { Platform } from 'react-native';
-import { firebaseAuth } from '../config/firebase';
+import { auth, firestoreService } from '../config/firebase';
+import { 
+  signInWithCredential, 
+  GoogleAuthProvider, 
+  OAuthProvider,
+  TwitterAuthProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword
+} from 'firebase/auth';
 import { userWalletService } from './userWalletService';
-import { unifiedUserService } from './unifiedUserService';
+import { logger } from './loggingService';
+import Constants from 'expo-constants';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import * as Crypto from 'expo-crypto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { twitterOAuthService } from './twitterOAuthService';
+import { loginWithGoogle } from './firebaseAuthService';
 
-// Configure WebBrowser for OAuth
-WebBrowser.maybeCompleteAuthSession();
-
-// OAuth configuration
-const GOOGLE_CLIENT_ID = 'your-google-client-id'; // Replace with your Google OAuth client ID
-const APPLE_CLIENT_ID = 'your-apple-client-id'; // Replace with your Apple OAuth client ID
-const TWITTER_CLIENT_ID = 'your-twitter-client-id'; // Replace with your Twitter OAuth client ID
-
-// Redirect URI for OAuth flows
-const REDIRECT_URI = 'wesplit://auth';
+// Environment variable helper
+const getEnvVar = (key: string): string => {
+  if (process.env[key]) { return process.env[key]!; }
+  if (Constants.expoConfig?.extra?.[key]) { return Constants.expoConfig.extra[key]; }
+  if ((Constants.manifest as any)?.extra?.[key]) { return (Constants.manifest as any).extra[key]; }
+  return '';
+};
 
 export interface SocialAuthResult {
   success: boolean;
   user?: any;
   error?: string;
+  provider: 'google' | 'apple' | 'twitter';
 }
 
-export class SocialAuthService {
-  // Google Sign In
-  static async signInWithGoogle(): Promise<SocialAuthResult> {
+class SocialAuthService {
+  private googleClientId: string;
+  private twitterClientId: string;
+  private twitterClientSecret: string;
+
+  constructor() {
+    this.googleClientId = getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID');
+    this.twitterClientId = getEnvVar('EXPO_PUBLIC_TWITTER_CLIENT_ID');
+    this.twitterClientSecret = getEnvVar('EXPO_PUBLIC_TWITTER_CLIENT_SECRET');
+  }
+
+  /**
+   * Sign in with Google OAuth
+   */
+  async signInWithGoogle(): Promise<SocialAuthResult> {
     try {
-      // For now, we'll use a mock implementation since we need to set up Google OAuth properly
-      // In a real implementation, you would use Google's OAuth flow
+      logger.info('🔄 Starting Google OAuth flow', null, 'SocialAuth');
       
-      if (__DEV__) {
-        console.log('🔄 Mock Google Sign In - would normally use Google OAuth');
-        
-        // Simulate successful Google sign in
-        const mockUser = {
-          uid: `google_${Date.now()}`,
-          email: 'user@gmail.com',
-          displayName: 'Google User',
-          photoURL: 'https://via.placeholder.com/150',
-          emailVerified: true,
-          providerData: [
-            {
-              providerId: 'google.com',
-              uid: `google_${Date.now()}`,
-              displayName: 'Google User',
-              email: 'user@gmail.com',
-              photoURL: 'https://via.placeholder.com/150'
-            }
-          ]
-        };
+      const result = await loginWithGoogle();
 
-        // Create or get user document
-        const userResult = await unifiedUserService.createOrGetUser({
-          email: mockUser.email,
-          name: mockUser.displayName || '',
-          walletAddress: '',
-          walletPublicKey: '',
-          avatar: mockUser.photoURL || ''
-        });
-
-        if (!userResult.success || !userResult.user) {
-          throw new Error(userResult.error || 'Failed to create user');
-        }
-
-        let userData = userResult.user;
-
-        // Ensure wallet exists
-        if (!userData.wallet_address) {
-          const walletResult = await userWalletService.ensureUserWallet(userData.id.toString());
-          if (walletResult.success && walletResult.wallet) {
-            userData.wallet_address = walletResult.wallet.address;
-            userData.wallet_public_key = walletResult.wallet.publicKey;
-          }
-        }
+      logger.info('✅ Google OAuth completed', { 
+        success: result.success, 
+        hasUser: !!result.user,
+        error: result.error 
+      }, 'SocialAuth');
 
         return {
-          success: true,
-          user: userData
+        ...result,
+          provider: 'google'
         };
-      }
-
-      // Real Google OAuth implementation would go here
-      // const discovery = await AuthSession.fetchDiscoveryAsync('https://accounts.google.com');
-      // const request = new AuthSession.AuthRequest({
-      //   clientId: GOOGLE_CLIENT_ID,
-      //   scopes: ['openid', 'profile', 'email'],
-      //   redirectUri: REDIRECT_URI,
-      //   responseType: AuthSession.ResponseType.IdToken,
-      //   extraParams: {
-      //     nonce: 'nonce',
-      //   },
-      // });
-      // const result = await request.promptAsync(discovery);
-      // if (result.type === 'success') {
-      //   const user = await firebaseAuth.signInWithGoogle(result.params.id_token);
-      //   return { success: true, user };
-      // }
-
-      throw new Error('Google OAuth not configured');
     } catch (error) {
-      console.error('Google sign in error:', error);
+      logger.error('❌ Google OAuth error', error, 'SocialAuth');
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Google sign in failed'
+        error: error instanceof Error ? error.message : 'Google Sign-In failed',
+        provider: 'google'
       };
     }
   }
 
-  // Apple Sign In
-  static async signInWithApple(): Promise<SocialAuthResult> {
+  /**
+   * Sign in with Twitter OAuth using the dedicated Twitter OAuth service
+   */
+  async signInWithTwitter(): Promise<SocialAuthResult> {
     try {
-      if (__DEV__) {
-        console.log('🔄 Mock Apple Sign In - would normally use Apple OAuth');
-        
-        // Simulate successful Apple sign in
-        const mockUser = {
-          uid: `apple_${Date.now()}`,
-          email: 'user@privaterelay.appleid.com',
-          displayName: 'Apple User',
-          photoURL: 'https://via.placeholder.com/150',
-          emailVerified: true,
-          providerData: [
-            {
-              providerId: 'apple.com',
-              uid: `apple_${Date.now()}`,
-              displayName: 'Apple User',
-              email: 'user@privaterelay.appleid.com',
-              photoURL: 'https://via.placeholder.com/150'
-            }
-          ]
-        };
+      logger.info('Starting Twitter Sign-In process', null, 'SocialAuth');
+      
+      if (!this.twitterClientId || !this.twitterClientSecret) {
+        throw new Error('Twitter OAuth credentials not configured');
+      }
 
-        // Create or get user document
-        const userResult = await unifiedUserService.createOrGetUser({
-          email: mockUser.email,
-          name: mockUser.displayName || '',
-          walletAddress: '',
-          walletPublicKey: '',
-          avatar: mockUser.photoURL || ''
+      // Use the dedicated Twitter OAuth service
+      const result = await twitterOAuthService.signInWithTwitter();
+
+      if (result.success && result.user) {
+        logger.info('Twitter OAuth successful, user authenticated', { 
+          uid: result.user.uid,
+          email: result.user.email 
+        }, 'SocialAuth');
+
+        // Ensure user has wallet
+        await userWalletService.ensureUserWallet(result.user.uid);
+
+        // Store tokens securely (Twitter tokens are handled by the Twitter OAuth service)
+        await this.storeTokens('twitter', {
+          accessToken: 'twitter_access_token', // Placeholder - actual tokens handled by Twitter service
+          idToken: 'twitter_id_token', // Placeholder
         });
 
-        if (!userResult.success || !userResult.user) {
-          throw new Error(userResult.error || 'Failed to create user');
-        }
-
-        let userData = userResult.user;
-
-        // Ensure wallet exists
-        if (!userData.wallet_address) {
-          const walletResult = await userWalletService.ensureUserWallet(userData.id);
-          if (walletResult.success && walletResult.wallet) {
-            userData.wallet_address = walletResult.wallet.address;
-            userData.wallet_public_key = walletResult.wallet.publicKey;
-          }
-        }
+        logger.info('Twitter Sign-In process completed successfully', { uid: result.user.uid }, 'SocialAuth');
 
         return {
           success: true,
-          user: userData
+          user: result.user,
+          provider: 'twitter'
+        };
+      } else {
+        logger.error('Twitter Sign-In failed', { error: result.error }, 'SocialAuth');
+        return {
+          success: false,
+          error: result.error || 'Twitter Sign-In failed',
+          provider: 'twitter'
         };
       }
 
-      // Real Apple OAuth implementation would go here
-      // const request = new AuthSession.AuthRequest({
-      //   clientId: APPLE_CLIENT_ID,
-      //   scopes: ['name', 'email'],
-      //   redirectUri: REDIRECT_URI,
-      //   responseType: AuthSession.ResponseType.IdToken,
-      //   extraParams: {
-      //     nonce: 'nonce',
-      //   },
-      // });
-      // const result = await request.promptAsync({
-      //   authorizationEndpoint: 'https://appleid.apple.com/auth/authorize',
-      //   tokenEndpoint: 'https://appleid.apple.com/auth/token',
-      // });
-      // if (result.type === 'success') {
-      //   const user = await firebaseAuth.signInWithApple(result.params.id_token, 'nonce');
-      //   return { success: true, user };
-      // }
+    } catch (error: any) {
+      let errorMessage = 'Twitter Sign-In failed';
+      
+      if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'Sign-in was cancelled by user';
+      } else if (error.code === 'auth/account-exists-with-different-credential') {
+        errorMessage = 'An account already exists with the same email address but different sign-in credentials';
+      } else if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'An account already exists with this email address';
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorMessage = 'Twitter Sign-In is not enabled in Firebase Console';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
 
-      throw new Error('Apple OAuth not configured');
-    } catch (error) {
-      console.error('Apple sign in error:', error);
+      logger.error('Twitter Sign-In error', error, 'SocialAuth');
+      
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Apple sign in failed'
+        error: errorMessage,
+        provider: 'twitter'
       };
     }
   }
 
-  // Twitter Sign In
-  static async signInWithTwitter(): Promise<SocialAuthResult> {
+  /**
+   * Sign in with Apple OAuth using expo-auth-session
+   */
+  async signInWithApple(): Promise<SocialAuthResult> {
     try {
-      if (__DEV__) {
-        console.log('🔄 Mock Twitter Sign In - would normally use Twitter OAuth');
-        
-        // Simulate successful Twitter sign in
-        const mockUser = {
-          uid: `twitter_${Date.now()}`,
-          email: 'user@twitter.com',
-          displayName: 'Twitter User',
-          photoURL: 'https://via.placeholder.com/150',
-          emailVerified: true,
-          providerData: [
-            {
-              providerId: 'twitter.com',
-              uid: `twitter_${Date.now()}`,
-              displayName: 'Twitter User',
-              email: 'user@twitter.com',
-              photoURL: 'https://via.placeholder.com/150'
-            }
-          ]
-        };
-
-        // Create or get user document
-        const userResult = await unifiedUserService.createOrGetUser({
-          email: mockUser.email,
-          name: mockUser.displayName || '',
-          walletAddress: '',
-          walletPublicKey: '',
-          avatar: mockUser.photoURL || ''
-        });
-
-        if (!userResult.success || !userResult.user) {
-          throw new Error(userResult.error || 'Failed to create user');
-        }
-
-        let userData = userResult.user;
-
-        // Ensure wallet exists
-        if (!userData.wallet_address) {
-          const walletResult = await userWalletService.ensureUserWallet(userData.id);
-          if (walletResult.success && walletResult.wallet) {
-            userData.wallet_address = walletResult.wallet.address;
-            userData.wallet_public_key = walletResult.wallet.publicKey;
-          }
-        }
-
-        return {
-          success: true,
-          user: userData
-        };
+      logger.info('Starting Apple Sign-In process', null, 'SocialAuth');
+      
+      const appleClientId = getEnvVar('EXPO_PUBLIC_APPLE_CLIENT_ID');
+      
+      if (!appleClientId) {
+        throw new Error('Apple OAuth credentials not configured');
       }
 
-      // Real Twitter OAuth implementation would go here
-      // const request = new AuthSession.AuthRequest({
-      //   clientId: TWITTER_CLIENT_ID,
-      //   scopes: ['tweet.read', 'users.read'],
-      //   redirectUri: REDIRECT_URI,
-      //   responseType: AuthSession.ResponseType.Code,
-      // });
-      // const result = await request.promptAsync({
-      //   authorizationEndpoint: 'https://twitter.com/i/oauth2/authorize',
-      //   tokenEndpoint: 'https://api.twitter.com/2/oauth2/token',
-      // });
-      // if (result.type === 'success') {
-      //   // Exchange code for tokens and then sign in with Firebase
-      //   const user = await firebaseAuth.signInWithTwitter(result.params.access_token, result.params.refresh_token);
-      //   return { success: true, user };
-      // }
+      // Generate nonce for Apple Sign-In
+      const nonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        Math.random().toString(),
+        { encoding: Crypto.CryptoEncoding.HEX }
+      );
 
-      throw new Error('Twitter OAuth not configured');
-    } catch (error) {
-      console.error('Twitter sign in error:', error);
+      // Create OAuth request
+      const redirectUri = AuthSession.makeRedirectUri({
+        scheme: 'wesplit',
+        path: 'auth'
+      });
+
+      const request = new AuthSession.AuthRequest({
+        clientId: appleClientId,
+        scopes: ['name', 'email'],
+        redirectUri,
+        responseType: AuthSession.ResponseType.Code,
+        extraParams: {
+          response_mode: 'form_post',
+          nonce: nonce,
+        },
+      });
+
+      // Open OAuth flow in browser
+      const result = await request.promptAsync({
+        authorizationEndpoint: 'https://appleid.apple.com/auth/authorize',
+      });
+
+      if (result.type === 'success' && result.params.code) {
+        // Exchange code for tokens
+        const tokenResponse = await AuthSession.exchangeCodeAsync(
+          {
+            clientId: appleClientId,
+            code: result.params.code,
+            redirectUri,
+            extraParams: {
+              code_verifier: request.codeChallenge || '',
+            },
+          },
+          {
+            tokenEndpoint: 'https://appleid.apple.com/auth/token',
+          }
+        );
+
+        if (tokenResponse.accessToken && tokenResponse.idToken) {
+          // Sign in to Firebase with Apple credential
+          const provider = new OAuthProvider('apple.com');
+          const credential = provider.credential({
+            idToken: tokenResponse.idToken,
+            rawNonce: nonce,
+          });
+          
+          const firebaseResult = await signInWithCredential(auth, credential);
+          
+          // Ensure user has wallet
+          await userWalletService.ensureUserWallet(firebaseResult.user.uid);
+
+          // Store tokens securely
+          await this.storeTokens('apple', {
+            accessToken: tokenResponse.accessToken,
+            idToken: tokenResponse.idToken,
+            refreshToken: tokenResponse.refreshToken,
+          });
+
+          logger.info('Apple Sign-In successful', { uid: firebaseResult.user.uid }, 'SocialAuth');
+
+          return {
+            success: true,
+            user: firebaseResult.user,
+            provider: 'apple'
+          };
+        } else {
+          throw new Error('Failed to exchange code for tokens');
+        }
+      } else if (result.type === 'cancel') {
+        return {
+          success: false,
+          error: 'Sign-in was cancelled by user',
+          provider: 'apple'
+        };
+      } else {
+        throw new Error('OAuth flow failed');
+      }
+
+    } catch (error: any) {
+      let errorMessage = 'Apple Sign-In failed';
+      
+      if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'Sign-in was cancelled by user';
+      } else if (error.code === 'auth/account-exists-with-different-credential') {
+        errorMessage = 'An account already exists with the same email address but different sign-in credentials';
+      } else if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'An account already exists with this email address';
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorMessage = 'Apple Sign-In is not enabled in Firebase Console';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      logger.error('Apple Sign-In error', error, 'SocialAuth');
+      
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Twitter sign in failed'
+        error: errorMessage,
+        provider: 'apple'
       };
     }
   }
 
-  // Helper method to transform Firebase user to app user format
-  private static transformFirebaseUser(firebaseUser: any) {
-    return {
-      id: firebaseUser.uid,
-      name: firebaseUser.displayName || '',
-      email: firebaseUser.email || '',
-      wallet_address: '',
-      wallet_public_key: '',
-      created_at: new Date().toISOString(),
-      avatar: firebaseUser.photoURL || '',
-      hasCompletedOnboarding: false
-    };
+  /**
+   * Store OAuth tokens securely
+   */
+  private async storeTokens(provider: string, tokens: {
+    accessToken: string;
+    idToken: string;
+    refreshToken?: string;
+  }) {
+    try {
+      const tokenData = {
+        provider,
+        accessToken: tokens.accessToken,
+        idToken: tokens.idToken,
+        refreshToken: tokens.refreshToken,
+        timestamp: new Date().toISOString(),
+      };
+
+      await AsyncStorage.setItem(
+        `oauth_tokens_${provider}`,
+        JSON.stringify(tokenData)
+      );
+
+      logger.info(`Stored ${provider} tokens securely`, null, 'SocialAuth');
+    } catch (error) {
+      logger.error(`Failed to store ${provider} tokens`, error, 'SocialAuth');
+    }
   }
-} 
+
+  /**
+   * Get stored OAuth tokens
+   */
+  async getStoredTokens(provider: string) {
+    try {
+      const tokenData = await AsyncStorage.getItem(`oauth_tokens_${provider}`);
+      return tokenData ? JSON.parse(tokenData) : null;
+    } catch (error) {
+      logger.error(`Failed to get stored ${provider} tokens`, error, 'SocialAuth');
+      return null;
+    }
+  }
+
+  /**
+   * Clear stored OAuth tokens
+   */
+  async clearStoredTokens(provider?: string) {
+    try {
+      if (provider) {
+        await AsyncStorage.removeItem(`oauth_tokens_${provider}`);
+      } else {
+        // Clear all OAuth tokens
+        const keys = await AsyncStorage.getAllKeys();
+        const oauthKeys = keys.filter(key => key.startsWith('oauth_tokens_'));
+        await AsyncStorage.multiRemove(oauthKeys);
+      }
+
+      logger.info(`Cleared ${provider || 'all'} OAuth tokens`, null, 'SocialAuth');
+    } catch (error) {
+      logger.error(`Failed to clear ${provider || 'all'} OAuth tokens`, error, 'SocialAuth');
+    }
+  }
+
+  /**
+   * Sign out from all social providers
+   */
+  async signOut(): Promise<void> {
+    try {
+      // Sign out from Firebase
+      await auth.signOut();
+      
+      // Clear all stored OAuth tokens
+      await this.clearStoredTokens();
+      
+      logger.info('Social Sign-Out successful', null, 'SocialAuth');
+    } catch (error) {
+      logger.error('Social Sign-Out error', error, 'SocialAuth');
+    }
+  }
+
+  /**
+   * Check if user is signed in with any social provider
+   */
+  async isSignedIn(): Promise<boolean> {
+    try {
+      const firebaseUser = auth.currentUser;
+      return !!firebaseUser;
+    } catch (error) {
+      logger.error('Error checking sign-in status', error, 'SocialAuth');
+      return false;
+    }
+  }
+
+  /**
+   * Get current user info
+   */
+  async getCurrentUser(): Promise<any> {
+    try {
+      const firebaseUser = auth.currentUser;
+      return firebaseUser;
+    } catch (error) {
+      logger.error('Error getting current user', error, 'SocialAuth');
+      return null;
+    }
+  }
+
+  /**
+   * Get user's social provider info
+   */
+  async getUserProviderInfo(user: any): Promise<{ provider: string; email?: string; name?: string }> {
+    try {
+      if (!user) return { provider: 'unknown' };
+
+      const providerData = user.providerData || [];
+      const primaryProvider = providerData[0];
+
+      return {
+        provider: primaryProvider?.providerId || 'unknown',
+        email: user.email || primaryProvider?.email,
+        name: user.displayName || primaryProvider?.displayName
+      };
+    } catch (error) {
+      logger.error('Error getting user provider info', error, 'SocialAuth');
+      return { provider: 'unknown' };
+    }
+  }
+
+  /**
+   * Get provider from user object
+   */
+  private getProviderFromUser(user: any): 'google' | 'apple' | 'twitter' {
+    const providerData = user.providerData || [];
+    const primaryProvider = providerData[0];
+    
+    switch (primaryProvider?.providerId) {
+      case 'google.com':
+        return 'google';
+      case 'apple.com':
+        return 'apple';
+      case 'twitter.com':
+        return 'twitter';
+      default:
+        return 'google'; // fallback
+    }
+  }
+}
+
+export const socialAuthService = new SocialAuthService(); 
