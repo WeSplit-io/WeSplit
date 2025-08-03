@@ -64,6 +64,21 @@ dist/
 *.crt
 *.der
 
+# Google Cloud Service Account credentials
+*-firebase-adminsdk-*.json
+*-service-account-*.json
+*-credentials-*.json
+*-key-*.json
+google-credentials.json
+service-account.json
+firebase-adminsdk-*.json
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.backup
+
 # IDE and Editor files
 .vscode/
 .idea/
