@@ -2,27 +2,25 @@ import { useApp } from '../context/AppContext';
 import { useWallet } from '../context/WalletContext';
 import { createMoonPayURL } from './moonpayService';
 
-// MoonPay configuration
-const MOONPAY_CONFIG = {
+// MoonPay SDK Configuration
+const MOONPAY_SDK_CONFIG = {
   // Development (Sandbox)
   development: {
-    apiKey: 'pk_live_37P9eF61y7Q7PZZp95q2kozulpBHYv7P',
-    environment: 'sandbox' as const,
-    baseUrl: 'https://buy-sandbox.moonpay.com',
+    apiKey: process.env.MOONPAY_API_KEY || '',
+    baseUrl: 'https://buy-sandbox.moonpay.com'
   },
   
   // Production
   production: {
-    apiKey: 'pk_live_37P9eF61y7Q7PZZp95q2kozulpBHYv7P',
-    environment: 'production' as const,
-    baseUrl: 'https://buy.moonpay.com',
+    apiKey: process.env.MOONPAY_API_KEY || '',
+    baseUrl: 'https://buy.moonpay.com'
   }
 };
 
 // Get current environment configuration
-const getMoonPayConfig = () => {
-  const environment = __DEV__ ? 'development' : 'production';
-  return MOONPAY_CONFIG[environment];
+const getCurrentConfig = () => {
+  const environment = process.env.NODE_ENV || 'development';
+  return MOONPAY_SDK_CONFIG[environment as keyof typeof MOONPAY_SDK_CONFIG] || MOONPAY_SDK_CONFIG.development;
 };
 
 // MoonPay transaction status
@@ -58,7 +56,7 @@ export interface MoonPaySDKResponse {
 export const useMoonPaySDK = () => {
   const { state } = useApp();
   const { appWalletAddress, getAppWalletBalance } = useWallet();
-  const config = getMoonPayConfig();
+  const config = getCurrentConfig();
 
   // Open MoonPay purchase flow using direct URL
   const openMoonPayPurchase = async (amount?: number) => {
@@ -66,7 +64,7 @@ export const useMoonPaySDK = () => {
       console.log('🔍 MoonPay SDK: Opening purchase flow...');
       console.log('🔍 MoonPay SDK: Config:', {
         apiKey: config.apiKey,
-        environment: config.environment,
+        environment: process.env.NODE_ENV,
         walletAddress: appWalletAddress,
         amount
       });

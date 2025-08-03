@@ -3,24 +3,25 @@ const admin = require('firebase-admin');
 
 // MoonPay configuration
 const MOONPAY_CONFIG = {
-  sandbox: {
-    apiKey: 'pk_live_37P9eF61y7Q7PZZp95q2kozulpBHYv7P',
-    secretKey: 'sk_live_xANcsPYYjcmU7EGIhZ9go0MKKbBoXH',
-    webhookSecret: 'wk_live_BIrcukm9OxPbAzDi6i4KcoewxAag0HBL',
+  // Development (Sandbox)
+  development: {
+    apiKey: process.env.MOONPAY_API_KEY || '',
+    secretKey: process.env.MOONPAY_SECRET_KEY || '',
     baseUrl: 'https://buy-sandbox.moonpay.com'
   },
+  
+  // Production
   production: {
-    apiKey: 'pk_live_37P9eF61y7Q7PZZp95q2kozulpBHYv7P',
-    secretKey: 'sk_live_xANcsPYYjcmU7EGIhZ9go0MKKbBoXH',
-    webhookSecret: 'wk_live_BIrcukm9OxPbAzDi6i4KcoewxAag0HBL',
+    apiKey: process.env.MOONPAY_API_KEY || '',
+    secretKey: process.env.MOONPAY_SECRET_KEY || '',
     baseUrl: 'https://buy.moonpay.com'
   }
 };
 
 // Get current environment configuration
-const getMoonPayConfig = () => {
-  const environment = process.env.NODE_ENV === 'production' ? 'production' : 'sandbox';
-  return MOONPAY_CONFIG[environment];
+const getCurrentConfig = () => {
+  const environment = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+  return MOONPAY_CONFIG[environment] || MOONPAY_CONFIG.development;
 };
 
 // MoonPay transaction status
@@ -96,7 +97,7 @@ const createMoonPayURL = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
     }
 
-    const config = getMoonPayConfig();
+    const config = getCurrentConfig();
 
     // For Solana, we need to use the correct currency code
     // MoonPay supports USDC on Solana with currency code 'usdc_sol'
@@ -165,7 +166,7 @@ const moonpayWebhook = functions.https.onRequest(async (req, res) => {
     });
 
     // Verify webhook signature (in production, you should verify this)
-    const config = getMoonPayConfig();
+    const config = getCurrentConfig();
     // TODO: Implement signature verification
     // if (!verifyWebhookSignature(signature, payload, config.webhookSecret)) {
     //   return res.status(401).json({ error: 'Invalid signature' });

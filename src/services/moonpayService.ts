@@ -1,9 +1,8 @@
-// Removed apiRequest import - using stub functions instead
+import { MOONPAY_CONFIG, getMoonPayConfig } from '../config/moonpay';
 
-// MoonPay direct URL parameters (using your real API key)
-const MOONPAY_DIRECT_CONFIG = {
-  baseUrl: 'https://buy-sandbox.moonpay.com', // Use https://buy.moonpay.com for production
-  apiKey: 'pk_live_37P9eF61y7Q7PZZp95q2kozulpBHYv7P', // Your real MoonPay public key
+export const moonpayConfig = {
+  // Use environment variables for API keys
+  apiKey: process.env.MOONPAY_API_KEY || '', // Your real MoonPay public key
   currency: 'USDC',
   network: 'solana'
 };
@@ -38,24 +37,28 @@ function createDirectMoonPayURL(walletAddress: string, amount?: number, currency
   }
   
   console.log('🔍 MoonPay: Creating URL with params:', {
-    apiKey: MOONPAY_DIRECT_CONFIG.apiKey,
+    apiKey: moonpayConfig.apiKey,
     currencyCode: currency,
     walletAddress: walletAddress,
     amount
   });
   
   const params = new URLSearchParams({
-    apiKey: MOONPAY_DIRECT_CONFIG.apiKey,
+    apiKey: moonpayConfig.apiKey,
     currencyCode: currency.toLowerCase(), // MoonPay expects lowercase
     walletAddress: walletAddress,
-    ...(amount && { baseCurrencyAmount: amount.toString() })
+    redirectURL: 'wesplit://moonpay-success'
   });
   
-  // Add additional MoonPay parameters
-  params.append('redirectURL', 'wesplit://moonpay-success');
+  // Add amount if provided
+  if (amount) {
+    params.append('baseCurrencyAmount', amount.toString());
+  }
+  
   params.append('failureRedirectURL', 'wesplit://moonpay-failure');
   
-  const url = `${MOONPAY_DIRECT_CONFIG.baseUrl}?${params.toString()}`;
+  const config = getMoonPayConfig();
+  const url = `${config.baseUrl}?${params.toString()}`;
   console.log('🔍 MoonPay: Generated URL:', url);
   
   return url;
