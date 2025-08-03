@@ -3,7 +3,7 @@ export const MOONPAY_CONFIG = {
   // Development (Sandbox)
   development: {
     baseUrl: 'https://buy-sandbox.moonpay.com',
-    apiKey: process.env.MOONPAY_API_KEY || 'pk_live_37P9eF61y7Q7PZZp95q2kozulpBHYv7P', // Load from environment variable
+    apiKey: process.env.MOONPAY_API_KEY || '', // Load from environment variable
     secretKey: process.env.MOONPAY_SECRET_KEY || '', // Load from environment variable
     webhookSecret: process.env.MOONPAY_WEBHOOK_SECRET || '', // Load from environment variable
   },
