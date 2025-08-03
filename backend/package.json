@@ -1,0 +1,37 @@
+{
+  "name": "wesplit-backend",
+  "version": "1.0.0",
+  "description": "WeSplit backend API",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "migrate": "node scripts/migrate-to-firebase.js",
+    "sync": "node scripts/cli-tools.js",
+    "extract-firebase": "node scripts/extract-firebase-config.js",
+    "sync-status": "curl -s http://localhost:3000/api/sync/status | jq",
+    "sync-full": "curl -X POST http://localhost:3000/api/sync/full",
+    "sync-incremental": "curl -X POST http://localhost:3000/api/sync/incremental",
+    "backup-db": "node -e \"const fs = require('fs'); const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19); fs.copyFileSync('wesplit.db', `wesplit.backup.${date}.db`); console.log('Database backed up successfully');\"",
+    "reset-db": "node reset-db.js"
+  },
+  "dependencies": {
+    "@sentry/node": "^9.36.0",
+    "@sentry/react-native": "^6.16.1",
+    "bcrypt": "^6.0.0",
+    "buffer": "^6.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.5.1",
+    "firebase-admin": "^13.4.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^7.0.5",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "@react-native-community/cli": "latest",
+    "nodemon": "^3.0.2"
+  }
+}

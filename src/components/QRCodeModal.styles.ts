@@ -1,0 +1,110 @@
+import { StyleSheet } from 'react-native';
+import { colors, spacing, typography } from '../theme';
+
+export const styles = StyleSheet.create({
+  qrModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  qrOverlayTouchable: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  qrModalContent: {
+    backgroundColor: colors.black,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 40,
+    paddingTop: 24,
+    maxHeight: '80%',
+    minHeight: 400,
+  },
+  qrHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.white50,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 50,
+  },
+  qrModalTitle: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: colors.white,
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  qrCodeContent: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  qrCodeContainerWrapper: {
+    backgroundColor: colors.green,
+    width: '100%',
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  qrCodeContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qrUserInfo: {
+    alignItems: 'center',
+    marginBottom: 32,
+    backgroundColor: colors.green10,
+    width: '100%',
+    padding: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  qrGroupDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  qrGroupIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  qrGroupImage: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+  },
+  qrUserName: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  qrWalletAddress: {
+    fontSize: 14,
+    color: colors.white70,
+    fontFamily: 'monospace',
+  },
+  qrDoneButton: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.green,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    width: '100%',
+    alignItems: 'center',
+  },
+  qrDoneButtonText: {
+    color: colors.green,
+    fontSize: 20,
+    fontWeight: 'semibold',
+  },
+}); 

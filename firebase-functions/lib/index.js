@@ -1,0 +1,310 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var _a, _b;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.cleanupRateLimits = exports.cleanupExpiredCodes = exports.onVerificationCodeCreated = exports.verifyCode = exports.sendVerificationEmail = void 0;
+const functions = __importStar(require("firebase-functions"));
+const admin = __importStar(require("firebase-admin"));
+const nodemailer = __importStar(require("nodemailer"));
+// Initialize Firebase Admin
+admin.initializeApp();
+const db = admin.firestore();
+// Email configuration
+const transporter = nodemailer.createTransport({
+    service: 'gmail', // or your preferred email service
+    auth: {
+        user: ((_a = functions.config().email) === null || _a === void 0 ? void 0 : _a.user) || 'your-email@gmail.com',
+        pass: ((_b = functions.config().email) === null || _b === void 0 ? void 0 : _b.password) || 'your-app-password'
+    }
+});
+// Email template for verification codes
+function generateEmailTemplate(code) {
+    return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px; text-align: center; color: white;">
+        <h1 style="margin: 0; font-size: 32px;">WeSplit</h1>
+        <p style="margin: 10px 0 0 0; font-size: 18px;">Your verification code</p>
+      </div>
+      
+      <div style="padding: 40px; background: #f9f9f9;">
+        <h2 style="color: #333; margin-bottom: 20px;">Hello!</h2>
+        <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
+          You requested a verification code for your WeSplit account. Use the code below to complete your verification:
+        </p>
+        
+        <div style="background: white; border: 2px solid #667eea; border-radius: 10px; padding: 30px; text-align: center; margin: 30px 0;">
+          <h1 style="color: #667eea; font-size: 48px; margin: 0; letter-spacing: 10px; font-family: 'Courier New', monospace;">${code}</h1>
+        </div>
+        
+        <p style="color: #666; font-size: 14px; margin-top: 30px;">
+          This code will expire in 10 minutes. If you didn't request this code, please ignore this email.
+        </p>
+        
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+          <p style="color: #999; font-size: 12px;">
+            © 2024 WeSplit. All rights reserved.
+          </p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+/**
+ * HTTP Callable Function: Send verification code via email
+ */
+exports.sendVerificationEmail = functions.https.onCall(async (data, context) => {
+    var _a, _b;
+    try {
+        const { email, code } = data;
+        // Validate input
+        if (!email || !code) {
+            throw new functions.https.HttpsError('invalid-argument', 'Email and code are required');
+        }
+        if (!email.includes('@')) {
+            throw new functions.https.HttpsError('invalid-argument', 'Invalid email format');
+        }
+        if (!/^\d{4}$/.test(code)) {
+            throw new functions.https.HttpsError('invalid-argument', 'Code must be 4 digits');
+        }
+        // Rate limiting: Check if too many requests for this email
+        const rateLimitKey = `rate_limit_${email}`;
+        const rateLimitRef = db.collection('rateLimits').doc(rateLimitKey);
+        const rateLimitDoc = await rateLimitRef.get();
+        if (rateLimitDoc.exists) {
+            const rateLimitData = rateLimitDoc.data();
+            const lastRequest = (_a = rateLimitData === null || rateLimitData === void 0 ? void 0 : rateLimitData.lastRequest) === null || _a === void 0 ? void 0 : _a.toDate();
+            const now = new Date();
+            // Allow only 1 request per minute per email
+            if (lastRequest && (now.getTime() - lastRequest.getTime()) < 60000) {
+                throw new functions.https.HttpsError('resource-exhausted', 'Too many requests. Please wait 1 minute before requesting another code.');
+            }
+        }
+        // Send email
+        const mailOptions = {
+            from: ((_b = functions.config().email) === null || _b === void 0 ? void 0 : _b.user) || 'noreply@wesplit.app',
+            to: email,
+            subject: 'WeSplit Verification Code',
+            html: generateEmailTemplate(code)
+        };
+        await transporter.sendMail(mailOptions);
+        // Update rate limit
+        await rateLimitRef.set({
+            email,
+            lastRequest: admin.firestore.FieldValue.serverTimestamp(),
+            requestCount: admin.firestore.FieldValue.increment(1)
+        });
+        console.log(`Verification email sent to ${email}`);
+        return {
+            success: true,
+            message: 'Verification email sent successfully'
+        };
+    }
+    catch (error) {
+        console.error('Error sending verification email:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'Failed to send verification email');
+    }
+});
+/**
+ * HTTP Callable Function: Verify code
+ */
+exports.verifyCode = functions.https.onCall(async (data, context) => {
+    var _a;
+    try {
+        const { email, code } = data;
+        // Validate input
+        if (!email || !code) {
+            throw new functions.https.HttpsError('invalid-argument', 'Email and code are required');
+        }
+        if (!email.includes('@')) {
+            throw new functions.https.HttpsError('invalid-argument', 'Invalid email format');
+        }
+        if (!/^\d{4}$/.test(code)) {
+            throw new functions.https.HttpsError('invalid-argument', 'Code must be 4 digits');
+        }
+        // Find the verification code in Firestore
+        const verificationRef = db.collection('verificationCodes');
+        const q = verificationRef
+            .where('email', '==', email)
+            .where('code', '==', code)
+            .where('used', '==', false);
+        const querySnapshot = await q.get();
+        if (querySnapshot.empty) {
+            throw new functions.https.HttpsError('not-found', 'Invalid or expired verification code');
+        }
+        const doc = querySnapshot.docs[0];
+        const verificationData = doc.data();
+        // Check if code is expired
+        const expiresAt = ((_a = verificationData.expiresAt) === null || _a === void 0 ? void 0 : _a.toDate) ?
+            verificationData.expiresAt.toDate() :
+            new Date(verificationData.expiresAt);
+        if (new Date() > expiresAt) {
+            throw new functions.https.HttpsError('deadline-exceeded', 'Verification code has expired');
+        }
+        // Mark code as used
+        await doc.ref.update({
+            used: true,
+            verifiedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        // Create or get Firebase user
+        let firebaseUser;
+        try {
+            firebaseUser = await admin.auth().getUserByEmail(email);
+        }
+        catch (error) {
+            if (error.code === 'auth/user-not-found') {
+                // Create new user
+                firebaseUser = await admin.auth().createUser({
+                    email: email,
+                    emailVerified: true // Mark as verified since they used the code
+                });
+            }
+            else {
+                throw error;
+            }
+        }
+        // Create custom token for the user
+        const customToken = await admin.auth().createCustomToken(firebaseUser.uid);
+        // Create or update user document in Firestore
+        const userRef = db.collection('users').doc(firebaseUser.uid);
+        await userRef.set({
+            id: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName || '',
+            wallet_address: '',
+            wallet_public_key: '',
+            created_at: admin.firestore.FieldValue.serverTimestamp(),
+            avatar: firebaseUser.photoURL || '',
+            emailVerified: true,
+            lastLoginAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        console.log(`Code verified successfully for ${email}`);
+        return {
+            success: true,
+            message: 'Code verified successfully',
+            user: {
+                id: firebaseUser.uid,
+                email: firebaseUser.email,
+                name: firebaseUser.displayName || '',
+                walletAddress: '',
+                walletPublicKey: '',
+                createdAt: firebaseUser.metadata.creationTime,
+                avatar: firebaseUser.photoURL || ''
+            },
+            customToken
+        };
+    }
+    catch (error) {
+        console.error('Error verifying code:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'Failed to verify code');
+    }
+});
+/**
+ * Firestore Trigger: Send email when verification code is created
+ */
+exports.onVerificationCodeCreated = functions.firestore
+    .document('verificationCodes/{docId}')
+    .onCreate(async (snap, context) => {
+    var _a;
+    try {
+        const data = snap.data();
+        const { email, code } = data;
+        if (!email || !code) {
+            console.error('Missing email or code in verification document');
+            return;
+        }
+        // Send the verification email
+        const mailOptions = {
+            from: ((_a = functions.config().email) === null || _a === void 0 ? void 0 : _a.user) || 'noreply@wesplit.app',
+            to: email,
+            subject: 'WeSplit Verification Code',
+            html: generateEmailTemplate(code)
+        };
+        await transporter.sendMail(mailOptions);
+        console.log(`Verification email sent to ${email} via trigger`);
+    }
+    catch (error) {
+        console.error('Error in onVerificationCodeCreated:', error);
+    }
+});
+/**
+ * Scheduled Function: Clean up expired verification codes
+ */
+exports.cleanupExpiredCodes = functions.pubsub
+    .schedule('every 1 hours')
+    .onRun(async (context) => {
+    try {
+        const now = admin.firestore.Timestamp.now();
+        const expiredCodesQuery = db.collection('verificationCodes')
+            .where('expiresAt', '<', now);
+        const snapshot = await expiredCodesQuery.get();
+        const deletePromises = snapshot.docs.map((doc) => doc.ref.delete());
+        await Promise.all(deletePromises);
+        console.log(`Cleaned up ${snapshot.docs.length} expired verification codes`);
+        return null;
+    }
+    catch (error) {
+        console.error('Error cleaning up expired codes:', error);
+        return null;
+    }
+});
+/**
+ * Scheduled Function: Clean up old rate limits
+ */
+exports.cleanupRateLimits = functions.pubsub
+    .schedule('every 24 hours')
+    .onRun(async (context) => {
+    try {
+        const oneDayAgo = new Date();
+        oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+        const oldRateLimitsQuery = db.collection('rateLimits')
+            .where('lastRequest', '<', admin.firestore.Timestamp.fromDate(oneDayAgo));
+        const snapshot = await oldRateLimitsQuery.get();
+        const deletePromises = snapshot.docs.map((doc) => doc.ref.delete());
+        await Promise.all(deletePromises);
+        console.log(`Cleaned up ${snapshot.docs.length} old rate limit records`);
+        return null;
+    }
+    catch (error) {
+        console.error('Error cleaning up rate limits:', error);
+        return null;
+    }
+});
+//# sourceMappingURL=index.js.map

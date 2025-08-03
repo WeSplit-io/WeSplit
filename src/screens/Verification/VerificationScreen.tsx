@@ -1,0 +1,273 @@
+import React, { useRef, useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { styles, BG_COLOR, GREEN, GRAY } from './styles';
+import { verifyCode, sendVerificationCode } from '../../services/firebaseFunctionsService';
+import { useApp } from '../../context/AppContext';
+import { firestoreService } from '../../config/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+
+const CODE_LENGTH = 4; // 4-digit code
+const RESEND_SECONDS = 30;
+
+const VerificationScreen: React.FC = () => {
+  const navigation = useNavigation();
+  const route = useRoute<any>();
+  const { authenticateUser } = useApp();
+  const [code, setCode] = useState(Array(CODE_LENGTH).fill(''));
+  const [error, setError] = useState('');
+  const [timer, setTimer] = useState(RESEND_SECONDS);
+  const [resending, setResending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const inputRefs = useRef<(TextInput | null)[]>([]);
+
+  useEffect(() => {
+    if (timer === 0) return;
+    const interval = setInterval(() => {
+      setTimer(t => (t > 0 ? t - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timer]);
+
+  const handleChange = (val: string, idx: number) => {
+    if (val.length === CODE_LENGTH && /^\d{4}$/.test(val)) {
+      setCode(val.split(''));
+      inputRefs.current[CODE_LENGTH - 1]?.focus();
+      return;
+    }
+    if (/^\d?$/.test(val)) {
+      const newCode = [...code];
+      newCode[idx] = val;
+      setCode(newCode);
+      if (val && idx < CODE_LENGTH - 1) {
+        inputRefs.current[idx + 1]?.focus();
+      }
+    }
+  };
+
+  const handleKeyPress = (e: any, idx: number) => {
+    if (e.nativeEvent.key === 'Backspace' && !code[idx] && idx > 0) {
+      inputRefs.current[idx - 1]?.focus();
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (code.join('').length !== CODE_LENGTH) {
+      setError('Please enter the 4-digit code');
+      return;
+    }
+
+    setError('');
+    setVerifying(true);
+
+    try {
+      const email = route.params?.email;
+      if (!email) {
+        throw new Error('Email not found');
+      }
+
+      const codeString = code.join('');
+      if (__DEV__) { console.log('🔐 Verifying code:', codeString, 'for email:', email); }
+      
+      const authResponse = await verifyCode(email, codeString);
+
+      if (!authResponse.success || !authResponse.user) {
+        throw new Error(authResponse.error || 'Authentication failed');
+      }
+
+      // Code verified successfully and user is now authenticated
+      if (__DEV__) { console.log('✅ Authentication successful:', authResponse.user); }
+      
+      // Get the actual user data from Firestore instead of relying on the response
+      let actualUserData = null;
+      try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('email', '==', email));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          actualUserData = querySnapshot.docs[0].data();
+          if (__DEV__) { console.log('📋 Found existing user in Firestore:', actualUserData); }
+        }
+      } catch (firestoreError) {
+        console.error('Error getting user data from Firestore:', firestoreError);
+      }
+      
+      // Use actual Firestore data if available, otherwise fall back to response data
+      const transformedUser = {
+        id: actualUserData?.id || authResponse.user.id,
+        name: actualUserData?.name || authResponse.user.name,
+        email: actualUserData?.email || authResponse.user.email,
+        wallet_address: actualUserData?.wallet_address || authResponse.user.walletAddress || '',
+        wallet_public_key: actualUserData?.wallet_public_key || authResponse.user.walletPublicKey || '',
+        created_at: actualUserData?.created_at || authResponse.user.createdAt,
+        avatar: actualUserData?.avatar || authResponse.user.avatar || '',
+        hasCompletedOnboarding: actualUserData?.hasCompletedOnboarding || authResponse.user.hasCompletedOnboarding || false
+      };
+      
+      // Update the global app context with the authenticated user
+      authenticateUser(transformedUser, 'email');
+      if (__DEV__) { console.log('📱 User authenticated in app context'); }
+      
+      // Update the user's last verification timestamp
+      try {
+        await firestoreService.updateLastVerifiedAt(email);
+        if (__DEV__) { console.log('✅ Updated lastVerifiedAt for user:', email); }
+      } catch (updateError) {
+        console.error('Error updating lastVerifiedAt:', updateError);
+        // Don't fail the verification if this update fails
+      }
+      
+      // Check if user needs to create a profile (has no name/pseudo)
+      const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+      
+      if (__DEV__) {
+        console.log('🔍 User profile check:', {
+          name: transformedUser.name,
+          hasCompletedOnboarding: transformedUser.hasCompletedOnboarding,
+          needsProfile,
+          actualUserData: actualUserData ? {
+            name: actualUserData.name,
+            hasCompletedOnboarding: actualUserData.hasCompletedOnboarding
+          } : null
+        });
+      }
+      
+      if (needsProfile) {
+        console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
+        (navigation as any).reset({
+          index: 0,
+          routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
+        });
+      } else if (transformedUser.hasCompletedOnboarding) {
+        console.log('✅ User completed onboarding, navigating to Dashboard');
+        (navigation as any).reset({
+          index: 0,
+          routes: [{ name: 'Dashboard' }],
+        });
+      } else {
+        console.log('🔄 User needs onboarding, navigating to Onboarding');
+        (navigation as any).reset({
+          index: 0,
+          routes: [{ name: 'Onboarding' }],
+        });
+      }
+      
+    } catch (error) {
+      console.error('❌ Verification failed:', error);
+      setError(error instanceof Error ? error.message : 'Verification failed');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (timer === 0 && !resending) {
+      setResending(true);
+      setError('');
+      
+      try {
+        const email = route.params?.email;
+        if (!email) {
+          throw new Error('Email not found');
+        }
+
+        const result = await sendVerificationCode(email);
+        
+        if (result.success) {
+          setTimer(RESEND_SECONDS);
+        // Show success message
+        Alert.alert('Success', 'New verification code sent to your email');
+        } else {
+          throw new Error(result.error || 'Failed to resend code');
+        }
+        
+      } catch (error) {
+        console.error('Failed to resend code:', error);
+        setError(error instanceof Error ? error.message : 'Failed to resend code');
+      } finally {
+        setResending(false);
+      }
+    }
+  };
+
+  const timerText = `00:${timer < 10 ? '0' : ''}${timer}`;
+
+  return (
+    <SafeAreaView style={styles.container}>
+    <View style={styles.scrollContent}>
+        {/* Logo Section */}
+        <View style={styles.logoSection}>
+          <Image source={require('../../../assets/WeSplitLogoName.png')} style={styles.logo} />
+        </View>
+
+      {/* Main Content */}
+      <View style={styles.centerContent}>
+        <View style={styles.mailIconBox}>
+          <Image source={require('../../../assets/mail.png')} style={styles.mailIcon} />
+        </View>
+        <Text style={styles.title}>Check your Email</Text>
+        <Text style={styles.subtitle}>
+          We sent a code to <Text style={styles.emailHighlight}>{route.params?.email || 'yourname@gmail.com'}</Text>
+        </Text>
+        
+        <View style={styles.codeRow}>
+          {code.map((digit, idx) => (
+            <TextInput
+              key={idx}
+              ref={ref => (inputRefs.current[idx] = ref)}
+              style={styles.codeInput}
+              value={digit}
+              onChangeText={val => handleChange(val, idx)}
+              keyboardType="number-pad"
+              maxLength={CODE_LENGTH}
+              autoFocus={idx === 0}
+              onKeyPress={e => handleKeyPress(e, idx)}
+              textContentType="oneTimeCode"
+              returnKeyType="done"
+            />
+          ))}
+        </View>
+        
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        
+        <TouchableOpacity 
+          style={[styles.submitButton, verifying && styles.submitButtonDisabled]} 
+          onPress={handleSubmit}
+          disabled={verifying}
+        >
+          {verifying ? (
+            <ActivityIndicator color="white" size="small" />
+          ) : (
+          <Text style={styles.submitButtonText}>Submit</Text>
+          )}
+        </TouchableOpacity>
+        
+        {/* Timer and resend */}
+        <View style={styles.timerSection}>
+        <Text style={styles.timer}>{timerText}</Text>
+        <TouchableOpacity
+          style={styles.resendLink}
+          onPress={handleResend}
+          disabled={timer !== 0 || resending}
+        >
+            <Text style={[styles.resendText, timer !== 0 || resending ? styles.resendTextDisabled : null]}>
+              Resend Code
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Help Link */}
+      <View style={styles.helpSection}>
+        <TouchableOpacity>
+          <Text style={styles.helpText}>Need help?</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+    </SafeAreaView>
+  );
+};
+
+export default VerificationScreen; 

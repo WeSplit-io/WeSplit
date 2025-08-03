@@ -1,0 +1,292 @@
+name: 🚀 WeSplit CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run security scans weekly
+    - cron: '0 2 * * 1'
+
+env:
+  NODE_VERSION: '18'
+  EXPO_VERSION: 'latest'
+
+jobs:
+  # 🔒 Security Scanning
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Run Snyk Security Scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+      - name: 🔍 Run CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: 🔍 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+      - name: 🔍 Check for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: HEAD~1
+
+  # 🧪 Testing
+  test:
+    name: 🧪 Run Tests
+    runs-on: ubuntu-latest
+    needs: security-scan
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Run ESLint
+        run: npm run lint
+
+      - name: 🧪 Run unit tests
+        run: npm test
+
+      - name: 🧪 Run integration tests
+        run: npm run test:integration
+
+      - name: 📊 Generate coverage report
+        run: npm run test:coverage
+
+      - name: 📊 Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
+  # 🏗️ Build
+  build:
+    name: 🏗️ Build Application
+    runs-on: ubuntu-latest
+    needs: [security-scan, test]
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔧 Setup Expo CLI
+        run: npm install -g @expo/cli
+
+      - name: 🔐 Setup environment variables
+        run: |
+          echo "EXPO_PUBLIC_FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}" >> .env
+          echo "EXPO_PUBLIC_FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}" >> .env
+
+      - name: 🏗️ Build for Android
+        run: eas build --platform android --non-interactive
+
+      - name: 🏗️ Build for iOS
+        run: eas build --platform ios --non-interactive
+
+      - name: 📦 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            *.apk
+            *.aab
+            *.ipa
+
+  # 🔍 Quality Assurance
+  quality-check:
+    name: 🔍 Quality Check
+    runs-on: ubuntu-latest
+    needs: [security-scan, test, build]
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Run TypeScript check
+        run: npx tsc --noEmit
+
+      - name: 🔍 Run dependency check
+        run: npm audit --audit-level=high
+
+      - name: 🔍 Check bundle size
+        run: npm run analyze
+
+      - name: 🔍 Run performance tests
+        run: npm run test:performance
+
+  # 🚀 Deploy (Only on main branch)
+  deploy:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [security-scan, test, build, quality-check]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔐 Setup Firebase
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+
+      - name: 🚀 Deploy to Firebase
+        run: firebase deploy --only hosting,functions
+
+      - name: 🔍 Verify deployment
+        run: npm run verify:deployment
+
+      - name: 📧 Send deployment notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: '🚀 WeSplit deployed successfully to production!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # 📊 Performance Monitoring
+  performance:
+    name: 📊 Performance Check
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 📊 Run Lighthouse CI
+        run: npm run lighthouse:ci
+
+      - name: 📊 Upload performance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: .lighthouseci/
+
+  # 🔒 Security Compliance Check
+  compliance:
+    name: 🔒 Compliance Check
+    runs-on: ubuntu-latest
+    needs: [security-scan, test]
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Check for hardcoded secrets
+        run: |
+          if grep -r "AIzaSy\|sk_\|pk_" src/; then
+            echo "❌ Hardcoded secrets found!"
+            exit 1
+          fi
+
+      - name: 🔍 Check environment variables
+        run: |
+          if ! grep -q "EXPO_PUBLIC_FIREBASE_API_KEY" .env.example; then
+            echo "❌ Missing environment variable template!"
+            exit 1
+          fi
+
+      - name: 🔍 Check security documentation
+        run: |
+          if [ ! -f "SECURITY.md" ]; then
+            echo "❌ Security documentation missing!"
+            exit 1
+          fi
+
+      - name: ✅ Compliance check passed
+        run: echo "✅ All compliance checks passed!"
+
+  # 📋 Summary
+  summary:
+    name: 📋 Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [security-scan, test, build, quality-check, deploy, performance, compliance]
+    if: always()
+    steps:
+      - name: 📊 Generate summary
+        run: |
+          echo "## 🚀 WeSplit CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Completed Jobs:" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Security Scan: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧪 Tests: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏗️ Build: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔍 Quality Check: ${{ needs.quality-check.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🚀 Deploy: ${{ needs.deploy.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 Performance: ${{ needs.performance.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Compliance: ${{ needs.compliance.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "- Monitor deployment health" >> $GITHUB_STEP_SUMMARY
+          echo "- Review security scan results" >> $GITHUB_STEP_SUMMARY
+          echo "- Check performance metrics" >> $GITHUB_STEP_SUMMARY 
