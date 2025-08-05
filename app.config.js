@@ -8,7 +8,8 @@ export default {
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
-    newArchEnabled: true,
+    newArchEnabled: false,
+    sdkVersion: "53.0.0",
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
@@ -17,6 +18,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
+      deploymentTarget: "15.1",
       infoPlist: {
         LSApplicationQueriesSchemes: [
           "phantom",

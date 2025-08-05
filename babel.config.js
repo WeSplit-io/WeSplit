@@ -15,7 +15,11 @@ module.exports = function (api) {
         {
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           alias: {
-            // Add any path aliases here if needed
+            // Add specific aliases for problematic modules
+            'rpc-websockets': './node_modules/rpc-websockets',
+            '@noble/hashes/crypto.js': './node_modules/@noble/hashes/crypto',
+            'crypto': './node_modules/react-native-crypto',
+            'ws': './node_modules/ws',
           },
         },
       ],

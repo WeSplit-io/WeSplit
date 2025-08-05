@@ -9,6 +9,9 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "ios": {
+        "prebuildCommand": "cd ios && ./cleanup-react-common.sh"
       }
     },
     "development-simple": {
@@ -17,13 +20,16 @@
       "android": {
         "buildType": "apk"
       },
+      "ios": {
+        "prebuildCommand": "cd ios && ./cleanup-react-common.sh"
+      },
       "env": {
-        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyBxGgOeJ69_i6OJ_AxM2FQnL6J0eX7_2dE",
-        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "wesplit-app.firebaseapp.com",
-        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "wesplit-app",
-        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "wesplit-app.appspot.com",
-        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "123456789",
-        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:123456789:android:abcdef123456"
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyAL4g82j16qTwLQByCijWxOsQpxlZgb6p4",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "wesplit-35186.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "wesplit-35186",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "wesplit-35186.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "483370851807",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:483370851807:web:b608c8e50d22b97b82386a"
       }
     },
     "development-fixed": {
@@ -33,13 +39,16 @@
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
       },
+      "ios": {
+        "prebuildCommand": "cd ios && ./cleanup-react-common.sh"
+      },
       "env": {
-        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyBxGgOeJ69_i6OJ_AxM2FQnL6J0eX7_2dE",
-        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "wesplit-app.firebaseapp.com",
-        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "wesplit-app",
-        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "wesplit-app.appspot.com",
-        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "123456789",
-        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:123456789:android:abcdef123456"
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyAL4g82j16qTwLQByCijWxOsQpxlZgb6p4",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "wesplit-35186.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "wesplit-35186",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "wesplit-35186.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "483370851807",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:483370851807:web:b608c8e50d22b97b82386a"
       }
     },
     "preview": {
@@ -48,17 +57,23 @@
       "android": {
         "buildType": "apk"
       },
+      "ios": {
+        "prebuildCommand": "cd ios && ./cleanup-react-common.sh"
+      },
       "env": {
-        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyBxGgOeJ69_i6OJ_AxM2FQnL6J0eX7_2dE",
-        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "wesplit-app.firebaseapp.com",
-        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "wesplit-app",
-        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "wesplit-app.appspot.com",
-        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "123456789",
-        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:123456789:android:abcdef123456"
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyAL4g82j16qTwLQByCijWxOsQpxlZgb6p4",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "wesplit-35186.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "wesplit-35186",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "wesplit-35186.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "483370851807",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:483370851807:web:b608c8e50d22b97b82386a"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "ios": {
+        "prebuildCommand": "cd ios && ./cleanup-react-common.sh"
+      }
     }
   },
   "submit": {
