@@ -32,9 +32,30 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+.env.production
 
 # typescript
 *.tsbuildinfo
 firebase-functions/.env
 
 backend/.env
+
+# Firebase Admin SDK credentials
+**/firebase-adminsdk-*.json
+
+# Build artifacts
+*.apk
+*.aab
+*.ipa
+
+# Large files
+*.apk
+*.aab
+*.ipa
+*.dmg
+*.pkg
+
+# Environment files
+.env*
+!.env.example
