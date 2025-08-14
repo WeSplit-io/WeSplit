@@ -1,20 +1,10 @@
-// MoonPay Configuration
-export const MOONPAY_CONFIG = {
-  // Development (Sandbox)
-  development: {
-    baseUrl: 'https://buy-sandbox.moonpay.com',
-    apiKey: process.env.MOONPAY_API_KEY || 'pk_live_37P9eF61y7Q7PZZp95q2kozulpBHYv7P', // Load from environment variable
-    secretKey: process.env.MOONPAY_SECRET_KEY || '', // Load from environment variable
-    webhookSecret: process.env.MOONPAY_WEBHOOK_SECRET || '', // Load from environment variable
-  },
-  
-  // Production
-  production: {
-    baseUrl: 'https://buy.moonpay.com',
-    apiKey: process.env.MOONPAY_API_KEY || '', // Load from environment variable
-    secretKey: process.env.MOONPAY_SECRET_KEY || '', // Load from environment variable
-    webhookSecret: process.env.MOONPAY_WEBHOOK_SECRET || '', // Load from environment variable
-  }
+import { MoonPayConfig } from '../types';
+
+// MoonPay configuration
+export const moonPayConfig: MoonPayConfig = {
+  apiKey: process.env.EXPO_PUBLIC_MOONPAY_API_KEY || 'YOUR_MOONPAY_API_KEY_HERE', // Load from environment variable
+  environment: __DEV__ ? 'sandbox' : 'production',
+  baseUrl: __DEV__ ? 'https://buy-sandbox.moonpay.com' : 'https://buy.moonpay.com'
 };
 
 // Get current environment configuration

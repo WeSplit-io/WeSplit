@@ -1,118 +1,110 @@
 #!/bin/bash
 
-echo "🔒 WeSplit - Nettoyage des secrets et préparation du projet"
-echo "=========================================================="
+# 🚨 SECRETS CLEANUP SCRIPT - WeSplit
+# Ce script nettoie automatiquement tous les secrets détectés par GitHub
 
-# 1. Vérifier que git filter-repo est installé
+set -e  # Arrêter le script en cas d'erreur
+
+echo "🔒 Début du nettoyage des secrets WeSplit..."
+echo "================================================"
+
+# Vérifier que git-filter-repo est installé
 if ! command -v git-filter-repo &> /dev/null; then
     echo "❌ git-filter-repo n'est pas installé"
-    echo "Installez-le avec: pip install git-filter-repo"
+    echo "📦 Installation..."
+    
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        if command -v brew &> /dev/null; then
+            brew install git-filter-repo
+        else
+            echo "❌ Homebrew n'est pas installé. Installez-le d'abord :"
+            echo "   /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+            exit 1
+        fi
+    else
+        # Linux/Windows
+        if command -v pip3 &> /dev/null; then
+            pip3 install git-filter-repo
+        elif command -v pip &> /dev/null; then
+            pip install git-filter-repo
+        else
+            echo "❌ pip n'est pas installé. Installez Python d'abord."
+            exit 1
+        fi
+    fi
+fi
+
+echo "✅ git-filter-repo est installé"
+
+# Vérifier que nous sommes dans un repo Git
+if [ ! -d ".git" ]; then
+    echo "❌ Ce répertoire n'est pas un repository Git"
     exit 1
 fi
 
-# 2. Sauvegarder les fichiers sensibles actuels
-echo "📁 Sauvegarde des fichiers sensibles..."
-if [ -f ".env" ]; then
-    cp .env .env.backup
-    echo "✅ .env sauvegardé dans .env.backup"
+# Vérifier qu'il n'y a pas de changements non commités
+if [ -n "$(git status --porcelain)" ]; then
+    echo "⚠️  Il y a des changements non commités"
+    echo "📝 Committez ou stashez vos changements avant de continuer"
+    git status
+    exit 1
 fi
 
-if [ -f ".env.production" ]; then
-    cp .env.production .env.production.backup
-    echo "✅ .env.production sauvegardé dans .env.production.backup"
-fi
+echo "✅ Aucun changement non commité détecté"
 
-# 3. Remplacer .env par des placeholders
-echo "🔄 Remplacement du fichier .env..."
-cat > .env << 'EOF'
-DATABASE_URL=postgres://username:password@localhost:5432/database_name
-PORT=4000
-EXPO_PUBLIC_FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY_HERE
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=YOUR_PROJECT_ID.firebaseapp.com
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=YOUR_PROJECT_ID.firebasestorage.app
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=YOUR_SENDER_ID
-EXPO_PUBLIC_FIREBASE_APP_ID=YOUR_APP_ID
-EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=YOUR_MEASUREMENT_ID
-NODE_ENV=development
+# Sauvegarder la branche actuelle
+CURRENT_BRANCH=$(git branch --show-current)
+BACKUP_BRANCH="backup-before-secrets-cleanup-$(date +%Y%m%d-%H%M%S)"
 
-MOONPAY_API_KEY=YOUR_MOONPAY_API_KEY_HERE
-MOONPAY_SECRET_KEY=YOUR_MOONPAY_SECRET_KEY_HERE
-MOONPAY_WEBHOOK_SECRET=YOUR_MOONPAY_WEBHOOK_SECRET_HERE
+echo "📋 Création d'une branche de sauvegarde : $BACKUP_BRANCH"
+git checkout -b "$BACKUP_BRANCH"
+git checkout "$CURRENT_BRANCH"
 
-EXPO_PUBLIC_GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID_HERE
-EXPO_PUBLIC_GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_CLIENT_SECRET_HERE
-ANDROID_GOOGLE_CLIENT_ID=YOUR_ANDROID_GOOGLE_CLIENT_ID_HERE
-IOS_GOOGLE_CLIENT_ID=YOUR_IOS_GOOGLE_CLIENT_ID_HERE
+echo "🔄 Nettoyage de l'historique Git..."
 
-EXPO_PUBLIC_APPLE_CLIENT_ID=YOUR_APPLE_CLIENT_ID_HERE
-EXPO_PUBLIC_APPLE_SERVICE_ID=YOUR_APPLE_SERVICE_ID_HERE
-EXPO_PUBLIC_APPLE_TEAM_ID=YOUR_APPLE_TEAM_ID_HERE
-EXPO_PUBLIC_APPLE_KEY_ID=YOUR_APPLE_KEY_ID_HERE
-EXPO_PUBLIC_TWITTER_CLIENT_ID=YOUR_TWITTER_CLIENT_ID_HERE
-EXPO_PUBLIC_TWITTER_CLIENT_SECRET=YOUR_TWITTER_CLIENT_SECRET_HERE
-EOF
+# Supprimer le fichier Firebase Admin SDK
+echo "🗑️  Suppression du fichier Firebase Admin SDK..."
+git filter-repo --path "backend/wesplit-35186-firebase-adminsdk-fbsvc-2b1bb8a520.json" --invert-paths --force
 
-echo "✅ Fichier .env remplacé par des placeholders"
+# Supprimer le fichier APK
+echo "🗑️  Suppression du fichier APK..."
+git filter-repo --path "WeSplit-Development.apk" --invert-paths --force
 
-# 4. Nettoyer l'historique Git avec git filter-repo
-echo "🧹 Nettoyage de l'historique Git..."
-echo "⚠️  ATTENTION: Cette opération va réécrire l'historique Git !"
-echo "   Assurez-vous d'avoir sauvegardé votre travail !"
-read -p "Continuer ? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "🧹 Suppression des fichiers sensibles de l'historique..."
-    
-    # Supprimer les fichiers sensibles de l'historique
-    git filter-repo --path .env --invert-paths --force
-    git filter-repo --path .env.production --invert-paths --force
-    git filter-repo --path "backend/wesplit-35186-firebase-adminsdk-fbsvc-2b1bb8a520.json" --invert-paths --force
-    git filter-repo --path "WeSplit-Development.apk" --invert-paths --force
-    
-    echo "✅ Historique Git nettoyé"
+# Supprimer tous les fichiers .env
+echo "🗑️  Suppression des fichiers .env..."
+git filter-repo --path ".env" --invert-paths --force
+git filter-repo --path ".env.production" --invert-paths --force
+git filter-repo --path ".env.development" --invert-paths --force
+git filter-repo --path ".env.staging" --invert-paths --force
+
+# Supprimer les fichiers de configuration sensibles
+echo "🗑️  Suppression des fichiers de configuration sensibles..."
+git filter-repo --path "firebase-functions/src/moonpay.js" --invert-paths --force
+
+echo "✅ Nettoyage terminé !"
+
+# Vérifier que les fichiers sensibles ne sont plus trackés
+echo "🔍 Vérification que les fichiers sensibles ne sont plus trackés..."
+if git ls-files | grep -E "\.(env|json|apk|aab|ipa)" | grep -v "\.gitignore"; then
+    echo "⚠️  Attention : Certains fichiers sensibles sont encore trackés"
+    git ls-files | grep -E "\.(env|json|apk|aab|ipa)" | grep -v "\.gitignore"
 else
-    echo "❌ Opération annulée"
-    exit 1
+    echo "✅ Aucun fichier sensible n'est plus tracké"
 fi
 
-# 5. Ajouter les nouveaux fichiers
-echo "📝 Ajout des nouveaux fichiers..."
-git add .env
-git add .gitignore
-git add env.example
-git add firebase-functions/src/moonpay.js
-git add eas.json
-git add src/services/moonpayService.ts
-git add src/services/moonpaySDKService.ts
-git add src/config/moonpay.ts
-git add app.config.js
-
-# 6. Commit des changements
-echo "💾 Commit des changements..."
-git commit -m "🔒 Nettoyage des secrets et sécurisation du projet
-
-- Suppression des clés Firebase Admin SDK
-- Remplacement des secrets par des placeholders
-- Mise à jour du .gitignore
-- Création du fichier env.example
-- Nettoyage du fichier moonpay.js
-- Suppression du fichier APK volumineux"
-
-echo "✅ Commit créé avec succès"
-
-# 7. Instructions finales
 echo ""
-echo "🎉 Nettoyage terminé avec succès !"
+echo "🎯 PROCHAINES ÉTAPES :"
+echo "1. Vérifiez que le .gitignore est à jour"
+echo "2. Créez un nouveau fichier .env à partir de env.example"
+echo "3. Testez votre application localement"
+echo "4. Force push de la branche nettoyée :"
+echo "   git push --force-with-lease origin $CURRENT_BRANCH"
 echo ""
-echo "📋 Prochaines étapes :"
-echo "1. Vérifiez que tous les secrets ont été supprimés : git log --oneline"
-echo "2. Forcez le push sur GitHub : git push --force-with-lease origin main"
-echo "3. Restaurez vos secrets locaux : cp .env.backup .env"
+echo "⚠️  ATTENTION :"
+echo "- Toutes les clés exposées doivent être régénérées"
+echo "- Le fichier .env ne doit JAMAIS être commité"
+echo "- Utilisez toujours des variables d'environnement"
 echo ""
-echo "⚠️  IMPORTANT :"
-echo "- Ne committez JAMAIS le fichier .env"
-echo "- Utilisez .env.example comme modèle"
-echo "- Les secrets sont maintenant dans .env.backup"
-echo ""
-echo "🔒 Votre projet est maintenant sécurisé !"
+echo "🔒 Nettoyage terminé avec succès !"
+echo "📋 Branche de sauvegarde créée : $BACKUP_BRANCH"

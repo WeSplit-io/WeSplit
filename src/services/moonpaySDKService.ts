@@ -6,14 +6,14 @@ import { createMoonPayURL } from './moonpayService';
 const MOONPAY_CONFIG = {
   // Development (Sandbox)
   development: {
-    apiKey: 'pk_live_37P9eF61y7Q7PZZp95q2kozulpBHYv7P',
+    apiKey: process.env.EXPO_PUBLIC_MOONPAY_API_KEY || 'YOUR_MOONPAY_API_KEY_HERE',
     environment: 'sandbox' as const,
     baseUrl: 'https://buy-sandbox.moonpay.com',
   },
   
   // Production
   production: {
-    apiKey: 'pk_live_37P9eF61y7Q7PZZp95q2kozulpBHYv7P',
+    apiKey: process.env.EXPO_PUBLIC_MOONPAY_API_KEY || 'YOUR_MOONPAY_API_KEY_HERE',
     environment: 'production' as const,
     baseUrl: 'https://buy.moonpay.com',
   }
