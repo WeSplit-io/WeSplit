@@ -63,6 +63,7 @@ export default StyleSheet.create({
   paymentMethodIcon: {
     marginBottom: spacing.md,
     height: 100,
+    width: 170,
     objectFit: 'contain',
   },
   paymentMethodTitle: {

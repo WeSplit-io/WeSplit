@@ -302,6 +302,7 @@ export const firebaseUserService = {
         
         if (userData.name && userData.name !== existingUser.name) {
           updates.name = userData.name;
+          updates.hasCompletedOnboarding = true; // Mark as completed when name is updated
           hasUpdates = true;
         }
         
@@ -317,6 +318,12 @@ export const firebaseUserService = {
         
         if (userData.avatar && userData.avatar !== existingUser.avatar) {
           updates.avatar = userData.avatar;
+          hasUpdates = true;
+        }
+        
+        // Check if hasCompletedOnboarding needs to be updated
+        if (userData.hasCompletedOnboarding !== undefined && userData.hasCompletedOnboarding !== existingUser.hasCompletedOnboarding) {
+          updates.hasCompletedOnboarding = userData.hasCompletedOnboarding;
           hasUpdates = true;
         }
         
@@ -357,6 +364,7 @@ export const firebaseUserService = {
     if (updates.wallet_address !== undefined) updateData.wallet_address = updates.wallet_address;
     if (updates.wallet_public_key !== undefined) updateData.wallet_public_key = updates.wallet_public_key;
     if (updates.avatar !== undefined) updateData.avatar = updates.avatar;
+    if (updates.hasCompletedOnboarding !== undefined) updateData.hasCompletedOnboarding = updates.hasCompletedOnboarding;
     
     updateData.updated_at = serverTimestamp();
     

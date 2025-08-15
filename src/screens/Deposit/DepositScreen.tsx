@@ -40,7 +40,7 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
   const walletName = params.targetWallet?.name || 'Your Wallet';
 
   const getHeaderTitle = () => {
-    return 'Top Up';
+    return 'Deposit';
   };
 
   const handleCreditDebitCard = () => {

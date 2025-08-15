@@ -952,7 +952,7 @@ const WalletManagementScreen: React.FC = () => {
                   style={styles.actionButtonIcon}
                 />
               </View>
-              <Text style={styles.actionButtonText}>Top up</Text>
+              <Text style={styles.actionButtonText}>Deposit</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

@@ -285,7 +285,7 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
               <View style={styles.handle} />
 
               {/* Title */}
-              <Text style={styles.title}>Top Up Your Wallet</Text>
+              <Text style={styles.title}>Deposit Crypto</Text>
 
               <View style={styles.content}>
                 <Text style={styles.description}>

@@ -10,7 +10,9 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.black,
-    paddingHorizontal: spacing.lg,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   logoSection: {
     alignItems: 'center',
@@ -18,7 +20,8 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   logo: {
-    height: 40,
+    height: 30,
+    width: 170,
     objectFit: 'contain',
   },
   centerContent: {

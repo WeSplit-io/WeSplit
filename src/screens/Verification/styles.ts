@@ -11,18 +11,50 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.black,
   },
+  // Header styles
+  header: {
+    position: 'relative',
+    height: 80,
+    backgroundColor: colors.black,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 24,
+    zIndex: 10,
+    padding: 8,
+  },
+  iconWrapper: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
+  },
+  placeholder: {
+    position: 'absolute',
+    right: spacing.lg,
+    top: 24,
+    width: 24,
+  },
   scrollContent: {
     flex: 1,
+  },
+  scrollContentContainer: {
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
     justifyContent: 'center',
+    flexGrow: 1,
   },
   logoSection: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     alignItems: 'center',
-    marginTop: spacing.xl,
-    marginBottom: spacing.xl,
+    justifyContent: 'center',
   },
   logo: {
-    height: 40,
+    height: 30,
+    width: 170,
     objectFit: 'contain',
   },
   centerContent: {

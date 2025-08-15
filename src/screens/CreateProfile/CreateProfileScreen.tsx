@@ -12,6 +12,7 @@ import {
   ActionSheetIOS,
   Platform,
   Linking,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
@@ -142,6 +143,12 @@ const CreateProfileScreen: React.FC = () => {
         return;
       }
       
+      // Prevent multiple submissions
+      if (isLoading) {
+        console.log('Already processing, ignoring duplicate request');
+        return;
+      }
+      
       setError('');
       setIsLoading(true);
 
@@ -175,13 +182,13 @@ const CreateProfileScreen: React.FC = () => {
           wallet_address: result.user.wallet_address,
           wallet_public_key: result.user.wallet_public_key,
           created_at: result.user.created_at,
-          hasCompletedOnboarding: false // New users start with onboarding incomplete
+          hasCompletedOnboarding: true // User has completed profile creation
         };
 
         authenticateUser(user, 'email');
         
         try {
-          (navigation as any).replace('Onboarding');
+          (navigation as any).replace('Dashboard');
         } catch (e) {
           console.error('Navigation error:', e);
           Alert.alert('Navigation Error', 'Navigation error: ' + (e as any).message);
@@ -200,13 +207,23 @@ const CreateProfileScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-        {/* Logo Section */}
-        <View style={styles.logoSection}>
-          <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} style={styles.logo} />
-        </View>
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Logo Section */}
+          <View style={styles.logoSection}>
+            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} style={styles.logo} />
+          </View>
 
-      {/* Main Content */}
-      <View style={styles.centerContent}>
+          {/* Main Content */}
+          <View style={styles.centerContent}>
         <Text style={styles.title}>Create Your Profile</Text>
         <Text style={styles.subtitle}>
           Create your initial profile to get started, you can always edit it later.
@@ -254,12 +271,14 @@ const CreateProfileScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Help Link */}
-      <View style={styles.helpSection}>
-        <TouchableOpacity onPress={() => Linking.openURL('https://t.me/wesplit_support_bot')}>
-          <Text style={styles.helpText}>Need help?</Text>
-        </TouchableOpacity>
-      </View>
+          {/* Help Link */}
+          <View style={styles.helpSection}>
+            <TouchableOpacity onPress={() => Linking.openURL('https://t.me/wesplit_support_bot')}>
+              <Text style={styles.helpText}>Need help?</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

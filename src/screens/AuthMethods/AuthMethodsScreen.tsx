@@ -314,17 +314,12 @@ const AuthMethodsScreen: React.FC = () => {
                 index: 0,
                 routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
               });
-            } else if (transformedUser.hasCompletedOnboarding) {
-              console.log('✅ User completed onboarding, navigating to Dashboard');
+            } else {
+              // User has a profile, go directly to Dashboard
+              console.log('✅ User has profile, navigating to Dashboard');
               navigation.reset({
                 index: 0,
                 routes: [{ name: 'Dashboard' }],
-              });
-            } else {
-              console.log('🔄 User needs onboarding, navigating to Onboarding');
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Onboarding' }],
               });
             }
           } else {
@@ -483,15 +478,19 @@ const AuthMethodsScreen: React.FC = () => {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {/* Logo Section */}
-        <View style={styles.logoSection}>
-          <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} style={styles.logo} />
-        
+        {/* Header with Logo */}
+        <View style={styles.header}>
+          <View style={styles.logoSection}>
+            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} style={styles.logo} />
+          </View>
         </View>
 
         <View style={styles.contentContainer}>
@@ -559,6 +558,8 @@ const AuthMethodsScreen: React.FC = () => {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              textContentType="emailAddress"
+              autoComplete="email"
             />
           </View>
           {/* Next Button */}

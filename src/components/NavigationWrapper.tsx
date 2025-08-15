@@ -12,22 +12,27 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
   const { state } = useApp();
   const { currentUser } = state;
+  const deepLinkSetupRef = useRef<boolean>(false);
 
   useEffect(() => {
-    if (navigationRef.current && currentUser) {
+    if (navigationRef.current && currentUser && !deepLinkSetupRef.current) {
       console.log('🔥 Setting up deep link listeners for user:', currentUser.id);
       
       // Set up deep link listeners when navigation and user are available
       const subscription = setupDeepLinkListeners(navigationRef.current, currentUser);
+      
+      // Mark as set up to prevent multiple calls
+      deepLinkSetupRef.current = true;
       
       return () => {
         // Clean up subscription when component unmounts
         if (subscription) {
           subscription.remove();
         }
+        deepLinkSetupRef.current = false;
       };
     }
-  }, [navigationRef.current, currentUser]);
+  }, [currentUser]); // Remove navigationRef.current from dependencies
 
   // Handle initial URL when app starts
   useEffect(() => {

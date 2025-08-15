@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, SafeAreaView, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, SafeAreaView, Linking, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { verifyCode, sendVerificationCode } from '../../services/firebaseFunctionsService';
@@ -158,10 +158,29 @@ const VerificationScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-    <View style={styles.scrollContent}>
-        {/* Logo Section */}
-        <View style={styles.logoSection}>
-          <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} style={styles.logo} />
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView 
+          style={styles.scrollContent}
+          contentContainerStyle={styles.scrollContentContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+        {/* Header with Back Button and Logo */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Image
+              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+              style={styles.iconWrapper}
+            />
+          </TouchableOpacity>
+          <View style={styles.logoSection}>
+            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} style={styles.logo} />
+          </View>
+          <View style={styles.placeholder} />
         </View>
 
       {/* Main Content */}
@@ -178,16 +197,19 @@ const VerificationScreen: React.FC = () => {
           {code.map((digit, idx) => (
             <TextInput
               key={idx}
-              ref={ref => (inputRefs.current[idx] = ref)}
+              ref={(ref) => {
+                inputRefs.current[idx] = ref;
+              }}
               style={styles.codeInput}
               value={digit}
               onChangeText={val => handleChange(val, idx)}
               keyboardType="number-pad"
               maxLength={CODE_LENGTH}
-              autoFocus={idx === 0}
               onKeyPress={e => handleKeyPress(e, idx)}
               textContentType="oneTimeCode"
               returnKeyType="done"
+              autoComplete="one-time-code"
+              enablesReturnKeyAutomatically={true}
             />
           ))}
         </View>
@@ -227,7 +249,8 @@ const VerificationScreen: React.FC = () => {
           <Text style={styles.helpText}>Need help?</Text>
         </TouchableOpacity>
       </View>
-    </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

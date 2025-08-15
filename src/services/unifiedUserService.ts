@@ -66,7 +66,8 @@ class UnifiedUserService {
         name: userData.name,
         wallet_address: userData.walletAddress || '',
         wallet_public_key: userData.walletPublicKey || '',
-        avatar: userData.avatar || ''
+        avatar: userData.avatar || '',
+        hasCompletedOnboarding: true // Mark as completed since user is creating profile
       });
 
       // Step 3: Ensure user has a wallet
@@ -162,6 +163,7 @@ class UnifiedUserService {
     // Check if we need to update name
     if (newData.name && newData.name !== existingUser.name) {
       updates.name = newData.name;
+      updates.hasCompletedOnboarding = true; // User has completed profile creation
       hasUpdates = true;
     }
 

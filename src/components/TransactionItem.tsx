@@ -42,7 +42,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
       case 'receive':
         return `Received from ${transaction.from_user}`;
       case 'deposit':
-        return 'Top Up Wallet';
+        return 'Deposit';
       case 'withdraw':
         return 'Withdraw';
       default:

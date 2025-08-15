@@ -6,10 +6,29 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.black,
   },
+  // Header styles
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingTop: 24,
+    paddingBottom: 16,
+    backgroundColor: colors.black,
+  },
+
+  iconWrapper: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
+  },
+  placeholder: {
+    width: 24,
+  },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: spacing.lg,
-    paddingTop: 60,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
     justifyContent: 'center',
   },

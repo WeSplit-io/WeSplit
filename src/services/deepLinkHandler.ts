@@ -343,13 +343,14 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
     handleDeepLink(event.url);
   });
 
-  // Handle links that opened the app
-  Linking.getInitialURL().then((url) => {
-    if (url) {
-      console.log('🔥 Initial URL found:', url);
-      handleDeepLink(url);
-    }
-  });
+  // Handle links that opened the app (only once)
+  // Note: This is now handled in NavigationWrapper to avoid duplicate calls
+  // Linking.getInitialURL().then((url) => {
+  //   if (url) {
+  //     console.log('🔥 Initial URL found:', url);
+  //     handleDeepLink(url);
+  //   }
+  // });
 
   return subscription;
 }
