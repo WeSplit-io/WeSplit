@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, SafeAreaView, Linking } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
-import { verifyCode, sendVerificationCode } from '../../services/firebaseAuthService';
+import { verifyCode, sendVerificationCode } from '../../services/firebaseFunctionsService';
 import { useApp } from '../../context/AppContext';
 
 const CODE_LENGTH = 4; // 4-digit code

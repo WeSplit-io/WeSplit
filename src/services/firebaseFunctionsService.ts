@@ -51,9 +51,12 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firebase Functions
 const functions = getFunctions(app);
 
+// Set the region to us-central1 for your specific function
+const functionsRegion = getFunctions(app, 'us-central1');
+
 // Firebase Functions callable functions
-const sendVerificationEmailFunction = httpsCallable(functions, 'sendVerificationEmail');
-const verifyCodeFunction = httpsCallable(functions, 'verifyCode');
+const sendVerificationEmailFunction = httpsCallable(functionsRegion, 'sendVerificationEmail');
+const verifyCodeFunction = httpsCallable(functionsRegion, 'verifyCode');
 
 export interface FirebaseAuthResponse {
   success: boolean;

@@ -28,7 +28,7 @@ import { socialAuthService } from '../../services/socialAuthService';
 import { userDataService } from '../../services/userDataService';
 import * as AuthSession from 'expo-auth-session';
 import { loginWithGoogle, getAuthConfig, testAuthConfiguration } from '../../services/firebaseAuthService';
-import { sendVerificationCode } from '../../services/emailAuthService';
+import { sendVerificationCode } from '../../services/firebaseFunctionsService';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
