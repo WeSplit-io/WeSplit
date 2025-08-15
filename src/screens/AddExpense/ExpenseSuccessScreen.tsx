@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, Image } from 'react-native';
-import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './ExpenseSuccessStyles';
 
@@ -76,7 +75,7 @@ const ExpenseSuccessScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
           {/* Success Icon */}
           <View style={styles.mockupSuccessIcon}>
-            <Image source={require('../../../assets/success-icon.png')} style={styles.mockupSuccessIconImage} />
+            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsuccess-icon.png?alt=media&token=6cf1d0fb-7a48-4c4c-aa4c-3c3f76c54f07' }} style={styles.mockupSuccessIconImage} />
           </View>
 
           {/* Success Title */}

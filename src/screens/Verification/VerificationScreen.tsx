@@ -1,12 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, SafeAreaView, Linking } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
-import { verifyCode, sendVerificationCode } from '../../services/firebaseFunctionsService';
+import { verifyCode, sendVerificationCode } from '../../services/firebaseAuthService';
 import { useApp } from '../../context/AppContext';
-import { firestoreService } from '../../config/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../config/firebase';
 
 const CODE_LENGTH = 4; // 4-digit code
 const RESEND_SECONDS = 30;
@@ -79,60 +76,25 @@ const VerificationScreen: React.FC = () => {
       // Code verified successfully and user is now authenticated
       if (__DEV__) { console.log('✅ Authentication successful:', authResponse.user); }
       
-      // Get the actual user data from Firestore instead of relying on the response
-      let actualUserData = null;
-      try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('email', '==', email));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          actualUserData = querySnapshot.docs[0].data();
-          if (__DEV__) { console.log('📋 Found existing user in Firestore:', actualUserData); }
-        }
-      } catch (firestoreError) {
-        console.error('Error getting user data from Firestore:', firestoreError);
-      }
-      
-      // Use actual Firestore data if available, otherwise fall back to response data
+      // Transform API response to match User type (snake_case)
+      // Keep Firebase user ID as string to match Firestore format
       const transformedUser = {
-        id: actualUserData?.id || authResponse.user.id,
-        name: actualUserData?.name || authResponse.user.name,
-        email: actualUserData?.email || authResponse.user.email,
-        wallet_address: actualUserData?.wallet_address || authResponse.user.walletAddress || '',
-        wallet_public_key: actualUserData?.wallet_public_key || authResponse.user.walletPublicKey || '',
-        created_at: actualUserData?.created_at || authResponse.user.createdAt,
-        avatar: actualUserData?.avatar || authResponse.user.avatar || '',
-        hasCompletedOnboarding: actualUserData?.hasCompletedOnboarding || authResponse.user.hasCompletedOnboarding || false
+        id: authResponse.user.id, // Keep as string for Firebase compatibility
+        name: authResponse.user.name,
+        email: authResponse.user.email,
+        wallet_address: authResponse.user.walletAddress,
+        wallet_public_key: authResponse.user.walletPublicKey,
+        created_at: authResponse.user.createdAt,
+        avatar: authResponse.user.avatar,
+        hasCompletedOnboarding: authResponse.user.hasCompletedOnboarding || false
       };
       
       // Update the global app context with the authenticated user
       authenticateUser(transformedUser, 'email');
       if (__DEV__) { console.log('📱 User authenticated in app context'); }
       
-      // Update the user's last verification timestamp
-      try {
-        await firestoreService.updateLastVerifiedAt(email);
-        if (__DEV__) { console.log('✅ Updated lastVerifiedAt for user:', email); }
-      } catch (updateError) {
-        console.error('Error updating lastVerifiedAt:', updateError);
-        // Don't fail the verification if this update fails
-      }
-      
       // Check if user needs to create a profile (has no name/pseudo)
       const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
-      
-      if (__DEV__) {
-        console.log('🔍 User profile check:', {
-          name: transformedUser.name,
-          hasCompletedOnboarding: transformedUser.hasCompletedOnboarding,
-          needsProfile,
-          actualUserData: actualUserData ? {
-            name: actualUserData.name,
-            hasCompletedOnboarding: actualUserData.hasCompletedOnboarding
-          } : null
-        });
-      }
       
       if (needsProfile) {
         console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
@@ -199,13 +161,13 @@ const VerificationScreen: React.FC = () => {
     <View style={styles.scrollContent}>
         {/* Logo Section */}
         <View style={styles.logoSection}>
-          <Image source={require('../../../assets/WeSplitLogoName.png')} style={styles.logo} />
+          <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} style={styles.logo} />
         </View>
 
       {/* Main Content */}
       <View style={styles.centerContent}>
         <View style={styles.mailIconBox}>
-          <Image source={require('../../../assets/mail.png')} style={styles.mailIcon} />
+          <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmail.png?alt=media&token=5e3ac6e7-79b1-47e7-8087-f7e4c070d222' }} style={styles.mailIcon} />
         </View>
         <Text style={styles.title}>Check your Email</Text>
         <Text style={styles.subtitle}>
@@ -261,7 +223,7 @@ const VerificationScreen: React.FC = () => {
 
       {/* Help Link */}
       <View style={styles.helpSection}>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => Linking.openURL('https://t.me/wesplit_support_bot')}>
           <Text style={styles.helpText}>Need help?</Text>
         </TouchableOpacity>
       </View>

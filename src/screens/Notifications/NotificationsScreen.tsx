@@ -698,7 +698,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
-            source={require('../../../assets/arrow-left.png')}
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -746,7 +746,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       >
         {Object.keys(groupedNotifications).length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Image source={require('../../../assets/notif-empty-state.png')} style={styles.emptyStateIcon} />
+            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fnotif-empty-state.png?alt=media&token=c2a67bb0-0e1b-40b0-9467-6e239f41a166' }} style={styles.emptyStateIcon} />
             <Text style={styles.emptyTitle}>No notifications yet</Text>
             <Text style={styles.emptySubtitle}>
               You have no notifications yet.

@@ -123,61 +123,61 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
     if (notification.type === 'payment_request' || notification.type === 'payment_reminder') {
       return notification.data?.requesterAvatar 
         ? { uri: notification.data.requesterAvatar }
-        : require('../../assets/user-icon-black.png');
+        : { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
     }
     
     // For settlement notifications, use wallet icon
     if (notification.type === 'settlement_request' || notification.type === 'settlement_notification') {
-      return require('../../assets/wallet-icon-default.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' };
     }
     
     // For funding notifications, use wallet icon
     if (notification.type === 'funding_notification') {
-      return require('../../assets/wallet-icon-default.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' };
     }
     
     // For expense added, use book icon
     if (notification.type === 'expense_added') {
-      return require('../../assets/book-icon-default.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fbook-icon-default.png?alt=media&token=ec1254bb-72d6-49eb-a107-5e82b714e031' };
     }
     
     // For group invites, use folder icon
     if (notification.type === 'group_invite') {
-      return require('../../assets/folder-icon-default.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ffolder-icon-default.png?alt=media&token=4d7d12ca-1b6f-4f42-a594-cb3de91f777a' };
     }
     
     // For general notifications, use user icon
     if (notification.type === 'general') {
-      return require('../../assets/user-icon-black.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
     }
     
     // For payment received, use wallet icon
     if (notification.type === 'payment_received') {
-      return require('../../assets/wallet-icon-default.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' };
     }
     
     // For group payment requests, use user icon
     if (notification.type === 'group_payment_request') {
-      return require('../../assets/user-icon-black.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
     }
     
     // For group added, use folder icon
     if (notification.type === 'group_added') {
-      return require('../../assets/folder-icon-default.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ffolder-icon-default.png?alt=media&token=4d7d12ca-1b6f-4f42-a594-cb3de91f777a' };
     }
     
     // For system warnings, use warning icon
     if (notification.type === 'system_warning') {
-      return require('../../assets/warning-icon.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwarning-icon.png?alt=media&token=5be5bba3-97cd-4e87-b872-4c3e82a6a4b8' };
     }
     
     // For system notifications, use info icon
     if (notification.type === 'system_notification') {
-      return require('../../assets/info-icon.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Finfo-icon.png?alt=media&token=4322bde0-8be0-43bd-aed8-a1c250f93853' };
     }
     
     // Default fallback
-    return require('../../assets/user-icon-black.png');
+    return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
   };
 
   const getNotificationIconColor = () => {

@@ -715,7 +715,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
           {/* Search Input */}
           {showSearch && (
             <View style={styles.searchContainer}>
-              <Image source={require('../../assets/search-icon-white50.png')} style={styles.searchIcon} />
+              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsearch-icon-white50.png?alt=media&token=d90fd15d-40f6-4fe0-8990-c38881dc1e8a' }} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
                 placeholder={activeTab === 'Search' ? "Search users by username or email" : placeholder}
@@ -831,13 +831,13 @@ const ContactsList: React.FC<ContactsListProps> = ({
                 )}
                 {!isSearching && searchQuery.trim() && searchResults.length === 0 && (
                   <View style={styles.emptyContainer}>
-                    <Image source={require('../../assets/search-empty-state.png')} style={styles.searchIconEmpty} />
+                    <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsearch-empty-state.png?alt=media&token=9da88073-11df-4b69-bfd8-21ec369f51c4' }} style={styles.searchIconEmpty} />
                     <Text style={styles.emptyText}>No users found matching "{searchQuery}"</Text>
                   </View>
                 )}
                 {!isSearching && !searchQuery.trim() && (
                   <View style={styles.emptyContainer}>
-                    <Image source={require('../../assets/search-empty-state.png')} style={styles.searchIconEmpty} />
+                    <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsearch-empty-state.png?alt=media&token=9da88073-11df-4b69-bfd8-21ec369f51c4' }} style={styles.searchIconEmpty} />
 
                     <Text style={styles.emptyText}>Search users by username or email to add them to your contacts</Text>
                   </View>
@@ -847,7 +847,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
             {/* Empty State */}
             {filteredContacts.length === 0 && (activeTab === 'All' || activeTab === 'Favorite') && (
               <View style={styles.emptyContainer}>
-                <Image source={require('../../assets/search-empty-state.png')} style={styles.searchIconEmpty} />
+                <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsearch-empty-state.png?alt=media&token=9da88073-11df-4b69-bfd8-21ec369f51c4' }} style={styles.searchIconEmpty} />
                 <Text style={styles.emptyText}>
                   {searchQuery.trim() !== ''
                     ? 'No contacts found matching your search'

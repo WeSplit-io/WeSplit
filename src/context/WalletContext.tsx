@@ -481,7 +481,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   // Listen for wallet connection events
   useEffect(() => {
     if (__DEV__) { console.log('WalletProvider: Setting up event listeners'); }
-  }, []); // Remove dependencies to prevent infinite re-renders
+  }, [isConnected, address, chainId, balance, walletName, currentWalletId]);
 
   // App wallet methods
   const ensureAppWallet = async (userId: string) => {

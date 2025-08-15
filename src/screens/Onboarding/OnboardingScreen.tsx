@@ -8,22 +8,22 @@ const slides = [
   {
     title: 'Add Friends',
     subtitle: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-    image: require('../../../assets/onboarding1.png'),
+    image: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fonboarding1.png?alt=media&token=41dfb55f-d8de-4b3c-b60d-a8adf669ecd9' },
   },
   {
     title: 'Create Groups',
     subtitle: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-    image: require('../../../assets/onboarding2.png'),
+    image: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fonboarding2.png?alt=media&token=10e7cb5b-0b84-44ad-906c-f269884ae1f6' },
   },
   {
     title: 'Add expenses',
     subtitle: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-    image: require('../../../assets/onboarding3.png'),
+    image: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fonboarding3.png?alt=media&token=e8e56c01-5fd0-4eee-b44f-182b2aaf2b5e' },
   },
   {
     title: 'Pay your friends in a few clicks',
     subtitle: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-    image: require('../../../assets/onboarding4.png'),
+    image: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fonboarding4.png?alt=media&token=1d36c769-9efc-48b8-928a-f94b79c8e18d' },
   },
 ];
 

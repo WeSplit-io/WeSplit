@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { colors, fontSizes, fontWeights, spacing, radii } from '../lib/theme';
-import Icon from './Icon';
 
 interface ExpenseItemProps {
   payer: string;

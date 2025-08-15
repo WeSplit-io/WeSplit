@@ -23,15 +23,15 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
   const getTransactionIcon = () => {
     switch (transaction.type) {
       case 'send':
-        return require('../../assets/icon-send.png');
+        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
       case 'receive':
-        return require('../../assets/icon-receive.png');
+        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' };
       case 'deposit':
-        return require('../../assets/icon-deposit.png');
+        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-deposit.png?alt=media&token=d832bae5-dc8e-4347-bab5-cfa9621a5c55' };
       case 'withdraw':
-        return require('../../assets/icon-withdraw.png');
+        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-withdraw.png?alt=media&token=8c0da99e-287c-4d19-8515-ba422430b71b' };
       default:
-        return require('../../assets/icon-send.png');
+        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
     }
   };
 

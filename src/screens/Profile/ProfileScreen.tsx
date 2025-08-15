@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, Alert, SafeAreaView, Switch } from 'react-native';
+import { View, Text, Image, TouchableOpacity, ScrollView, Alert, SafeAreaView, Switch, ActivityIndicator, Linking } from 'react-native';
 import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
 import { useApp } from '../../context/AppContext';
@@ -15,6 +15,49 @@ const SafeImage = ({ source, style, fallbackSource }: any) => {
       style={style}
       onError={() => setHasError(true)}
     />
+  );
+};
+
+// Avatar component with loading state and error handling
+const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    if (avatar && avatar.trim() !== '') {
+      setIsLoading(true);
+      setHasError(false);
+    }
+  }, [avatar]);
+
+  if (!avatar || avatar.trim() === '' || hasError) {
+    return (
+      <View style={[style, styles.avatarFallback]}>
+        <Text style={styles.avatarFallbackText}>
+          {displayName.charAt(0).toUpperCase()}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={style}>
+      {isLoading && (
+        <View style={[style, styles.avatarLoadingContainer]}>
+          <ActivityIndicator size="small" color="#A5EA15" />
+        </View>
+      )}
+      <Image 
+        source={{ uri: avatar }} 
+        style={[style, { opacity: isLoading ? 0 : 1 }]}
+        onLoadStart={() => setIsLoading(true)}
+        onLoad={() => setIsLoading(false)}
+        onError={() => {
+          setIsLoading(false);
+          setHasError(true);
+        }}
+      />
+    </View>
   );
 };
 
@@ -79,7 +122,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const handleHelpCenter = () => {
-    Alert.alert('Help Center', 'Help center feature coming soon!');
+    Linking.openURL('https://t.me/wesplit_support_bot');
   };
 
   const handleFAQ = () => {
@@ -99,7 +142,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
-            source={require('../../../assets/arrow-left.png')}
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -111,31 +154,19 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
         {/* Profile Header Card */}
         <TouchableOpacity style={styles.profileCard} onPress={handleAccountInfo}>
           <View style={styles.profileAvatar}>
-            {currentUser?.avatar && currentUser.avatar.trim() !== '' ? (
-              <Image 
-                source={{ uri: currentUser.avatar }} 
-                style={styles.avatarImage}
-                defaultSource={require('../../../assets/user.png')}
-                onError={() => {
-                  // If the avatar fails to load, we could set a fallback state here
-                  console.log('Failed to load avatar image');
-                }}
-              />
-            ) : (
-              <View style={styles.avatarFallback}>
-                <Text style={styles.avatarFallbackText}>
-                  {displayName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
+            <AvatarComponent 
+              avatar={currentUser?.avatar}
+              displayName={displayName}
+              style={styles.avatarImage}
+            />
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{displayName}</Text>
             <Text style={styles.profileId}>{displayId}</Text>
           </View>
-          <TouchableOpacity style={styles.editButton}>
+          <TouchableOpacity style={styles.editButton} onPress={handleAccountInfo}>
             <Image
-              source={require('../../../assets/icon-edit-white70.png')}
+                              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-edit-white70.png?alt=media&token=bc45a0b7-6fcd-45f1-8d65-c73fe2ef4a92' }}
               style={styles.editIcon}
             />
           </TouchableOpacity>
@@ -146,79 +177,79 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
         
         <TouchableOpacity style={styles.menuItem} onPress={handleAccountInfo}>
           <SafeImage 
-            source={require('../../../assets/profil-account-icon.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-account-icon.png?alt=media&token=29c78193-1d31-4c25-9cd6-ba301a241554' }} 
             style={styles.menuIcon}
-            fallbackSource={require('../../../assets/user.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
           />
           <Text style={styles.menuItemText}>Account info</Text>
           <SafeImage 
-            source={require('../../../assets/chevron-right.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
             style={styles.chevronIcon}
-            fallbackSource={require('../../../assets/arrow-left.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
           />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={handleWallet}>
           <SafeImage 
-            source={require('../../../assets/profil-wallet-icon.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-wallet-icon.png?alt=media&token=f88a0ca7-0c4f-4c67-919e-0c26b253317a' }} 
             style={styles.menuIcon}
-            fallbackSource={require('../../../assets/user.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
           />
           <Text style={styles.menuItemText}>Wallet</Text>
           <SafeImage 
-            source={require('../../../assets/chevron-right.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
             style={styles.chevronIcon}
-            fallbackSource={require('../../../assets/arrow-left.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
           />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={handleTransactionHistory}>
           <SafeImage 
-            source={require('../../../assets/profil-history-icon.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-history-icon.png?alt=media&token=95a8fbb7-1574-4f6b-8dc8-5bd02d0608e9' }} 
             style={styles.menuIcon}
-            fallbackSource={require('../../../assets/user.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
           />
           <Text style={styles.menuItemText}>Transaction History</Text>
           <SafeImage 
-            source={require('../../../assets/chevron-right.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
             style={styles.chevronIcon}
-            fallbackSource={require('../../../assets/arrow-left.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
           />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={handleVerifyAccount}>
           <SafeImage 
-            source={require('../../../assets/profil-verify-icon.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-verify-icon.png?alt=media&token=abda6454-007c-495b-a64d-5169da43316e' }} 
             style={styles.menuIcon}
-            fallbackSource={require('../../../assets/user.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
           />
           <Text style={styles.menuItemText}>Verify account</Text>
           <SafeImage 
-            source={require('../../../assets/chevron-right.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
             style={styles.chevronIcon}
-            fallbackSource={require('../../../assets/arrow-left.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
           />
         </TouchableOpacity>
           
         <TouchableOpacity style={styles.menuItem} onPress={handleReferralFriend}>
           <SafeImage 
-            source={require('../../../assets/profil-referal-icon.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-referal-icon.png?alt=media&token=d8f12c3f-11ef-46bd-8f8f-013da5274a80' }} 
             style={styles.menuIcon}
-            fallbackSource={require('../../../assets/user.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
           />
           <Text style={styles.menuItemText}>Referral Friend</Text>
           <SafeImage 
-            source={require('../../../assets/chevron-right.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
             style={styles.chevronIcon}
-            fallbackSource={require('../../../assets/arrow-left.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
           />
         </TouchableOpacity>
 
         <View style={styles.menuItem}>
           <SafeImage 
-            source={require('../../../assets/profil-scan-id.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-scan-id.png?alt=media&token=25846ce1-e65a-4fe3-bbc3-1681575836c2' }} 
             style={styles.menuIcon}
-            fallbackSource={require('../../../assets/user.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
           />
           <Text style={styles.menuItemText}>Set up Face ID</Text>
           <Switch
@@ -234,43 +265,43 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
         
         <TouchableOpacity style={styles.menuItem} onPress={handleHelpCenter}>
           <SafeImage 
-            source={require('../../../assets/profil-help-icon.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-help-icon.png?alt=media&token=b8848597-c8ee-415d-b689-22bd31397ad2' }} 
             style={styles.menuIcon}
-            fallbackSource={require('../../../assets/user.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
           />
           <Text style={styles.menuItemText}>Help Center</Text>
           <SafeImage 
-            source={require('../../../assets/chevron-right.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
             style={styles.chevronIcon}
-            fallbackSource={require('../../../assets/arrow-left.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
           />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={handleFAQ}>
           <SafeImage 
-            source={require('../../../assets/profil-faq-icon.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-faq-icon.png?alt=media&token=afb4392e-da9e-4c53-bf59-2475eef7c40c' }} 
             style={styles.menuIcon}
-            fallbackSource={require('../../../assets/user.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
           />
           <Text style={styles.menuItemText}>FAQ</Text>
           <SafeImage 
-            source={require('../../../assets/chevron-right.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
             style={styles.chevronIcon}
-            fallbackSource={require('../../../assets/arrow-left.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
           />
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.menuItem, { marginBottom: 0 }]} onPress={handleLogout}>
           <SafeImage 
-            source={require('../../../assets/profil-logout-icon.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-logout-icon.png?alt=media&token=5282a042-4105-445a-8ea2-1136245a59c6' }} 
             style={styles.menuIcon}
-            fallbackSource={require('../../../assets/user.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
           />
           <Text style={[styles.menuItemText, styles.logoutText]}>Log Out</Text>
           <SafeImage 
-            source={require('../../../assets/chevron-right.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
             style={styles.chevronIcon}
-            fallbackSource={require('../../../assets/arrow-left.png')}
+            fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
           />
         </TouchableOpacity>
         

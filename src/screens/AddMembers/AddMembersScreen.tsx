@@ -357,7 +357,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
       <View style={styles.headerContainer}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
-            source={require('../../../assets/arrow-left.png')}
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -370,7 +370,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Image source={require('../../../assets/search-icon-white50.png')} style={styles.searchIcon} />
+        <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsearch-icon-white50.png?alt=media&token=d90fd15d-40f6-4fe0-8990-c38881dc1e8a' }} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search"

@@ -77,7 +77,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
       
       <View style={styles.logoContainer}>
         <Image 
-          source={require('../../../assets/WeSplitLogoName.png')} 
+          source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} 
           style={styles.logo}
           resizeMode="contain"
         />

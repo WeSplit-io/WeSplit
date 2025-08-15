@@ -329,7 +329,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
                 {/* Owner Label */}
                 {isOwner && (
                   <View style={styles.ownerLabel}>
-                    <Image source={require('../../../assets/award-icon-black.png')} style={styles.ownerLabelIcon} />
+                    <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Faward-icon-black.png?alt=media&token=07283493-afd6-489e-a5c2-7dffc6922f41' }} style={styles.ownerLabelIcon} />
                     <Text style={styles.ownerLabelText}>Owner</Text>
                   </View>
                 )}
@@ -462,7 +462,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
           style={styles.addButton}
           onPress={handleCreateGroup}
         >
-          <Image source={require('../../../assets/plus-icon-green.png')} style={styles.addButtonIcon} />
+                          <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fplus-icon-green.png?alt=media&token=15ce2f24-4cec-4d4d-8c98-d7fba808604e' }} style={styles.addButtonIcon} />
           <Text style={styles.addButtonText}>New Group</Text>
         </TouchableOpacity>
       </View>
@@ -522,7 +522,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
                     {/* Show USD-converted total */}
                     <View style={styles.prominentGroupAmountContainer}>
                       <Image
-                        source={require('../../../assets/usdc-logo-black.png')}
+                        source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fusdc-logo-black.png?alt=media&token=2b33d108-f3aa-471d-b7fe-6166c53c1d56' }}
                         style={styles.prominentUsdcLogo}
                       />
                       <Text style={styles.prominentGroupAmount}>
@@ -536,7 +536,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
 
                   {/* Role Container */}
                   <View style={styles.prominentGroupRoleContainer}>
-                    <Image source={require('../../../assets/award-icon-black.png')} style={styles.prominentGroupRoleIcon} />
+                    <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Faward-icon-black.png?alt=media&token=07283493-afd6-489e-a5c2-7dffc6922f41' }} style={styles.prominentGroupRoleIcon} />
 
                     <Text style={styles.prominentGroupRole}>
                       Owner
@@ -594,7 +594,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
         {/* Groups List */}
         {displayGroups.length === 0 ? (
           <View style={styles.emptyState}>
-            <Image source={require('../../../assets/group-enpty-state.png')} style={styles.emptyStateIcon} />
+            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fgroup-enpty-state.png?alt=media&token=c3f4dae7-1628-4d8a-9836-e413e3824ebd' }} style={styles.emptyStateIcon} />
             <Text style={styles.emptyStateTitle}>No groups found</Text>
             <Text style={styles.emptyStateSubtitle}>
               {activeFilter === 'all'

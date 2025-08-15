@@ -202,15 +202,15 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
   const getTransactionIcon = (transaction: Transaction) => {
     switch (transaction.type) {
       case 'send':
-        return require('../../../assets/icon-send.png');
+        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
       case 'receive':
-        return require('../../../assets/icon-receive.png');
+        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' };
       case 'deposit':
-        return require('../../../assets/icon-deposit.png');
+        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-deposit.png?alt=media&token=d832bae5-dc8e-4347-bab5-cfa9621a5c55' };
       case 'withdraw':
-        return require('../../../assets/icon-withdraw.png');
+        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-withdraw.png?alt=media&token=8c0da99e-287c-4d19-8515-ba422430b71b' };
       default:
-        return require('../../../assets/icon-send.png');
+        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
     }
   };
 
@@ -491,7 +491,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Image source={require('../../../assets/transactions-empty-state.png')} style={styles.emptyStateImage} />
+      <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftransactions-empty-state.png?alt=media&token=f0850cc3-9cc3-472a-9ff1-03e3772b5a4b' }} style={styles.emptyStateImage} />
       <Text style={styles.emptyStateTitle}>No transactions</Text>
       <Text style={styles.emptyStateSubtitle}>
         Make your first transactions to see it here
@@ -516,7 +516,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Image
-            source={require('../../../assets/arrow-left.png')}
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>

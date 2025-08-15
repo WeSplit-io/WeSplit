@@ -139,112 +139,112 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
     
     switch (provider.name.toLowerCase()) {
       case 'backpack':
-        logoSource = require('../../../assets/backpack-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fbackpack-logo.png?alt=media&token=8624ee25-0f7d-475f-baad-3c80ad66d0aa' };
         break;
       case 'metamask':
-        logoSource = require('../../../assets/metamask-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmetamask-logo.png?alt=media&token=8d75e112-385c-45de-a0b5-ee47e67eb310' };
         break;
       case 'walletconnect':
-        logoSource = require('../../../assets/walletconnect-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwalletconnect-logo.png?alt=media&token=4e2dad45-747f-4cf2-b7f7-ebea73936e41' };
         break;
       case 'exodus':
-        logoSource = require('../../../assets/exodus-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fexodus-logo.png?alt=media&token=57837099-dd80-4b70-8a3b-600cd2e10132' };
         break;
       case 'glow':
-        logoSource = require('../../../assets/glow-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fglow-logo.png?alt=media&token=707a5ab3-e81d-48e0-9391-49169cf37872' };
         break;
       case 'slope':
-        logoSource = require('../../../assets/slope-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fslope-logo.png?alt=media&token=b5039c6d-9438-4b96-a9c3-22a1dec74bd0' };
         break;
       case 'solflare':
-        logoSource = require('../../../assets/solflare-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsolflare-logo.png?alt=media&token=36e5b0d8-5f20-4eba-a5fb-5f1b2063926d' };
         break;
       case 'zerion':
-        logoSource = require('../../../assets/zerion-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fzerion-logo.png?alt=media&token=27b12d12-569e-4051-8074-8c80c7aa0175' };
         break;
       case 'xdefi':
-        logoSource = require('../../../assets/xdefi-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fxdefi-logo.png?alt=media&token=f429ac0c-bf51-4890-9998-19bb353d4752' };
         break;
       case 'trust wallet':
-        logoSource = require('../../../assets/trustwallet-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftrustwallet-logo.png?alt=media&token=f376904f-5032-4ad6-8572-15502018881c' };
         break;
       case 'talisman':
-        logoSource = require('../../../assets/talisman-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftalisman-logo.png?alt=media&token=0f95aee3-3c56-4d0f-b6ad-617b8c46bbdf' };
         break;
       case 'safepal':
-        logoSource = require('../../../assets/safepal-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsafepal-logo.png?alt=media&token=c2ed8958-ff46-4f44-bc20-372426e3d235' };
         break;
       case 'rainbow':
-        logoSource = require('../../../assets/raimbow-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fraimbow-logo.png?alt=media&token=22d86212-70c3-4c53-8a53-ffe1547c36ef' };
         break;
       case 'onto':
-        logoSource = require('../../../assets/onto-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fonto-logo.png?alt=media&token=ab746131-d390-4dbc-b94b-f4c7efecf753' };
         break;
       case 'okx':
-        logoSource = require('../../../assets/okx-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fokx-logo.png?alt=media&token=504420f4-acd0-4c3d-be8d-bccdae6c0509' };
         break;
       case 'nightly':
-        logoSource = require('../../../assets/nightly-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fnightly-logo.png?alt=media&token=d51a8fd6-25d9-41be-8333-c3f46bce0bb3' };
         break;
       case 'myria':
-        logoSource = require('../../../assets/myria-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmyria-logo.png?alt=media&token=465739a9-f5b3-4691-b6c3-321eab727363' };
         break;
       case 'math wallet':
-        logoSource = require('../../../assets/mathwallet-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmathwallet-logo.png?alt=media&token=93173eb3-f83f-4b49-abeb-0334621205a3' };
         break;
       case 'magic eden':
-        logoSource = require('../../../assets/magiceden-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmagiceden-logo.png?alt=media&token=00c68158-c015-4056-a513-cfb2763017e3' };
         break;
       case 'kraken':
-        logoSource = require('../../../assets/kraken-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fkraken-logo.png?alt=media&token=b97dc798-92d6-4d5c-aa26-a2727c025d93' };
         break;
       case 'imtoken':
-        logoSource = require('../../../assets/imtoken-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fimtoken-logo.png?alt=media&token=878e8b4b-6c6a-4b38-828d-c402d56352b4' };
         break;
       case 'huobi':
-        logoSource = require('../../../assets/huobi-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fhuobi-logo.png?alt=media&token=aa0417be-fae6-4e55-a9f3-4e46fd837c6f' };
         break;
       case 'gate.io':
-        logoSource = require('../../../assets/gate-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fgate-logo.png?alt=media&token=d551e2d3-e180-4cc0-b9f3-914a174b2d5e' };
         break;
       case 'coinbase':
-        logoSource = require('../../../assets/coinbase-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fcoinbase-logo.png?alt=media&token=8b4331c1-3f9d-4f57-907c-53a2f0d8b137' };
         break;
       case 'coin98':
-        logoSource = require('../../../assets/coin98-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fcoin98-logo.png?alt=media&token=e217c873-7346-47be-bc7b-acee7e9559ee' };
         break;
       case 'clover':
-        logoSource = require('../../../assets/clover-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fclover-logo.png?alt=media&token=10b35b99-3100-4e22-b17c-ca522d3e0cd8' };
         break;
       case 'bybit':
-        logoSource = require('../../../assets/bybit-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fbybit-logo.png?alt=media&token=77756071-5994-4ba8-b173-7ff617e2bb9b' };
         break;
       case 'bravos':
-        logoSource = require('../../../assets/bravos-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fbravos-logo.png?alt=media&token=7c063169-db3e-4396-ad9f-e112b39d688b' };
         break;
       case 'brave':
-        logoSource = require('../../../assets/brave-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fbrave-logo.png?alt=media&token=62079355-59e2-48da-989b-b795873f8be6' };
         break;
       case 'blocto':
-        logoSource = require('../../../assets/blocto-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fblocto-logo.png?alt=media&token=65abdd59-1fc7-4e8b-ad25-0c29df68f412' };
         break;
       case 'bitget':
-        logoSource = require('../../../assets/bitget-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fbitget-logo.png?alt=media&token=fbe986bd-e5ef-488e-87c0-7fa860cb9a39' };
         break;
       case 'binance':
-        logoSource = require('../../../assets/binance-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fbinance-logo.png?alt=media&token=3880f1e5-d8a0-4494-af9f-997ba91e6ce0' };
         break;
       case 'argent':
-        logoSource = require('../../../assets/argent-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fargent-logo.png?alt=media&token=f09e5ed1-88b7-4b80-ae06-198c223b965a' };
         break;
       case 'ud':
-        logoSource = require('../../../assets/ud-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fud-logo.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' };
         break;
       case 'tokenpocket':
-        logoSource = require('../../../assets/tokenpocket-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftokenpocket-logo.png?alt=media&token=4d31dd0f-1d69-4bd5-a024-52239dedb53d' };
         break;
       default:
-        logoSource = require('../../../assets/phantom-logo.png');
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fphantom-logo.png?alt=media&token=18cd1c78-d879-4b94-abbe-a2011149837a' };
         break;
     }
     
@@ -266,7 +266,7 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
           navigation.goBack();
         }} style={styles.backButton}>
           <Image
-            source={require('../../../assets/arrow-left.png')}
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>

@@ -12,7 +12,6 @@ const SOLANA_RPC_ENDPOINTS = {
   mainnet: 'https://api.mainnet-beta.solana.com'
 };
 
-
 // USDC Token mint addresses
 const USDC_MINT_ADDRESSES = {
   devnet: 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr', // Devnet USDC
@@ -45,26 +44,15 @@ export interface WalletCreationResult {
 
 export class UserWalletService {
   private connection: Connection;
-  private walletCheckCache = new Map<string, { result: WalletCreationResult; timestamp: number }>();
-  private readonly CACHE_DURATION = 10000; // 10 seconds cache
-  private airdropInProgress = new Set<string>(); // Track airdrops in progress
 
   constructor() {
     this.connection = new Connection(RPC_ENDPOINT, 'confirmed');
   }
 
-    // Ensure user has a wallet - create if missing
-async ensureUserWallet(userId: string): Promise<WalletCreationResult> {
+  // Ensure user has a wallet - create if missing
+  async ensureUserWallet(userId: string): Promise<WalletCreationResult> {
     try {
-      // Check cache first
-      const cached = this.walletCheckCache.get(userId);
-      if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
-        if (__DEV__) { console.log('✅ Using cached wallet result for user:', userId); }
-        return cached.result;
-      }
-
       // Ensuring wallet exists for user
-      if (__DEV__) { console.log('🔄 Checking wallet for user:', userId); }
 
       // Get current user data
       const user = await firebaseDataService.user.getCurrentUser(userId);
@@ -72,22 +60,14 @@ async ensureUserWallet(userId: string): Promise<WalletCreationResult> {
       // Check if user already has a wallet
       if (user && user.wallet_address && user.wallet_address.trim() !== '') {
         // User already has wallet
-        if (__DEV__) { console.log('✅ User already has wallet:', user.wallet_address); }
-        const result = {
+        return {
           success: true,
           wallet: {
             address: user.wallet_address,
             publicKey: user.wallet_public_key || user.wallet_address
           }
         };
-        
-        // Cache the result
-        this.walletCheckCache.set(userId, { result, timestamp: Date.now() });
-        return result;
       }
-
-      // Add a longer delay to prevent rapid successive calls
-      await new Promise(resolve => setTimeout(resolve, 500));
 
       // User doesn't have a wallet, create one
 
@@ -99,40 +79,25 @@ async ensureUserWallet(userId: string): Promise<WalletCreationResult> {
       if (walletResult.success && walletResult.wallet) {
         // Wallet created successfully
         
-        // Request airdrop in background for development (only once per wallet)
-        if (process.env.NODE_ENV !== 'production' && walletResult.wallet && !this.airdropInProgress.has(walletResult.wallet.address)) {
-          this.airdropInProgress.add(walletResult.wallet.address);
-          
+        // Request airdrop in background for development
+        if (process.env.NODE_ENV !== 'production') {
           this.requestAirdrop(walletResult.wallet.address)
             .then(() => {
               logger.info('Background airdrop successful: 1 SOL added to wallet', null, 'UserWalletService');
             })
             .catch((airdropError) => {
               logger.warn('Background airdrop failed (this is normal)', airdropError, 'UserWalletService');
-            })
-            .finally(() => {
-              if (walletResult.wallet) {
-                this.airdropInProgress.delete(walletResult.wallet.address);
-              }
             });
         }
       }
 
-      // Cache the result
-      this.walletCheckCache.set(userId, { result: walletResult, timestamp: Date.now() });
-      
       return walletResult;
     } catch (error) {
       logger.error('Error ensuring user wallet', error, 'UserWalletService');
-      const errorResult = {
+      return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to ensure user wallet'
       };
-      
-      // Cache error result too (for a shorter time)
-      this.walletCheckCache.set(userId, { result: errorResult, timestamp: Date.now() });
-      
-      return errorResult;
     }
   }
 
@@ -158,7 +123,7 @@ async ensureUserWallet(userId: string): Promise<WalletCreationResult> {
         const seedPhrase = result.mnemonic;
         await secureStorageService.storeSeedPhrase(userId, seedPhrase);
         
-        if (__DEV__) { console.log('✅ Seed phrase stored securely for user:', userId); }
+        logger.info('Seed phrase stored securely for user', { userId }, 'UserWalletService');
       }
 
       // Wallet created and saved for user

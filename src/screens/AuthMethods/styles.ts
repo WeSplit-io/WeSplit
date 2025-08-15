@@ -29,6 +29,7 @@ export const styles = StyleSheet.create({
   },
   logo: {
     height: 40,
+    width: 130,
     objectFit: 'contain',
   },
   contentContainer: {

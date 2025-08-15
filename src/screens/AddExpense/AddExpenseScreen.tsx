@@ -553,7 +553,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Image
-              source={require('../../../assets/arrow-left.png')}
+              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
               style={styles.iconWrapper}
             />
           </TouchableOpacity>
@@ -582,7 +582,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
-            source={require('../../../assets/arrow-left.png')}
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -590,7 +590,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
         <TouchableOpacity style={styles.headerIcon} onPress={handleImagePicker}>
           <View style={styles.cameraIconContainer}>
             <Image
-              source={require('../../../assets/camera-icon.png')}
+              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fcamera-icon.png?alt=media&token=bd15c73f-252c-4bb5-b1e8-f6dce6b186e4' }}
               style={styles.iconWrapper}
             />
             {selectedImage && <View style={styles.cameraIndicator} />}
@@ -636,7 +636,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
             >
               <View style={styles.addReceiptContent}>
                 <Image
-                  source={require('../../../assets/camera-icon.png')}
+                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fcamera-icon.png?alt=media&token=bd15c73f-252c-4bb5-b1e8-f6dce6b186e4' }}
                   style={styles.addReceiptIcon}
                 />
                 <Text style={styles.addReceiptText}>Add Receipt</Text>
@@ -650,7 +650,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
         <TouchableOpacity style={styles.dateInput} onPress={openDatePicker}>
           <Text style={styles.dateText}>{formatDate(date)}</Text>
           <Image
-            source={require('../../../assets/calendar-icon.png')}
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fcalendar-icon.png?alt=media&token=72c78717-b0c3-4662-a8ca-4a42e90f0339' }}
             style={styles.dateIcon}
           />
         </TouchableOpacity>
@@ -713,7 +713,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
                 <Image
                   source={{ uri: groupMembers.find(m => m.id === paidBy)?.avatar }}
                   style={styles.paidByAvatarImage}
-                  defaultSource={require('../../../assets/user.png')}
+                  defaultSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
                 />
               ) : (
                 <Text style={styles.paidByAvatarText}>
@@ -949,7 +949,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
                           <Image
                             source={{ uri: member.avatar }}
                             style={styles.paidByOptionAvatarImage}
-                            defaultSource={require('../../../assets/user.png')}
+                            defaultSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
                           />
                         ) : (
                           <Text style={styles.paidByOptionAvatarText}>

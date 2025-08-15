@@ -1,593 +1,378 @@
-# 🚀 WeSplit - Revolutionary Crypto Expense Splitting App
+# WeSplit - Crypto Expense Splitting App
 
 <div align="center">
   <img src="./assets/icon.png" alt="WeSplit Logo" width="120" height="120">
   
-  **Split expenses seamlessly with cryptocurrency payments on Solana blockchain**
+  **Split expenses seamlessly with cryptocurrency payments**
   
   [![React Native](https://img.shields.io/badge/React_Native-0.76-blue.svg)](https://reactnative.dev/)
   [![Expo](https://img.shields.io/badge/Expo-52.0-black.svg)](https://expo.dev/)
   [![Solana](https://img.shields.io/badge/Solana-Web3-purple.svg)](https://solana.com/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://www.typescriptlang.org/)
-  [![Firebase](https://img.shields.io/badge/Firebase-11.10-orange.svg)](https://firebase.google.com/)
-  [![Security](https://img.shields.io/badge/Security-A+%20Grade-green.svg)](https://github.com/your-username/WeSplit/security)
 </div>
 
----
+## 📱 About WeSplit
 
-## 📋 **Table of Contents**
+WeSplit is a modern expense splitting application that leverages blockchain technology to make group payments transparent, secure, and efficient. Built with React Native and Solana integration, it allows users to:
 
-- [🎯 Project Overview](#-project-overview)
-- [🌟 Key Features](#-key-features)
-- [🏗️ Architecture](#️-architecture)
-- [🚀 Quick Start](#-quick-start)
-- [⚙️ Configuration](#️-configuration)
-- [📱 Features Deep Dive](#-features-deep-dive)
-- [🔒 Security](#-security)
-- [🧪 Testing](#-testing)
-- [🚀 Deployment](#-deployment)
-- [📚 Documentation](#-documentation)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
+- 🧮 **Split expenses** easily within groups
+- 💰 **Pay with cryptocurrency** (SOL, USDC)
+- 👛 **Manage Solana wallets** (app-generated or imported)
+- 💳 **Fund wallets** with fiat via MoonPay integration
+- 📊 **Track balances** and settlement history
+- 🔒 **Secure transactions** on Solana blockchain
 
 ---
 
-## 🎯 **Project Overview**
+## 🎨 **For Designers - Quick Start Guide**
 
-WeSplit is a **next-generation expense splitting application** that leverages **blockchain technology** to revolutionize how friends, roommates, and groups manage shared expenses. Built with React Native, Expo, and Solana integration, it provides a seamless, secure, and transparent way to split costs using cryptocurrency.
+### 🚀 **Complete Setup & Launch (15 minutes)**
 
-### **🎯 Mission**
-Transform traditional expense splitting into a blockchain-powered experience that's faster, more secure, and more transparent than traditional payment methods.
+**Follow this exact sequence to get the project running without issues:**
 
-### **💡 Vision**
-Make cryptocurrency payments as easy as sending a text message, while maintaining the security and transparency of blockchain technology.
+#### **Step 1: Install Required Software** ⏱️ *10 minutes*
 
----
+**Choose your platform:**
 
-## 🌟 **Key Features**
+<details>
+<summary><strong>🖥️ Windows Setup</strong></summary>
 
-### **💰 Multi-Currency Support**
-- **SOL** - Native Solana cryptocurrency
-- **USDC** - Stablecoin for predictable payments
-- **USD** - Traditional fiat currency support
-- **MoonPay Integration** - Direct fiat-to-crypto onramp
+1. **Install Node.js** (Required)
+   - Download from [nodejs.org](https://nodejs.org/) → Get LTS version
+   - ✅ **Verify**: Open Command Prompt, type `node --version` (should show v18+)
 
-### **👛 Integrated Wallet Management**
-- **Built-in Solana Wallet** - Secure key generation and storage
-- **Multi-wallet Support** - Connect external wallets (Phantom, Solflare, etc.)
-- **Biometric Security** - Touch ID/Face ID authentication
-- **Seed Phrase Management** - Secure backup and recovery
+2. **Install Git** (Required)
+   - Download from [git-scm.com](https://git-scm.com/)
+   - ✅ **Verify**: Type `git --version` in Command Prompt
 
-### **🧮 Smart Expense Splitting**
-- **Equal Split** - Automatic equal distribution
-- **Percentage Split** - Custom percentage allocations
-- **Custom Amounts** - Manual amount specification
-- **Real-time Calculations** - Live balance updates
+3. **Install Android Studio** (For Android testing)
+   - Download from [developer.android.com/studio](https://developer.android.com/studio)
+   - ⚠️ **Important**: Choose "Standard" installation
+   - ✅ **Verify**: Android Studio opens without errors
 
-### **📊 Real-time Dashboard**
-- **Live Balance Tracking** - Real-time updates across all members
-- **Transaction History** - Complete blockchain-verified history
-- **Group Analytics** - Spending patterns and insights
-- **Settlement Tracking** - Automated debt calculations
+</details>
 
-### **🔐 Advanced Security**
-- **End-to-End Encryption** - All sensitive data encrypted
-- **Blockchain Verification** - All transactions on Solana
-- **Secure Storage** - Private keys never leave device
-- **Audit Trail** - Complete transaction history
+<details>
+<summary><strong>🍎 macOS Setup</strong></summary>
 
-### **🌐 Cross-Platform**
-- **iOS** - Native iOS app with App Store deployment
-- **Android** - Native Android app with Play Store deployment
-- **Web** - Progressive Web App (PWA) support
-- **Responsive Design** - Optimized for all screen sizes
+1. **Install Node.js** (Required)
+   - Download from [nodejs.org](https://nodejs.org/) → Get LTS version
+   - ✅ **Verify**: Open Terminal, type `node --version` (should show v18+)
 
----
+2. **Install Git** (Required)
+   - Download from [git-scm.com](https://git-scm.com/)
+   - ✅ **Verify**: Type `git --version` in Terminal
 
-## 🏗️ **Architecture**
+3. **Install Xcode** (For iOS testing)
+   - Download from [Mac App Store](https://apps.apple.com/us/app/xcode/id497799835)
+   - ⚠️ **Important**: This is a large download (10+ GB)
+   - ✅ **Verify**: Xcode opens and accepts license
 
-### **Frontend Architecture**
-```
-src/
-├── 📱 screens/           # 30+ UI screens
-│   ├── Dashboard/        # Main dashboard
-│   ├── AddExpense/       # Expense creation
-│   ├── Send/            # Payment sending
-│   ├── Request/         # Payment requests
-│   ├── Deposit/         # Wallet funding
-│   ├── Withdraw/        # Wallet withdrawals
-│   ├── WalletManagement/ # Wallet operations
-│   └── ...              # 20+ more screens
-├── 🧩 components/        # Reusable UI components
-├── 🔧 services/         # Business logic (30+ services)
-├── 📊 context/          # State management
-├── 🎨 theme/            # Design system
-├── 🔧 utils/            # Utility functions
-└── 📝 types/            # TypeScript definitions
-```
+4. **Install Android Studio** (For Android testing)
+   - Download from [developer.android.com/studio](https://developer.android.com/studio)
+   - ⚠️ **Important**: Choose "Standard" installation
 
-### **Backend Architecture**
-```
-backend/
-├── 🔥 firebase-functions/  # Cloud Functions
-│   ├── auth/              # Authentication
-│   ├── payments/          # Payment processing
-│   ├── notifications/     # Push notifications
-│   └── webhooks/          # External integrations
-├── 🗄️ firestore/          # NoSQL database
-├── 🔐 firebase-auth/      # User authentication
-└── 📁 storage/            # File storage
-```
+</details>
 
-### **Blockchain Integration**
-```
-blockchain/
-├── ⛓️ solana/             # Solana Web3 integration
-│   ├── wallet/           # Wallet management
-│   ├── transactions/     # Payment processing
-│   └── balance/          # Balance tracking
-├── 🔗 moonpay/           # Fiat onramp
-└── 🔐 security/          # Cryptographic operations
-```
-
-### **Technology Stack**
-
-| **Layer** | **Technology** | **Purpose** |
-|-----------|----------------|-------------|
-| **Frontend** | React Native + Expo | Cross-platform mobile development |
-| **Backend** | Firebase Cloud Functions | Serverless backend |
-| **Database** | Firestore | Real-time NoSQL database |
-| **Authentication** | Firebase Auth | Multi-provider auth |
-| **Blockchain** | Solana Web3.js | Cryptocurrency transactions |
-| **Storage** | Firebase Storage | File and media storage |
-| **Analytics** | Firebase Analytics | User behavior tracking |
-| **Monitoring** | Firebase Crashlytics | Error tracking |
-
----
-
-## 🚀 **Quick Start**
-
-### **Prerequisites**
-- **Node.js** (v18+)
-- **npm** or **yarn**
-- **Expo CLI**: `npm install -g @expo/cli`
-- **Firebase CLI**: `npm install -g firebase-tools`
-- **Git**
-
-### **Installation**
+#### **Step 2: Clone & Setup Project** ⏱️ *3 minutes*
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/your-username/WeSplit.git
 cd WeSplit
 
-# 2. Install dependencies
+# 2. Install dependencies (this may take 2-3 minutes)
 npm install
 
-# 3. Install backend dependencies
-cd backend && npm install && cd ..
+# 3. Setup backend
+cd backend
+npm install
+node reset-db.js
+cd ..
 
-# 4. Install Firebase Functions dependencies
-cd firebase-functions && npm install && cd ..
-
-# 5. Setup environment variables
-cp env.example .env
-# Edit .env with your configuration
+# ✅ You should see "Database reset successfully" message
 ```
 
-### **Environment Configuration**
+#### **Step 3: Launch the Project** ⏱️ *2 minutes*
 
-Create a `.env` file in the root directory:
+**Open TWO terminal windows:**
 
-```env
-# 🔥 Firebase Configuration (REQUIRED)
-EXPO_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-EXPO_PUBLIC_FIREBASE_APP_ID=your_app_id
-
-# 💰 MoonPay Integration (OPTIONAL)
-EXPO_PUBLIC_MOONPAY_API_KEY=your_moonpay_key
-EXPO_PUBLIC_MOONPAY_SECRET_KEY=your_moonpay_secret
-
-# 🐦 Social Authentication (OPTIONAL)
-EXPO_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
-EXPO_PUBLIC_TWITTER_CLIENT_ID=your_twitter_client_id
-
-# ⛓️ Blockchain Configuration
-EXPO_PUBLIC_SOLANA_NETWORK=devnet
-```
-
-### **Running the Application**
-
+**Terminal 1 - Start Backend:**
 ```bash
-# Start Expo development server
+cd WeSplit/backend
 npm start
-
-# Run on specific platforms
-npm run android    # Android device/emulator
-npm run ios        # iOS device/simulator
-npm run web        # Web browser
-
-# Start backend server (in separate terminal)
-cd backend && npm run dev
-
-# Deploy Firebase Functions
-cd firebase-functions && npm run deploy
 ```
+✅ **Success indicator**: `Server running on port 3000`
 
----
-
-## ⚙️ **Configuration**
-
-### **Firebase Setup**
-
-1. **Create Firebase Project**
-   ```bash
-   # Go to Firebase Console
-   # Create new project
-   # Enable Authentication, Firestore, Storage, Functions
-   ```
-
-2. **Configure Authentication**
-   ```bash
-   # Enable Email/Password
-   # Enable Google Sign-In
-   # Enable Apple Sign-In (iOS)
-   # Configure OAuth redirects
-   ```
-
-3. **Setup Firestore Database**
-   ```bash
-   # Create database in test mode
-   # Set up security rules
-   # Configure indexes
-   ```
-
-4. **Deploy Cloud Functions**
-   ```bash
-   cd firebase-functions
-   npm run deploy
-   ```
-
-### **Solana Configuration**
-
-1. **Network Selection**
-   ```env
-   # Development
-   EXPO_PUBLIC_SOLANA_NETWORK=devnet
-   
-   # Production
-   EXPO_PUBLIC_SOLANA_NETWORK=mainnet-beta
-   ```
-
-2. **RPC Endpoint**
-   ```env
-   # Default RPC
-   EXPO_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
-   
-   # Custom RPC (recommended for production)
-   EXPO_PUBLIC_SOLANA_RPC_URL=https://your-rpc-endpoint.com
-   ```
-
-### **MoonPay Integration**
-
-1. **Create MoonPay Account**
-   ```bash
-   # Sign up at moonpay.com
-   # Complete KYC verification
-   # Get API keys
-   ```
-
-2. **Configure Webhooks**
-   ```bash
-   # Set webhook URL
-   # Configure secret
-   # Test integration
-   ```
-
----
-
-## 📱 **Features Deep Dive**
-
-### **🔐 Authentication System**
-
-**Multi-Provider Support:**
-- **Email/Password** - Traditional authentication
-- **Google Sign-In** - OAuth 2.0 integration
-- **Apple Sign-In** - iOS native authentication
-- **Twitter OAuth** - Social media login
-- **Biometric** - Touch ID/Face ID
-
-**Security Features:**
-- **OTP Verification** - Email-based verification
-- **Session Management** - Secure token handling
-- **Rate Limiting** - Brute force protection
-- **Account Recovery** - Secure password reset
-
-### **💰 Payment System**
-
-**Multi-Currency Support:**
-```typescript
-// Supported currencies
-const currencies = {
-  SOL: 'solana',
-  USDC: 'usdc',
-  USD: 'usd'
-};
-```
-
-**Transaction Types:**
-- **Send Money** - Direct peer-to-peer payments
-- **Request Payment** - Payment requests with amounts
-- **Group Payments** - Split expenses automatically
-- **Settlement** - Debt resolution
-
-**Blockchain Integration:**
-```typescript
-// Solana transaction example
-const transaction = await solanaService.sendPayment({
-  from: userWallet,
-  to: recipientAddress,
-  amount: 1.5,
-  currency: 'SOL'
-});
-```
-
-### **👛 Wallet Management**
-
-**Built-in Features:**
-- **Key Generation** - Secure random key generation
-- **Seed Phrase** - 12-word backup phrase
-- **Multi-wallet** - Support for external wallets
-- **Balance Tracking** - Real-time balance updates
-
-**External Wallet Support:**
-- **Phantom** - Popular Solana wallet
-- **Solflare** - Feature-rich wallet
-- **Slope** - Mobile-first wallet
-- **Metamask** - Ethereum wallet (via bridge)
-
-### **📊 Dashboard & Analytics**
-
-**Real-time Features:**
-- **Live Balances** - Instant balance updates
-- **Transaction Feed** - Real-time transaction history
-- **Group Analytics** - Spending insights
-- **Settlement Tracking** - Automated debt calculations
-
-**Data Visualization:**
-- **Charts** - Spending patterns
-- **Graphs** - Payment flows
-- **Statistics** - Usage metrics
-- **Reports** - Monthly summaries
-
----
-
-## 🔒 **Security**
-
-### **Blockchain Security**
-- **🔐 Encrypted Key Storage** - Private keys never leave device
-- **🛡️ Biometric Authentication** - Touch ID/Face ID support
-- **🔒 Secure Transactions** - All payments on Solana blockchain
-- **📊 Audit Trail** - Complete transaction history
-
-### **Data Protection**
-- **🔐 End-to-End Encryption** - All sensitive data encrypted
-- **🛡️ Firebase Security Rules** - Database access control
-- **🔒 Environment Variables** - API key protection
-- **📱 Secure Storage** - Wallet credentials protection
-
-### **Privacy Compliance**
-- **🔒 GDPR Compliant** - European data protection
-- **🛡️ No Personal Data** - Minimal blockchain data
-- **🔐 User Consent** - Explicit permission collection
-- **📊 Data Portability** - Export capabilities
-
-### **Security Measures**
-```typescript
-// Example security implementation
-const secureStorage = {
-  encrypt: (data: string) => crypto.encrypt(data),
-  decrypt: (data: string) => crypto.decrypt(data),
-  biometric: () => LocalAuthentication.authenticateAsync(),
-  keychain: () => SecureStore.setItemAsync()
-};
-```
-
----
-
-## 🧪 **Testing**
-
-### **Automated Testing**
+**Terminal 2 - Start App:**
 ```bash
-# Run all tests
-npm test
-
-# Run specific test suites
-npm run test:unit
-npm run test:integration
-npm run test:e2e
-
-# Run with coverage
-npm run test:coverage
+cd WeSplit
+npm start
 ```
+✅ **Success indicator**: QR codes appear + "Metro waiting on exp://..."
 
-### **Test Coverage**
-- **Unit Tests** - 85% code coverage
-- **Integration Tests** - All API endpoints
-- **E2E Tests** - Complete user flows
-- **Security Tests** - Penetration testing
+### 📱 **Run on Your Devices**
 
-### **Manual Testing**
-- **📱 Cross-platform** - iOS, Android, Web
-- **🔄 Real devices** - 10+ device types
-- **🌐 Network conditions** - 3G, 4G, WiFi
-- **🛡️ Security validation** - OWASP compliance
+#### **🤖 Android Testing**
+
+**Option A: Physical Android Device (Recommended)**
+1. Install "Expo Go" from Google Play Store
+2. Scan the QR code from Terminal 2
+3. ✅ **App should load in 30-60 seconds**
+
+**Option B: Android Emulator**
+1. Open Android Studio → AVD Manager
+2. Create new device (Pixel 7 recommended)
+3. Start the emulator
+4. In Terminal 2, press `a` 
+5. ✅ **App installs automatically**
+
+#### **🍎 iOS Testing (macOS only)**
+
+**Option A: Physical iPhone (Recommended)**
+1. Install "Expo Go" from App Store
+2. Scan the QR code with Camera app
+3. ✅ **App should load in 30-60 seconds**
+
+**Option B: iOS Simulator**
+1. Open Xcode → Open Developer Tool → Simulator
+2. Choose iPhone 14 or newer
+3. In Terminal 2, press `i`
+4. ✅ **App installs automatically**
 
 ---
 
-## 🚀 **Deployment**
+## ✨ **Start Designing & Editing**
 
-### **Mobile App Deployment**
+Once the app is running successfully, you're ready to customize it!
 
-**iOS (App Store):**
-```bash
-# Build iOS app
-eas build --platform ios
+### 🎨 **Design System Guide**
+📖 **Quick start**: [DESIGNER_HANDOFF.md](./DESIGNER_HANDOFF.md) - **Essential info for designers**  
+📖 **Complete guide**: [DESIGN_SYSTEM_README.md](./DESIGN_SYSTEM_README.md) - **Detailed documentation**
 
-# Submit to App Store
-eas submit --platform ios
-```
+**Quick Overview:**
+- **Colors**: Edit `src/theme/colors.ts` to change the app's color scheme
+- **Spacing**: Modify `src/theme/spacing.ts` for layout adjustments
+- **Typography**: Update `src/theme/typography.ts` for font changes
+- **Screen Styles**: Each screen has its own `styles.ts` file
 
-**Android (Play Store):**
-```bash
-# Build Android app
-eas build --platform android
+### 🔧 **Making Your First Edit**
 
-# Submit to Play Store
-eas submit --platform android
-```
+**Try this 30-second test:**
 
-### **Backend Deployment**
+1. **Open** `src/theme/colors.ts`
+2. **Change** `primaryGreen: '#C5FF00'` to `primaryGreen: '#FF6B00'` (orange)
+3. **Save** the file
+4. **Watch** the app automatically reload with orange accents!
+5. **Change it back** to `#C5FF00` when done
 
-**Firebase Functions:**
-```bash
-# Deploy functions
-cd firebase-functions
-npm run deploy
+**🎯 This confirms your editing environment is working perfectly!**
 
-# Deploy database rules
-firebase deploy --only firestore:rules
+### 📱 **Screen-by-Screen Editing**
 
-# Deploy storage rules
-firebase deploy --only storage
-```
+**Most Important Screens to Customize:**
+- **Dashboard**: `src/screens/Dashboard/styles.ts` - Main balance screen
+- **Send Money**: `src/screens/Send/styles.ts` - Payment interface  
+- **Add Expense**: `src/screens/AddExpense/styles.ts` - Expense creation
+- **Profile**: `src/screens/Profile/styles.ts` - User profile
 
-### **CI/CD Pipeline**
-
-**GitHub Actions:**
-```yaml
-# Example workflow
-name: Deploy
-on:
-  push:
-    branches: [main]
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
-      - run: npm install
-      - run: npm test
-      - run: eas build --auto-submit
-```
+**Each style file has detailed comments showing exactly what each style controls.**
 
 ---
 
-## 📚 **Documentation**
+## 🛠️ **Troubleshooting for Designers**
 
-### **Developer Documentation**
-- [📖 API Documentation](./docs/API.md)
-- [🛠️ Development Guide](./docs/DEVELOPMENT.md)
-- [🔒 Security Guide](./docs/SECURITY.md)
-- [🚀 Deployment Guide](./docs/DEPLOYMENT.md)
-- [🧪 Testing Guide](./TESTING_GUIDE.md)
-- [🔧 Environment Setup](./ENVIRONMENT_SETUP.md)
+### **App Won't Start**
 
-### **User Documentation**
-- [📱 User Guide](./docs/USER_GUIDE.md)
-- [💰 Wallet Setup](./docs/WALLET_SETUP.md)
-- [🔒 Security Best Practices](./docs/SECURITY_BEST_PRACTICES.md)
-- [📊 Dashboard Guide](./docs/DASHBOARD_GUIDE.md)
+**Problem**: Terminal shows errors when running `npm start`
+```bash
+# Solution: Clear cache and restart
+npx expo start --clear
+```
 
-### **Technical Documentation**
-- [🏗️ Architecture Overview](./docs/ARCHITECTURE.md)
-- [🔧 Configuration Guide](./docs/CONFIGURATION.md)
-- [📊 Database Schema](./docs/DATABASE.md)
-- [🔐 Security Implementation](./docs/SECURITY_IMPLEMENTATION.md)
+**Problem**: "Metro bundler failed to start"
+```bash
+# Solution: Reset everything
+npm start -- --reset-cache
+```
+
+### **Android Issues**
+
+**Problem**: Emulator is very slow
+- **Solution**: Increase RAM to 8GB in AVD settings
+- **Alternative**: Use physical device (much faster)
+
+**Problem**: "App keeps crashing on Android"
+```bash
+# Solution: Rebuild the app
+cd WeSplit
+npx expo start --clear
+# Press 'a' to reinstall on Android
+```
+
+### **iOS Issues**
+
+**Problem**: Simulator won't start
+```bash
+# Solution: Reset simulator
+xcrun simctl shutdown all
+xcrun simctl erase all
+```
+
+**Problem**: "Build failed on iOS"
+- **Solution**: Restart Xcode completely
+- **Alternative**: Use physical iPhone (more reliable)
+
+### **Styling Not Updating**
+
+**Problem**: Changed colors but app doesn't update
+1. **Save the file** (Ctrl+S / Cmd+S)
+2. **Check terminal** for error messages
+3. **Shake device** or press `r` in terminal to reload
+4. **Restart Metro** if needed: `npm start`
+
+### **Get Help Fast**
+
+**If you're stuck:**
+1. **Check Terminal 1 & 2** for any red error messages
+2. **Restart both terminals** (stop with Ctrl+C, restart)
+3. **Try the "clear cache" commands** above
+4. **Use physical device** instead of emulator (often more reliable)
 
 ---
+
+## 📁 **Project Structure for Designers**
+
+```
+WeSplit/
+├── 🎨 src/theme/              # 🔥 DESIGN TOKENS - Edit these first!
+│   ├── colors.ts              # All app colors
+│   ├── spacing.ts             # Margins, padding, sizes
+│   └── typography.ts          # Font sizes and styles
+├── 📱 src/screens/            # 🔥 SCREEN STYLES - Edit these for specific screens
+│   ├── Dashboard/styles.ts    # Main balance screen
+│   ├── Send/styles.ts         # Send money screens
+│   ├── Request/styles.ts      # Request money screens
+│   ├── AddExpense/styles.ts   # Add expense screen
+│   └── [Screen]/styles.ts     # Each screen has its own styles
+├── 🧩 src/components/         # Reusable UI components
+├── 🖼️ assets/                 # Images and icons
+└── 📚 DESIGN_SYSTEM_README.md # Complete styling guide
+```
+
+**🎯 Focus on the folders marked with 🔥 - these control the entire app's appearance!**
+
+---
+
+## 🏗️ **Technical Architecture**
+
+- **Frontend**: React Native with Expo
+- **Backend**: Node.js/Express with SQLite
+- **Blockchain**: Solana Web3.js integration
+- **Payment Gateway**: MoonPay for fiat onramps
+- **Database**: SQLite for local development
+
+## 🔧 **Advanced Development**
+
+### **Prerequisites (for developers)**
+- **Node.js** (v18 or later)
+- **npm** or **yarn** package manager
+- **Git**
+- **Expo CLI**: `npm install -g @expo/cli`
+- **EAS CLI**: `npm install -g eas-cli` (for builds)
+
+### **Environment Setup**
+Create `backend/.env` file:
+```env
+# MoonPay Configuration
+MOONPAY_API_KEY=your_moonpay_api_key_here
+
+# Database Configuration  
+DATABASE_URL=./wesplit.db
+
+# Server Configuration
+PORT=3000
+NODE_ENV=development
+```
+
+### **Development Scripts**
+
+```bash
+# Frontend commands
+npm start              # Start Expo development server
+npm run android       # Run on Android emulator/device
+npm run ios          # Run on iOS simulator/device
+npm run web          # Run in web browser
+npm run clear        # Clear cache and reinstall
+
+# Backend commands  
+cd backend
+npm start            # Start backend server
+node reset-db.js     # Reset database to initial state
+```
+
+### **Building for Production**
+
+```bash
+# Android
+eas build --platform android --profile production
+
+# iOS  
+eas build --platform ios --profile production
+```
+
+## 🧪 **Testing Features**
+
+### **Test Flow Checklist**
+- ✅ User registration with email
+- ✅ Automatic wallet generation
+- ✅ Create expense groups
+- ✅ Add members to groups
+- ✅ Split expenses among members
+- ✅ Send/request payments
+- ✅ Transaction confirmations
+- ✅ Balance updates
+
+## 📚 **Additional Resources**
+
+### **Design & Styling**
+- 🎨 [Designer Handoff Summary](./DESIGNER_HANDOFF.md) - **Quick start guide**
+- 📖 [Complete Design System Guide](./DESIGN_SYSTEM_README.md)
+- 🎨 [React Native Styling Docs](https://reactnative.dev/docs/style)
+- 📐 [8px Grid System Guide](https://builttoadapt.io/intro-to-the-8-point-grid-system-d2573cde8632)
+
+### **Development**
+- 📱 [Expo Documentation](https://docs.expo.dev/)
+- ⚛️ [React Native Troubleshooting](https://reactnative.dev/docs/troubleshooting)
+- 🔗 [Solana Web3.js Docs](https://solana-labs.github.io/solana-web3.js/)
+
+### **Additional Guides**
+- 💰 [Wallet Funding System](./WALLET_FUNDING_README.md)
+- 🔄 [AppKit Migration Notes](./APPKIT_MIGRATION.md)
 
 ## 🤝 **Contributing**
 
-WeSplit is open to contributions! Please read our [Contributing Guidelines](./CONTRIBUTING.md) before submitting pull requests.
-
-### **Development Setup**
-```bash
-# Fork and clone the repository
-git clone https://github.com/your-username/WeSplit.git
-cd WeSplit
-
-# Install dependencies
-npm install
-
-# Setup development environment
-npm run setup:dev
-
-# Start development server
-npm start
-```
-
-### **Code Standards**
-- **TypeScript** - Strict type checking
-- **ESLint** - Code linting
-- **Prettier** - Code formatting
-- **Husky** - Git hooks
-- **Commitizen** - Conventional commits
-
-### **Pull Request Process**
-1. **Fork** the repository
-2. **Create** feature branch
-3. **Make** changes with tests
-4. **Run** all tests
-5. **Submit** pull request
-6. **Wait** for review and merge
-
----
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
 ## 📄 **License**
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
----
-
 ## 🙏 **Acknowledgments**
 
 - [Expo](https://expo.dev/) for the amazing development platform
 - [Solana](https://solana.com/) for blockchain infrastructure
-- [Firebase](https://firebase.google.com/) for backend services
 - [MoonPay](https://moonpay.com/) for fiat onramp integration
-- [React Native](https://reactnative.dev/) for cross-platform development
-- [TypeScript](https://www.typescriptlang.org/) for type safety
-
----
-
-## 📞 **Support**
-
-### **Getting Help**
-- **📖 Documentation** - Comprehensive guides
-- **🐛 Issue Tracker** - Report bugs and features
-- **💬 Community** - Join our Discord
-- **📧 Email** - Direct support contact
-
-### **Resources**
-- **🎥 Video Tutorials** - Step-by-step guides
-- **📱 Demo App** - Try before you buy
-- **🔧 API Reference** - Complete API documentation
-- **📊 Status Page** - Service uptime monitoring
+- [React Navigation](https://reactnavigation.org/) for navigation
 
 ---
 
 <div align="center">
-  <strong>Made with ❤️ by the dAppzy Team</strong>
+  Made with ❤️ by the dAppzy Team
   
-  **🏆 Ready to revolutionize expense splitting? Start exploring WeSplit today!**
-  
-  [![Download on App Store](https://img.shields.io/badge/App_Store-Download-blue.svg)](https://apps.apple.com/app/wesplit)
-  [![Get it on Google Play](https://img.shields.io/badge/Google_Play-Get_it-green.svg)](https://play.google.com/store/apps/details?id=com.wesplit.app)
-  [![Try on Web](https://img.shields.io/badge/Web-Try_Now-orange.svg)](https://wesplit.app)
+  **🎨 Ready to design? Start with the [Design System Guide](./DESIGN_SYSTEM_README.md)**
 </div> 

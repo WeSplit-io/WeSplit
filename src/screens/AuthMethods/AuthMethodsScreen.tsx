@@ -9,7 +9,8 @@ import {
   Alert,
   ScrollView,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Linking
 } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { styles } from './styles';
@@ -18,7 +19,7 @@ import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseAuth, firestoreService, auth } from '../../config/firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { solanaAppKitService } from '../../services/solanaAppKitService';
 import { userWalletService } from '../../services/userWalletService';
@@ -27,7 +28,7 @@ import { socialAuthService } from '../../services/socialAuthService';
 import { userDataService } from '../../services/userDataService';
 import * as AuthSession from 'expo-auth-session';
 import { loginWithGoogle, getAuthConfig, testAuthConfiguration } from '../../services/firebaseAuthService';
-import { sendVerificationCode } from '../../services/firebaseFunctionsService';
+import { sendVerificationCode } from '../../services/emailAuthService';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
@@ -189,28 +190,6 @@ const AuthMethodsScreen: React.FC = () => {
     try {
       // Check if user has already verified within the last 30 days
       const hasVerifiedWithin30Days = await firestoreService.hasVerifiedWithin30Days(sanitizedEmail);
-      
-      // If verification check failed, try to fix invalid lastVerifiedAt
-      if (!hasVerifiedWithin30Days) {
-        try {
-          const wasFixed = await firestoreService.fixInvalidLastVerifiedAt(sanitizedEmail);
-          if (wasFixed) {
-            if (__DEV__) {
-              console.log('📅 Fixed invalid lastVerifiedAt, rechecking verification status');
-            }
-            // Recheck after fixing
-            const recheckResult = await firestoreService.hasVerifiedWithin30Days(sanitizedEmail);
-            if (recheckResult) {
-              if (__DEV__) {
-                console.log('✅ User now verified within 30 days after fix');
-              }
-              // Continue with the existing user flow below
-            }
-          }
-        } catch (fixError) {
-          console.error('Error fixing lastVerifiedAt:', fixError);
-        }
-      }
 
       if (hasVerifiedWithin30Days) {
         if (__DEV__) {
@@ -249,53 +228,24 @@ const AuthMethodsScreen: React.FC = () => {
                   firebaseUser = await firebaseAuth.createUserWithEmail(sanitizedEmail, temporaryPassword);
                   if (__DEV__) { console.log('✅ Created new Firebase Auth user for existing Firestore user'); }
                 } catch (createError: any) {
-                  if (createError.code === 'auth/email-already-in-use' || createError.name === 'FirebaseAuthWarning') {
+                  if (createError.code === 'auth/email-already-in-use') {
                     // User already exists in Firebase Auth, we need to handle this
                     // For now, we'll use the existing user data and skip Firebase Auth
                     if (__DEV__) { console.warn('⚠️ User exists in Firebase Auth but we can\'t sign in without password (this is normal)'); }
 
                     // Check if existing user should skip onboarding
                     const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
-                    
-                    // Fix onboarding status if needed
-                    let updatedUserData = userData;
-                    try {
-                      const wasFixed = await firestoreService.fixCompletedOnboardingStatus(userData);
-                      if (wasFixed) {
-                        if (__DEV__) {
-                          console.log('🔧 Fixed onboarding status, rechecking');
-                        }
-                        // Refetch user data to get updated hasCompletedOnboarding
-                        const userRef = doc(db, 'users', userData.id);
-                        const userSnap = await getDoc(userRef);
-                        if (userSnap.exists()) {
-                          updatedUserData = userSnap.data();
-                          if (__DEV__) {
-                            console.log('📋 Refetched user data after fix:', updatedUserData);
-                          }
-                        }
-                        // Recheck after fixing
-                        const recheckResult = await firestoreService.shouldSkipOnboardingForExistingUser(updatedUserData);
-                        if (recheckResult) {
-                          if (__DEV__) {
-                            console.log('✅ User now has completed onboarding after fix');
-                          }
-                        }
-                      }
-                    } catch (fixError) {
-                      console.error('Error fixing onboarding status:', fixError);
-                    }
 
-                    // Use the updated Firestore user data
+                    // Use the Firestore user data directly
                     const transformedUser = {
-                      id: updatedUserData.id,
-                      name: updatedUserData.name,
-                      email: updatedUserData.email,
-                      wallet_address: updatedUserData.wallet_address || '',
-                      wallet_public_key: updatedUserData.wallet_public_key || '',
-                      created_at: updatedUserData.created_at,
-                      avatar: updatedUserData.avatar || '',
-                      hasCompletedOnboarding: updatedUserData.hasCompletedOnboarding || shouldSkipOnboarding
+                      id: userData.id,
+                      name: userData.name,
+                      email: userData.email,
+                      wallet_address: userData.wallet_address || '',
+                      wallet_public_key: userData.wallet_public_key || '',
+                      created_at: userData.created_at,
+                      avatar: userData.avatar || '',
+                      hasCompletedOnboarding: shouldSkipOnboarding
                     };
 
                     // Update the global app context with the authenticated user
@@ -305,22 +255,25 @@ const AuthMethodsScreen: React.FC = () => {
                     const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
 
                     if (needsProfile) {
+                      console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
                       navigation.reset({
                         index: 0,
-                        routes: [{ name: 'CreateProfile' }],
+                        routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
                       });
-                    } else if (shouldSkipOnboarding) {
+                    } else if (transformedUser.hasCompletedOnboarding) {
+                      console.log('✅ User completed onboarding, navigating to Dashboard');
                       navigation.reset({
                         index: 0,
                         routes: [{ name: 'Dashboard' }],
                       });
                     } else {
+                      console.log('🔄 User needs onboarding, navigating to Onboarding');
                       navigation.reset({
                         index: 0,
                         routes: [{ name: 'Onboarding' }],
                       });
                     }
-                    return; // Exit early to avoid showing error
+                    return;
                   } else {
                     throw createError;
                   }
@@ -336,46 +289,17 @@ const AuthMethodsScreen: React.FC = () => {
 
             // Check if existing user should skip onboarding
             const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
-            
-            // Fix onboarding status if needed
-            let updatedUserData = userData;
-            try {
-              const wasFixed = await firestoreService.fixCompletedOnboardingStatus(userData);
-              if (wasFixed) {
-                if (__DEV__) {
-                  console.log('🔧 Fixed onboarding status, rechecking');
-                }
-                // Refetch user data to get updated hasCompletedOnboarding
-                const userRef = doc(db, 'users', userData.id);
-                const userSnap = await getDoc(userRef);
-                if (userSnap.exists()) {
-                  updatedUserData = userSnap.data();
-                  if (__DEV__) {
-                    console.log('📋 Refetched user data after fix:', updatedUserData);
-                  }
-                }
-                // Recheck after fixing
-                const recheckResult = await firestoreService.shouldSkipOnboardingForExistingUser(updatedUserData);
-                if (recheckResult) {
-                  if (__DEV__) {
-                    console.log('✅ User now has completed onboarding after fix');
-                  }
-                }
-              }
-            } catch (fixError) {
-              console.error('Error fixing onboarding status:', fixError);
-            }
 
-            // Use the updated user data
+            // Use the existing user data
             const transformedUser = {
-              id: updatedUserData.id,
-              name: updatedUserData.name,
-              email: updatedUserData.email,
-              wallet_address: updatedUserData.wallet_address || '',
-              wallet_public_key: updatedUserData.wallet_public_key || '',
-              created_at: updatedUserData.created_at,
-              avatar: updatedUserData.avatar || '',
-              hasCompletedOnboarding: updatedUserData.hasCompletedOnboarding || shouldSkipOnboarding
+              id: userData.id,
+              name: userData.name,
+              email: userData.email,
+              wallet_address: userData.wallet_address || '',
+              wallet_public_key: userData.wallet_public_key || '',
+              created_at: userData.created_at,
+              avatar: userData.avatar || '',
+              hasCompletedOnboarding: shouldSkipOnboarding
             };
 
             // Update the global app context with the authenticated user
@@ -429,12 +353,11 @@ const AuthMethodsScreen: React.FC = () => {
       }
           } catch (error: any) {
         // Convert expected errors to warnings
-        if (error.code === 'auth/email-already-in-use' || error.name === 'FirebaseAuthWarning') {
+        if (error.code === 'auth/email-already-in-use') {
           if (__DEV__) {
             console.warn('Expected Firebase Auth error (user already exists):', error.message);
           }
-          // Don't show error alert for existing accounts - this is expected behavior
-          return;
+          // Continue with the flow since we handle this case above
         } else {
           console.error('Error in email authentication:', error);
 
@@ -567,7 +490,8 @@ const AuthMethodsScreen: React.FC = () => {
       >
         {/* Logo Section */}
         <View style={styles.logoSection}>
-          <Image source={require('../../../assets/WeSplitLogoName.png')} style={styles.logo} />
+          <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} style={styles.logo} />
+        
         </View>
 
         <View style={styles.contentContainer}>
@@ -581,7 +505,7 @@ const AuthMethodsScreen: React.FC = () => {
               onPress={() => handleSocialAuth('google')}
               disabled={loading || socialLoading !== null}
             >
-              <Image source={require('../../../assets/google.png')} style={styles.socialIcon} />
+              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fgoogle.png?alt=media&token=76efeba8-dc73-4ed3-bf5c-f28bd0ae6fdd' }} style={styles.socialIcon} />
               <Text style={styles.socialButtonText}>
                 {socialLoading === 'google' ? getSocialLoadingText('google') : 'Continue with Google'}
               </Text>
@@ -595,7 +519,7 @@ const AuthMethodsScreen: React.FC = () => {
               onPress={() => handleSocialAuth('twitter')}
               disabled={loading || socialLoading !== null}
             >
-              <Image source={require('../../../assets/twitter.png')} style={styles.socialIcon} />
+              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftwitter.png?alt=media&token=470228c6-cb4e-4c39-9c40-563b7e707c43' }} style={styles.socialIcon} />
               <Text style={styles.socialButtonText}>
                 {socialLoading === 'twitter' ? getSocialLoadingText('twitter') : 'Continue with Twitter'}
               </Text>
@@ -609,7 +533,7 @@ const AuthMethodsScreen: React.FC = () => {
               onPress={() => handleSocialAuth('apple')}
               disabled={loading || socialLoading !== null}
             >
-              <Image source={require('../../../assets/apple.png')} style={styles.socialIcon} />
+              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fapple.png?alt=media&token=783e0e17-b215-4532-896b-6333cc667c5b' }} style={styles.socialIcon} />
               <Text style={styles.socialButtonText}>
                 {socialLoading === 'apple' ? getSocialLoadingText('apple') : 'Continue with Apple'}
               </Text>
@@ -654,7 +578,7 @@ const AuthMethodsScreen: React.FC = () => {
 
         {/* Help Link */}
         <View style={styles.helpSection}>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => Linking.openURL('https://t.me/wesplit_support_bot')}>
             <Text style={styles.helpText}>Need help?</Text>
           </TouchableOpacity>
         </View>

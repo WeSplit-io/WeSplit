@@ -262,7 +262,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
-            source={require('../../../assets/arrow-left.png')}
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -308,7 +308,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.sentAmountContainer}>
           <Text style={styles.sentAmountLabel}>Sent amount</Text>
           <View style={styles.sentAmountValueContainer}>
-          <Image source={require('../../../assets/usdc-logo-white.png')} style={{ width: 32, height: 32, marginRight: 8 }} />
+                          <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fusdc-logo-white.png?alt=media&token=fb534b70-6bb8-4803-8bea-e8e60b1cd0cc' }} style={{ width: 32, height: 32, marginRight: 8 }} />
             <Text style={styles.sentAmountValue}>{amount}</Text>
           </View>
           {description && (

@@ -33,23 +33,7 @@ export async function calculateGroupBalances(
     currentUserId
   } = options;
 
-  // Validate group data
-  if (!group || !group.id) {
-    if (__DEV__) {
-      console.error('❌ calculateGroupBalances: Invalid group data:', group);
-    }
-    return [];
-  }
-
-  if (__DEV__) {
-    console.log('💰 calculateGroupBalances: Starting calculation for group:', {
-      id: group.id,
-      name: group.name,
-      expensesCount: group.expenses?.length || 0,
-      membersCount: group.members?.length || 0,
-      expensesByCurrencyCount: group.expenses_by_currency?.length || 0
-    });
-  }
+  // Starting calculation for group
 
   // If we have individual expenses and members, use detailed calculation
   if (group.expenses && group.expenses.length > 0 && group.members && group.members.length > 0) {
@@ -75,84 +59,24 @@ async function calculateBalancesFromExpenses(
   const { normalizeToUSDC = true, includeZeroBalances = true } = options;
   
   if (!group.expenses || !group.members) {
-    if (__DEV__) {
-      console.error('❌ calculateBalancesFromExpenses: Missing expenses or members:', {
-        hasExpenses: !!group.expenses,
-        hasMembers: !!group.members,
-        expensesLength: group.expenses?.length,
-        membersLength: group.members?.length
-      });
-    }
     return [];
-  }
-
-  if (__DEV__) {
-    console.log('💰 calculateBalancesFromExpenses: Processing', group.expenses.length, 'expenses for', group.members.length, 'members');
   }
 
   const memberBalances: Record<string, Record<string, number>> = {};
   
   // Initialize balances for all members
   group.members.forEach(member => {
-    if (member && member.id) {
-      const memberId = String(member.id);
-      memberBalances[memberId] = {};
-      if (__DEV__) {
-        console.log('💰 Initialized balances for member:', {
-          memberId,
-          memberName: member.name
-        });
-      }
-    } else {
-      if (__DEV__) {
-        console.warn('⚠️ calculateBalancesFromExpenses: Invalid member data:', member);
-      }
-    }
+    const memberId = String(member.id);
+    memberBalances[memberId] = {};
   });
-  
-  if (__DEV__) {
-    console.log('💰 memberBalances after initialization:', memberBalances);
-  }
 
   // Process each expense
   for (const expense of group.expenses) {
-    if (!expense || !expense.id) {
-      if (__DEV__) {
-        console.warn('⚠️ calculateBalancesFromExpenses: Skipping invalid expense:', expense);
-      }
-      continue;
-    }
-    
     const currency = expense.currency || 'SOL';
     const amount = expense.amount || 0;
     const paidBy = expense.paid_by ? String(expense.paid_by) : null;
     
-    // Validate that paidBy is actually a group member
-    const groupMemberIds = group.members.map(m => String(m.id));
-    let validPaidBy = paidBy;
-    
-    if (paidBy && !groupMemberIds.includes(paidBy)) {
-      if (__DEV__) {
-        console.warn('⚠️ calculateBalancesFromExpenses: paid_by is not a group member, mapping to first member:', {
-          expenseId: expense.id,
-          originalPaidBy: paidBy,
-          groupMemberIds
-        });
-      }
-      // Map to the first group member as fallback
-      validPaidBy = groupMemberIds[0];
-    }
-    
-    if (__DEV__) {
-      console.log('💰 Processing expense:', {
-        expenseId: expense.id,
-        currency,
-        amount,
-        paidBy: validPaidBy,
-        originalPaidBy: paidBy,
-        memberBalancesKeys: Object.keys(memberBalances)
-      });
-    }
+    // Processing expense
 
     // Parse split data
     let splitData: any = null;
@@ -166,84 +90,18 @@ async function calculateBalancesFromExpenses(
       // Failed to parse split data
       splitData = null;
     }
-    
-    if (__DEV__) {
-      console.log('💰 Split data for expense:', {
-        expenseId: expense.id,
-        splitData,
-        splitDataType: typeof expense.splitData,
-        paidBy: validPaidBy,
-        originalPaidBy: expense.paid_by,
-        groupMembers: group.members.map(m => ({ id: m.id, name: m.name }))
-      });
-    }
 
     // Determine who owes what
     let membersInSplit: string[] = [];
     let amountPerPerson = 0;
 
-    if (splitData && Array.isArray(splitData) && splitData.length > 0) {
-      // New format: splitData is an array of objects with user_id and amount
-      // Map the split data user IDs to actual group member IDs
-      const groupMemberIds = group.members.map(m => String(m.id));
-      const splitDataUserIds = splitData.map((item: any) => String(item.user_id));
-      
-      if (__DEV__) {
-        console.log('💰 Mapping split data to group members:', {
-          expenseId: expense.id,
-          splitDataUserIds,
-          groupMemberIds,
-          paidBy: validPaidBy,
-          originalPaidBy: expense.paid_by
-        });
-      }
-      
-      // If the split data user IDs don't match group member IDs, use the group members
-      if (splitDataUserIds.some(id => !groupMemberIds.includes(id))) {
-        if (__DEV__) {
-          console.log('💰 Split data user IDs don\'t match group members, using group members for equal split');
-        }
-        membersInSplit = groupMemberIds;
-        amountPerPerson = amount / membersInSplit.length;
-      } else {
-        // Use the split data as provided
-        membersInSplit = splitDataUserIds;
-        const totalSplitAmount = splitData.reduce((sum: number, item: any) => sum + (item.amount || 0), 0);
-        amountPerPerson = totalSplitAmount / membersInSplit.length;
-      }
-      
-      if (__DEV__) {
-        console.log('💰 Processing split data (new format):', {
-          expenseId: expense.id,
-          membersInSplit,
-          amountPerPerson,
-          totalAmount: amount
-        });
-      }
-    } else if (splitData && splitData.memberIds && Array.isArray(splitData.memberIds) && splitData.memberIds.length > 0) {
-      // Old format: splitData has memberIds array
+    if (splitData && splitData.memberIds && Array.isArray(splitData.memberIds) && splitData.memberIds.length > 0) {
       membersInSplit = splitData.memberIds.map((id: any) => String(id));
       amountPerPerson = splitData.amountPerPerson || (amount / membersInSplit.length);
-      
-      if (__DEV__) {
-        console.log('💰 Processing split data (old format):', {
-          expenseId: expense.id,
-          membersInSplit,
-          amountPerPerson
-        });
-      }
     } else {
       // Fallback: split equally among all group members
       membersInSplit = group.members.map(m => String(m.id));
       amountPerPerson = amount / membersInSplit.length;
-      
-      if (__DEV__) {
-        console.log('💰 Using fallback split (equal among all members):', {
-          expenseId: expense.id,
-          membersInSplit,
-          amountPerPerson
-        });
-      }
     }
 
     // Initialize currency tracking
@@ -255,76 +113,15 @@ async function calculateBalancesFromExpenses(
     });
 
     // Calculate who owes what to whom
-    if (validPaidBy && membersInSplit.length > 0) {
-      if (splitData && Array.isArray(splitData) && splitData.length > 0) {
-        // Check if split data user IDs match group member IDs
-        const groupMemberIds = group.members.map(m => String(m.id));
-        const splitDataUserIds = splitData.map((item: any) => String(item.user_id));
-        const useSplitData = !splitDataUserIds.some(id => !groupMemberIds.includes(id));
-        
-        if (useSplitData) {
-          // New format: process individual amounts for each user
-          splitData.forEach((item: any) => {
-            const memberId = String(item.user_id);
-            const memberAmount = item.amount || 0;
-            
-            if (memberId !== validPaidBy && validPaidBy) {
-              // This member owes their specific amount to the payer
-              memberBalances[memberId][currency] -= memberAmount;
-              // The payer is owed this amount from this member
-              memberBalances[validPaidBy][currency] += memberAmount;
-            }
-          });
-          
-          if (__DEV__) {
-            console.log('💰 Processed individual split amounts for expense:', {
-              expenseId: expense.id,
-              paidBy: validPaidBy,
-              originalPaidBy: paidBy,
-              splitData
-            });
-          }
-        } else {
-          // Split data user IDs don't match group members, use equal split
-          membersInSplit.forEach(memberId => {
-            if (memberId !== validPaidBy && validPaidBy) {
-              // Each selected member owes their share to the payer
-              memberBalances[memberId][currency] -= amountPerPerson;
-              // The payer is owed this amount from each selected member
-              memberBalances[validPaidBy][currency] += amountPerPerson;
-            }
-          });
-          
-          if (__DEV__) {
-            console.log('💰 Processed equal split (split data mismatch):', {
-              expenseId: expense.id,
-              paidBy: validPaidBy,
-              originalPaidBy: paidBy,
-              amountPerPerson,
-              reason: 'Split data user IDs don\'t match group members'
-            });
-          }
+    if (paidBy && membersInSplit.length > 0) {
+      membersInSplit.forEach(memberId => {
+        if (memberId !== paidBy) {
+          // Each selected member owes their share to the payer
+          memberBalances[memberId][currency] -= amountPerPerson;
+          // The payer is owed this amount from each selected member
+          memberBalances[paidBy][currency] += amountPerPerson;
         }
-      } else {
-        // Old format: equal splitting
-        membersInSplit.forEach(memberId => {
-          if (memberId !== validPaidBy && validPaidBy) {
-            // Each selected member owes their share to the payer
-            memberBalances[memberId][currency] -= amountPerPerson;
-            // The payer is owed this amount from each selected member
-            memberBalances[validPaidBy][currency] += amountPerPerson;
-          }
-        });
-        
-        if (__DEV__) {
-          console.log('💰 Processed equal split for expense:', {
-            expenseId: expense.id,
-            paidBy: validPaidBy,
-            originalPaidBy: paidBy,
-            amountPerPerson
-          });
-        }
-      }
+      });
     } else {
       if (__DEV__) {
         console.log('💰 Skipping expense due to missing paid_by or members:', {
@@ -335,152 +132,48 @@ async function calculateBalancesFromExpenses(
       }
     }
   }
-  
-  if (__DEV__) {
-    console.log('💰 memberBalances after processing all expenses:', memberBalances);
-  }
 
   // Convert to Balance objects
   const balances: CalculatedBalance[] = [];
   
   for (const member of group.members) {
-    if (!member || !member.id) {
-      if (__DEV__) {
-        console.warn('⚠️ calculateBalancesFromExpenses: Skipping invalid member:', member);
-      }
-      continue;
-    }
-    
     const memberId = String(member.id);
-    const currencies = memberBalances[memberId];
+    const currencies = memberBalances[memberId] || {};
     
-    if (__DEV__) {
-      console.log('💰 Processing member balances:', {
-        memberId,
-        memberName: member.name,
-        currencies,
-        currenciesType: typeof currencies,
-        isObject: currencies && typeof currencies === 'object'
-      });
-    }
-    
-    // Safely handle currencies object
-    if (!currencies || typeof currencies !== 'object') {
-      if (__DEV__) {
-        console.warn('⚠️ calculateBalancesFromExpenses: Invalid currencies for member:', {
-          memberId,
-          currencies,
-          currenciesType: typeof currencies
-        });
-      }
-      // Create a default balance for this member
-      balances.push({
-        userId: memberId,
-        userName: member.name || '',
-        userAvatar: member.avatar || '',
-        amount: 0,
-        currency: group.currency || 'SOL',
-        status: 'settled' as const,
-        originalAmount: 0,
-        originalCurrency: group.currency || 'SOL',
-        usdcAmount: 0
-      });
-      continue;
-    }
-    
-    // Calculate net balance across all currencies
-    let netBalance = 0;
+    // Find the currency with the largest absolute balance
     let primaryCurrency = group.currency || 'SOL';
-    let primaryAmount = 0;
+    let primaryAmount = currencies[primaryCurrency] || 0;
     
-    try {
-      const balanceEntries = Object.entries(currencies);
-      if (__DEV__) {
-        console.log('💰 Balance entries for member:', {
-          memberId,
-          balanceEntries,
-          balanceEntriesLength: balanceEntries.length
-        });
-      }
-      
-      if (balanceEntries.length > 0) {
-        // Calculate net balance by converting all currencies to USD
-        for (const [currency, amount] of balanceEntries) {
-          if (amount !== 0) {
-            // Use fallback rates for immediate calculation
-            const rate = currency === 'SOL' ? 162 : (currency === 'USDC' ? 1 : 100);
-            const usdAmount = amount * rate;
-            netBalance += usdAmount;
-            
-            if (__DEV__) {
-              console.log(`💰 Converting ${amount} ${currency} to USD: ${amount} × $${rate} = $${usdAmount}`);
-            }
-          }
-        }
-        
-        // Find the currency with the largest absolute balance for display
-        const [maxCurrency, maxAmount] = balanceEntries.reduce((max, [curr, amount]) => 
-          Math.abs(amount) > Math.abs(max[1]) ? [curr, amount] : max
-        );
+    const balanceEntries = Object.entries(currencies);
+    if (balanceEntries.length > 0) {
+      const [maxCurrency, maxAmount] = balanceEntries.reduce((max, [curr, amount]) => 
+        Math.abs(amount) > Math.abs(max[1]) ? [curr, amount] : max
+      );
+      if (Math.abs(maxAmount) > Math.abs(primaryAmount)) {
         primaryCurrency = maxCurrency;
         primaryAmount = maxAmount;
       }
-    } catch (error) {
-      if (__DEV__) {
-        console.error('❌ Error processing currencies for member:', {
-          memberId,
-          currencies,
-          error: error instanceof Error ? error.message : String(error)
-        });
-      }
-      // Fallback to default values
-      primaryCurrency = group.currency || 'SOL';
-      primaryAmount = 0;
-      netBalance = 0;
     }
 
     // Convert to USDC if requested
     let usdcAmount: number | undefined;
     if (normalizeToUSDC && primaryAmount !== 0) {
-      try {
-        usdcAmount = await convertToUSDC(primaryAmount, primaryCurrency);
-        if (__DEV__) {
-          console.log(`💰 Balance conversion: ${primaryAmount} ${primaryCurrency} = $${usdcAmount} USD`);
-        }
-      } catch (error) {
-        console.error(`Error converting balance ${primaryAmount} ${primaryCurrency} to USDC:`, error);
-        // Fallback to hardcoded rates
-        const rate = primaryCurrency === 'SOL' ? 200 : (primaryCurrency === 'USDC' ? 1 : 100);
-        usdcAmount = primaryAmount * rate;
-        if (__DEV__) {
-          console.log(`💰 Using fallback rate for ${primaryCurrency}: ${rate}`);
-        }
-      }
+      usdcAmount = await convertToUSDC(primaryAmount, primaryCurrency);
     }
 
-    // Determine status based on net balance
-    let status: 'gets_back' | 'owes' | 'settled';
-    if (Math.abs(netBalance) < 0.01) {
-      status = 'settled';
-    } else if (netBalance > 0) {
-      status = 'gets_back';
-    } else {
-      status = 'owes';
-    }
-    
     const balance: CalculatedBalance = {
       userId: memberId,
       userName: member.name,
       userAvatar: member.avatar,
-      amount: netBalance, // Use net balance instead of primary amount
-      currency: 'USDC', // Always use USDC for net balance
-      status,
+      amount: primaryAmount,
+      currency: primaryCurrency,
+      status: Math.abs(primaryAmount) < 0.01 ? 'settled' : primaryAmount > 0 ? 'gets_back' : 'owes',
       originalAmount: primaryAmount,
       originalCurrency: primaryCurrency,
-      usdcAmount: netBalance // Net balance is already in USD
+      usdcAmount
     };
 
-    if (includeZeroBalances || Math.abs(netBalance) >= 0.01) {
+    if (includeZeroBalances || Math.abs(primaryAmount) >= 0.01) {
       balances.push(balance);
     }
   }
@@ -536,20 +229,7 @@ async function calculateBalancesFromSummary(
       // Convert to USDC if requested
       let usdcAmount: number | undefined;
       if (normalizeToUSDC && amount !== 0) {
-        try {
-          usdcAmount = await convertToUSDC(amount, primaryCurrencyEntry.currency);
-          if (__DEV__) {
-            console.log(`💰 Summary balance conversion: ${amount} ${primaryCurrencyEntry.currency} = $${usdcAmount} USD`);
-          }
-        } catch (error) {
-          console.error(`Error converting summary balance ${amount} ${primaryCurrencyEntry.currency} to USDC:`, error);
-          // Fallback to hardcoded rates
-          const rate = primaryCurrencyEntry.currency === 'SOL' ? 200 : (primaryCurrencyEntry.currency === 'USDC' ? 1 : 100);
-          usdcAmount = amount * rate;
-          if (__DEV__) {
-            console.log(`💰 Using fallback rate for ${primaryCurrencyEntry.currency}: ${rate}`);
-          }
-        }
+        usdcAmount = await convertToUSDC(amount, primaryCurrencyEntry.currency);
       }
 
       const balance: CalculatedBalance = {

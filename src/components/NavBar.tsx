@@ -5,41 +5,27 @@ import NavIcon from './NavIcon';
 import { styles } from './NavBar.styles';
 import platformUtils from '../utils/platformUtils';
 
-// Fonction pour obtenir l'image selon le nom
-const getImageSource = (iconName: string) => {
-  switch (iconName) {
-    case 'home':
-      return require('../../assets/home-icon-default.png');
-    case 'groups':
-      return require('../../assets/folder-icon-default.png');
-    default:
-      return require('../../assets/folder-icon-default.png');
-  }
-};
 
-// Fonction pour détecter si c'est un chemin d'image
 const isImagePath = (icon: string) => {
   return icon.startsWith('../') || icon.startsWith('./') || icon.includes('.png') || icon.includes('.jpg');
 };
 
-// Fonction pour obtenir l'image depuis un chemin
 const getImageFromPath = (path: string) => {
-  // Supprimer le préfixe '../' et mapper vers les assets disponibles
   const cleanPath = path.replace(/^\.\.\/assets\//, '');
   
   switch (cleanPath) {
     case 'home-icon-default.png':
-      return require('../../assets/home-icon-default.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fhome-icon-default.png?alt=media&token=73d79921-5d1c-4c9e-acdb-7f669321db27' };
     case 'folder-icon-default.png':
-      return require('../../assets/folder-icon-default.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ffolder-icon-default.png?alt=media&token=15b46b57-2d90-4ba3-9e96-2dda32d35c93' };
     case 'wallet-icon-default.png':
-      return require('../../assets/wallet-icon-default.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' };
     case 'book-icon-default.png':
-      return require('../../assets/book-icon-default.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fbook-icon-default.png?alt=media&token=ec1254bb-72d6-49eb-a107-5e82b714e031' };
     case 'profile-icon-default.png':
-      return require('../../assets/profile-icon-default.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofile-icon-default.png?alt=media&token=9b2ee114-cfa0-4249-804b-ff4978ba4305' };
     default:
-      return require('../../assets/folder-icon-default.png');
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ffolder-icon-default.png?alt=media&token=4d7d12ca-1b6f-4f42-a594-cb3de91f777a' };
   }
 };
 

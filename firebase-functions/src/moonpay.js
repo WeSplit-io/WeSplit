@@ -3,25 +3,24 @@ const admin = require('firebase-admin');
 
 // MoonPay configuration
 const MOONPAY_CONFIG = {
-  // Development (Sandbox)
-  development: {
-    apiKey: process.env.MOONPAY_API_KEY || '',
-    secretKey: process.env.MOONPAY_SECRET_KEY || '',
+  sandbox: {
+    apiKey: process.env.MOONPAY_API_KEY || 'YOUR_MOONPAY_API_KEY_HERE',
+    secretKey: process.env.MOONPAY_SECRET_KEY || 'YOUR_MOONPAY_SECRET_KEY_HERE',
+    webhookSecret: process.env.MOONPAY_WEBHOOK_SECRET || 'YOUR_MOONPAY_WEBHOOK_SECRET_HERE',
     baseUrl: 'https://buy-sandbox.moonpay.com'
   },
-  
-  // Production
   production: {
-    apiKey: process.env.MOONPAY_API_KEY || '',
-    secretKey: process.env.MOONPAY_SECRET_KEY || '',
+    apiKey: process.env.MOONPAY_API_KEY || 'YOUR_MOONPAY_API_KEY_HERE',
+    secretKey: process.env.MOONPAY_SECRET_KEY || 'YOUR_MOONPAY_SECRET_KEY_HERE',
+    webhookSecret: process.env.MOONPAY_WEBHOOK_SECRET || 'YOUR_MOONPAY_WEBHOOK_SECRET_HERE',
     baseUrl: 'https://buy.moonpay.com'
   }
 };
 
 // Get current environment configuration
-const getCurrentConfig = () => {
-  const environment = process.env.NODE_ENV === 'production' ? 'production' : 'development';
-  return MOONPAY_CONFIG[environment] || MOONPAY_CONFIG.development;
+const getMoonPayConfig = () => {
+  const environment = process.env.NODE_ENV === 'production' ? 'production' : 'sandbox';
+  return MOONPAY_CONFIG[environment];
 };
 
 // MoonPay transaction status
@@ -97,7 +96,7 @@ const createMoonPayURL = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
     }
 
-    const config = getCurrentConfig();
+    const config = getMoonPayConfig();
 
     // For Solana, we need to use the correct currency code
     // MoonPay supports USDC on Solana with currency code 'usdc_sol'
@@ -166,7 +165,7 @@ const moonpayWebhook = functions.https.onRequest(async (req, res) => {
     });
 
     // Verify webhook signature (in production, you should verify this)
-    const config = getCurrentConfig();
+    const config = getMoonPayConfig();
     // TODO: Implement signature verification
     // if (!verifyWebhookSignature(signature, payload, config.webhookSecret)) {
     //   return res.status(401).json({ error: 'Invalid signature' });
@@ -398,4 +397,4 @@ module.exports = {
   moonpayWebhook,
   getMoonPayTransactionStatus,
   getUserMoonPayTransactions
-}; 
+};

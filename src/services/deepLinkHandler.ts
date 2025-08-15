@@ -218,19 +218,10 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
   const handleDeepLink = async (url: string) => {
     console.log('🔥 Received deep link:', url);
     
-    // Skip if this is just the initial app URL (not a deep link)
-    if (url.includes('exp://') && !url.includes('wesplit://')) {
-      console.log('🔥 Skipping initial app URL, not a deep link');
-      return;
-    }
-    
     const linkData = parseWeSplitDeepLink(url);
     if (!linkData) {
       console.warn('🔥 Invalid deep link format:', url);
-      // Only show alert for actual deep links, not initial app URLs
-      if (url.includes('wesplit://')) {
-        Alert.alert('Invalid Link', 'This invitation link is not valid.');
-      }
+      Alert.alert('Invalid Link', 'This invitation link is not valid.');
       return;
     }
 

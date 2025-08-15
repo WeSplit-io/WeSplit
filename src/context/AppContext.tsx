@@ -10,6 +10,7 @@ import {
   Notification 
 } from '../types';
 import { firebaseDataService } from '../services/firebaseDataService';
+import { hybridDataService } from '../services/hybridDataService';
 import { i18nService } from '../services/i18nService';
 import { getUserNotifications } from '../services/firebaseNotificationService';
 import { MultiSignStateService } from '../services/multiSignStateService';

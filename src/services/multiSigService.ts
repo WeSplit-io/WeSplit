@@ -480,15 +480,9 @@ export class MultiSigService {
   // Get all multi-signature wallets for a user
   async getUserMultiSigWallets(userId: string): Promise<MultiSigWallet[]> {
     try {
-      const wallets = await firebaseDataService.multiSig.getUserMultiSigWallets(userId);
-      if (__DEV__) {
-        console.log('✅ Multi-signature wallets loaded:', wallets.length);
-      }
-      return wallets;
+      return await firebaseDataService.multiSig.getUserMultiSigWallets(userId);
     } catch (error) {
-      if (__DEV__) {
-        console.warn('⚠️ No multi-signature wallets found (this is normal for new users):', error);
-      }
+      console.error('Error getting user multi-signature wallets:', error);
       return [];
     }
   }

@@ -36,64 +36,54 @@ yarn-error.*
 .env.production
 .env.development
 .env.staging
-.env.test
 
 # typescript
 *.tsbuildinfo
 firebase-functions/.env
+
 backend/.env
+
+# Firebase Admin SDK credentials
+**/firebase-adminsdk-*.json
+**/firebase-adminsdk-*.pem
+**/firebase-adminsdk-*.key
 
 # Build artifacts
 *.apk
 *.aab
 *.ipa
-*.app
-build/
-dist/
 
-# Security
-*.pem
-*.key
-*.p12
-*.jks
-*.keystore
-*.pfx
-*.p8
-*.mobileprovision
-*.cer
-*.crt
-*.der
+# Large files
+*.apk
+*.aab
+*.ipa
+*.dmg
+*.pkg
 
-# Google Cloud Service Account credentials
-*-firebase-adminsdk-*.json
-*-service-account-*.json
-*-credentials-*.json
-*-key-*.json
-google-credentials.json
-service-account.json
-firebase-adminsdk-*.json
+# Environment files
+.env*
+!.env.example
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-*.backup
+# Specific sensitive files
+backend/wesplit-35186-firebase-adminsdk-fbsvc-2b1bb8a520.json
+WeSplit-Development.apk
+WeSplit-Development-*.apk
 
-# IDE and Editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# API Keys and Secrets
+**/moonpay.js
+**/stripe.js
+**/google-oauth.js
 
-# OS generated files
-Thumbs.db
-ehthumbs.db
-Desktop.ini
+# Configuration locale
+config.local.js
+config.js
 
 # Logs
 *.log
 logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Runtime data
 pids
@@ -103,12 +93,26 @@ pids
 
 # Coverage directory used by tools like istanbul
 coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
 
 # Dependency directories
+node_modules/
 jspm_packages/
 
 # Optional npm cache directory
 .npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
 
 # Optional REPL history
 .node_repl_history
@@ -120,44 +124,39 @@ jspm_packages/
 .yarn-integrity
 
 # dotenv environment variables file
-.env
+.env.test
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
 
-# next.js build output
+# Next.js build output
 .next
 
-# nuxt.js build output
+# Nuxt.js build / generate output
 .nuxt
+dist
 
-# vuepress build output
-.vuepress/dist
+# Gatsby files
+.cache/
+public
 
-# Serverless directories
-.serverless
+# Storybook build outputs
+.out
+.storybook-out
 
-# FuseBox cache
-.fusebox/
+# Temporary folders
+tmp/
+temp/
 
-# DynamoDB Local files
-.dynamodb/
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# TernJS port file
-.tern-port
-
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
-
-# Firebase
-.firebase/
-firebase-debug.log
-firebase-debug.*.log
-
-# Sentry
-.sentryclirc
-
-# Temporary files
-*.tmp
-*.temp
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, SafeAreaView, Image } from 'react-native';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
-import Icon from '../../components/Icon';
 import MoonPayWidget from '../../components/MoonPayWidget';
 import styles from './styles';
 
@@ -103,7 +102,7 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
-            source={require('../../../assets/arrow-left.png')}
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             style={{ width: 24, height: 24 }}
           />
         </TouchableOpacity>
@@ -126,7 +125,7 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
           >
            
               <Image
-                source={require('../../../assets/topup-img-card.png')}
+                source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftopup-img-card.png?alt=media&token=b362caf8-0072-4fd7-9542-4ee0751769ea' }}
                 style={styles.paymentMethodIcon}
               />
         
@@ -145,7 +144,7 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
           >
             
               <Image
-                source={require('../../../assets/topup-img-wallet.png')}
+                source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftopup-img-wallet.png?alt=media&token=844d9b87-eb25-44ad-bc13-3ff85313cb50' }}
                 style={styles.paymentMethodIcon}
               />
             

@@ -16,34 +16,6 @@ import TransactionModal from '../../components/TransactionModal';
 import { colors } from '../../theme';
 import { styles } from './styles';
 
-// Component to display expense amount with proper currency conversion
-const ExpenseAmountDisplay: React.FC<{ expense: Expense; realTimeUSDAmounts: Record<string, number> }> = ({ expense, realTimeUSDAmounts }) => {
-  const { currentUser } = useApp().state;
-  
-  // Use real-time conversion if available, otherwise fallback to hardcoded rate
-  const getDisplayAmount = () => {
-    if (realTimeUSDAmounts[expense.id]) {
-      return realTimeUSDAmounts[expense.id];
-    }
-    
-    // Fallback to hardcoded rate
-    const currency = expense.currency || 'SOL';
-    const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
-    return expense.amount * rate;
-  };
-
-  const displayAmount = getDisplayAmount();
-
-  return (
-    <Text style={[
-      styles.expenseUserAmount,
-      expense.paid_by === currentUser?.id ? styles.positiveAmount : styles.neutralAmount
-    ]}>
-      ${displayAmount.toFixed(2)}
-    </Text>
-  );
-};
-
 const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   // Validate and extract groupId from route params
   const groupId = route.params?.groupId;
@@ -117,10 +89,6 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Prevent infinite loops by tracking if we've already loaded data
   const [hasLoadedData, setHasLoadedData] = useState(false);
-  
-  // State for real-time currency conversion
-  const [realTimeUSDAmounts, setRealTimeUSDAmounts] = useState<Record<string, number>>({});
-  const [conversionLoading, setConversionLoading] = useState(false);
 
   // Load real balance data function with comprehensive error handling
   const loadRealBalances = useCallback(async () => {
@@ -140,16 +108,9 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     setDataError(null);
 
     try {
-      // Ensure we have a consistent current user ID
-      const currentUserId = currentUser?.id ? String(currentUser.id) : null;
-      
-      if (__DEV__) {
-        console.log('🔍 GroupDetailsScreen: Loading balances with currentUserId:', currentUserId);
-      }
-      
       // Load members and expenses in parallel
       const [members, expenses] = await Promise.all([
-        firebaseDataService.group.getGroupMembers(groupId.toString(), false, currentUserId),
+        firebaseDataService.group.getGroupMembers(groupId.toString(), false, currentUser?.id ? String(currentUser.id) : undefined),
         firebaseDataService.expense.getGroupExpenses(groupId.toString())
       ]);
 
@@ -210,7 +171,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       const balances = await calculateGroupBalances(groupForCalculation, {
         normalizeToUSDC: true,
         includeZeroBalances: true,
-        currentUserId: currentUserId
+        currentUserId: currentUser?.id?.toString()
       });
 
       setRealGroupBalances(balances);
@@ -269,23 +230,19 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     }
   }, [groupId, hasLoadedData, groupLoading]); // Removed loadRealBalances from dependencies
 
-  // Start group listener when component mounts (only once)
+  // Start group listener when component mounts
   useEffect(() => {
     if (groupId) {
-      if (__DEV__) {
-        console.log('🔍 GroupDetailsScreen: Starting group listener for:', groupId);
-      }
+      // Group listener started
       startGroupListener(groupId.toString());
       
       // Cleanup function to stop listener when component unmounts
       return () => {
-        if (__DEV__) {
-          console.log('🔍 GroupDetailsScreen: Stopping group listener for:', groupId);
-        }
+        // Group listener stopped
         stopGroupListener(groupId.toString());
       };
     }
-  }, [groupId]); // Removed startGroupListener and stopGroupListener from dependencies to prevent restarts
+  }, [groupId, startGroupListener, stopGroupListener]);
 
   // Also load group data if not available
   useEffect(() => {
@@ -293,58 +250,6 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       // The useGroupData hook should handle this, but let's ensure it's triggered
     }
   }, [groupId, group, groupLoading]);
-
-  // Function to update real-time currency conversion
-  const updateRealTimeConversion = useCallback(async () => {
-    if (individualExpenses.length === 0 || conversionLoading) return;
-    
-    setConversionLoading(true);
-    try {
-      const conversionPromises = individualExpenses.map(async (expense) => {
-        if (!expense || expense.amount === undefined) return null;
-        const currency = expense.currency || 'SOL';
-        const amount = expense.amount || 0;
-        
-        try {
-          if (currency === 'USDC') {
-            return { id: expense.id, amount };
-          } else {
-            const converted = await convertToUSDC(amount, currency);
-            return { id: expense.id, amount: converted };
-          }
-        } catch (error) {
-          console.error(`Error converting expense ${expense.id} to USD:`, error);
-          return null;
-        }
-      });
-      
-      const results = await Promise.all(conversionPromises);
-      const newAmounts: Record<string, number> = {};
-      
-      results.forEach(result => {
-        if (result) {
-          newAmounts[result.id] = result.amount;
-        }
-      });
-      
-      setRealTimeUSDAmounts(newAmounts);
-    } catch (error) {
-      console.error('Error updating real-time conversion:', error);
-    } finally {
-      setConversionLoading(false);
-    }
-  }, [individualExpenses, conversionLoading]);
-
-  // Update real-time conversion when expenses change (with debounce)
-  useEffect(() => {
-    if (individualExpenses.length > 0) {
-      const timeoutId = setTimeout(() => {
-        updateRealTimeConversion();
-      }, 500); // Debounce for 500ms
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [individualExpenses, updateRealTimeConversion]);
 
   // Track if modal was opened from route params to prevent reopening
   const [modalOpenedFromParams, setModalOpenedFromParams] = useState(false);
@@ -459,35 +364,15 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       let totalAmountDisplay = '$0.00';
 
       if (individualExpenses.length > 0) {
-        // Use actual conversion rates from real-time amounts when available
         totalAmountUSD = individualExpenses.reduce((sum, expense) => {
           if (!expense || expense.amount === undefined) return sum;
           const currency = expense.currency || 'SOL';
           const amount = expense.amount || 0;
-          
-          // Use real-time conversion if available, otherwise fallback
-          if (realTimeUSDAmounts[expense.id]) {
-            return sum + realTimeUSDAmounts[expense.id];
-          } else {
-            // Use more accurate fallback rates
-            const rate = currency === 'SOL' ? 162 : (currency === 'USDC' ? 1 : 100);
-            return sum + (amount * rate);
-          }
+          // Use consistent conversion rates
+          const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
+          return sum + (amount * rate);
         }, 0);
         totalAmountDisplay = `$${totalAmountUSD.toFixed(2)}`;
-        
-        if (__DEV__) {
-          console.log('💰 GroupDetailsScreen: Total spending calculation:', {
-            totalAmountUSD,
-            individualExpenses: individualExpenses.map(e => ({
-              id: e.id,
-              amount: e.amount,
-              currency: e.currency,
-              realTimeUSD: realTimeUSDAmounts[e.id],
-              calculated: realTimeUSDAmounts[e.id] || (e.amount * (e.currency === 'SOL' ? 162 : 1))
-            }))
-          });
-        }
       }
 
       // Calculate user-specific amounts based on the unified balance calculation
@@ -508,36 +393,22 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
             expense && String(expense.paid_by) === currentUserId
           );
 
-          // Convert user's paid expenses to USD using real-time rates when available
           userPaidUSD = userPaidExpenses.reduce((sum, expense) => {
             if (!expense || expense.amount === undefined) return sum;
             const currency = expense.currency || 'SOL';
             const amount = expense.amount || 0;
-            
-            // Use real-time conversion if available, otherwise fallback
-            if (realTimeUSDAmounts[expense.id]) {
-              return sum + realTimeUSDAmounts[expense.id];
-            } else {
-              // Use more accurate fallback rates
-              const rate = currency === 'SOL' ? 162 : (currency === 'USDC' ? 1 : 100);
-              return sum + (amount * rate);
-            }
+            // Use consistent conversion rates
+            const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
+            return sum + (amount * rate);
           }, 0);
 
-          // Calculate total group expenses and user's share using real-time rates when available
+          // Calculate total group expenses and user's share
           const totalGroupExpenses = individualExpenses.reduce((sum, expense) => {
             if (!expense || expense.amount === undefined) return sum;
             const currency = expense.currency || 'SOL';
             const amount = expense.amount || 0;
-            
-            // Use real-time conversion if available, otherwise fallback
-            if (realTimeUSDAmounts[expense.id]) {
-              return sum + realTimeUSDAmounts[expense.id];
-            } else {
-              // Use more accurate fallback rates
-              const rate = currency === 'SOL' ? 162 : (currency === 'USDC' ? 1 : 100);
-              return sum + (amount * rate);
-            }
+            const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
+            return sum + (amount * rate);
           }, 0);
 
           const memberCount = group.member_count || 1;
@@ -682,7 +553,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         <Image
           source={{ uri: avatar }}
           style={styles.expenseAvatarImage}
-          defaultSource={require('../../../assets/user.png')}
+                      defaultSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
         />
       );
     }
@@ -739,7 +610,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           <Image
             source={{ uri: avatar }}
             style={styles.memberBalanceAvatarImage}
-            defaultSource={require('../../../assets/user.png')}
+            defaultSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
           />
         </View>
       );
@@ -836,7 +707,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.navigate('Dashboard')} style={styles.backButton}>
           <Image
-            source={require('../../../assets/arrow-left.png')}
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -886,7 +757,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
             <View style={styles.spendingInfo}>
               <Text style={styles.spendingLabel}>Total spending</Text>
               <View style={styles.spendingAmountContainer}>
-                <Image source={require('../../../assets/usdc-logo-black.png')} style={styles.spendingAmountIcon} />
+                <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fusdc-logo-black.png?alt=media&token=2b33d108-f3aa-471d-b7fe-6166c53c1d56' }} style={styles.spendingAmountIcon} />
                 <Text style={styles.spendingAmount}>
                   {getGroupSummary.totalAmountDisplay || '$0.00'}
                 </Text>
@@ -984,7 +855,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
                 >
                   <View style={styles.settlementCardInfos}>
                     <View style={styles.settlementCardIcon}>
-                      <Image source={require('../../../assets/icon-send.png')} style={{ width: 20, height: 20 }} />
+                      <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' }} style={{ width: 20, height: 20 }} />
                     </View>
                     <View style={styles.settlementCardContent}>
                       <Text style={styles.settlementCardTitleBlack}>
@@ -1012,7 +883,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
                 >
                   <View style={styles.settlementCardInfos}>
                     <View style={styles.settlementCardIcon}>
-                      <Image source={require('../../../assets/icon-receive.png')} style={{ width: 20, height: 20 }} />
+                      <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' }} style={{ width: 20, height: 20 }} />
                     </View>
                     <View style={styles.settlementCardContent}>
                       <Text style={styles.settlementCardTitle}>
@@ -1044,7 +915,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
                   >
                     <View style={styles.settlementCardSmallInfos}>
                     <View style={styles.settlementAvatar}>
-                      <Image source={require('../../../assets/icon-send.png')} style={{ width: 20, height: 20 }} />
+                      <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' }} style={{ width: 20, height: 20 }} />
                     </View>
                     <View style={styles.settlementInfo}>
                       <Text style={styles.settlementTitleBlack}>
@@ -1070,7 +941,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
                   >
                     <View style={styles.settlementCardSmallInfos}>
                       <View style={styles.settlementAvatar}>
-                        <Image source={require('../../../assets/icon-receive.png')} style={{ width: 20, height: 20 }} />
+                        <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' }} style={{ width: 20, height: 20 }} />
                       </View>
                       <View style={styles.settlementInfo}>
                         <Text style={styles.settlementTitle}>
@@ -1142,7 +1013,12 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
                         <Text style={styles.expenseUserStatus}>
                           {expense.paid_by === currentUser?.id ? 'You paid' : 'Group expense'}
                         </Text>
-                        <ExpenseAmountDisplay expense={expense} realTimeUSDAmounts={realTimeUSDAmounts} />
+                        <Text style={[
+                          styles.expenseUserAmount,
+                          expense.paid_by === currentUser?.id ? styles.positiveAmount : styles.neutralAmount
+                        ]}>
+                          ${expense.amount.toFixed(2)}
+                        </Text>
                       </View>
                     </View>
                   </TouchableOpacity>

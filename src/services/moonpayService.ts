@@ -1,10 +1,11 @@
-import { MOONPAY_CONFIG, getMoonPayConfig } from '../config/moonpay';
+import { apiRequest } from '../config/api';
+import { MoonPayConfig } from '../types';
 
-export const moonpayConfig = {
-  // Use environment variables for API keys
-  apiKey: process.env.MOONPAY_API_KEY || '', // Your real MoonPay public key
-  currency: 'USDC',
-  network: 'solana'
+// MoonPay configuration
+export const moonPayConfig: MoonPayConfig = {
+  apiKey: process.env.EXPO_PUBLIC_MOONPAY_API_KEY || 'YOUR_MOONPAY_API_KEY_HERE', // Load from environment variable
+  environment: __DEV__ ? 'sandbox' : 'production',
+  baseUrl: __DEV__ ? 'https://buy-sandbox.moonpay.com' : 'https://buy.moonpay.com'
 };
 
 export interface MoonPayURLResponse {
@@ -37,28 +38,24 @@ function createDirectMoonPayURL(walletAddress: string, amount?: number, currency
   }
   
   console.log('🔍 MoonPay: Creating URL with params:', {
-    apiKey: moonpayConfig.apiKey,
+    apiKey: moonPayConfig.apiKey,
     currencyCode: currency,
     walletAddress: walletAddress,
     amount
   });
   
   const params = new URLSearchParams({
-    apiKey: moonpayConfig.apiKey,
+    apiKey: moonPayConfig.apiKey,
     currencyCode: currency.toLowerCase(), // MoonPay expects lowercase
     walletAddress: walletAddress,
-    redirectURL: 'wesplit://moonpay-success'
+    ...(amount && { baseCurrencyAmount: amount.toString() })
   });
   
-  // Add amount if provided
-  if (amount) {
-    params.append('baseCurrencyAmount', amount.toString());
-  }
-  
+  // Add additional MoonPay parameters
+  params.append('redirectURL', 'wesplit://moonpay-success');
   params.append('failureRedirectURL', 'wesplit://moonpay-failure');
   
-  const config = getMoonPayConfig();
-  const url = `${config.baseUrl}?${params.toString()}`;
+  const url = `${moonPayConfig.baseUrl}?${params.toString()}`;
   console.log('🔍 MoonPay: Generated URL:', url);
   
   return url;
@@ -94,17 +91,12 @@ export async function createMoonPayURL(walletAddress: string, amount?: number, c
 }
 
 export async function checkMoonPayStatus(transactionId: string): Promise<MoonPayStatusResponse> {
-  // Stub function - MoonPay status checking is not implemented yet
-  if (__DEV__) { console.log('🔍 MoonPay: Status check not implemented for transaction:', transactionId); }
-  
-  // Return a mock response for now
-  return {
-    transactionId,
-    status: 'pending',
-    amount: '0',
-    currency: 'USDC',
-    timestamp: new Date().toISOString()
-  };
+  try {
+    return await apiRequest<MoonPayStatusResponse>(`/api/moonpay/status/${transactionId}`);
+  } catch (e) {
+    console.error('Error checking MoonPay status:', e);
+    throw new Error('Unable to check transaction status. Please contact support if needed.');
+  }
 }
 
 export function openMoonPayInBrowser(url: string): void {

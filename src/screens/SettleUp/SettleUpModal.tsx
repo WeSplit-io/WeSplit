@@ -1066,7 +1066,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
                         </Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <Image
-                            source={require('../../../assets/usdc-logo-white.png')}
+                            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fusdc-logo-white.png?alt=media&token=fb534b70-6bb8-4803-8bea-e8e60b1cd0cc' }}
                             style={styles.amountHeaderCurrency}
                           />
                           <Text style={styles.amountHeaderValue}>
@@ -1122,7 +1122,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
                               <View style={styles.settlementCardAmountContainer}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                                   <Image
-                                    source={require('../../../assets/usdc-logo-white.png')}
+                                    source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fusdc-logo-white.png?alt=media&token=fb534b70-6bb8-4803-8bea-e8e60b1cd0cc' }}
                                     style={styles.settlementCardCurrency}
                                   />
                                   <Text style={styles.settlementCardAmount}>

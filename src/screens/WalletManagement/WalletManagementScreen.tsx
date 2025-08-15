@@ -587,7 +587,7 @@ const WalletManagementScreen: React.FC = () => {
           <View style={styles.externalWalletCard}>
             <View style={styles.externalWalletAddress}>
               <View style={styles.optionLeft}>
-                <Image source={require('../../../assets/wallet-icon-white.png')} style={styles.optionIcon} />
+                <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-white.png?alt=media&token=96e009f8-b451-4dbd-80da-65fcb315ecb2' }} style={styles.optionIcon} />
                 <Text style={styles.externalWalletAddressText}>
                   {formatAddress(appWalletAddress)}
                 </Text>
@@ -598,7 +598,7 @@ const WalletManagementScreen: React.FC = () => {
         ) : (
           <View style={styles.linkWalletButton}>
             <View style={styles.optionLeft}>
-              <Image source={require('../../../assets/wallet-icon-white.png')} style={styles.optionIcon} />
+              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-white.png?alt=media&token=96e009f8-b451-4dbd-80da-65fcb315ecb2' }} style={styles.optionIcon} />
               <Text style={styles.linkWalletText}>App wallet not connected</Text>
             </View>
           </View>
@@ -620,7 +620,7 @@ const WalletManagementScreen: React.FC = () => {
           <View style={styles.externalWalletCard}>
             <View style={styles.externalWalletAddress}>
               <View style={styles.optionLeft}>
-                <Image source={require('../../../assets/wallet-icon-green.png')} style={styles.optionIcon} />
+                <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-green.png?alt=media&token=40942c0d-a9f5-4128-a58e-243f41e0c67e' }} style={styles.optionIcon} />
                 <Text style={styles.externalWalletAddressText}>
                 {formatAddress(walletInfo.address)}
               </Text>
@@ -638,7 +638,7 @@ const WalletManagementScreen: React.FC = () => {
             onPress={() => navigation.navigate('ExternalWalletConnection')}
           >
             <View style={styles.optionLeft}>
-              <Image source={require('../../../assets/wallet-icon-white.png')} style={styles.optionIcon} />
+              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-white.png?alt=media&token=96e009f8-b451-4dbd-80da-65fcb315ecb2' }} style={styles.optionIcon} />
               <Text style={styles.linkWalletText}>Link external wallet</Text>
             </View>
             <Icon name="chevron-right" size={16} color={colors.white} />
@@ -653,7 +653,7 @@ const WalletManagementScreen: React.FC = () => {
           onPress={handleSeedPhrase}
         >
           <View style={styles.optionLeft}>
-            <Image source={require('../../../assets/id-icon-white.png')} style={styles.optionIcon} />
+            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fid-icon-white.png?alt=media&token=247ae71e-f5c2-4193-ba3a-c1fc3ddaa5d0' }} style={styles.optionIcon} />
             <Text style={styles.optionText}>Seed phrase</Text>
           </View>
           <Icon name="chevron-right" size={16} color={colors.textLightSecondary} />
@@ -661,7 +661,7 @@ const WalletManagementScreen: React.FC = () => {
 
         <View style={styles.optionRow}>
           <View style={styles.optionLeft}>
-            <Image source={require('../../../assets/scan-icon-white.png')} style={styles.optionIcon} />
+            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fscan-icon-white.png?alt=media&token=c284a318-5a38-4ac6-a660-c7219af4360f' }} style={styles.optionIcon} />
             <View>
               <Text style={styles.optionText}>Multi-sign</Text>
               {multiSignEnabled && multiSignRemainingDays > 0 && (
@@ -728,27 +728,27 @@ const WalletManagementScreen: React.FC = () => {
           let transactionSubtitle;
 
           if (isIncoming) {
-            transactionIcon = require('../../../assets/icon-receive.png');
+            transactionIcon = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' };
             transactionColor = colors.primaryGreen;
             transactionTitle = `Received from ${transaction.recipient}`;
             transactionSubtitle = `+$${transaction.amount.toFixed(2)}`;
           } else if (isOutgoing) {
-            transactionIcon = require('../../../assets/icon-send.png');
+            transactionIcon = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
             transactionColor = colors.textLight;
             transactionTitle = `Sent to ${transaction.recipient}`;
             transactionSubtitle = `-$${transaction.amount.toFixed(2)}`;
           } else if (isDeposit) {
-            transactionIcon = require('../../../assets/icon-deposit.png');
+            transactionIcon = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-deposit.png?alt=media&token=d832bae5-dc8e-4347-bab5-cfa9621a5c55' };
             transactionColor = colors.primaryGreen;
             transactionTitle = 'Deposit';
             transactionSubtitle = `+$${transaction.amount.toFixed(2)}`;
           } else if (isWithdraw) {
-            transactionIcon = require('../../../assets/icon-withdraw.png');
+            transactionIcon = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-withdraw.png?alt=media&token=8c0da99e-287c-4d19-8515-ba422430b71b' };
             transactionColor = colors.textLight;
             transactionTitle = 'Withdrawal';
             transactionSubtitle = `-$${transaction.amount.toFixed(2)}`;
           } else {
-            transactionIcon = require('../../../assets/icon-send.png');
+            transactionIcon = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
             transactionColor = colors.textLight;
             transactionTitle = transaction.recipient || 'Unknown';
             transactionSubtitle = `$${transaction.amount.toFixed(2)}`;
@@ -802,7 +802,7 @@ const WalletManagementScreen: React.FC = () => {
       ) : (
         <View style={styles.emptyTransactions}>
           <Image 
-            source={require('../../../assets/group-enpty-state.png')} 
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fgroup-enpty-state.png?alt=media&token=c3f4dae7-1628-4d8a-9836-e413e3824ebd' }} 
             style={{ width: 80, height: 80, marginBottom: spacing.md, opacity: 0.5 }}
           />
           <Text style={styles.emptyTransactionsText}>No transactions yet</Text>
@@ -833,7 +833,7 @@ const WalletManagementScreen: React.FC = () => {
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Image
-            source={require('../../../assets/arrow-left.png')}
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -852,7 +852,7 @@ const WalletManagementScreen: React.FC = () => {
             <Text style={styles.balanceLabel}>App Wallet Balance</Text>
             <TouchableOpacity style={styles.qrCodeIcon} onPress={() => setQrCodeModalVisible(true)}>
               <Image
-                source={require('../../../assets/qr-code-scan.png')}
+                source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fqr-code-scan.png?alt=media&token=3fc388bd-fdf7-4863-a8b1-9313490d6382' }}
                 style={styles.qrCodeImage}
               />
             </TouchableOpacity>
@@ -872,7 +872,7 @@ const WalletManagementScreen: React.FC = () => {
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={require('../../../assets/icon-send.png')}
+                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' }}
                   style={styles.actionButtonIcon}
                 />
               </View>
@@ -885,7 +885,7 @@ const WalletManagementScreen: React.FC = () => {
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={require('../../../assets/icon-receive.png')}
+                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' }}
                   style={styles.actionButtonIcon}
                 />
               </View>
@@ -898,7 +898,7 @@ const WalletManagementScreen: React.FC = () => {
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={require('../../../assets/icon-deposit.png')}
+                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-deposit.png?alt=media&token=d832bae5-dc8e-4347-bab5-cfa9621a5c55' }}
                   style={styles.actionButtonIcon}
                 />
               </View>
@@ -913,7 +913,7 @@ const WalletManagementScreen: React.FC = () => {
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={require('../../../assets/icon-withdraw.png')}
+                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-withdraw.png?alt=media&token=8c0da99e-287c-4d19-8515-ba422430b71b' }}
                   style={styles.actionButtonIcon}
                 />
               </View>
@@ -983,7 +983,7 @@ const WalletManagementScreen: React.FC = () => {
             <View style={styles.bottomSheet}>
               <View style={styles.modalContent}>
                 <View style={styles.successContainer}>
-                  <Image source={require('../../../assets/success-icon.png')} style={styles.successIcon} />
+                  <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsuccess-icon.png?alt=media&token=6cf1d0fb-7a48-4c4c-aa4c-3c3f76c54f07' }} style={styles.successIcon} />
                   <Text style={styles.successTitle}>Multi-sign activated</Text>
                 </View>
               </View>

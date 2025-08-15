@@ -221,7 +221,7 @@ const AccountSettingsScreen = ({ navigation }: any) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <Image
-            source={require('../../../assets/arrow-left.png')}
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -241,11 +241,11 @@ const AccountSettingsScreen = ({ navigation }: any) => {
                 <Image source={{ uri: currentUser.avatar }} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                  <Image source={require('../../../assets/user.png')} style={styles.avatarIcon} />
+                  <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media' }} style={styles.avatarIcon} />
                 </View>
               )}
               <View style={styles.cameraIconContainer}>
-                <Image source={require('../../../assets/modify-icon-white.png')} style={styles.cameraIcon} />
+                                  <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmodify-icon-white.png?alt=media&token=4b1aa40d-4d81-4e40-9d3b-9638bc589e21' }} style={styles.cameraIcon} />
               </View>
             </TouchableOpacity>
           </View>

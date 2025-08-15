@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Alert, ActivityIndicator, Linking } from 'react-native';
 import Icon from '../../components/Icon';
 import { useTranslation, i18nService, SupportedLanguage } from '../../services/i18nService';
 import styles from './styles';
@@ -119,7 +119,9 @@ const LanguageScreen = ({ navigation }: any) => {
         </View>
 
         <View style={styles.helpSection}>
-          <Text style={styles.helpTitle}>Need Help?</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://t.me/wesplit_support_bot')}>
+            <Text style={styles.helpTitle}>Need Help?</Text>
+          </TouchableOpacity>
           <Text style={styles.helpText}>
             If you don't see your language listed, please contact our support team. 
             We're constantly working to add more language options.
