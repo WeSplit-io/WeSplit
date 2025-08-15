@@ -35,9 +35,14 @@ const USDC_MINT_ADDRESSES = {
 };
 
 // Current network configuration
-const CURRENT_NETWORK = process.env.NODE_ENV === 'production' ? 'mainnet' : 'devnet';
+// Force mainnet for production use - Phantom wallets are typically on mainnet
+const CURRENT_NETWORK = 'mainnet'; // Always use mainnet for real USDC transactions
 const RPC_ENDPOINT = SOLANA_RPC_ENDPOINTS[CURRENT_NETWORK];
 const USDC_MINT_ADDRESS = USDC_MINT_ADDRESSES[CURRENT_NETWORK];
+
+console.log('🌐 SolanaAppKitService: Using network:', CURRENT_NETWORK);
+console.log('🌐 SolanaAppKitService: RPC endpoint:', RPC_ENDPOINT);
+console.log('🌐 SolanaAppKitService: USDC mint address:', USDC_MINT_ADDRESS);
 
 export interface WalletInfo {
   address: string;

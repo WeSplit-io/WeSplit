@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // WalletInfo interface for backward compatibility
@@ -55,6 +55,10 @@ interface WalletContextType {
   appWalletBalance: number | null;
   appWalletConnected: boolean;
   
+  // Auto-refresh state
+  autoRefreshEnabled: boolean;
+  lastBalanceCheck: Date;
+  
   // Actions
   connectWallet: () => Promise<void>; // Connect external wallet
   connectToExternalWallet: (providerKey: string) => Promise<void>;
@@ -69,6 +73,12 @@ interface WalletContextType {
   // App Wallet Actions
   ensureAppWallet: (userId: string) => Promise<void>;
   getAppWalletBalance: (userId: string) => Promise<number>;
+  
+  // Auto-refresh Actions
+  startBalancePolling: (userId: string) => Promise<void>;
+  stopBalancePolling: () => void;
+  toggleAutoRefresh: (enabled: boolean) => void;
+  enhancedRefreshBalance: () => Promise<void>;
   
   // Provider methods
   getAvailableProviders: () => any[];
@@ -102,10 +112,15 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [availableWallets, setAvailableWallets] = useState<StoredWallet[]>([]);
   const [currentWalletId, setCurrentWalletId] = useState<string | null>(null);
   
-  // App wallet state (separate from external wallet)
+  // App Wallet State (separate from external wallet)
   const [appWalletAddress, setAppWalletAddress] = useState<string | null>(null);
   const [appWalletBalance, setAppWalletBalance] = useState<number | null>(null);
   const [appWalletConnected, setAppWalletConnected] = useState(false);
+  
+  // Auto-refresh state for balances
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [lastBalanceCheck, setLastBalanceCheck] = useState<Date>(new Date());
+  const [balancePollingInterval, setBalancePollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (__DEV__) { console.log('WalletProvider mounted successfully'); }
@@ -483,6 +498,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     if (__DEV__) { console.log('WalletProvider: Setting up event listeners'); }
   }, [isConnected, address, chainId, balance, walletName, currentWalletId]);
 
+
+
   // App wallet methods
   const ensureAppWallet = async (userId: string) => {
     try {
@@ -518,6 +535,96 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       return 0;
     }
   };
+
+  // Auto-refresh balance functionality
+  const startBalancePolling = useCallback(async (userId: string) => {
+    if (!autoRefreshEnabled || balancePollingInterval) return;
+
+    console.log('🔄 WalletProvider: Starting balance polling for user:', userId);
+    
+    const interval = setInterval(async () => {
+      try {
+        // Refresh app wallet balance with transaction monitoring
+        if (appWalletConnected) {
+          const { userWalletService } = await import('../services/userWalletService');
+          const enhancedResult = await userWalletService.getUserWalletBalanceWithTransactionCheck(
+            userId, 
+            { 
+              solBalance: 0, 
+              usdcBalance: 0, 
+              totalUSD: appWalletBalance || 0, 
+              address: appWalletAddress || '', 
+              isConnected: true 
+            }
+          );
+          
+          if (enhancedResult.balance) {
+            setAppWalletBalance(enhancedResult.balance.totalUSD);
+            
+            // If new transactions detected, log them
+            if (enhancedResult.hasNewTransactions) {
+              console.log('🎉 WalletProvider: New transactions detected!', {
+                newTransactions: enhancedResult.newTransactions.length,
+                newBalance: enhancedResult.balance.totalUSD
+              });
+            }
+          }
+        }
+        
+        // Refresh external wallet balance if connected
+        if (isConnected && address) {
+          await refreshBalance();
+        }
+        
+        setLastBalanceCheck(new Date());
+        
+      } catch (error) {
+        console.error('❌ WalletProvider: Error during auto-refresh:', error);
+      }
+    }, 30000); // Check every 30 seconds
+
+    setBalancePollingInterval(interval);
+  }, [autoRefreshEnabled, appWalletConnected, isConnected, address]); // Simplified dependencies
+
+  const stopBalancePolling = useCallback(() => {
+    if (balancePollingInterval) {
+      clearInterval(balancePollingInterval);
+      setBalancePollingInterval(null);
+      console.log('🛑 WalletProvider: Balance polling stopped');
+    }
+  }, [balancePollingInterval]);
+
+  const toggleAutoRefresh = useCallback((enabled: boolean) => {
+    setAutoRefreshEnabled(enabled);
+    if (enabled) {
+      console.log('✅ WalletProvider: Auto-refresh enabled');
+    } else {
+      console.log('❌ WalletProvider: Auto-refresh disabled');
+      stopBalancePolling();
+    }
+  }, [stopBalancePolling]);
+
+  // Enhanced refresh balance method with auto-polling
+  const enhancedRefreshBalance = useCallback(async () => {
+    try {
+      if (__DEV__) {
+        console.log('🔄 WalletProvider: Manual balance refresh triggered');
+      }
+      
+      // Refresh external wallet balance if connected
+      if (isConnected && address) {
+        await refreshBalance();
+      }
+      
+      setLastBalanceCheck(new Date());
+      
+      if (__DEV__) {
+        console.log('✅ WalletProvider: Manual balance refresh completed');
+      }
+    } catch (error) {
+      console.error('❌ WalletProvider: Error during manual balance refresh:', error);
+    }
+  }, [isConnected, address]);
 
   const handleSendTransaction = async (params: TransactionParams): Promise<{ signature: string; txId: string }> => {
     try {
@@ -591,6 +698,9 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     appWalletAddress,
     appWalletBalance,
     appWalletConnected,
+    // Auto-refresh state
+    autoRefreshEnabled,
+    lastBalanceCheck,
     // Actions
     connectWallet: handleConnectWallet,
     connectToExternalWallet,
@@ -635,10 +745,37 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     // App wallet actions
     ensureAppWallet,
     getAppWalletBalance,
+    // Auto-refresh Actions
+    startBalancePolling,
+    stopBalancePolling,
+    toggleAutoRefresh,
+    enhancedRefreshBalance,
     // Provider methods
     getAvailableProviders,
     isProviderAvailable,
   };
+
+  // Auto-refresh balance polling effects
+  useEffect(() => {
+    // Start polling when app wallet is connected
+    if (appWalletConnected && autoRefreshEnabled) {
+      // We need a userId to start polling, but we don't have it in this context
+      // The polling will be started from the Dashboard when we have the userId
+      console.log('🔄 WalletProvider: App wallet connected, ready for polling');
+    }
+    
+    return () => {
+      // Cleanup polling on unmount
+      stopBalancePolling();
+    };
+  }, [appWalletConnected, autoRefreshEnabled, stopBalancePolling]);
+
+  // Cleanup polling when wallet disconnects
+  useEffect(() => {
+    if (!appWalletConnected && !isConnected) {
+      stopBalancePolling();
+    }
+  }, [appWalletConnected, isConnected, stopBalancePolling]);
 
   return (
     <WalletContext.Provider value={value}>

@@ -20,9 +20,14 @@ const USDC_MINT_ADDRESSES = {
 };
 
 // Current network configuration
-const CURRENT_NETWORK = process.env.NODE_ENV === 'production' ? 'mainnet' : 'devnet';
+// Force mainnet for production use - Phantom wallets are typically on mainnet
+const CURRENT_NETWORK = 'mainnet'; // Always use mainnet for real USDC transactions
 const RPC_ENDPOINT = SOLANA_RPC_ENDPOINTS[CURRENT_NETWORK];
 const USDC_MINT_ADDRESS = USDC_MINT_ADDRESSES[CURRENT_NETWORK];
+
+console.log('🌐 UserWalletService: Using network:', CURRENT_NETWORK);
+console.log('🌐 UserWalletService: RPC endpoint:', RPC_ENDPOINT);
+console.log('🌐 UserWalletService: USDC mint address:', USDC_MINT_ADDRESS);
 
 export interface UserWalletBalance {
   solBalance: number;
@@ -229,6 +234,91 @@ export class UserWalletService {
     } catch (error) {
       console.error('Error fetching user wallet balance:', error);
       return null;
+    }
+  }
+
+  // Enhanced balance checking with transaction monitoring
+  async getUserWalletBalanceWithTransactionCheck(userId: string, lastKnownBalance?: UserWalletBalance): Promise<{
+    balance: UserWalletBalance | null;
+    hasNewTransactions: boolean;
+    newTransactions: any[];
+  }> {
+    try {
+      const currentBalance = await this.getUserWalletBalance(userId);
+      
+      if (!currentBalance) {
+        return {
+          balance: null,
+          hasNewTransactions: false,
+          newTransactions: []
+        };
+      }
+
+      // Check if there are new transactions by comparing balances
+      let hasNewTransactions = false;
+      let newTransactions: any[] = [];
+
+      if (lastKnownBalance) {
+        const balanceChanged = 
+          Math.abs(currentBalance.usdcBalance - lastKnownBalance.usdcBalance) > 0.000001 ||
+          Math.abs(currentBalance.solBalance - lastKnownBalance.solBalance) > 0.000001;
+
+        if (balanceChanged) {
+          hasNewTransactions = true;
+          console.log('💰 UserWalletService: Balance change detected!', {
+            previous: lastKnownBalance,
+            current: currentBalance
+          });
+
+          // Try to fetch recent transactions for this wallet
+          try {
+            const publicKey = new PublicKey(currentBalance.address);
+            const signatures = await this.connection.getSignaturesForAddress(publicKey, { limit: 5 });
+            
+            if (signatures.length > 0) {
+              // Get transaction details for the most recent signatures
+              const transactionDetails = await Promise.all(
+                signatures.slice(0, 3).map(async (sig) => {
+                  try {
+                    const tx = await this.connection.getTransaction(sig.signature, {
+                      commitment: 'confirmed',
+                      maxSupportedTransactionVersion: 0
+                    });
+                    return {
+                      signature: sig.signature,
+                      blockTime: sig.blockTime,
+                      slot: sig.slot,
+                      transaction: tx
+                    };
+                  } catch (error) {
+                    console.warn('Failed to get transaction details for signature:', sig.signature);
+                    return null;
+                  }
+                })
+              );
+
+              newTransactions = transactionDetails.filter(tx => tx !== null);
+              console.log('💰 UserWalletService: Found new transactions:', newTransactions.length);
+            }
+          } catch (error) {
+            console.warn('Failed to fetch recent transactions:', error);
+          }
+        }
+      }
+
+      return {
+        balance: currentBalance,
+        hasNewTransactions,
+        newTransactions
+      };
+
+    } catch (error) {
+      console.error('Error in enhanced balance check:', error);
+      return {
+        balance: null,
+        hasNewTransactions: false,
+        newTransactions: []
+      };
     }
   }
 

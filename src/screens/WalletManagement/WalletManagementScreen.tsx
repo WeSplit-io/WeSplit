@@ -13,6 +13,7 @@ import {
   Modal,
   Animated,
   PanResponder,
+  RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
@@ -145,6 +146,14 @@ const WalletManagementScreen: React.FC = () => {
 
     loadWalletInfo();
   }, [currentUser?.id]);
+
+  // Monitor balance changes
+  useEffect(() => {
+    if (localAppWalletBalance) {
+      console.log('💰 WalletManagement: Balance updated:', localAppWalletBalance.totalUSD, 'USD');
+      console.log('💰 WalletManagement: USDC balance:', localAppWalletBalance.usdcBalance, 'USDC');
+    }
+  }, [localAppWalletBalance?.totalUSD, localAppWalletBalance?.usdcBalance]);
 
   // Load multi-signature data
   const loadMultiSigData = async () => {
@@ -299,13 +308,35 @@ const WalletManagementScreen: React.FC = () => {
       setRefreshing(true);
       if (!currentUser?.id) return;
 
+      console.log('🔄 WalletManagement: Manual refresh triggered');
+
       // Ensure user has a wallet first
       const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
 
       if (walletResult.success && walletResult.wallet) {
-        // Refresh app wallet balance
+        console.log('💰 WalletManagement: Refreshing wallet balance...');
+        
+        // Refresh app wallet balance directly
         const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
-        setLocalAppWalletBalance(balance);
+        
+        if (balance) {
+          console.log('💰 WalletManagement: New balance detected:', balance.totalUSD, 'USD');
+          console.log('💰 WalletManagement: USDC balance:', balance.usdcBalance, 'USDC');
+          
+          // Update local balance state
+          setLocalAppWalletBalance(balance);
+          
+          // Also update the app wallet balance in context if available
+          if (getAppWalletBalance) {
+            try {
+              await getAppWalletBalance(currentUser.id.toString());
+            } catch (error) {
+              console.log('Could not update context balance:', error);
+            }
+          }
+        } else {
+          console.error('❌ WalletManagement: Failed to get wallet balance');
+        }
 
         // Refresh transactions with enhanced data
         const userTransactions = await firebaseDataService.transaction.getUserTransactions(
@@ -365,12 +396,12 @@ const WalletManagementScreen: React.FC = () => {
           setMultiSignRemainingDays(remainingDays);
         }
 
-        if (__DEV__) { console.log('✅ Wallet info refreshed successfully'); }
+        console.log('✅ WalletManagement: Refresh completed successfully');
       } else {
         console.error('❌ Failed to ensure wallet during refresh:', walletResult.error);
       }
     } catch (error) {
-      console.error('Error refreshing wallet info:', error);
+      console.error('❌ WalletManagement: Error during refresh:', error);
     } finally {
       setRefreshing(false);
     }
@@ -845,6 +876,14 @@ const WalletManagementScreen: React.FC = () => {
         style={styles.content}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primaryGreen]}
+            tintColor={colors.primaryGreen}
+          />
+        }
       >
         {/* Balance Card */}
         <View style={styles.balanceCard}>
@@ -857,9 +896,20 @@ const WalletManagementScreen: React.FC = () => {
               />
             </TouchableOpacity>
           </View>
-          <Text style={styles.balanceAmount}>
-            ${(appWalletBalance || 0).toFixed(2)}
-          </Text>
+          
+          {refreshing ? (
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <ActivityIndicator size="small" color={colors.primaryGreen} />
+              <Text style={{ color: colors.textLight, marginTop: 8, fontSize: 12 }}>
+                Updating balance...
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.balanceAmount}>
+              ${(appWalletBalance || 0).toFixed(2)}
+            </Text>
+          )}
+          
           <Text style={styles.balanceLimitText}>Balance Limit $1000</Text>
         </View>
 
