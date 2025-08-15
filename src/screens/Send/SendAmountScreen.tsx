@@ -10,7 +10,7 @@ import { styles } from './styles';
 
 const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, groupId, prefilledAmount, prefilledNote, isSettlement } = route.params || {};
-  const [amount, setAmount] = useState(prefilledAmount ? prefilledAmount.toString() : '0');
+  const [amount, setAmount] = useState(prefilledAmount ? prefilledAmount.toString() : '');
   const [showAddNote, setShowAddNote] = useState(!!prefilledNote || isSettlement);
   const [note, setNote] = useState(prefilledNote || '');
   const [noteInputWidth, setNoteInputWidth] = useState(60);
@@ -38,8 +38,12 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
   }, [note, maxNoteInputWidth]);
 
   const handleAmountChange = (value: string) => {
-    // Only allow numbers and decimal point
-    const cleaned = value.replace(/[^0-9.]/g, '');
+    // Allow empty string, numbers, and decimal separators (both . and ,)
+    // First, convert commas to dots for consistency
+    let cleaned = value.replace(/,/g, '.');
+    
+    // Then remove any other non-numeric characters except dots
+    cleaned = cleaned.replace(/[^0-9.]/g, '');
 
     // Prevent multiple decimal points
     const parts = cleaned.split('.');
@@ -48,7 +52,8 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
     // Limit decimal places to 2
     if (parts.length === 2 && parts[1].length > 2) return;
 
-    setAmount(cleaned || '0');
+    // Allow empty string or valid number
+    setAmount(cleaned);
   };
 
   const handleContinue = () => {
@@ -80,7 +85,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
   };
 
-  const isAmountValid = parseFloat(amount) > 0;
+  const isAmountValid = amount.length > 0 && parseFloat(amount) > 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -145,7 +150,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
                 onChangeText={handleAmountChange}
                 placeholder="0"
                 placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
+                keyboardType="decimal-pad"
                 autoFocus={true}
                 editable={!isSettlement}
                 textAlign="center"
