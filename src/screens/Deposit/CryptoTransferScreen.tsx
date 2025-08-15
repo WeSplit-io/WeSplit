@@ -67,29 +67,19 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
 
   const handleCopy = () => {
     if (depositAddress) {
-      const transferLink = generateTransferLink(
-        depositAddress,
-        currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
-        currentUser?.email
-      );
-      Clipboard.setString(transferLink);
-      Alert.alert('Copied', 'Transfer link copied to clipboard!');
+      Clipboard.setString(depositAddress);
+      Alert.alert('Copied', 'Wallet address copied to clipboard!');
     }
   };
 
   const handleShare = async () => {
     if (depositAddress) {
       try {
-        const transferLink = generateTransferLink(
-          depositAddress,
-          currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
-          currentUser?.email
-        );
         await Share.share({
-          message: `Transfer funds to ${isGroupWallet ? 'our group' : 'my'} app wallet using this link: ${transferLink}`,
+          message: `${isGroupWallet ? 'Our group' : 'My'} wallet address: ${depositAddress}`,
         });
       } catch (e) {
-        Alert.alert('Error', 'Could not share transfer link.');
+        Alert.alert('Error', 'Could not share wallet address.');
       }
     }
   };
@@ -250,11 +240,11 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity style={styles.actionButton} onPress={handleCopy}>
                 <Icon name="copy" size={18} color="#212121" />
-                <Text style={styles.actionButtonText}>Copy Link</Text>
+                <Text style={styles.actionButtonText}>Copy Address</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
                 <Icon name="share-2" size={18} color="#212121" />
-                <Text style={styles.actionButtonText}>Share Link</Text>
+                <Text style={styles.actionButtonText}>Share Address</Text>
               </TouchableOpacity>
             </View>
           )}
