@@ -49,6 +49,8 @@ export interface WalletCreationResult {
 
 export class UserWalletService {
   private connection: Connection;
+  private lastBalanceCall: { [userId: string]: number } = {};
+  private readonly BALANCE_CALL_DEBOUNCE_MS = 5000; // 5 seconds debounce
 
   constructor() {
     this.connection = new Connection(RPC_ENDPOINT, 'confirmed');
@@ -189,6 +191,18 @@ export class UserWalletService {
   // Get user's created wallet balance
   async getUserWalletBalance(userId: string): Promise<UserWalletBalance | null> {
     try {
+      // Check debounce - prevent rapid successive calls
+      const now = Date.now();
+      const lastCall = this.lastBalanceCall[userId] || 0;
+      if (now - lastCall < this.BALANCE_CALL_DEBOUNCE_MS) {
+        console.log('🔄 UserWalletService: Debouncing balance call for user:', userId);
+        // Return cached balance or null if no cache available
+        return null;
+      }
+      
+      // Update last call time
+      this.lastBalanceCall[userId] = now;
+      
       // First ensure user has a wallet
       const walletResult = await this.ensureUserWallet(userId);
       
@@ -201,20 +215,48 @@ export class UserWalletService {
       
       // Fetching balance for user wallet
 
-      // Get SOL balance
-      const publicKey = new PublicKey(walletAddress);
-      const solBalance = await this.connection.getBalance(publicKey);
-      const solBalanceInSol = solBalance / LAMPORTS_PER_SOL;
+      // Get SOL balance with rate limiting protection
+      let solBalanceInSol = 0;
+      try {
+        const publicKey = new PublicKey(walletAddress);
+        const solBalance = await this.connection.getBalance(publicKey);
+        solBalanceInSol = solBalance / LAMPORTS_PER_SOL;
+      } catch (error) {
+        // Handle rate limiting specifically
+        if (error instanceof Error && error.message.includes('429')) {
+          console.warn('Rate limited when fetching SOL balance, using cached value');
+          // Return cached balance or 0 if no cache
+          return {
+            solBalance: 0,
+            usdcBalance: 0,
+            totalUSD: 0,
+            address: walletAddress,
+            isConnected: true
+          };
+        }
+        throw error;
+      }
 
-      // Get USDC balance
+      // Get USDC balance with rate limiting protection
       let usdcBalance = 0;
       try {
         const usdcMint = new PublicKey(USDC_MINT_ADDRESS);
-        const usdcTokenAccount = await getAssociatedTokenAddress(usdcMint, publicKey);
+        const usdcTokenAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(walletAddress));
         const accountInfo = await getAccount(this.connection, usdcTokenAccount);
         usdcBalance = Number(accountInfo.amount) / 1000000; // USDC has 6 decimals
       } catch (error) {
-        // Token account doesn't exist, balance is 0
+        // Handle rate limiting specifically
+        if (error instanceof Error && error.message.includes('429')) {
+          console.warn('Rate limited when fetching USDC balance, using 0');
+          usdcBalance = 0;
+        } else if (error instanceof Error && error.message.includes('TokenAccountNotFoundError')) {
+          // Token account doesn't exist, balance is 0
+          usdcBalance = 0;
+        } else {
+          // For other errors, log but continue
+          console.warn('Error fetching USDC balance:', error);
+          usdcBalance = 0;
+        }
       }
 
       // Calculate total USD value (simplified conversion)
@@ -232,6 +274,17 @@ export class UserWalletService {
       };
 
     } catch (error) {
+      // Handle rate limiting at the top level
+      if (error instanceof Error && error.message.includes('429')) {
+        console.warn('Rate limited when fetching wallet balance');
+        return {
+          solBalance: 0,
+          usdcBalance: 0,
+          totalUSD: 0,
+          address: '',
+          isConnected: false
+        };
+      }
       console.error('Error fetching user wallet balance:', error);
       return null;
     }

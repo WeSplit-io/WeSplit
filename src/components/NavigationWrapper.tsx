@@ -13,9 +13,20 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
   const { state } = useApp();
   const { currentUser } = state;
   const deepLinkSetupRef = useRef<boolean>(false);
+  const currentUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (navigationRef.current && currentUser && !deepLinkSetupRef.current) {
+    // Only set up deep link listeners if:
+    // 1. Navigation is ready
+    // 2. User is authenticated
+    // 3. User ID has changed (to prevent infinite loops)
+    // 4. Deep link setup hasn't been done for this user
+    if (
+      navigationRef.current && 
+      currentUser?.id && 
+      currentUserIdRef.current !== currentUser.id && 
+      !deepLinkSetupRef.current
+    ) {
       console.log('🔥 Setting up deep link listeners for user:', currentUser.id);
       
       // Set up deep link listeners when navigation and user are available
@@ -23,16 +34,17 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
       
       // Mark as set up to prevent multiple calls
       deepLinkSetupRef.current = true;
+      currentUserIdRef.current = currentUser.id;
       
       return () => {
-        // Clean up subscription when component unmounts
+        // Clean up subscription when component unmounts or user changes
         if (subscription) {
           subscription.remove();
         }
         deepLinkSetupRef.current = false;
       };
     }
-  }, [currentUser]); // Remove navigationRef.current from dependencies
+  }, [currentUser?.id]); // Only depend on user ID, not the entire user object
 
   // Handle initial URL when app starts
   useEffect(() => {

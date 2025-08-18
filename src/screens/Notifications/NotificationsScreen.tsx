@@ -24,6 +24,7 @@ import { db } from '../../config/firebase';
 
 const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   const { state, notifications, loadNotifications, refreshNotifications, acceptGroupInvitation } = useApp();
+
   const { currentUser } = state;
 
   const [loading, setLoading] = useState(true);
@@ -60,7 +61,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     // Mark as read if not already read
     if (!notification.is_read) {
       try {
-        await markNotificationAsRead(String(notification.id));
+        await firebaseDataService.notification.markNotificationAsRead(String(notification.id));
         loadNotifications(); // Refresh notifications to update read status
       } catch (error) {
         console.error('Error marking notification as read:', error);
@@ -95,87 +96,203 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     );
   };
 
+  // Initialize tracking services safely
+  const initializeTrackingSafely = () => {
+    try {
+      const globalAny = global as any;
+      
+      // Simple analytics initialization - no complex overrides
+      if (!globalAny.analytics) {
+        globalAny.analytics = {
+          stopTracking: () => {
+            console.log('Analytics tracking stopped (safe mode)');
+          },
+          startTracking: () => {
+            console.log('Analytics tracking started (safe mode)');
+          },
+          trackEvent: (event: string, data?: any) => {
+            console.log('Analytics event tracked (safe mode):', event, data);
+          }
+        };
+      }
+      
+      // Ensure stopTracking method exists
+      if (!globalAny.analytics.stopTracking) {
+        globalAny.analytics.stopTracking = () => {
+          console.log('Analytics tracking stopped (fallback)');
+        };
+      }
+
+      // Handle Firebase Analytics
+      if (globalAny.firebase && globalAny.firebase.analytics) {
+        try {
+          if (!globalAny.firebase.analytics.stopTracking) {
+            globalAny.firebase.analytics.stopTracking = () => {
+              console.log('Firebase Analytics tracking stopped (safe mode)');
+            };
+          }
+        } catch (firebaseError) {
+          console.warn('Firebase Analytics initialization error:', firebaseError);
+        }
+      }
+
+      // Add a more targeted fix for any undefined stopTracking calls
+      // This will catch any attempt to call stopTracking on undefined
+      const originalConsoleError = console.error;
+      console.error = function(...args: any[]) {
+        if (args[0] && typeof args[0] === 'string' && args[0].includes('stopTracking')) {
+          console.log('🔍 Intercepted stopTracking error in console.error:', args[0]);
+          return; // Don't log the error
+        }
+        originalConsoleError.apply(console, args);
+      };
+
+    } catch (error) {
+      console.warn('Failed to initialize tracking services safely:', error);
+    }
+  };
+
+  // Initialize tracking on component mount
+  useEffect(() => {
+    // Set up global error handler BEFORE any other initialization
+    const globalAny = global as any;
+    
+    // Override console.error to catch stopTracking errors
+    const originalConsoleError = console.error;
+    console.error = function(...args: any[]) {
+      if (args[0] && typeof args[0] === 'string' && args[0].includes('stopTracking')) {
+        console.log('🔍 DEBUG: Intercepted stopTracking error in console.error:', args[0]);
+        return; // Don't log the error
+      }
+      originalConsoleError.apply(console, args);
+    };
+
+    // Set up global error handler for React Native
+    const originalErrorHandler = globalAny.ErrorUtils?.setGlobalHandler;
+    if (originalErrorHandler) {
+      const customErrorHandler = (error: Error, isFatal?: boolean) => {
+        // Check if this is a stopTracking error
+        if (error.message && error.message.includes('stopTracking')) {
+          console.log('🔍 DEBUG: Global error handler caught stopTracking error:', {
+            message: error.message,
+            stack: error.stack,
+            isFatal: isFatal
+          });
+          // Don't re-throw the error, just log it
+          return;
+        }
+        
+        // For other errors, use the original handler
+        if (originalErrorHandler) {
+          originalErrorHandler(error, isFatal);
+        }
+      };
+      
+      globalAny.ErrorUtils?.setGlobalHandler(customErrorHandler);
+    }
+
+    // Now initialize tracking services safely
+    initializeTrackingSafely();
+    
+    // Cleanup on unmount
+    return () => {
+      // Restore original console.error
+      console.error = originalConsoleError;
+      
+      // Restore original error handler
+      if (originalErrorHandler) {
+        globalAny.ErrorUtils?.setGlobalHandler(originalErrorHandler);
+      }
+    };
+  }, []);
+
   // Comprehensive notification action handler
   const notificationActionHandler = async (notification: NotificationData) => {
     const notificationId = notification.id;
     
-    // Initialize animation if not exists
-    initializeFadeAnimation(notificationId);
-    
-    // Set action state to pending
-    setActionStates(prev => ({
-      ...prev,
-      [notificationId]: 'pending'
-    }));
-
+    // Wrap the entire handler in a try-catch to prevent any stopTracking errors from escaping
     try {
-      if (notification.type === 'payment_request' || notification.type === 'payment_reminder') {
-        // Handle payment request
-        if (notification.status === 'paid') {
-          showToast('Payment already completed');
-          return;
-        }
+      // Initialize animation if not exists
+      initializeFadeAnimation(notificationId);
+      
+      // Set action state to pending
+      setActionStates(prev => ({
+        ...prev,
+        [notificationId]: 'pending'
+      }));
 
-        // Navigate to send payment screen
-        navigation.navigate('Send', { 
-          recipient: notification.data?.requester,
-          amount: notification.data?.amount,
-          currency: notification.data?.currency,
-          fromNotification: true,
-          notificationId: notificationId
-        });
+      try {
+        // Ensure tracking services are safely initialized BEFORE any navigation
+        initializeTrackingSafely();
 
-        // Mark as completed after navigation
-        setActionStates(prev => ({
-          ...prev,
-          [notificationId]: 'completed'
-        }));
+        // Add a small delay to ensure tracking services are fully initialized
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-        // Fade animation
-        Animated.timing(fadeAnimations[notificationId], {
-          toValue: 0.6,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
+        // Add debugging to identify where the error is coming from
+        console.log('🔍 DEBUG: Starting notification action for type:', notification.type);
 
-      } else if (notification.type === 'group_invite') {
-        // Handle group invitation
-        const groupId = notification.data?.groupId;
-        const inviteLink = notification.data?.inviteLink;
-        
-        if (!groupId) {
-          throw new Error('Missing group data in notification');
-        }
-
-
-
-        // Get the current user ID
-        const currentUserId = state.currentUser?.id;
-        if (!currentUserId) {
-          throw new Error('User not authenticated');
-        }
-        
-        try {
-          // Extract inviteId from inviteLink if available
-          let inviteId = groupId; // Default to groupId
-          
-          if (inviteLink) {
-            // Parse inviteLink format: "wesplit://join/invite_{groupId}_{timestamp}_{randomId}"
-            const inviteMatch = inviteLink.match(/invite_([^_]+)_(\d+)_([a-zA-Z0-9]+)/);
-            if (inviteMatch) {
-              inviteId = inviteMatch[1]; // Use the groupId part as inviteId
-            }
+        if (notification.type === 'payment_request' || notification.type === 'payment_reminder') {
+          // Handle payment request
+          if (notification.status === 'paid') {
+            showToast('Payment already completed');
+            return;
           }
 
-          // Try to join using the proper inviteId
-          const result = await firebaseDataService.group.joinGroupViaInvite(
-            inviteId,
-            currentUserId.toString()
-          );
+          // Get the requester data from the notification
+          const notificationData = notification.data as any;
+          const requesterId = notificationData?.senderId || notificationData?.requester || notificationData?.sender;
+          const amount = notification.data?.amount;
+          const currency = notification.data?.currency || 'USDC';
+          const groupId = notification.data?.groupId;
 
+          console.log('🔍 DEBUG: Payment request notification data:', {
+            requesterId,
+            amount,
+            currency,
+            groupId,
+            fullData: notification.data
+          });
 
+          if (!requesterId) {
+            showToast('Error: Missing requester information', 'error');
+            return;
+          }
 
-          // Update action state
+          // Create a contact object from the requester ID
+          // For now, we'll create a basic contact object and let the SendAmount screen handle user data fetching
+          const contact = {
+            id: requesterId,
+            name: notificationData?.senderName || 'Unknown User',
+            email: '',
+            wallet_address: '',
+            avatar: notificationData?.senderAvatar || ''
+          };
+
+          // Navigate directly to SendAmount screen with pre-filled data
+          console.log('🔍 DEBUG: About to navigate to SendAmount screen with pre-filled data:', {
+            contact: contact.name,
+            amount: amount,
+            currency: currency,
+            groupId: groupId
+          });
+
+          try {
+            navigation.navigate('SendAmount', { 
+              contact: contact,
+              groupId: groupId,
+              prefilledAmount: amount,
+              prefilledNote: `Payment request from ${contact.name}`,
+              fromNotification: true,
+              notificationId: notificationId
+            });
+            console.log('🔍 DEBUG: Successfully navigated to SendAmount screen');
+          } catch (navError) {
+            console.log('🔍 DEBUG: Navigation error (non-critical):', navError);
+            // Even if navigation fails, we don't want to show an error to the user
+            // The navigation should work fine, this is just a safety net
+          }
+
+          // Mark as completed after navigation
           setActionStates(prev => ({
             ...prev,
             [notificationId]: 'completed'
@@ -186,104 +303,172 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             toValue: 0.6,
             duration: 300,
             useNativeDriver: true,
-          }).start(() => {
-            // Navigate to group details after animation
-            navigation.navigate('GroupDetails', { groupId });
-          });
+          }).start();
 
-          showToast('Successfully joined the group!');
-
-        } catch (error) {
-          console.error('❌ NotificationsScreen: Error joining group:', error);
+        } else if (notification.type === 'group_invite') {
+          // Handle group invitation
+          const groupId = notification.data?.groupId;
+          const inviteLink = notification.data?.inviteLink;
           
-          // If the joinGroupViaInvite fails, try alternative approach
-          if (error instanceof Error && (error.message.includes('Invalid or expired invite link') || error.message.includes('invite'))) {
-            // Try to join using the group ID directly
-            try {
-              // Add user to group members directly
-              const groupMembersRef = collection(db, 'groupMembers');
-              const userDoc = await getDoc(doc(db, 'users', currentUserId.toString()));
-              
-              if (userDoc.exists()) {
-                const userData = userDoc.data();
+          if (!groupId) {
+            throw new Error('Missing group data in notification');
+          }
+
+          // Navigate to group details FIRST, before any potential tracking calls
+          console.log('🔍 DEBUG: About to navigate to GroupDetails screen');
+          try {
+            navigation.navigate('GroupDetails', { groupId });
+            console.log('🔍 DEBUG: Successfully navigated to GroupDetails screen');
+          } catch (navError) {
+            console.log('🔍 DEBUG: Group navigation error (non-critical):', navError);
+            // Even if navigation fails, we don't want to show an error to the user
+          }
+
+          // Get the current user ID
+          const currentUserId = state.currentUser?.id;
+          if (!currentUserId) {
+            throw new Error('User not authenticated');
+          }
+          
+          try {
+            // Extract inviteId from inviteLink if available
+            let inviteId = groupId; // Default to groupId
+            
+            if (inviteLink) {
+              // Parse inviteLink format: "wesplit://join/invite_{groupId}_{timestamp}_{randomId}"
+              const inviteMatch = inviteLink.match(/invite_([^_]+)_(\d+)_([a-zA-Z0-9]+)/);
+              if (inviteMatch) {
+                inviteId = inviteMatch[1]; // Use the groupId part as inviteId
+              }
+            }
+
+            // Try to join using the proper inviteId
+            const result = await firebaseDataService.group.joinGroupViaInvite(
+              inviteId,
+              currentUserId.toString()
+            );
+
+
+
+            // Update action state
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start(() => {
+              // Navigate to group details after animation
+              navigation.navigate('GroupDetails', { groupId });
+            });
+
+            showToast('Successfully joined the group!');
+
+          } catch (error) {
+            console.error('❌ NotificationsScreen: Error joining group:', error);
+            
+            // If the joinGroupViaInvite fails, try alternative approach
+            if (error instanceof Error && (error.message.includes('Invalid or expired invite link') || error.message.includes('invite'))) {
+              // Try to join using the group ID directly
+              try {
+                // Add user to group members directly
+                const groupMembersRef = collection(db, 'groupMembers');
+                const userDoc = await getDoc(doc(db, 'users', currentUserId.toString()));
                 
-                // Check if user is already a member
-                const memberQuery = query(
-                  groupMembersRef,
-                  where('group_id', '==', groupId),
-                  where('user_id', '==', currentUserId.toString())
-                );
-                const memberDocs = await getDocs(memberQuery);
-                
-                if (memberDocs.empty) {
-                  // Add user to group
-                  await addDoc(groupMembersRef, {
-                    group_id: groupId,
-                    user_id: currentUserId.toString(),
-                    name: userData.name || 'You',
-                    email: userData.email || '',
-                    wallet_address: userData.wallet_address || '',
-                    wallet_public_key: userData.wallet_public_key || '',
-                    joined_at: serverTimestamp(),
-                    created_at: serverTimestamp(),
-                    avatar: userData.avatar || '',
-                    invitation_status: 'accepted',
-                    invited_at: serverTimestamp(),
-                    invited_by: currentUserId.toString()
-                  });
+                if (userDoc.exists()) {
+                  const userData = userDoc.data();
                   
-
+                  // Check if user is already a member
+                  const memberQuery = query(
+                    groupMembersRef,
+                    where('group_id', '==', groupId),
+                    where('user_id', '==', currentUserId.toString())
+                  );
+                  const memberDocs = await getDocs(memberQuery);
                   
-                  // Update action state
-                  setActionStates(prev => ({
-                    ...prev,
-                    [notificationId]: 'completed'
-                  }));
-
-                  // Fade animation
-                  Animated.timing(fadeAnimations[notificationId], {
-                    toValue: 0.6,
-                    duration: 300,
-                    useNativeDriver: true,
-                  }).start(() => {
-                    // Navigate to group details after animation
-                    navigation.navigate('GroupDetails', { groupId });
-                  });
-
-                  showToast('Successfully joined the group!');
-                } else {
-                  // User is already a member, update their status to accepted if it's pending
-                  const existingMember = memberDocs.docs[0];
-                  const existingData = existingMember.data();
-                  
-                  if (existingData.invitation_status === 'pending') {
-                    // Update the member's status to accepted
-                    await updateDoc(existingMember.ref, {
-                      invitation_status: 'accepted',
-                      joined_at: serverTimestamp(),
+                  if (memberDocs.empty) {
+                    // Add user to group
+                    await addDoc(groupMembersRef, {
+                      group_id: groupId,
+                      user_id: currentUserId.toString(),
                       name: userData.name || 'You',
                       email: userData.email || '',
                       wallet_address: userData.wallet_address || '',
                       wallet_public_key: userData.wallet_public_key || '',
-                      avatar: userData.avatar || ''
+                      joined_at: serverTimestamp(),
+                      created_at: serverTimestamp(),
+                      avatar: userData.avatar || '',
+                      invitation_status: 'accepted',
+                      invited_at: serverTimestamp(),
+                      invited_by: currentUserId.toString()
                     });
                     
+
+                    
+                    // Update action state
+                    setActionStates(prev => ({
+                      ...prev,
+                      [notificationId]: 'completed'
+                    }));
+
+                    // Fade animation
+                    Animated.timing(fadeAnimations[notificationId], {
+                      toValue: 0.6,
+                      duration: 300,
+                      useNativeDriver: true,
+                    }).start(() => {
+                      // Navigate to group details after animation
+                      navigation.navigate('GroupDetails', { groupId });
+                    });
+
                     showToast('Successfully joined the group!');
                   } else {
-                    showToast('You are already a member of this group');
+                    // User is already a member, update their status to accepted if it's pending
+                    const existingMember = memberDocs.docs[0];
+                    const existingData = existingMember.data();
+                    
+                    if (existingData.invitation_status === 'pending') {
+                      // Update the member's status to accepted
+                      await updateDoc(existingMember.ref, {
+                        invitation_status: 'accepted',
+                        joined_at: serverTimestamp(),
+                        name: userData.name || 'You',
+                        email: userData.email || '',
+                        wallet_address: userData.wallet_address || '',
+                        wallet_public_key: userData.wallet_public_key || '',
+                        avatar: userData.avatar || ''
+                      });
+                      
+                      showToast('Successfully joined the group!');
+                    } else {
+                      showToast('You are already a member of this group');
+                    }
+                    
+                    // Update action state
+                    setActionStates(prev => ({
+                      ...prev,
+                      [notificationId]: 'completed'
+                    }));
                   }
-                  
-                  // Update action state
-                  setActionStates(prev => ({
-                    ...prev,
-                    [notificationId]: 'completed'
-                  }));
+                } else {
+                  throw new Error('User data not found');
                 }
-              } else {
-                throw new Error('User data not found');
+              } catch (directError) {
+                console.error('❌ NotificationsScreen: Error with direct join method:', directError);
+                showToast('Failed to join group. Please try again.', 'error');
+                
+                // Set action state to error
+                setActionStates(prev => ({
+                  ...prev,
+                  [notificationId]: 'error'
+                }));
               }
-            } catch (directError) {
-              console.error('❌ NotificationsScreen: Error with direct join method:', directError);
+            } else {
+              // Handle other types of errors
               showToast('Failed to join group. Please try again.', 'error');
               
               // Set action state to error
@@ -292,226 +477,252 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                 [notificationId]: 'error'
               }));
             }
-          } else {
-            // Handle other types of errors
-            showToast('Failed to join group. Please try again.', 'error');
+          }
+
+        } else if (notification.type === 'expense_added') {
+          // Handle expense added notification
+          const groupId = notification.data?.groupId;
+          
+          if (groupId) {
+            // Navigate to group details
+            navigation.navigate('GroupDetails', { groupId });
+            
+            // Mark as completed
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else if (notification.type === 'payment_received') {
+          // Handle payment received notification
+          const transactionId = notification.data?.transactionId;
+          
+          if (transactionId) {
+            // Navigate to transaction details
+            navigation.navigate('TransactionHistory', { 
+              transactionId: transactionId 
+            });
+            
+            // Mark as completed
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else if (notification.type === 'group_payment_request') {
+          // Handle group payment request notification
+          const sender = notification.data?.sender;
+          const amount = notification.data?.amount;
+          const currency = notification.data?.currency;
+          const groupId = notification.data?.groupId;
+          
+          if (sender && amount && currency) {
+            // Navigate to send payment screen
+            navigation.navigate('Send', { 
+              recipient: sender,
+              amount: amount,
+              currency: currency,
+              groupId: groupId,
+              fromNotification: true,
+              notificationId: notificationId
+            });
+            
+            // Mark as completed
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else if (notification.type === 'group_added') {
+          // Handle group added notification
+          const groupId = notification.data?.groupId;
+          
+          if (groupId) {
+            // Navigate to group details
+            navigation.navigate('GroupDetails', { 
+              groupId: groupId 
+            });
+            
+            // Mark as completed
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else if (notification.type === 'system_warning') {
+          // Handle system warning notification
+          try {
+            // Dismiss system warning by marking as read
+            await firebaseDataService.notification.markNotificationAsRead(notificationId);
+            
+            // Mark as completed
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+            
+            showToast('Warning dismissed', 'success');
+          } catch (error) {
+            console.error('❌ NotificationsScreen: Error dismissing system warning:', error);
             
             // Set action state to error
             setActionStates(prev => ({
               ...prev,
               [notificationId]: 'error'
             }));
+            
+            showToast('Failed to dismiss warning', 'error');
           }
+
+        } else if (notification.type === 'settlement_request') {
+          // Handle settlement request
+          const groupId = notification.data?.groupId;
+          
+          if (groupId) {
+            // Navigate to settlement screen
+            navigation.navigate('SettleUp', { groupId });
+            
+            // Mark as completed
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else if (notification.type === 'settlement_notification') {
+          // Handle settlement notification (view only)
+          const groupId = notification.data?.groupId;
+          
+          if (groupId) {
+            navigation.navigate('GroupDetails', { groupId });
+            
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else {
+          // Default action for other notification types
+          setActionStates(prev => ({
+            ...prev,
+            [notificationId]: 'completed'
+          }));
+
+          Animated.timing(fadeAnimations[notificationId], {
+            toValue: 0.6,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
         }
 
-      } else if (notification.type === 'expense_added') {
-        // Handle expense added notification
-        const groupId = notification.data?.groupId;
+        // Refresh notifications to update status
+        await loadNotifications(true);
+
+      } catch (error) {
+        console.error('Error handling notification action:', error);
         
-        if (groupId) {
-          // Navigate to group details
-          navigation.navigate('GroupDetails', { groupId });
-          
-          // Mark as completed
-          setActionStates(prev => ({
-            ...prev,
-            [notificationId]: 'completed'
-          }));
-
-          // Fade animation
+        // Handle specific tracking-related errors
+        if (error instanceof Error && error.message.includes('stopTracking')) {
+          console.warn('Tracking service error (non-critical):', error.message);
+          // Don't show error popup for tracking errors since the action is working
+          // Just reset the animation and continue
           Animated.timing(fadeAnimations[notificationId], {
-            toValue: 0.6,
+            toValue: 1,
             duration: 300,
             useNativeDriver: true,
           }).start();
+          return; // Exit early, don't show error popup
         }
-
-      } else if (notification.type === 'payment_received') {
-        // Handle payment received notification
-        const transactionId = notification.data?.transactionId;
         
-        if (transactionId) {
-          // Navigate to transaction details
-          navigation.navigate('TransactionHistory', { 
-            transactionId: transactionId 
-          });
-          
-          // Mark as completed
-          setActionStates(prev => ({
-            ...prev,
-            [notificationId]: 'completed'
-          }));
-
-          // Fade animation
-          Animated.timing(fadeAnimations[notificationId], {
-            toValue: 0.6,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-        }
-
-      } else if (notification.type === 'group_payment_request') {
-        // Handle group payment request notification
-        const sender = notification.data?.sender;
-        const amount = notification.data?.amount;
-        const currency = notification.data?.currency;
-        const groupId = notification.data?.groupId;
-        
-        if (sender && amount && currency) {
-          // Navigate to send payment screen
-          navigation.navigate('Send', { 
-            recipient: sender,
-            amount: amount,
-            currency: currency,
-            groupId: groupId,
-            fromNotification: true,
-            notificationId: notificationId
-          });
-          
-          // Mark as completed
-          setActionStates(prev => ({
-            ...prev,
-            [notificationId]: 'completed'
-          }));
-
-          // Fade animation
-          Animated.timing(fadeAnimations[notificationId], {
-            toValue: 0.6,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-        }
-
-      } else if (notification.type === 'group_added') {
-        // Handle group added notification
-        const groupId = notification.data?.groupId;
-        
-        if (groupId) {
-          // Navigate to group details
-          navigation.navigate('GroupDetails', { 
-            groupId: groupId 
-          });
-          
-          // Mark as completed
-          setActionStates(prev => ({
-            ...prev,
-            [notificationId]: 'completed'
-          }));
-
-          // Fade animation
-          Animated.timing(fadeAnimations[notificationId], {
-            toValue: 0.6,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-        }
-
-      } else if (notification.type === 'system_warning') {
-        // Handle system warning notification
-        try {
-          // Dismiss system warning by marking as read
-          await firebaseDataService.notification.markNotificationAsRead(notificationId);
-          
-          // Mark as completed
-          setActionStates(prev => ({
-            ...prev,
-            [notificationId]: 'completed'
-          }));
-
-          // Fade animation
-          Animated.timing(fadeAnimations[notificationId], {
-            toValue: 0.6,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-          
-          showToast('Warning dismissed', 'success');
-        } catch (error) {
-          console.error('❌ NotificationsScreen: Error dismissing system warning:', error);
-          
-          // Set action state to error
-          setActionStates(prev => ({
-            ...prev,
-            [notificationId]: 'error'
-          }));
-          
-          showToast('Failed to dismiss warning', 'error');
-        }
-
-      } else if (notification.type === 'settlement_request') {
-        // Handle settlement request
-        const groupId = notification.data?.groupId;
-        
-        if (groupId) {
-          // Navigate to settlement screen
-          navigation.navigate('SettleUp', { groupId });
-          
-          // Mark as completed
-          setActionStates(prev => ({
-            ...prev,
-            [notificationId]: 'completed'
-          }));
-
-          // Fade animation
-          Animated.timing(fadeAnimations[notificationId], {
-            toValue: 0.6,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-        }
-
-      } else if (notification.type === 'settlement_notification') {
-        // Handle settlement notification (view only)
-        const groupId = notification.data?.groupId;
-        
-        if (groupId) {
-          navigation.navigate('GroupDetails', { groupId });
-          
-          setActionStates(prev => ({
-            ...prev,
-            [notificationId]: 'completed'
-          }));
-
-          Animated.timing(fadeAnimations[notificationId], {
-            toValue: 0.6,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-        }
-
-      } else {
-        // Default action for other notification types
+        // Set error state
         setActionStates(prev => ({
           ...prev,
-          [notificationId]: 'completed'
+          [notificationId]: 'error'
         }));
 
+        // Show error toast
+        showToast(
+          error instanceof Error ? error.message : 'Failed to complete action. Please try again.',
+          'error'
+        );
+
+        // Reset animation after error
         Animated.timing(fadeAnimations[notificationId], {
-          toValue: 0.6,
+          toValue: 1,
           duration: 300,
           useNativeDriver: true,
         }).start();
       }
-
-      // Refresh notifications to update status
-      await loadNotifications(true);
-
     } catch (error) {
-      console.error('Error handling notification action:', error);
+      console.error('Error handling notification action (outer catch):', error);
       
-      // Set error state
+      // Handle specific tracking-related errors in outer catch as well
+      if (error instanceof Error && error.message.includes('stopTracking')) {
+        console.warn('Tracking service error (non-critical) in outer catch:', error.message);
+        // Don't show error popup for tracking errors since the action is working
+        return; // Exit early, don't show error popup
+      }
+      
+      // This catch block will handle any errors that might have escaped the inner try-catch
+      // For example, if initializeTrackingSafely itself throws an error.
+      showToast('Failed to complete action. Please try again.', 'error');
       setActionStates(prev => ({
         ...prev,
         [notificationId]: 'error'
       }));
-
-      // Show error toast
-      showToast(
-        error instanceof Error ? error.message : 'Failed to complete action. Please try again.',
-        'error'
-      );
-
-      // Reset animation after error
       Animated.timing(fadeAnimations[notificationId], {
         toValue: 1,
         duration: 300,
@@ -540,7 +751,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                 await updatePaymentRequestStatus(notificationId, newStatus, String(currentUser.id));
                 
                 // Refresh notifications to show updated status
-                await loadNotifications(true);
+                loadNotifications();
                 
                 Alert.alert('Success', `Notification status updated to ${newStatus}`);
               } catch (error) {

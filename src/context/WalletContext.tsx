@@ -118,7 +118,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [appWalletConnected, setAppWalletConnected] = useState(false);
   
   // Auto-refresh state for balances
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false); // Disabled by default to prevent rate limiting
   const [lastBalanceCheck, setLastBalanceCheck] = useState<Date>(new Date());
   const [balancePollingInterval, setBalancePollingInterval] = useState<NodeJS.Timeout | null>(null);
 
@@ -579,12 +579,18 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         setLastBalanceCheck(new Date());
         
       } catch (error) {
-        console.error('❌ WalletProvider: Error during auto-refresh:', error);
+        // Handle rate limiting specifically
+        if (error instanceof Error && error.message.includes('429')) {
+          console.warn('🔄 WalletProvider: Rate limited, will retry later');
+          // Don't log as error for rate limiting
+        } else {
+          console.error('❌ WalletProvider: Error during auto-refresh:', error);
+        }
       }
-    }, 30000); // Check every 30 seconds
+    }, 60000); // Check every 60 seconds instead of 30 to reduce rate limiting
 
     setBalancePollingInterval(interval);
-  }, [autoRefreshEnabled, appWalletConnected, isConnected, address]); // Simplified dependencies
+  }, [autoRefreshEnabled, appWalletConnected, isConnected, address, appWalletBalance, appWalletAddress]); // Added missing dependencies
 
   const stopBalancePolling = useCallback(() => {
     if (balancePollingInterval) {
@@ -757,18 +763,15 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   // Auto-refresh balance polling effects
   useEffect(() => {
-    // Start polling when app wallet is connected
-    if (appWalletConnected && autoRefreshEnabled) {
-      // We need a userId to start polling, but we don't have it in this context
-      // The polling will be started from the Dashboard when we have the userId
-      console.log('🔄 WalletProvider: App wallet connected, ready for polling');
-    }
+    // Disabled automatic polling to prevent rate limiting and infinite loops
+    // Users can manually refresh balances when needed
+    console.log('🔄 WalletProvider: Auto-refresh disabled to prevent rate limiting');
     
     return () => {
       // Cleanup polling on unmount
       stopBalancePolling();
     };
-  }, [appWalletConnected, autoRefreshEnabled, stopBalancePolling]);
+  }, []); // Empty dependency array to run only once
 
   // Cleanup polling when wallet disconnects
   useEffect(() => {

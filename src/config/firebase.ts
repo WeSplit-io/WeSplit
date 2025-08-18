@@ -334,8 +334,15 @@ export const firestoreService = {
         return false; // No verification record, needs verification
       }
       
-      // Check if last verification was within the last 30 days
+      // Check if lastVerifiedAt is a valid date (not NaN)
       const lastVerified = new Date(lastVerifiedAt);
+      if (isNaN(lastVerified.getTime())) {
+        console.warn('⚠️ Invalid lastVerifiedAt date found for user:', email, 'Value:', lastVerifiedAt);
+        // Fix the invalid date by updating it to current time
+        await this.updateLastVerifiedAt(email);
+        return true; // Allow user to proceed since we're fixing the issue
+      }
+      
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
       
@@ -377,6 +384,44 @@ export const firestoreService = {
       }
     } catch (error) {
       console.error('Error updating lastVerifiedAt:', error);
+    }
+  },
+
+  // Fix users with invalid lastVerifiedAt dates
+  async fixInvalidLastVerifiedAt() {
+    try {
+      const usersRef = collection(db, 'users');
+      const querySnapshot = await getDocs(usersRef);
+      
+      let fixedCount = 0;
+      
+      for (const doc of querySnapshot.docs) {
+        const userData = doc.data();
+        const lastVerifiedAt = userData.lastVerifiedAt;
+        
+        if (lastVerifiedAt) {
+          const lastVerified = new Date(lastVerifiedAt);
+          if (isNaN(lastVerified.getTime())) {
+            console.warn('⚠️ Fixing invalid lastVerifiedAt for user:', userData.email, 'Value:', lastVerifiedAt);
+            
+            await updateDoc(doc.ref, {
+              lastVerifiedAt: new Date().toISOString(),
+              lastLoginAt: new Date().toISOString()
+            });
+            
+            fixedCount++;
+          }
+        }
+      }
+      
+      if (fixedCount > 0) {
+        console.log(`✅ Fixed ${fixedCount} users with invalid lastVerifiedAt dates`);
+      }
+      
+      return fixedCount;
+    } catch (error) {
+      console.error('Error fixing invalid lastVerifiedAt dates:', error);
+      return 0;
     }
   },
 

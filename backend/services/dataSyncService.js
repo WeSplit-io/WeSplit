@@ -137,6 +137,19 @@ class DataSyncService {
   // ===== INDIVIDUAL SYNC METHODS =====
 
   async syncUserToFirebase(user) {
+    // Handle potential NaN values in last_verified_at
+    let lastVerifiedAt = null;
+    if (user.last_verified_at) {
+      const lastVerifiedDate = new Date(user.last_verified_at);
+      if (!isNaN(lastVerifiedDate.getTime())) {
+        lastVerifiedAt = lastVerifiedDate;
+      } else {
+        console.warn('⚠️ Invalid last_verified_at found for user:', user.email, 'Value:', user.last_verified_at);
+        // Use current time as fallback
+        lastVerifiedAt = new Date();
+      }
+    }
+
     const userDoc = {
       id: user.id.toString(),
       email: user.email,
@@ -145,7 +158,7 @@ class DataSyncService {
       walletPublicKey: user.wallet_public_key,
       avatar: user.avatar,
       createdAt: new Date(user.created_at),
-      lastVerifiedAt: user.last_verified_at ? new Date(user.last_verified_at) : null,
+      lastVerifiedAt: lastVerifiedAt,
       syncedFrom: 'sqlite',
       lastSyncedAt: new Date()
     };

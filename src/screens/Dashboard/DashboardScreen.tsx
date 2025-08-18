@@ -240,19 +240,15 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     } finally {
       setLoadingUserWallet(false);
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUser?.wallet_address, updateUser]);
 
-  // Load user wallet balance when component mounts or wallet connection changes
+  // Consolidated effect to load user wallet balance - only run when necessary
   useEffect(() => {
-    loadUserCreatedWalletBalance();
-  }, [currentUser?.id, updateUser]); // Add updateUser dependency
-
-  // Reload app wallet balance when app wallet state changes (for consistency)
-  useEffect(() => {
-    if (currentUser?.id) {
-    loadUserCreatedWalletBalance();
+    // Only load balance when user is authenticated and we have a user ID
+    if (currentUser?.id && isAuthenticated) {
+      loadUserCreatedWalletBalance();
     }
-  }, [appWalletConnected, currentUser?.id, updateUser]); // Add updateUser dependency
+  }, [currentUser?.id, isAuthenticated, loadUserCreatedWalletBalance]);
 
   // Convert group amounts to USD for display with proper currency handling
   const convertGroupAmountsToUSD = useCallback(async (groups: GroupWithDetails[]) => {

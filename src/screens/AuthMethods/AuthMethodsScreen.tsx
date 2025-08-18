@@ -165,33 +165,23 @@ const AuthMethodsScreen: React.FC = () => {
   const handleEmailAuth = async () => {
     // Sanitize email by trimming whitespace and newlines
     const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
-    
-    if (!sanitizedEmail || !sanitizedEmail.includes('@')) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
-      return;
-    }
 
-    // Prevent multiple checks
-    if (hasCheckedMonthlyVerification) {
-      if (__DEV__) { console.log('🔄 Monthly verification already checked, skipping...'); }
-      return;
-    }
-
-    // Check if user is already authenticated
-    const currentUser = auth.currentUser;
-    if (currentUser && currentUser.email === email) {
-      if (__DEV__) { console.log('🔄 User already authenticated, skipping verification...'); }
+    if (!sanitizedEmail) {
+      Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
     setLoading(true);
-    setHasCheckedMonthlyVerification(true);
 
     try {
-      // Check if user has already verified within the last 30 days
-      const hasVerifiedWithin30Days = await firestoreService.hasVerifiedWithin30Days(sanitizedEmail);
+      // First, fix any users with invalid lastVerifiedAt dates
+      const { firestoreService } = await import('../../config/firebase');
+      await firestoreService.fixInvalidLastVerifiedAt();
 
-      if (hasVerifiedWithin30Days) {
+      // Check if user has verified within 30 days
+      const hasVerifiedRecently = await firestoreService.hasVerifiedWithin30Days(sanitizedEmail);
+
+      if (hasVerifiedRecently) {
         if (__DEV__) {
           console.log('✅ User has already verified within the last 30 days, bypassing verification');
         }
