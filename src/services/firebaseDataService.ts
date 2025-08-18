@@ -2688,6 +2688,61 @@ export const firebaseSettlementService = {
   }
 };
 
+// Multi-signature services (Firebase implementations)
+export const firebaseMultiSigService = {
+  getUserMultiSigWallets: async (userId: string): Promise<any[]> => {
+    try {
+      if (__DEV__) { console.log('🔥 Getting user multi-signature wallets for:', userId); }
+      
+      const walletsRef = collection(db, 'multiSigWallets');
+      const walletsQuery = query(
+        walletsRef,
+        where('owners', 'array-contains', userId),
+        orderBy('created_at', 'desc')
+      );
+      
+      const walletsSnapshot = await getDocs(walletsQuery);
+      const wallets = walletsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      if (__DEV__) { console.log('🔥 Retrieved multi-signature wallets:', wallets.length); }
+      
+      return wallets;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting user multi-signature wallets:', error); }
+      throw error;
+    }
+  },
+
+  getUserTransactions: async (userId: string): Promise<any[]> => {
+    try {
+      if (__DEV__) { console.log('🔥 Getting user multi-signature transactions for:', userId); }
+      
+      const transactionsRef = collection(db, 'multiSigTransactions');
+      const transactionsQuery = query(
+        transactionsRef,
+        where('participants', 'array-contains', userId),
+        orderBy('created_at', 'desc')
+      );
+      
+      const transactionsSnapshot = await getDocs(transactionsQuery);
+      const transactions = transactionsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      if (__DEV__) { console.log('🔥 Retrieved multi-signature transactions:', transactions.length); }
+      
+      return transactions;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting user multi-signature transactions:', error); }
+      throw error;
+    }
+  }
+};
+
 // Main Firebase data service export
 export const firebaseDataService = {
   user: firebaseUserService,
@@ -2696,5 +2751,6 @@ export const firebaseDataService = {
   transaction: firebaseTransactionService,
   notification: firebaseNotificationService,
   settlement: firebaseSettlementService,
+  multiSig: firebaseMultiSigService,
   transformers: firebaseDataTransformers
 }; 

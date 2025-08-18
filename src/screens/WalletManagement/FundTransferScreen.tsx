@@ -1,0 +1,410 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+  TextInput,
+  ActivityIndicator
+} from 'react-native';
+import { useApp } from '../../context/AppContext';
+import { walletLinkingService, WalletLink } from '../../services/walletLinkingService';
+import { phantomWalletLinkingService } from '../../services/phantomWalletLinkingService';
+import { theme } from '../../lib/theme';
+
+interface FundTransferScreenProps {
+  navigation: any;
+  route: any;
+}
+
+const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, route }) => {
+  const { state } = useApp();
+  const currentUser = state.currentUser;
+  const [linkedWallets, setLinkedWallets] = useState<WalletLink[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [transferring, setTransferring] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState<WalletLink | null>(null);
+  const [amount, setAmount] = useState('');
+  const [appWalletAddress, setAppWalletAddress] = useState('');
+
+  useEffect(() => {
+    loadLinkedWallets();
+    loadAppWalletAddress();
+  }, []);
+
+  const loadLinkedWallets = async () => {
+    try {
+      setLoading(true);
+      if (!currentUser?.id) {
+        console.log('🔗 FundTransferScreen: No current user');
+        return;
+      }
+
+      console.log('🔗 FundTransferScreen: Loading linked wallets for user:', currentUser.id);
+      const wallets = await walletLinkingService.getLinkedWallets(currentUser.id.toString());
+      setLinkedWallets(wallets);
+      
+      console.log('🔗 FundTransferScreen: Loaded wallets:', wallets.length);
+    } catch (error) {
+      console.error('🔗 FundTransferScreen: Error loading linked wallets:', error);
+      Alert.alert('Error', 'Failed to load linked wallets');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAppWalletAddress = async () => {
+    try {
+      // In a real implementation, you would get the user's app wallet address
+      // For now, we'll use a placeholder
+      setAppWalletAddress('E7W2pyGG9Vkc4FWiEyZPUd7sBvNsrKkhqaA6nnRauniF');
+    } catch (error) {
+      console.error('🔗 FundTransferScreen: Error loading app wallet address:', error);
+    }
+  };
+
+  const handleTransferFunds = async () => {
+    try {
+      if (!selectedWallet) {
+        Alert.alert('Error', 'Please select a wallet to transfer from');
+        return;
+      }
+
+      const transferAmount = parseFloat(amount);
+      if (isNaN(transferAmount) || transferAmount <= 0) {
+        Alert.alert('Error', 'Please enter a valid amount');
+        return;
+      }
+
+      setTransferring(true);
+
+      console.log('🔗 FundTransferScreen: Starting fund transfer...');
+      console.log('🔗 FundTransferScreen: From:', selectedWallet.walletAddress);
+      console.log('🔗 FundTransferScreen: To:', appWalletAddress);
+      console.log('🔗 FundTransferScreen: Amount:', transferAmount, 'SOL');
+
+      // Transfer funds using the secure wallet linking service
+      const transferResult = await phantomWalletLinkingService.transferFundsToAppWallet(
+        selectedWallet.walletAddress,
+        appWalletAddress,
+        transferAmount
+      );
+
+      if (transferResult.success) {
+        Alert.alert(
+          'Transfer Successful',
+          `Successfully transferred ${transferAmount} SOL to your app wallet!\n\nTransaction ID: ${transferResult.transactionId}`,
+          [
+            {
+              text: 'Continue',
+              onPress: () => {
+                navigation.goBack();
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Transfer Failed', transferResult.error || 'Unknown error occurred');
+      }
+
+    } catch (error) {
+      console.error('🔗 FundTransferScreen: Error transferring funds:', error);
+      Alert.alert('Error', 'Failed to transfer funds');
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  const formatWalletAddress = (address: string) => {
+    return `${address.slice(0, 8)}...${address.slice(-8)}`;
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading linked wallets...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Transfer Funds</Text>
+      </View>
+
+      <ScrollView style={styles.scrollView}>
+        {/* App Wallet Info */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Your App Wallet</Text>
+          <View style={styles.walletCard}>
+            <Text style={styles.walletName}>WeSplit App Wallet</Text>
+            <Text style={styles.walletAddress}>
+              {formatWalletAddress(appWalletAddress)}
+            </Text>
+            <Text style={styles.walletType}>Internal Wallet</Text>
+          </View>
+        </View>
+
+        {/* Select Source Wallet */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Select Source Wallet</Text>
+          {linkedWallets.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>No Linked Wallets</Text>
+              <Text style={styles.emptySubtitle}>
+                You need to link an external wallet first to transfer funds.
+              </Text>
+              <TouchableOpacity 
+                style={styles.linkWalletButton}
+                onPress={() => navigation.navigate('ExternalWalletConnection')}
+              >
+                <Text style={styles.linkWalletButtonText}>Link External Wallet</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            linkedWallets.map((wallet) => (
+              <TouchableOpacity
+                key={wallet.id}
+                style={[
+                  styles.walletCard,
+                  selectedWallet?.id === wallet.id && styles.selectedWalletCard
+                ]}
+                onPress={() => setSelectedWallet(wallet)}
+              >
+                <View style={styles.walletHeader}>
+                  <Text style={styles.walletName}>{wallet.walletName}</Text>
+                  <View style={styles.walletTypeBadge}>
+                    <Text style={styles.walletTypeText}>{wallet.walletType}</Text>
+                  </View>
+                </View>
+                <Text style={styles.walletAddress}>
+                  {formatWalletAddress(wallet.walletAddress)}
+                </Text>
+                <Text style={styles.walletLinkedDate}>
+                  Linked: {formatDate(wallet.linkedAt)}
+                </Text>
+                {wallet.balance !== undefined && (
+                  <Text style={styles.walletBalance}>
+                    Balance: {wallet.balance.toFixed(4)} SOL
+                  </Text>
+                )}
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+
+        {/* Transfer Amount */}
+        {selectedWallet && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Transfer Amount</Text>
+            <View style={styles.amountContainer}>
+              <TextInput
+                style={styles.amountInput}
+                value={amount}
+                onChangeText={setAmount}
+                placeholder="Enter amount in SOL"
+                placeholderTextColor={theme.colors.gray}
+                keyboardType="numeric"
+              />
+              <Text style={styles.currencyLabel}>SOL</Text>
+            </View>
+            <Text style={styles.amountHint}>
+              Transfer from {selectedWallet.walletName} to your app wallet
+            </Text>
+          </View>
+        )}
+
+        {/* Transfer Button */}
+        {selectedWallet && amount && (
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={[
+                styles.transferButton,
+                transferring && styles.transferButtonDisabled
+              ]}
+              onPress={handleTransferFunds}
+              disabled={transferring}
+            >
+              {transferring ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={styles.transferButtonText}>Transfer Funds</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.background,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: theme.colors.text,
+  },
+  header: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  section: {
+    padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 12,
+  },
+  walletCard: {
+    backgroundColor: theme.colors.card,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: 12,
+  },
+  selectedWalletCard: {
+    borderColor: theme.colors.primary,
+    borderWidth: 2,
+  },
+  walletHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  walletName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  },
+  walletTypeBadge: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  walletTypeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'white',
+  },
+  walletAddress: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontFamily: 'monospace',
+    marginBottom: 4,
+  },
+  walletType: {
+    fontSize: 14,
+    color: theme.colors.gray,
+    marginBottom: 4,
+  },
+  walletLinkedDate: {
+    fontSize: 14,
+    color: theme.colors.gray,
+    marginBottom: 4,
+  },
+  walletBalance: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: theme.colors.gray,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  linkWalletButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  linkWalletButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  amountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  amountInput: {
+    flex: 1,
+    fontSize: 18,
+    color: theme.colors.text,
+  },
+  currencyLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginLeft: 8,
+  },
+  amountHint: {
+    fontSize: 14,
+    color: theme.colors.gray,
+    marginTop: 8,
+  },
+  transferButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  transferButtonDisabled: {
+    opacity: 0.6,
+  },
+  transferButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+});
+
+export default FundTransferScreen; 

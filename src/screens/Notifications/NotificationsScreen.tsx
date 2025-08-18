@@ -19,11 +19,39 @@ import { updatePaymentRequestStatus, updateSettlementRequestStatus } from '../..
 import { firebaseDataService } from '../../services/firebaseDataService';
 import styles from './styles';
 import { colors } from '../../theme/colors';
-import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
 const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   const { state, notifications, loadNotifications, refreshNotifications, acceptGroupInvitation } = useApp();
+
+  // Function to fetch user data from Firebase
+  const fetchUserData = async (userId: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        return {
+          id: userId,
+          name: userData.name || userData.email || 'Unknown User',
+          email: userData.email || '',
+          wallet_address: userData.wallet_address || userData.wallet_public_key || '',
+          avatar: userData.avatar || userData.photoURL || ''
+        };
+      }
+    } catch (error) {
+      console.log('🔍 DEBUG: Error fetching user data:', error);
+    }
+    
+    // Return fallback data if user not found
+    return {
+      id: userId,
+      name: 'Unknown User',
+      email: '',
+      wallet_address: '',
+      avatar: ''
+    };
+  };
 
   const { currentUser } = state;
 
@@ -258,15 +286,16 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             return;
           }
 
-          // Create a contact object from the requester ID
-          // For now, we'll create a basic contact object and let the SendAmount screen handle user data fetching
-          const contact = {
-            id: requesterId,
-            name: notificationData?.senderName || 'Unknown User',
-            email: '',
-            wallet_address: '',
-            avatar: notificationData?.senderAvatar || ''
-          };
+          // Fetch the user data to get wallet address and other details
+          console.log('🔍 DEBUG: Fetching user data for ID:', requesterId);
+          const contact = await fetchUserData(requesterId);
+          
+          console.log('🔍 DEBUG: Fetched contact data:', {
+            id: contact.id,
+            name: contact.name,
+            email: contact.email,
+            wallet: contact.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet'
+          });
 
           // Navigate directly to SendAmount screen with pre-filled data
           console.log('🔍 DEBUG: About to navigate to SendAmount screen with pre-filled data:', {
@@ -286,6 +315,10 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               notificationId: notificationId
             });
             console.log('🔍 DEBUG: Successfully navigated to SendAmount screen');
+            
+            // Delete the notification after successful navigation
+            await deleteNotification(notificationId);
+            
           } catch (navError) {
             console.log('🔍 DEBUG: Navigation error (non-critical):', navError);
             // Even if navigation fails, we don't want to show an error to the user
@@ -319,6 +352,10 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           try {
             navigation.navigate('GroupDetails', { groupId });
             console.log('🔍 DEBUG: Successfully navigated to GroupDetails screen');
+            
+            // Delete the notification after successful navigation
+            await deleteNotification(notificationId);
+            
           } catch (navError) {
             console.log('🔍 DEBUG: Group navigation error (non-critical):', navError);
             // Even if navigation fails, we don't want to show an error to the user
@@ -355,6 +392,9 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               ...prev,
               [notificationId]: 'completed'
             }));
+
+            // Delete the notification after successful group join
+            await deleteNotification(notificationId);
 
             // Fade animation
             Animated.timing(fadeAnimations[notificationId], {
@@ -414,6 +454,9 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                       ...prev,
                       [notificationId]: 'completed'
                     }));
+
+                    // Delete the notification after successful group join
+                    await deleteNotification(notificationId);
 
                     // Fade animation
                     Animated.timing(fadeAnimations[notificationId], {
@@ -482,10 +525,28 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         } else if (notification.type === 'expense_added') {
           // Handle expense added notification
           const groupId = notification.data?.groupId;
+          const notificationData = notification.data as any;
+          const expenseId = notificationData?.expenseId;
+          const addedBy = notificationData?.addedBy;
+          
+          console.log('🔍 DEBUG: Expense added notification data:', {
+            groupId,
+            expenseId,
+            addedBy,
+            fullData: notification.data
+          });
           
           if (groupId) {
-            // Navigate to group details
-            navigation.navigate('GroupDetails', { groupId });
+            // Navigate to group details with expense details
+            navigation.navigate('GroupDetails', { 
+              groupId: groupId,
+              expenseId: expenseId, // Pass the expense ID to open expense details
+              fromNotification: true,
+              notificationId: notificationId
+            });
+            
+            // Delete the notification after successful navigation
+            await deleteNotification(notificationId);
             
             // Mark as completed
             setActionStates(prev => ({
@@ -510,6 +571,9 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             navigation.navigate('TransactionHistory', { 
               transactionId: transactionId 
             });
+            
+            // Delete the notification after successful navigation
+            await deleteNotification(notificationId);
             
             // Mark as completed
             setActionStates(prev => ({
@@ -543,6 +607,9 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               notificationId: notificationId
             });
             
+            // Delete the notification after successful navigation
+            await deleteNotification(notificationId);
+            
             // Mark as completed
             setActionStates(prev => ({
               ...prev,
@@ -566,6 +633,9 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             navigation.navigate('GroupDetails', { 
               groupId: groupId 
             });
+            
+            // Delete the notification after successful navigation
+            await deleteNotification(notificationId);
             
             // Mark as completed
             setActionStates(prev => ({
@@ -728,6 +798,24 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         duration: 300,
         useNativeDriver: true,
       }).start();
+    }
+  };
+
+  // Function to delete notification after it has served its purpose
+  const deleteNotification = async (notificationId: string) => {
+    try {
+      console.log('🗑️ DEBUG: Deleting notification after action:', notificationId);
+      
+      // Delete from Firestore
+      await deleteDoc(doc(db, 'notifications', notificationId));
+      
+      // Refresh notifications to update the list
+      loadNotifications();
+      
+      console.log('🗑️ DEBUG: Notification deleted successfully');
+    } catch (error) {
+      console.error('🗑️ DEBUG: Error deleting notification:', error);
+      // Don't show error to user as this is not critical
     }
   };
 

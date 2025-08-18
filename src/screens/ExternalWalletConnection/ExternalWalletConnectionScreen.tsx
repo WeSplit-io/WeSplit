@@ -14,6 +14,17 @@ import { colors } from '../../theme/colors';
 import { externalWalletAuthService, WalletProvider } from '../../services/externalWalletAuthService';
 import { walletConnectionService } from '../../services/walletConnectionService';
 import { styles } from './styles';
+import { solanaAppKitService } from '../../services/solanaAppKitService';
+import { walletLogoService } from '../../services/walletLogoService';
+import { solanaWalletAdapterService } from '../../services/solanaWalletAdapterService';
+import { walletLinkingService } from '../../services/walletLinkingService';
+import { useApp } from '../../context/AppContext';
+import { realWalletAdapterService } from '../../services/realWalletAdapterService';
+import { walletWebSocketService } from '../../services/walletWebSocketService';
+import { mobileWalletAdapterService } from '../../services/mobileWalletAdapterService';
+import { solanaMobileStackService } from '../../services/solanaMobileStackService';
+import { phantomDirectService } from '../../services/phantomDirectService';
+import { phantomWalletLinkingService } from '../../services/phantomWalletLinkingService';
 
 interface ExternalWalletConnectionScreenProps {
   navigation: any;
@@ -29,16 +40,125 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
   const [providers, setProviders] = useState<WalletProvider[]>([]);
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { state } = useApp();
+  const currentUser = state.currentUser;
 
   useEffect(() => {
     loadProviders();
   }, []);
 
+  // Test function to verify Alert dialogs work
+  const testAlertDialog = () => {
+    console.log('🔍 DEBUG: Testing Alert dialog...');
+    Alert.alert(
+      'Test Alert',
+      'This is a test alert to verify dialogs are working.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'OK', onPress: () => console.log('🔍 DEBUG: Test alert OK pressed') }
+      ]
+    );
+  };
+
+  // Debug function to test wallet detection
+  const debugWalletDetection = async () => {
+    try {
+      console.log('🔍 DEBUG: Testing wallet detection...');
+      
+      // Test direct access to solanaAppKitService
+      const appKitProviders = solanaAppKitService.getAvailableProviders();
+      console.log('🔍 DEBUG: AppKit providers:', appKitProviders.map(p => p.name));
+      
+      // Test walletLogoService
+      const logoWallets = await walletLogoService.getAvailableWallets();
+      console.log('🔍 DEBUG: Logo service wallets:', logoWallets.map(w => `${w.name} (${w.isAvailable})`));
+      
+      // Test externalWalletAuthService
+      const authProviders = await externalWalletAuthService.getAvailableProviders();
+      console.log('🔍 DEBUG: Auth service providers:', authProviders.map(p => `${p.name} (${p.isAvailable})`));
+      
+      // Test Phantom specifically
+      const phantomWallet = logoWallets.find(w => w.name.toLowerCase() === 'phantom');
+      console.log('🔍 DEBUG: Phantom wallet details:', phantomWallet);
+      
+      // Test Phantom deep link schemes
+      await phantomDirectService.testPhantomSchemes();
+      
+      // Test Phantom opening approaches
+      await solanaMobileStackService.testPhantomOpening();
+      
+      Alert.alert(
+        'Debug Info',
+        `AppKit: ${appKitProviders.length} providers\nLogo: ${logoWallets.length} wallets\nAuth: ${authProviders.length} providers\nPhantom: ${phantomWallet ? (phantomWallet.isAvailable ? 'Available' : 'Not Available') : 'Not Found'}\n\nCheck console for detailed scheme testing.`
+      );
+    } catch (error) {
+      console.error('🔍 DEBUG: Error in wallet detection test:', error);
+      Alert.alert('Debug Error', error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
+
+  // Get the correct app store URL for a specific wallet
+  const getWalletStoreUrl = (walletName: string, platform: string): string => {
+    const walletStoreUrls: { [key: string]: { ios: string; android: string } } = {
+      'Phantom': {
+        ios: 'https://apps.apple.com/app/phantom-crypto-wallet/id1598432977',
+        android: 'https://play.google.com/store/apps/details?id=app.phantom'
+      },
+      'Solflare': {
+        ios: 'https://apps.apple.com/app/solflare-wallet/id1580902717',
+        android: 'https://play.google.com/store/apps/details?id=com.solflare.wallet'
+      },
+      'Backpack': {
+        ios: 'https://apps.apple.com/app/backpack-wallet/id6443944476',
+        android: 'https://play.google.com/store/apps/details?id=com.backpack.app'
+      },
+      'Slope': {
+        ios: 'https://apps.apple.com/app/slope-wallet/id1574624530',
+        android: 'https://play.google.com/store/apps/details?id=com.slope.finance'
+      }
+    };
+    
+    const walletUrls = walletStoreUrls[walletName];
+    if (walletUrls) {
+      return platform === 'ios' ? walletUrls.ios : walletUrls.android;
+    }
+    
+    // Fallback to search
+    return platform === 'ios' 
+      ? `https://apps.apple.com/search?term=${encodeURIComponent(walletName)}`
+      : `https://play.google.com/store/search?q=${encodeURIComponent(walletName)}`;
+  };
+
   const loadProviders = async () => {
     try {
       setLoading(true);
+      console.log('🔍 ExternalWalletConnection: Loading providers...');
+      
       const availableProviders = await externalWalletAuthService.getAvailableProviders();
+      console.log('🔍 ExternalWalletConnection: Available providers:', availableProviders.map(p => `${p.name} (${p.isAvailable ? 'Available' : 'Not Available'})`));
+      
       setProviders(availableProviders);
+      
+      // Debug: Check if Phantom is in the list
+      const phantomProvider = availableProviders.find(p => p.name.toLowerCase() === 'phantom');
+      console.log('🔍 ExternalWalletConnection: Phantom provider found:', phantomProvider);
+      
+      // Only add Phantom as fallback if it's completely missing from the list
+      if (!phantomProvider) {
+        console.log('🔍 ExternalWalletConnection: Adding Phantom as fallback provider');
+        const fallbackPhantom = {
+          name: 'Phantom',
+          icon: '👻',
+          logoUrl: 'https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/icons/phantom.png',
+          isAvailable: false, // Start as false, will be tested by the service
+          connect: async () => ({ address: '', publicKey: null, balance: 0, walletName: 'Phantom' }),
+          disconnect: async () => {},
+          signTransaction: async (transaction: any) => transaction,
+          signMessage: async (message: any) => message
+        };
+        setProviders([fallbackPhantom, ...availableProviders]);
+      }
+      
     } catch (error) {
       console.error('Error loading providers:', error);
       Alert.alert('Error', 'Failed to load available wallet providers');
@@ -49,7 +169,33 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
 
   const handleConnectWallet = async (provider: WalletProvider) => {
     if (!provider.isAvailable) {
-      Alert.alert('Not Available', `${provider.name} is not available on this device`);
+      // Provide helpful installation instructions
+      const installMessage = `${provider.name} is not installed on your device. Would you like to install it?`;
+      Alert.alert(
+        'Wallet Not Available',
+        installMessage,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Install',
+            onPress: () => {
+              // Open the appropriate app store with specific wallet links
+              const { Linking, Platform } = require('react-native');
+              
+              // Get the correct store URL for the specific wallet
+              const storeUrl = getWalletStoreUrl(provider.name, Platform.OS);
+              
+              Linking.openURL(storeUrl).catch((error: any) => {
+                console.error('Error opening app store:', error);
+                Alert.alert('Error', 'Could not open app store');
+              });
+            }
+          }
+        ]
+      );
       return;
     }
 
@@ -57,10 +203,67 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
       setConnectingProvider(provider.name);
       setStep('connecting');
 
-      // Use the new wallet connection service
+      console.log(`🔗 ExternalWalletConnection: Starting connection to ${provider.name}...`);
+
+      // For Phantom, use the direct connection method
+      if (provider.name.toLowerCase() === 'phantom') {
+        console.log('🔗 ExternalWalletConnection: Using direct Phantom connection...');
+        
+        // Step 1: Connect to Phantom using secure wallet linking service
+        console.log('🔗 ExternalWalletConnection: Starting secure Phantom wallet linking...');
+        
+        // Get user ID for linking
+        const userId = currentUser?.id?.toString();
+        
+        if (!userId) {
+          throw new Error('User not authenticated');
+        }
+        
+        // Use secure wallet linking with message signing
+        const linkingResult = await phantomWalletLinkingService.linkWalletWithSignature(userId, 'Phantom');
+        
+        if (!linkingResult.success) {
+          throw new Error('Failed to link wallet securely');
+        }
+
+        console.log('🔗 ExternalWalletConnection: Phantom wallet linked securely with signature:', linkingResult.signature);
+
+        // Step 2: Get the wallet address from the linking result
+        const walletAddress = linkingResult.publicKey;
+        
+        // Step 3: Show success message
+        Alert.alert(
+          'Wallet Linked Securely',
+          `Your Phantom wallet has been securely linked to your account!\n\nWallet: ${walletAddress.slice(0, 8)}...${walletAddress.slice(-8)}\nSignature: ${linkingResult.signature.slice(0, 16)}...\n\nYour wallet is now authorized for secure transactions.`,
+          [
+            {
+              text: 'Continue',
+              onPress: () => {
+                // Navigate back with success result
+                navigation.goBack();
+                // You can also pass the result back to the previous screen if needed
+                if (route.params?.onSuccess) {
+                  route.params.onSuccess({
+                    success: true,
+                    walletAddress: walletAddress,
+                    walletName: 'Phantom',
+                    balance: 0,
+                    linked: true,
+                    signature: linkingResult.signature
+                  });
+                }
+              }
+            }
+          ]
+        );
+        
+        return;
+      }
+
+      // For other wallets, use the wallet connection service
       const connectionResult = await walletConnectionService.connectWallet({
         provider: provider.name,
-        showInstallPrompt: true
+        showInstallPrompt: false // Don't show install prompt since we already checked availability
       });
 
       if (!connectionResult.success) {
@@ -271,7 +474,13 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Connect External Wallet</Text>
-        <View style={styles.placeholder} />
+        <TouchableOpacity style={styles.debugButton} onPress={debugWalletDetection}>
+          <Text style={styles.debugButtonText}>Debug</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.testButton} onPress={testAlertDialog}>
+          <Text style={styles.testButtonText}>Test Alert</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Content */}

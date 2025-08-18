@@ -134,4 +134,26 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
+  debugButton: {
+    padding: 8,
+    backgroundColor: colors.primaryGreen,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  debugButtonText: {
+    color: colors.black,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  testButton: {
+    padding: 8,
+    backgroundColor: colors.info,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  testButtonText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
 }); 

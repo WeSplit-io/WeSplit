@@ -147,8 +147,13 @@ export class SolanaTransactionService {
         const accountInfo = await getAccount(this.connection, usdcTokenAccount);
         usdcBalance = Number(accountInfo.amount) / 1000000; // USDC has 6 decimals
       } catch (error) {
-        // Token account doesn't exist, balance is 0
-        console.log('USDC token account does not exist for this wallet');
+        // Token account doesn't exist, balance is 0 - this is normal for new wallets
+        if (error instanceof Error && error.message.includes('TokenAccountNotFoundError')) {
+          console.log('💰 SolanaTransactionService: USDC token account not found for wallet (normal for new wallets)');
+        } else {
+          console.warn('Error fetching USDC balance:', error);
+        }
+        usdcBalance = 0;
       }
       
       return {

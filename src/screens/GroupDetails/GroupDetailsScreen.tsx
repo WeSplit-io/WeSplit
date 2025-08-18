@@ -62,6 +62,10 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   // Check if we should show the settle up modal on load
   const shouldShowSettleUpModal = route.params?.showSettleUpModal;
   const onSettlementComplete = route.params?.onSettlementComplete;
+  
+  // Check if we should open expense details on load
+  const expenseIdToOpen = route.params?.expenseId;
+  const fromNotification = route.params?.fromNotification;
 
   // State for optimized settlement transactions
   const [optimizedSettlementTransactions, setOptimizedSettlementTransactions] = useState<any[]>([]);
@@ -256,11 +260,11 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   
   // Auto-open settle up modal if requested (only once)
   useEffect(() => {
-    if (shouldShowSettleUpModal && !settleUpModalVisible && !modalOpenedFromParams) {
+    if (shouldShowSettleUpModal && !modalOpenedFromParams) {
       setSettleUpModalVisible(true);
       setModalOpenedFromParams(true);
     }
-  }, [shouldShowSettleUpModal, settleUpModalVisible, modalOpenedFromParams]);
+  }, [shouldShowSettleUpModal, modalOpenedFromParams]);
 
   // Refresh group data when screen comes into focus (e.g., after accepting invitation)
   useFocusEffect(
@@ -339,6 +343,135 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       calculateOptimizedSettlements();
     }
   }, [realGroupBalances, loadingBalances, calculateOptimizedSettlements]);
+
+  // Function to get user avatar for expense
+  const getUserAvatarForExpense = useCallback((expense: Expense) => {
+    if (!expense || !expense.paid_by) return null;
+
+    // First, try to find the user in realMembers
+    const paidByUser = realMembers.find(member => String(member.id) === String(expense.paid_by));
+    if (paidByUser && paidByUser.avatar && paidByUser.avatar.trim() !== '') {
+      return paidByUser.avatar;
+    }
+
+    // If not found in realMembers, try to find in group members
+    if (group?.members) {
+      const groupMember = group.members.find(member => String(member.id) === String(expense.paid_by));
+      if (groupMember && groupMember.avatar && groupMember.avatar.trim() !== '') {
+        return groupMember.avatar;
+      }
+    }
+
+    return null;
+  }, [realMembers, group?.members]);
+
+  // Function to get user name for expense
+  const getUserNameForExpense = useCallback((expense: Expense) => {
+    if (!expense || !expense.paid_by) return 'Someone';
+
+    // First, try to find the user in realMembers
+    const paidByUser = realMembers.find(member => String(member.id) === String(expense.paid_by));
+    if (paidByUser) {
+      return paidByUser.name || 'Someone';
+    }
+
+    // If not found in realMembers, try to find in group members
+    if (group?.members) {
+      const groupMember = group.members.find(member => String(member.id) === String(expense.paid_by));
+      if (groupMember) {
+        return groupMember.name || 'Someone';
+      }
+    }
+
+    return expense.paid_by_name || 'Someone';
+  }, [realMembers, group?.members]);
+
+  // Function to render avatar for expense
+  const renderExpenseAvatar = useCallback((expense: Expense) => {
+    const avatar = getUserAvatarForExpense(expense);
+    const userName = getUserNameForExpense(expense);
+
+    if (avatar) {
+      return (
+        <Image
+          source={{ uri: avatar }}
+          style={styles.expenseAvatarImage}
+                      defaultSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+        />
+      );
+    }
+
+    // Fallback to icon with user initial
+    return (
+      <View style={styles.expenseAvatar}>
+        <Text style={styles.expenseAvatarText}>
+          {userName.charAt(0).toUpperCase()}
+        </Text>
+      </View>
+    );
+  }, [getUserAvatarForExpense, getUserNameForExpense]);
+
+  // Function to convert expense to transaction format
+  const convertExpenseToTransaction = useCallback((expense: Expense): Transaction => {
+    const paidByUser = realMembers.find(member => String(member.id) === String(expense.paid_by));
+    const paidByName = paidByUser?.name || 'Unknown User';
+    
+    return {
+      id: `group_${groupId}_expense_${expense.id}`,
+      type: 'send' as const,
+      amount: expense.amount,
+      currency: expense.currency,
+      from_user: paidByName,
+      to_user: 'Group Members',
+      from_wallet: paidByUser?.wallet_address || '',
+      to_wallet: '',
+      tx_hash: expense.id?.toString() || '',
+      status: 'completed' as const,
+      created_at: expense.created_at || new Date().toISOString(),
+      updated_at: expense.updated_at || new Date().toISOString(),
+      note: expense.description || ''
+    };
+  }, [realMembers, groupId]);
+
+  // Auto-open expense details if expenseId is provided from notification
+  useEffect(() => {
+    if (expenseIdToOpen && fromNotification && individualExpenses.length > 0 && !modalOpenedFromParams) {
+      console.log('🔍 GroupDetails: Auto-opening expense details for expenseId:', expenseIdToOpen);
+      
+      // Find the expense in the loaded expenses
+      const targetExpense = individualExpenses.find(expense => 
+        String(expense.id) === String(expenseIdToOpen)
+      );
+      
+      if (targetExpense) {
+        console.log('🔍 GroupDetails: Found expense, opening details:', targetExpense);
+        const transaction = convertExpenseToTransaction(targetExpense);
+        setSelectedTransaction(transaction);
+        setTransactionModalVisible(true);
+        setModalOpenedFromParams(true);
+        
+        // Clear the route parameters to prevent reopening
+        navigation.setParams({
+          expenseId: undefined,
+          fromNotification: undefined
+        });
+      } else {
+        console.log('🔍 GroupDetails: Expense not found in loaded expenses:', expenseIdToOpen);
+      }
+    }
+  }, [expenseIdToOpen, fromNotification, individualExpenses, modalOpenedFromParams, convertExpenseToTransaction, navigation]);
+
+  // Refresh group data when screen comes into focus (e.g., after accepting invitation)
+  useFocusEffect(
+    useCallback(() => {
+      if (groupId && !groupLoading) {
+        // Only refresh if we don't have data yet or if group is not loaded
+        if (!hasLoadedData || !group) {
+          refresh();
+        }
+      }
+    }, [groupId, groupLoading, hasLoadedData, group, refresh])
+  );
 
   // Calculate group summary using unified balance calculation
   const getGroupSummary = useMemo(() => {
@@ -500,95 +633,6 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     loadingExpenses,
     currentUser?.id
   ]);
-
-  // Function to get user avatar for expense
-  const getUserAvatarForExpense = useCallback((expense: Expense) => {
-    if (!expense || !expense.paid_by) return null;
-
-    // First, try to find the user in realMembers
-    const paidByUser = realMembers.find(member => String(member.id) === String(expense.paid_by));
-    if (paidByUser && paidByUser.avatar && paidByUser.avatar.trim() !== '') {
-      return paidByUser.avatar;
-    }
-
-    // If not found in realMembers, try to find in group members
-    if (group?.members) {
-      const groupMember = group.members.find(member => String(member.id) === String(expense.paid_by));
-      if (groupMember && groupMember.avatar && groupMember.avatar.trim() !== '') {
-        return groupMember.avatar;
-      }
-    }
-
-    return null;
-  }, [realMembers, group?.members]);
-
-  // Function to get user name for expense
-  const getUserNameForExpense = useCallback((expense: Expense) => {
-    if (!expense || !expense.paid_by) return 'Someone';
-
-    // First, try to find the user in realMembers
-    const paidByUser = realMembers.find(member => String(member.id) === String(expense.paid_by));
-    if (paidByUser) {
-      return paidByUser.name || 'Someone';
-    }
-
-    // If not found in realMembers, try to find in group members
-    if (group?.members) {
-      const groupMember = group.members.find(member => String(member.id) === String(expense.paid_by));
-      if (groupMember) {
-        return groupMember.name || 'Someone';
-      }
-    }
-
-    return expense.paid_by_name || 'Someone';
-  }, [realMembers, group?.members]);
-
-  // Function to render avatar for expense
-  const renderExpenseAvatar = useCallback((expense: Expense) => {
-    const avatar = getUserAvatarForExpense(expense);
-    const userName = getUserNameForExpense(expense);
-
-    if (avatar) {
-      return (
-        <Image
-          source={{ uri: avatar }}
-          style={styles.expenseAvatarImage}
-                      defaultSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
-        />
-      );
-    }
-
-    // Fallback to icon with user initial
-    return (
-      <View style={styles.expenseAvatar}>
-        <Text style={styles.expenseAvatarText}>
-          {userName.charAt(0).toUpperCase()}
-        </Text>
-      </View>
-    );
-  }, [getUserAvatarForExpense, getUserNameForExpense]);
-
-  // Function to convert expense to transaction format
-  const convertExpenseToTransaction = useCallback((expense: Expense): Transaction => {
-    const paidByUser = realMembers.find(member => String(member.id) === String(expense.paid_by));
-    const paidByName = paidByUser?.name || 'Unknown User';
-    
-    return {
-      id: `group_${groupId}_expense_${expense.id}`,
-      type: 'send' as const,
-      amount: expense.amount,
-      currency: expense.currency,
-      from_user: paidByName,
-      to_user: 'Group Members',
-      from_wallet: paidByUser?.wallet_address || '',
-      to_wallet: '',
-      tx_hash: expense.id?.toString() || '',
-      status: 'completed' as const,
-      created_at: expense.created_at || new Date().toISOString(),
-      updated_at: expense.updated_at || new Date().toISOString(),
-      note: expense.description || ''
-    };
-  }, [realMembers, groupId]);
 
   // Function to handle expense click
   const handleExpenseClick = useCallback((expense: Expense) => {

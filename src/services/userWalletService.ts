@@ -250,7 +250,8 @@ export class UserWalletService {
           console.warn('Rate limited when fetching USDC balance, using 0');
           usdcBalance = 0;
         } else if (error instanceof Error && error.message.includes('TokenAccountNotFoundError')) {
-          // Token account doesn't exist, balance is 0
+          // Token account doesn't exist, balance is 0 - this is normal for new wallets
+          console.log('💰 UserWalletService: USDC token account not found for wallet (normal for new wallets)');
           usdcBalance = 0;
         } else {
           // For other errors, log but continue

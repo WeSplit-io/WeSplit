@@ -45,7 +45,30 @@ export default {
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
-      ]
+      ],
+      intentFilters: [
+        {
+          action: "VIEW",
+          autoVerify: true,
+          data: [
+            {
+              scheme: "wesplit"
+            }
+          ],
+          category: ["BROWSABLE", "DEFAULT"]
+        }
+      ],
+      queries: {
+        package: [
+          "app.phantom",
+          "com.solflare.wallet",
+          "com.slope.finance",
+          "com.backpack.app",
+          "io.metamask",
+          "me.rainbow",
+          "com.wallet.crypto.trustapp"
+        ]
+      }
     },
     web: {
       favicon: "./assets/favicon.png"

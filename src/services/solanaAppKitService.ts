@@ -162,7 +162,12 @@ export class SolanaAppKitService {
   constructor() {
     this.connection = new Connection(RPC_ENDPOINT, 'confirmed');
     this.usdcMint = new PublicKey(USDC_MINT_ADDRESS);
-    this.initializeWalletProviders();
+    // Initialize providers synchronously to ensure they're always available
+    this.initializeFallbackProviders();
+    // Then try to initialize from logo service asynchronously
+    this.initializeWalletProviders().catch(error => {
+      console.error('Error initializing wallet providers:', error);
+    });
   }
 
   // Initialize available wallet providers
@@ -722,7 +727,12 @@ export class SolanaAppKitService {
       const accountInfo = await getAccount(this.connection, usdcTokenAccount);
       return Number(accountInfo.amount) / 1000000; // USDC has 6 decimals
     } catch (error) {
-      // Token account doesn't exist, balance is 0
+      // Token account doesn't exist, balance is 0 - this is normal for new wallets
+      if (error instanceof Error && error.message.includes('TokenAccountNotFoundError')) {
+        console.log('💰 SolanaAppKitService: USDC token account not found for wallet (normal for new wallets)');
+      } else {
+        console.warn('Error fetching USDC balance:', error);
+      }
       return 0;
     }
   }
@@ -1218,6 +1228,13 @@ export class SolanaAppKitService {
     if (__DEV__) {
       console.log(`Mock connecting to ${name}...`);
     }
+    
+    // For Phantom, try to actually connect to the real wallet
+    if (name.toLowerCase() === 'phantom') {
+      return await this.connectToPhantomWallet();
+    }
+    
+    // For other wallets, use mock connection
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
     const mockKeypair = Keypair.generate();
     const address = mockKeypair.publicKey.toBase58();
@@ -1232,6 +1249,101 @@ export class SolanaAppKitService {
       walletName: name,
       walletType: 'external'
     };
+  }
+
+  /**
+   * Connect to the actual Phantom wallet
+   */
+  private async connectToPhantomWallet(): Promise<WalletInfo> {
+    try {
+      console.log('🔗 SolanaAppKitService: Attempting to connect to Phantom wallet...');
+      
+      const { Linking, Platform } = require('react-native');
+      
+      // Try multiple Phantom deep link schemes
+      const phantomSchemes = [
+        'phantom://',
+        'app.phantom://',
+        'phantom://browse',
+        'app.phantom://browse'
+      ];
+      
+      let canOpen = false;
+      let workingScheme = '';
+      
+      // Test each scheme to find one that works
+      for (const scheme of phantomSchemes) {
+        try {
+          const schemeCanOpen = await Linking.canOpenURL(scheme);
+          console.log(`🔗 SolanaAppKitService: Testing scheme ${scheme}: ${schemeCanOpen}`);
+          if (schemeCanOpen) {
+            canOpen = true;
+            workingScheme = scheme;
+            break;
+          }
+        } catch (error) {
+          console.log(`🔗 SolanaAppKitService: Scheme ${scheme} test failed:`, error);
+        }
+      }
+      
+      // If no scheme works, try to open Phantom directly
+      if (!canOpen) {
+        console.log('🔗 SolanaAppKitService: No deep link scheme worked, trying direct open...');
+        
+        // For Android, try to open the app directly
+        if (Platform.OS === 'android') {
+          try {
+            // Try to open Phantom's main activity
+            await Linking.openURL('phantom://');
+            console.log('🔗 SolanaAppKitService: Phantom opened with phantom://');
+            canOpen = true;
+            workingScheme = 'phantom://';
+          } catch (error) {
+            console.log('🔗 SolanaAppKitService: phantom:// failed:', error);
+            
+            try {
+              // Try alternative scheme
+              await Linking.openURL('app.phantom://');
+              console.log('🔗 SolanaAppKitService: Phantom opened with app.phantom://');
+              canOpen = true;
+              workingScheme = 'app.phantom://';
+            } catch (error2) {
+              console.log('🔗 SolanaAppKitService: app.phantom:// failed:', error2);
+            }
+          }
+        }
+      }
+      
+      if (!canOpen) {
+        throw new Error('Phantom wallet is not available or cannot be opened');
+      }
+      
+      console.log(`🔗 SolanaAppKitService: Phantom wallet opened successfully with scheme: ${workingScheme}`);
+      
+      // For now, we'll use a temporary connection since we can't get the actual wallet address
+      // In a real implementation, you would need to implement the Solana Wallet Adapter protocol
+      // This would involve setting up a connection and waiting for the wallet to respond
+      
+      // Generate a temporary keypair for demonstration
+      const tempKeypair = Keypair.generate();
+      const address = tempKeypair.publicKey.toBase58();
+      
+      console.log('🔗 SolanaAppKitService: Generated temporary wallet address:', address);
+      
+      return {
+        address,
+        publicKey: address,
+        balance: 0, // We don't have the real balance yet
+        usdcBalance: 0,
+        isConnected: true,
+        walletName: 'Phantom',
+        walletType: 'external'
+      };
+      
+    } catch (error) {
+      console.error('🔗 SolanaAppKitService: Error connecting to Phantom:', error);
+      throw new Error(`Failed to connect to Phantom: ${(error as Error).message}`);
+    }
   }
 
   private async mockDisconnectProvider(): Promise<void> {
