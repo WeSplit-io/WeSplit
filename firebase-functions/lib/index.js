@@ -199,31 +199,94 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
         }
         // Create custom token for the user
         const customToken = await admin.auth().createCustomToken(firebaseUser.uid);
-        // Create or update user document in Firestore
-        const userRef = db.collection('users').doc(firebaseUser.uid);
+        
+        // CRITICAL: Search for existing user by EMAIL, not just by UID
+        // This ensures we find existing users even if Firebase Auth UID changes
+        let existingUserDoc = null;
+        let existingWalletAddress = '';
+        let existingWalletPublicKey = '';
+        let existingName = '';
+        let existingAvatar = '';
+        let hasCompletedOnboarding = false;
+        let existingUserId = firebaseUser.uid; // Default to new UID
+        
+        // First, try to find existing user by email
+        try {
+          const existingUserQuery = await db.collection('users')
+            .where('email', '==', email)
+            .limit(1)
+            .get();
+          
+          if (!existingUserQuery.empty) {
+            existingUserDoc = existingUserQuery.docs[0];
+            const existingData = existingUserDoc.data();
+            existingWalletAddress = existingData.wallet_address || '';
+            existingWalletPublicKey = existingData.wallet_public_key || '';
+            existingName = existingData.name || '';
+            existingAvatar = existingData.avatar || '';
+            hasCompletedOnboarding = existingData.hasCompletedOnboarding || false;
+            existingUserId = existingData.id || firebaseUser.uid; // Use existing ID if available
+            
+            console.log(`✅ Found existing user by email: ${email}, ID: ${existingUserId}, name: ${existingName}, wallet: ${existingWalletAddress}`);
+          } else {
+            console.log(`🆕 No existing user found by email: ${email}, will create new user`);
+          }
+        } catch (searchError) {
+          console.warn(`⚠️ Error searching for existing user by email: ${searchError.message}`);
+        }
+        
+        // If no existing user found by email, try by UID as fallback
+        if (!existingUserDoc) {
+          try {
+            const userRef = db.collection('users').doc(firebaseUser.uid);
+            const uidUserDoc = await userRef.get();
+            
+            if (uidUserDoc.exists) {
+              existingUserDoc = uidUserDoc;
+              const existingData = uidUserDoc.data();
+              existingWalletAddress = existingData.wallet_address || '';
+              existingWalletPublicKey = existingData.wallet_public_key || '';
+              existingName = existingData.name || '';
+              existingAvatar = existingData.avatar || '';
+              hasCompletedOnboarding = existingData.hasCompletedOnboarding || false;
+              
+              console.log(`✅ Found existing user by UID: ${firebaseUser.uid}, name: ${existingName}, wallet: ${existingWalletAddress}`);
+            }
+          } catch (uidError) {
+            console.warn(`⚠️ Error searching for existing user by UID: ${uidError.message}`);
+          }
+        }
+        
+        // Use existing user document if found, otherwise create new one
+        const userRef = existingUserDoc ? existingUserDoc.ref : db.collection('users').doc(firebaseUser.uid);
+        
         await userRef.set({
-            id: firebaseUser.uid,
+            id: existingUserId, // Use existing ID if available, otherwise new UID
             email: firebaseUser.email,
-            name: firebaseUser.displayName || '',
-            wallet_address: '',
-            wallet_public_key: '',
+            name: existingName || firebaseUser.displayName || '', // Preserve existing name
+            wallet_address: existingWalletAddress, // Preserve existing wallet
+            wallet_public_key: existingWalletPublicKey, // Preserve existing wallet
             created_at: admin.firestore.FieldValue.serverTimestamp(),
-            avatar: firebaseUser.photoURL || '',
+            avatar: existingAvatar || firebaseUser.photoURL || '', // Preserve existing avatar
             emailVerified: true,
-            lastLoginAt: admin.firestore.FieldValue.serverTimestamp()
+            lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(), // Track verification
+            hasCompletedOnboarding: hasCompletedOnboarding // Preserve onboarding status
         }, { merge: true });
-        console.log(`Code verified successfully for ${email}`);
+        
+        console.log(`Code verified successfully for ${email}. Wallet preserved: ${existingWalletAddress}, Name preserved: ${existingName}, Onboarding: ${hasCompletedOnboarding}`);
         return {
             success: true,
             message: 'Code verified successfully',
             user: {
-                id: firebaseUser.uid,
+                id: existingUserId, // Return existing ID if available
                 email: firebaseUser.email,
-                name: firebaseUser.displayName || '',
-                walletAddress: '',
-                walletPublicKey: '',
+                name: existingName || firebaseUser.displayName || '', // Return existing name
+                walletAddress: existingWalletAddress, // Return existing wallet
+                walletPublicKey: existingWalletPublicKey, // Return existing wallet
                 createdAt: firebaseUser.metadata.creationTime,
-                avatar: firebaseUser.photoURL || ''
+                avatar: existingAvatar || firebaseUser.photoURL || '', // Return existing avatar
+                hasCompletedOnboarding: hasCompletedOnboarding // Return onboarding status
             },
             customToken
         };

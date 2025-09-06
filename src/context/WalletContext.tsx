@@ -164,46 +164,9 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     }
   };
 
-  // Check initial wallet connection status - runs after wallets are loaded
-  useEffect(() => {
-    const checkInitialConnection = async () => {
-      try {
-        // Only check for external wallet connections (Phantom, etc.)
-        // App wallet is handled separately when user logs in
-        const info = await solanaAppKitService.getWalletInfo();
-        
-        if (info && info.isConnected) {
-          setIsConnected(true);
-          setAddress(info.address);
-          setBalance(info.balance || null);
-          setWalletInfo({
-            ...info,
-            walletType: 'external'
-          } as ExtendedWalletInfo);
-          setWalletName(info.walletName || 'External Wallet');
-          setChainId(process.env.NODE_ENV === 'production' ? 'solana:mainnet' : 'solana:devnet');
-          
-          if (__DEV__) { console.log('External wallet connected:', info.address, 'using', info.walletName); }
-          
-          // Refresh external wallet balance
-          setTimeout(() => {
-            refreshBalance();
-          }, 1000);
-        }
-      } catch (error) {
-        // This is expected when no external wallet is connected - not an error
-        if (__DEV__) {
-          console.warn('No external wallet connected (this is normal):', error);
-        }
-        // Don't auto-connect on error - let user manually connect
-      }
-    };
-
-    // Only run after wallets are loaded
-    if (availableWallets.length > 0 || !isConnected) {
-      checkInitialConnection();
-    }
-  }, [availableWallets]); // Depend on availableWallets so it runs after they're loaded
+  // REMOVED: Automatic external wallet connection check
+  // This was causing Phantom to open automatically when the app loaded
+  // Users should manually connect wallets when they want to use them
 
   // Connect to a specific wallet
   const connectToWallet = async (wallet: StoredWallet) => {

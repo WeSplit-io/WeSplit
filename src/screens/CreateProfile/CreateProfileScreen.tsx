@@ -155,6 +155,40 @@ const CreateProfileScreen: React.FC = () => {
       // Get email from route/context or authenticated user
       const email = (route?.params as any)?.email || state.currentUser?.email || 'user@example.com';
 
+      // Check if user already exists and has a username
+      try {
+        const existingUser = await unifiedUserService.getUserByEmail(email);
+        
+        if (existingUser && existingUser.name && existingUser.name.trim() !== '') {
+          console.log('✅ User already has username, skipping profile creation:', existingUser.name);
+          
+          // User already has a username, authenticate them directly
+          const user = {
+            id: existingUser.id.toString(),
+            name: existingUser.name,
+            email: existingUser.email,
+            avatar: existingUser.avatar || 'https://randomuser.me/api/portraits/men/32.jpg',
+            walletAddress: existingUser.wallet_address,
+            wallet_address: existingUser.wallet_address,
+            wallet_public_key: existingUser.wallet_public_key,
+            created_at: existingUser.created_at,
+            hasCompletedOnboarding: true
+          };
+
+          authenticateUser(user, 'email');
+          
+          try {
+            (navigation as any).replace('Dashboard');
+          } catch (e) {
+            console.error('Navigation error:', e);
+            Alert.alert('Navigation Error', 'Navigation error: ' + (e as any).message);
+          }
+          return;
+        }
+      } catch (error) {
+        console.log('Could not check existing user, proceeding with profile creation');
+      }
+
       // Create or get user using unified service
       try {
         const userData = {

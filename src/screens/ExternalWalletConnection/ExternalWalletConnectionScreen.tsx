@@ -47,56 +47,6 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
     loadProviders();
   }, []);
 
-  // Test function to verify Alert dialogs work
-  const testAlertDialog = () => {
-    console.log('🔍 DEBUG: Testing Alert dialog...');
-    Alert.alert(
-      'Test Alert',
-      'This is a test alert to verify dialogs are working.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'OK', onPress: () => console.log('🔍 DEBUG: Test alert OK pressed') }
-      ]
-    );
-  };
-
-  // Debug function to test wallet detection
-  const debugWalletDetection = async () => {
-    try {
-      console.log('🔍 DEBUG: Testing wallet detection...');
-      
-      // Test direct access to solanaAppKitService
-      const appKitProviders = solanaAppKitService.getAvailableProviders();
-      console.log('🔍 DEBUG: AppKit providers:', appKitProviders.map(p => p.name));
-      
-      // Test walletLogoService
-      const logoWallets = await walletLogoService.getAvailableWallets();
-      console.log('🔍 DEBUG: Logo service wallets:', logoWallets.map(w => `${w.name} (${w.isAvailable})`));
-      
-      // Test externalWalletAuthService
-      const authProviders = await externalWalletAuthService.getAvailableProviders();
-      console.log('🔍 DEBUG: Auth service providers:', authProviders.map(p => `${p.name} (${p.isAvailable})`));
-      
-      // Test Phantom specifically
-      const phantomWallet = logoWallets.find(w => w.name.toLowerCase() === 'phantom');
-      console.log('🔍 DEBUG: Phantom wallet details:', phantomWallet);
-      
-      // Test Phantom deep link schemes
-      await phantomDirectService.testPhantomSchemes();
-      
-      // Test Phantom opening approaches
-      await solanaMobileStackService.testPhantomOpening();
-      
-      Alert.alert(
-        'Debug Info',
-        `AppKit: ${appKitProviders.length} providers\nLogo: ${logoWallets.length} wallets\nAuth: ${authProviders.length} providers\nPhantom: ${phantomWallet ? (phantomWallet.isAvailable ? 'Available' : 'Not Available') : 'Not Found'}\n\nCheck console for detailed scheme testing.`
-      );
-    } catch (error) {
-      console.error('🔍 DEBUG: Error in wallet detection test:', error);
-      Alert.alert('Debug Error', error instanceof Error ? error.message : 'Unknown error');
-    }
-  };
-
   // Get the correct app store URL for a specific wallet
   const getWalletStoreUrl = (walletName: string, platform: string): string => {
     const walletStoreUrls: { [key: string]: { ios: string; android: string } } = {
@@ -474,13 +424,7 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Connect External Wallet</Text>
-        <TouchableOpacity style={styles.debugButton} onPress={debugWalletDetection}>
-          <Text style={styles.debugButtonText}>Debug</Text>
-        </TouchableOpacity>
         
-        <TouchableOpacity style={styles.testButton} onPress={testAlertDialog}>
-          <Text style={styles.testButtonText}>Test Alert</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Content */}

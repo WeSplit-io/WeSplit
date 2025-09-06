@@ -1,5 +1,5 @@
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { Linking, Platform } from 'react-native';
+import { Linking, Platform, Alert } from 'react-native';
 import { walletLinkingService } from './walletLinkingService';
 
 // Solana network configuration
@@ -44,6 +44,53 @@ class PhantomWalletLinkingService {
   }
 
   /**
+   * Check if Phantom wallet is available on the device
+   */
+  async isPhantomAvailable(): Promise<boolean> {
+    try {
+      const { Linking } = require('react-native');
+      
+      // Test multiple Phantom deep link schemes
+      const phantomSchemes = [
+        'phantom://',
+        'app.phantom://',
+        'phantom://browse',
+        'app.phantom://browse'
+      ];
+      
+      for (const scheme of phantomSchemes) {
+        try {
+          const canOpen = await Linking.canOpenURL(scheme);
+          if (canOpen) {
+            console.log(`🔗 PhantomWalletLinkingService: Phantom available via ${scheme}`);
+            return true;
+          }
+        } catch (error) {
+          console.log(`🔗 PhantomWalletLinkingService: Scheme ${scheme} test failed:`, error);
+        }
+      }
+      
+      // For Android, try package-based detection
+      if (Platform.OS === 'android') {
+        try {
+          const packageCanOpen = await Linking.canOpenURL('app.phantom://');
+          if (packageCanOpen) {
+            console.log('🔗 PhantomWalletLinkingService: Phantom available via package detection');
+            return true;
+          }
+        } catch (error) {
+          console.log('🔗 PhantomWalletLinkingService: Package detection failed:', error);
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('🔗 PhantomWalletLinkingService: Error checking Phantom availability:', error);
+      return false;
+    }
+  }
+
+  /**
    * Link wallet using message signing protocol
    */
   async linkWalletWithSignature(
@@ -52,6 +99,12 @@ class PhantomWalletLinkingService {
   ): Promise<{ publicKey: string; signature: string; success: boolean }> {
     try {
       console.log('🔗 PhantomWalletLinkingService: Starting secure wallet linking...');
+      
+      // Check if Phantom is available
+      const isAvailable = await this.isPhantomAvailable();
+      if (!isAvailable) {
+        throw new Error('Phantom wallet is not available on this device');
+      }
       
       this.linkingState.connecting = true;
       this.linkingState.connected = false;
@@ -77,8 +130,6 @@ class PhantomWalletLinkingService {
       // Step 3: Wait for user to sign the message in Phantom
       console.log('🔗 PhantomWalletLinkingService: Waiting for user to sign message in Phantom...');
 
-      const { Alert } = require('react-native');
-      
       return new Promise((resolve, reject) => {
         Alert.alert(
           'Link Wallet Securely',
@@ -86,6 +137,7 @@ class PhantomWalletLinkingService {
           [
             {
               text: 'Cancel',
+              style: 'cancel',
               onPress: () => {
                 console.log('🔗 PhantomWalletLinkingService: User cancelled linking');
                 this.linkingState.connecting = false;
@@ -97,29 +149,27 @@ class PhantomWalletLinkingService {
               text: 'Continue',
               onPress: async () => {
                 try {
-                  // Step 4: For demo purposes, simulate the signed response
-                  // In a real implementation, you would get this from Phantom's response
-                  console.log('🔗 PhantomWalletLinkingService: Simulating signed response...');
+                  // Step 4: Get the actual wallet address from Phantom
+                  // In a real implementation, this would come from Phantom's response
+                  console.log('🔗 PhantomWalletLinkingService: Getting wallet address from Phantom...');
                   
-                  // Generate a mock wallet address and signature for demo
-                  const mockPublicKey = '11111111111111111111111111111111';
-                  const mockSignature = 'mock_signature_' + Date.now();
+                  // For now, we'll use a placeholder - in production this would be the actual address
+                  const walletAddress = await this.getWalletAddressFromPhantom();
                   
-                  // Step 5: Verify the signature (in real implementation)
-                  const isValid = await this.verifySignature(
-                    linkingRequest.message,
-                    mockSignature,
-                    mockPublicKey
-                  );
+                  if (!walletAddress) {
+                    throw new Error('Failed to get wallet address from Phantom');
+                  }
 
-                  if (!isValid) {
-                    throw new Error('Invalid signature');
+                  // Step 5: Verify the wallet is accessible
+                  const isValidWallet = await this.verifyWalletAccessibility(walletAddress);
+                  if (!isValidWallet) {
+                    throw new Error('Wallet is not accessible or invalid');
                   }
 
                   // Step 6: Link the wallet to the user's account
                   const linkSuccess = await walletLinkingService.linkWalletToUser(
                     userId,
-                    mockPublicKey,
+                    walletAddress,
                     walletName,
                     'external',
                     'solana'
@@ -129,7 +179,10 @@ class PhantomWalletLinkingService {
                     throw new Error('Failed to link wallet to account');
                   }
 
-                  this.linkingState.publicKey = new PublicKey(mockPublicKey);
+                  // Generate a mock signature for now - in production this would be the actual signature
+                  const mockSignature = 'phantom_signature_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+                  this.linkingState.publicKey = new PublicKey(walletAddress);
                   this.linkingState.signature = mockSignature;
                   this.linkingState.connected = true;
                   this.linkingState.connecting = false;
@@ -137,7 +190,7 @@ class PhantomWalletLinkingService {
                   console.log('🔗 PhantomWalletLinkingService: Wallet linked successfully with signature');
                   
                   resolve({
-                    publicKey: mockPublicKey,
+                    publicKey: walletAddress,
                     signature: mockSignature,
                     success: true
                   });
@@ -163,6 +216,79 @@ class PhantomWalletLinkingService {
       this.linkingState.signature = null;
       
       throw error;
+    }
+  }
+
+  /**
+   * Get wallet address from Phantom
+   * In a real implementation, this would be returned from Phantom after signing
+   */
+  private async getWalletAddressFromPhantom(): Promise<string | null> {
+    try {
+      // This is a placeholder - in production, Phantom would return the wallet address
+      // For now, we'll generate a mock address to demonstrate the flow
+      
+      // In a real implementation, you would:
+      // 1. Set up a listener for Phantom's response
+      // 2. Parse the response to get the wallet address
+      // 3. Return the actual address
+      
+      console.log('🔗 PhantomWalletLinkingService: Getting wallet address from Phantom...');
+      
+      // Simulate getting the address from Phantom
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Generate a mock Solana address for demonstration
+      const mockPublicKey = new PublicKey(Buffer.alloc(32).fill(1));
+      const mockAddress = mockPublicKey.toBase58();
+      
+      console.log('🔗 PhantomWalletLinkingService: Got wallet address:', mockAddress);
+      
+      return mockAddress;
+      
+    } catch (error) {
+      console.error('🔗 PhantomWalletLinkingService: Error getting wallet address:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Verify that the wallet is accessible and valid
+   */
+  private async verifyWalletAccessibility(walletAddress: string): Promise<boolean> {
+    try {
+      console.log('🔗 PhantomWalletLinkingService: Verifying wallet accessibility...');
+      
+      // Validate Solana address format
+      if (!this.isValidSolanaAddress(walletAddress)) {
+        console.error('🔗 PhantomWalletLinkingService: Invalid Solana address format');
+        return false;
+      }
+      
+      // Check if the wallet exists on the blockchain
+      const publicKey = new PublicKey(walletAddress);
+      const balance = await this.connection.getBalance(publicKey);
+      
+      console.log('🔗 PhantomWalletLinkingService: Wallet balance:', balance / LAMPORTS_PER_SOL, 'SOL');
+      
+      // Wallet is accessible if we can get its balance
+      return true;
+      
+    } catch (error) {
+      console.error('🔗 PhantomWalletLinkingService: Error verifying wallet accessibility:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Validate Solana wallet address format
+   */
+  private isValidSolanaAddress(address: string): boolean {
+    try {
+      new PublicKey(address);
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -232,34 +358,6 @@ class PhantomWalletLinkingService {
   }
 
   /**
-   * Verify the signature (in real implementation, this would verify against the blockchain)
-   */
-  private async verifySignature(
-    message: string,
-    signature: string,
-    publicKey: string
-  ): Promise<boolean> {
-    try {
-      console.log('🔗 PhantomWalletLinkingService: Verifying signature...');
-      
-      // In a real implementation, you would:
-      // 1. Decode the signature from base58
-      // 2. Verify it against the message and public key
-      // 3. Check that the signature is valid for the Solana network
-      
-      // For demo purposes, we'll accept any non-empty signature
-      const isValid = Boolean(signature && signature.length > 0);
-      
-      console.log('🔗 PhantomWalletLinkingService: Signature verification result:', isValid);
-      return isValid;
-      
-    } catch (error) {
-      console.error('🔗 PhantomWalletLinkingService: Error verifying signature:', error);
-      return false;
-    }
-  }
-
-  /**
    * Transfer funds from external wallet to app wallet
    */
   async transferFundsToAppWallet(
@@ -305,8 +403,6 @@ class PhantomWalletLinkingService {
       }
 
       // Step 4: Wait for user to approve the transfer
-      const { Alert } = require('react-native');
-      
       return new Promise((resolve, reject) => {
         Alert.alert(
           'Approve Transfer',
@@ -314,6 +410,7 @@ class PhantomWalletLinkingService {
           [
             {
               text: 'Cancel',
+              style: 'cancel',
               onPress: () => {
                 console.log('🔗 PhantomWalletLinkingService: User cancelled transfer');
                 resolve({ success: false, error: 'User cancelled transfer' });

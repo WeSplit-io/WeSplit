@@ -152,13 +152,13 @@ app.post('/api/auth/verify-code', async (req, res) => {
   try {
     const result = await emailVerificationService.verifyCode(email, code);
     if (result.success) {
-    res.json({
+      res.json({
         success: true,
         message: 'Code verified successfully',
         user: result.user,
         accessToken: result.accessToken,
         refreshToken: result.refreshToken
-    });
+      });
     } else {
       res.status(400).json({ error: result.error || 'Invalid code' });
     }

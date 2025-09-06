@@ -143,10 +143,52 @@ async function verifyCode(email, code) {
       if (userDoc.exists) {
         userData = userDoc.data();
         // Update last verification timestamp for existing user
-        await userRef.update({
+        // IMPORTANT: Preserve existing wallet information
+        const updateData = {
           lastVerifiedAt: new Date().toISOString(),
           lastLoginAt: new Date().toISOString()
-        });
+        };
+        
+        // Only update wallet fields if they don't exist (preserve existing wallets)
+        if (!userData.wallet_address) {
+          updateData.wallet_address = '';
+        }
+        if (!userData.wallet_public_key) {
+          updateData.wallet_public_key = '';
+        }
+        
+        // CRITICAL: Never overwrite existing username/name
+        // Only add name if user doesn't have any
+        if (!userData.name || userData.name.trim() === '') {
+          updateData.name = '';
+        }
+        
+        // CRITICAL: Never overwrite existing avatar
+        // Only add avatar if user doesn't have any
+        if (!userData.avatar) {
+          updateData.avatar = '';
+        }
+        
+        await userRef.update(updateData);
+        
+        console.log(`Existing user ${email} verified. Wallet preserved: ${userData.wallet_address}, Name preserved: ${userData.name}`);
+        
+        // Return user data with proper structure
+        return {
+          success: true,
+          user: {
+            id: userData.id,
+            email: userData.email,
+            name: userData.name,
+            walletAddress: userData.wallet_address,
+            walletPublicKey: userData.wallet_public_key,
+            createdAt: userData.created_at,
+            avatar: userData.avatar,
+            hasCompletedOnboarding: userData.hasCompletedOnboarding || false
+          },
+          accessToken,
+          refreshToken
+        };
       } else {
         // Create new user document
         const { getAuth } = require('firebase-admin/auth');
@@ -163,10 +205,29 @@ async function verifyCode(email, code) {
           avatar: firebaseUser.photoURL || '',
           emailVerified: true,
           lastLoginAt: new Date().toISOString(),
-          lastVerifiedAt: new Date().toISOString() // Track when user last verified
+          lastVerifiedAt: new Date().toISOString(), // Track when user last verified
+          hasCompletedOnboarding: false // New users need onboarding
         };
         
         await userRef.set(userData);
+        console.log(`New user ${email} created without wallet`);
+        
+        // Return user data with proper structure
+        return {
+          success: true,
+          user: {
+            id: userData.id,
+            email: userData.email,
+            name: userData.name,
+            walletAddress: userData.wallet_address,
+            walletPublicKey: userData.wallet_public_key,
+            createdAt: userData.created_at,
+            avatar: userData.avatar,
+            hasCompletedOnboarding: userData.hasCompletedOnboarding
+          },
+          accessToken,
+          refreshToken
+        };
       }
     }
 

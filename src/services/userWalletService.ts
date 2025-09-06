@@ -66,7 +66,12 @@ export class UserWalletService {
       
       // Check if user already has a wallet
       if (user && user.wallet_address && user.wallet_address.trim() !== '') {
-        // User already has wallet
+        // User already has wallet - IMPORTANT: Return existing wallet, don't create new one
+        logger.info('User already has existing wallet, preserving it', { 
+          userId, 
+          walletAddress: user.wallet_address 
+        }, 'UserWalletService');
+        
         return {
           success: true,
           wallet: {
@@ -77,6 +82,7 @@ export class UserWalletService {
       }
 
       // User doesn't have a wallet, create one
+      logger.info('User has no wallet, creating new one', { userId }, 'UserWalletService');
 
       const walletResult = await this.createWalletForUser(userId);
       

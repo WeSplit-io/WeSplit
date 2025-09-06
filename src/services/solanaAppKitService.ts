@@ -1229,9 +1229,9 @@ export class SolanaAppKitService {
       console.log(`Mock connecting to ${name}...`);
     }
     
-    // For Phantom, try to actually connect to the real wallet
+    // For Phantom, use passive detection instead of opening the app
     if (name.toLowerCase() === 'phantom') {
-      return await this.connectToPhantomWallet();
+      return await this.connectToPhantomWalletPassively();
     }
     
     // For other wallets, use mock connection
@@ -1252,15 +1252,15 @@ export class SolanaAppKitService {
   }
 
   /**
-   * Connect to the actual Phantom wallet
+   * Connect to Phantom wallet passively without opening the app
    */
-  private async connectToPhantomWallet(): Promise<WalletInfo> {
+  private async connectToPhantomWalletPassively(): Promise<WalletInfo> {
     try {
-      console.log('🔗 SolanaAppKitService: Attempting to connect to Phantom wallet...');
+      console.log('🔗 SolanaAppKitService: Attempting to connect to Phantom wallet passively...');
       
       const { Linking, Platform } = require('react-native');
       
-      // Try multiple Phantom deep link schemes
+      // Test multiple Phantom deep link schemes without opening the app
       const phantomSchemes = [
         'phantom://',
         'app.phantom://',
@@ -1286,39 +1286,25 @@ export class SolanaAppKitService {
         }
       }
       
-      // If no scheme works, try to open Phantom directly
-      if (!canOpen) {
-        console.log('🔗 SolanaAppKitService: No deep link scheme worked, trying direct open...');
-        
-        // For Android, try to open the app directly
-        if (Platform.OS === 'android') {
-          try {
-            // Try to open Phantom's main activity
-            await Linking.openURL('phantom://');
-            console.log('🔗 SolanaAppKitService: Phantom opened with phantom://');
+      // For Android, try package-based detection
+      if (!canOpen && Platform.OS === 'android') {
+        try {
+          const packageCanOpen = await Linking.canOpenURL('app.phantom://');
+          if (packageCanOpen) {
+            console.log('🔗 SolanaAppKitService: Phantom package detection successful');
             canOpen = true;
-            workingScheme = 'phantom://';
-          } catch (error) {
-            console.log('🔗 SolanaAppKitService: phantom:// failed:', error);
-            
-            try {
-              // Try alternative scheme
-              await Linking.openURL('app.phantom://');
-              console.log('🔗 SolanaAppKitService: Phantom opened with app.phantom://');
-              canOpen = true;
-              workingScheme = 'app.phantom://';
-            } catch (error2) {
-              console.log('🔗 SolanaAppKitService: app.phantom:// failed:', error2);
-            }
+            workingScheme = 'app.phantom://';
           }
+        } catch (error) {
+          console.log('🔗 SolanaAppKitService: Phantom package detection failed:', error);
         }
       }
       
       if (!canOpen) {
-        throw new Error('Phantom wallet is not available or cannot be opened');
+        throw new Error('Phantom wallet is not available on this device');
       }
       
-      console.log(`🔗 SolanaAppKitService: Phantom wallet opened successfully with scheme: ${workingScheme}`);
+      console.log(`🔗 SolanaAppKitService: Phantom wallet detected via ${workingScheme}`);
       
       // For now, we'll use a temporary connection since we can't get the actual wallet address
       // In a real implementation, you would need to implement the Solana Wallet Adapter protocol
@@ -1344,6 +1330,16 @@ export class SolanaAppKitService {
       console.error('🔗 SolanaAppKitService: Error connecting to Phantom:', error);
       throw new Error(`Failed to connect to Phantom: ${(error as Error).message}`);
     }
+  }
+
+  /**
+   * Connect to the actual Phantom wallet
+   * DEPRECATED: This method opens the wallet app, which is not desired behavior
+   * Use connectToPhantomWalletPassively() instead
+   */
+  private async connectToPhantomWallet(): Promise<WalletInfo> {
+    console.warn('🔗 SolanaAppKitService: connectToPhantomWallet is deprecated - use passive connection instead');
+    return this.connectToPhantomWalletPassively();
   }
 
   private async mockDisconnectProvider(): Promise<void> {

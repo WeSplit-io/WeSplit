@@ -300,12 +300,16 @@ export const firebaseUserService = {
         const updates: Partial<User> = {};
         let hasUpdates = false;
         
-        if (userData.name && userData.name !== existingUser.name) {
+        // CRITICAL: Never overwrite existing username/name
+        // Only add name if user doesn't have any
+        if (userData.name && (!existingUser.name || existingUser.name.trim() === '')) {
           updates.name = userData.name;
           updates.hasCompletedOnboarding = true; // Mark as completed when name is updated
           hasUpdates = true;
         }
         
+        // CRITICAL: Never overwrite existing wallet information
+        // Only add wallet info if user doesn't have any
         if (userData.wallet_address && !existingUser.wallet_address) {
           updates.wallet_address = userData.wallet_address;
           hasUpdates = true;
@@ -316,7 +320,9 @@ export const firebaseUserService = {
           hasUpdates = true;
         }
         
-        if (userData.avatar && userData.avatar !== existingUser.avatar) {
+        // CRITICAL: Never overwrite existing avatar
+        // Only add avatar if user doesn't have any
+        if (userData.avatar && !existingUser.avatar) {
           updates.avatar = userData.avatar;
           hasUpdates = true;
         }

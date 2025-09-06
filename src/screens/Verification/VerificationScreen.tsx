@@ -78,7 +78,7 @@ const VerificationScreen: React.FC = () => {
       
       // Transform API response to match User type (snake_case)
       // Keep Firebase user ID as string to match Firestore format
-      const transformedUser = {
+      let transformedUser = {
         id: authResponse.user.id, // Keep as string for Firebase compatibility
         name: authResponse.user.name,
         email: authResponse.user.email,
@@ -89,6 +89,49 @@ const VerificationScreen: React.FC = () => {
         hasCompletedOnboarding: authResponse.user.hasCompletedOnboarding || false
       };
       
+      // CRITICAL FIX: If Firebase Functions didn't return user data, fetch it from Firestore
+      if (!transformedUser.name || !transformedUser.wallet_address) {
+        if (__DEV__) { console.log('🔄 Firebase Functions returned empty data, fetching from Firestore...'); }
+        
+        try {
+          const { firestoreService } = await import('../../config/firebase');
+          const existingUserData = await firestoreService.getUserDocument(transformedUser.id);
+          
+          if (existingUserData && existingUserData.name && existingUserData.wallet_address) {
+            if (__DEV__) { console.log('✅ Found existing user data in Firestore:', existingUserData); }
+            
+            // Update transformed user with existing data
+            transformedUser = {
+              ...transformedUser,
+              name: existingUserData.name,
+              wallet_address: existingUserData.wallet_address,
+              wallet_public_key: existingUserData.wallet_public_key || existingUserData.wallet_address,
+              hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false
+            };
+            
+            if (__DEV__) { console.log('✅ Updated user data from Firestore:', transformedUser); }
+          }
+        } catch (firestoreError) {
+          if (__DEV__) { console.warn('⚠️ Could not fetch user data from Firestore:', firestoreError); }
+        }
+      }
+      
+      if (__DEV__) {
+        console.log('🔍 Verification: Raw API Response:', authResponse);
+        console.log('🔍 Verification: Transformed User:', transformedUser);
+        console.log('🔍 Verification: User Data Analysis:', {
+          id: transformedUser.id,
+          name: transformedUser.name,
+          nameType: typeof transformedUser.name,
+          nameLength: transformedUser.name?.length,
+          trimmedName: transformedUser.name?.trim(),
+          trimmedNameLength: transformedUser.name?.trim()?.length,
+          hasCompletedOnboarding: transformedUser.hasCompletedOnboarding,
+          walletAddress: transformedUser.wallet_address,
+          walletPublicKey: transformedUser.wallet_public_key
+        });
+      }
+      
       // Update the global app context with the authenticated user
       authenticateUser(transformedUser, 'email');
       if (__DEV__) { console.log('📱 User authenticated in app context'); }
@@ -96,23 +139,30 @@ const VerificationScreen: React.FC = () => {
       // Check if user needs to create a profile (has no name/pseudo)
       const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
       
+      if (__DEV__) {
+        console.log('🔍 Verification: Profile Creation Check:', {
+          name: transformedUser.name,
+          nameLength: transformedUser.name?.length,
+          trimmedName: transformedUser.name?.trim(),
+          trimmedNameLength: transformedUser.name?.trim()?.length,
+          needsProfile,
+          hasCompletedOnboarding: transformedUser.hasCompletedOnboarding,
+          willNavigateTo: needsProfile ? 'CreateProfile' : 'Dashboard'
+        });
+      }
+      
       if (needsProfile) {
         console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
         (navigation as any).reset({
           index: 0,
           routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
         });
-      } else if (transformedUser.hasCompletedOnboarding) {
-        console.log('✅ User completed onboarding, navigating to Dashboard');
+      } else {
+        // User already has a name, go directly to Dashboard
+        console.log('✅ User already has name, navigating to Dashboard:', transformedUser.name);
         (navigation as any).reset({
           index: 0,
           routes: [{ name: 'Dashboard' }],
-        });
-      } else {
-        console.log('🔄 User needs onboarding, navigating to Onboarding');
-        (navigation as any).reset({
-          index: 0,
-          routes: [{ name: 'Onboarding' }],
         });
       }
       

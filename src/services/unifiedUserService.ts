@@ -42,9 +42,12 @@ class UnifiedUserService {
       if (existingUser) {
         if (__DEV__) {
           console.log('✅ UnifiedUserService: User already exists:', existingUser.id);
+          if (existingUser.wallet_address) {
+            console.log('💰 UnifiedUserService: User has existing wallet:', existingUser.wallet_address);
+          }
         }
         
-        // Update user if needed (e.g., wallet info)
+        // CRITICAL: Update user if needed but NEVER overwrite existing wallet
         const updatedUser = await this.updateUserIfNeeded(existingUser, userData);
         
         return {
@@ -70,7 +73,7 @@ class UnifiedUserService {
         hasCompletedOnboarding: true // Mark as completed since user is creating profile
       });
 
-      // Step 3: Ensure user has a wallet
+      // Step 3: Ensure user has a wallet ONLY if they're truly new
       if (!newUser.wallet_address) {
         if (__DEV__) {
           console.log('🔄 UnifiedUserService: Ensuring wallet for new user');
@@ -149,28 +152,43 @@ class UnifiedUserService {
     const updates: Partial<User> = {};
     let hasUpdates = false;
 
-    // Check if we need to update wallet info
+    // CRITICAL: Never overwrite existing wallet information
+    // Only add wallet info if user doesn't have any
     if (newData.walletAddress && !existingUser.wallet_address) {
       updates.wallet_address = newData.walletAddress;
       hasUpdates = true;
+      if (__DEV__) {
+        console.log('🔄 UnifiedUserService: Adding missing wallet address for user');
+      }
     }
 
     if (newData.walletPublicKey && !existingUser.wallet_public_key) {
       updates.wallet_public_key = newData.walletPublicKey;
       hasUpdates = true;
+      if (__DEV__) {
+        console.log('🔄 UnifiedUserService: Adding missing wallet public key for user');
+      }
     }
 
-    // Check if we need to update name
-    if (newData.name && newData.name !== existingUser.name) {
+    // CRITICAL: Never overwrite existing username/name
+    // Only add name if user doesn't have any
+    if (newData.name && (!existingUser.name || existingUser.name.trim() === '')) {
       updates.name = newData.name;
       updates.hasCompletedOnboarding = true; // User has completed profile creation
       hasUpdates = true;
+      if (__DEV__) {
+        console.log('🔄 UnifiedUserService: Adding missing username for user');
+      }
     }
 
-    // Check if we need to update avatar
-    if (newData.avatar && newData.avatar !== existingUser.avatar) {
+    // CRITICAL: Never overwrite existing avatar
+    // Only add avatar if user doesn't have any
+    if (newData.avatar && !existingUser.avatar) {
       updates.avatar = newData.avatar;
       hasUpdates = true;
+      if (__DEV__) {
+        console.log('🔄 UnifiedUserService: Adding missing avatar for user');
+      }
     }
 
     if (hasUpdates) {

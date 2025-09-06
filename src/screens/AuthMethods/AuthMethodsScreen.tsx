@@ -111,8 +111,10 @@ const AuthMethodsScreen: React.FC = () => {
       };
 
       // Ensure user has a wallet using the centralized wallet service
+      // CRITICAL: Only create wallet if user doesn't have one
       if (!appUser.wallet_address) {
         try {
+          console.log('🔄 AuthMethods: User has no wallet, ensuring one exists...');
           const walletResult = await userWalletService.ensureUserWallet(appUser.id);
 
           if (walletResult.success && walletResult.wallet) {
@@ -120,15 +122,21 @@ const AuthMethodsScreen: React.FC = () => {
             appUser.wallet_address = walletResult.wallet.address;
             appUser.wallet_public_key = walletResult.wallet.publicKey;
             
+            console.log('✅ AuthMethods: Wallet ensured for user:', walletResult.wallet.address);
+            
             // Update user in AppContext
             updateUser(appUser);
           } else {
-            console.error('Failed to ensure user wallet:', walletResult.error);
+            console.error('❌ AuthMethods: Failed to ensure user wallet:', walletResult.error);
+            // Continue without wallet - user can add it later
           }
         } catch (error) {
-          console.error('Error ensuring user wallet:', error);
+          console.error('❌ AuthMethods: Error ensuring user wallet:', error);
+          // Continue without wallet - user can add it later
         }
       } else {
+        // User already has wallet - preserve it
+        console.log('💰 AuthMethods: User already has wallet, preserving it:', appUser.wallet_address);
         // User already has wallet, just update AppContext
         updateUser(appUser);
       }
@@ -243,24 +251,19 @@ const AuthMethodsScreen: React.FC = () => {
 
                     // Check if user needs to create a profile (has no name/pseudo)
                     const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
-
+                    
                     if (needsProfile) {
                       console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
                       navigation.reset({
                         index: 0,
                         routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
                       });
-                    } else if (transformedUser.hasCompletedOnboarding) {
-                      console.log('✅ User completed onboarding, navigating to Dashboard');
+                    } else {
+                      // User has a profile, go directly to Dashboard
+                      console.log('✅ User has profile, navigating to Dashboard');
                       navigation.reset({
                         index: 0,
                         routes: [{ name: 'Dashboard' }],
-                      });
-                    } else {
-                      console.log('🔄 User needs onboarding, navigating to Onboarding');
-                      navigation.reset({
-                        index: 0,
-                        routes: [{ name: 'Onboarding' }],
                       });
                     }
                     return;

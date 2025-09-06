@@ -507,10 +507,9 @@ class WalletLogoService {
         }
       }
       
-      // Fallback: if we can't check the deep link, assume it's available
-      // This is because some devices might not properly report deep link availability
-      console.log(`🔍 WalletLogoService: Assuming ${provider.name} is available due to detection error`);
-      return true;
+      // Don't assume availability on error - this can lead to false positives
+      console.log(`🔍 WalletLogoService: ${provider.name} availability check failed, marking as unavailable`);
+      return false;
     }
   }
 
@@ -525,8 +524,8 @@ class WalletLogoService {
       const phantomSchemes = [
         'phantom://',
         'app.phantom://',
-        'https://phantom.app/',
-        'https://phantom.app'
+        'phantom://browse',
+        'app.phantom://browse'
       ];
       
       for (const scheme of phantomSchemes) {
@@ -630,11 +629,11 @@ class WalletLogoService {
         }
       }
 
-      // For Phantom specifically, try to actually open it
+      // For Phantom specifically, use passive detection instead of opening the app
       if (walletName.toLowerCase() === 'phantom') {
-        const phantomInstalled = await this.testPhantomInstallation();
+        const phantomInstalled = await this.passivePhantomDetection();
         if (phantomInstalled) {
-          console.log(`🔍 WalletLogoService: ${walletName} installation test successful`);
+          console.log(`🔍 WalletLogoService: ${walletName} passive detection successful`);
           return true;
         }
       }
@@ -649,41 +648,60 @@ class WalletLogoService {
   }
 
   /**
-   * Test if Phantom is actually installed by trying to open it
+   * Passive Phantom detection without opening the app
    */
-  private async testPhantomInstallation(): Promise<boolean> {
+  private async passivePhantomDetection(): Promise<boolean> {
     try {
       const { Linking, Platform } = require('react-native');
       
-      // Try to actually open Phantom with a simple action
+      // Test multiple Phantom deep link schemes without opening the app
+      const phantomSchemes = [
+        'phantom://',
+        'app.phantom://',
+        'phantom://browse',
+        'app.phantom://browse'
+      ];
+      
+      for (const scheme of phantomSchemes) {
+        try {
+          const canOpen = await Linking.canOpenURL(scheme);
+          if (canOpen) {
+            console.log(`🔍 WalletLogoService: Phantom scheme ${scheme} available`);
+            return true;
+          }
+        } catch (error) {
+          console.log(`🔍 WalletLogoService: Phantom scheme ${scheme} test failed:`, error);
+        }
+      }
+      
+      // For Android, try package-based detection
       if (Platform.OS === 'android') {
         try {
-          // Try to open Phantom's main activity
-          await Linking.openURL('phantom://');
-          console.log('🔍 WalletLogoService: Phantom opened successfully');
-          return true;
-        } catch (error) {
-          console.log('🔍 WalletLogoService: Phantom open failed:', error);
-          
-          // Try alternative schemes
-          const alternativeSchemes = ['app.phantom://', 'https://phantom.app/'];
-          for (const scheme of alternativeSchemes) {
-            try {
-              await Linking.openURL(scheme);
-              console.log(`🔍 WalletLogoService: Phantom opened with ${scheme}`);
-              return true;
-            } catch (schemeError) {
-              console.log(`🔍 WalletLogoService: Phantom ${scheme} failed:`, schemeError);
-            }
+          const packageCanOpen = await Linking.canOpenURL('app.phantom://');
+          if (packageCanOpen) {
+            console.log('🔍 WalletLogoService: Phantom package detection successful');
+            return true;
           }
+        } catch (error) {
+          console.log('🔍 WalletLogoService: Phantom package detection failed:', error);
         }
       }
       
       return false;
     } catch (error) {
-      console.error('🔍 WalletLogoService: Error testing Phantom installation:', error);
+      console.error('🔍 WalletLogoService: Error in passive Phantom detection:', error);
       return false;
     }
+  }
+
+  /**
+   * Test if Phantom is actually installed by trying to open it
+   * DEPRECATED: This method opens the wallet app, which is not desired behavior
+   * Use passivePhantomDetection() instead
+   */
+  private async testPhantomInstallation(): Promise<boolean> {
+    console.warn('🔍 WalletLogoService: testPhantomInstallation is deprecated - use passive detection instead');
+    return this.passivePhantomDetection();
   }
 
   /**
