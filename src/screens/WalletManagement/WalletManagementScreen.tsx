@@ -24,7 +24,6 @@ import { firebaseDataService } from '../../services/firebaseDataService';
 import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
 import { multiSigService } from '../../services/multiSigService';
 import { MultiSignStateService } from '../../services/multiSignStateService';
-import { useWalletCreation } from '../../hooks/useWalletCreation';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
@@ -39,10 +38,7 @@ const WalletManagementScreen: React.FC = () => {
     // External wallet state (for funding/withdrawals)
     walletInfo, 
     isConnected: externalWalletConnected, 
-    address: externalWalletAddress, 
     balance: externalWalletBalance, 
-    walletName: externalWalletName, 
-    chainId,
     // App wallet state (for internal transactions)
     appWalletAddress,
     appWalletBalance,
@@ -50,18 +46,14 @@ const WalletManagementScreen: React.FC = () => {
     ensureAppWallet,
     getAppWalletBalance
   } = useWallet();
-  const { walletExists, walletAddress, isLoading: walletLoading, ensureWallet } = useWalletCreation();
 
   // Local state
   const [localAppWalletBalance, setLocalAppWalletBalance] = useState<UserWalletBalance | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [multiSignEnabled, setMultiSignEnabled] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'transactions'>('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [multiSigWallets, setMultiSigWallets] = useState<any[]>([]);
-  const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
   const [multiSignRemainingDays, setMultiSignRemainingDays] = useState<number>(0);
   const [showMultiSignExplanation, setShowMultiSignExplanation] = useState(false);
   const [showMultiSignActivated, setShowMultiSignActivated] = useState(false);
@@ -113,21 +105,8 @@ const WalletManagementScreen: React.FC = () => {
           const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
           setLocalAppWalletBalance(balance);
 
-          // Load transactions
-          const userTransactions = await firebaseDataService.transaction.getUserTransactions(
-            currentUser.id.toString()
-          );
-
-          const formattedTransactions = userTransactions.map(tx => ({
-            id: tx.id,
-            type: tx.type || 'send',
-            recipient: tx.to_user || 'Unknown',
-            note: tx.note || '',
-            amount: tx.amount || 0,
-            date: tx.created_at || new Date().toISOString(),
-          }));
-
-          setTransactions(formattedTransactions);
+          // Load transactions using consolidated function
+          await loadTransactions(false);
 
           // Load multi-signature wallets and transactions
           await loadMultiSigData();
@@ -135,10 +114,20 @@ const WalletManagementScreen: React.FC = () => {
           console.error('❌ Failed to ensure wallet:', walletResult.error);
           // Show error state
           setLocalAppWalletBalance(null);
+          Alert.alert(
+            'Wallet Error', 
+            'Failed to initialize your wallet. Please try again or contact support if the issue persists.',
+            [{ text: 'OK' }]
+          );
         }
       } catch (error) {
         console.error('Error loading wallet info:', error);
         setLocalAppWalletBalance(null);
+        Alert.alert(
+          'Loading Error', 
+          'Failed to load wallet information. Please check your connection and try again.',
+          [{ text: 'OK' }]
+        );
       } finally {
         setIsLoading(false);
       }
@@ -162,20 +151,10 @@ const WalletManagementScreen: React.FC = () => {
     try {
       // Load user's multi-signature wallets
       const userMultiSigWallets = await multiSigService.getUserMultiSigWallets(currentUser.id.toString());
-      setMultiSigWallets(userMultiSigWallets);
-
-      // Load pending transactions for all wallets
-      const allPendingTransactions: any[] = [];
-      for (const wallet of userMultiSigWallets) {
-        const pending = await multiSigService.getPendingTransactions(wallet.id);
-        allPendingTransactions.push(...pending);
-      }
-      setPendingTransactions(allPendingTransactions);
 
       if (__DEV__) {
         console.log('✅ Multi-signature data loaded:', {
-          walletsCount: userMultiSigWallets.length,
-          pendingTransactionsCount: allPendingTransactions.length
+          walletsCount: userMultiSigWallets.length
         });
       }
     } catch (error) {
@@ -183,79 +162,84 @@ const WalletManagementScreen: React.FC = () => {
     }
   };
 
-  // Load transactions from Firebase
-  useEffect(() => {
-    const loadTransactions = async () => {
-      if (!currentUser?.id) {
-        setLoadingTransactions(false);
-        return;
-      }
+  // Consolidated transaction loading function
+  const loadTransactions = async (showLoading = false) => {
+    if (!currentUser?.id) {
+      setLoadingTransactions(false);
+      return;
+    }
 
-      try {
+    try {
+      if (showLoading) {
         setLoadingTransactions(true);
+      }
 
-        // Get user's transactions from Firebase
-        const userTransactions = await firebaseDataService.transaction.getUserTransactions(
-          currentUser.id.toString()
-        );
+      // Get user's transactions from Firebase
+      const userTransactions = await firebaseDataService.transaction.getUserTransactions(
+        currentUser.id.toString()
+      );
 
-        // Transform transactions for display with enhanced data
-        const formattedTransactions = await Promise.all(
-          userTransactions.map(async (tx) => {
-            // Determine if this is an incoming or outgoing transaction
-            const isIncoming = tx.to_user === currentUser.id.toString();
-            const isOutgoing = tx.from_user === currentUser.id.toString();
-            
-            // Get recipient/sender name
-            let recipientName = 'Unknown';
-            let senderName = 'Unknown';
-            
-            try {
-              if (isIncoming && tx.from_user) {
-                const sender = await firebaseDataService.user.getCurrentUser(tx.from_user);
-                senderName = sender.name || 'Unknown';
-              }
-              if (isOutgoing && tx.to_user) {
-                const recipient = await firebaseDataService.user.getCurrentUser(tx.to_user);
-                recipientName = recipient.name || 'Unknown';
-              }
-            } catch (error) {
-              console.log('Could not fetch user details for transaction:', tx.id);
+      // Transform transactions for display with enhanced data
+      const formattedTransactions = await Promise.all(
+        userTransactions.map(async (tx) => {
+          // Determine if this is an incoming or outgoing transaction
+          const isIncoming = tx.to_user === currentUser.id.toString();
+          const isOutgoing = tx.from_user === currentUser.id.toString();
+          
+          // Get recipient/sender name
+          let recipientName = 'Unknown';
+          let senderName = 'Unknown';
+          
+          try {
+            if (isIncoming && tx.from_user) {
+              const sender = await firebaseDataService.user.getCurrentUser(tx.from_user);
+              senderName = sender.name || 'Unknown';
             }
+            if (isOutgoing && tx.to_user) {
+              const recipient = await firebaseDataService.user.getCurrentUser(tx.to_user);
+              recipientName = recipient.name || 'Unknown';
+            }
+          } catch (error) {
+            console.log('Could not fetch user details for transaction:', tx.id);
+          }
 
-            return {
-              id: tx.id,
-              type: tx.type || 'send',
-              recipient: isIncoming ? senderName : recipientName,
-              sender: isOutgoing ? senderName : recipientName,
-              note: tx.note || '',
-              amount: tx.amount || 0,
-              date: tx.created_at || new Date().toISOString(),
-              status: tx.status || 'pending',
-              currency: tx.currency || 'USDC',
-              from_user: tx.from_user,
-              to_user: tx.to_user,
-              isIncoming,
-              isOutgoing
-            };
-          })
-        );
+          return {
+            id: tx.id,
+            type: tx.type || 'send',
+            recipient: isIncoming ? senderName : recipientName,
+            sender: isOutgoing ? senderName : recipientName,
+            note: tx.note || '',
+            amount: tx.amount || 0,
+            date: tx.created_at || new Date().toISOString(),
+            status: tx.status || 'pending',
+            currency: tx.currency || 'USDC',
+            from_user: tx.from_user,
+            to_user: tx.to_user,
+            isIncoming,
+            isOutgoing
+          };
+        })
+      );
 
-        setTransactions(formattedTransactions);
-        
-        if (__DEV__) {
-          console.log('✅ Loaded transactions:', formattedTransactions.length);
-        }
-      } catch (error) {
-        console.error('Error loading transactions:', error);
-        // Fallback to empty array
-        setTransactions([]);
-      } finally {
+      setTransactions(formattedTransactions);
+      
+      if (__DEV__) {
+        console.log('✅ Loaded transactions:', formattedTransactions.length);
+      }
+    } catch (error) {
+      console.error('Error loading transactions:', error);
+      // Fallback to empty array
+      setTransactions([]);
+    } finally {
+      if (showLoading) {
         setLoadingTransactions(false);
       }
-    };
+    }
+  };
 
-    loadTransactions();
+  // Load transactions on component mount
+  useEffect(() => {
+    loadTransactions(true);
   }, [currentUser?.id]);
 
   const handleBack = () => {
@@ -338,51 +322,8 @@ const WalletManagementScreen: React.FC = () => {
           console.error('❌ WalletManagement: Failed to get wallet balance');
         }
 
-        // Refresh transactions with enhanced data
-        const userTransactions = await firebaseDataService.transaction.getUserTransactions(
-          currentUser.id.toString()
-        );
-
-        const formattedTransactions = await Promise.all(
-          userTransactions.map(async (tx) => {
-            const isIncoming = tx.to_user === currentUser.id.toString();
-            const isOutgoing = tx.from_user === currentUser.id.toString();
-            
-            let recipientName = 'Unknown';
-            let senderName = 'Unknown';
-            
-            try {
-              if (isIncoming && tx.from_user) {
-                const sender = await firebaseDataService.user.getCurrentUser(tx.from_user);
-                senderName = sender.name || 'Unknown';
-              }
-              if (isOutgoing && tx.to_user) {
-                const recipient = await firebaseDataService.user.getCurrentUser(tx.to_user);
-                recipientName = recipient.name || 'Unknown';
-              }
-            } catch (error) {
-              console.log('Could not fetch user details for transaction:', tx.id);
-            }
-
-            return {
-              id: tx.id,
-              type: tx.type || 'send',
-              recipient: isIncoming ? senderName : recipientName,
-              sender: isOutgoing ? senderName : recipientName,
-              note: tx.note || '',
-              amount: tx.amount || 0,
-              date: tx.created_at || new Date().toISOString(),
-              status: tx.status || 'pending',
-              currency: tx.currency || 'USDC',
-              from_user: tx.from_user,
-              to_user: tx.to_user,
-              isIncoming,
-              isOutgoing
-            };
-          })
-        );
-
-        setTransactions(formattedTransactions);
+        // Refresh transactions using consolidated function
+        await loadTransactions(false);
 
         // Refresh multi-signature data
         await loadMultiSigData();
@@ -428,15 +369,6 @@ const WalletManagementScreen: React.FC = () => {
     }
   };
 
-  const handleCloseMultiSignModal = () => {
-    // This function is no longer needed as modal is handled by separate screens
-  };
-
-  const handleActivateMultiSign = () => {
-    setMultiSignEnabled(true);
-    // In a real app, this would activate multi-sign
-    // navigation.navigate('MultiSignActivated');
-  };
 
   const handleApproveTransaction = async (transactionId: string) => {
     try {
@@ -482,25 +414,6 @@ const WalletManagementScreen: React.FC = () => {
     }
   };
 
-  const handleSliderPress = () => {
-    // This function is no longer needed as slider is removed
-  };
-
-  const handleGoBack = () => {
-    // This function is no longer needed as slider is removed
-  };
-
-  const handleSliderReset = () => {
-    // This function is no longer needed as slider is removed
-  };
-
-  const openModal = () => {
-    // This function is no longer needed as modal is handled by separate screens
-  };
-
-  const closeModal = () => {
-    // This function is no longer needed as modal is handled by separate screens
-  };
 
   // Apple-style slider component
   const AppleSlider = () => {
@@ -596,8 +509,12 @@ const WalletManagementScreen: React.FC = () => {
   // Get display balance based on active wallet
   const getDisplayBalance = () => {
     // For wallet management, show app wallet balance as primary
-    if (appWalletBalance !== null) {
+    if (appWalletBalance !== null && appWalletBalance !== undefined) {
       return appWalletBalance;
+    }
+    // Fallback to local balance if context balance not available
+    if (localAppWalletBalance !== null && localAppWalletBalance.totalUSD !== undefined) {
+      return localAppWalletBalance.totalUSD;
     }
     // Fallback to external wallet balance if app wallet not available
     if (externalWalletConnected && externalWalletBalance !== null) {
@@ -677,7 +594,7 @@ const WalletManagementScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Wallet Management Options - Match mockup exactly */}
+      {/* Wallet Management Options */}
       <View style={styles.optionsContainer}>
         <TouchableOpacity
           style={styles.optionRow}
@@ -906,7 +823,7 @@ const WalletManagementScreen: React.FC = () => {
             </View>
           ) : (
             <Text style={styles.balanceAmount}>
-              ${(appWalletBalance || 0).toFixed(2)}
+              ${getDisplayBalance().toFixed(2)}
             </Text>
           )}
           

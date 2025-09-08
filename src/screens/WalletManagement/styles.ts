@@ -223,7 +223,7 @@ export const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
 
-  // External wallet card matching mockup
+  // External wallet card
   externalWalletCard: {
     backgroundColor: colors.primaryGreen,
     borderRadius: spacing.radiusMd,

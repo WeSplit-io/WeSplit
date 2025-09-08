@@ -133,8 +133,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [loadingGroupTransactions, setLoadingGroupTransactions] = useState(false);
   const [loadingPaymentRequests, setLoadingPaymentRequests] = useState(false);
   const [initialRequestsLoaded, setInitialRequestsLoaded] = useState(false);
-  const [forceUpdate, setForceUpdate] = useState(0); // Force re-render
   const [refreshBalance, setRefreshBalance] = useState<number | null>(null); // Local refresh balance
+  const [balanceLoaded, setBalanceLoaded] = useState(false); // Track if balance has been loaded
 
 
   // Memoized balance calculations to avoid expensive recalculations
@@ -200,13 +200,13 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   // Load user's created wallet balance (always load, even when external wallet is connected)
   const loadUserCreatedWalletBalance = useCallback(async () => {
-    if (!currentUser?.id) {
-      setUserCreatedWalletBalance(null);
+    if (!currentUser?.id || loadingUserWallet) {
       return;
     }
 
     try {
       setLoadingUserWallet(true);
+      console.log('💰 Dashboard: Loading user wallet balance...');
       
       // First ensure the user has a wallet
       const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
@@ -227,28 +227,37 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         
         // Now get the balance
         const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
+        console.log('💰 Dashboard: Balance loaded:', balance?.totalUSD, 'USD');
         setUserCreatedWalletBalance(balance);
+        setBalanceLoaded(true);
       } else {
           // Keep error logging for debugging
         console.error('Failed to ensure wallet for dashboard:', walletResult.error);
         setUserCreatedWalletBalance(null);
+        setBalanceLoaded(true);
       }
     } catch (error) {
       // Keep error logging for debugging
       console.error('Error loading user created wallet balance:', error);
       setUserCreatedWalletBalance(null);
+      setBalanceLoaded(true);
     } finally {
       setLoadingUserWallet(false);
     }
-  }, [currentUser?.id, currentUser?.wallet_address, updateUser]);
+  }, [currentUser?.id, currentUser?.wallet_address, updateUser, loadingUserWallet]);
+
+  // Reset balance loaded flag when user changes
+  useEffect(() => {
+    setBalanceLoaded(false);
+  }, [currentUser?.id]);
 
   // Consolidated effect to load user wallet balance - only run when necessary
   useEffect(() => {
-    // Only load balance when user is authenticated and we have a user ID
-    if (currentUser?.id && isAuthenticated) {
+    // Only load balance when user is authenticated and we have a user ID and haven't loaded yet
+    if (currentUser?.id && isAuthenticated && !loadingUserWallet && !balanceLoaded) {
       loadUserCreatedWalletBalance();
     }
-  }, [currentUser?.id, isAuthenticated, loadUserCreatedWalletBalance]);
+  }, [currentUser?.id, isAuthenticated, balanceLoaded]); // Use balanceLoaded to prevent infinite loops
 
   // Convert group amounts to USD for display with proper currency handling
   const convertGroupAmountsToUSD = useCallback(async (groups: GroupWithDetails[]) => {
@@ -639,11 +648,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   // Monitor balance changes and show notifications for new transactions
   useEffect(() => {
     if (userCreatedWalletBalance) {
-      // This effect will trigger when the balance changes due to polling
-      // You could add logic here to detect significant changes and show notifications
+      // This effect will trigger when the balance changes
       console.log('💰 Dashboard: Balance updated:', userCreatedWalletBalance.totalUSD);
     }
-  }, [userCreatedWalletBalance?.totalUSD, forceUpdate]); // Added forceUpdate dependency
+  }, [userCreatedWalletBalance?.totalUSD]); // Removed forceUpdate dependency to prevent excessive re-renders
 
 
   // Load data when component mounts or comes into focus - FIXED: Remove problematic dependencies
@@ -669,7 +677,9 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           }
           
           // Also load user created wallet balance for backward compatibility
-          loadUserCreatedWalletBalance();
+          if (!balanceLoaded) {
+            loadUserCreatedWalletBalance();
+          }
         }).catch(error => {
           // Keep error logging for debugging
           console.error('Error initializing app wallet:', error);
@@ -753,6 +763,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
     try {
       console.log('🔄 Dashboard: Manual refresh triggered');
+      setBalanceLoaded(false); // Reset balance loaded flag to allow refresh
       
       // Ensure wallet exists and refresh balance
       const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
@@ -769,10 +780,9 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         }
       }
       
-      // Force refresh the wallet balance directly
+      // Refresh the wallet balance directly
       if (walletResult.success && walletResult.wallet) {
-        console.log('💰 Dashboard: Refreshing wallet balance directly...');
-        console.log('💰 Dashboard: Current balance state:', userCreatedWalletBalance);
+        console.log('💰 Dashboard: Refreshing wallet balance...');
         
         try {
           setLoadingUserWallet(true);
@@ -782,29 +792,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           
           if (balance) {
             console.log('💰 Dashboard: New balance detected:', balance.totalUSD, 'USD');
-            console.log('💰 Dashboard: USDC balance:', balance.usdcBalance, 'USDC');
-            console.log('💰 Dashboard: Setting new balance...');
             
-            // Update local refresh balance immediately
+            // Simple state update without complex setTimeout logic
+            setUserCreatedWalletBalance(balance);
             setRefreshBalance(balance.totalUSD);
-            console.log('💰 Dashboard: Local refresh balance set to:', balance.totalUSD);
-            
-            // Force immediate state update
-            setUserCreatedWalletBalance(null); // Clear first
-            setTimeout(() => {
-              setUserCreatedWalletBalance(balance); // Set new value
-              console.log('💰 Dashboard: Balance state after update:', balance);
-            }, 50);
-            
-            // Force a re-render to update the UI
-            setForceUpdate(prev => prev + 1);
-            console.log('🔄 Dashboard: Forcing re-render...');
-            
-            // Alternative approach: force state update with minimal delay
-            setTimeout(() => {
-              console.log('⏰ Dashboard: Alternative force update...');
-              setUserCreatedWalletBalance({...balance});
-            }, 100);
           } else {
             console.error('❌ Dashboard: Failed to get wallet balance');
           }
@@ -1291,8 +1282,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                   <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
                     {(refreshBalance !== null ? refreshBalance : (appWalletBalance || userCreatedWalletBalance?.totalUSD || 0)).toFixed(2)}
                   </Text>
-                  {/* Force re-render with unique key */}
-                  <Text style={{ display: 'none' }}>{forceUpdate}</Text>
                 </View>
                 
               </View>
