@@ -10,9 +10,11 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { useApp } from '../../context/AppContext';
+import { consolidatedWalletService } from '../../services/consolidatedWalletService';
 import { walletLinkingService, WalletLink } from '../../services/walletLinkingService';
 import { phantomWalletLinkingService } from '../../services/phantomWalletLinkingService';
-import { theme } from '../../lib/theme';
+import { colors, spacing, typography } from '../../theme';
+import theme from '../../theme';
 
 interface FundTransferScreenProps {
   navigation: any;

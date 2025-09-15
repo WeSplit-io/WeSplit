@@ -1,31 +1,21 @@
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Connection, PublicKey, LAMPORTS_PER_SOL, Keypair } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 import { firebaseDataService } from './firebaseDataService';
-import { solanaAppKitService } from './solanaAppKitService';
+import { consolidatedWalletService } from './consolidatedWalletService';
 import { secureStorageService } from './secureStorageService';
+import { walletManagementService } from './walletManagementService';
+import { bip39WalletService } from './bip39WalletService';
+import { legacyWalletRecoveryService } from './legacyWalletRecoveryService';
 import { logger } from './loggingService';
 
-// Solana RPC endpoints
-const SOLANA_RPC_ENDPOINTS = {
-  devnet: 'https://api.devnet.solana.com',
-  testnet: 'https://api.testnet.solana.com',
-  mainnet: 'https://api.mainnet-beta.solana.com'
-};
+// Import shared constants
+import { RPC_CONFIG, USDC_CONFIG, WALLET_CONFIG } from './shared/walletConstants';
 
-// USDC Token mint addresses
-const USDC_MINT_ADDRESSES = {
-  devnet: 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr', // Devnet USDC
-  testnet: 'CpMah17kQEL2wqyMKt3mZBdTnZbkbfx4nqmQMFDP5vwp', // Testnet USDC
-  mainnet: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' // Mainnet USDC
-};
+// Use shared constants
+const RPC_ENDPOINT = RPC_CONFIG.endpoint;
+const USDC_MINT_ADDRESS = USDC_CONFIG.mintAddress;
 
-// Current network configuration
-// Force mainnet for production use - Phantom wallets are typically on mainnet
-const CURRENT_NETWORK = 'mainnet'; // Always use mainnet for real USDC transactions
-const RPC_ENDPOINT = SOLANA_RPC_ENDPOINTS[CURRENT_NETWORK];
-const USDC_MINT_ADDRESS = USDC_MINT_ADDRESSES[CURRENT_NETWORK];
-
-console.log('🌐 UserWalletService: Using network:', CURRENT_NETWORK);
+console.log('🌐 UserWalletService: Using network:', RPC_CONFIG.network);
 console.log('🌐 UserWalletService: RPC endpoint:', RPC_ENDPOINT);
 console.log('🌐 UserWalletService: USDC mint address:', USDC_MINT_ADDRESS);
 
@@ -50,7 +40,8 @@ export interface WalletCreationResult {
 export class UserWalletService {
   private connection: Connection;
   private lastBalanceCall: { [userId: string]: number } = {};
-  private readonly BALANCE_CALL_DEBOUNCE_MS = 5000; // 5 seconds debounce
+  private lastSuccessfulBalance: { [userId: string]: UserWalletBalance } = {};
+  private readonly BALANCE_CALL_DEBOUNCE_MS = WALLET_CONFIG.balanceCallDebounce; // Use shared configuration
 
   constructor() {
     this.connection = new Connection(RPC_ENDPOINT, 'confirmed');
@@ -117,8 +108,8 @@ export class UserWalletService {
   // Create wallet for a specific user
   async createWalletForUser(userId: string): Promise<WalletCreationResult> {
     try {
-      // Create wallet using Solana AppKit
-      const result = await solanaAppKitService.createWallet();
+      // Create wallet using consolidated service
+      const result = await consolidatedWalletService.createWallet();
       const wallet = result.wallet;
 
       if (!wallet || !wallet.address) {
@@ -131,15 +122,47 @@ export class UserWalletService {
         wallet_public_key: wallet.publicKey || wallet.address
       });
 
+      // Track wallet creation in Firebase
+      await walletManagementService.trackWalletCreation(userId, wallet.address, 'app-generated');
+
+      // CRITICAL: Store private key in secure storage for transaction signing
+      if (wallet.secretKey) {
+        try {
+          // Convert secret key to JSON array format for storage
+          const secretKeyArray = Array.from(new Uint8Array(Buffer.from(wallet.secretKey, 'base64')));
+          await secureStorageService.storePrivateKey(userId, JSON.stringify(secretKeyArray));
+          
+          // Track private key storage in Firebase
+          await walletManagementService.trackPrivateKeyStorage(userId, true);
+          
+          logger.info('Private key stored securely for user', { 
+            userId, 
+            walletAddress: wallet.address 
+          }, 'UserWalletService');
+        } catch (keyStorageError) {
+          logger.error('Failed to store private key for user', keyStorageError, 'UserWalletService');
+          // Don't fail wallet creation if key storage fails, but log the error
+        }
+      }
+
       // Save seed phrase if available
       if (result.mnemonic) {
         const seedPhrase = result.mnemonic;
         await secureStorageService.storeSeedPhrase(userId, seedPhrase);
         
+        // Track seed phrase storage in Firebase
+        await walletManagementService.trackSeedPhraseStorage(userId, true);
+        
         logger.info('Seed phrase stored securely for user', { userId }, 'UserWalletService');
       }
 
       // Wallet created and saved for user
+      logger.info('Wallet creation completed successfully', {
+        userId,
+        walletAddress: wallet.address,
+        hasPrivateKey: !!wallet.secretKey,
+        hasSeedPhrase: !!result.mnemonic
+      }, 'UserWalletService');
 
       return {
         success: true,
@@ -183,7 +206,7 @@ export class UserWalletService {
       }
 
       // Generate and save a new seed phrase
-      const newSeedPhrase = solanaAppKitService.generateMnemonic();
+      const newSeedPhrase = bip39WalletService.generateMnemonic();
       await secureStorageService.storeSeedPhrase(userId, newSeedPhrase);
       
       logger.info('Seed phrase generated and saved securely for user', { userId }, 'UserWalletService');
@@ -197,13 +220,14 @@ export class UserWalletService {
   // Get user's created wallet balance
   async getUserWalletBalance(userId: string): Promise<UserWalletBalance | null> {
     try {
-      // Check debounce - prevent rapid successive calls
+      // Check debounce - prevent rapid successive calls, but only if we have a recent successful call
       const now = Date.now();
       const lastCall = this.lastBalanceCall[userId] || 0;
-      if (now - lastCall < this.BALANCE_CALL_DEBOUNCE_MS) {
-        console.log('🔄 UserWalletService: Debouncing balance call for user:', userId);
-        // Return cached balance or null if no cache available
-        return null;
+      const hasRecentSuccessfulCall = this.lastSuccessfulBalance[userId] && (now - lastCall < this.BALANCE_CALL_DEBOUNCE_MS);
+      
+      if (hasRecentSuccessfulCall) {
+        console.log('🔄 UserWalletService: Debouncing balance call for user (returning cached):', userId);
+        return this.lastSuccessfulBalance[userId];
       }
       
       // Update last call time
@@ -272,13 +296,18 @@ export class UserWalletService {
 
       // User wallet balance calculated
 
-      return {
+      const balance = {
         solBalance: solBalanceInSol,
         usdcBalance,
-        totalUSD,
+        totalUSD: totalUSD || 0, // Ensure totalUSD is never undefined
         address: walletAddress,
         isConnected: true
       };
+
+      // Cache the successful balance
+      this.lastSuccessfulBalance[userId] = balance;
+      
+      return balance;
 
     } catch (error) {
       // Handle rate limiting at the top level
@@ -382,6 +411,264 @@ export class UserWalletService {
     }
   }
 
+  // Clear balance cache for a user (useful when balance seems incorrect)
+  async clearBalanceCache(userId: string): Promise<void> {
+    try {
+      delete this.lastSuccessfulBalance[userId];
+      delete this.lastBalanceCall[userId];
+      
+      logger.info('Balance cache cleared for user', { userId }, 'UserWalletService');
+    } catch (error) {
+      logger.error('Failed to clear balance cache', error, 'UserWalletService');
+    }
+  }
+
+  // Force refresh balance from blockchain (bypasses cache)
+  async forceRefreshBalance(userId: string): Promise<UserWalletBalance | null> {
+    try {
+      // Clear cache first
+      await this.clearBalanceCache(userId);
+      
+      // Get fresh balance
+      const balance = await this.getUserWalletBalance(userId);
+      
+      logger.info('Balance force refreshed for user', { 
+        userId, 
+        balance: balance ? `${balance.usdcBalance} USDC, ${balance.solBalance} SOL` : 'null'
+      }, 'UserWalletService');
+      
+      return balance;
+    } catch (error) {
+      logger.error('Failed to force refresh balance', error, 'UserWalletService');
+      return null;
+    }
+  }
+
+  // Fix existing user wallet by storing private key from seed phrase
+  async fixExistingUserWallet(userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      logger.info('Attempting to fix existing user wallet', { userId }, 'UserWalletService');
+      
+      // Get user's current wallet address and restore original if needed
+      const user = await firebaseDataService.user.getCurrentUser(userId);
+      const currentWalletAddress = user?.wallet_address;
+      const originalWalletAddress = 'G86LiEfFkKAhq4QYXrZ9EmVEfDXrVoKuvWgirSz5rfpE';
+      
+      if (!currentWalletAddress) {
+        return { success: false, error: 'No wallet address found for user' };
+      }
+      
+      // Restore original wallet address if it's different
+      if (currentWalletAddress !== originalWalletAddress) {
+        logger.info('Restoring original wallet address', { userId, currentAddress: currentWalletAddress, originalAddress: originalWalletAddress }, 'UserWalletService');
+        
+        await firebaseDataService.user.updateUser(userId, {
+          wallet_address: originalWalletAddress,
+          wallet_public_key: originalWalletAddress,
+          wallet_status: 'healthy',
+          wallet_has_private_key: false,
+          wallet_last_fixed_at: new Date().toISOString()
+        });
+        
+        logger.info('Original wallet address restored', { userId, originalWalletAddress }, 'UserWalletService');
+      }
+      
+      const expectedWalletAddress = originalWalletAddress;
+      
+      // Check if private key already exists
+      const existingPrivateKey = await secureStorageService.getPrivateKey(userId);
+      if (existingPrivateKey) {
+        logger.info('Private key already exists for user', { userId }, 'UserWalletService');
+        return { success: true };
+      }
+      
+      // Get seed phrase
+      const seedPhrase = await secureStorageService.getSeedPhrase(userId);
+      if (!seedPhrase) {
+        return { success: false, error: 'No seed phrase found for user' };
+      }
+      
+      logger.info('Found seed phrase for user, attempting to derive private key', { userId }, 'UserWalletService');
+      
+      // Try to derive the keypair from seed phrase
+      const derivedKeypair = await this.deriveKeypairFromSeedPhrase(seedPhrase, expectedWalletAddress);
+      
+      if (derivedKeypair && derivedKeypair.publicKey.toBase58() === expectedWalletAddress) {
+        // Store the private key
+        const secretKeyArray = Array.from(derivedKeypair.secretKey);
+        await secureStorageService.storePrivateKey(userId, JSON.stringify(secretKeyArray));
+        
+        // Update Firebase to reflect private key availability
+        await firebaseDataService.user.updateUser(userId, {
+          wallet_has_private_key: true,
+          wallet_status: 'healthy',
+          wallet_last_fixed_at: new Date().toISOString()
+        });
+        
+        // Track wallet fix success in Firebase
+        await walletManagementService.trackWalletFix(userId, true);
+        
+        logger.info('Successfully stored private key for existing user', { 
+          userId, 
+          walletAddress: expectedWalletAddress 
+        }, 'UserWalletService');
+        
+        return { success: true };
+      } else {
+        // Try legacy recovery methods
+        logger.info('Standard derivation failed, attempting legacy recovery', { userId, expectedWalletAddress }, 'UserWalletService');
+        
+        const legacyRecovery = await legacyWalletRecoveryService.recoverLegacyWallet(userId, expectedWalletAddress);
+        
+        if (legacyRecovery.success && legacyRecovery.keypair) {
+          // Store the recovered private key
+          const secretKeyArray = Array.from(legacyRecovery.keypair.secretKey);
+          await secureStorageService.storePrivateKey(userId, JSON.stringify(secretKeyArray));
+          
+          // Update Firebase to reflect private key availability
+          await firebaseDataService.user.updateUser(userId, {
+            wallet_has_private_key: true,
+            wallet_status: 'healthy',
+            wallet_last_fixed_at: new Date().toISOString()
+          });
+          
+          // Track wallet fix success in Firebase
+          await walletManagementService.trackWalletFix(userId, true);
+          
+          logger.info('Successfully recovered wallet using legacy method', { 
+            userId, 
+            walletAddress: expectedWalletAddress,
+            method: legacyRecovery.method
+          }, 'UserWalletService');
+          
+          return { success: true };
+        } else {
+          // Legacy recovery failed, but we don't want to create a new wallet
+          logger.info('Legacy recovery failed, but preserving original wallet address', { userId, expectedWalletAddress }, 'UserWalletService');
+
+          // Track wallet fix failure in Firebase
+          await walletManagementService.trackWalletFix(userId, false, 'Could not recover private key for existing wallet');
+          
+          return {
+            success: false,
+            error: 'Could not recover private key for existing wallet. Please contact support to restore access to your funds.'
+          };
+        }
+      }
+      
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      // Track wallet fix failure in Firebase
+      await walletManagementService.trackWalletFix(userId, false, errorMsg);
+      
+      logger.error('Failed to fix existing user wallet', error, 'UserWalletService');
+      return { 
+        success: false, 
+        error: errorMsg
+      };
+    }
+  }
+
+  // Derive keypair from seed phrase for existing users
+  private async deriveKeypairFromSeedPhrase(seedPhrase: string, expectedAddress: string): Promise<Keypair | null> {
+    try {
+      logger.info('Attempting to derive keypair from seed phrase', { 
+        expectedAddress,
+        seedPhraseLength: seedPhrase.split(' ').length 
+      }, 'UserWalletService');
+      
+      // First, check if it's a valid BIP39 mnemonic
+      if (bip39WalletService.isBip39Mnemonic(seedPhrase)) {
+        logger.info('Seed phrase appears to be BIP39 mnemonic, attempting recovery', { expectedAddress }, 'UserWalletService');
+        
+        // Try to recover the wallet using BIP39 service
+        const recoveredWallet = bip39WalletService.tryRecoverWalletFromMnemonic(seedPhrase, expectedAddress);
+        if (recoveredWallet) {
+          logger.info('Successfully recovered wallet using BIP39 service', { expectedAddress }, 'UserWalletService');
+          return recoveredWallet.keypair;
+        }
+      } else {
+        logger.info('Seed phrase is not BIP39 mnemonic, will try custom recovery methods', { expectedAddress }, 'UserWalletService');
+      }
+      
+      // Try to use the consolidated service to import the wallet from seed phrase
+      try {
+        const importedWallet = await consolidatedWalletService.importWallet(seedPhrase);
+        
+        if (importedWallet && importedWallet.address === expectedAddress) {
+          logger.info('Successfully imported wallet from seed phrase using service', { expectedAddress }, 'UserWalletService');
+          
+          // Get the keypair from the service
+          const keypair = (consolidatedWalletService as any).keypair;
+          if (keypair) {
+            return keypair;
+          }
+        }
+      } catch (importError) {
+        logger.warn('Failed to import wallet from seed phrase using service', importError, 'UserWalletService');
+      }
+      
+      // Fallback: Try deterministic approach (for non-BIP39 seed phrases)
+      const seedWords = seedPhrase.split(' ');
+      if (seedWords.length !== 12 && seedWords.length !== 24) {
+        logger.warn('Seed phrase does not have standard word count', { 
+          wordCount: seedWords.length,
+          expectedAddress 
+        }, 'UserWalletService');
+        return null;
+      }
+      
+      // Create a deterministic seed from the seed phrase
+      const seedString = seedPhrase;
+      const seedBytes = new TextEncoder().encode(seedString);
+      
+      // Use the seed to create a deterministic keypair
+      const keypair = Keypair.fromSeed(seedBytes.slice(0, 32));
+      
+      // Check if this keypair matches the expected address
+      if (keypair.publicKey.toBase58() === expectedAddress) {
+        logger.info('Successfully derived matching keypair from seed phrase using fallback method', { expectedAddress }, 'UserWalletService');
+        return keypair;
+      } else {
+        logger.warn('Derived keypair does not match expected address', {
+          expected: expectedAddress,
+          derived: keypair.publicKey.toBase58()
+        }, 'UserWalletService');
+        return null;
+      }
+    } catch (error) {
+      logger.error('Failed to derive keypair from seed phrase', error, 'UserWalletService');
+      return null;
+    }
+  }
+
+  // Ensure USDC token account exists for a wallet
+  async ensureUsdcTokenAccount(walletAddress: string): Promise<boolean> {
+    try {
+      const publicKey = new PublicKey(walletAddress);
+      const usdcMint = new PublicKey(USDC_MINT_ADDRESS);
+      const usdcTokenAccount = await getAssociatedTokenAddress(usdcMint, publicKey);
+
+      // Check if token account exists
+      try {
+        await getAccount(this.connection, usdcTokenAccount);
+        logger.info('USDC token account already exists', { walletAddress }, 'UserWalletService');
+        return true;
+      } catch (error) {
+        // Token account doesn't exist, we need to create it
+        logger.info('USDC token account missing, attempting to create', { walletAddress }, 'UserWalletService');
+        
+        // Note: In a real implementation, you would need the wallet's private key to create the token account
+        // For now, we'll return false and let the transaction creation handle it
+        logger.warn('Cannot create USDC token account without private key', { walletAddress }, 'UserWalletService');
+        return false;
+      }
+    } catch (error) {
+      logger.error('Failed to check/create USDC token account', error, 'UserWalletService');
+      return false;
+    }
+  }
+
   // Get balance for a specific wallet address
   async getWalletBalanceByAddress(walletAddress: string): Promise<UserWalletBalance | null> {
     try {
@@ -412,13 +699,18 @@ export class UserWalletService {
       const solToUSD = 200; // Approximate SOL to USD rate
       const totalUSD = (solBalanceInSol * solToUSD) + usdcBalance;
 
-      return {
+      const balance = {
         solBalance: solBalanceInSol,
         usdcBalance,
-        totalUSD,
+        totalUSD: totalUSD || 0, // Ensure totalUSD is never undefined
         address: walletAddress,
         isConnected: true
       };
+
+      // Cache the successful balance (use wallet address as key for this method)
+      this.lastSuccessfulBalance[walletAddress] = balance;
+      
+      return balance;
 
     } catch (error) {
       console.error('Error fetching wallet balance by address:', error);

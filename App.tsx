@@ -186,6 +186,7 @@ export default function App() {
                 <Stack.Screen name="SeedPhraseVerify" component={SeedPhraseVerifyScreen} />
                 <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
                 <Stack.Screen name="ExternalWalletConnection" component={ExternalWalletConnectionScreen} />
+                <Stack.Screen name="SettleUpModal" component={SettleUpModal} />
               </Stack.Navigator>
             </NavigationWrapper>
           </WalletLinkingProvider>

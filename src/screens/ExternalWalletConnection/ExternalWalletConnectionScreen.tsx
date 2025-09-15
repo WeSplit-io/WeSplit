@@ -11,20 +11,13 @@ import {
 } from 'react-native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
-import { externalWalletAuthService, WalletProvider } from '../../services/externalWalletAuthService';
-import { walletConnectionService } from '../../services/walletConnectionService';
+import { consolidatedWalletService } from '../../services/consolidatedWalletService';
+import { WalletProvider as UnifiedWalletProvider } from '../../types/walletTypes';
 import { styles } from './styles';
-import { solanaAppKitService } from '../../services/solanaAppKitService';
-import { walletLogoService } from '../../services/walletLogoService';
-import { solanaWalletAdapterService } from '../../services/solanaWalletAdapterService';
-import { walletLinkingService } from '../../services/walletLinkingService';
 import { useApp } from '../../context/AppContext';
-import { realWalletAdapterService } from '../../services/realWalletAdapterService';
-import { walletWebSocketService } from '../../services/walletWebSocketService';
-import { mobileWalletAdapterService } from '../../services/mobileWalletAdapterService';
-import { solanaMobileStackService } from '../../services/solanaMobileStackService';
-import { phantomDirectService } from '../../services/phantomDirectService';
-import { phantomWalletLinkingService } from '../../services/phantomWalletLinkingService';
+
+// Use the actual WalletProvider type from the service
+type WalletProvider = UnifiedWalletProvider;
 
 interface ExternalWalletConnectionScreenProps {
   navigation: any;
@@ -47,300 +40,89 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
     loadProviders();
   }, []);
 
-  // Get the correct app store URL for a specific wallet
-  const getWalletStoreUrl = (walletName: string, platform: string): string => {
-    const walletStoreUrls: { [key: string]: { ios: string; android: string } } = {
-      'Phantom': {
-        ios: 'https://apps.apple.com/app/phantom-crypto-wallet/id1598432977',
-        android: 'https://play.google.com/store/apps/details?id=app.phantom'
-      },
-      'Solflare': {
-        ios: 'https://apps.apple.com/app/solflare-wallet/id1580902717',
-        android: 'https://play.google.com/store/apps/details?id=com.solflare.wallet'
-      },
-      'Backpack': {
-        ios: 'https://apps.apple.com/app/backpack-wallet/id6443944476',
-        android: 'https://play.google.com/store/apps/details?id=com.backpack.app'
-      },
-      'Slope': {
-        ios: 'https://apps.apple.com/app/slope-wallet/id1574624530',
-        android: 'https://play.google.com/store/apps/details?id=com.slope.finance'
-      }
-    };
-    
-    const walletUrls = walletStoreUrls[walletName];
-    if (walletUrls) {
-      return platform === 'ios' ? walletUrls.ios : walletUrls.android;
-    }
-    
-    // Fallback to search
-    return platform === 'ios' 
-      ? `https://apps.apple.com/search?term=${encodeURIComponent(walletName)}`
-      : `https://play.google.com/store/search?q=${encodeURIComponent(walletName)}`;
-  };
-
   const loadProviders = async () => {
     try {
       setLoading(true);
       console.log('🔍 ExternalWalletConnection: Loading providers...');
       
-      const availableProviders = await externalWalletAuthService.getAvailableProviders();
+      const availableProviders = await consolidatedWalletService.getAvailableProviders();
       console.log('🔍 ExternalWalletConnection: Available providers:', availableProviders.map(p => `${p.name} (${p.isAvailable ? 'Available' : 'Not Available'})`));
       
       setProviders(availableProviders);
-      
-      // Debug: Check if Phantom is in the list
-      const phantomProvider = availableProviders.find(p => p.name.toLowerCase() === 'phantom');
-      console.log('🔍 ExternalWalletConnection: Phantom provider found:', phantomProvider);
-      
-      // Only add Phantom as fallback if it's completely missing from the list
-      if (!phantomProvider) {
-        console.log('🔍 ExternalWalletConnection: Adding Phantom as fallback provider');
-        const fallbackPhantom = {
-          name: 'Phantom',
-          icon: '👻',
-          logoUrl: 'https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/icons/phantom.png',
-          isAvailable: false, // Start as false, will be tested by the service
-          connect: async () => ({ address: '', publicKey: null, balance: 0, walletName: 'Phantom' }),
-          disconnect: async () => {},
-          signTransaction: async (transaction: any) => transaction,
-          signMessage: async (message: any) => message
-        };
-        setProviders([fallbackPhantom, ...availableProviders]);
-      }
-      
     } catch (error) {
-      console.error('Error loading providers:', error);
-      Alert.alert('Error', 'Failed to load available wallet providers');
+      console.error('❌ ExternalWalletConnection: Error loading providers:', error);
+      setError('Failed to load wallet providers');
     } finally {
       setLoading(false);
     }
   };
 
   const handleConnectWallet = async (provider: WalletProvider) => {
-    if (!provider.isAvailable) {
-      // Provide helpful installation instructions
-      const installMessage = `${provider.name} is not installed on your device. Would you like to install it?`;
-      Alert.alert(
-        'Wallet Not Available',
-        installMessage,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Install',
-            onPress: () => {
-              // Open the appropriate app store with specific wallet links
-              const { Linking, Platform } = require('react-native');
-              
-              // Get the correct store URL for the specific wallet
-              const storeUrl = getWalletStoreUrl(provider.name, Platform.OS);
-              
-              Linking.openURL(storeUrl).catch((error: any) => {
-                console.error('Error opening app store:', error);
-                Alert.alert('Error', 'Could not open app store');
-              });
-            }
-          }
-        ]
-      );
-      return;
-    }
-
     try {
       setConnectingProvider(provider.name);
-      setStep('connecting');
-
-      console.log(`🔗 ExternalWalletConnection: Starting connection to ${provider.name}...`);
-
-      // For Phantom, use the direct connection method
+      setError(null);
+      console.log('🔗 ExternalWalletConnection: Starting connection to', provider.name);
+      
+      // For Phantom, use manual connection approach
       if (provider.name.toLowerCase() === 'phantom') {
-        console.log('🔗 ExternalWalletConnection: Using direct Phantom connection...');
-        
-        // Step 1: Connect to Phantom using secure wallet linking service
-        console.log('🔗 ExternalWalletConnection: Starting secure Phantom wallet linking...');
-        
-        // Get user ID for linking
-        const userId = currentUser?.id?.toString();
-        
-        if (!userId) {
-          throw new Error('User not authenticated');
-        }
-        
-        // Use secure wallet linking with message signing
-        const linkingResult = await phantomWalletLinkingService.linkWalletWithSignature(userId, 'Phantom');
-        
-        if (!linkingResult.success) {
-          throw new Error('Failed to link wallet securely');
-        }
-
-        console.log('🔗 ExternalWalletConnection: Phantom wallet linked securely with signature:', linkingResult.signature);
-
-        // Step 2: Get the wallet address from the linking result
-        const walletAddress = linkingResult.publicKey;
-        
-        // Step 3: Show success message
-        Alert.alert(
-          'Wallet Linked Securely',
-          `Your Phantom wallet has been securely linked to your account!\n\nWallet: ${walletAddress.slice(0, 8)}...${walletAddress.slice(-8)}\nSignature: ${linkingResult.signature.slice(0, 16)}...\n\nYour wallet is now authorized for secure transactions.`,
-          [
-            {
-              text: 'Continue',
-              onPress: () => {
-                // Navigate back with success result
-                navigation.goBack();
-                // You can also pass the result back to the previous screen if needed
-                if (route.params?.onSuccess) {
-                  route.params.onSuccess({
-                    success: true,
-                    walletAddress: walletAddress,
-                    walletName: 'Phantom',
-                    balance: 0,
-                    linked: true,
-                    signature: linkingResult.signature
-                  });
-                }
-              }
-            }
-          ]
-        );
-        
-        return;
-      }
-
-      // For other wallets, use the wallet connection service
-      const connectionResult = await walletConnectionService.connectWallet({
-        provider: provider.name,
-        showInstallPrompt: false // Don't show install prompt since we already checked availability
-      });
-
-      if (!connectionResult.success) {
-        throw new Error(connectionResult.error || 'Connection failed');
-      }
-
-      // Step 2: Request transaction signing for authentication
-      setStep('signing');
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate signing time
-
-      // Step 3: Verify the transaction
-      setStep('verifying');
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate verification time
-
-      // Step 4: Complete authentication
-      const result = await externalWalletAuthService.connectWithAuthentication(provider.name);
-
-      if (result.success) {
-        Alert.alert(
-          'Connection Successful',
-          `Successfully connected to ${provider.name}!\n\nWallet: ${result.walletAddress?.slice(0, 8)}...${result.walletAddress?.slice(-8)}\nBalance: $${(result.balance || 0).toFixed(2)} USDC`,
-          [
-            {
-              text: 'Continue',
-              onPress: () => {
-                // Navigate back with success result
-                navigation.goBack();
-                // You can also pass the result back to the previous screen if needed
-                if (route.params?.onSuccess) {
-                  route.params.onSuccess(result);
-                }
-              }
-            }
-          ]
-        );
+        await handlePhantomConnection();
       } else {
-        throw new Error(result.error || 'Authentication failed');
+        // For other wallets, try standard connection
+        await consolidatedWalletService.connectToProvider(provider.name);
       }
-
     } catch (error) {
-      console.error('Connection failed:', error);
-
-      const errorMessage = error instanceof Error ? error.message : 'Connection failed';
-
-      Alert.alert(
-        'Connection Failed',
-        `Failed to connect to ${provider.name}:\n\n${errorMessage}`,
-        [{ text: 'OK' }]
-      );
+      console.error('❌ ExternalWalletConnection: Connection failed:', error);
+      setError(`Failed to connect to ${provider.name}: ${error}`);
+      Alert.alert('Connection Failed', `Failed to connect to ${provider.name}. Please try again.`);
     } finally {
       setConnectingProvider(null);
-      setStep('select');
     }
   };
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
-  const getStepText = () => {
-    switch (step) {
-      case 'connecting':
-        return 'Connecting to wallet...';
-      case 'signing':
-        return 'Please sign the authentication transaction in your wallet...';
-      case 'verifying':
-        return 'Verifying transaction signature...';
-      default:
-        return 'Select a wallet to connect';
+  const handlePhantomConnection = async () => {
+    try {
+      console.log('🔗 ExternalWalletConnection: Starting automatic Phantom connection...');
+      
+      // Use automatic connection with signature request
+      await consolidatedWalletService.connectToProvider('Phantom');
+      
+      // Show success message
+      Alert.alert(
+        'Connection Request Sent',
+        'Phantom will open and show a connection request. Please sign the message to connect your wallet to WeSplit.',
+        [{ text: 'Got it!', style: 'default' }]
+      );
+    } catch (error) {
+      console.error('❌ ExternalWalletConnection: Phantom connection failed:', error);
+      throw error;
     }
   };
 
-    const renderWalletLogo = (provider: WalletProvider) => {
-    // Use specific logos for known providers, Phantom for others
+
+  const renderWalletLogo = (provider: WalletProvider) => {
     let logoSource;
     
     switch (provider.name.toLowerCase()) {
-      case 'backpack':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fbackpack-logo.png?alt=media&token=8624ee25-0f7d-475f-baad-3c80ad66d0aa' };
-        break;
-      case 'metamask':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmetamask-logo.png?alt=media&token=8d75e112-385c-45de-a0b5-ee47e67eb310' };
-        break;
-      case 'walletconnect':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwalletconnect-logo.png?alt=media&token=4e2dad45-747f-4cf2-b7f7-ebea73936e41' };
-        break;
-      case 'exodus':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fexodus-logo.png?alt=media&token=57837099-dd80-4b70-8a3b-600cd2e10132' };
-        break;
-      case 'glow':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fglow-logo.png?alt=media&token=707a5ab3-e81d-48e0-9391-49169cf37872' };
-        break;
-      case 'slope':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fslope-logo.png?alt=media&token=b5039c6d-9438-4b96-a9c3-22a1dec74bd0' };
+      case 'phantom':
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fphantom-logo.png?alt=media&token=18cd1c78-d879-4b94-abbe-a2011149837a' };
         break;
       case 'solflare':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsolflare-logo.png?alt=media&token=36e5b0d8-5f20-4eba-a5fb-5f1b2063926d' };
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsolflare-logo.png?alt=media&token=8b4331c1-3f9d-4f57-907c-53a2f0d8b137' };
         break;
-      case 'zerion':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fzerion-logo.png?alt=media&token=27b12d12-569e-4051-8074-8c80c7aa0175' };
+      case 'backpack':
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fbackpack-logo.png?alt=media&token=7c063169-db3e-4396-ad9f-e112b39d688b' };
         break;
-      case 'xdefi':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fxdefi-logo.png?alt=media&token=f429ac0c-bf51-4890-9998-19bb353d4752' };
+      case 'slope':
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fslope-logo.png?alt=media&token=62079355-59e2-48da-989b-b795873f8be6' };
         break;
-      case 'trust wallet':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftrustwallet-logo.png?alt=media&token=f376904f-5032-4ad6-8572-15502018881c' };
+      case 'glow':
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fglow-logo.png?alt=media&token=65abdd59-1fc7-4e8b-ad25-0c29df68f412' };
         break;
-      case 'talisman':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftalisman-logo.png?alt=media&token=0f95aee3-3c56-4d0f-b6ad-617b8c46bbdf' };
-        break;
-      case 'safepal':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsafepal-logo.png?alt=media&token=c2ed8958-ff46-4f44-bc20-372426e3d235' };
-        break;
-      case 'rainbow':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fraimbow-logo.png?alt=media&token=22d86212-70c3-4c53-8a53-ffe1547c36ef' };
-        break;
-      case 'onto':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fonto-logo.png?alt=media&token=ab746131-d390-4dbc-b94b-f4c7efecf753' };
+      case 'exodus':
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fexodus-logo.png?alt=media&token=fbe986bd-e5ef-488e-87c0-7fa860cb9a39' };
         break;
       case 'okx':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fokx-logo.png?alt=media&token=504420f4-acd0-4c3d-be8d-bccdae6c0509' };
-        break;
-      case 'nightly':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fnightly-logo.png?alt=media&token=d51a8fd6-25d9-41be-8333-c3f46bce0bb3' };
-        break;
-      case 'myria':
-        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmyria-logo.png?alt=media&token=465739a9-f5b3-4691-b6c3-321eab727363' };
+        logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fokx-logo.png?alt=media&token=3880f1e5-d8a0-4494-af9f-997ba91e6ce0' };
         break;
       case 'math wallet':
         logoSource = { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmathwallet-logo.png?alt=media&token=93173eb3-f83f-4b49-abeb-0334621205a3' };
@@ -424,7 +206,6 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Connect External Wallet</Text>
-        
       </View>
 
       {/* Content */}
@@ -438,6 +219,58 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
           Connect your external wallet to fund your app wallet. You'll need to sign a transaction to prove wallet ownership.
         </Text>
 
+        {/* Automatic Connection Instructions */}
+        <View style={{
+          marginVertical: 20,
+          padding: 16,
+          backgroundColor: colors.cardBackground,
+          borderRadius: 12,
+        }}>
+          <Text style={{
+            fontSize: 18,
+            fontWeight: '600',
+            color: colors.white,
+            marginBottom: 8,
+          }}>Automatic Wallet Connection</Text>
+          <Text style={{
+            fontSize: 14,
+            color: colors.textLight,
+            marginBottom: 16,
+            lineHeight: 20,
+          }}>
+            Connect your Phantom wallet automatically. Phantom will open and ask you to sign a message to verify wallet ownership.
+          </Text>
+          <TouchableOpacity 
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderRadius: 8,
+              alignItems: 'center',
+              backgroundColor: colors.primaryGreen,
+            }}
+            onPress={async () => {
+              try {
+                await consolidatedWalletService.connectToProvider('Phantom');
+                Alert.alert(
+                  'Connection Request Sent', 
+                  'Phantom will open and show a connection request. Please sign the message to connect your wallet to WeSplit.',
+                  [{ text: 'Got it!', style: 'default' }]
+                );
+              } catch (error) {
+                Alert.alert('Connection Failed', `Error: ${error}`);
+              }
+            }}
+          >
+            <Text style={{
+              color: colors.white,
+              fontSize: 16,
+              fontWeight: '600',
+              textAlign: 'center',
+            }}>Connect Phantom Wallet</Text>
+          </TouchableOpacity>
+          
+        </View>
+
         {/* Loading indicator */}
         {loading && (
           <View style={styles.loadingContainer}>
@@ -450,50 +283,61 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
         {providers
           .sort((a, b) => {
             // Sort available providers first, then unavailable ones
+            // Within each group, sort alphabetically
             if (a.isAvailable && !b.isAvailable) return -1;
             if (!a.isAvailable && b.isAvailable) return 1;
-            return 0;
+            return a.name.localeCompare(b.name);
           })
-          .map((provider, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[
-              styles.providerButton,
-              !provider.isAvailable && styles.providerButtonDisabled
-            ]}
-            onPress={() => handleConnectWallet(provider)}
-            disabled={!provider.isAvailable}
-          >
-            <View style={styles.providerInfo}>
-
-              <View style={styles.providerHeader}>
-                <View style={styles.walletLogoContainer}>
-                  {renderWalletLogo(provider)}
-                </View>
-                <View style={styles.providerNameContainer}>
-                  <View style={styles.providerInfoHeader}>
-                    <Text style={styles.providerName}>{provider.name}</Text>
-                    {!provider.isAvailable && (
-                      <Text style={styles.providerUnavailable}>Not available</Text>
-                    )}
-
-
-                  </View>
-                  {provider.isAvailable && (
-                    <View style={styles.detectedBadge}>
-                      <Text style={styles.detectedText}>Detected</Text>
+          .map((provider, index) => {
+            // Allow clicking on all providers - they can try to connect even if not detected
+            const isClickable = true;
+            
+            return (
+              <TouchableOpacity
+                key={`${provider.name}-${index}`}
+                style={[
+                  styles.providerButton,
+                  !provider.isAvailable && styles.providerButtonDisabled
+                ]}
+                onPress={() => handleConnectWallet(provider)}
+                disabled={false} // Always allow clicking
+              >
+                <View style={styles.providerInfo}>
+                  <View style={styles.providerHeader}>
+                    <View style={styles.walletLogoContainer}>
+                      {renderWalletLogo(provider)}
                     </View>
-                  )}
+                    <View style={styles.providerNameContainer}>
+                      <View style={styles.providerInfoHeader}>
+                        <Text style={styles.providerName}>{provider.name}</Text>
+                        {!provider.isAvailable && (
+                          <Text style={styles.providerUnavailable}>
+                            {provider.name.toLowerCase() === 'phantom' ? 'Not detected - try anyway' : 'Not detected'}
+                          </Text>
+                        )}
+                      </View>
+                      {provider.isAvailable ? (
+                        <View style={styles.detectedBadge}>
+                          <Text style={styles.detectedText}>Detected</Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.detectedBadge, { backgroundColor: colors.warning }]}>
+                          <Text style={styles.detectedText}>
+                            {provider.name.toLowerCase() === 'phantom' ? 'Try Connect' : 'Install'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
                 </View>
-              </View>
-            </View>
-            <Icon
-              name="chevron-right"
-              size={20}
-              color={provider.isAvailable ? colors.white : colors.white}
-            />
-          </TouchableOpacity>
-        ))}
+                <Icon
+                  name="chevron-right"
+                  size={20}
+                  color={colors.white}
+                />
+              </TouchableOpacity>
+            );
+          })}
       </ScrollView>
 
       {/* Footer */}
@@ -506,4 +350,4 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
   );
 };
 
-export default ExternalWalletConnectionScreen; 
+export default ExternalWalletConnectionScreen;

@@ -22,7 +22,7 @@ import {
   Keypair,
   LAMPORTS_PER_SOL
 } from '@solana/web3.js';
-import { solanaService } from '../src/services/solanaTransactionService';
+import { consolidatedTransactionService } from '../src/services/consolidatedTransactionService';
 
 // Your Solana network configuration
 const SOLANA_NETWORK = process.env.NODE_ENV === 'production' ? 'mainnet-beta' : 'devnet';
@@ -196,7 +196,7 @@ const walletManager = new SolanaWalletManager();
 export const generateWallet = async (): Promise<WalletInfo> => {
   try {
     // Try to use the new Solana service first
-    const walletData = await solanaService.generateWallet();
+    const walletData = await consolidatedTransactionService.getWalletInfo();
     
     // Also generate with the old service for compatibility
     const oldWalletInfo = await walletManager.generateWallet();

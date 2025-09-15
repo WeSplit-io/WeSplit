@@ -10,7 +10,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Linking
+  Linking 
 } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { styles } from './styles';
@@ -21,13 +21,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseAuth, firestoreService, auth } from '../../config/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { solanaAppKitService } from '../../services/solanaAppKitService';
+import { consolidatedWalletService } from '../../services/consolidatedWalletService';
+import { consolidatedAuthService } from '../../services/consolidatedAuthService';
 import { userWalletService } from '../../services/userWalletService';
 import { unifiedUserService } from '../../services/unifiedUserService';
-import { socialAuthService } from '../../services/socialAuthService';
 import { userDataService } from '../../services/userDataService';
-import * as AuthSession from 'expo-auth-session';
-import { loginWithGoogle, getAuthConfig, testAuthConfiguration } from '../../services/firebaseAuthService';
 import { sendVerificationCode } from '../../services/firebaseFunctionsService';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
@@ -171,23 +169,44 @@ const AuthMethodsScreen: React.FC = () => {
 
   // Handle email authentication using Firebase directly
   const handleEmailAuth = async () => {
+    console.log('🚀 handleEmailAuth called with email:', email);
+    
     // Sanitize email by trimming whitespace and newlines
     const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
+    console.log('🧹 Sanitized email:', sanitizedEmail);
 
     if (!sanitizedEmail) {
+      console.log('❌ No email provided');
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
+    console.log('⏳ Setting loading to true');
     setLoading(true);
 
     try {
-      // First, fix any users with invalid lastVerifiedAt dates
+      console.log('🔄 Starting email authentication process...');
+      
+      // Import firestore service
       const { firestoreService } = await import('../../config/firebase');
-      await firestoreService.fixInvalidLastVerifiedAt();
+      console.log('✅ Firebase service imported');
 
-      // Check if user has verified within 30 days
-      const hasVerifiedRecently = await firestoreService.hasVerifiedWithin30Days(sanitizedEmail);
+      // Check if user has verified within 30 days (with shorter timeout to prevent hanging)
+      console.log('🔍 Checking if user has verified within 30 days...');
+      let hasVerifiedRecently = false;
+      try {
+        hasVerifiedRecently = await Promise.race([
+          firestoreService.hasVerifiedWithin30Days(sanitizedEmail),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Verification check timeout')), 5000)
+          )
+        ]) as boolean;
+        console.log('📅 Has verified recently:', hasVerifiedRecently);
+      } catch (timeoutError) {
+        console.warn('⚠️ Verification check timed out after 5 seconds, proceeding with verification flow');
+        // If verification check times out, assume user needs verification
+        hasVerifiedRecently = false;
+      }
 
       if (hasVerifiedRecently) {
         if (__DEV__) {
@@ -333,19 +352,62 @@ const AuthMethodsScreen: React.FC = () => {
           console.log('🔄 User needs verification (not verified within 30 days), sending OTP');
         }
 
-        // Send verification code
-        await sendVerificationCode(sanitizedEmail);
+        // Send verification code (with longer timeout to allow Firebase Functions to complete)
+        console.log('📧 Sending verification code...');
+        try {
+          await Promise.race([
+            sendVerificationCode(sanitizedEmail),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Verification code send timeout')), 60000)
+            )
+          ]);
+          console.log('✅ Verification code sent successfully');
+        } catch (sendError) {
+          console.warn('⚠️ Verification code send failed or timed out:', sendError);
+          // Continue anyway - user can request a new code on the verification screen
+        }
 
-        // Navigate to verification screen
+        // Navigate to verification screen (always navigate, regardless of send success)
+        console.log('🧭 Navigating to verification screen...');
         navigation.navigate('Verification', { email: sanitizedEmail });
       }
           } catch (error: any) {
+        console.log('❌ Error in email authentication:', error);
+        console.log('🔍 Error code:', error.code);
+        console.log('📝 Error message:', error.message);
+        
         // Convert expected errors to warnings
         if (error.code === 'auth/email-already-in-use') {
           if (__DEV__) {
             console.warn('Expected Firebase Auth error (user already exists):', error.message);
           }
           // Continue with the flow since we handle this case above
+        } else if (error.message === 'Verification check timeout') {
+          console.warn('⚠️ Verification check timed out, proceeding with verification flow');
+          // If verification check times out, proceed with sending verification code
+          try {
+            console.log('📧 Sending verification code after timeout...');
+            await Promise.race([
+              sendVerificationCode(sanitizedEmail),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Verification code send timeout')), 60000)
+              )
+            ]);
+            console.log('✅ Verification code sent successfully');
+          } catch (sendError) {
+            console.warn('⚠️ Verification code send failed or timed out:', sendError);
+            // Continue anyway - user can request a new code on the verification screen
+          }
+          
+          // Always navigate to verification screen
+          console.log('🧭 Navigating to verification screen after timeout...');
+          navigation.navigate('Verification', { email: sanitizedEmail });
+        } else if (error.message === 'Verification code send timeout') {
+          console.warn('⚠️ Verification code send timed out');
+          Alert.alert(
+            'Network Error',
+            'Unable to send verification code. Please check your connection and try again.'
+          );
         } else {
           console.error('Error in email authentication:', error);
 
@@ -364,6 +426,7 @@ const AuthMethodsScreen: React.FC = () => {
           }
         }
       } finally {
+        console.log('🏁 Email authentication process finished, setting loading to false');
         setLoading(false);
       }
   };
@@ -377,13 +440,13 @@ const AuthMethodsScreen: React.FC = () => {
       
       switch (provider) {
         case 'google':
-          authResult = await loginWithGoogle();
+          authResult = await consolidatedAuthService.signInWithGoogle();
           break;
         case 'twitter':
-          authResult = await socialAuthService.signInWithTwitter();
+          authResult = await consolidatedAuthService.signInWithTwitter();
           break;
         case 'apple':
-          authResult = await socialAuthService.signInWithApple();
+          authResult = await consolidatedAuthService.signInWithApple();
           break;
         default:
           throw new Error('Unsupported provider');
@@ -547,7 +610,10 @@ const AuthMethodsScreen: React.FC = () => {
               placeholder="Enter your email"
               placeholderTextColor={colors.white50}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                console.log('📝 Email input changed:', text);
+                setEmail(text);
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -558,7 +624,13 @@ const AuthMethodsScreen: React.FC = () => {
           {/* Next Button */}
           <TouchableOpacity
             style={[styles.nextButton, (!email || loading || socialLoading !== null) && styles.nextButtonDisabled]}
-            onPress={handleEmailAuth}
+            onPress={() => {
+              console.log('🔘 Next button pressed!');
+              console.log('📧 Email value:', email);
+              console.log('⏳ Loading state:', loading);
+              console.log('🔗 Social loading state:', socialLoading);
+              handleEmailAuth();
+            }}
             disabled={!email || loading || socialLoading !== null}
           >
             {loading ? (

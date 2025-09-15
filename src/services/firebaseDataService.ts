@@ -62,7 +62,17 @@ export const firebaseDataTransformers = {
     wallet_address: doc.data().wallet_address || doc.data().walletAddress || '',
     wallet_public_key: doc.data().wallet_public_key || doc.data().walletPublicKey || '',
     created_at: firebaseDataTransformers.timestampToISO(doc.data().created_at),
-    avatar: doc.data().avatar || ''
+    avatar: doc.data().avatar || '',
+    hasCompletedOnboarding: doc.data().hasCompletedOnboarding || false,
+    // Wallet management tracking fields
+    wallet_status: doc.data().wallet_status || 'no_wallet',
+    wallet_created_at: doc.data().wallet_created_at || null,
+    wallet_last_fixed_at: doc.data().wallet_last_fixed_at || null,
+    wallet_fix_attempts: doc.data().wallet_fix_attempts || 0,
+    wallet_has_private_key: doc.data().wallet_has_private_key || false,
+    wallet_has_seed_phrase: doc.data().wallet_has_seed_phrase || false,
+    wallet_type: doc.data().wallet_type || 'app-generated',
+    wallet_migration_status: doc.data().wallet_migration_status || 'none'
   }),
 
   // Transform User to Firestore data
@@ -72,7 +82,17 @@ export const firebaseDataTransformers = {
     wallet_address: user.wallet_address,
     wallet_public_key: user.wallet_public_key,
     created_at: serverTimestamp(),
-    avatar: user.avatar
+    avatar: user.avatar,
+    hasCompletedOnboarding: user.hasCompletedOnboarding,
+    // Wallet management tracking fields
+    wallet_status: user.wallet_status,
+    wallet_created_at: user.wallet_created_at,
+    wallet_last_fixed_at: user.wallet_last_fixed_at,
+    wallet_fix_attempts: user.wallet_fix_attempts,
+    wallet_has_private_key: user.wallet_has_private_key,
+    wallet_has_seed_phrase: user.wallet_has_seed_phrase,
+    wallet_type: user.wallet_type,
+    wallet_migration_status: user.wallet_migration_status
   }),
 
   // Transform Firestore document to Group
@@ -371,6 +391,16 @@ export const firebaseUserService = {
     if (updates.wallet_public_key !== undefined) updateData.wallet_public_key = updates.wallet_public_key;
     if (updates.avatar !== undefined) updateData.avatar = updates.avatar;
     if (updates.hasCompletedOnboarding !== undefined) updateData.hasCompletedOnboarding = updates.hasCompletedOnboarding;
+    
+    // Wallet management tracking fields
+    if (updates.wallet_status !== undefined) updateData.wallet_status = updates.wallet_status;
+    if (updates.wallet_created_at !== undefined) updateData.wallet_created_at = updates.wallet_created_at;
+    if (updates.wallet_last_fixed_at !== undefined) updateData.wallet_last_fixed_at = updates.wallet_last_fixed_at;
+    if (updates.wallet_fix_attempts !== undefined) updateData.wallet_fix_attempts = updates.wallet_fix_attempts;
+    if (updates.wallet_has_private_key !== undefined) updateData.wallet_has_private_key = updates.wallet_has_private_key;
+    if (updates.wallet_has_seed_phrase !== undefined) updateData.wallet_has_seed_phrase = updates.wallet_has_seed_phrase;
+    if (updates.wallet_type !== undefined) updateData.wallet_type = updates.wallet_type;
+    if (updates.wallet_migration_status !== undefined) updateData.wallet_migration_status = updates.wallet_migration_status;
     
     updateData.updated_at = serverTimestamp();
     

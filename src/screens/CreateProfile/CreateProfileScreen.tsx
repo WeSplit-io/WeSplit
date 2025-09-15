@@ -20,7 +20,7 @@ import { unifiedUserService } from '../../services/unifiedUserService';
 import { userWalletService } from '../../services/userWalletService';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { colors } from '../../theme';
-import { solanaAppKitService } from '../../services/solanaAppKitService';
+import { consolidatedWalletService } from '../../services/consolidatedWalletService';
 import * as ImagePicker from 'expo-image-picker';
 
 const CreateProfileScreen: React.FC = () => {

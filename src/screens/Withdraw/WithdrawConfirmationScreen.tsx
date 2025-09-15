@@ -125,17 +125,17 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const safeTotalWithdraw = totalWithdraw || 0;
 
   const handleSignTransaction = async () => {
-    if (!appWalletConnected && !__DEV__) {
+    if (!appWalletConnected) {
       Alert.alert('App Wallet Error', 'Please ensure your app wallet is connected first');
       return;
     }
 
-    if (!externalWalletConnected && !__DEV__) {
+    if (!externalWalletConnected) {
       Alert.alert('External Wallet Error', 'Please connect your external wallet to receive the withdrawal');
       return;
     }
 
-    if (appWalletBalance !== null && amount > appWalletBalance && !__DEV__) {
+    if (appWalletBalance !== null && amount > appWalletBalance) {
       Alert.alert('Insufficient Balance', 'You do not have enough balance in your app wallet to complete this withdrawal');
       return;
     }
@@ -145,15 +145,8 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     try {
       let transactionResult;
       
-      if (__DEV__ && !appWalletConnected) {
-        // Dev mode: Simulate transaction for testing
-        console.log('🧪 DEV MODE: Simulating withdrawal transaction from app wallet to external wallet');
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate 2 second delay
-        
-        transactionResult = {
-          signature: `DEV_${transactionId}`,
-          txId: `DEV_${transactionId}`
-        };
+      if (!appWalletConnected) {
+        throw new Error('App wallet not connected. Please ensure your app wallet is properly initialized.');
       } else {
         // Send the actual withdrawal transaction from app wallet to external wallet
         console.log('🔍 WithdrawConfirmation: Sending from app wallet to external wallet:', {

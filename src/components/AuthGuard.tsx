@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors, fontSizes, fontWeights, spacing } from '../lib/theme';
+import { colors, spacing, typography } from '../theme';
 import { useApp } from '../context/AppContext';
 
 interface AuthGuardProps {
@@ -39,13 +39,13 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   title: {
-    fontSize: fontSizes.xl,
-    fontWeight: fontWeights.bold as any,
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
     color: colors.text,
     marginBottom: spacing.md,
   },
   subtitle: {
-    fontSize: fontSizes.md,
+    fontSize: typography.fontSize.md,
     color: colors.gray,
     textAlign: 'center',
     marginBottom: spacing.xl,
@@ -58,8 +58,8 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: colors.background,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.semibold as any,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
   },
 });
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
-import { colors, spacing } from '../lib/theme';
+import { colors, spacing } from '../theme';
 import Icon from './Icon';
 
 interface AddButtonProps {

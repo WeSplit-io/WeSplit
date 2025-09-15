@@ -4,7 +4,7 @@ import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { SubscriptionService, SubscriptionPlan, UserSubscription, PaymentMethod } from '../../services/subscriptionService';
-import { solanaService } from '../../services/solanaTransactionService';
+import { consolidatedTransactionService } from '../../services/consolidatedTransactionService';
 import styles from './styles';
 
 const PremiumScreen = ({ navigation }: any) => {
@@ -98,12 +98,12 @@ const PremiumScreen = ({ navigation }: any) => {
             text: 'Pay Now',
             onPress: async () => {
               try {
-                // Generate a dummy recipient address for payment processing
-                const dummyRecipient = 'HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH'; // Demo address
+                // Use company wallet address for premium payments
+                const companyWalletAddress = process.env.EXPO_PUBLIC_COMPANY_WALLET_ADDRESS || 'HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH';
                 
-                // Send payment transaction
+                // Send payment transaction to company wallet
                 const transactionResult = await sendTransaction({
-                  to: dummyRecipient,
+                  to: companyWalletAddress,
                   amount: currency === 'USDC' ? plan.price : cryptoAmount,
                   currency: currency,
                   memo: `WeSplit Premium: ${plan.name}`,

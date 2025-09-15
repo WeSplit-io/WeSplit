@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { walletConnectionService } from '../services/walletConnectionService';
+import { consolidatedWalletService } from '../services/consolidatedWalletService';
 import { Alert } from 'react-native';
 
 export interface LinkedWallet {
@@ -40,7 +40,7 @@ export const WalletLinkingProvider: React.FC<WalletLinkingProviderProps> = ({ ch
     try {
       // In a real app, you would load this from secure storage
       // For now, we'll use a simple approach
-      const connectedWallet = await walletConnectionService.getConnectedWalletInfo();
+      const connectedWallet = await consolidatedWalletService.getWalletInfo();
       if (connectedWallet) {
         const linkedWallet: LinkedWallet = {
           address: connectedWallet.address,
@@ -61,10 +61,7 @@ export const WalletLinkingProvider: React.FC<WalletLinkingProviderProps> = ({ ch
     try {
       setIsConnecting(true);
 
-      const result = await walletConnectionService.connectWallet({
-        provider,
-        showInstallPrompt: true
-      });
+      const result = await consolidatedWalletService.connectToProvider(provider);
 
       if (!result.success) {
         Alert.alert('Connection Failed', result.error || 'Failed to connect wallet');
@@ -112,7 +109,7 @@ export const WalletLinkingProvider: React.FC<WalletLinkingProviderProps> = ({ ch
 
   const disconnectWallet = async (address: string): Promise<void> => {
     try {
-      await walletConnectionService.disconnectWallet();
+      await consolidatedWalletService.disconnect();
       
       setLinkedWallets(prev => 
         prev.map(wallet => 

@@ -7,10 +7,10 @@ import {
   AppState, 
   AppAction,
   NavigationParams,
-  Notification 
+  Notification
 } from '../types';
 import { firebaseDataService } from '../services/firebaseDataService';
-import { hybridDataService } from '../services/hybridDataService';
+import { hybridDataService } from '../servicues/hybridDataService';
 import { i18nService } from '../services/i18nService';
 import { getUserNotifications } from '../services/firebaseNotificationService';
 import { MultiSignStateService } from '../services/multiSignStateService';

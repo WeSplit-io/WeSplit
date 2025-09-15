@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
-import { colors, fontSizes, fontWeights, spacing, radii } from '../lib/theme';
+import { colors, spacing, typography } from '../theme';
 
 interface BalanceRowProps {
   avatar: string;
@@ -28,7 +28,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.background,
-    borderRadius: radii.card,
+    borderRadius: 12,
     padding: spacing.md,
     marginBottom: spacing.sm,
     shadowColor: '#000',
@@ -46,18 +46,18 @@ const styles = StyleSheet.create({
   },
   name: {
     flex: 1,
-    fontSize: fontSizes.md,
+    fontSize: typography.fontSize.md,
     color: colors.text,
-    fontWeight: fontWeights.medium as any,
+    fontWeight: typography.fontWeight.medium,
   },
   amount: {
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.bold as any,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
     marginRight: spacing.sm,
   },
   status: {
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.semibold as any,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
   },
 });
 

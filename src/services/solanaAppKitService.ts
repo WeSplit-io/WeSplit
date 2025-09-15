@@ -20,27 +20,14 @@ import {
 } from '@solana/spl-token';
 import { walletLogoService } from './walletLogoService';
 
-// Solana RPC endpoints
-const SOLANA_RPC_ENDPOINTS = {
-  devnet: 'https://api.devnet.solana.com',
-  testnet: 'https://api.testnet.solana.com',
-  mainnet: 'https://api.mainnet-beta.solana.com'
-};
+// Import shared constants
+import { RPC_CONFIG, USDC_CONFIG, PHANTOM_SCHEMES } from './shared/walletConstants';
 
-// USDC Token mint addresses
-const USDC_MINT_ADDRESSES = {
-  devnet: 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr', // Devnet USDC
-  testnet: 'CpMah17kQEL2wqyMKt3mZBdTnZbkbfx4nqmQMFDP5vwp', // Testnet USDC
-  mainnet: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' // Mainnet USDC
-};
+// Use shared constants
+const RPC_ENDPOINT = RPC_CONFIG.endpoint;
+const USDC_MINT_ADDRESS = USDC_CONFIG.mintAddress;
 
-// Current network configuration
-// Force mainnet for production use - Phantom wallets are typically on mainnet
-const CURRENT_NETWORK = 'mainnet'; // Always use mainnet for real USDC transactions
-const RPC_ENDPOINT = SOLANA_RPC_ENDPOINTS[CURRENT_NETWORK];
-const USDC_MINT_ADDRESS = USDC_MINT_ADDRESSES[CURRENT_NETWORK];
-
-console.log('🌐 SolanaAppKitService: Using network:', CURRENT_NETWORK);
+console.log('🌐 SolanaAppKitService: Using network:', RPC_CONFIG.network);
 console.log('🌐 SolanaAppKitService: RPC endpoint:', RPC_ENDPOINT);
 console.log('🌐 SolanaAppKitService: USDC mint address:', USDC_MINT_ADDRESS);
 
@@ -1261,12 +1248,7 @@ export class SolanaAppKitService {
       const { Linking, Platform } = require('react-native');
       
       // Test multiple Phantom deep link schemes without opening the app
-      const phantomSchemes = [
-        'phantom://',
-        'app.phantom://',
-        'phantom://browse',
-        'app.phantom://browse'
-      ];
+      const phantomSchemes = PHANTOM_SCHEMES;
       
       let canOpen = false;
       let workingScheme = '';
@@ -1332,15 +1314,7 @@ export class SolanaAppKitService {
     }
   }
 
-  /**
-   * Connect to the actual Phantom wallet
-   * DEPRECATED: This method opens the wallet app, which is not desired behavior
-   * Use connectToPhantomWalletPassively() instead
-   */
-  private async connectToPhantomWallet(): Promise<WalletInfo> {
-    console.warn('🔗 SolanaAppKitService: connectToPhantomWallet is deprecated - use passive connection instead');
-    return this.connectToPhantomWalletPassively();
-  }
+  // Removed deprecated connectToPhantomWallet method - use connectToPhantomWalletPassively instead
 
   private async mockDisconnectProvider(): Promise<void> {
     if (__DEV__) {

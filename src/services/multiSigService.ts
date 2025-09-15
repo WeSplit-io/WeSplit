@@ -7,7 +7,7 @@ import {
   sendAndConfirmTransaction
 } from '@solana/web3.js';
 import { firebaseDataService } from './firebaseDataService';
-import { solanaAppKitService } from './solanaAppKitService';
+import { consolidatedWalletService } from './consolidatedWalletService';
 
 export interface MultiSigWallet {
   id: string;
@@ -96,7 +96,8 @@ export class MultiSigService {
       }
 
       // Create multi-sig wallet using Solana AppKit
-      const multiSigWallet = await solanaAppKitService.createMultiSigWallet(owners, threshold);
+      // TODO: Implement multi-sig wallet creation
+      const multiSigWallet = { address: 'mock-address', owners, threshold }; // Mock implementation
 
       // Store in Firebase
       const walletData = {

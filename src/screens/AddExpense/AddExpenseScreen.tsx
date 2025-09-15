@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, SafeAreaView, ActivityIndicator, Modal, Image, Platform, Switch } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import NetInfo from '@react-native-community/netinfo';
 import Icon from '../../components/Icon';
 import GroupIcon from '../../components/GroupIcon';
 import { useApp } from '../../context/AppContext';

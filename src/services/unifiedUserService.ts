@@ -250,22 +250,7 @@ class UnifiedUserService {
     }
   }
 
-  /**
-   * Clean up duplicate users (migration function)
-   */
-  async cleanupDuplicateUsers(): Promise<void> {
-    try {
-      if (__DEV__) {
-        console.log('🧹 UnifiedUserService: Starting duplicate user cleanup');
-      }
-
-      // This would be implemented to clean up existing duplicates
-      // For now, we'll just log the intention
-      console.log('Duplicate user cleanup not implemented yet');
-    } catch (error) {
-      console.error('Error cleaning up duplicate users:', error);
-    }
-  }
+  // Removed cleanupDuplicateUsers method - duplicates are now prevented at creation time
 }
 
 export const unifiedUserService = new UnifiedUserService(); 

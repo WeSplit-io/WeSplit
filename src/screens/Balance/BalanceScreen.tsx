@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import BalanceRow from '../../components/BalanceRow';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
-import { colors } from '../../lib/theme';
+import { colors } from '../../theme';
 import { styles } from './styles';
 
 const BalanceScreen: React.FC<any> = ({ navigation, route }) => {

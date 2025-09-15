@@ -15,14 +15,17 @@ module.exports = function (api) {
         {
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           alias: {
-            // Add specific aliases for problematic modules
-            'rpc-websockets': './node_modules/rpc-websockets',
-            '@noble/hashes/crypto.js': './node_modules/@noble/hashes/crypto',
-            'crypto': './node_modules/react-native-crypto',
-            'ws': './node_modules/ws',
+            // Essential polyfills only - no rpc-websockets alias
+            'stream': './node_modules/readable-stream',
+            'crypto': './src/config/crypto-stub.js',
+            'buffer': './node_modules/buffer',
+            'util': './node_modules/util',
+            'process': './node_modules/process',
+            'events': './node_modules/events',
+            '@noble/hashes/crypto.js': './src/config/crypto-stub.js',
           },
         },
       ],
     ],
   };
-}; 
+};

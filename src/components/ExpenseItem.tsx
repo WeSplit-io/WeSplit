@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
-import { colors, fontSizes, fontWeights, spacing, radii } from '../lib/theme';
+import { colors, spacing, typography } from '../theme';
 
 interface ExpenseItemProps {
   payer: string;
@@ -37,7 +37,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.background,
-    borderRadius: radii.card,
+    borderRadius: 12,
     padding: spacing.md,
     marginBottom: spacing.sm,
     shadowColor: '#000',
@@ -57,25 +57,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   desc: {
-    fontSize: fontSizes.md,
+    fontSize: typography.fontSize.md,
     color: colors.text,
-    fontWeight: fontWeights.medium as any,
+    fontWeight: typography.fontWeight.medium,
   },
   sub: {
-    fontSize: fontSizes.xs,
+    fontSize: typography.fontSize.xs,
     color: colors.gray,
     marginTop: 2,
   },
   lent: {
     color: colors.green,
-    fontWeight: fontWeights.semibold as any,
-    fontSize: fontSizes.sm,
+    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.sm,
     marginLeft: spacing.md,
   },
   owe: {
     color: colors.red,
-    fontWeight: fontWeights.semibold as any,
-    fontSize: fontSizes.sm,
+    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.sm,
     marginLeft: spacing.md,
   },
 });

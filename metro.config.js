@@ -1,118 +1,46 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-// Fix for problematic modules
+// Alternative approach: Use a custom transformer to handle problematic modules
+config.transformer = {
+  ...config.transformer,
+  // Add custom transformer logic if needed
+};
+
+// Use resolverMainFields to prioritize browser versions
 config.resolver = {
   ...config.resolver,
   alias: {
-    'rpc-websockets': require.resolve('rpc-websockets'),
-    'buffer': require.resolve('buffer'),
-    'stream': require.resolve('readable-stream'),
-    'util': require.resolve('util'),
-    'process': require.resolve('process'),
-    // Add stream alias for cipher-base
-    'stream$': require.resolve('readable-stream'),
-    // Fix for @noble/hashes crypto.js issue
-    '@noble/hashes/crypto.js': require.resolve('@noble/hashes/crypto'),
-    // Platform-specific resolutions
-    'crypto': require.resolve('react-native-crypto'),
-    // Additional polyfills
-    'events': require.resolve('events'),
-    // Fix for cipher-base stream dependency
-    'cipher-base': require.resolve('./src/config/cipher-base-fix.js'),
+    // Essential polyfills for React Native mobile apps
+    'stream': path.resolve(__dirname, 'node_modules/readable-stream'),
+    'crypto': path.resolve(__dirname, 'src/config/crypto-stub.js'),
+    'buffer': path.resolve(__dirname, 'node_modules/buffer'),
+    'util': path.resolve(__dirname, 'node_modules/util'),
+    'process': path.resolve(__dirname, 'node_modules/process'),
+    'events': path.resolve(__dirname, 'node_modules/events'),
+    '@noble/hashes/crypto.js': path.resolve(__dirname, 'src/config/crypto-stub.js'),
+    // WebSocket polyfill for Node.js ws module
+    'ws': path.resolve(__dirname, 'src/config/websocket-stub.js'),
+    // Node.js modules that crypto/wallet libraries need
+    'os': path.resolve(__dirname, 'node_modules/os-browserify'),
+    'path': path.resolve(__dirname, 'node_modules/path-browserify'),
+    'url': path.resolve(__dirname, 'node_modules/url'),
+    'querystring': path.resolve(__dirname, 'node_modules/querystring-es3'),
+    'string_decoder': path.resolve(__dirname, 'node_modules/string_decoder'),
+    'inherits': path.resolve(__dirname, 'node_modules/inherits'),
   },
-  resolverMainFields: ['react-native', 'browser', 'main'],
+  resolverMainFields: ['browser', 'react-native', 'main'], // Prioritize browser versions
   sourceExts: [...config.resolver.sourceExts, 'mjs', 'cjs'],
   platforms: ['ios', 'android', 'native', 'web'],
-  // Add platform-specific module resolution with better error handling
-  resolveRequest: (context, moduleName, platform) => {
-    // Handle rpc-websockets for iOS
-    if (moduleName === 'rpc-websockets' && platform === 'ios') {
-      try {
-        return {
-          filePath: require.resolve('rpc-websockets'),
-          type: 'sourceFile',
-        };
-      } catch (error) {
-        console.warn('Failed to resolve rpc-websockets for iOS, using fallback');
-        return {
-          filePath: require.resolve('buffer'),
-          type: 'sourceFile',
-        };
-      }
-    }
-    
-    // Handle @noble/hashes crypto.js for iOS
-    if (moduleName === '@noble/hashes/crypto.js' && platform === 'ios') {
-      try {
-        return {
-          filePath: require.resolve('@noble/hashes/crypto'),
-          type: 'sourceFile',
-        };
-      } catch (error) {
-        console.warn('Failed to resolve @noble/hashes/crypto.js for iOS, using fallback');
-        return {
-          filePath: require.resolve('react-native-crypto'),
-          type: 'sourceFile',
-        };
-      }
-    }
-    
-    // Handle WebSocket for iOS
-    if (moduleName === 'ws' && platform === 'ios') {
-      try {
-        return {
-          filePath: require.resolve('ws'),
-          type: 'sourceFile',
-        };
-      } catch (error) {
-        console.warn('Failed to resolve ws for iOS, using fallback');
-        return {
-          filePath: require.resolve('buffer'),
-          type: 'sourceFile',
-        };
-      }
-    }
-    
-    // Handle cipher-base stream dependency
-    if (moduleName === 'stream' && (platform === 'ios' || platform === 'android')) {
-      return {
-        filePath: require.resolve('readable-stream'),
-        type: 'sourceFile',
-      };
-    }
-    
-    return context.resolveRequest(context, moduleName, platform);
-  },
-  // Add node_modules resolution
-  nodeModulesPaths: [
-    require.resolve('react-native-crypto'),
-    require.resolve('ws'),
-    require.resolve('@noble/hashes'),
-    require.resolve('./src/config/cipher-base-fix.js'),
-  ],
+  unstable_enablePackageExports: false,
 };
 
-// Fix serializer issues
-config.transformer = {
-  ...config.transformer,
-  minifierConfig: {
-    ...config.transformer.minifierConfig,
-    mangle: {
-      ...config.transformer.minifierConfig?.mangle,
-      keep_fnames: true,
-    },
-  },
-  experimentalImportSupport: false,
-  inlineRequires: true,
-  // Add transformer for problematic modules
-  getTransformOptions: async () => ({
-    transform: {
-      experimentalImportSupport: false,
-      inlineRequires: true,
-    },
-  }),
+// Disable the problematic serializer entirely
+config.serializer = {
+  ...config.serializer,
+  getModulesRunBeforeMainModule: () => [],
 };
 
 module.exports = config;

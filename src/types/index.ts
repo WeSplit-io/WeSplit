@@ -10,6 +10,16 @@ export interface User {
   created_at: string;
   avatar?: string; // For UI purposes, can be generated or uploaded
   hasCompletedOnboarding?: boolean; // Track if user has completed onboarding flow
+  
+  // Wallet management tracking
+  wallet_status?: 'healthy' | 'needs_fix' | 'no_wallet' | 'fixing' | 'error';
+  wallet_created_at?: string;
+  wallet_last_fixed_at?: string;
+  wallet_fix_attempts?: number;
+  wallet_has_private_key?: boolean;
+  wallet_has_seed_phrase?: boolean;
+  wallet_type?: 'app-generated' | 'external' | 'migrated';
+  wallet_migration_status?: 'none' | 'in_progress' | 'completed' | 'failed';
 }
 
 // Group member is essentially a User but with group-specific metadata

@@ -145,15 +145,67 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  testButton: {
-    padding: 8,
-    backgroundColor: colors.info,
-    borderRadius: 6,
-    marginLeft: 8,
+  // Debug styles
+  debugContainer: {
+    backgroundColor: colors.gray800,
+    padding: spacing.md,
+    borderRadius: 8,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.primaryGreen,
   },
-  testButtonText: {
-    color: colors.white,
+  debugText: {
+    color: colors.primaryGreen,
     fontSize: 12,
-    fontWeight: 'bold',
+    marginBottom: spacing.sm,
+    fontFamily: 'monospace',
+  },
+  refreshButton: {
+    backgroundColor: colors.primaryGreen,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  refreshButtonText: {
+    color: colors.black,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.medium,
+  },
+  sectionContainer: {
+    marginVertical: spacing.lg,
+    padding: spacing.lg,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.white,
+    marginBottom: spacing.sm,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: spacing.md,
+    lineHeight: 20,
+  },
+  alternativeButtonsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  alternativeButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  alternativeButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.medium,
+    textAlign: 'center',
   },
 }); 

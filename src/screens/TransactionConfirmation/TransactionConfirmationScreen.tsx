@@ -55,19 +55,12 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
         throw new Error('Wallet not connected');
       }
 
-      // Check balance (simplified check - in real implementation you'd check actual balance)
-      if (amount > 1000) { // Placeholder balance check
-        throw new Error('Insufficient balance');
+      // Check actual balance using existing wallet service
+      const { consolidatedTransactionService } = await import('../../services/consolidatedTransactionService');
+      const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
+      if (balance.usdc < amount) {
+        throw new Error(`Insufficient balance. Required: ${amount} USDC, Available: ${balance.usdc} USDC`);
       }
-
-      // Simulate transaction processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // In a real implementation, this would:
-      // 1. Create a Solana transaction
-      // 2. Send USDC tokens to recipient's wallet
-      // 3. Record the transaction in the backend
-      // 4. Update group balances
       
       const transactionResult = await sendTransaction({
         to: params.recipient.wallet_address,

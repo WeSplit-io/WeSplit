@@ -45,7 +45,7 @@ class WalletLogoService {
         detectionMethod: 'deep-link',
         deepLinkScheme: 'phantom://',
         appStoreId: '1598432977',
-        playStoreId: 'com.phantom.app',
+        playStoreId: 'app.phantom',
         websiteUrl: 'https://phantom.app'
       },
       {
@@ -520,12 +520,13 @@ class WalletLogoService {
     try {
       const { Linking, Platform } = require('react-native');
       
-      // Try multiple Phantom deep link schemes
+      // Try multiple Phantom deep link schemes in order of preference
       const phantomSchemes = [
-        'phantom://',
-        'app.phantom://',
-        'phantom://browse',
-        'app.phantom://browse'
+        'phantom://',           // Standard Phantom deep link
+        'phantom://connect',    // Connection-specific deep link
+        'phantom://browse',     // Browse deep link
+        'app.phantom://',       // Android package-based deep link
+        'app.phantom://connect', // Android connection deep link
       ];
       
       for (const scheme of phantomSchemes) {
@@ -533,6 +534,7 @@ class WalletLogoService {
           const canOpen = await Linking.canOpenURL(scheme);
           console.log(`🔍 WalletLogoService: Phantom scheme test ${scheme}:`, canOpen);
           if (canOpen) {
+            console.log(`🔍 WalletLogoService: Phantom detected via ${scheme}`);
             return true;
           }
         } catch (error) {
@@ -540,20 +542,21 @@ class WalletLogoService {
         }
       }
       
-      // For Android, try to check if the Phantom app is installed
+      // For Android, try package-based detection as fallback
       if (Platform.OS === 'android') {
         try {
-          // Try to open Phantom with a specific action
-          const canOpen = await Linking.canOpenURL('phantom://browse');
-          console.log(`🔍 WalletLogoService: Phantom browse test:`, canOpen);
-          if (canOpen) {
+          const packageCanOpen = await Linking.canOpenURL('app.phantom://');
+          console.log(`🔍 WalletLogoService: Phantom package test:`, packageCanOpen);
+          if (packageCanOpen) {
+            console.log(`🔍 WalletLogoService: Phantom detected via package`);
             return true;
           }
         } catch (error) {
-          console.log(`🔍 WalletLogoService: Phantom browse test failed:`, error);
+          console.log(`🔍 WalletLogoService: Phantom package test failed:`, error);
         }
       }
       
+      console.log(`🔍 WalletLogoService: Phantom not detected`);
       return false;
     } catch (error) {
       console.error('🔍 WalletLogoService: Error in Phantom detection:', error);
@@ -589,63 +592,6 @@ class WalletLogoService {
     }
   }
 
-  /**
-   * Test if a wallet can actually be connected to
-   */
-  async testWalletConnection(walletName: string): Promise<boolean> {
-    try {
-      console.log(`🔍 WalletLogoService: Testing connection to ${walletName}...`);
-      
-      // Try to open the wallet's deep link to see if it responds
-      const provider = this.walletProviders.get(walletName.toLowerCase());
-      if (!provider || !provider.deepLinkScheme) {
-        return false;
-      }
-
-      const { Linking } = require('react-native');
-      
-      // Try to open the wallet's deep link
-      const canOpen = await Linking.canOpenURL(provider.deepLinkScheme);
-      
-      if (canOpen) {
-        console.log(`🔍 WalletLogoService: ${walletName} deep link test successful`);
-        return true;
-      }
-
-      // For Android, try package-based detection
-      const { Platform } = require('react-native');
-      if (Platform.OS === 'android') {
-        const packageName = this.getPackageNameForWallet(walletName);
-        if (packageName) {
-          try {
-            const packageCanOpen = await Linking.canOpenURL(`${packageName}://`);
-            if (packageCanOpen) {
-              console.log(`🔍 WalletLogoService: ${walletName} package test successful`);
-              return true;
-            }
-          } catch (error) {
-            console.log(`🔍 WalletLogoService: ${walletName} package test failed:`, error);
-          }
-        }
-      }
-
-      // For Phantom specifically, use passive detection instead of opening the app
-      if (walletName.toLowerCase() === 'phantom') {
-        const phantomInstalled = await this.passivePhantomDetection();
-        if (phantomInstalled) {
-          console.log(`🔍 WalletLogoService: ${walletName} passive detection successful`);
-          return true;
-        }
-      }
-
-      console.log(`🔍 WalletLogoService: ${walletName} connection test failed`);
-      return false;
-      
-    } catch (error) {
-      console.error(`🔍 WalletLogoService: Error testing ${walletName} connection:`, error);
-      return false;
-    }
-  }
 
   /**
    * Passive Phantom detection without opening the app
@@ -694,15 +640,7 @@ class WalletLogoService {
     }
   }
 
-  /**
-   * Test if Phantom is actually installed by trying to open it
-   * DEPRECATED: This method opens the wallet app, which is not desired behavior
-   * Use passivePhantomDetection() instead
-   */
-  private async testPhantomInstallation(): Promise<boolean> {
-    console.warn('🔍 WalletLogoService: testPhantomInstallation is deprecated - use passive detection instead');
-    return this.passivePhantomDetection();
-  }
+  // Removed deprecated testPhantomInstallation method - use passivePhantomDetection instead
 
   /**
    * Get package name for wallet on Android
@@ -781,13 +719,13 @@ class WalletLogoService {
       }
     }
     
-    // Test connections for popular wallets that were marked as unavailable
+    // Use passive detection for popular wallets that were marked as unavailable
     for (const wallet of wallets) {
       if (popularWallets.includes(wallet.name) && !wallet.isAvailable) {
-        console.log(`🔍 WalletLogoService: Testing connection for ${wallet.name}...`);
-        const canConnect = await this.testWalletConnection(wallet.name);
-        wallet.isAvailable = canConnect;
-        console.log(`🔍 WalletLogoService: ${wallet.name} connection test result: ${canConnect}`);
+        console.log(`🔍 WalletLogoService: Checking availability for ${wallet.name}...`);
+        const isAvailable = await this.checkWalletAvailability(wallet.name);
+        wallet.isAvailable = isAvailable;
+        console.log(`🔍 WalletLogoService: ${wallet.name} availability result: ${isAvailable}`);
       }
     }
     

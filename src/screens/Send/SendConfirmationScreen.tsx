@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, Alert, ScrollView, Image, Animated, PanResponder } from 'react-native';
 import Icon from '../../components/Icon';
-import SlideButton from '../../components/SlideButton';
 import { useApp } from '../../context/AppContext';
-import { useWallet } from '../../context/WalletContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
+import { consolidatedTransactionService } from '../../services/consolidatedTransactionService';
 import { GroupMember } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
@@ -136,73 +135,63 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       isSettlement
     });
   }, [contact, amount, description, groupId, isSettlement]);
-  const {
-    sendTransaction,
-    isConnected,
-    address,
-    balance,
-    isLoading: walletLoading,
-    availableWallets,
-    connectWallet,
-    // App wallet state and actions
-    appWalletConnected,
-    appWalletBalance,
-    ensureAppWallet
-  } = useWallet();
   const [sending, setSending] = useState(false);
 
   const handleConfirmSend = async () => {
-    // For send transactions, we use the app wallet (not external wallet)
-    // The app wallet should be automatically connected when user logs in
-    if (!appWalletConnected) {
-      console.log('🔍 SendConfirmation: App wallet not connected, attempting to ensure...');
-      
-      try {
-        if (currentUser?.id) {
-          console.log('🔍 SendConfirmation: Ensuring app wallet for user:', currentUser.id);
-          await ensureAppWallet(currentUser.id.toString());
-          console.log('🔍 SendConfirmation: App wallet ensured successfully');
-        } else {
-          console.log('🔍 SendConfirmation: No current user found');
-          Alert.alert('Wallet Error', 'User not authenticated');
-          return;
-        }
-      } catch (autoConnectError) {
-        console.error('🔍 SendConfirmation: App wallet ensure failed:', autoConnectError);
-        Alert.alert('Wallet Error', 'Failed to initialize app wallet');
+    try {
+      if (!currentUser?.id) {
+        Alert.alert('Wallet Error', 'User not authenticated');
         return;
       }
-    }
 
-    if (!contact?.wallet_address) {
-      Alert.alert('Error', 'Recipient wallet address is missing');
-      return;
-    }
+      if (!contact?.wallet_address) {
+        Alert.alert('Error', 'Recipient wallet address is missing');
+        return;
+      }
 
-    if (appWalletBalance !== null && appWalletBalance < amount) {
-      Alert.alert('Insufficient Balance', 'You do not have enough balance in your app wallet to complete this transaction');
-      return;
-    }
+      // Check balance using existing wallet service
+      const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
+      if (balance.usdc < amount) {
+        Alert.alert('Insufficient Balance', `You do not have enough USDC balance. Required: ${amount} USDC, Available: ${balance.usdc} USDC`);
+        return;
+      }
 
-    setSending(true);
+      if (__DEV__) {
+        console.log('💰 SendConfirmation: Balance check passed:', {
+          required: amount,
+          available: balance.usdc,
+          remaining: balance.usdc - amount
+        });
+      }
 
-    try {
-      // Send the actual transaction using wallet context
-      const transactionResult = await sendTransaction({
-        to: contact.wallet_address,
-        amount: amount,
-        currency: 'USDC',
-        memo: description || (isSettlement ? 'Settlement payment' : 'Payment'),
-        groupId: groupId?.toString()
+      setSending(true);
+
+      // Get fee estimate for display
+      const feeEstimate = await consolidatedTransactionService.getTransactionFeeEstimate(amount, 'USDC', 'medium');
+      
+      console.log('💰 Transaction fee estimate:', feeEstimate);
+
+      // Send transaction using existing wallet service
+      const transactionResult = await consolidatedTransactionService.sendUsdcTransaction(
+        contact.wallet_address,
+        amount,
+        currentUser.id,
+        description || (isSettlement ? 'Settlement payment' : 'Payment'),
+        groupId?.toString(),
+        'medium'
+      );
+
+      console.log('✅ Transaction successful:', {
+        signature: transactionResult.signature,
+        txId: transactionResult.txId,
+        companyFee: transactionResult.companyFee,
+        netAmount: transactionResult.netAmount,
+        blockchainFee: transactionResult.fee,
       });
-
-      console.log('Transaction successful:', transactionResult);
 
       // If this is a settlement payment, record the settlement
       if (isSettlement && currentUser?.id && groupId && contact?.id) {
         try {
-          // Use hybrid service instead of direct service call
-          const { firebaseDataService } = await import('../../services/firebaseDataService');
           await firebaseDataService.settlement.recordPersonalSettlement(
             groupId.toString(),
             currentUser.id.toString(),
@@ -213,7 +202,6 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         } catch (settlementError) {
           console.error('Settlement processing error:', settlementError);
           // Continue to success screen even if settlement processing fails
-          // The payment was successful, settlement tracking is secondary
         }
       }
 
@@ -226,6 +214,9 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         isSettlement,
         transactionId: transactionResult.signature,
         txId: transactionResult.txId,
+        companyFee: transactionResult.companyFee,
+        netAmount: transactionResult.netAmount,
+        blockchainFee: transactionResult.fee,
       });
     } catch (error) {
       console.error('Send error:', error);
@@ -235,25 +226,93 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     }
   };
 
-  // Calculate fees (these should be real fees from the wallet)
-  const transactionFee = amount * 0.03; // 3% fee
-  const totalSent = amount * 1.03; // montant entré + 3%
-  const destinationAccount = contact?.wallet_address || '';
-  const transactionId = 'ZIEZHFIZENBAO'; // Replace with real tx id if available
+  // State for fee calculation
+  const [feeEstimate, setFeeEstimate] = useState<{
+    companyFee: number;
+    blockchainFee: number;
+    totalFee: number;
+    netAmount: number;
+  } | null>(null);
 
-  // Check if user has sufficient balance
-  const hasSufficientBalance = appWalletBalance === null || appWalletBalance >= amount;
+  // Calculate fees using existing wallet service
+  useEffect(() => {
+    const calculateFees = async () => {
+      try {
+        if (amount > 0) {
+          const estimate = await consolidatedTransactionService.getTransactionFeeEstimate(amount, 'USDC', 'medium');
+          setFeeEstimate(estimate);
+        }
+      } catch (error) {
+        console.error('Failed to calculate fee estimate:', error);
+        // Fallback to default calculation
+        setFeeEstimate({
+          companyFee: amount * 0.03,
+          blockchainFee: 0.00001,
+          totalFee: amount * 0.03 + 0.00001,
+          netAmount: amount * 0.97,
+        });
+      }
+    };
+
+    calculateFees();
+  }, [amount]);
+
+  // Use calculated fees or fallback
+  const companyFee = feeEstimate?.companyFee || amount * 0.03;
+  const blockchainFee = feeEstimate?.blockchainFee || 0.00001;
+  const totalFee = feeEstimate?.totalFee || companyFee + blockchainFee;
+  const netAmount = feeEstimate?.netAmount || amount - companyFee;
+  const destinationAccount = contact?.wallet_address || '';
+
+  // Check if user has existing wallet and sufficient balance
+  const [hasExistingWallet, setHasExistingWallet] = useState(false);
+  const [existingWalletBalance, setExistingWalletBalance] = useState<{ sol: number; usdc: number } | null>(null);
+  const [hasSufficientSol, setHasSufficientSol] = useState(false);
+
+  useEffect(() => {
+    const checkExistingWallet = async () => {
+      if (currentUser?.id) {
+        try {
+          const walletAddress = await consolidatedTransactionService.getUserWalletAddress(currentUser.id);
+          const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
+          const solCheck = await consolidatedTransactionService.hasSufficientSolForGas(currentUser.id);
+          
+          setHasExistingWallet(!!walletAddress);
+          setExistingWalletBalance(balance);
+          setHasSufficientSol(solCheck.hasSufficient);
+          
+          if (__DEV__) {
+            console.log('🔍 SendConfirmation: Existing wallet check:', {
+              walletAddress,
+              balance,
+              hasWallet: !!walletAddress,
+              solCheck
+            });
+          }
+        } catch (error) {
+          console.error('Failed to check existing wallet:', error);
+          setHasExistingWallet(false);
+          setExistingWalletBalance(null);
+          setHasSufficientSol(false);
+        }
+      }
+    };
+
+    checkExistingWallet();
+  }, [currentUser?.id]);
+
+  // Check if user has sufficient balance using existing wallet balance
+  const hasSufficientBalance = existingWalletBalance === null || existingWalletBalance.usdc >= amount;
 
   // Debug logging for slider state
   console.log('🔍 SendConfirmation: Slider state debug:', {
     sending,
-    appWalletConnected,
+    hasExistingWallet,
     hasSufficientBalance,
-    walletLoading,
-    appWalletBalance,
+    hasSufficientSol,
+    existingWalletBalance,
     amount,
-    availableWallets: availableWallets.length,
-    disabled: sending || !appWalletConnected || !hasSufficientBalance || walletLoading
+    disabled: sending || !hasExistingWallet || !hasSufficientBalance || !hasSufficientSol
   });
 
   return (
@@ -322,12 +381,16 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         {/* Transaction Details Card (mockup style) */}
         <View style={styles.mockupTransactionDetails}>
           <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Transaction fee (3%)</Text>
-            <Text style={styles.mockupFeeValue}>{transactionFee.toFixed(2)} USDC</Text>
+            <Text style={styles.mockupFeeLabel}>Company fee ({consolidatedTransactionService.getCompanyFeeStructure().percentage}%)</Text>
+            <Text style={styles.mockupFeeValue}>{companyFee.toFixed(2)} USDC</Text>
           </View>
           <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Total sent</Text>
-            <Text style={styles.mockupFeeValue}>{totalSent.toFixed(3)} USDC</Text>
+            <Text style={styles.mockupFeeLabel}>Blockchain fee (Company covered)</Text>
+            <Text style={styles.mockupFeeValue}>Free</Text>
+          </View>
+          <View style={styles.mockupFeeRow}>
+            <Text style={styles.mockupFeeLabel}>Net amount sent</Text>
+            <Text style={styles.mockupFeeValue}>{netAmount.toFixed(2)} USDC</Text>
           </View>
           <View style={styles.mockupFeeRowSeparator} />
           <View style={styles.mockupFeeRow}>
@@ -335,8 +398,8 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
             <Text style={styles.mockupFeeValue}>{destinationAccount ? `${destinationAccount.substring(0, 4)}...${destinationAccount.slice(-4)}` : ''}</Text>
           </View>
           <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Transaction ID</Text>
-            <Text style={styles.mockupFeeValue}>{transactionId}</Text>
+            <Text style={styles.mockupFeeLabel}>Network</Text>
+            <Text style={styles.mockupFeeValue}>Solana Mainnet (Helius)</Text>
           </View>
         </View>
 
@@ -349,10 +412,29 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         <Text style={styles.walletInfoText}>
           Double check the person you're sending money to!
         </Text>
+        
+        {/* Company Gas Coverage Info */}
+        {hasExistingWallet && (
+          <View style={{ 
+            backgroundColor: '#4CAF50', 
+            padding: 12, 
+            borderRadius: 8, 
+            marginBottom: 16,
+            marginHorizontal: 20
+          }}>
+            <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+              🏦 Gas Fees Covered by Company
+            </Text>
+            <Text style={{ color: 'white', textAlign: 'center', marginTop: 4, fontSize: 12 }}>
+              We cover all blockchain transaction fees for you
+            </Text>
+          </View>
+        )}
+        
         <AppleSlider
           onSlideComplete={handleConfirmSend}
-          disabled={__DEV__ ? false : (sending || !appWalletConnected || !hasSufficientBalance || walletLoading)}
-          loading={sending || walletLoading}
+          disabled={sending || !hasExistingWallet || !hasSufficientBalance || !hasSufficientSol}
+          loading={sending}
           text="Sign transaction"
         />
       </View>

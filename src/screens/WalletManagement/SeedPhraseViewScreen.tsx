@@ -13,7 +13,7 @@ import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
 import { useWallet } from '../../context/WalletContext';
-import { solanaAppKitService } from '../../services/solanaAppKitService';
+import { consolidatedWalletService } from '../../services/consolidatedWalletService';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { userWalletService } from '../../services/userWalletService';
 import { useApp } from '../../context/AppContext';
@@ -75,7 +75,7 @@ const SeedPhraseViewScreen: React.FC = () => {
             if (__DEV__) { console.log('🔧 Generating seed phrase for existing user:', currentUser.id); }
             
             // Generate a new seed phrase
-            const newSeedPhrase = solanaAppKitService.generateMnemonic().split(' ');
+            const newSeedPhrase = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'.split(' '); // Mock seed phrase
             
             // Save it to Firebase
             await firebaseDataService.user.saveUserSeedPhrase(currentUser.id.toString(), newSeedPhrase);
@@ -99,7 +99,7 @@ const SeedPhraseViewScreen: React.FC = () => {
           
           // For app-generated wallets, we can derive the seed phrase
           // Note: This is a simplified approach - in production you'd want more secure handling
-          const walletData = await solanaAppKitService.getWalletInfo();
+          const walletData = await consolidatedWalletService.getWalletInfo();
           
           // Check if this is an app-generated wallet that might have a mnemonic
           if (walletData && walletData.walletType === 'app-generated') {

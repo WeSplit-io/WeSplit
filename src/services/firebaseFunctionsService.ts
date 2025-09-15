@@ -54,9 +54,13 @@ const functions = getFunctions(app);
 // Set the region to us-central1 for your specific function
 const functionsRegion = getFunctions(app, 'us-central1');
 
-// Firebase Functions callable functions
-const sendVerificationEmailFunction = httpsCallable(functionsRegion, 'sendVerificationEmail');
-const verifyCodeFunction = httpsCallable(functionsRegion, 'verifyCode');
+// Firebase Functions callable functions with increased timeout
+const sendVerificationEmailFunction = httpsCallable(functionsRegion, 'sendVerificationEmail', {
+  timeout: 60000 // 60 seconds timeout
+});
+const verifyCodeFunction = httpsCallable(functionsRegion, 'verifyCode', {
+  timeout: 60000 // 60 seconds timeout
+});
 
 export interface FirebaseAuthResponse {
   success: boolean;

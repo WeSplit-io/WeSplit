@@ -12,6 +12,7 @@ import {
   Linking
 } from 'react-native';
 import { useApp } from '../../context/AppContext';
+import { consolidatedWalletService } from '../../services/consolidatedWalletService';
 import { walletLinkingService, WalletLink } from '../../services/walletLinkingService';
 import { phoneWalletAnalysisService, WalletProvider } from '../../services/phoneWalletAnalysisService';
 import { colors } from '../../theme/colors';
