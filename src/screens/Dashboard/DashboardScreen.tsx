@@ -239,13 +239,27 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       } else {
           // Keep error logging for debugging
         console.error('Failed to ensure wallet for dashboard:', walletResult.error);
-        throw new Error('Failed to ensure wallet');
+        throw new Error(walletResult.error || 'Failed to ensure wallet');
       }
     } catch (error) {
       // Keep error logging for debugging
       console.error('Error loading user created wallet balance:', error);
       
-      // Auto-retry logic - keep trying until we get a valid balance (max 5 attempts)
+      // Check if this is a critical error that should stop retry - don't retry for these
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('User not found') || 
+          errorMessage.includes('User document not found') ||
+          errorMessage.includes('Failed to ensure wallet') ||
+          errorMessage.includes('timestamp.toDate is not a function') ||
+          errorMessage.includes('toDate is not a function') ||
+          errorMessage.includes('Wallet is already working')) {
+        console.log(' Dashboard: Critical error detected, stopping retry loop:', errorMessage);
+        setUserCreatedWalletBalance(null);
+        setBalanceLoaded(true);
+        return;
+      }
+      
+      // Auto-retry logic - but only for certain errors, not for User not found
       if (retryCount < 4) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5 seconds
         console.log(`🔄 Dashboard: Auto-retrying balance load in ${delay}ms... (attempt ${retryCount + 1}/5)`);
@@ -1724,3 +1738,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 };
 
 export default DashboardScreen; 
+
+
+

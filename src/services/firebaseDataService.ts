@@ -45,8 +45,40 @@ import { sendNotification } from './firebaseNotificationService';
 // Data transformation utilities
 export const firebaseDataTransformers = {
   // Transform Firestore timestamp to ISO string
-  timestampToISO: (timestamp: Timestamp | null): string => {
-    return timestamp?.toDate().toISOString() || new Date().toISOString();
+  timestampToISO: (timestamp: Timestamp | null | any): string => {
+    try {
+      // Handle different timestamp formats
+      if (!timestamp) {
+        return new Date().toISOString();
+      }
+      
+      // If it's already a Firestore Timestamp object
+      if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        return timestamp.toDate().toISOString();
+      }
+      
+      // If it's a Firestore timestamp object with seconds and nanoseconds
+      if (timestamp.seconds && timestamp.nanoseconds !== undefined) {
+        const date = new Date(timestamp.seconds * 1000 + timestamp.nanoseconds / 1000000);
+        return date.toISOString();
+      }
+      
+      // If it's already an ISO string
+      if (typeof timestamp === 'string') {
+        return timestamp;
+      }
+      
+      // If it's a Date object
+      if (timestamp instanceof Date) {
+        return timestamp.toISOString();
+      }
+      
+      // Fallback to current time
+      return new Date().toISOString();
+    } catch (error) {
+      console.warn('Error converting timestamp to ISO:', error, 'Value:', timestamp);
+      return new Date().toISOString();
+    }
   },
 
   // Transform ISO string to Firestore timestamp
@@ -284,11 +316,23 @@ const updateGroupExpenseCount = async (groupId: string) => {
 // User services
 export const firebaseUserService = {
   getCurrentUser: async (userId: string): Promise<User> => {
+    // First try to get the document by document ID
     const userDoc = await getDoc(doc(db, 'users', userId));
-    if (!userDoc.exists()) {
-      throw new Error('User not found');
+    if (userDoc.exists()) {
+      return firebaseDataTransformers.firestoreToUser(userDoc);
     }
-    return firebaseDataTransformers.firestoreToUser(userDoc);
+    
+    // If not found by document ID, try to find by the 'id' field
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('id', '==', userId));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0];
+      return firebaseDataTransformers.firestoreToUser(userDoc);
+    }
+    
+    throw new Error('User not found');
   },
 
   createUser: async (userData: Omit<User, 'id' | 'created_at'>): Promise<User> => {
@@ -798,8 +842,8 @@ export const firebaseGroupService = {
         if (members.length > 1) {
           // Sort by joined_at timestamp (most recent first)
           members.sort((a, b) => {
-            const aTime = a.data.joined_at?.toDate?.() || new Date(0);
-            const bTime = b.data.joined_at?.toDate?.() || new Date(0);
+            const aTime = new Date(firebaseDataTransformers.timestampToISO(a.data.joined_at));
+            const bTime = new Date(firebaseDataTransformers.timestampToISO(b.data.joined_at));
             return bTime.getTime() - aTime.getTime();
           });
           
@@ -1296,9 +1340,9 @@ export const firebaseGroupService = {
               email: memberData.email || '',
               wallet_address: memberData.wallet_address || '',
               wallet_public_key: memberData.wallet_public_key || '',
-             created_at: memberData.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-             joined_at: memberData.joined_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-             first_met_at: memberData.joined_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+             created_at: firebaseDataTransformers.timestampToISO(memberData.created_at),
+             joined_at: firebaseDataTransformers.timestampToISO(memberData.joined_at),
+             first_met_at: firebaseDataTransformers.timestampToISO(memberData.joined_at),
              mutual_groups_count: 1
            });
          } else {
@@ -1355,7 +1399,7 @@ export const firebaseGroupService = {
             email: userData.email || '',
             wallet_address: userData.wallet_address || '',
             wallet_public_key: userData.wallet_public_key || '',
-            created_at: userData.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+            created_at: firebaseDataTransformers.timestampToISO(userData.created_at),
             avatar: userData.avatar || ''
           });
         }
@@ -2480,7 +2524,7 @@ export const firebaseSettlementService = {
       
       reminderDocs.docs.forEach(doc => {
         const data = doc.data() as any;
-        const sentAt = data.sent_at?.toDate() || new Date();
+        const sentAt = new Date(firebaseDataTransformers.timestampToISO(data.sent_at));
         const timeSinceSent = now.getTime() - sentAt.getTime();
         
         if (timeSinceSent < cooldownDuration) {
@@ -2551,7 +2595,7 @@ export const firebaseSettlementService = {
       const recentReminders = await getDocs(recentReminderQuery);
       
       if (!recentReminders.empty) {
-        const lastSent = recentReminders.docs[0].data().sent_at?.toDate() || new Date();
+        const lastSent = new Date(firebaseDataTransformers.timestampToISO(recentReminders.docs[0].data().sent_at));
         const nextAllowed = new Date(lastSent.getTime() + 24 * 60 * 60 * 1000);
         const timeRemaining = Math.ceil((nextAllowed.getTime() - Date.now()) / (1000 * 60 * 60));
         
@@ -2640,7 +2684,7 @@ export const firebaseSettlementService = {
       const bulkReminders = await getDocs(bulkReminderQuery);
       
       if (!bulkReminders.empty) {
-        const lastSent = bulkReminders.docs[0].data().sent_at?.toDate() || new Date();
+        const lastSent = new Date(firebaseDataTransformers.timestampToISO(bulkReminders.docs[0].data().sent_at));
         const nextAllowed = new Date(lastSent.getTime() + 24 * 60 * 60 * 1000);
         const timeRemaining = Math.ceil((nextAllowed.getTime() - Date.now()) / (1000 * 60 * 60));
         

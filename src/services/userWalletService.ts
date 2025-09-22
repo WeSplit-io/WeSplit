@@ -1,5 +1,7 @@
 import { Connection, PublicKey, LAMPORTS_PER_SOL, Keypair } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import { firebaseDataService } from './firebaseDataService';
 import { consolidatedWalletService } from './consolidatedWalletService';
 import { secureStorageService } from './secureStorageService';
@@ -50,30 +52,103 @@ export class UserWalletService {
   // Ensure user has a wallet - create if missing
   async ensureUserWallet(userId: string): Promise<WalletCreationResult> {
     try {
-      // Ensuring wallet exists for user
+      logger.info('UserWalletService: Ensuring wallet for user', { userId }, 'UserWalletService');
 
-      // Get current user data
-      const user = await firebaseDataService.user.getCurrentUser(userId);
+      // Get current user data - use original user ID only
+      let user;
+      try {
+        user = await firebaseDataService.user.getCurrentUser(userId);
+        logger.info('Found user document with original user ID', { userId }, 'UserWalletService');
+      } catch (userError) {
+        if (userError instanceof Error && userError.message.includes('User not found')) {
+          logger.error('User document not found in Firestore', { userId, error: userError.message }, 'UserWalletService');
+          return {
+            success: false,
+            error: 'User document not found in Firestore'
+          };
+        } else {
+          throw userError;
+        }
+      }
+
+      // Debug: Log the user data to understand what we're getting
+      logger.info('UserWalletService: Retrieved user data for wallet check', { 
+        userId: userId,
+        actualUserId: user?.id,
+        hasUser: !!user,
+        walletAddress: user?.wallet_address,
+        primaryWallet: (user as any)?.primary_wallet,
+        walletPublicKey: user?.wallet_public_key,
+        hasWalletAddress: !!(user?.wallet_address),
+        walletAddressLength: user?.wallet_address?.length || 0,
+        walletAddressTrimmed: user?.wallet_address?.trim() || '',
+        walletAddressIsEmpty: !user?.wallet_address?.trim()
+      }, 'UserWalletService');
+
+      // Check if user already has a wallet - prioritize wallet_address over primary_wallet
+      const existingWalletAddress = user?.wallet_address || (user as any)?.primary_wallet;
+      const walletStatus = (user as any)?.wallet_status;
+      const hasPrivateKey = (user as any)?.wallet_has_private_key;
       
-      // Check if user already has a wallet
-      if (user && user.wallet_address && user.wallet_address.trim() !== '') {
-        // User already has wallet - IMPORTANT: Return existing wallet, don't create new one
-        logger.info('User already has existing wallet, preserving it', { 
-          userId, 
-          walletAddress: user.wallet_address 
+      // Check if user has a valid wallet address (not placeholder)
+      const hasValidWalletAddress = existingWalletAddress && 
+                                   existingWalletAddress.trim() !== '' && 
+                                   existingWalletAddress !== '11111111111111111111111111111111';
+      
+      // Check if wallet is actually working (has valid address and private key)
+      const walletIsWorking = hasValidWalletAddress && hasPrivateKey;
+      
+      if (user && walletIsWorking) {
+        // User already has a working wallet - IMPORTANT: Return existing wallet, don't create new one
+        logger.info('User already has working wallet, preserving it', { 
+          userId: userId, 
+          walletAddress: existingWalletAddress,
+          source: user.wallet_address ? 'wallet_address' : 'primary_wallet',
+          walletStatus: walletStatus,
+          hasPrivateKey: hasPrivateKey,
+          walletIsWorking: true
         }, 'UserWalletService');
         
         return {
           success: true,
           wallet: {
-            address: user.wallet_address,
-            publicKey: user.wallet_public_key || user.wallet_address
+            address: existingWalletAddress,
+            publicKey: user.wallet_public_key || existingWalletAddress
           }
         };
       }
 
-      // User doesn't have a wallet, create one
-      logger.info('User has no wallet, creating new one', { userId }, 'UserWalletService');
+      // Check if we need to restore the correct wallet address
+      if (hasValidWalletAddress && !walletIsWorking) {
+        // User has a valid wallet address but it's not working properly
+        // This might be because the wallet_address field was overwritten
+        logger.info('User has valid wallet address but wallet is not working, attempting to restore', { 
+          userId, 
+          existingWalletAddress,
+          walletStatus: walletStatus,
+          hasPrivateKey: hasPrivateKey
+        }, 'UserWalletService');
+        
+        // Try to restore the wallet using the existing address
+        const restoreResult = await this.restoreUserWallet(userId, existingWalletAddress);
+        if (restoreResult.success) {
+          return {
+            success: true,
+            wallet: {
+              address: existingWalletAddress,
+              publicKey: user.wallet_public_key || existingWalletAddress
+            }
+          };
+        }
+      }
+
+      // User doesn't have a valid wallet, create one
+      logger.info('User has no valid wallet, creating new one', { 
+        userId: userId, 
+        existingWalletAddress,
+        walletStatus: (user as any)?.wallet_status,
+        hasPlaceholderWallet: existingWalletAddress === '11111111111111111111111111111111'
+      }, 'UserWalletService');
 
       const walletResult = await this.createWalletForUser(userId);
       
@@ -108,6 +183,36 @@ export class UserWalletService {
   // Create wallet for a specific user
   async createWalletForUser(userId: string): Promise<WalletCreationResult> {
     try {
+      // CRITICAL: Check if user already has a valid wallet before creating a new one
+      let existingUser;
+      try {
+        existingUser = await firebaseDataService.user.getCurrentUser(userId);
+      } catch (error) {
+        // User not found, existingUser will be undefined
+        existingUser = undefined;
+      }
+      
+      const existingWalletAddress = existingUser?.wallet_address || (existingUser as any)?.primary_wallet;
+      const hasValidExistingWallet = existingWalletAddress && 
+                                    existingWalletAddress.trim() !== '' && 
+                                    existingWalletAddress !== '11111111111111111111111111111111';
+      
+      if (hasValidExistingWallet) {
+        logger.warn('User already has a valid wallet, not creating a new one', { 
+          userId, 
+          existingWalletAddress,
+          walletStatus: (existingUser as any)?.wallet_status
+        }, 'UserWalletService');
+        
+        return {
+          success: true,
+          wallet: {
+            address: existingWalletAddress,
+            publicKey: existingUser?.wallet_public_key || existingWalletAddress
+          }
+        };
+      }
+
       // Create wallet using consolidated service
       const result = await consolidatedWalletService.createWallet();
       const wallet = result.wallet;
@@ -116,7 +221,7 @@ export class UserWalletService {
         throw new Error('Wallet creation failed - no address generated');
       }
 
-      // Update user document with wallet info
+      // Update user document with wallet info - use the original user ID
       await firebaseDataService.user.updateUser(userId, {
         wallet_address: wallet.address,
         wallet_public_key: wallet.publicKey || wallet.address
@@ -145,15 +250,18 @@ export class UserWalletService {
         }
       }
 
-      // Save seed phrase if available
-      if (result.mnemonic) {
-        const seedPhrase = result.mnemonic;
-        await secureStorageService.storeSeedPhrase(userId, seedPhrase);
+      // Generate and save seed phrase for the new wallet
+      try {
+        const bip39Result = bip39WalletService.generateWallet();
+        await secureStorageService.storeSeedPhrase(userId, bip39Result.mnemonic);
         
         // Track seed phrase storage in Firebase
         await walletManagementService.trackSeedPhraseStorage(userId, true);
         
-        logger.info('Seed phrase stored securely for user', { userId }, 'UserWalletService');
+        logger.info('Seed phrase generated and stored securely for user', { userId }, 'UserWalletService');
+      } catch (seedError) {
+        logger.warn('Failed to generate seed phrase for user', seedError, 'UserWalletService');
+        // Don't fail wallet creation if seed phrase generation fails
       }
 
       // Wallet created and saved for user
@@ -161,7 +269,7 @@ export class UserWalletService {
         userId,
         walletAddress: wallet.address,
         hasPrivateKey: !!wallet.secretKey,
-        hasSeedPhrase: !!result.mnemonic
+        hasSeedPhrase: true // Seed phrase is generated separately
       }, 'UserWalletService');
 
       return {
@@ -195,6 +303,55 @@ export class UserWalletService {
     }
   }
 
+  // Restore user wallet using existing address
+  async restoreUserWallet(userId: string, walletAddress: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      logger.info('Attempting to restore user wallet', { userId, walletAddress }, 'UserWalletService');
+      
+      // Check if private key already exists
+      const existingPrivateKey = await secureStorageService.getPrivateKey(userId);
+      if (existingPrivateKey) {
+        logger.info('Private key already exists for user, wallet is restored', { userId }, 'UserWalletService');
+        return { success: true };
+      }
+      
+      // Get seed phrase
+      const seedPhrase = await secureStorageService.getSeedPhrase(userId);
+      if (!seedPhrase) {
+        logger.warn('No seed phrase found for user, cannot restore wallet', { userId }, 'UserWalletService');
+        return { success: false, error: 'No seed phrase found' };
+      }
+      
+      // Try to derive the keypair from seed phrase
+      const derivedKeypair = await this.deriveKeypairFromSeedPhrase(seedPhrase, walletAddress);
+      
+      if (derivedKeypair && derivedKeypair.publicKey.toBase58() === walletAddress) {
+        // Store the private key
+        const secretKeyArray = Array.from(derivedKeypair.secretKey);
+        await secureStorageService.storePrivateKey(userId, JSON.stringify(secretKeyArray));
+        
+        // Update Firebase to reflect private key availability
+        await firebaseDataService.user.updateUser(userId, {
+          wallet_has_private_key: true,
+          wallet_status: 'healthy',
+          wallet_last_fixed_at: new Date().toISOString()
+        });
+        
+        logger.info('Successfully restored wallet for user', { userId, walletAddress }, 'UserWalletService');
+        return { success: true };
+      } else {
+        logger.warn('Could not derive keypair for existing wallet address', { userId, walletAddress }, 'UserWalletService');
+        return { success: false, error: 'Could not derive keypair for existing wallet' };
+      }
+    } catch (error) {
+      logger.error('Failed to restore user wallet', error, 'UserWalletService');
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to restore wallet'
+      };
+    }
+  }
+
   // Ensure user has a seed phrase
   async ensureUserSeedPhrase(userId: string): Promise<boolean> {
     try {
@@ -206,8 +363,8 @@ export class UserWalletService {
       }
 
       // Generate and save a new seed phrase
-      const newSeedPhrase = bip39WalletService.generateMnemonic();
-      await secureStorageService.storeSeedPhrase(userId, newSeedPhrase);
+      const bip39Result = bip39WalletService.generateWallet();
+      await secureStorageService.storeSeedPhrase(userId, bip39Result.mnemonic);
       
       logger.info('Seed phrase generated and saved securely for user', { userId }, 'UserWalletService');
       return true;
@@ -238,10 +395,24 @@ export class UserWalletService {
       
       if (!walletResult.success || !walletResult.wallet) {
         // Failed to ensure wallet for user
+        logger.error('Failed to ensure wallet for balance check', { 
+          userId, 
+          success: walletResult.success, 
+          error: walletResult.error 
+        }, 'UserWalletService');
         return null;
       }
 
       const walletAddress = walletResult.wallet.address;
+      
+      // Debug: Log wallet address and network info
+      logger.info('Fetching balance for wallet', { 
+        userId, 
+        walletAddress, 
+        network: RPC_CONFIG.network,
+        rpcEndpoint: RPC_ENDPOINT,
+        isProduction: RPC_CONFIG.isProduction
+      }, 'UserWalletService');
       
       // Fetching balance for user wallet
 
@@ -249,9 +420,21 @@ export class UserWalletService {
       let solBalanceInSol = 0;
       try {
         const publicKey = new PublicKey(walletAddress);
+        logger.info('Fetching SOL balance from blockchain', { 
+          walletAddress, 
+          publicKey: publicKey.toBase58() 
+        }, 'UserWalletService');
+        
         const solBalance = await this.connection.getBalance(publicKey);
         solBalanceInSol = solBalance / LAMPORTS_PER_SOL;
+        
+        logger.info('SOL balance fetched successfully', { 
+          walletAddress, 
+          solBalanceLamports: solBalance,
+          solBalanceSOL: solBalanceInSol
+        }, 'UserWalletService');
       } catch (error) {
+        logger.error('Error fetching SOL balance', error, 'UserWalletService');
         // Handle rate limiting specifically
         if (error instanceof Error && error.message.includes('429')) {
           console.warn('Rate limited when fetching SOL balance, using cached value');
@@ -272,9 +455,23 @@ export class UserWalletService {
       try {
         const usdcMint = new PublicKey(USDC_MINT_ADDRESS);
         const usdcTokenAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(walletAddress));
+        
+        logger.info('Fetching USDC balance from blockchain', { 
+          walletAddress, 
+          usdcMint: usdcMint.toBase58(),
+          usdcTokenAccount: usdcTokenAccount.toBase58()
+        }, 'UserWalletService');
+        
         const accountInfo = await getAccount(this.connection, usdcTokenAccount);
         usdcBalance = Number(accountInfo.amount) / 1000000; // USDC has 6 decimals
+        
+        logger.info('USDC balance fetched successfully', { 
+          walletAddress, 
+          usdcBalanceRaw: accountInfo.amount.toString(),
+          usdcBalance: usdcBalance
+        }, 'UserWalletService');
       } catch (error) {
+        logger.warn('USDC balance fetch failed (token account may not exist)', error, 'UserWalletService');
         // Handle rate limiting specifically
         if (error instanceof Error && error.message.includes('429')) {
           console.warn('Rate limited when fetching USDC balance, using 0');
@@ -303,6 +500,16 @@ export class UserWalletService {
         address: walletAddress,
         isConnected: true
       };
+
+      // Debug: Log final balance
+      logger.info('Balance calculation completed', { 
+        userId,
+        walletAddress,
+        solBalance: solBalanceInSol,
+        usdcBalance: usdcBalance,
+        totalUSD: totalUSD,
+        solToUSDRate: solToUSD
+      }, 'UserWalletService');
 
       // Cache the successful balance
       this.lastSuccessfulBalance[userId] = balance;
@@ -450,17 +657,73 @@ export class UserWalletService {
       logger.info('Attempting to fix existing user wallet', { userId }, 'UserWalletService');
       
       // Get user's current wallet address and restore original if needed
-      const user = await firebaseDataService.user.getCurrentUser(userId);
+      let user;
+      try {
+        user = await firebaseDataService.user.getCurrentUser(userId);
+      } catch (userError) {
+        // Handle case where user document doesn't exist in Firestore
+        if (userError instanceof Error && userError.message.includes('User not found')) {
+          logger.warn('User document not found in Firestore during wallet fix, creating user document first', { userId }, 'UserWalletService');
+          
+          // Create user document first
+          try {
+            const userData = {
+              id: userId,
+              name: '',
+              email: '',
+              wallet_address: '',
+              wallet_public_key: '',
+              created_at: new Date().toISOString(),
+              avatar: '',
+              emailVerified: true,
+              lastLoginAt: new Date().toISOString(),
+              hasCompletedOnboarding: false
+            };
+            
+            const userRef = doc(db, 'users', userId);
+            await setDoc(userRef, userData, { merge: true });
+            
+            logger.info('Created missing user document during wallet fix', { userId }, 'UserWalletService');
+            user = userData;
+          } catch (createError) {
+            logger.error('Failed to create user document during wallet fix', createError, 'UserWalletService');
+            return {
+              success: false,
+              error: 'Failed to create user document: ' + (createError instanceof Error ? createError.message : 'Unknown error')
+            };
+          }
+        } else {
+          throw userError;
+        }
+      }
+      
       const currentWalletAddress = user?.wallet_address;
       const originalWalletAddress = 'G86LiEfFkKAhq4QYXrZ9EmVEfDXrVoKuvWgirSz5rfpE';
+      
+      // Check if wallet is already working and doesn't need fixing
+      if (currentWalletAddress && 
+          currentWalletAddress !== '11111111111111111111111111111111' && 
+          (user as any)?.wallet_status !== 'error' &&
+          (user as any)?.wallet_has_private_key) {
+        logger.info('Wallet is already working, no fix needed', { 
+          userId, 
+          walletAddress: currentWalletAddress,
+          walletStatus: (user as any)?.wallet_status,
+          hasPrivateKey: (user as any)?.wallet_has_private_key
+        }, 'UserWalletService');
+        return {
+          success: true,
+          error: 'Wallet is already working'
+        };
+      }
       
       if (!currentWalletAddress) {
         return { success: false, error: 'No wallet address found for user' };
       }
       
-      // Restore original wallet address if it's different
-      if (currentWalletAddress !== originalWalletAddress) {
-        logger.info('Restoring original wallet address', { userId, currentAddress: currentWalletAddress, originalAddress: originalWalletAddress }, 'UserWalletService');
+      // Only restore wallet address if current address is a placeholder
+      if (currentWalletAddress === '11111111111111111111111111111111') {
+        logger.info('Restoring wallet address from placeholder', { userId, currentAddress: currentWalletAddress, originalAddress: originalWalletAddress }, 'UserWalletService');
         
         await firebaseDataService.user.updateUser(userId, {
           wallet_address: originalWalletAddress,

@@ -15,7 +15,7 @@ module.exports = function (api) {
         {
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           alias: {
-            // Essential polyfills only - no rpc-websockets alias
+            // Essential polyfills for React Native compatibility
             'stream': './node_modules/readable-stream',
             'crypto': './src/config/crypto-stub.js',
             'buffer': './node_modules/buffer',
@@ -23,6 +23,8 @@ module.exports = function (api) {
             'process': './node_modules/process',
             'events': './node_modules/events',
             '@noble/hashes/crypto.js': './src/config/crypto-stub.js',
+            // Platform constants polyfill
+            'PlatformConstants': './src/config/platform-constants.js',
           },
         },
       ],

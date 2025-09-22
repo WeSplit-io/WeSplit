@@ -93,20 +93,47 @@ const AuthMethodsScreen: React.FC = () => {
         userData = await firestoreService.createUserDocument(firebaseUser);
       }
 
+      // Debug: Log the user data to understand what we're getting
+      console.log('🔍 AuthMethods: Retrieved user data:', {
+        id: userData.id,
+        email: userData.email,
+        wallet_address: userData.wallet_address,
+        primary_wallet: userData.primary_wallet,
+        linked_wallets: userData.linked_wallets,
+        wallet_public_key: userData.wallet_public_key,
+        wallet_status: userData.wallet_status,
+        hasWalletAddress: !!userData.wallet_address,
+        walletAddressLength: userData.wallet_address?.length || 0,
+        isPlaceholderWallet: userData.primary_wallet === '11111111111111111111111111111111'
+      });
+
       // Check if existing user should skip onboarding
       const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
 
-      // Transform to app user format
+      // Transform to app user format - prioritize wallet_address over primary_wallet
+      const walletAddress = userData.wallet_address || (userData.primary_wallet && userData.primary_wallet !== '11111111111111111111111111111111' ? userData.primary_wallet : '');
+      
       const appUser = {
         id: userData.id || firebaseUser.uid,
         name: userData.name || firebaseUser.displayName || '',
         email: userData.email || firebaseUser.email || '',
-        wallet_address: userData.wallet_address || '',
-        wallet_public_key: userData.wallet_public_key || '',
+        wallet_address: walletAddress,
+        wallet_public_key: userData.wallet_public_key || walletAddress,
         created_at: userData.created_at || new Date().toISOString(),
         avatar: userData.avatar || '',
         hasCompletedOnboarding: shouldSkipOnboarding
       };
+
+      // Debug: Log the transformed app user
+      console.log('🔍 AuthMethods: Transformed app user:', {
+        id: appUser.id,
+        email: appUser.email,
+        wallet_address: appUser.wallet_address,
+        wallet_public_key: appUser.wallet_public_key,
+        hasWalletAddress: !!appUser.wallet_address,
+        walletAddressLength: appUser.wallet_address?.length || 0,
+        walletSource: userData.wallet_address ? 'wallet_address' : (userData.primary_wallet ? 'primary_wallet' : 'none')
+      });
 
       // Ensure user has a wallet using the centralized wallet service
       // CRITICAL: Only create wallet if user doesn't have one
@@ -198,7 +225,7 @@ const AuthMethodsScreen: React.FC = () => {
         hasVerifiedRecently = await Promise.race([
           firestoreService.hasVerifiedWithin30Days(sanitizedEmail),
           new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Verification check timeout')), 5000)
+            setTimeout(() => reject(new Error('Verification check timeout')), 15000)
           )
         ]) as boolean;
         console.log('📅 Has verified recently:', hasVerifiedRecently);

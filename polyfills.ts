@@ -7,6 +7,9 @@
 import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 
+// Import platform constants polyfill
+import './src/config/platform-constants';
+
 // Buffer polyfill
 import { Buffer } from 'buffer';
 

@@ -10,6 +10,7 @@ export default {
     userInterfaceStyle: "light",
     newArchEnabled: false,
     sdkVersion: "54.0.0",
+    jsEngine: "hermes",
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
