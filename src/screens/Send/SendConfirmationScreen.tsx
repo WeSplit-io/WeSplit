@@ -246,10 +246,10 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         console.error('Failed to calculate fee estimate:', error);
         // Fallback to default calculation
         setFeeEstimate({
-          companyFee: amount * 0.03,
+          companyFee: amount * 0.03, // 3% company fee
           blockchainFee: 0.00001,
           totalFee: amount * 0.03 + 0.00001,
-          netAmount: amount * 0.97,
+          netAmount: amount * 0.97, // 97% goes to recipient
         });
       }
     };
@@ -258,43 +258,78 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   }, [amount]);
 
   // Use calculated fees or fallback
-  const companyFee = feeEstimate?.companyFee || amount * 0.03;
+  const companyFee = feeEstimate?.companyFee || amount * 0.03; // 3% company fee
   const blockchainFee = feeEstimate?.blockchainFee || 0.00001;
   const totalFee = feeEstimate?.totalFee || companyFee + blockchainFee;
-  const netAmount = feeEstimate?.netAmount || amount - companyFee;
+  const netAmount = feeEstimate?.netAmount || amount - companyFee; // 97% goes to recipient
   const destinationAccount = contact?.wallet_address || '';
 
   // Check if user has existing wallet and sufficient balance
   const [hasExistingWallet, setHasExistingWallet] = useState(false);
   const [existingWalletBalance, setExistingWalletBalance] = useState<{ sol: number; usdc: number } | null>(null);
   const [hasSufficientSol, setHasSufficientSol] = useState(false);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletError, setWalletError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkExistingWallet = async () => {
-      if (currentUser?.id) {
-        try {
-          const walletAddress = await consolidatedTransactionService.getUserWalletAddress(currentUser.id);
-          const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
-          const solCheck = await consolidatedTransactionService.hasSufficientSolForGas(currentUser.id);
-          
-          setHasExistingWallet(!!walletAddress);
-          setExistingWalletBalance(balance);
-          setHasSufficientSol(solCheck.hasSufficient);
-          
-          if (__DEV__) {
-            console.log('🔍 SendConfirmation: Existing wallet check:', {
-              walletAddress,
-              balance,
-              hasWallet: !!walletAddress,
-              solCheck
-            });
-          }
-        } catch (error) {
-          console.error('Failed to check existing wallet:', error);
-          setHasExistingWallet(false);
-          setExistingWalletBalance(null);
-          setHasSufficientSol(false);
+      if (!currentUser?.id) {
+        setWalletLoading(false);
+        return;
+      }
+
+      try {
+        setWalletLoading(true);
+        setWalletError(null);
+        
+        console.log('🔍 SendConfirmation: Starting wallet validation checks...');
+        
+        // Check wallet address
+        const walletAddress = await consolidatedTransactionService.getUserWalletAddress(currentUser.id);
+        console.log('🔍 SendConfirmation: Wallet address check result:', walletAddress);
+        
+        if (!walletAddress) {
+          throw new Error('No wallet address found for user');
         }
+        
+        // Check balance
+        const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
+        console.log('🔍 SendConfirmation: Balance check result:', balance);
+        
+        // Check SOL for gas
+        const solCheck = await consolidatedTransactionService.hasSufficientSolForGas(currentUser.id);
+        console.log('🔍 SendConfirmation: SOL check result:', solCheck);
+        
+        // Set states
+        setHasExistingWallet(true);
+        setExistingWalletBalance(balance);
+        setHasSufficientSol(solCheck.hasSufficient);
+        setWalletError(null);
+        
+        console.log('🔍 SendConfirmation: Wallet validation completed successfully:', {
+          walletAddress,
+          balance,
+          hasWallet: true,
+          solCheck
+        });
+        
+      } catch (error) {
+        console.error('🔍 SendConfirmation: Wallet validation failed:', error);
+        
+        const errorMessage = error instanceof Error ? error.message : 'Unknown wallet error';
+        setWalletError(errorMessage);
+        setHasExistingWallet(false);
+        setExistingWalletBalance(null);
+        setHasSufficientSol(false);
+        
+        // Show user-friendly error message
+        Alert.alert(
+          'Wallet Error',
+          `Unable to access your wallet: ${errorMessage}\n\nPlease try again or contact support if the issue persists.`,
+          [{ text: 'OK' }]
+        );
+      } finally {
+        setWalletLoading(false);
       }
     };
 
@@ -312,7 +347,9 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     hasSufficientSol,
     existingWalletBalance,
     amount,
-    disabled: sending || !hasExistingWallet || !hasSufficientBalance || !hasSufficientSol
+    walletLoading,
+    walletError,
+    disabled: walletLoading || sending || !hasExistingWallet || !hasSufficientBalance || !hasSufficientSol || !!walletError
   });
 
   return (
@@ -413,8 +450,61 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           Double check the person you're sending money to!
         </Text>
         
+        {/* Wallet Error Display */}
+        {walletError && (
+          <View style={{ 
+            backgroundColor: '#FF5252', 
+            padding: 12, 
+            borderRadius: 8, 
+            marginBottom: 16,
+            marginHorizontal: 20
+          }}>
+            <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+              ⚠️ Wallet Error
+            </Text>
+            <Text style={{ color: 'white', textAlign: 'center', marginTop: 4, fontSize: 12 }}>
+              {walletError}
+            </Text>
+            <TouchableOpacity 
+              style={{ 
+                backgroundColor: 'rgba(255,255,255,0.2)', 
+                padding: 8, 
+                borderRadius: 4, 
+                marginTop: 8 
+              }}
+              onPress={() => {
+                setWalletError(null);
+                // Retry wallet check
+                const checkExistingWallet = async () => {
+                  if (!currentUser?.id) return;
+                  try {
+                    setWalletLoading(true);
+                    const walletAddress = await consolidatedTransactionService.getUserWalletAddress(currentUser.id);
+                    const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
+                    const solCheck = await consolidatedTransactionService.hasSufficientSolForGas(currentUser.id);
+                    
+                    setHasExistingWallet(!!walletAddress);
+                    setExistingWalletBalance(balance);
+                    setHasSufficientSol(solCheck.hasSufficient);
+                    setWalletError(null);
+                  } catch (error) {
+                    setWalletError(error instanceof Error ? error.message : 'Unknown error');
+                  } finally {
+                    setWalletLoading(false);
+                  }
+                };
+                checkExistingWallet();
+              }}
+            >
+              <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+                Retry
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Company Gas Coverage Info */}
-        {hasExistingWallet && (
+        {hasExistingWallet && !walletError && (
           <View style={{ 
             backgroundColor: '#4CAF50', 
             padding: 12, 
@@ -433,9 +523,9 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         
         <AppleSlider
           onSlideComplete={handleConfirmSend}
-          disabled={sending || !hasExistingWallet || !hasSufficientBalance || !hasSufficientSol}
-          loading={sending}
-          text="Sign transaction"
+          disabled={walletLoading || sending || !hasExistingWallet || !hasSufficientBalance || !hasSufficientSol || !!walletError}
+          loading={walletLoading || sending}
+          text={walletLoading ? "Loading wallet..." : walletError ? "Wallet Error" : "Sign transaction"}
         />
       </View>
     </SafeAreaView>

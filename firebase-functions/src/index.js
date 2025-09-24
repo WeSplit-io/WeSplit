@@ -1,6 +1,4 @@
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
-const { onSchedule } = require('firebase-functions/v2/scheduler');
+const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 
@@ -16,8 +14,8 @@ const db = admin.firestore();
 const transporter = nodemailer.createTransport({
   service: 'gmail', // or your preferred email service
   auth: {
-    user: process.env.EMAIL_USER || 'your-email@gmail.com',
-    pass: process.env.EMAIL_PASS || 'your-app-password'
+    user: functions.config().email?.user || 'your-email@gmail.com',
+    pass: functions.config().email?.password || 'your-app-password'
   }
 });
 
@@ -57,9 +55,9 @@ function generateEmailTemplate(code) {
 /**
  * HTTP Callable Function: Send verification code via email
  */
-exports.sendVerificationEmail = onCall(async (request) => {
+exports.sendVerificationEmail = functions.https.onCall(async (data, context) => {
   try {
-    const { email, code } = request.data;
+    const { email, code } = data;
     
     // Sanitize email by trimming whitespace and newlines
     const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
@@ -68,15 +66,15 @@ exports.sendVerificationEmail = onCall(async (request) => {
     
     // Validate input
     if (!sanitizedEmail || !code) {
-      throw new HttpsError('invalid-argument', 'Email and code are required');
+      throw new functions.https.HttpsError('invalid-argument', 'Email and code are required');
     }
     
     if (!sanitizedEmail.includes('@')) {
-      throw new HttpsError('invalid-argument', 'Invalid email format');
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid email format');
     }
     
     if (!/^\d{4}$/.test(code)) {
-      throw new HttpsError('invalid-argument', 'Code must be 4 digits');
+      throw new functions.https.HttpsError('invalid-argument', 'Code must be 4 digits');
     }
 
     // Rate limiting: Check if too many requests for this email
@@ -91,13 +89,13 @@ exports.sendVerificationEmail = onCall(async (request) => {
       
       // Allow only 1 request per minute per email
       if (lastRequest && (now.getTime() - lastRequest.getTime()) < 60000) {
-        throw new HttpsError('resource-exhausted', 'Too many requests. Please wait 1 minute before requesting another code.');
+        throw new functions.https.HttpsError('resource-exhausted', 'Too many requests. Please wait 1 minute before requesting another code.');
       }
     }
 
     // Send email
     const mailOptions = {
-      from: process.env.EMAIL_USER || 'noreply@wesplit.app',
+      from: functions.config().email?.user || 'noreply@wesplit.app',
       to: sanitizedEmail,
       subject: 'WeSplit Verification Code',
       html: generateEmailTemplate(code)
@@ -121,20 +119,20 @@ exports.sendVerificationEmail = onCall(async (request) => {
   } catch (error) {
     console.error('Error sending verification email:', error);
     
-    if (error instanceof HttpsError) {
+    if (error instanceof functions.https.HttpsError) {
       throw error;
     }
     
-    throw new HttpsError('internal', 'Failed to send verification email');
+    throw new functions.https.HttpsError('internal', 'Failed to send verification email');
   }
 });
 
 /**
  * HTTP Callable Function: Verify code
  */
-exports.verifyCode = onCall(async (request) => {
+exports.verifyCode = functions.https.onCall(async (data, context) => {
   try {
-    const { email, code } = request.data;
+    const { email, code } = data;
     
     // Sanitize email by trimming whitespace and newlines
     const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
@@ -143,15 +141,15 @@ exports.verifyCode = onCall(async (request) => {
     
     // Validate input
     if (!sanitizedEmail || !code) {
-      throw new HttpsError('invalid-argument', 'Email and code are required');
+      throw new functions.https.HttpsError('invalid-argument', 'Email and code are required');
     }
     
     if (!sanitizedEmail.includes('@')) {
-      throw new HttpsError('invalid-argument', 'Invalid email format');
+      throw new functions.https.HttpsError('invalid-argument', 'Invalid email format');
     }
     
     if (!/^\d{4}$/.test(code)) {
-      throw new HttpsError('invalid-argument', 'Code must be 4 digits');
+      throw new functions.https.HttpsError('invalid-argument', 'Code must be 4 digits');
     }
 
     // Find the verification code in Firestore
@@ -164,7 +162,7 @@ exports.verifyCode = onCall(async (request) => {
     const querySnapshot = await q.get();
     
     if (querySnapshot.empty) {
-      throw new HttpsError('not-found', 'Invalid or expired verification code');
+      throw new functions.https.HttpsError('not-found', 'Invalid or expired verification code');
     }
 
     const doc = querySnapshot.docs[0];
@@ -176,7 +174,7 @@ exports.verifyCode = onCall(async (request) => {
       new Date(verificationData.expiresAt);
     
     if (new Date() > expiresAt) {
-      throw new HttpsError('deadline-exceeded', 'Verification code has expired');
+      throw new functions.https.HttpsError('deadline-exceeded', 'Verification code has expired');
     }
 
     // Create or get Firebase user first (before marking code as used)
@@ -272,11 +270,11 @@ exports.verifyCode = onCall(async (request) => {
   } catch (error) {
     console.error('Error verifying code:', error);
     
-    if (error instanceof HttpsError) {
+    if (error instanceof functions.https.HttpsError) {
       throw error;
     }
     
-    throw new HttpsError('internal', 'Failed to verify code');
+    throw new functions.https.HttpsError('internal', 'Failed to verify code');
   }
 });
 

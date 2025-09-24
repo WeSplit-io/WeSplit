@@ -6,7 +6,6 @@ import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 // Bootstrap Icons imports - Using correct paths
 import HouseFill from 'react-native-bootstrap-icons/icons/house-fill';
 import House from 'react-native-bootstrap-icons/icons/house';
-import PersonFill from 'react-native-bootstrap-icons/icons/person-fill';
 import Person from 'react-native-bootstrap-icons/icons/person';
 import PlusCircleFill from 'react-native-bootstrap-icons/icons/plus-circle-fill';
 import Plus from 'react-native-bootstrap-icons/icons/plus';
@@ -20,15 +19,12 @@ import ArrowDown from 'react-native-bootstrap-icons/icons/arrow-down';
 import ArrowUpShort from 'react-native-bootstrap-icons/icons/arrow-up-short';
 import ArrowDownShort from 'react-native-bootstrap-icons/icons/arrow-down-short';
 import People from 'react-native-bootstrap-icons/icons/people';
-import PeopleFill from 'react-native-bootstrap-icons/icons/people-fill';
 import Check from 'react-native-bootstrap-icons/icons/check';
 import CheckCircle from 'react-native-bootstrap-icons/icons/check-circle';
 import CheckCircleFill from 'react-native-bootstrap-icons/icons/check-circle-fill';
 import XLg from 'react-native-bootstrap-icons/icons/x-lg';
 import X from 'react-native-bootstrap-icons/icons/x';
-import Grid from 'react-native-bootstrap-icons/icons/grid';
 import Grid3x3 from 'react-native-bootstrap-icons/icons/grid-3x3';
-import Square from 'react-native-bootstrap-icons/icons/square';
 import Share from 'react-native-bootstrap-icons/icons/share';
 import ShareFill from 'react-native-bootstrap-icons/icons/share-fill';
 import Upload from 'react-native-bootstrap-icons/icons/upload';
@@ -79,10 +75,8 @@ import CameraFill from 'react-native-bootstrap-icons/icons/camera-fill';
 import UpcScan from 'react-native-bootstrap-icons/icons/upc-scan';
 import Upc from 'react-native-bootstrap-icons/icons/upc';
 import Briefcase from 'react-native-bootstrap-icons/icons/briefcase';
-import BriefcaseFill from 'react-native-bootstrap-icons/icons/briefcase-fill';
 import CupStraw from 'react-native-bootstrap-icons/icons/cup-straw';
 import Megaphone from 'react-native-bootstrap-icons/icons/megaphone';
-import MegaphoneFill from 'react-native-bootstrap-icons/icons/megaphone-fill';
 
 export type IconType = 'bootstrap' | 'ionicons' | 'fontawesome5';
 

@@ -16,6 +16,7 @@ import { useWallet } from '../../context/WalletContext';
 import { consolidatedWalletService } from '../../services/consolidatedWalletService';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { userWalletService } from '../../services/userWalletService';
+import { secureSeedPhraseService } from '../../services/secureSeedPhraseService';
 import { useApp } from '../../context/AppContext';
 
 const SeedPhraseViewScreen: React.FC = () => {
@@ -36,104 +37,63 @@ const SeedPhraseViewScreen: React.FC = () => {
     secretKey 
   } = useWallet();
 
-  // Get actual seed phrase from wallet
+  // Get seed phrase from secure device storage (never from database)
   useEffect(() => {
-    const getSeedPhrase = async () => {
+    const getSecureSeedPhrase = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // First ensure the app wallet is initialized
-        if (currentUser?.id) {
-          console.log('🔍 SeedPhraseView: Ensuring app wallet is initialized...');
-          try {
-            await userWalletService.ensureUserWallet(currentUser.id.toString());
-            console.log('🔍 SeedPhraseView: App wallet ensured successfully');
-          } catch (ensureError) {
-            console.error('🔍 SeedPhraseView: Error ensuring app wallet:', ensureError);
-          }
+        if (!currentUser?.id) {
+          setLoading(false);
+          return;
         }
+
+        console.log('🔐 SeedPhraseView: Retrieving seed phrase from secure device storage...');
         
-        // Try to get seed phrase from Firebase first
-        if (currentUser?.id) {
-          try {
-            const userSeedPhrase = await firebaseDataService.user.getUserSeedPhrase(currentUser.id.toString());
-            if (userSeedPhrase && userSeedPhrase.length > 0) {
-              setSeedPhrase(userSeedPhrase);
-              setLoading(false);
-              return;
-            }
-          } catch (firebaseError) {
-            // Continue to fallback logic
-            if (__DEV__) { console.log('No seed phrase in Firebase, generating one...'); }
-          }
-        }
+        // Initialize secure wallet if needed
+        const { address, isNew } = await secureSeedPhraseService.initializeSecureWallet(currentUser.id.toString());
         
-        // If no seed phrase exists, generate one for the user
-        if (currentUser?.id && currentUser?.wallet_address) {
-          try {
-            if (__DEV__) { console.log('🔧 Generating seed phrase for existing user:', currentUser.id); }
-            
-            // Generate a new seed phrase
-            const newSeedPhrase = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'.split(' '); // Mock seed phrase
-            
-            // Save it to Firebase
-            await firebaseDataService.user.saveUserSeedPhrase(currentUser.id.toString(), newSeedPhrase);
-            
-            if (__DEV__) { console.log('✅ Seed phrase generated and saved for user:', currentUser.id); }
-            
-            setSeedPhrase(newSeedPhrase);
-            setLoading(false);
-            return;
-          } catch (generateError) {
-            console.error('Error generating seed phrase:', generateError);
-            setError('Failed to generate seed phrase. Please try again later.');
-            setLoading(false);
-            return;
-          }
-        }
-        
-        // Fallback: Try to get seed phrase from the app wallet
-        if (appWalletConnected && appWalletAddress) {
-          console.log('🔍 SeedPhraseView: App wallet connected, checking for seed phrase...');
-          
-          // For app-generated wallets, we can derive the seed phrase
-          // Note: This is a simplified approach - in production you'd want more secure handling
-          const walletData = await consolidatedWalletService.getWalletInfo();
-          
-          // Check if this is an app-generated wallet that might have a mnemonic
-          if (walletData && walletData.walletType === 'app-generated') {
-            // For now, we'll show a message that seed phrases are not yet implemented
-            // In a real implementation, you'd store the mnemonic when creating the wallet
-            setError('Seed phrase feature not yet implemented for app-generated wallets. This feature will be available in a future update.');
-          } else {
-            setError('Seed phrase not available for external wallets. External wallets manage their own seed phrases.');
-          }
-        } else if (secretKey) {
-          // Fallback to external wallet if app wallet not available
-          console.log('🔍 SeedPhraseView: Using external wallet as fallback...');
-          setError('Seed phrase not available for external wallets. External wallets manage their own seed phrases.');
+        if (isNew) {
+          console.log('🔐 SeedPhraseView: New secure wallet created for user:', currentUser.id);
         } else {
-          setError('No app wallet connected. Please ensure you have an app wallet set up.');
+          console.log('🔐 SeedPhraseView: Existing app wallet seed phrase retrieved for user:', currentUser.id);
+        }
+
+        // Get the seed phrase from secure device storage
+        const mnemonic = await secureSeedPhraseService.getSeedPhraseSecurely();
+        
+        if (mnemonic && secureSeedPhraseService.validateSeedPhrase(mnemonic)) {
+          // Format seed phrase for display
+          const seedPhraseWords = secureSeedPhraseService.formatSeedPhraseForDisplay(mnemonic);
+          setSeedPhrase(seedPhraseWords);
+          console.log('🔐 SeedPhraseView: Seed phrase retrieved successfully from device storage');
+        } else {
+          // Don't show error - just leave seed phrase empty for user-friendly experience
+          console.log('🔐 SeedPhraseView: No seed phrase found - user will see empty state');
         }
       } catch (err) {
-        console.error('Error getting seed phrase:', err);
-        setError('Failed to retrieve seed phrase. Please try again later.');
+        console.error('🔐 SeedPhraseView: Error retrieving secure seed phrase:', err);
+        // Don't show error to user - keep it user-friendly
       } finally {
         setLoading(false);
       }
     };
 
-    getSeedPhrase();
-  }, [secretKey, currentUser?.id]);
+    getSecureSeedPhrase();
+  }, [currentUser?.id]);
 
   const handleBack = () => {
     navigation.goBack();
   };
 
   const handleReveal = () => {
-    if (error) {
-      Alert.alert('Error', error);
+    if (seedPhrase.length === 0) {
+      Alert.alert(
+        'No Seed Phrase Available',
+        'No seed phrase found for your wallet. This may be because:\n\n• Your wallet was created externally\n• The seed phrase is not available on this device\n\nYou can still use your wallet normally, but you won\'t be able to export it to other apps.',
+        [{ text: 'OK' }]
+      );
       return;
     }
     
@@ -155,11 +115,27 @@ const SeedPhraseViewScreen: React.FC = () => {
     navigation.navigate('SeedPhraseVerify' as never);
   };
 
-  const handleCopy = () => {
-    const seedPhraseText = seedPhrase.join(' ');
-    Clipboard.setString(seedPhraseText);
-    Alert.alert('Copied!', 'Seed phrase has been copied to clipboard.');
+  const handleCopySeedPhrase = async () => {
+    if (seedPhrase.length === 0) return;
+    
+    try {
+      const seedPhraseText = seedPhrase.join(' ');
+      await Clipboard.setString(seedPhraseText);
+      Alert.alert('Copied', 'Seed phrase copied to clipboard!');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to copy seed phrase');
+    }
   };
+
+  const handleShowExportInstructions = () => {
+    const instructions = secureSeedPhraseService.getExportInstructions();
+    Alert.alert(
+      'Export to External Wallets',
+      instructions,
+      [{ text: 'Got it' }]
+    );
+  };
+
 
   if (loading) {
     return (
@@ -229,8 +205,8 @@ const SeedPhraseViewScreen: React.FC = () => {
           <Text style={styles.instructionsTitle}>Write Down Your Seed Phrase</Text>
           <Text style={styles.instructionsText}>
             {!isRevealed 
-              ? "This is your seed phrase. Write it down on a paper and keep it in a safe place. You'll be asked to re-enter this phrase (in order) on the next step."
-              : "This is your seed phrase. Write it down on a paper and keep it in a safe place."
+              ? "This is your single app wallet's 12-word seed phrase. Write it down on a paper and keep it in a safe place. This seed phrase is compatible with most external wallets like Phantom and Solflare."
+              : "This is your single app wallet's 12-word seed phrase. Write it down on a paper and keep it in a safe place. You can use this to export your wallet to other apps."
             }
           </Text>
         </View>
@@ -263,15 +239,25 @@ const SeedPhraseViewScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Copy Button */}
-        {isRevealed && (
-          <TouchableOpacity 
-            style={styles.copyButton}
-            onPress={handleCopy}
-          >
-            <Text style={styles.copyButtonText}>Copy</Text>
-            <Icon name="copy" size={20} color={colors.black} />
-          </TouchableOpacity>
+        {/* Action Buttons */}
+        {isRevealed && seedPhrase.length > 0 && (
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity 
+              style={styles.copyButton}
+              onPress={handleCopySeedPhrase}
+            >
+              <Text style={styles.copyButtonText}>Copy Seed Phrase</Text>
+              <Icon name="copy" size={20} color={colors.black} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.exportButton}
+              onPress={handleShowExportInstructions}
+            >
+              <Text style={styles.exportButtonText}>Export Instructions</Text>
+              <Icon name="external-link" size={20} color={colors.primaryGreen} />
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     </SafeAreaView>

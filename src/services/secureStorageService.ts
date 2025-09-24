@@ -169,6 +169,43 @@ class SecureStorageService {
   }
 
   /**
+   * Clear all wallet-related data for a user (comprehensive cleanup)
+   */
+  async clearAllWalletData(userId: string): Promise<void> {
+    try {
+      // Clear secure storage
+      await this.clearUserData(userId);
+      
+      // Clear standard AsyncStorage wallet data
+      const standardKeys = [
+        `wallet_${userId}`,
+        `user_wallet_${userId}`,
+        `wallet_address_${userId}`,
+        `wallet_public_key_${userId}`,
+        `wallet_private_key_${userId}`,
+        `seed_phrase_${userId}`,
+        `mnemonic_${userId}`,
+        `keypair_${userId}`,
+        `secure_seed_phrase`,
+        `wallet_info`
+      ];
+
+      for (const key of standardKeys) {
+        try {
+          await AsyncStorage.removeItem(key);
+        } catch (error) {
+          // Ignore individual key removal errors
+        }
+      }
+
+      logger.info(`Cleared all wallet data for user: ${userId}`, null, 'SecureStorage');
+    } catch (error) {
+      logger.error(`Failed to clear all wallet data for: ${userId}`, error, 'SecureStorage');
+      throw error;
+    }
+  }
+
+  /**
    * Get all secure data keys for debugging (development only)
    */
   async getAllSecureKeys(): Promise<string[]> {

@@ -27,7 +27,7 @@ export interface Notification {
   user_id?: string | number; // Legacy field for compatibility
   title: string;
   message: string;
-  type: 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'payment_reminder' | 'general' | 'expense_added' | 'group_invite' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification';
+  type: 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'payment_reminder' | 'general' | 'expense_added' | 'group_invite' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'group_payment_sent' | 'group_payment_received';
   data?: any; // Additional data for the notification
   is_read: boolean;
   created_at: string;

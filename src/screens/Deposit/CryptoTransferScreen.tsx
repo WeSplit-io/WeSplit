@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, Share, SafeAreaView, Image, TextInput, ScrollView } from 'react-native';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
-import QRCode from 'react-native-qrcode-svg';
+import { QrCodeView } from '@features/qr';
 import Icon from '../../components/Icon';
 import { Clipboard } from 'react-native';
 import styles from './styles';
@@ -203,15 +203,18 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
             
             {depositAddress ? (
               <View style={styles.qrContainer}>
-                <QRCode
-                  value={generateTransferLink(
-                    depositAddress,
-                    currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
-                    currentUser?.email
-                  )}
+                <QrCodeView
+                  value={depositAddress}
+                  address={depositAddress}
+                  useSolanaPay={true}
+                  amount={transferAmount ? parseFloat(transferAmount) : undefined}
+                  label="WeSplit Deposit"
+                  message={`Deposit to ${currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}`}
                   size={200}
                   backgroundColor={colors.white}
                   color="#000"
+                  caption="Scan to deposit USDC"
+                  showButtons={true}
                 />
               </View>
             ) : (

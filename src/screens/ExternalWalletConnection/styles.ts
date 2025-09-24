@@ -147,7 +147,7 @@ export const styles = StyleSheet.create({
   },
   // Debug styles
   debugContainer: {
-    backgroundColor: colors.gray800,
+    backgroundColor: colors.cardBackground,
     padding: spacing.md,
     borderRadius: 8,
     marginBottom: spacing.lg,
@@ -180,7 +180,7 @@ export const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: typography.fontWeight.semiBold,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.white,
     marginBottom: spacing.sm,
   },
@@ -207,5 +207,208 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: typography.fontWeight.medium,
     textAlign: 'center',
+  },
+  // Header buttons
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  fixButton: {
+    backgroundColor: colors.warning,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  fixButtonText: {
+    color: colors.black,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.bold,
+  },
+  importButton: {
+    backgroundColor: colors.primaryGreen,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  importButtonText: {
+    color: colors.black,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.bold,
+  },
+  // Linked wallet items
+  linkedWalletItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.white10,
+    padding: spacing.md,
+    borderRadius: 8,
+    marginBottom: spacing.sm,
+  },
+  walletInfo: {
+    flex: 1,
+  },
+  walletName: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.medium,
+  },
+  walletAddress: {
+    color: colors.textLight,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  walletStatus: {
+    backgroundColor: colors.primaryGreen,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  walletStatusText: {
+    color: colors.black,
+    fontSize: 10,
+    fontWeight: typography.fontWeight.bold,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.black,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.darkBorder,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+  },
+  modalCloseButton: {
+    padding: 8,
+  },
+  modalContent: {
+    flex: 1,
+    padding: spacing.lg,
+  },
+  modalDescription: {
+    fontSize: 16,
+    color: colors.textLight,
+    lineHeight: 24,
+    marginBottom: spacing.lg,
+  },
+  importTypeContainer: {
+    flexDirection: 'row',
+    marginBottom: spacing.lg,
+    backgroundColor: colors.white10,
+    borderRadius: 8,
+    padding: 4,
+  },
+  importTypeButton: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  importTypeButtonActive: {
+    backgroundColor: colors.primaryGreen,
+  },
+  importTypeButtonText: {
+    color: colors.textLight,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.medium,
+  },
+  importTypeButtonTextActive: {
+    color: colors.black,
+    fontWeight: typography.fontWeight.bold,
+  },
+  inputContainer: {
+    marginBottom: spacing.lg,
+  },
+  inputLabel: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.sm,
+  },
+  inputField: {
+    backgroundColor: colors.white10,
+    borderWidth: 1,
+    borderColor: colors.white50,
+    borderRadius: 8,
+    padding: spacing.md,
+    color: colors.white,
+    fontSize: 16,
+    minHeight: 50,
+  },
+  instructionsContainer: {
+    backgroundColor: colors.white10,
+    padding: spacing.md,
+    borderRadius: 8,
+    marginBottom: spacing.lg,
+  },
+  instructionsTitle: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
+  },
+  instructionsText: {
+    color: colors.textLight,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  warningContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.warning + '20',
+    padding: spacing.md,
+    borderRadius: 8,
+    marginBottom: spacing.lg,
+  },
+  warningText: {
+    color: colors.warning,
+    fontSize: 14,
+    lineHeight: 20,
+    marginLeft: spacing.sm,
+    flex: 1,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.darkBorder,
+    gap: spacing.md,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.white50,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.medium,
+  },
+  importSubmitButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    backgroundColor: colors.primaryGreen,
+    alignItems: 'center',
+  },
+  importSubmitButtonDisabled: {
+    opacity: 0.5,
+  },
+  importSubmitButtonText: {
+    color: colors.black,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.bold,
   },
 }); 

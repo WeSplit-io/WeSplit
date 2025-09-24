@@ -24,6 +24,8 @@ import { firebaseDataService } from '../../services/firebaseDataService';
 import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
 import { multiSigService } from '../../services/multiSigService';
 import { MultiSignStateService } from '../../services/multiSignStateService';
+import { secureSeedPhraseService } from '../../services/secureSeedPhraseService';
+import { secureStorageService } from '../../services/secureStorageService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
@@ -257,24 +259,77 @@ const WalletManagementScreen: React.FC = () => {
     Alert.alert('Link External Wallet', 'This will open wallet connection');
   };
 
+  const handleClearWalletData = async () => {
+    if (!currentUser?.id) return;
+
+    Alert.alert(
+      'Clear Wallet Data',
+      'This will permanently delete all stored wallet credentials (private keys, seed phrases, etc.) from this device. This action cannot be undone.\n\nYou will need to import your wallet again to access your funds.\n\nAre you sure you want to continue?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Clear All Data',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('🗑️ Clearing all wallet data for user:', currentUser.id);
+              
+              // Clear all wallet data
+              await secureStorageService.clearAllWalletData(String(currentUser.id));
+              
+              // Clear any cached wallet state
+              await ensureAppWallet(String(currentUser.id));
+              
+              Alert.alert(
+                'Wallet Data Cleared',
+                'All wallet credentials have been removed from this device. You can now import your wallet again.',
+                [{ text: 'OK' }]
+              );
+              
+              console.log('✅ All wallet data cleared successfully');
+            } catch (error) {
+              console.error('❌ Failed to clear wallet data:', error);
+              Alert.alert(
+                'Error',
+                'Failed to clear wallet data. Please try again.',
+                [{ text: 'OK' }]
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSeedPhrase = async () => {
     try {
       if (!currentUser?.id) return;
 
-      console.log('🔍 WalletManagement: Preparing seed phrase for app wallet...');
+      console.log('🔐 WalletManagement: Preparing secure seed phrase access...');
 
-      // First ensure the app wallet is initialized
-      await ensureAppWallet(currentUser.id.toString());
+      // Initialize secure wallet (generates if needed, retrieves if exists)
+      const { address, isNew } = await secureSeedPhraseService.initializeSecureWallet(currentUser.id.toString());
 
-      // Ensure user has a seed phrase for the app wallet
-      await userWalletService.ensureUserSeedPhrase(currentUser.id.toString());
+      if (isNew) {
+        console.log('🔐 WalletManagement: New secure wallet created for user:', currentUser.id);
+        Alert.alert(
+          'Secure Wallet Created',
+          'Your single app wallet has been created. Your 12-word seed phrase is stored securely on your device only and can be used to export your wallet to external providers like Phantom and Solflare.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        console.log('🔐 WalletManagement: Existing app wallet seed phrase retrieved for user:', currentUser.id);
+      }
 
-      console.log('🔍 WalletManagement: App wallet seed phrase prepared successfully');
+      console.log('🔐 WalletManagement: Secure seed phrase access prepared successfully');
 
       navigation.navigate('SeedPhraseView');
     } catch (error) {
-      console.error('Error ensuring app wallet seed phrase:', error);
-      Alert.alert('Error', 'Failed to prepare app wallet seed phrase. Please try again.');
+      console.error('🔐 WalletManagement: Error preparing secure seed phrase access:', error);
+      Alert.alert('Error', 'Failed to prepare secure seed phrase access. Please try again.');
     }
   };
 
@@ -607,6 +662,17 @@ const WalletManagementScreen: React.FC = () => {
           <Icon name="chevron-right" size={16} color={colors.textLightSecondary} />
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[styles.optionRow, { borderBottomColor: colors.error }]}
+          onPress={handleClearWalletData}
+        >
+          <View style={styles.optionLeft}>
+            <Icon name="trash" size={20} color={colors.error} />
+            <Text style={[styles.optionText, { color: colors.error }]}>Clear Wallet Data</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.error} />
+        </TouchableOpacity>
+
         <View style={styles.optionRow}>
           <View style={styles.optionLeft}>
             <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fscan-icon-white.png?alt=media&token=c284a318-5a38-4ac6-a660-c7219af4360f' }} style={styles.optionIcon} />
@@ -786,7 +852,7 @@ const WalletManagementScreen: React.FC = () => {
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Wallet</Text>
-        <View style={{ width: 24 }} />
+        <View style={styles.placeholder} />
       </View>
 
       <ScrollView

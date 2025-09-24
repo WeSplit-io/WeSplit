@@ -17,7 +17,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
-import QRCode from 'react-native-qrcode-svg';
+import QRCode from '@features/qr';
 
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';

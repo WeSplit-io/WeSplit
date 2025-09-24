@@ -9,7 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
-import QRCode from 'react-native-qrcode-svg';
+import { QrCodeView } from '@features/qr';
 import Icon from './Icon';
 import { styles } from './QRCodeModal.styles';
 import { colors } from '../theme';
@@ -160,7 +160,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
                 {/* QR Code Container */}
                 <View style={styles.qrCodeContainerWrapper}>
                   <View style={styles.qrCodeContainer}>
-                    <QRCode
+                    <QrCodeView
                       value={qrValue}
                       size={200}
                       backgroundColor={colors.white}

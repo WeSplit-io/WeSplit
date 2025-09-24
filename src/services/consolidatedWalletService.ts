@@ -26,6 +26,7 @@ import {
 import { Alert, Linking, Platform } from 'react-native';
 import { walletLogoService } from './walletLogoService';
 import { RPC_CONFIG, USDC_CONFIG } from './shared/walletConstants';
+import { COMPANY_WALLET_CONFIG } from '../config/chain';
 
 // Types
 export interface WalletInfo {
@@ -134,8 +135,10 @@ class ConsolidatedWalletService {
    */
   async createWallet(): Promise<{ wallet: WalletInfo }> {
     try {
-      // Generate a new keypair
-      const keypair = Keypair.generate();
+      // CRITICAL FIX: Use BIP39 mnemonic-based generation instead of random keypair
+      const { generateWalletFromMnemonic } = await import('../wallet/derive');
+      const walletResult = generateWalletFromMnemonic();
+      const keypair = walletResult.keypair;
       const address = keypair.publicKey.toBase58();
       
       // Get balance
@@ -589,6 +592,11 @@ class ConsolidatedWalletService {
       const toPublicKey = new PublicKey(params.to);
       const amount = Math.floor(params.amount * 1_000_000); // USDC has 6 decimals
 
+      // Use company wallet for fees if configured, otherwise use user wallet
+      const feePayerPublicKey = COMPANY_WALLET_CONFIG.useUserWalletForFees 
+        ? fromPublicKey 
+        : new PublicKey(COMPANY_WALLET_CONFIG.address);
+
       // Get associated token addresses
       const fromTokenAccount = await getAssociatedTokenAddress(
         new PublicKey(USDC_CONFIG.mintAddress),
@@ -606,7 +614,7 @@ class ConsolidatedWalletService {
       // Create transaction
       const transaction = new Transaction({
         recentBlockhash: blockhash,
-        feePayer: fromPublicKey
+        feePayer: feePayerPublicKey // User or company pays fees based on configuration
       });
 
       // Add priority fee
@@ -626,7 +634,7 @@ class ConsolidatedWalletService {
         // Token account doesn't exist, create it
         transaction.add(
           createAssociatedTokenAccountInstruction(
-            fromPublicKey, // payer
+            feePayerPublicKey, // Fee payer pays ATA creation
             toTokenAccount, // ata
             toPublicKey, // owner
             new PublicKey(USDC_CONFIG.mintAddress) // mint

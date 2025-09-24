@@ -170,7 +170,7 @@ export interface Notification {
   id: string | number; // Support both SQLite (number) and Firebase (string) IDs
   user_id?: number | string; // Legacy field for SQLite compatibility
   userId?: string; // Firebase field
-  type: 'expense_added' | 'payment_reminder' | 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'general' | 'group_invite' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification';
+  type: 'expense_added' | 'payment_reminder' | 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'general' | 'group_invite' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'group_payment_sent' | 'group_payment_received';
   title: string;
   message: string;
   data?: any;

@@ -542,51 +542,23 @@ export const firebaseUserService = {
     }
   },
 
-  // Seed phrase management
+  // Seed phrase management - DEPRECATED: Use secureSeedPhraseService instead
+  // These functions are kept for backward compatibility but should not be used
+  // Seed phrases are now stored securely on device only, never in database
   saveUserSeedPhrase: async (userId: string, seedPhrase: string[]): Promise<void> => {
-    try {
-      const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, {
-        seed_phrase: seedPhrase,
-        seed_phrase_verified: false,
-        updated_at: serverTimestamp()
-      });
-      
-      if (__DEV__) { console.log('🔥 Seed phrase saved for user:', userId); }
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error saving seed phrase:', error); }
-      throw error;
-    }
+    console.warn('🔥 DEPRECATED: saveUserSeedPhrase should not be used. Use secureSeedPhraseService instead.');
+    throw new Error('Seed phrase storage in database is not allowed. Use secureSeedPhraseService for device-only storage.');
   },
 
   getUserSeedPhrase: async (userId: string): Promise<string[] | null> => {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      if (!userDoc.exists()) {
-        return null;
-      }
-      
-      const data = userDoc.data();
-      return data.seed_phrase || null;
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error getting user seed phrase:', error); }
-      throw new Error('No seed phrase found for this user');
-    }
+    console.warn('🔥 DEPRECATED: getUserSeedPhrase should not be used. Use secureSeedPhraseService instead.');
+    throw new Error('Seed phrase retrieval from database is not allowed. Use secureSeedPhraseService for device-only storage.');
   },
 
   markSeedPhraseVerified: async (userId: string): Promise<void> => {
-    try {
-      const userRef = doc(db, 'users', userId);
-      await updateDoc(userRef, {
-        seed_phrase_verified: true,
-        updated_at: serverTimestamp()
-      });
-      
-      if (__DEV__) { console.log('🔥 Seed phrase marked as verified for user:', userId); }
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error marking seed phrase as verified:', error); }
-      throw error;
-    }
+    console.warn('🔥 DEPRECATED: markSeedPhraseVerified should not be used. Seed phrases are now device-only.');
+    // This function is kept for compatibility but does nothing
+    console.log('🔥 Seed phrase verification is now handled by secureSeedPhraseService');
   }
 };
 
@@ -1366,35 +1338,35 @@ export const firebaseGroupService = {
       
       const usersRef = collection(db, 'users');
       
-      // Search by name (case-insensitive)
-      const nameQuery = query(
-        usersRef,
-        where('name', '>=', searchTerm.toLowerCase()),
-        where('name', '<=', searchTerm.toLowerCase() + '\uf8ff'),
-        limit(10)
-      );
+      // Get all users and filter client-side for better search results
+      // This is more reliable than Firestore range queries for partial matches
+      const allUsersQuery = query(usersRef, limit(100)); // Limit to prevent performance issues
+      const allDocs = await getDocs(allUsersQuery);
       
-      const nameDocs = await getDocs(nameQuery);
-      
-      // Also search by email for partial matches
-      const emailQuery = query(
-        usersRef,
-        where('email', '>=', searchTerm.toLowerCase()),
-        where('email', '<=', searchTerm.toLowerCase() + '\uf8ff'),
-        limit(10)
-      );
-      
-      const emailDocs = await getDocs(emailQuery);
-      
-      // Combine and deduplicate results
-      const allDocs = [...nameDocs.docs, ...emailDocs.docs];
+      const searchTermLower = searchTerm.toLowerCase().trim();
       const uniqueUsers = new Map<string, any>();
       
       allDocs.forEach(doc => {
         const userData = doc.data();
-        if (!excludeUserId || doc.id !== excludeUserId) {
-          uniqueUsers.set(doc.id, {
-            id: doc.id,
+        const userId = doc.id;
+        
+        // Skip excluded user
+        if (excludeUserId && userId === excludeUserId) {
+          return;
+        }
+        
+        const userName = (userData.name || '').toLowerCase();
+        const userEmail = (userData.email || '').toLowerCase();
+        const userWallet = (userData.wallet_address || '').toLowerCase();
+        
+        // Check if search term matches name, email, or wallet address
+        const matchesName = userName.includes(searchTermLower);
+        const matchesEmail = userEmail.includes(searchTermLower);
+        const matchesWallet = userWallet.includes(searchTermLower);
+        
+        if (matchesName || matchesEmail || matchesWallet) {
+          uniqueUsers.set(userId, {
+            id: userId,
             name: userData.name || '',
             email: userData.email || '',
             wallet_address: userData.wallet_address || '',
@@ -1407,9 +1379,35 @@ export const firebaseGroupService = {
       
       const results = Array.from(uniqueUsers.values());
       
-      if (__DEV__) { console.log('🔥 Found users:', results.length); }
+      // Sort results by relevance (exact matches first, then partial matches)
+      results.sort((a, b) => {
+        const aName = (a.name || '').toLowerCase();
+        const bName = (b.name || '').toLowerCase();
+        const aEmail = (a.email || '').toLowerCase();
+        const bEmail = (b.email || '').toLowerCase();
+        
+        // Exact name matches first
+        if (aName === searchTermLower && bName !== searchTermLower) return -1;
+        if (bName === searchTermLower && aName !== searchTermLower) return 1;
+        
+        // Name starts with search term
+        if (aName.startsWith(searchTermLower) && !bName.startsWith(searchTermLower)) return -1;
+        if (bName.startsWith(searchTermLower) && !aName.startsWith(searchTermLower)) return 1;
+        
+        // Email starts with search term
+        if (aEmail.startsWith(searchTermLower) && !bEmail.startsWith(searchTermLower)) return -1;
+        if (bEmail.startsWith(searchTermLower) && !aEmail.startsWith(searchTermLower)) return 1;
+        
+        // Alphabetical order for remaining matches
+        return aName.localeCompare(bName);
+      });
       
-      return results;
+      // Limit results to 10
+      const limitedResults = results.slice(0, 10);
+      
+      if (__DEV__) { console.log('🔥 Found users:', limitedResults.length, 'for search term:', searchTerm); }
+      
+      return limitedResults;
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error searching users:', error); }
       return [];

@@ -16,6 +16,7 @@ import {
   sendAndConfirmTransaction,
   ComputeBudgetProgram
 } from '@solana/web3.js';
+import { COMPANY_WALLET_CONFIG } from '../config/chain';
 import { 
   getAssociatedTokenAddress, 
   createAssociatedTokenAccountInstruction,
@@ -23,6 +24,7 @@ import {
   TOKEN_PROGRAM_ID,
   getAccount
 } from '@solana/spl-token';
+import { internalTransferService } from '../transfer/sendInternal';
 import { 
   collection, 
   doc, 
@@ -78,7 +80,7 @@ export interface PaymentRequestResult {
 
 // Company fee structure
 const COMPANY_FEE_STRUCTURE = {
-  percentage: 0.025, // 2.5%
+  percentage: 0.03, // 3% company fee on user currency transfers
   minimum: 0.001, // 0.001 SOL minimum
   maximum: 0.1 // 0.1 SOL maximum
 };
@@ -112,6 +114,43 @@ class ConsolidatedTransactionService {
       ConsolidatedTransactionService.instance = new ConsolidatedTransactionService();
     }
     return ConsolidatedTransactionService.instance;
+  }
+
+  // ===== WALLET MANAGEMENT METHODS =====
+
+  /**
+   * Load wallet from secure storage (cybersecurity compliant)
+   */
+  async loadWallet(): Promise<boolean> {
+    try {
+      console.log('🔗 ConsolidatedTransactionService: Loading wallet from secure storage');
+      
+      // Use the existing solanaWalletService to load the wallet securely
+      const { solanaWalletService } = await import('../wallet/solanaWallet');
+      const walletLoaded = await solanaWalletService.loadWallet();
+      
+      if (walletLoaded) {
+        // Get the keypair from solanaWalletService
+        const walletInfo = await solanaWalletService.getWalletInfo();
+        if (walletInfo && walletInfo.secretKey) {
+          // Convert secret key back to keypair for this service
+          const secretKeyBuffer = Buffer.from(walletInfo.secretKey, 'base64');
+          this.keypair = Keypair.fromSecretKey(secretKeyBuffer);
+          
+          console.log('🔗 ConsolidatedTransactionService: Wallet loaded successfully', {
+            address: this.keypair.publicKey.toBase58()
+          });
+          
+          return true;
+        }
+      }
+      
+      console.warn('🔗 ConsolidatedTransactionService: Failed to load wallet');
+      return false;
+    } catch (error) {
+      console.error('🔗 ConsolidatedTransactionService: Error loading wallet:', error);
+      return false;
+    }
   }
 
   // ===== TRANSACTION METHODS =====
@@ -254,6 +293,11 @@ class ConsolidatedTransactionService {
       const toPublicKey = new PublicKey(params.to);
       const amount = Math.floor(netAmount * 1_000_000); // USDC has 6 decimals
 
+      // Use company wallet for fees if configured, otherwise use user wallet
+      const feePayerPublicKey = COMPANY_WALLET_CONFIG.useUserWalletForFees 
+        ? fromPublicKey 
+        : new PublicKey(COMPANY_WALLET_CONFIG.address);
+
       // Get associated token addresses
       const fromTokenAccount = await getAssociatedTokenAddress(
         new PublicKey(USDC_CONFIG.mintAddress),
@@ -271,7 +315,7 @@ class ConsolidatedTransactionService {
       // Create transaction
       const transaction = new Transaction({
         recentBlockhash: blockhash,
-        feePayer: fromPublicKey
+        feePayer: feePayerPublicKey // User or company pays fees based on configuration
       });
 
       // Add priority fee
@@ -291,7 +335,7 @@ class ConsolidatedTransactionService {
         // Token account doesn't exist, create it
         transaction.add(
           createAssociatedTokenAccountInstruction(
-            fromPublicKey, // payer
+            feePayerPublicKey, // Fee payer pays ATA creation
             toTokenAccount, // ata
             toPublicKey, // owner
             new PublicKey(USDC_CONFIG.mintAddress) // mint
@@ -365,10 +409,96 @@ class ConsolidatedTransactionService {
       try {
         console.log(`🔄 Transaction attempt ${attempt}/${TRANSACTION_CONFIG.retry.maxRetries} (${priority} priority)`);
         
+        // Prepare signers array
+        const signers = [this.keypair!];
+        
+        // If company wallet is the fee payer, we need to add company wallet keypair
+        if (!COMPANY_WALLET_CONFIG.useUserWalletForFees && COMPANY_WALLET_CONFIG.secretKey) {
+          try {
+            console.log('Processing company wallet secret key', {
+              secretKeyLength: COMPANY_WALLET_CONFIG.secretKey.length,
+              secretKeyPreview: COMPANY_WALLET_CONFIG.secretKey.substring(0, 10) + '...'
+            });
+
+            // Try different formats for the secret key
+            let companySecretKeyBuffer: Buffer;
+            
+            // Check if it looks like a comma-separated array first
+            if (COMPANY_WALLET_CONFIG.secretKey.includes(',') || COMPANY_WALLET_CONFIG.secretKey.includes('[')) {
+              try {
+                // Remove square brackets if present and split by comma
+                const cleanKey = COMPANY_WALLET_CONFIG.secretKey.replace(/[\[\]]/g, '');
+                const keyArray = cleanKey.split(',').map(num => parseInt(num.trim(), 10));
+                
+                // Validate that all elements are valid numbers
+                if (keyArray.some(num => isNaN(num))) {
+                  throw new Error('Invalid comma-separated array format - contains non-numeric values');
+                }
+                
+                companySecretKeyBuffer = Buffer.from(keyArray);
+                console.log('Successfully decoded secret key as comma-separated array', {
+                  bufferLength: companySecretKeyBuffer.length,
+                  arrayLength: keyArray.length
+                });
+              } catch (arrayError) {
+                throw new Error(`Failed to parse comma-separated array: ${arrayError instanceof Error ? arrayError.message : String(arrayError)}`);
+              }
+            } else {
+              try {
+                // Try base64 first for other formats
+                companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'base64');
+                
+                // Check if the length is reasonable for Solana (64 or 65 bytes)
+                if (companySecretKeyBuffer.length === 64 || companySecretKeyBuffer.length === 65) {
+                  console.log('Successfully decoded secret key as base64', {
+                    bufferLength: companySecretKeyBuffer.length
+                  });
+                } else {
+                  throw new Error(`Base64 decoded to unexpected length: ${companySecretKeyBuffer.length}`);
+                }
+              } catch (base64Error) {
+                try {
+                  // Try hex format
+                  companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'hex');
+                  console.log('Successfully decoded secret key as hex', {
+                    bufferLength: companySecretKeyBuffer.length
+                  });
+                } catch (hexError) {
+                  throw new Error('Unable to decode secret key in any supported format');
+                }
+              }
+            }
+
+            // Validate the secret key length (should be 64 or 65 bytes for Solana)
+            if (companySecretKeyBuffer.length === 65) {
+              // Remove the last byte (public key) to get the 64-byte secret key
+              companySecretKeyBuffer = companySecretKeyBuffer.slice(0, 64);
+              console.log('Trimmed 65-byte keypair to 64-byte secret key', {
+                originalLength: 65,
+                trimmedLength: companySecretKeyBuffer.length
+              });
+            } else if (companySecretKeyBuffer.length !== 64) {
+              throw new Error(`Invalid secret key length: ${companySecretKeyBuffer.length} bytes (expected 64 or 65)`);
+            }
+
+            const companyKeypair = Keypair.fromSecretKey(companySecretKeyBuffer);
+            signers.push(companyKeypair);
+            
+            console.log('Using company wallet for fees', {
+              companyWalletAddress: COMPANY_WALLET_CONFIG.address,
+              userWalletAddress: this.keypair!.publicKey.toBase58(),
+              companyKeypairAddress: companyKeypair.publicKey.toBase58()
+            });
+          } catch (error) {
+            console.error('Failed to load company wallet keypair', error);
+            throw new Error('Company wallet keypair not available for signing');
+          }
+        }
+
         const signature = await sendAndConfirmTransaction(
           this.connection,
           transaction,
-          [this.keypair!],
+          signers, // Use all required signers
           {
             commitment: 'confirmed',
             preflightCommitment: 'confirmed',
@@ -539,7 +669,7 @@ class ConsolidatedTransactionService {
       }
 
       // Send the transaction
-      const transactionResult = await this.sendTransaction({
+      const transactionResult = await this.sendUSDCTransaction({
         to: senderWalletAddress,
         amount: request.amount,
         currency: request.currency as 'SOL' | 'USDC',
@@ -675,51 +805,177 @@ class ConsolidatedTransactionService {
   }
 
   /**
-   * Get user wallet balance (stub implementation)
+   * Get user wallet balance from on-chain
    */
   async getUserWalletBalance(userId: string): Promise<{ usdc: number; sol: number }> {
     console.log('🔗 ConsolidatedTransactionService: Getting wallet balance for user:', userId);
-    // TODO: Implement proper balance checking
-    return { usdc: 100, sol: 1 }; // Mock balance
+    
+    try {
+      // Use the existing userWalletService to get the balance
+      const { userWalletService } = await import('./userWalletService');
+      const balance = await userWalletService.getUserWalletBalance(userId);
+      
+      console.log('🔗 ConsolidatedTransactionService: Balance retrieved:', balance);
+      
+      return {
+        sol: balance?.solBalance || 0,
+        usdc: balance?.usdcBalance || 0
+      };
+    } catch (error) {
+      console.error('🔗 ConsolidatedTransactionService: Failed to get wallet balance:', error);
+      throw error;
+    }
   }
 
   /**
-   * Get transaction fee estimate (stub implementation)
+   * Get transaction fee estimate from on-chain
    */
   async getTransactionFeeEstimate(amount: number, currency: string, priority: string): Promise<number> {
     console.log('🔗 ConsolidatedTransactionService: Getting fee estimate:', { amount, currency, priority });
-    // TODO: Implement proper fee estimation
-    return amount * COMPANY_FEE_STRUCTURE.percentage; // Mock fee
+    
+    try {
+      // Calculate company fee
+      const companyFee = this.calculateCompanyFee(amount).fee;
+      
+      // Estimate blockchain fee based on transaction type and priority
+      let blockchainFee = 0.000005; // Base fee for simple transfer
+      
+      if (currency === 'USDC') {
+        blockchainFee = 0.00001; // Higher fee for token transfer
+      }
+      
+      // Add priority fee
+      const priorityFee = this.getPriorityFee(priority as 'low' | 'medium' | 'high');
+      const priorityFeeInSol = priorityFee / 1000000; // Convert micro-lamports to SOL
+      
+      const totalFee = companyFee + blockchainFee + priorityFeeInSol;
+      
+      console.log('Fee breakdown:', {
+        companyFee,
+        blockchainFee,
+        priorityFee: priorityFeeInSol,
+        totalFee
+      });
+      
+      return totalFee;
+    } catch (error) {
+      console.error('Failed to get fee estimate:', error);
+      // Fallback to simple calculation
+      return amount * COMPANY_FEE_STRUCTURE.percentage;
+    }
   }
 
   /**
-   * Send USDC transaction (stub implementation)
+   * Send USDC transaction (real implementation)
    */
-  async sendUsdcTransaction(toAddress: string, amount: number, userId: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+  async sendUsdcTransaction(
+    toAddress: string, 
+    amount: number, 
+    userId: string, 
+    memo?: string, 
+    groupId?: string, 
+    priority: 'low' | 'medium' | 'high' = 'medium'
+  ): Promise<{ 
+    success: boolean; 
+    transactionId?: string; 
+    signature?: string;
+    companyFee?: number;
+    netAmount?: number;
+    fee?: number;
+    error?: string 
+  }> {
     console.log('🔗 ConsolidatedTransactionService: Sending USDC transaction:', { toAddress, amount, userId });
-    // TODO: Implement proper USDC transaction
-    return {
-      success: false,
-      error: 'USDC transaction functionality not yet implemented'
-    };
+    
+    try {
+      // Use the internal transfer service for real USDC transactions
+      const result = await internalTransferService.sendInternalTransfer({
+        to: toAddress,
+        amount,
+        currency: 'USDC',
+        memo: memo || `Payment from ${userId}`,
+        groupId,
+        userId,
+        priority
+      });
+
+      if (result.success) {
+        return {
+          success: true,
+          transactionId: result.txId,
+          signature: result.signature,
+          companyFee: result.companyFee,
+          netAmount: result.netAmount,
+          fee: result.blockchainFee
+        };
+      } else {
+        return {
+          success: false,
+          error: result.error
+        };
+      }
+    } catch (error) {
+      console.error('Failed to send USDC transaction:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   }
 
   /**
-   * Get user wallet address (stub implementation)
+   * Get user wallet address (real implementation)
    */
   async getUserWalletAddress(userId: string): Promise<string | null> {
     console.log('🔗 ConsolidatedTransactionService: Getting wallet address for user:', userId);
-    // TODO: Implement proper wallet address retrieval
-    return '11111111111111111111111111111112'; // Mock address
+    
+    try {
+      // Use the existing userWalletService to get the wallet address
+      const { userWalletService } = await import('./userWalletService');
+      const walletResult = await userWalletService.ensureUserWallet(userId);
+      
+      if (walletResult.success && walletResult.wallet) {
+        console.log('🔗 ConsolidatedTransactionService: Wallet address retrieved:', walletResult.wallet.address);
+        return walletResult.wallet.address;
+      }
+      
+      console.warn('🔗 ConsolidatedTransactionService: No wallet found for user:', userId);
+      return null;
+    } catch (error) {
+      console.error('🔗 ConsolidatedTransactionService: Failed to get wallet address:', error);
+      return null;
+    }
   }
 
   /**
-   * Check if user has sufficient SOL for gas (stub implementation)
+   * Check if user has sufficient SOL for gas (company covers all blockchain fees)
    */
-  async hasSufficientSolForGas(userId: string): Promise<boolean> {
-    console.log('🔗 ConsolidatedTransactionService: Checking SOL balance for gas:', userId);
-    // TODO: Implement proper SOL balance checking
-    return true; // Mock result
+  async hasSufficientSolForGas(userId: string): Promise<{ hasSufficient: boolean; currentSol: number; requiredSol: number }> {
+    console.log('🔗 ConsolidatedTransactionService: SOL gas check - company covers all blockchain fees');
+    
+    try {
+      const balance = await this.getUserWalletBalance(userId);
+      
+      // Company covers all blockchain fees, so SOL check always passes
+      console.log('🔗 ConsolidatedTransactionService: SOL gas check result (company covers fees):', {
+        hasSufficient: true,
+        currentSol: balance.sol,
+        requiredSol: 0
+      });
+      
+      return {
+        hasSufficient: true, // Company covers all blockchain fees
+        currentSol: balance.sol,
+        requiredSol: 0
+      };
+    } catch (error) {
+      console.error('🔗 ConsolidatedTransactionService: Failed to check SOL balance for gas:', error);
+      // Even on error, company covers fees so we allow the transaction
+      return {
+        hasSufficient: true,
+        currentSol: 0,
+        requiredSol: 0
+      };
+    }
   }
 
   /**

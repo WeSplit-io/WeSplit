@@ -181,8 +181,8 @@ export default function App() {
                 <Stack.Screen name="WithdrawAmount" component={WithdrawAmountScreen} />
                 <Stack.Screen name="WithdrawConfirmation" component={WithdrawConfirmationScreen} />
                 <Stack.Screen name="WithdrawSuccess" component={WithdrawSuccessScreen} />
-                <Stack.Screen name="WalletManagement" component={WalletManagementScreen} />
-                <Stack.Screen name="SeedPhraseView" component={SeedPhraseViewScreen} />
+        <Stack.Screen name="WalletManagement" component={WalletManagementScreen} />
+        <Stack.Screen name="SeedPhraseView" component={SeedPhraseViewScreen} />
                 <Stack.Screen name="SeedPhraseVerify" component={SeedPhraseVerifyScreen} />
                 <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
                 <Stack.Screen name="ExternalWalletConnection" component={ExternalWalletConnectionScreen} />

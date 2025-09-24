@@ -51,7 +51,11 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
             marginBottom: 40,
           }]}>{getCurrentDate()}</Text>
 
-          <Text style={styles.mockupSuccessDescription}>View transaction details</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('TransactionHistory')}>
+            <Text style={[styles.mockupSuccessDescription, { color: colors.primaryGreen, textDecorationLine: 'underline' }]}>
+              View transaction details
+            </Text>
+          </TouchableOpacity>
         </View>
         {/* Back Home Button collé en bas */}
         <View style={{width: '100%', paddingBottom: 24, alignItems: 'center'}}>

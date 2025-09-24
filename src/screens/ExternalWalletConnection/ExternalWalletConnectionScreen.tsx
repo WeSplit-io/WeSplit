@@ -8,6 +8,9 @@ import {
   ScrollView,
   SafeAreaView,
   Image,
+  RefreshControl,
+  TextInput,
+  Modal,
 } from 'react-native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
@@ -15,6 +18,8 @@ import { consolidatedWalletService } from '../../services/consolidatedWalletServ
 import { WalletProvider as UnifiedWalletProvider } from '../../types/walletTypes';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
+import { userWalletService } from '../../services/userWalletService';
+import { firebaseDataService } from '../../services/firebaseDataService';
 
 // Use the actual WalletProvider type from the service
 type WalletProvider = UnifiedWalletProvider;
@@ -36,9 +41,132 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
   const { state } = useApp();
   const currentUser = state.currentUser;
 
+  // Wallet management state
+  const [refreshing, setRefreshing] = useState(false);
+  const [linkedWallets, setLinkedWallets] = useState<any[]>([]);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importType, setImportType] = useState<'privateKey' | 'seedPhrase'>('privateKey');
+  const [importInput, setImportInput] = useState('');
+  const [importing, setImporting] = useState(false);
+
   useEffect(() => {
     loadProviders();
+    loadLinkedWallets();
   }, []);
+
+  const loadLinkedWallets = async () => {
+    try {
+      if (!currentUser?.id) return;
+      
+      // For now, we'll use an empty array since getLinkedWallets doesn't exist
+      // This can be implemented later when the Firebase service is updated
+      setLinkedWallets([]);
+    } catch (error) {
+      console.error('Error loading linked wallets:', error);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadProviders(),
+        loadLinkedWallets()
+      ]);
+    } catch (error) {
+      console.error('Error refreshing:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleFixWallet = async () => {
+    try {
+      if (!currentUser?.id) return;
+
+      Alert.alert(
+        'Fix Wallet',
+        'This will attempt to recover your app wallet credentials. This is useful if you have an app wallet with funds but can\'t access it.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Fix Wallet',
+            onPress: async () => {
+              try {
+                const result = await userWalletService.fixExistingUserWallet(currentUser.id.toString());
+                if (result.success) {
+                  Alert.alert('Success', 'Wallet fixed successfully! You can now use your app wallet for transactions.');
+                  await loadLinkedWallets();
+                } else {
+                  Alert.alert('Error', result.error || 'Failed to fix wallet');
+                }
+              } catch (error) {
+                Alert.alert('Error', 'Failed to fix wallet. Please try again.');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error fixing wallet:', error);
+      Alert.alert('Error', 'Failed to fix wallet');
+    }
+  };
+
+  const handleImportWallet = () => {
+    setShowImportModal(true);
+  };
+
+  const handleImportSubmit = async () => {
+    if (!importInput.trim()) {
+      Alert.alert('Error', 'Please enter your private key or seed phrase');
+      return;
+    }
+
+    if (!currentUser?.id) return;
+
+    setImporting(true);
+    try {
+      const result = await userWalletService.importExistingWallet(
+        currentUser.id.toString(),
+        importInput.trim()
+      );
+
+      if (result.success) {
+        Alert.alert('Success', 'Wallet imported successfully! You can now use this wallet for transactions.');
+        setShowImportModal(false);
+        setImportInput('');
+        await loadLinkedWallets();
+      } else {
+        Alert.alert('Error', result.error || 'Failed to import wallet');
+      }
+    } catch (error) {
+      console.error('Error importing wallet:', error);
+      Alert.alert('Error', 'Failed to import wallet. Please check your credentials and try again.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleImportCancel = () => {
+    setShowImportModal(false);
+    setImportInput('');
+    setImportType('privateKey');
+  };
+
+  const analyzePhoneForWallets = async () => {
+    setAnalyzing(true);
+    try {
+      // This would analyze the phone for installed wallet apps
+      // For now, just refresh the providers
+      await loadProviders();
+    } catch (error) {
+      console.error('Error analyzing phone for wallets:', error);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const loadProviders = async () => {
     try {
@@ -48,7 +176,13 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
       const availableProviders = await consolidatedWalletService.getAvailableProviders();
       console.log('🔍 ExternalWalletConnection: Available providers:', availableProviders.map(p => `${p.name} (${p.isAvailable ? 'Available' : 'Not Available'})`));
       
-      setProviders(availableProviders);
+      // Convert to the expected type
+      const convertedProviders = availableProviders.map(provider => ({
+        ...provider,
+        detectionMethod: provider.detectionMethod || 'manual' as const
+      }));
+      
+      setProviders(convertedProviders);
     } catch (error) {
       console.error('❌ ExternalWalletConnection: Error loading providers:', error);
       setError('Failed to load wallet providers');
@@ -205,7 +339,15 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Connect External Wallet</Text>
+        <Text style={styles.headerTitle}>Wallet Management</Text>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.fixButton} onPress={handleFixWallet}>
+            <Text style={styles.fixButtonText}>Fix</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.importButton} onPress={handleImportWallet}>
+            <Text style={styles.importButtonText}>Import</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Content */}
@@ -213,7 +355,36 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
         style={styles.content}
         showsVerticalScrollIndicator={true}
         contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
+        {/* Wallet Management Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>Wallet Management</Text>
+          <Text style={styles.sectionDescription}>
+            Fix your app wallet or import an existing wallet to regain access to your funds. You can also connect external wallets for funding and withdrawals.
+          </Text>
+        </View>
+
+        {/* Linked Wallets Section */}
+        {linkedWallets.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Linked Wallets ({linkedWallets.length})</Text>
+            {linkedWallets.map((wallet, index) => (
+              <View key={index} style={styles.linkedWalletItem}>
+                <View style={styles.walletInfo}>
+                  <Text style={styles.walletName}>{wallet.name || 'Unknown Wallet'}</Text>
+                  <Text style={styles.walletAddress}>{wallet.address}</Text>
+                </View>
+                <View style={styles.walletStatus}>
+                  <Text style={styles.walletStatusText}>Connected</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Description */}
         <Text style={styles.description}>
           Connect your external wallet to fund your app wallet. You'll need to sign a transaction to prove wallet ownership.
@@ -346,6 +517,133 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
           By connecting your wallet, you agree to sign a transaction to verify ownership.
         </Text>
       </View>
+
+      {/* Import Modal */}
+      <Modal
+        visible={showImportModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleImportCancel}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Import Existing Wallet</Text>
+            <TouchableOpacity onPress={handleImportCancel} style={styles.modalCloseButton}>
+              <Icon name="x" size={24} color={colors.white} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            <Text style={styles.modalDescription}>
+              Import your existing wallet using either your private key or seed phrase. This will give you full control over your wallet and allow you to send transactions.
+            </Text>
+
+            {/* Import Type Selection */}
+            <View style={styles.importTypeContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.importTypeButton,
+                  importType === 'privateKey' && styles.importTypeButtonActive
+                ]}
+                onPress={() => setImportType('privateKey')}
+              >
+                <Text style={[
+                  styles.importTypeButtonText,
+                  importType === 'privateKey' && styles.importTypeButtonTextActive
+                ]}>
+                  Private Key
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.importTypeButton,
+                  importType === 'seedPhrase' && styles.importTypeButtonActive
+                ]}
+                onPress={() => setImportType('seedPhrase')}
+              >
+                <Text style={[
+                  styles.importTypeButtonText,
+                  importType === 'seedPhrase' && styles.importTypeButtonTextActive
+                ]}>
+                  Seed Phrase
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Input Field */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>
+                {importType === 'privateKey' ? 'Private Key' : 'Seed Phrase'}
+              </Text>
+              <TextInput
+                style={styles.inputField}
+                value={importInput}
+                onChangeText={setImportInput}
+                placeholder={
+                  importType === 'privateKey' 
+                    ? 'Enter your private key (base64 or JSON array format)'
+                    : 'Enter your 12 or 24 word seed phrase'
+                }
+                placeholderTextColor={colors.GRAY}
+                multiline={importType === 'seedPhrase'}
+                numberOfLines={importType === 'seedPhrase' ? 3 : 1}
+                secureTextEntry={true}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            {/* Instructions */}
+            <View style={styles.instructionsContainer}>
+              <Text style={styles.instructionsTitle}>Instructions:</Text>
+              {importType === 'privateKey' ? (
+                <Text style={styles.instructionsText}>
+                  • Enter your private key in base64 format or as a JSON array{'\n'}
+                  • This will replace your current app wallet{'\n'}
+                  • Make sure you have the correct private key for your wallet with funds
+                </Text>
+              ) : (
+                <Text style={styles.instructionsText}>
+                  • Enter your 12 or 24 word seed phrase{'\n'}
+                  • Words should be separated by spaces{'\n'}
+                  • This will replace your current app wallet{'\n'}
+                  • Make sure you have the correct seed phrase for your wallet with funds
+                </Text>
+              )}
+            </View>
+
+            {/* Warning */}
+            <View style={styles.warningContainer}>
+              <Icon name="alert-triangle" size={20} color={colors.warning} />
+              <Text style={styles.warningText}>
+                Warning: This will replace your current app wallet. Make sure you have the correct credentials for the wallet that contains your funds.
+              </Text>
+            </View>
+          </ScrollView>
+
+          {/* Modal Footer */}
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={handleImportCancel}
+              disabled={importing}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.importSubmitButton, importing && styles.importSubmitButtonDisabled]}
+              onPress={handleImportSubmit}
+              disabled={importing || !importInput.trim()}
+            >
+              {importing ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Text style={styles.importSubmitButtonText}>Import Wallet</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };

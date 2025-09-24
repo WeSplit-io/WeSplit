@@ -6,6 +6,16 @@
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "target": "es2020"
+    "target": "es2020",
+    "baseUrl": "src",
+    "paths": {
+      "@app/*": ["app/*"],
+      "@components/*": ["components/*"],
+      "@features/*": ["features/*"],
+      "@libs/*": ["libs/*"],
+      "@config/*": ["config/*"],
+      "@theme/*": ["theme/*"],
+      "@storage/*": ["storage/*"]
+    }
   }
 }

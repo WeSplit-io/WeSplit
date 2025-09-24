@@ -1,7 +1,50 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { initializeApp } from 'firebase/app';
+import Constants from 'expo-constants';
 
-// Initialize Firebase Functions
-const functions = getFunctions();
+// Get environment variables from Expo Constants
+const getEnvVar = (key: string): string => {
+  // Try to get from process.env first (for development)
+  if (process.env[key]) {
+    return process.env[key]!;
+  }
+  
+  // Try to get from Expo Constants
+  if (Constants.expoConfig?.extra?.[key]) {
+    return Constants.expoConfig.extra[key];
+  }
+  
+  // Try to get from Constants.manifest (older Expo versions)
+  if ((Constants.manifest as any)?.extra?.[key]) {
+    return (Constants.manifest as any).extra[key];
+  }
+  
+  return '';
+};
+
+// Get Firebase configuration values
+const apiKey = getEnvVar('EXPO_PUBLIC_FIREBASE_API_KEY');
+const authDomain = getEnvVar('EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN') || "wesplit-35186.firebaseapp.com";
+const projectId = getEnvVar('EXPO_PUBLIC_FIREBASE_PROJECT_ID') || "wesplit-35186";
+const storageBucket = getEnvVar('EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET') || "wesplit-35186.appspot.com";
+const messagingSenderId = getEnvVar('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID');
+const appId = getEnvVar('EXPO_PUBLIC_FIREBASE_APP_ID');
+
+// Firebase configuration
+const firebaseConfig = {
+  apiKey,
+  authDomain,
+  projectId,
+  storageBucket,
+  messagingSenderId,
+  appId
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// Initialize Firebase Functions with us-central1 region
+const functions = getFunctions(app, 'us-central1');
 
 // MoonPay transaction interface
 export interface MoonPayTransaction {
@@ -80,7 +123,9 @@ export const createMoonPayURL = async (
     console.log('🔍 Firebase MoonPay: Calling Firebase function with data:', data);
 
     // Call Firebase Function - authentication is handled by the function
-    const createMoonPayURLFunction = httpsCallable(functions, 'createMoonPayURL');
+    const createMoonPayURLFunction = httpsCallable(functions, 'createMoonPayURL', {
+      timeout: 60000 // 60 seconds timeout
+    });
     const result = await createMoonPayURLFunction(data);
 
     const response = result.data as MoonPayURLResponse;
@@ -130,7 +175,9 @@ export const getMoonPayTransactionStatus = async (
     console.log('🔍 Firebase MoonPay: Getting transaction status...', { transactionId });
 
     // Call Firebase Function - authentication is handled by the function
-    const getTransactionStatusFunction = httpsCallable(functions, 'getMoonPayTransactionStatus');
+    const getTransactionStatusFunction = httpsCallable(functions, 'getMoonPayTransactionStatus', {
+      timeout: 60000 // 60 seconds timeout
+    });
     const result = await getTransactionStatusFunction({ transactionId });
 
     const response = result.data as MoonPayTransactionStatusResponse;
@@ -151,7 +198,9 @@ export const getUserMoonPayTransactions = async (
     console.log('🔍 Firebase MoonPay: Getting user transactions...', { limit });
 
     // Call Firebase Function - authentication is handled by the function
-    const getUserTransactionsFunction = httpsCallable(functions, 'getUserMoonPayTransactions');
+    const getUserTransactionsFunction = httpsCallable(functions, 'getUserMoonPayTransactions', {
+      timeout: 60000 // 60 seconds timeout
+    });
     const result = await getUserTransactionsFunction({ limit });
 
     const response = result.data as { transactions: MoonPayTransaction[] };

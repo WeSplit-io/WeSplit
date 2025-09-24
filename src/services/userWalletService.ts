@@ -9,6 +9,7 @@ import { walletManagementService } from './walletManagementService';
 import { bip39WalletService } from './bip39WalletService';
 import { legacyWalletRecoveryService } from './legacyWalletRecoveryService';
 import { logger } from './loggingService';
+import * as bip39 from 'bip39';
 
 // Import shared constants
 import { RPC_CONFIG, USDC_CONFIG, WALLET_CONFIG } from './shared/walletConstants';
@@ -180,6 +181,255 @@ export class UserWalletService {
     }
   }
 
+  // Import existing wallet for a specific user (overwrites existing)
+  async importExistingWallet(userId: string, privateKeyOrSeedPhrase: string): Promise<WalletCreationResult> {
+    try {
+      logger.info('Importing existing wallet for user', { userId }, 'UserWalletService');
+      
+      // Get the user's current data to get the actual Firebase document ID
+      const currentUser = await firebaseDataService.user.getCurrentUser(userId);
+      if (!currentUser) {
+        logger.error('User not found in Firebase', { userId }, 'UserWalletService');
+        return {
+          success: false,
+          error: 'User not found in Firebase'
+        };
+      }
+      
+      // Use the actual Firebase document ID for updates
+      const actualUserId = String(currentUser.id);
+      logger.info('Using actual Firebase document ID for wallet import', {
+        displayUserId: userId,
+        actualUserId: actualUserId
+      }, 'UserWalletService');
+      
+      let wallet;
+      let mnemonic: string | null = null;
+      
+      // Check if it's a seed phrase (12 or 24 words) or a private key
+      const words = privateKeyOrSeedPhrase.trim().split(' ');
+      if (words.length === 12 || words.length === 24) {
+        // It's a seed phrase
+        mnemonic = privateKeyOrSeedPhrase.trim();
+        
+        // Validate the mnemonic
+        if (!bip39.validateMnemonic(mnemonic)) {
+          throw new Error('Invalid seed phrase');
+        }
+        
+        // Import wallet from seed phrase
+        wallet = await consolidatedWalletService.importWallet(mnemonic);
+      } else {
+        // It's a private key (base64 or array format)
+        let privateKeyBuffer: Buffer;
+        
+        try {
+          // Try to parse as JSON array first
+          const privateKeyArray = JSON.parse(privateKeyOrSeedPhrase);
+          privateKeyBuffer = Buffer.from(privateKeyArray);
+        } catch {
+          // If not JSON, try as base64
+          privateKeyBuffer = Buffer.from(privateKeyOrSeedPhrase, 'base64');
+        }
+        
+        // Create keypair from private key
+        const keypair = Keypair.fromSecretKey(privateKeyBuffer);
+        
+        // Create wallet info
+        wallet = {
+          address: keypair.publicKey.toBase58(),
+          publicKey: keypair.publicKey.toBase58(),
+          secretKey: Buffer.from(keypair.secretKey).toString('base64'),
+          balance: 0,
+          usdcBalance: 0,
+          isConnected: true,
+          walletName: 'Imported Wallet',
+          walletType: 'imported'
+        };
+      }
+
+      if (!wallet || !wallet.address) {
+        throw new Error('Wallet import failed - no address generated');
+      }
+
+      // Update user document with wallet info - use the actual Firebase document ID
+      await firebaseDataService.user.updateUser(actualUserId, {
+        wallet_address: wallet.address,
+        wallet_public_key: wallet.publicKey || wallet.address
+      });
+
+      // Track wallet import in Firebase
+      await walletManagementService.trackWalletCreation(actualUserId, wallet.address, 'external');
+
+      // CRITICAL: Store private key in secure storage for transaction signing
+      if (wallet.secretKey) {
+        try {
+          // Convert secret key to JSON array format for storage
+          const secretKeyArray = Array.from(new Uint8Array(Buffer.from(wallet.secretKey, 'base64')));
+          await secureStorageService.storePrivateKey(userId, JSON.stringify(secretKeyArray));
+          
+          // Track private key storage in Firebase
+          await walletManagementService.trackPrivateKeyStorage(actualUserId, true);
+          
+          logger.info('Private key stored securely for imported wallet', { 
+            userId, 
+            walletAddress: wallet.address 
+          }, 'UserWalletService');
+        } catch (keyStorageError) {
+          logger.error('Failed to store private key for imported wallet', keyStorageError, 'UserWalletService');
+          // Don't fail wallet import if key storage fails, but log the error
+        }
+      }
+
+      // Store the mnemonic if provided
+      if (mnemonic) {
+        try {
+          await secureStorageService.storeSeedPhrase(userId, mnemonic);
+          
+          // Track seed phrase storage in Firebase
+          await walletManagementService.trackSeedPhraseStorage(actualUserId, true);
+          
+          logger.info('Seed phrase stored securely for imported wallet', { 
+            userId, 
+            walletAddress: wallet.address 
+          }, 'UserWalletService');
+        } catch (seedError) {
+          logger.warn('Failed to store seed phrase for imported wallet', seedError, 'UserWalletService');
+          // Don't fail wallet import if seed phrase storage fails
+        }
+      }
+
+      // Wallet imported and saved for user
+      logger.info('Wallet import completed successfully', {
+        userId,
+        walletAddress: wallet.address,
+        hasPrivateKey: !!wallet.secretKey,
+        hasSeedPhrase: !!mnemonic
+      }, 'UserWalletService');
+
+      return {
+        success: true,
+        wallet: {
+          address: wallet.address,
+          publicKey: wallet.publicKey || wallet.address
+        }
+      };
+    } catch (error) {
+      logger.error('Failed to import wallet for user', error, 'UserWalletService');
+      return {
+        success: false,
+        error: `Failed to import wallet: ${error}`
+      };
+    }
+  }
+
+  // Create a new unified wallet for a specific user (overwrites existing)
+  async createNewUnifiedWallet(userId: string): Promise<WalletCreationResult> {
+    try {
+      logger.info('Creating new unified BIP39-based wallet for user (overwriting existing)', { userId }, 'UserWalletService');
+      
+      // Get the user's current data to get the actual Firebase document ID
+      const currentUser = await firebaseDataService.user.getCurrentUser(userId);
+      if (!currentUser) {
+        logger.error('User not found in Firebase', { userId }, 'UserWalletService');
+        return {
+          success: false,
+          error: 'User not found in Firebase'
+        };
+      }
+      
+      // Use the actual Firebase document ID for updates
+      const actualUserId = String(currentUser.id);
+      logger.info('Using actual Firebase document ID for wallet update', {
+        displayUserId: userId,
+        actualUserId: actualUserId
+      }, 'UserWalletService');
+      
+      // Generate a cryptographically secure mnemonic (12 words)
+      const mnemonic = bip39.generateMnemonic(128); // 12 words - compatible with most wallets
+      
+      // Validate the generated mnemonic
+      if (!bip39.validateMnemonic(mnemonic)) {
+        throw new Error('Generated mnemonic is invalid');
+      }
+      
+      // Derive wallet from the mnemonic using consolidated service
+      const result = await consolidatedWalletService.importWallet(mnemonic);
+      const wallet = result;
+
+      if (!wallet || !wallet.address) {
+        throw new Error('Wallet creation failed - no address generated from mnemonic');
+      }
+
+      // Update user document with wallet info - use the actual Firebase document ID
+      await firebaseDataService.user.updateUser(actualUserId, {
+        wallet_address: wallet.address,
+        wallet_public_key: wallet.publicKey || wallet.address
+      });
+
+      // Track wallet creation in Firebase
+      await walletManagementService.trackWalletCreation(actualUserId, wallet.address, 'app-generated');
+
+      // CRITICAL: Store private key in secure storage for transaction signing
+      if (wallet.secretKey) {
+        try {
+          // Convert secret key to JSON array format for storage
+          const secretKeyArray = Array.from(new Uint8Array(Buffer.from(wallet.secretKey, 'base64')));
+          await secureStorageService.storePrivateKey(userId, JSON.stringify(secretKeyArray));
+          
+          // Track private key storage in Firebase
+          await walletManagementService.trackPrivateKeyStorage(actualUserId, true);
+          
+          logger.info('Private key stored securely for user', { 
+            userId, 
+            walletAddress: wallet.address 
+          }, 'UserWalletService');
+        } catch (keyStorageError) {
+          logger.error('Failed to store private key for user', keyStorageError, 'UserWalletService');
+          // Don't fail wallet creation if key storage fails, but log the error
+        }
+      }
+
+      // Store the mnemonic that was used to generate this wallet
+      try {
+        await secureStorageService.storeSeedPhrase(userId, mnemonic);
+        
+        // Track seed phrase storage in Firebase
+        await walletManagementService.trackSeedPhraseStorage(actualUserId, true);
+        
+        logger.info('Seed phrase stored securely for user (matches wallet)', { 
+          userId, 
+          walletAddress: wallet.address 
+        }, 'UserWalletService');
+      } catch (seedError) {
+        logger.warn('Failed to store seed phrase for user', seedError, 'UserWalletService');
+        // Don't fail wallet creation if seed phrase storage fails
+      }
+
+      // Wallet created and saved for user
+      logger.info('Unified wallet creation completed successfully', {
+        userId,
+        walletAddress: wallet.address,
+        hasPrivateKey: !!wallet.secretKey,
+        hasSeedPhrase: true
+      }, 'UserWalletService');
+
+      return {
+        success: true,
+        wallet: {
+          address: wallet.address,
+          publicKey: wallet.publicKey || wallet.address
+        }
+      };
+    } catch (error) {
+      logger.error('Failed to create unified wallet for user', error, 'UserWalletService');
+      return {
+        success: false,
+        error: `Failed to create unified wallet: ${error}`
+      };
+    }
+  }
+
   // Create wallet for a specific user
   async createWalletForUser(userId: string): Promise<WalletCreationResult> {
     try {
@@ -213,12 +463,23 @@ export class UserWalletService {
         };
       }
 
-      // Create wallet using consolidated service
-      const result = await consolidatedWalletService.createWallet();
-      const wallet = result.wallet;
+      // UNIFIED APPROACH: Generate BIP39 mnemonic and derive wallet from it
+      logger.info('Creating unified BIP39-based wallet for user', { userId }, 'UserWalletService');
+      
+      // Generate a cryptographically secure mnemonic (12 words)
+      const mnemonic = bip39.generateMnemonic(128); // 12 words - compatible with most wallets
+      
+      // Validate the generated mnemonic
+      if (!bip39.validateMnemonic(mnemonic)) {
+        throw new Error('Generated mnemonic is invalid');
+      }
+      
+      // Derive wallet from the mnemonic using consolidated service
+      const result = await consolidatedWalletService.importWallet(mnemonic);
+      const wallet = result;
 
       if (!wallet || !wallet.address) {
-        throw new Error('Wallet creation failed - no address generated');
+        throw new Error('Wallet creation failed - no address generated from mnemonic');
       }
 
       // Update user document with wallet info - use the original user ID
@@ -250,18 +511,20 @@ export class UserWalletService {
         }
       }
 
-      // Generate and save seed phrase for the new wallet
+      // Store the mnemonic that was used to generate this wallet
       try {
-        const bip39Result = bip39WalletService.generateWallet();
-        await secureStorageService.storeSeedPhrase(userId, bip39Result.mnemonic);
+        await secureStorageService.storeSeedPhrase(userId, mnemonic);
         
         // Track seed phrase storage in Firebase
         await walletManagementService.trackSeedPhraseStorage(userId, true);
         
-        logger.info('Seed phrase generated and stored securely for user', { userId }, 'UserWalletService');
+        logger.info('Seed phrase stored securely for user (matches wallet)', { 
+          userId, 
+          walletAddress: wallet.address 
+        }, 'UserWalletService');
       } catch (seedError) {
-        logger.warn('Failed to generate seed phrase for user', seedError, 'UserWalletService');
-        // Don't fail wallet creation if seed phrase generation fails
+        logger.warn('Failed to store seed phrase for user', seedError, 'UserWalletService');
+        // Don't fail wallet creation if seed phrase storage fails
       }
 
       // Wallet created and saved for user

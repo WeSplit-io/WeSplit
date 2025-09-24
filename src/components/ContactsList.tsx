@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Image, Alert, Linking } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import Icon from './Icon';
 import { useApp } from '../context/AppContext';
 import { useGroupData } from '../hooks/useGroupData';
@@ -59,7 +59,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [isAddingContact, setIsAddingContact] = useState<number | null>(null);
   const [mode, setMode] = useState<'list' | 'qr'>('list');
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isProcessingQR, setIsProcessingQR] = useState(false);
   const [qrInputValue, setQrInputValue] = useState('');
@@ -68,176 +68,13 @@ const ContactsList: React.FC<ContactsListProps> = ({
     loadContacts();
   }, [currentUser, group, groupId]);
 
-  // Simplified permission handling for Expo Go
-  useEffect(() => {
-    setHasPermission(true); // Assume permission is available in Expo Go
-  }, []);
+  // Camera permissions are now handled by useCameraPermissions hook
 
-  // HTML content for web-based QR scanner
-  const qrScannerHTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>WeSplit QR Scanner</title>
-        <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-        <style>
-            body {
-                margin: 0;
-                padding: 0;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: #000;
-                color: white;
-                display: flex;
-                flex-direction: column;
-                height: 60vh;
-                overflow: hidden;
-            }
-            #reader {
-                width: 100%;
-                height: 100%;
-                position: relative;
-            }
-            .header {
-                background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-                padding: 10px;
-                text-align: center;
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                z-index: 1000;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            }
-            .header h3 {
-                margin: 0;
-                font-size: 16px;
-                font-weight: 600;
-                color: #4CAF50;
-            }
-            .instructions {
-                background: rgba(0,0,0,0.9);
-                padding: 8px 12px;
-                text-align: center;
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                z-index: 1000;
-                border-top: 1px solid #333;
-            }
-            .instructions p {
-                margin: 0;
-                font-size: 12px;
-                color: #ccc;
-                line-height: 1.3;
-            }
-            .corner-guides {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 250px;
-                height: 250px;
-                z-index: 1001;
-                pointer-events: none;
-            }
-            .corner {
-                position: absolute;
-                width: 25px;
-                height: 25px;
-                border: 2px solid #4CAF50;
-            }
-            .corner-top-left {
-                top: 0;
-                left: 0;
-                border-right: none;
-                border-bottom: none;
-            }
-            .corner-top-right {
-                top: 0;
-                right: 0;
-                border-left: none;
-                border-bottom: none;
-            }
-            .corner-bottom-left {
-                bottom: 0;
-                left: 0;
-                border-right: none;
-                border-top: none;
-            }
-            .corner-bottom-right {
-                bottom: 0;
-                right: 0;
-                border-left: none;
-                border-top: none;
-            }
-            .scanning-indicator {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: rgba(76, 175, 80, 0.9);
-                color: white;
-                padding: 6px 12px;
-                border-radius: 15px;
-                font-size: 10px;
-                font-weight: 500;
-                z-index: 1002;
-                animation: pulse 2s infinite;
-            }
-            @keyframes pulse {
-                0% { opacity: 0.7; }
-                50% { opacity: 1; }
-                100% { opacity: 0.7; }
-            }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-        </div>
-        <div id="reader"></div>
-        <div class="corner-guides">
-            <div class="corner corner-top-left"></div>
-            <div class="corner corner-top-right"></div>
-            <div class="corner corner-bottom-left"></div>
-            <div class="corner corner-bottom-right"></div>
-        </div>
-        <div class="scanning-indicator">Scanning...</div>
-        <div class="instructions">
-            <p>📱 Position QR code within the square frame</p>
-        </div>
-        <script>
-            const html5QrcodeScanner = new Html5QrcodeScanner(
-                "reader", 
-                { 
-                    fps: 10, 
-                    qrbox: { width: 200, height: 200 },
-                    aspectRatio: 1.0,
-                    showTorchButtonIfSupported: true,
-                    showZoomSliderIfSupported: true
-                }
-            );
-            
-            html5QrcodeScanner.render((decodedText, decodedResult) => {
-                // Send the scanned QR code data to React Native
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'qr-scanned',
-                    data: decodedText
-                }));
-            });
-            
-            // Handle errors silently
-            html5QrcodeScanner.render((decodedText, decodedResult) => {
-                // Success callback
-            }, (errorMessage) => {
-                // Error callback - ignore errors for better UX
-            });
-        </script>
-    </body>
-    </html>
-  `;
+  // Handle QR code scanning with real camera
+  const handleQRScan = (data: { recipient: string; amount?: number; label?: string; message?: string }) => {
+    // Process the scanned QR code data
+    handleBarCodeScanned({ type: 'qr', data: data.recipient });
+  };
 
   useEffect(() => {
     let filtered = [...contacts];
@@ -270,19 +107,23 @@ const ContactsList: React.FC<ContactsListProps> = ({
   // Handle user search
   const handleUserSearch = async (query: string) => {
     if (!query.trim() || query.length < 2) {
+      console.log('🔍 Search query too short or empty:', query);
       setSearchResults([]);
       return;
     }
 
     try {
+      console.log('🔍 Starting user search for:', query);
       setIsSearching(true);
       const results = await firebaseDataService.group.searchUsersByUsername(
         query.trim(),
         currentUser?.id ? String(currentUser.id) : undefined
       );
+      console.log('🔍 Search results received:', results.length, 'users');
+      console.log('🔍 Search results:', results.map(r => ({ name: r.name, email: r.email })));
       setSearchResults(results);
     } catch (error) {
-      console.error('Error searching users:', error);
+      console.error('❌ Error searching users:', error);
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -291,16 +132,21 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
   // Debounced search
   useEffect(() => {
+    console.log('🔍 Search effect triggered:', { activeTab, searchQuery: searchQuery.trim() });
+    
     if (activeTab === 'Search' && searchQuery.trim()) {
+      console.log('🔍 Setting up debounced search for:', searchQuery);
       const timeoutId = setTimeout(() => {
         handleUserSearch(searchQuery);
       }, 500);
 
       return () => clearTimeout(timeoutId);
     } else if (activeTab === 'Search') {
+      console.log('🔍 Clearing search results - no query');
       setSearchResults([]);
     } else {
       // Clear search results when not in search tab
+      console.log('🔍 Clearing search results - not in search tab');
       setSearchResults([]);
     }
   }, [searchQuery, activeTab]);
@@ -587,22 +433,10 @@ const ContactsList: React.FC<ContactsListProps> = ({
     }
   };
 
+  // Reset scanner state
   const resetScanner = () => {
     setScanned(false);
-  };
-
-  // Handle messages from WebView QR scanner
-  const handleWebViewMessage = (event: any) => {
-    try {
-      const message = JSON.parse(event.nativeEvent.data);
-      if (message.type === 'qr-scanned') {
-        console.log('🔍 WebView QR code scanned:', message.data);
-        handleBarCodeScanned({ type: 'text', data: message.data });
-        setScanned(false); // Reset scanned state after successful scan
-      }
-    } catch (error) {
-      console.error('Error parsing WebView message:', error);
-    }
+    setIsProcessingQR(false);
   };
 
   const renderContact = (item: UserContact, section: 'friends' | 'others' | 'all' | 'favorite') => (
@@ -861,20 +695,16 @@ const ContactsList: React.FC<ContactsListProps> = ({
         </>
       ) : (
         <View style={styles.qrScannerContainer}>
-          {hasPermission === null ? (
+          {!permission ? (
             <View style={styles.qrScannerPlaceholder}>
               <Text style={styles.qrScannerPlaceholderText}>Requesting camera permission...</Text>
             </View>
-          ) : hasPermission === false ? (
+          ) : !permission.granted ? (
             <View style={styles.qrScannerPlaceholder}>
               <Text style={styles.qrScannerPlaceholderText}>Camera permission denied</Text>
               <TouchableOpacity 
                 style={styles.permissionButton}
-                onPress={() => {
-                  Linking.openSettings().catch(() => {
-                    Alert.alert('Error', 'Could not open settings.');
-                  });
-                }}
+                onPress={requestPermission}
               >
                 <Text style={styles.permissionButtonText}>Grant Permission</Text>
               </TouchableOpacity>
@@ -882,16 +712,17 @@ const ContactsList: React.FC<ContactsListProps> = ({
                       ) : (
               <View style={styles.scannerContainer}>
                 <View style={styles.cameraScannerContainer}>
-                  <WebView
-                    source={{ html: qrScannerHTML }}
+                  <CameraView
+                    onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
                     style={styles.cameraWebView}
-                    onMessage={handleWebViewMessage}
-                    javaScriptEnabled={true}
-                    domStorageEnabled={true}
-                    startInLoadingState={true}
-                    allowsInlineMediaPlayback={true}
-                    mediaPlaybackRequiresUserAction={false}
+                    flash="off"
+                    barcodeScannerSettings={{
+                      barcodeTypes: ['qr', 'pdf417'],
+                    }}
                   />
+                  <View style={styles.scannerOverlay}>
+                    <Text style={styles.scannerOverlayText}>Position QR code within frame</Text>
+                  </View>
                 </View>
               </View>
             )}

@@ -4,7 +4,7 @@ import { Image } from 'react-native';
 import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import QRCode from 'react-native-qrcode-svg';
+import { QrCodeView } from '@features/qr';
 import { styles } from './styles';
 import { colors } from '../../theme/colors';
 import { firebaseDataService } from '../../services/firebaseDataService';
@@ -142,7 +142,7 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
               <View style={styles.requestQRCodeContainerWrapper}>
                 <View style={styles.requestQRCodeContainer}>
                   {currentUser?.wallet_address ? (
-                    <QRCode
+                    <QrCodeView
                       value={sendQRCode}
                       size={160}
                       backgroundColor={colors.white}

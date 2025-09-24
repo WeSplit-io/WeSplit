@@ -13,6 +13,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    minHeight: 60,
   },
   
   backButton: {
@@ -22,6 +23,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: spacing.radiusSm,
+    flexShrink: 0,
   },
   
   iconWrapper: {
@@ -35,10 +37,14 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: spacing.md,
   },
   
   placeholder: {
     width: 40,
+    flexShrink: 0,
   },
   
   content: {

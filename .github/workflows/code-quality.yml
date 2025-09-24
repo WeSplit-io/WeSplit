@@ -1,0 +1,134 @@
+name: Code Quality & Duplication Checks
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run TypeScript type checking
+      run: npm run typecheck
+      
+    - name: Run ESLint
+      run: npm run lint
+      
+    - name: Run tests
+      run: npm test
+      
+    - name: Check for duplicate files
+      run: npm run dup:files
+      continue-on-error: true
+      
+    - name: Check for duplicate code blocks
+      run: npm run dup:blocks
+      continue-on-error: true
+      
+    - name: Check for dead code
+      run: npm run deadcode:ts
+      continue-on-error: true
+      
+    - name: Check for unused dependencies
+      run: npm run deadcode:deps
+      continue-on-error: true
+      
+    - name: Generate bundle report
+      run: npm run bundle:report
+      continue-on-error: true
+      
+    - name: Check mainnet configuration
+      run: npm run check:mainnet
+      
+    - name: Run on-chain audit
+      run: npm run audit:onchain
+      
+    - name: Upload bundle report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: bundle-report
+        path: |
+          bundle-report.json
+          bundle-analysis.html
+        retention-days: 30
+        
+    - name: Comment PR with results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          let comment = '## 🔍 Code Quality Report\n\n';
+          
+          // Check if bundle report exists
+          if (fs.existsSync('bundle-report.json')) {
+            const report = JSON.parse(fs.readFileSync('bundle-report.json', 'utf8'));
+            comment += `### 📦 Bundle Analysis\n`;
+            comment += `- **Total Size**: ${report.totalSize}\n`;
+            comment += `- **Large Modules**: ${report.largeModules.length}\n`;
+            comment += `- **Duplicate Groups**: ${report.duplicateModules.length}\n\n`;
+          }
+          
+          comment += `### ✅ Quality Checks\n`;
+          comment += `- TypeScript: ✅\n`;
+          comment += `- ESLint: ✅\n`;
+          comment += `- Tests: ✅\n`;
+          comment += `- Mainnet Config: ✅\n`;
+          comment += `- On-chain Audit: ✅\n\n`;
+          
+          comment += `### 📋 Recommendations\n`;
+          comment += `- Review bundle report for optimization opportunities\n`;
+          comment += `- Check for unused dependencies and dead code\n`;
+          comment += `- Ensure no duplicate code blocks\n\n`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run security audit
+      run: npm audit --audit-level=moderate
+      
+    - name: Check for secrets
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
