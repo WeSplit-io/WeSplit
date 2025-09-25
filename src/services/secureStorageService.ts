@@ -206,6 +206,75 @@ class SecureStorageService {
   }
 
   /**
+   * Store a linked external wallet
+   */
+  async storeLinkedWallet(userId: string, linkedWallet: any): Promise<void> {
+    try {
+      const key = `linked_wallets_${userId}`;
+      const existingWallets = await this.getLinkedWallets(userId);
+      
+      // Add or update the wallet
+      const updatedWallets = existingWallets.filter(w => w.id !== linkedWallet.id);
+      updatedWallets.push(linkedWallet);
+      
+      const secureData = await this.encrypt(JSON.stringify(updatedWallets));
+      await AsyncStorage.setItem(key, JSON.stringify(secureData));
+      
+      logger.info(`Stored linked wallet for user ${userId}`, null, 'SecureStorage');
+    } catch (error) {
+      logger.error('Failed to store linked wallet', error, 'SecureStorage');
+      throw new Error('Failed to store linked wallet');
+    }
+  }
+
+  /**
+   * Get all linked wallets for a user
+   */
+  async getLinkedWallets(userId: string): Promise<any[]> {
+    try {
+      const key = `linked_wallets_${userId}`;
+      const data = await AsyncStorage.getItem(key);
+      
+      if (!data) {
+        return [];
+      }
+      
+      const secureData: SecureData = JSON.parse(data);
+      const decrypted = await this.decrypt(secureData.encrypted, secureData.iv);
+      return JSON.parse(decrypted);
+    } catch (error) {
+      logger.error('Failed to get linked wallets', error, 'SecureStorage');
+      return [];
+    }
+  }
+
+  /**
+   * Remove a linked wallet
+   */
+  async removeLinkedWallet(userId: string, walletId: string): Promise<void> {
+    try {
+      const existingWallets = await this.getLinkedWallets(userId);
+      const updatedWallets = existingWallets.filter(w => w.id !== walletId);
+      
+      if (updatedWallets.length === 0) {
+        // Remove the key entirely if no wallets left
+        const key = `linked_wallets_${userId}`;
+        await AsyncStorage.removeItem(key);
+      } else {
+        // Update with remaining wallets
+        const key = `linked_wallets_${userId}`;
+        const secureData = await this.encrypt(JSON.stringify(updatedWallets));
+        await AsyncStorage.setItem(key, JSON.stringify(secureData));
+      }
+      
+      logger.info(`Removed linked wallet ${walletId} for user ${userId}`, null, 'SecureStorage');
+    } catch (error) {
+      logger.error('Failed to remove linked wallet', error, 'SecureStorage');
+      throw new Error('Failed to remove linked wallet');
+    }
+  }
+
+  /**
    * Get all secure data keys for debugging (development only)
    */
   async getAllSecureKeys(): Promise<string[]> {

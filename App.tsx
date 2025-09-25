@@ -60,6 +60,7 @@ import { ContactsScreen } from './src/screens/Contacts';
 import ContactActionScreen from './src/screens/ContactAction/ContactActionScreen';
 import TransactionHistoryScreen from './src/screens/TransactionHistory/TransactionHistoryScreen';
 import ExternalWalletConnectionScreen from './src/screens/ExternalWalletConnection';
+import ManualSignatureInputScreen from './src/screens/ExternalWalletConnection/ManualSignatureInputScreen';
 
 
 const Stack = createStackNavigator();
@@ -186,6 +187,7 @@ export default function App() {
                 <Stack.Screen name="SeedPhraseVerify" component={SeedPhraseVerifyScreen} />
                 <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
                 <Stack.Screen name="ExternalWalletConnection" component={ExternalWalletConnectionScreen} />
+                <Stack.Screen name="ManualSignatureInput" component={ManualSignatureInputScreen} />
                 <Stack.Screen name="SettleUpModal" component={SettleUpModal} />
               </Stack.Navigator>
             </NavigationWrapper>

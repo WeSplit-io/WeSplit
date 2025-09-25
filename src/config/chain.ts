@@ -125,7 +125,7 @@ export const TRANSACTION_CONFIG = {
 // Company fee structure
 export const COMPANY_FEE_CONFIG = {
   percentage: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE') || '3.0'),
-  minFee: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MIN_FEE') || '0.50'),
+  minFee: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MIN_FEE') || '0.01'), // Reduced from 0.50 to 0.01 to allow small transactions
   maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MAX_FEE') || '10.00'),
   currency: 'USDC',
 };

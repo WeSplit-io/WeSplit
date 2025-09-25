@@ -81,8 +81,8 @@ export interface PaymentRequestResult {
 // Company fee structure
 const COMPANY_FEE_STRUCTURE = {
   percentage: 0.03, // 3% company fee on user currency transfers
-  minimum: 0.001, // 0.001 SOL minimum
-  maximum: 0.1 // 0.1 SOL maximum
+  minimum: 0.01, // 0.01 USDC minimum (reduced to allow small transactions)
+  maximum: 10.0 // 10.0 USDC maximum
 };
 
 // Transaction configuration
@@ -343,7 +343,7 @@ class ConsolidatedTransactionService {
         );
       }
 
-      // Add transfer instruction
+      // Add transfer instruction for recipient (net amount)
       transaction.add(
         createTransferInstruction(
           fromTokenAccount,
@@ -352,6 +352,34 @@ class ConsolidatedTransactionService {
           amount
         )
       );
+
+      // Add company fee transfer instruction to admin wallet
+      if (companyFee > 0) {
+        const companyFeeAmount = Math.floor(companyFee * 1_000_000); // USDC has 6 decimals
+        
+        // Get company wallet's USDC token account
+        const companyTokenAccount = await getAssociatedTokenAddress(
+          new PublicKey(USDC_CONFIG.mintAddress),
+          new PublicKey(COMPANY_WALLET_CONFIG.address)
+        );
+        
+        console.log('💰 Adding company fee transfer instruction:', {
+          companyFeeAmount,
+          companyFee,
+          fromTokenAccount: fromTokenAccount.toBase58(),
+          companyTokenAccount: companyTokenAccount.toBase58(),
+          companyWalletAddress: COMPANY_WALLET_CONFIG.address
+        });
+        
+        transaction.add(
+          createTransferInstruction(
+            fromTokenAccount,
+            companyTokenAccount,
+            fromPublicKey,
+            companyFeeAmount
+          )
+        );
+      }
 
       // Add memo if provided
       if (params.memo) {
@@ -538,8 +566,18 @@ class ConsolidatedTransactionService {
       COMPANY_FEE_STRUCTURE.minimum,
       Math.min(amount * COMPANY_FEE_STRUCTURE.percentage, COMPANY_FEE_STRUCTURE.maximum)
     );
-    const netAmount = amount - fee;
-    return { fee, netAmount };
+    
+    // Ensure fee doesn't exceed the transaction amount (prevent negative net amounts)
+    const adjustedFee = Math.min(fee, amount);
+    
+    const netAmount = amount - adjustedFee;
+    
+    // Validate that net amount is positive
+    if (netAmount <= 0) {
+      throw new Error(`Transaction amount (${amount} USDC) is too small to cover the minimum fee (${adjustedFee} USDC). Minimum transaction amount required: ${adjustedFee + 0.001} USDC`);
+    }
+    
+    return { fee: adjustedFee, netAmount };
   }
 
   // ===== PAYMENT REQUEST METHODS =====

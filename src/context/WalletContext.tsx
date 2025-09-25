@@ -82,6 +82,9 @@ interface WalletContextType {
   // Provider methods
   getAvailableProviders: () => any[];
   isProviderAvailable: (providerKey: string) => boolean;
+  
+  // User logout cleanup
+  clearAppWalletState: () => void; // Clear all wallet state for user logout
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -642,6 +645,42 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     }
   };
 
+  // Clear all wallet state for user logout
+  const clearAppWalletState = useCallback(() => {
+    try {
+      if (__DEV__) { console.log('🔄 WalletProvider: Clearing all wallet state for user logout'); }
+      
+      // Stop any active polling
+      stopBalancePolling();
+      
+      // Clear external wallet state
+      setIsConnected(false);
+      setAddress(null);
+      setBalance(null);
+      setWalletInfo(null);
+      setWalletName(null);
+      setChainId(null);
+      setSecretKey(null);
+      setCurrentWalletId(null);
+      
+      // Clear app wallet state
+      setAppWalletAddress(null);
+      setAppWalletBalance(null);
+      setAppWalletConnected(false);
+      
+      // Clear auto-refresh state
+      setAutoRefreshEnabled(false);
+      setLastBalanceCheck(new Date());
+      
+      // Clear available wallets (user-specific)
+      setAvailableWallets([]);
+      
+      if (__DEV__) { console.log('✅ WalletProvider: All wallet state cleared for user logout'); }
+    } catch (error) {
+      console.error('❌ Error clearing wallet state:', error);
+    }
+  }, [stopBalancePolling]);
+
   const value: WalletContextType = {
     isConnected,
     address,
@@ -712,6 +751,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     // Provider methods
     getAvailableProviders,
     isProviderAvailable,
+    // User logout cleanup
+    clearAppWalletState,
   };
 
   // Auto-refresh balance polling effects

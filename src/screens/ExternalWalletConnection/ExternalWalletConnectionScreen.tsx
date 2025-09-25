@@ -12,6 +12,7 @@ import {
   TextInput,
   Modal,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
 import { consolidatedWalletService } from '../../services/consolidatedWalletService';
@@ -197,12 +198,36 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
       setError(null);
       console.log('🔗 ExternalWalletConnection: Starting connection to', provider.name);
       
-      // For Phantom, use manual connection approach
-      if (provider.name.toLowerCase() === 'phantom') {
-        await handlePhantomConnection();
+      if (!currentUser?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      // Use the new signature-based linking with userId
+      const result = await consolidatedWalletService.connectToProvider(
+        provider.name, 
+        currentUser.id.toString()
+      );
+
+      if (result.success) {
+        Alert.alert(
+          'Wallet Connected',
+          `Successfully connected to ${provider.name}!\n\nWallet Address: ${result.walletAddress?.substring(0, 8)}...`,
+          [{ text: 'OK' }]
+        );
+        
+        // Refresh the screen to show updated state
+        await onRefresh();
+      } else if (result.error === 'MANUAL_INPUT_REQUIRED' && result.challenge) {
+        // Navigate to manual signature input screen
+        console.log('🔗 ExternalWalletConnection: Navigating to manual signature input');
+        navigation.navigate('ManualSignatureInput', {
+          challenge: result.challenge,
+          provider: provider.name,
+          providerDisplayName: (provider as any).displayName || provider.name
+        });
+        return; // Don't throw error, this is expected behavior
       } else {
-        // For other wallets, try standard connection
-        await consolidatedWalletService.connectToProvider(provider.name);
+        throw new Error(result.error || 'Connection failed');
       }
     } catch (error) {
       console.error('❌ ExternalWalletConnection: Connection failed:', error);

@@ -3,6 +3,7 @@ import { View, Text, Image, TouchableOpacity, ScrollView, Alert, SafeAreaView, S
 import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
 import { useApp } from '../../context/AppContext';
+import { useWallet } from '../../context/WalletContext';
 import { styles } from './styles';
 
 // Helper function to safely load images with fallback
@@ -64,6 +65,7 @@ const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, disp
 const ProfileScreen: React.FC<any> = ({ navigation }) => {
   const { state, logoutUser } = useApp();
   const { currentUser } = state;
+  const { clearAppWalletState } = useWallet();
   const [faceIdEnabled, setFaceIdEnabled] = useState(false);
 
   const handleLogout = async () => {
@@ -77,20 +79,59 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
           style: 'destructive', 
           onPress: async () => {
             try {
-              // Import Firebase logout function
-              const { logout: firebaseLogout } = await import('../../services/firebaseAuthService');
+              if (__DEV__) { console.log('🔄 Starting logout process...'); }
               
-              // Call Firebase logout to clear auth state
-              await firebaseLogout();
+              // Import required services
+              const { consolidatedAuthService } = await import('../../services/consolidatedAuthService');
+              const { secureStorageService } = await import('../../services/secureStorageService');
+              const { userWalletService } = await import('../../services/userWalletService');
               
-              // Clear app context state
+              // Step 1: Sign out from Firebase Auth
+              await consolidatedAuthService.signOut();
+              if (__DEV__) { console.log('✅ Firebase Auth signOut completed'); }
+              
+              // Step 2: Clear secure storage data for current user
+              if (currentUser?.id) {
+                try {
+                  await secureStorageService.clearUserData(String(currentUser.id));
+                  if (__DEV__) { console.log('✅ Secure storage cleared for user:', currentUser.id); }
+                } catch (storageError) {
+                  console.warn('⚠️ Failed to clear secure storage:', storageError);
+                  // Continue with logout even if storage clearing fails
+                }
+              }
+              
+              // Step 2.5: Clear wallet balance cache for current user
+              if (currentUser?.id) {
+                try {
+                  userWalletService.clearBalanceCache(String(currentUser.id));
+                  if (__DEV__) { console.log('✅ Wallet balance cache cleared for user:', currentUser.id); }
+                } catch (cacheError) {
+                  console.warn('⚠️ Failed to clear wallet balance cache:', cacheError);
+                  // Continue with logout even if cache clearing fails
+                }
+              }
+              
+              // Step 3: Clear wallet context state (prevents wallet data leakage between users)
+              try {
+                clearAppWalletState();
+                if (__DEV__) { console.log('✅ Wallet context state cleared'); }
+              } catch (walletError) {
+                console.warn('⚠️ Failed to clear wallet context state:', walletError);
+                // Continue with logout even if wallet context clearing fails
+              }
+              
+              // Step 4: Clear app context state (this also clears listeners and cache)
               logoutUser();
+              if (__DEV__) { console.log('✅ App context cleared'); }
               
               if (__DEV__) { console.log('✅ Logout completed successfully'); }
               
+              // Step 5: Navigate to auth methods screen
               navigation.replace('AuthMethods');
+              
             } catch (error) {
-              console.error('Logout error:', error);
+              console.error('❌ Logout error:', error);
               // Still clear app context even if Firebase logout fails
               logoutUser();
               navigation.replace('AuthMethods');

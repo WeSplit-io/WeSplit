@@ -1243,6 +1243,23 @@ export class UserWalletService {
       return null;
     }
   }
+
+  /**
+   * Clear all balance cache (used during app reset)
+   */
+  clearAllBalanceCache(): void {
+    try {
+      if (__DEV__) { console.log('🔄 UserWalletService: Clearing all balance cache'); }
+      
+      // Clear all balance cache
+      this.lastBalanceCall = {};
+      this.lastSuccessfulBalance = {};
+      
+      if (__DEV__) { console.log('✅ UserWalletService: All balance cache cleared'); }
+    } catch (error) {
+      console.error('❌ Error clearing all balance cache:', error);
+    }
+  }
 }
 
 // Create singleton instance

@@ -453,9 +453,9 @@ class InternalTransferService {
         );
       }
 
-      // Add USDC transfer instruction
+      // Add USDC transfer instruction for recipient (net amount)
       const transferAmount = Math.floor(netAmount * Math.pow(10, 6)); // USDC has 6 decimals
-      logger.info('Adding USDC transfer instruction', { 
+      logger.info('Adding USDC transfer instruction for recipient', { 
         transferAmount, 
         netAmount,
         fromTokenAccount: fromTokenAccount.toBase58(),
@@ -474,6 +474,34 @@ class InternalTransferService {
           TOKEN_PROGRAM_ID
         )
       );
+
+      // Add company fee transfer instruction to admin wallet
+      if (companyFee > 0) {
+        const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6)); // USDC has 6 decimals
+        
+        // Get company wallet's USDC token account
+        const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(COMPANY_WALLET_CONFIG.address));
+        
+        logger.info('Adding company fee transfer instruction', { 
+          companyFeeAmount, 
+          companyFee,
+          fromTokenAccount: fromTokenAccount.toBase58(),
+          companyTokenAccount: companyTokenAccount.toBase58(),
+          companyWalletAddress: COMPANY_WALLET_CONFIG.address,
+          authority: fromPublicKey.toBase58()
+        }, 'InternalTransferService');
+        
+        transaction.add(
+          createTransferInstruction(
+            fromTokenAccount,
+            companyTokenAccount,
+            fromPublicKey, // User is the authority for the token transfer
+            companyFeeAmount,
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+      }
 
       // Add memo if provided
       if (params.memo) {
@@ -834,7 +862,15 @@ class InternalTransferService {
     fee = Math.max(fee, COMPANY_FEE_CONFIG.minFee);
     fee = Math.min(fee, COMPANY_FEE_CONFIG.maxFee);
     
+    // Ensure fee doesn't exceed the transaction amount (prevent negative net amounts)
+    fee = Math.min(fee, amount);
+    
     const netAmount = amount - fee;
+    
+    // Validate that net amount is positive
+    if (netAmount <= 0) {
+      throw new Error(`Transaction amount (${amount} ${COMPANY_FEE_CONFIG.currency}) is too small to cover the minimum fee (${fee} ${COMPANY_FEE_CONFIG.currency}). Minimum transaction amount required: ${fee + 0.001} ${COMPANY_FEE_CONFIG.currency}`);
+    }
     
     return { fee, netAmount };
   }

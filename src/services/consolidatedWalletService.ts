@@ -47,6 +47,7 @@ export interface WalletConnectionResult {
   balance?: number;
   error?: string;
   provider?: string;
+  challenge?: any; // For manual signature input
 }
 
 export interface WalletConnectionOptions {
@@ -57,6 +58,7 @@ export interface WalletConnectionOptions {
 
 export interface WalletProvider {
   name: string;
+  displayName?: string;
   icon: string;
   logoUrl: string;
   isAvailable: boolean;
@@ -82,8 +84,8 @@ export interface TransactionResult {
 // Company fee structure
 const COMPANY_FEE_STRUCTURE = {
   percentage: 0.025, // 2.5%
-  minimum: 0.001, // 0.001 SOL minimum
-  maximum: 0.1 // 0.1 SOL maximum
+  minimum: 0.01, // 0.01 USDC minimum (reduced to allow small transactions)
+  maximum: 10.0 // 10.0 USDC maximum
 };
 
 // Transaction configuration
@@ -243,99 +245,178 @@ class ConsolidatedWalletService {
   // ===== WALLET CONNECTION METHODS =====
 
   /**
-   * Get all available wallet providers
+   * Get all available wallet providers using new MWA discovery
    */
   async getAvailableProviders(): Promise<WalletProvider[]> {
     try {
-      const allWallets = walletLogoService.getAllWalletProviders();
-      const availableProviders: WalletProvider[] = [];
+      console.log('🔍 ConsolidatedWalletService: Getting available providers using MWA discovery...');
+      
+      // Import the new discovery service
+      const { mwaDiscoveryService } = await import('../wallets/discovery/mwaDiscoveryService');
+      
+      // Use MWA discovery to get providers
+      const discoveryResults = await mwaDiscoveryService.discoverProviders({
+        useCache: true,
+        includeUnsupported: false
+      });
 
-      for (const wallet of allWallets) {
-        const isAvailable = await this.checkWalletAvailability(wallet.name);
-        availableProviders.push({
-          name: wallet.name,
-          icon: wallet.fallbackIcon,
-          logoUrl: wallet.logoUrl,
-          isAvailable,
-          deepLinkScheme: wallet.deepLinkScheme,
-          detectionMethod: wallet.detectionMethod as any
-        });
-      }
+      // Convert discovery results to WalletProvider format
+      const availableProviders: WalletProvider[] = discoveryResults.map(result => ({
+        name: result.provider.name,
+        icon: result.provider.fallbackIcon,
+        logoUrl: result.provider.logoUrl,
+        isAvailable: result.isAvailable,
+        deepLinkScheme: result.provider.deepLinkScheme,
+        detectionMethod: result.detectionMethod as any
+      }));
 
-      // Always ensure Phantom is available
-      const hasPhantom = availableProviders.some(p => p.name.toLowerCase() === 'phantom');
-      if (!hasPhantom) {
-        availableProviders.unshift({
-          name: 'Phantom',
-          icon: '👻',
-          logoUrl: 'https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/icons/phantom.png',
-          isAvailable: true,
-          deepLinkScheme: 'phantom://',
-          detectionMethod: 'deep-link'
-        });
-      }
+      console.log('🔍 ConsolidatedWalletService: Discovery completed', {
+        totalProviders: availableProviders.length,
+        availableProviders: availableProviders.filter(p => p.isAvailable).length
+      });
 
       return availableProviders;
     } catch (error) {
-      console.error('Error getting available providers:', error);
-      return [{
-        name: 'Phantom',
-        icon: '👻',
-        logoUrl: 'https://raw.githubusercontent.com/solana-labs/wallet-adapter/master/packages/wallets/icons/phantom.png',
-        isAvailable: true,
-        deepLinkScheme: 'phantom://',
-        detectionMethod: 'deep-link'
-      }];
+      console.error('❌ ConsolidatedWalletService: Error getting available providers:', error);
+      
+      // Fallback to old method if new discovery fails
+      try {
+        const allWallets = walletLogoService.getAllWalletProviders();
+        const availableProviders: WalletProvider[] = [];
+
+        for (const wallet of allWallets) {
+          const isAvailable = await this.checkWalletAvailability(wallet.name);
+          availableProviders.push({
+            name: wallet.name,
+            icon: wallet.fallbackIcon,
+            logoUrl: wallet.logoUrl,
+            isAvailable,
+            deepLinkScheme: wallet.deepLinkScheme,
+            detectionMethod: wallet.detectionMethod as any
+          });
+        }
+
+        return availableProviders;
+      } catch (fallbackError) {
+        console.error('❌ ConsolidatedWalletService: Fallback method also failed:', fallbackError);
+        
+        // Return minimal fallback
+        return [{
+          name: 'Phantom',
+          icon: '👻',
+          logoUrl: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fphantom-logo.png?alt=media&token=18cd1c78-d879-4b94-abbe-a2011149837a',
+          isAvailable: true,
+          deepLinkScheme: 'phantom://',
+          detectionMethod: 'deep-link'
+        }];
+      }
     }
   }
 
   /**
-   * Connect to a specific wallet provider
+   * Connect to a specific wallet provider using signature-based linking
    */
-  async connectToProvider(providerName: string): Promise<WalletConnectionResult> {
+  async connectToProvider(providerName: string, userId?: string): Promise<WalletConnectionResult> {
     try {
       if (this.connectionState.connecting) {
         throw new Error('Connection already in progress');
       }
 
       this.connectionState.connecting = true;
-      console.log('🔗 Connecting to wallet provider:', providerName);
+      console.log('🔗 ConsolidatedWalletService: Connecting to wallet provider:', providerName);
 
-      // Check if provider is available
-      const isAvailable = await this.checkWalletAvailability(providerName);
-      if (!isAvailable) {
-        if (await this.promptWalletInstallation(providerName)) {
-          await this.installWallet(providerName);
-          return this.connectToProvider(providerName);
-        }
-        throw new Error(`${providerName} is not available on this device`);
-      }
-
-      // Handle different providers
-      let walletInfo: WalletInfo;
+      // Import the new signature linking service
+      const { signatureLinkService } = await import('../wallets/linking/signatureLinkService');
       
-      if (providerName.toLowerCase() === 'phantom') {
-        walletInfo = await this.connectToPhantom();
-      } else {
-        // For other providers, use similar logic
-        walletInfo = await this.connectToExternalWallet(providerName);
+      // Check if provider is available using new discovery
+      const { mwaDiscoveryService } = await import('../wallets/discovery/mwaDiscoveryService');
+      const discoveryResult = await mwaDiscoveryService.testDiscovery(providerName);
+      
+      console.log('🔗 ConsolidatedWalletService: Discovery result:', {
+        provider: providerName,
+        isAvailable: discoveryResult.isAvailable,
+        method: discoveryResult.detectionMethod,
+        error: discoveryResult.error
+      });
+      
+      if (!discoveryResult.isAvailable) {
+        this.connectionState.connecting = false;
+        return {
+          success: false,
+          error: `${providerName} is not available on this device. Please install the wallet app first.`
+        };
       }
 
-      this.connectionState.connected = true;
-      this.connectionState.publicKey = new PublicKey(walletInfo.address);
-      this.connectionState.connecting = false;
+      // Use signature-based linking if userId is provided
+      if (userId) {
+        console.log('🔗 ConsolidatedWalletService: Using signature-based linking for user:', userId);
+        
+        const linkResult = await signatureLinkService.linkExternalWallet({
+          userId,
+          provider: providerName,
+          label: `${providerName} Wallet`,
+          timeout: 30000
+        });
 
-      return {
-        success: true,
-        walletAddress: walletInfo.address,
-        walletName: walletInfo.walletName,
-        balance: walletInfo.balance,
-        provider: providerName
-      };
+        if (!linkResult.success) {
+          this.connectionState.connecting = false;
+          return {
+            success: false,
+            error: linkResult.error || 'Failed to link wallet',
+            challenge: linkResult.challenge // Pass through challenge for manual input
+          };
+        }
+
+        // Create wallet info from linked wallet
+        const walletInfo: WalletInfo = {
+          address: linkResult.publicKey!,
+          publicKey: linkResult.publicKey!,
+          balance: 0, // Will be fetched separately
+          usdcBalance: 0, // Will be fetched separately
+          isConnected: true,
+          walletName: `${providerName} Wallet`,
+          walletType: 'external'
+        };
+
+        this.connectionState.connected = true;
+        this.connectionState.publicKey = new PublicKey(walletInfo.address);
+        this.connectionState.connecting = false;
+
+        return {
+          success: true,
+          walletAddress: walletInfo.address,
+          walletName: walletInfo.walletName,
+          balance: walletInfo.balance,
+          provider: providerName
+        };
+      } else {
+        // Fallback to old connection method for backward compatibility
+        console.log('🔗 ConsolidatedWalletService: Using legacy connection method');
+        
+        let walletInfo: WalletInfo;
+        
+        if (providerName.toLowerCase() === 'phantom') {
+          walletInfo = await this.connectToPhantom();
+        } else {
+          walletInfo = await this.connectToExternalWallet(providerName);
+        }
+
+        this.connectionState.connected = true;
+        this.connectionState.publicKey = new PublicKey(walletInfo.address);
+        this.connectionState.connecting = false;
+
+        return {
+          success: true,
+          walletAddress: walletInfo.address,
+          walletName: walletInfo.walletName,
+          balance: walletInfo.balance,
+          provider: providerName
+        };
+      }
 
     } catch (error) {
       this.connectionState.connecting = false;
-      console.error('Connection failed:', error);
+      console.error('❌ ConsolidatedWalletService: Connection failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Connection failed'
@@ -735,8 +816,18 @@ class ConsolidatedWalletService {
       COMPANY_FEE_STRUCTURE.minimum,
       Math.min(amount * COMPANY_FEE_STRUCTURE.percentage, COMPANY_FEE_STRUCTURE.maximum)
     );
-    const netAmount = amount - fee;
-    return { fee, netAmount };
+    
+    // Ensure fee doesn't exceed the transaction amount (prevent negative net amounts)
+    const adjustedFee = Math.min(fee, amount);
+    
+    const netAmount = amount - adjustedFee;
+    
+    // Validate that net amount is positive
+    if (netAmount <= 0) {
+      throw new Error(`Transaction amount (${amount} USDC) is too small to cover the minimum fee (${adjustedFee} USDC). Minimum transaction amount required: ${adjustedFee + 0.001} USDC`);
+    }
+    
+    return { fee: adjustedFee, netAmount };
   }
 
   // ===== WALLET MANAGEMENT METHODS =====

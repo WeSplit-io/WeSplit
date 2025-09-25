@@ -46,6 +46,20 @@ export const styles = StyleSheet.create({
     width: 40,
     flexShrink: 0,
   },
+
+  debugButton: {
+    backgroundColor: colors.primaryGreen,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.radiusSm,
+    flexShrink: 0,
+  },
+
+  debugButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+  },
   
   content: {
     flex: 1,

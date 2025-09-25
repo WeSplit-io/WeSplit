@@ -841,6 +841,10 @@ const WalletManagementScreen: React.FC = () => {
     handleRefresh();
   };
 
+  const handleOpenWalletDebug = () => {
+    navigation.navigate('WalletDebug');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -852,7 +856,12 @@ const WalletManagementScreen: React.FC = () => {
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Wallet</Text>
-        <View style={styles.placeholder} />
+        {__DEV__ && (
+          <TouchableOpacity onPress={handleOpenWalletDebug} style={styles.debugButton}>
+            <Text style={styles.debugButtonText}>Debug</Text>
+          </TouchableOpacity>
+        )}
+        {!__DEV__ && <View style={styles.placeholder} />}
       </View>
 
       <ScrollView
