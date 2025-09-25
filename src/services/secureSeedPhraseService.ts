@@ -107,10 +107,16 @@ class SecureSeedPhraseService {
         return mnemonic;
       }
 
+      if (mnemonic) {
+        logger.warn('Invalid seed phrase found in device storage, clearing corrupted data', null, 'SecureSeedPhrase');
+        // Clear corrupted seed phrase
+        await secureStorageService.removeSecureData(this.SEED_PHRASE_KEY);
+      }
+
       logger.warn('No valid seed phrase found in device storage', null, 'SecureSeedPhrase');
       return null;
     } catch (error) {
-      logger.error('Failed to retrieve seed phrase from device storage', error, 'SecureSeedPhrase');
+      logger.warn('Failed to retrieve seed phrase from device storage (this is normal if no wallet exists)', { error }, 'SecureSeedPhrase');
       return null;
     }
   }
@@ -122,11 +128,27 @@ class SecureSeedPhraseService {
     try {
       const walletInfoStr = await secureStorageService.getSecureData(this.WALLET_INFO_KEY);
       if (walletInfoStr) {
-        return JSON.parse(walletInfoStr);
+        try {
+          const walletInfo = JSON.parse(walletInfoStr);
+          // Validate that the wallet info has the required fields
+          if (walletInfo && walletInfo.address && walletInfo.walletType && walletInfo.createdAt) {
+            return walletInfo;
+          } else {
+            logger.warn('Invalid wallet info structure found, clearing corrupted data', { walletInfo }, 'SecureSeedPhrase');
+            // Clear corrupted wallet info
+            await secureStorageService.removeSecureData(this.WALLET_INFO_KEY);
+            return null;
+          }
+        } catch (parseError) {
+          logger.warn('Failed to parse wallet info, clearing corrupted data', { parseError }, 'SecureSeedPhrase');
+          // Clear corrupted wallet info
+          await secureStorageService.removeSecureData(this.WALLET_INFO_KEY);
+          return null;
+        }
       }
       return null;
     } catch (error) {
-      logger.error('Failed to retrieve wallet info', error, 'SecureSeedPhrase');
+      logger.warn('Failed to retrieve wallet info (this is normal if no wallet exists)', { error }, 'SecureSeedPhrase');
       return null;
     }
   }
@@ -240,6 +262,42 @@ class SecureSeedPhraseService {
     } catch (error) {
       logger.error('Failed to clear secure seed phrase data', error, 'SecureSeedPhrase');
       throw new Error('Failed to clear secure seed phrase data');
+    }
+  }
+
+  /**
+   * Clear corrupted or invalid data (for cleanup)
+   */
+  async clearCorruptedData(): Promise<void> {
+    try {
+      logger.info('Clearing corrupted secure seed phrase data', null, 'SecureSeedPhrase');
+      
+      // Try to get and validate the seed phrase
+      const mnemonic = await secureStorageService.getSecureData(this.SEED_PHRASE_KEY);
+      if (mnemonic && !bip39.validateMnemonic(mnemonic)) {
+        logger.warn('Found corrupted seed phrase, clearing it', null, 'SecureSeedPhrase');
+        await secureStorageService.removeSecureData(this.SEED_PHRASE_KEY);
+      }
+
+      // Try to get and validate the wallet info
+      const walletInfoStr = await secureStorageService.getSecureData(this.WALLET_INFO_KEY);
+      if (walletInfoStr) {
+        try {
+          const walletInfo = JSON.parse(walletInfoStr);
+          if (!walletInfo || !walletInfo.address || !walletInfo.walletType || !walletInfo.createdAt) {
+            logger.warn('Found corrupted wallet info, clearing it', null, 'SecureSeedPhrase');
+            await secureStorageService.removeSecureData(this.WALLET_INFO_KEY);
+          }
+        } catch (parseError) {
+          logger.warn('Found corrupted wallet info (parse error), clearing it', null, 'SecureSeedPhrase');
+          await secureStorageService.removeSecureData(this.WALLET_INFO_KEY);
+        }
+      }
+      
+      logger.info('Corrupted secure seed phrase data cleared successfully', null, 'SecureSeedPhrase');
+    } catch (error) {
+      logger.error('Failed to clear corrupted secure seed phrase data', error, 'SecureSeedPhrase');
+      // Don't throw error here as this is a cleanup operation
     }
   }
 

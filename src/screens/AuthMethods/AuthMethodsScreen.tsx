@@ -136,33 +136,28 @@ const AuthMethodsScreen: React.FC = () => {
       });
 
       // Ensure user has a wallet using the centralized wallet service
-      // CRITICAL: Only create wallet if user doesn't have one
-      if (!appUser.wallet_address) {
-        try {
-          console.log('🔄 AuthMethods: User has no wallet, ensuring one exists...');
-          const walletResult = await userWalletService.ensureUserWallet(appUser.id);
+      // CRITICAL: Always call ensureUserWallet to verify wallet integrity and restore if needed
+      try {
+        console.log('🔄 AuthMethods: Ensuring wallet integrity for user...');
+        const walletResult = await userWalletService.ensureUserWallet(appUser.id);
 
-          if (walletResult.success && walletResult.wallet) {
-            // Update app user with wallet info
-            appUser.wallet_address = walletResult.wallet.address;
-            appUser.wallet_public_key = walletResult.wallet.publicKey;
-            
-            console.log('✅ AuthMethods: Wallet ensured for user:', walletResult.wallet.address);
-            
-            // Update user in AppContext
-            updateUser(appUser);
-          } else {
-            console.error('❌ AuthMethods: Failed to ensure user wallet:', walletResult.error);
-            // Continue without wallet - user can add it later
-          }
-        } catch (error) {
-          console.error('❌ AuthMethods: Error ensuring user wallet:', error);
+        if (walletResult.success && walletResult.wallet) {
+          // Update app user with wallet info (this will be the same wallet if it already exists)
+          appUser.wallet_address = walletResult.wallet.address;
+          appUser.wallet_public_key = walletResult.wallet.publicKey;
+          
+          console.log('✅ AuthMethods: Wallet ensured for user:', walletResult.wallet.address);
+          
+          // Update user in AppContext
+          updateUser(appUser);
+        } else {
+          console.error('❌ AuthMethods: Failed to ensure user wallet:', walletResult.error);
           // Continue without wallet - user can add it later
+          updateUser(appUser);
         }
-      } else {
-        // User already has wallet - preserve it
-        console.log('💰 AuthMethods: User already has wallet, preserving it:', appUser.wallet_address);
-        // User already has wallet, just update AppContext
+      } catch (error) {
+        console.error('❌ AuthMethods: Error ensuring user wallet:', error);
+        // Continue without wallet - user can add it later
         updateUser(appUser);
       }
 

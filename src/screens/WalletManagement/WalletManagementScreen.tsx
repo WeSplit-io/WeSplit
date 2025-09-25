@@ -116,11 +116,62 @@ const WalletManagementScreen: React.FC = () => {
           console.error('❌ Failed to ensure wallet:', walletResult.error);
           // Show error state
           setLocalAppWalletBalance(null);
-          Alert.alert(
-            'Wallet Error', 
-            'Failed to initialize your wallet. Please try again or contact support if the issue persists.',
-            [{ text: 'OK' }]
-          );
+          
+          // Check if this is an unrecoverable wallet error
+          const errorMessage = walletResult.error || '';
+          if (errorMessage.includes('unrecoverable')) {
+            Alert.alert(
+              'Wallet Recovery Failed',
+              'Your wallet cannot be recovered with the current seed phrase. You can create a new wallet, but any funds in the old wallet will be lost unless you can recover the private key.\n\nWould you like to create a new wallet?',
+              [
+                {
+                  text: 'Cancel',
+                  style: 'cancel'
+                },
+                {
+                  text: 'Create New Wallet',
+                  onPress: async () => {
+                    try {
+                      const newWalletResult = await userWalletService.createNewWalletForUnrecoverableUser(currentUser.id.toString());
+                      
+                      if (newWalletResult.success && newWalletResult.wallet) {
+                        Alert.alert(
+                          'New Wallet Created',
+                          `Your new wallet has been created successfully!\n\nAddress: ${newWalletResult.wallet.address}\n\nPlease save your seed phrase securely.`,
+                          [{ 
+                            text: 'OK',
+                            onPress: () => {
+                              // Reload wallet info
+                              loadWalletInfo();
+                            }
+                          }]
+                        );
+                      } else {
+                        Alert.alert(
+                          'Error',
+                          `Failed to create new wallet: ${newWalletResult.error}`,
+                          [{ text: 'OK' }]
+                        );
+                      }
+                    } catch (error) {
+                      console.error('Error creating new wallet:', error);
+                      Alert.alert(
+                        'Error',
+                        'Failed to create new wallet. Please try again or contact support.',
+                        [{ text: 'OK' }]
+                      );
+                    }
+                  }
+                }
+              ]
+            );
+          } else {
+            Alert.alert(
+              'Wallet Error', 
+              'Failed to initialize your wallet. Please try again or contact support if the issue persists.',
+              [{ text: 'OK' }]
+            );
+          }
         }
       } catch (error) {
         console.error('Error loading wallet info:', error);

@@ -1,6 +1,16 @@
+/**
+ * Simplified Wallet Context for WeSplit
+ * Clean, focused wallet state management
+ * Keeps frontend interface intact while simplifying backend logic
+ */
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { consolidatedWalletService, TransactionParams as ConsolidatedTransactionParams, TransactionResult as ConsolidatedTransactionResult } from '../services/consolidatedWalletService';
+import { consolidatedTransactionService } from '../services/consolidatedTransactionService';
+import { solanaWalletService } from '../wallet/solanaWallet';
+
 // WalletInfo interface for backward compatibility
 interface WalletInfo {
   publicKey: any;
@@ -10,8 +20,24 @@ interface WalletInfo {
   walletName?: string;
   secretKey?: string;
 }
-import { consolidatedWalletService, TransactionParams as ConsolidatedTransactionParams, TransactionResult as ConsolidatedTransactionResult } from '../services/consolidatedWalletService';
-import { consolidatedTransactionService } from '../services/consolidatedTransactionService';
+
+// External wallet authentication result interface
+interface ExternalWalletAuthResult {
+  success: boolean;
+  walletAddress?: string;
+  balance?: number;
+  walletName?: string;
+  error?: string;
+}
+
+// Solana transaction parameters interface
+interface SolanaTransactionParams {
+  to: string;
+  amount: number;
+  currency: string;
+  memo?: string;
+  groupId?: string;
+}
 
 interface TransactionParams {
   to: string;
@@ -72,11 +98,36 @@ interface WalletContextType {
   // App Wallet Actions
   ensureAppWallet: (userId: string) => Promise<void>;
   getAppWalletBalance: (userId: string) => Promise<number>;
+  exportAppWallet: (userId: string) => Promise<{
+    success: boolean;
+    walletAddress?: string;
+    seedPhrase?: string;
+    privateKey?: string;
+    error?: string;
+  }>;
+  getAppWalletInfo: (userId: string) => Promise<{
+    success: boolean;
+    walletAddress?: string;
+    balance?: any;
+    error?: string;
+  }>;
+  fixAppWalletMismatch: (userId: string) => Promise<{
+    success: boolean;
+    wallet?: {
+      address: string;
+      publicKey: string;
+      secretKey?: string;
+    };
+    error?: string;
+  }>;
   
   // Auto-refresh Actions
   startBalancePolling: (userId: string) => Promise<void>;
   stopBalancePolling: () => void;
   toggleAutoRefresh: (enabled: boolean) => void;
+  
+  // User switching
+  clearAllWalletStateForUserSwitch: () => void;
   enhancedRefreshBalance: () => Promise<void>;
   
   // Provider methods
@@ -166,10 +217,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     }
   };
 
-  // REMOVED: Automatic external wallet connection check
-  // This was causing Phantom to open automatically when the app loaded
-  // Users should manually connect wallets when they want to use them
-
   // Connect to a specific wallet
   const connectToWallet = async (wallet: StoredWallet) => {
     try {
@@ -206,7 +253,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       
       // Try to connect the Solana service as well
       try {
-        await solanaService.importWallet(wallet.secretKey);
+        await solanaWalletService.importWallet(wallet.secretKey);
         if (__DEV__) { console.log('Solana blockchain service connected successfully'); }
       } catch (solanaError) {
         console.warn('Failed to connect Solana blockchain service:', solanaError);
@@ -214,8 +261,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       
       // Refresh balance after connecting
       await refreshBalance();
-      
-
       
     } catch (error) {
       console.error('Error connecting to wallet:', error);
@@ -251,8 +296,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       
       // Refresh balance after connecting
       await refreshBalance();
-      
-
       
     } catch (error) {
       console.error('Error connecting to external wallet:', error);
@@ -326,7 +369,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         
         // Try to connect the Solana service as well
         try {
-          await solanaService.importWallet(wallet.secretKey);
+          await solanaWalletService.importWallet(wallet.secretKey);
           if (__DEV__) { console.log('Solana blockchain service connected successfully'); }
         } catch (solanaError) {
           console.warn('Failed to connect Solana blockchain service:', solanaError);
@@ -337,8 +380,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       
       // Refresh balance after connecting
       await refreshBalance();
-      
-
       
     } catch (error) {
       console.error('Error in connectWallet:', error);
@@ -362,7 +403,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       await consolidatedWalletService.disconnect();
       
       // Also disconnect from Solana service and AppKit provider
-      solanaService.disconnect();
+      await solanaWalletService.clearWallet();
       await consolidatedWalletService.disconnect();
       
       if (__DEV__) { console.log('Disconnecting wallet...'); }
@@ -428,8 +469,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Refresh balance after importing
       await refreshBalance();
       
-
-      
     } catch (error) {
       console.error('Error importing wallet:', error);
       throw error;
@@ -457,13 +496,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       Alert.alert('Error', 'Failed to remove wallet. Please try again.');
     }
   };
-
-  // Listen for wallet connection events
-  useEffect(() => {
-    if (__DEV__) { console.log('WalletProvider: Setting up event listeners'); }
-  }, [isConnected, address, chainId, balance, walletName, currentWalletId]);
-
-
 
   // App wallet methods
   const ensureAppWallet = async (userId: string) => {
@@ -501,6 +533,90 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     }
   };
 
+  const exportAppWallet = async (userId: string) => {
+    try {
+      // Import userWalletService to export app wallet
+      const { userWalletService } = await import('../services/userWalletService');
+      const result = await userWalletService.exportWallet(userId);
+      
+      if (result.success) {
+        console.log('🔍 WalletProvider: Successfully exported app wallet:', {
+          walletAddress: result.walletAddress,
+          hasSeedPhrase: !!result.seedPhrase,
+          hasPrivateKey: !!result.privateKey
+        });
+      } else {
+        console.error('🔍 WalletProvider: Failed to export app wallet:', result.error);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('🔍 WalletProvider: Error exporting app wallet:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to export wallet'
+      };
+    }
+  };
+
+  const getAppWalletInfo = async (userId: string) => {
+    try {
+      // Import userWalletService to get app wallet info
+      const { userWalletService } = await import('../services/userWalletService');
+      const result = await userWalletService.getWalletInfo(userId);
+      
+      if (result.success && result.walletAddress) {
+        setAppWalletAddress(result.walletAddress);
+        setAppWalletConnected(true);
+        
+        if (result.balance) {
+          setAppWalletBalance(result.balance.totalUSD);
+        }
+      } else {
+        console.error('🔍 WalletProvider: Failed to get app wallet info:', result.error);
+        setAppWalletConnected(false);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('🔍 WalletProvider: Error getting app wallet info:', error);
+      setAppWalletConnected(false);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get wallet info'
+      };
+    }
+  };
+
+  const fixAppWalletMismatch = async (userId: string) => {
+    try {
+      // Import userWalletService to fix wallet mismatch
+      const { userWalletService } = await import('../services/userWalletService');
+      const result = await userWalletService.fixWalletMismatch(userId);
+      
+      if (result.success && result.wallet) {
+        setAppWalletAddress(result.wallet.address);
+        setAppWalletConnected(true);
+        
+        console.log('🔍 WalletProvider: Successfully fixed wallet mismatch:', {
+          walletAddress: result.wallet.address
+        });
+      } else {
+        console.error('🔍 WalletProvider: Failed to fix wallet mismatch:', result.error);
+        setAppWalletConnected(false);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('🔍 WalletProvider: Error fixing wallet mismatch:', error);
+      setAppWalletConnected(false);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fix wallet mismatch'
+      };
+    }
+  };
+
   // Auto-refresh balance functionality
   const startBalancePolling = useCallback(async (userId: string) => {
     if (!autoRefreshEnabled || balancePollingInterval) return;
@@ -509,30 +625,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     
     const interval = setInterval(async () => {
       try {
-        // Refresh app wallet balance with transaction monitoring
+        // Refresh app wallet balance
         if (appWalletConnected) {
           const { userWalletService } = await import('../services/userWalletService');
-          const enhancedResult = await userWalletService.getUserWalletBalanceWithTransactionCheck(
-            userId, 
-            { 
-              solBalance: 0, 
-              usdcBalance: 0, 
-              totalUSD: appWalletBalance || 0, 
-              address: appWalletAddress || '', 
-              isConnected: true 
-            }
-          );
+          const balance = await userWalletService.getUserWalletBalance(userId);
           
-          if (enhancedResult.balance) {
-            setAppWalletBalance(enhancedResult.balance.totalUSD);
-            
-            // If new transactions detected, log them
-            if (enhancedResult.hasNewTransactions) {
-              console.log('🎉 WalletProvider: New transactions detected!', {
-                newTransactions: enhancedResult.newTransactions.length,
-                newBalance: enhancedResult.balance.totalUSD
-              });
-            }
+          if (balance) {
+            setAppWalletBalance(balance.totalUSD);
           }
         }
         
@@ -547,15 +646,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         // Handle rate limiting specifically
         if (error instanceof Error && error.message.includes('429')) {
           console.warn('🔄 WalletProvider: Rate limited, will retry later');
-          // Don't log as error for rate limiting
         } else {
           console.error('❌ WalletProvider: Error during auto-refresh:', error);
         }
       }
-    }, 60000); // Check every 60 seconds instead of 30 to reduce rate limiting
+    }, 60000); // Check every 60 seconds to reduce rate limiting
 
     setBalancePollingInterval(interval);
-  }, [autoRefreshEnabled, appWalletConnected, isConnected, address, appWalletBalance, appWalletAddress]); // Added missing dependencies
+  }, [autoRefreshEnabled, appWalletConnected, isConnected, address, appWalletBalance, appWalletAddress]);
 
   const stopBalancePolling = useCallback(() => {
     if (balancePollingInterval) {
@@ -608,10 +706,10 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Try to use real Solana blockchain transaction
       try {
         // Check if Solana service is connected
-        if (!solanaService.isConnected()) {
+        if (!solanaWalletService.getPublicKey()) {
           // If not connected, try to connect using the wallet info
           if (walletInfo && (walletInfo as any).secretKey) {
-            await solanaService.importWallet((walletInfo as any).secretKey);
+            await solanaWalletService.importWallet((walletInfo as any).secretKey);
           } else {
             throw new Error('No wallet secret key available for blockchain transaction');
           }
@@ -626,8 +724,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           groupId: params.groupId
         };
         
-        // Send real blockchain transaction
-        const result = await solanaService.sendTransaction(solanaParams);
+        // Send real blockchain transaction using consolidated transaction service
+        const result = await consolidatedTransactionService.sendTransaction({
+          to: solanaParams.to,
+          amount: solanaParams.amount,
+          currency: solanaParams.currency as 'SOL' | 'USDC',
+          memo: solanaParams.memo,
+          userId: undefined // Will be set by the service
+        });
         
         if (__DEV__) { console.log('Real blockchain transaction sent successfully:', result); }
         
@@ -645,10 +749,49 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     }
   };
 
-  // Clear all wallet state for user logout
+  // Clear all wallet state for user logout (but preserve wallet creation state)
   const clearAppWalletState = useCallback(() => {
     try {
-      if (__DEV__) { console.log('🔄 WalletProvider: Clearing all wallet state for user logout'); }
+      if (__DEV__) { console.log('🔄 WalletProvider: Clearing wallet UI state for user logout (preserving wallet data)'); }
+      
+      // Stop any active polling
+      stopBalancePolling();
+      
+      // Clear external wallet state
+      setIsConnected(false);
+      setAddress(null);
+      setBalance(null);
+      setWalletInfo(null);
+      setWalletName(null);
+      setChainId(null);
+      setSecretKey(null);
+      setCurrentWalletId(null);
+      
+      // Clear app wallet UI state (but don't clear wallet creation state)
+      setAppWalletAddress(null);
+      setAppWalletBalance(null);
+      setAppWalletConnected(false);
+      
+      // Clear auto-refresh state
+      setAutoRefreshEnabled(false);
+      setLastBalanceCheck(new Date());
+      
+      // Clear available wallets (user-specific)
+      setAvailableWallets([]);
+      
+      // NOTE: We intentionally do NOT clear wallet creation state here
+      // This allows the wallet to be restored when the user logs back in
+      
+      if (__DEV__) { console.log('✅ WalletProvider: Wallet UI state cleared for user logout (wallet data preserved)'); }
+    } catch (error) {
+      console.error('❌ Error clearing wallet state:', error);
+    }
+  }, [stopBalancePolling]);
+
+  // Clear all wallet state when switching users (including wallet creation state)
+  const clearAllWalletStateForUserSwitch = useCallback(() => {
+    try {
+      if (__DEV__) { console.log('🔄 WalletProvider: Clearing all wallet state for user switch'); }
       
       // Stop any active polling
       stopBalancePolling();
@@ -675,9 +818,9 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Clear available wallets (user-specific)
       setAvailableWallets([]);
       
-      if (__DEV__) { console.log('✅ WalletProvider: All wallet state cleared for user logout'); }
+      if (__DEV__) { console.log('✅ WalletProvider: All wallet state cleared for user switch'); }
     } catch (error) {
-      console.error('❌ Error clearing wallet state:', error);
+      console.error('❌ Error clearing wallet state for user switch:', error);
     }
   }, [stopBalancePolling]);
 
@@ -743,11 +886,17 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     // App wallet actions
     ensureAppWallet,
     getAppWalletBalance,
+    exportAppWallet,
+    getAppWalletInfo,
+    fixAppWalletMismatch,
     // Auto-refresh Actions
     startBalancePolling,
     stopBalancePolling,
     toggleAutoRefresh,
     enhancedRefreshBalance,
+    
+    // User switching
+    clearAllWalletStateForUserSwitch,
     // Provider methods
     getAvailableProviders,
     isProviderAvailable,
@@ -779,4 +928,4 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       {children}
     </WalletContext.Provider>
   );
-}; 
+};

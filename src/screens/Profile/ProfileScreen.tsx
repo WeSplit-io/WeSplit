@@ -90,11 +90,12 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
               await consolidatedAuthService.signOut();
               if (__DEV__) { console.log('✅ Firebase Auth signOut completed'); }
               
-              // Step 2: Clear secure storage data for current user
+              // Step 2: Clear secure storage data for current user (EXCEPT wallet data)
               if (currentUser?.id) {
                 try {
-                  await secureStorageService.clearUserData(String(currentUser.id));
-                  if (__DEV__) { console.log('✅ Secure storage cleared for user:', currentUser.id); }
+                  // Clear user data but preserve wallet credentials
+                  await secureStorageService.clearUserDataExceptWallet(String(currentUser.id));
+                  if (__DEV__) { console.log('✅ Secure storage cleared for user (wallet preserved):', currentUser.id); }
                 } catch (storageError) {
                   console.warn('⚠️ Failed to clear secure storage:', storageError);
                   // Continue with logout even if storage clearing fails

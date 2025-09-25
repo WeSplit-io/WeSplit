@@ -134,6 +134,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [initialRequestsLoaded, setInitialRequestsLoaded] = useState(false);
   const [refreshBalance, setRefreshBalance] = useState<number | null>(null); // Local refresh balance
   const [balanceLoaded, setBalanceLoaded] = useState(false); // Track if balance has been loaded
+  const [walletUnrecoverable, setWalletUnrecoverable] = useState(false); // Track if wallet is unrecoverable
 
 
   // Memoized balance calculations to avoid expensive recalculations
@@ -252,10 +253,75 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           errorMessage.includes('Failed to ensure wallet') ||
           errorMessage.includes('timestamp.toDate is not a function') ||
           errorMessage.includes('toDate is not a function') ||
-          errorMessage.includes('Wallet is already working')) {
+          errorMessage.includes('Wallet is already working') ||
+          errorMessage.includes('Wallet is marked as unrecoverable') ||
+          errorMessage.includes('unrecoverable')) {
         console.log(' Dashboard: Critical error detected, stopping retry loop:', errorMessage);
         setUserCreatedWalletBalance(null);
         setBalanceLoaded(true);
+        
+        // Check if this is an unrecoverable wallet error
+        if (errorMessage.includes('unrecoverable')) {
+          setWalletUnrecoverable(true);
+          // Show user-friendly alert for unrecoverable wallet
+          Alert.alert(
+            'Wallet Recovery Failed',
+            'Your wallet cannot be recovered with the current seed phrase. You can create a new wallet, but any funds in the old wallet will be lost unless you can recover the private key.\n\nWould you like to create a new wallet?',
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel',
+                onPress: () => {
+                  // User chose to cancel, keep the unrecoverable state
+                  console.log('User chose not to create new wallet');
+                }
+              },
+              {
+                text: 'Create New Wallet',
+                onPress: async () => {
+                  try {
+                    console.log('User chose to create new wallet');
+                    // Call the new wallet creation method
+                    const newWalletResult = await userWalletService.createNewWalletForUnrecoverableUser(currentUser.id.toString());
+                    
+                    if (newWalletResult.success && newWalletResult.wallet) {
+                      // Update user context with new wallet
+                      await updateUser({
+                        wallet_address: newWalletResult.wallet.address,
+                        wallet_public_key: newWalletResult.wallet.publicKey
+                      });
+                      
+                      // Reset states and reload balance
+                      setWalletUnrecoverable(false);
+                      setBalanceLoaded(false);
+                      loadUserCreatedWalletBalance(0);
+                      
+                      Alert.alert(
+                        'New Wallet Created',
+                        `Your new wallet has been created successfully!\n\nAddress: ${newWalletResult.wallet.address}\n\nPlease save your seed phrase securely.`,
+                        [{ text: 'OK' }]
+                      );
+                    } else {
+                      Alert.alert(
+                        'Error',
+                        `Failed to create new wallet: ${newWalletResult.error}`,
+                        [{ text: 'OK' }]
+                      );
+                    }
+                  } catch (error) {
+                    console.error('Error creating new wallet:', error);
+                    Alert.alert(
+                      'Error',
+                      'Failed to create new wallet. Please try again or contact support.',
+                      [{ text: 'OK' }]
+                    );
+                  }
+                }
+              }
+            ]
+          );
+        }
+        
         return;
       }
       
@@ -278,9 +344,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     }
   }, [currentUser?.id, currentUser?.wallet_address, updateUser, loadingUserWallet]);
 
-  // Reset balance loaded flag when user changes
+  // Reset balance loaded flag and unrecoverable state when user changes
   useEffect(() => {
     setBalanceLoaded(false);
+    setWalletUnrecoverable(false);
   }, [currentUser?.id]);
 
   // Auto-refresh balance periodically to keep it up-to-date

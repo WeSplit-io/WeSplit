@@ -921,9 +921,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [initializeTrackingSafely, stopGroupListener]);
 
   // User operations
-  const authenticateUser = useCallback((user: User, method: 'wallet' | 'email' | 'guest' | 'social') => {
+  const authenticateUser = useCallback(async (user: User, method: 'wallet' | 'email' | 'guest' | 'social') => {
+    // ALWAYS clear wallet data for current user before authenticating new user
+    // This ensures no wallet data from previous user interferes with new user
+    if (state.currentUser) {
+      console.log('🔄 AppContext: Clearing current user wallet data before authentication');
+      
+      try {
+        // Import services
+        const { userWalletService } = await import('../services/userWalletService');
+        const { secureStorageService } = await import('../services/secureStorageService');
+        
+        // Clear current user's wallet data
+        await userWalletService.clearWalletDataForUser(state.currentUser.id.toString());
+        
+        // Also clear any generic wallet data that might be stored
+        await secureStorageService.clearAllWalletData();
+        
+        console.log('✅ AppContext: Cleared current user wallet data');
+      } catch (error) {
+        console.warn('⚠️ AppContext: Failed to clear current user wallet data:', error);
+        // Continue with authentication even if clearing fails
+      }
+    }
+    
     dispatch({ type: 'AUTHENTICATE_USER', payload: { user, method } });
-  }, []);
+  }, [state.currentUser]);
 
   const updateUser = useCallback(async (updates: Partial<User>): Promise<void> => {
     if (!state.currentUser?.id) {
