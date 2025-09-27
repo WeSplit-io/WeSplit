@@ -173,19 +173,22 @@ class ConsolidatedTransactionService {
         isProduction: this.isProduction,
       });
 
-      // Calculate company fee
-      const { fee: companyFee, netAmount } = this.calculateCompanyFee(params.amount);
+      // Calculate company fee - NEW APPROACH
+      const { fee: companyFee, totalAmount, recipientAmount } = this.calculateCompanyFee(params.amount);
 
       console.log('💰 Fee calculation:', {
         originalAmount: params.amount,
         companyFee,
-        netAmount,
+        recipientAmount,
+        totalAmount,
         feePercentage: COMPANY_FEE_STRUCTURE.percentage,
       });
 
       const fromPublicKey = this.keypair.publicKey;
       const toPublicKey = new PublicKey(params.to);
-      const lamports = netAmount * LAMPORTS_PER_SOL;
+      
+      // Recipient gets the full amount
+      const lamports = recipientAmount * LAMPORTS_PER_SOL;
 
       // Get recent blockhash
       const { blockhash } = await this.connection.getLatestBlockhash();
@@ -206,7 +209,7 @@ class ConsolidatedTransactionService {
         );
       }
 
-      // Add transfer instruction
+      // Add transfer instruction for recipient (full amount)
       transaction.add(
         SystemProgram.transfer({
           fromPubkey: fromPublicKey,
@@ -214,6 +217,19 @@ class ConsolidatedTransactionService {
           lamports: lamports
         })
       );
+
+      // Add company fee transfer instruction to admin wallet
+      if (companyFee > 0) {
+        const companyFeeLamports = companyFee * LAMPORTS_PER_SOL;
+        
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: fromPublicKey,
+            toPubkey: new PublicKey(COMPANY_WALLET_CONFIG.address),
+            lamports: companyFeeLamports
+          })
+        );
+      }
 
       // Add memo if provided
       if (params.memo) {
@@ -237,7 +253,7 @@ class ConsolidatedTransactionService {
           currency: params.currency,
           signature,
           companyFee,
-          netAmount,
+          netAmount: recipientAmount, // This is now the recipient amount
           memo: params.memo
         });
       }
@@ -279,19 +295,24 @@ class ConsolidatedTransactionService {
         isProduction: this.isProduction,
       });
 
-      // Calculate company fee
-      const { fee: companyFee, netAmount } = this.calculateCompanyFee(params.amount);
+      // Calculate company fee - NEW APPROACH
+      const { fee: companyFee, totalAmount, recipientAmount } = this.calculateCompanyFee(params.amount);
 
       console.log('💰 Fee calculation:', {
         originalAmount: params.amount,
         companyFee,
-        netAmount,
+        recipientAmount,
+        totalAmount,
         feePercentage: COMPANY_FEE_STRUCTURE.percentage,
       });
 
       const fromPublicKey = this.keypair.publicKey;
       const toPublicKey = new PublicKey(params.to);
-      const amount = Math.floor(netAmount * 1_000_000); // USDC has 6 decimals
+      
+      // Recipient gets the full amount
+      const recipientAmountInSmallestUnit = Math.round(recipientAmount * 1_000_000); // USDC has 6 decimals
+      // Company fee amount
+      const companyFeeAmount = Math.round(companyFee * 1_000_000); // USDC has 6 decimals
 
       // Use company wallet for fees if configured, otherwise use user wallet
       const feePayerPublicKey = COMPANY_WALLET_CONFIG.useUserWalletForFees 
@@ -343,19 +364,18 @@ class ConsolidatedTransactionService {
         );
       }
 
-      // Add transfer instruction for recipient (net amount)
+      // Add transfer instruction for recipient (full amount)
       transaction.add(
         createTransferInstruction(
           fromTokenAccount,
           toTokenAccount,
           fromPublicKey,
-          amount
+          recipientAmountInSmallestUnit
         )
       );
 
       // Add company fee transfer instruction to admin wallet
       if (companyFee > 0) {
-        const companyFeeAmount = Math.floor(companyFee * 1_000_000); // USDC has 6 decimals
         
         // Get company wallet's USDC token account
         const companyTokenAccount = await getAssociatedTokenAddress(
@@ -403,7 +423,7 @@ class ConsolidatedTransactionService {
           currency: params.currency,
           signature,
           companyFee,
-          netAmount,
+          netAmount: recipientAmount, // This is now the recipient amount
           memo: params.memo
         });
       }
@@ -559,25 +579,27 @@ class ConsolidatedTransactionService {
   }
 
   /**
-   * Calculate company fee
+   * Calculate company fee - NEW APPROACH: Recipient gets full amount, sender pays amount + fees
    */
-  calculateCompanyFee(amount: number): { fee: number; netAmount: number } {
-    const fee = Math.max(
-      COMPANY_FEE_STRUCTURE.minimum,
-      Math.min(amount * COMPANY_FEE_STRUCTURE.percentage, COMPANY_FEE_STRUCTURE.maximum)
-    );
+  calculateCompanyFee(amount: number): { fee: number; totalAmount: number; recipientAmount: number } {
+    // Calculate 3% fee on the transaction amount
+    const fee = Math.min(amount * COMPANY_FEE_STRUCTURE.percentage, COMPANY_FEE_STRUCTURE.maximum);
     
-    // Ensure fee doesn't exceed the transaction amount (prevent negative net amounts)
-    const adjustedFee = Math.min(fee, amount);
+    // Recipient gets the full amount they expect
+    const recipientAmount = amount;
     
-    const netAmount = amount - adjustedFee;
+    // Sender pays the amount + fees
+    const totalAmount = amount + fee;
     
-    // Validate that net amount is positive
-    if (netAmount <= 0) {
-      throw new Error(`Transaction amount (${amount} USDC) is too small to cover the minimum fee (${adjustedFee} USDC). Minimum transaction amount required: ${adjustedFee + 0.001} USDC`);
-    }
+    console.log('💰 NEW Fee calculation:', {
+      requestedAmount: amount,
+      fee,
+      recipientAmount,
+      totalAmount,
+      feePercentage: COMPANY_FEE_STRUCTURE.percentage,
+    });
     
-    return { fee: adjustedFee, netAmount };
+    return { fee, totalAmount, recipientAmount };
   }
 
   // ===== PAYMENT REQUEST METHODS =====

@@ -809,25 +809,27 @@ class ConsolidatedWalletService {
   }
 
   /**
-   * Calculate company fee
+   * Calculate company fee - NEW APPROACH: Recipient gets full amount, sender pays amount + fees
    */
-  calculateCompanyFee(amount: number): { fee: number; netAmount: number } {
-    const fee = Math.max(
-      COMPANY_FEE_STRUCTURE.minimum,
-      Math.min(amount * COMPANY_FEE_STRUCTURE.percentage, COMPANY_FEE_STRUCTURE.maximum)
-    );
+  calculateCompanyFee(amount: number): { fee: number; totalAmount: number; recipientAmount: number } {
+    // Calculate 3% fee on the transaction amount
+    const fee = Math.min(amount * COMPANY_FEE_STRUCTURE.percentage, COMPANY_FEE_STRUCTURE.maximum);
     
-    // Ensure fee doesn't exceed the transaction amount (prevent negative net amounts)
-    const adjustedFee = Math.min(fee, amount);
+    // Recipient gets the full amount they expect
+    const recipientAmount = amount;
     
-    const netAmount = amount - adjustedFee;
+    // Sender pays the amount + fees
+    const totalAmount = amount + fee;
     
-    // Validate that net amount is positive
-    if (netAmount <= 0) {
-      throw new Error(`Transaction amount (${amount} USDC) is too small to cover the minimum fee (${adjustedFee} USDC). Minimum transaction amount required: ${adjustedFee + 0.001} USDC`);
-    }
+    console.log('💰 NEW Wallet Fee calculation:', {
+      requestedAmount: amount,
+      fee,
+      recipientAmount,
+      totalAmount,
+      feePercentage: COMPANY_FEE_STRUCTURE.percentage,
+    });
     
-    return { fee: adjustedFee, netAmount };
+    return { fee, totalAmount, recipientAmount };
   }
 
   // ===== WALLET MANAGEMENT METHODS =====

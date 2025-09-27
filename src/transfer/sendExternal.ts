@@ -100,8 +100,8 @@ class ExternalTransferService {
         };
       }
 
-      // Calculate company fee
-      const { fee: companyFee, netAmount } = this.calculateCompanyFee(params.amount);
+      // Calculate company fee - NEW APPROACH
+      const { fee: companyFee, totalAmount, recipientAmount } = this.calculateCompanyFee(params.amount);
 
       // Load wallet
       const walletLoaded = await solanaWalletService.loadWallet();
@@ -115,9 +115,9 @@ class ExternalTransferService {
       // Build and send transaction
       let result: ExternalTransferResult;
       if (params.currency === 'SOL') {
-        result = await this.sendSolTransfer(params, netAmount, companyFee);
+        result = await this.sendSolTransfer(params, recipientAmount, companyFee);
       } else {
-        result = await this.sendUsdcTransfer(params, netAmount, companyFee);
+        result = await this.sendUsdcTransfer(params, recipientAmount, companyFee);
       }
 
       if (result.success) {
@@ -227,13 +227,13 @@ class ExternalTransferService {
    */
   private async sendSolTransfer(
     params: ExternalTransferParams, 
-    netAmount: number, 
+    recipientAmount: number, 
     companyFee: number
   ): Promise<ExternalTransferResult> {
     try {
       const fromPublicKey = new PublicKey(solanaWalletService.getPublicKey()!);
       const toPublicKey = new PublicKey(params.to);
-      const lamports = netAmount * LAMPORTS_PER_SOL;
+      const lamports = recipientAmount * LAMPORTS_PER_SOL;
 
       // Get recent blockhash
       const { blockhash } = await this.connection.getLatestBlockhash();
@@ -290,7 +290,7 @@ class ExternalTransferService {
         signature,
         txId: signature,
         companyFee,
-        netAmount,
+        netAmount: recipientAmount,
         blockchainFee: this.estimateBlockchainFee(transaction)
       };
     } catch (error) {
@@ -307,7 +307,7 @@ class ExternalTransferService {
    */
   private async sendUsdcTransfer(
     params: ExternalTransferParams, 
-    netAmount: number, 
+    recipientAmount: number, 
     companyFee: number
   ): Promise<ExternalTransferResult> {
     try {
@@ -350,8 +350,8 @@ class ExternalTransferService {
         );
       }
 
-      // Add USDC transfer instruction for recipient (net amount)
-      const transferAmount = Math.floor(netAmount * Math.pow(10, 6)); // USDC has 6 decimals
+      // Add USDC transfer instruction for recipient (full amount)
+      const transferAmount = Math.floor(recipientAmount * Math.pow(10, 6)); // USDC has 6 decimals
       transaction.add(
         createTransferInstruction(
           fromTokenAccount,
@@ -417,7 +417,7 @@ class ExternalTransferService {
         signature,
         txId: signature,
         companyFee,
-        netAmount,
+        netAmount: recipientAmount,
         blockchainFee: this.estimateBlockchainFee(transaction)
       };
     } catch (error) {
@@ -464,27 +464,30 @@ class ExternalTransferService {
   }
 
   /**
-   * Calculate company fee
+   * Calculate company fee - NEW APPROACH: Recipient gets full amount, sender pays amount + fees
    */
-  private calculateCompanyFee(amount: number): { fee: number; netAmount: number } {
+  private calculateCompanyFee(amount: number): { fee: number; totalAmount: number; recipientAmount: number } {
     const feePercentage = COMPANY_FEE_CONFIG.percentage / 100;
     let fee = amount * feePercentage;
     
-    // Apply min/max fee limits
-    fee = Math.max(fee, COMPANY_FEE_CONFIG.minFee);
+    // Apply only max fee limit (no minimum)
     fee = Math.min(fee, COMPANY_FEE_CONFIG.maxFee);
     
-    // Ensure fee doesn't exceed the transaction amount (prevent negative net amounts)
-    fee = Math.min(fee, amount);
+    // Recipient gets the full amount they expect
+    const recipientAmount = amount;
     
-    const netAmount = amount - fee;
+    // Sender pays the amount + fees
+    const totalAmount = amount + fee;
     
-    // Validate that net amount is positive
-    if (netAmount <= 0) {
-      throw new Error(`Transaction amount (${amount} ${COMPANY_FEE_CONFIG.currency}) is too small to cover the minimum fee (${fee} ${COMPANY_FEE_CONFIG.currency}). Minimum transaction amount required: ${fee + 0.001} ${COMPANY_FEE_CONFIG.currency}`);
-    }
+    console.log('💰 NEW External Fee calculation:', {
+      requestedAmount: amount,
+      fee,
+      recipientAmount,
+      totalAmount,
+      feePercentage: COMPANY_FEE_CONFIG.percentage,
+    });
     
-    return { fee, netAmount };
+    return { fee, totalAmount, recipientAmount };
   }
 
   /**

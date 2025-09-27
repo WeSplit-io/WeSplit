@@ -149,18 +149,20 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         return;
       }
 
-      // Check balance using existing wallet service
+      // Check balance using existing wallet service - check total amount including fees
       const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
-      if (balance.usdc < amount) {
-        Alert.alert('Insufficient Balance', `You do not have enough USDC balance. Required: ${amount} USDC, Available: ${balance.usdc} USDC`);
+      const totalAmountToPay = amount + (amount * 0.03); // Amount + 3% fee
+      if (balance.usdc < totalAmountToPay) {
+        Alert.alert('Insufficient Balance', `You do not have enough USDC balance. Required: ${totalAmountToPay.toFixed(2)} USDC (including fees), Available: ${balance.usdc.toFixed(2)} USDC`);
         return;
       }
 
       if (__DEV__) {
         console.log('💰 SendConfirmation: Balance check passed:', {
-          required: amount,
+          amountToRecipient: amount,
+          totalAmountToPay: totalAmountToPay,
           available: balance.usdc,
-          remaining: balance.usdc - amount
+          remaining: balance.usdc - totalAmountToPay
         });
       }
 
@@ -232,24 +234,37 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     blockchainFee: number;
     totalFee: number;
     netAmount: number;
+    totalAmount?: number;
   } | null>(null);
 
-  // Calculate fees using existing wallet service
+  // Calculate fees using existing wallet service - NEW APPROACH
   useEffect(() => {
     const calculateFees = async () => {
       try {
         if (amount > 0) {
-          const estimate = await consolidatedTransactionService.getTransactionFeeEstimate(amount, 'USDC', 'medium');
-          setFeeEstimate(estimate);
+          // Use the new fee calculation approach
+          const feeCalculation = consolidatedTransactionService.calculateCompanyFee(amount);
+          const blockchainFee = 0.00001; // Company covers blockchain fees
+          
+          setFeeEstimate({
+            companyFee: feeCalculation.fee,
+            blockchainFee: blockchainFee,
+            totalFee: feeCalculation.fee + blockchainFee,
+            netAmount: feeCalculation.recipientAmount, // Recipient gets full amount
+            totalAmount: feeCalculation.totalAmount, // Sender pays amount + fees
+          });
         }
       } catch (error) {
         console.error('Failed to calculate fee estimate:', error);
-        // Fallback to default calculation
+        // Fallback to new calculation approach
+        const companyFee = amount * 0.03; // 3% company fee
+        const blockchainFee = 0.00001;
         setFeeEstimate({
-          companyFee: amount * 0.03, // 3% company fee
-          blockchainFee: 0.00001,
-          totalFee: amount * 0.03 + 0.00001,
-          netAmount: amount * 0.97, // 97% goes to recipient
+          companyFee: companyFee,
+          blockchainFee: blockchainFee,
+          totalFee: companyFee + blockchainFee,
+          netAmount: amount, // Recipient gets full amount
+          totalAmount: amount + companyFee, // Sender pays amount + fees
         });
       }
     };
@@ -257,11 +272,12 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     calculateFees();
   }, [amount]);
 
-  // Use calculated fees or fallback
+  // Use calculated fees or fallback - NEW APPROACH
   const companyFee = feeEstimate?.companyFee || amount * 0.03; // 3% company fee
   const blockchainFee = feeEstimate?.blockchainFee || 0.00001;
   const totalFee = feeEstimate?.totalFee || companyFee + blockchainFee;
-  const netAmount = feeEstimate?.netAmount || amount - companyFee; // 97% goes to recipient
+  const netAmount = feeEstimate?.netAmount || amount; // Recipient gets full amount
+  const totalAmount = feeEstimate?.totalAmount || amount + companyFee; // Sender pays amount + fees
   const destinationAccount = contact?.wallet_address || '';
 
   // Check if user has existing wallet and sufficient balance
@@ -336,8 +352,9 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     checkExistingWallet();
   }, [currentUser?.id]);
 
-  // Check if user has sufficient balance using existing wallet balance
-  const hasSufficientBalance = existingWalletBalance === null || existingWalletBalance.usdc >= amount;
+  // Check if user has sufficient balance using existing wallet balance - check total amount including fees
+  const totalAmountToPay = amount + (amount * 0.03); // Amount + 3% fee
+  const hasSufficientBalance = existingWalletBalance === null || existingWalletBalance.usdc >= totalAmountToPay;
 
   // Debug logging for slider state
   console.log('🔍 SendConfirmation: Slider state debug:', {
@@ -418,18 +435,22 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         {/* Transaction Details Card (mockup style) */}
         <View style={styles.mockupTransactionDetails}>
           <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Company fee ({consolidatedTransactionService.getCompanyFeeStructure().percentage}%)</Text>
+            <Text style={styles.mockupFeeLabel}>Amount to recipient</Text>
+            <Text style={styles.mockupFeeValue}>{netAmount.toFixed(2)} USDC</Text>
+          </View>
+          <View style={styles.mockupFeeRow}>
+            <Text style={styles.mockupFeeLabel}>Company fee ({consolidatedTransactionService.getCompanyFeeStructure().percentage * 100}%)</Text>
             <Text style={styles.mockupFeeValue}>{companyFee.toFixed(2)} USDC</Text>
           </View>
           <View style={styles.mockupFeeRow}>
             <Text style={styles.mockupFeeLabel}>Blockchain fee (Company covered)</Text>
             <Text style={styles.mockupFeeValue}>Free</Text>
           </View>
-          <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Net amount sent</Text>
-            <Text style={styles.mockupFeeValue}>{netAmount.toFixed(2)} USDC</Text>
-          </View>
           <View style={styles.mockupFeeRowSeparator} />
+          <View style={styles.mockupFeeRow}>
+            <Text style={styles.mockupFeeLabel}>Total you'll pay</Text>
+            <Text style={[styles.mockupFeeValue, { color: colors.brandGreen, fontWeight: 'bold' }]}>{totalAmount.toFixed(2)} USDC</Text>
+          </View>
           <View style={styles.mockupFeeRow}>
             <Text style={styles.mockupFeeLabel}>Destination account</Text>
             <Text style={styles.mockupFeeValue}>{destinationAccount ? `${destinationAccount.substring(0, 4)}...${destinationAccount.slice(-4)}` : ''}</Text>
