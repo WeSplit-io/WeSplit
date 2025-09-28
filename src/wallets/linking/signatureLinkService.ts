@@ -192,82 +192,69 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
     });
 
     try {
-      // Since MWA requires complex setup, let's skip directly to deep link fallback
+      // Since MWA requires complex setup, let's use deep link approach directly
       // This will provide a better user experience with real wallet interaction
-      console.log('🔗 Signature Link: Skipping MWA, using deep link fallback for', provider.name);
+      console.log('🔗 Signature Link: Using deep link approach for', provider.name);
       
-      // Throw an error to trigger the fallback to deep link
-      throw new Error('MWA not fully implemented, using deep link fallback');
+      // For now, just open the wallet app with a simple deep link
+      // Most wallets don't support complex signature request deep links
+      const simpleDeepLink = provider.deepLinkScheme || `${provider.name}://`;
+      
+      console.log('🔗 Signature Link: Attempting to open wallet with simple deep link:', simpleDeepLink);
+      
+      // Always try to open the wallet app, even if canOpenURL returns false
+      // This is because canOpenURL can be unreliable on some devices
+      try {
+        await Linking.openURL(simpleDeepLink);
+        console.log('🔗 Signature Link: Successfully opened wallet app');
+      } catch (openError) {
+        console.log('🔗 Signature Link: Failed to open wallet app:', openError);
+        // Continue anyway - user can manually open the app
+      }
+
+      // Don't show alert here - let the calling screen handle the user flow
+      console.log('🔗 Signature Link: Wallet app opened, proceeding to manual input flow');
+
+      // Always return manual input required since we can't capture the signature automatically
+      const result = {
+        success: false,
+        error: 'MANUAL_INPUT_REQUIRED',
+        provider: provider.name,
+        challenge: challenge // Include challenge for manual input
+      };
+      
+      console.log('🔗 Signature Link: Returning result:', {
+        success: result.success,
+        error: result.error,
+        provider: result.provider,
+        hasChallenge: !!result.challenge,
+        challengeNonce: result.challenge?.nonce
+      });
+      
+      return result;
 
     } catch (error) {
       console.error('🔗 Signature Link: Signature request failed:', error);
-      console.log('🔗 Signature Link: Starting deep link fallback...');
       
-      // Fallback to deep link if MWA fails
-      try {
-        // Try to open the wallet app with a simple deep link first
-        const simpleDeepLink = provider.deepLinkScheme || `${provider.name}://`;
-        
-        console.log('🔗 Signature Link: Attempting to open wallet with deep link:', simpleDeepLink);
-        
-        // Always try to open the wallet app, even if canOpenURL returns false
-        // This is because canOpenURL can be unreliable on some devices
-        try {
-          await Linking.openURL(simpleDeepLink);
-          console.log('🔗 Signature Link: Successfully opened wallet app');
-        } catch (openError) {
-          console.log('🔗 Signature Link: Failed to open wallet app:', openError);
-          // Continue anyway - user can manually open the app
-        }
+      // Even if deep link fails, we can still provide manual input
+      console.log('🔗 Signature Link: Deep link failed, proceeding to manual input flow');
 
-        // Show user instruction and navigate to manual signature input
-        Alert.alert(
-          'Open Wallet App',
-          `We're trying to open ${provider.displayName} for you. If it doesn't open automatically, please:\n\n1. Open ${provider.displayName} manually\n2. Sign this message:\n\n"${challenge.message}"\n\n3. Copy the signature and return to WeSplit`,
-          [
-            { 
-              text: 'I\'ve Signed It', 
-              onPress: () => {
-                console.log('🔗 Signature Link: User claims to have signed the message');
-              }
-            },
-            { text: 'Cancel', style: 'cancel' }
-          ]
-        );
-
-        // Always return manual input required since we can't capture the signature automatically
-        return {
-          success: false,
-          error: 'MANUAL_INPUT_REQUIRED',
-          provider: provider.name,
-          challenge: challenge // Include challenge for manual input
-        };
-
-      } catch (fallbackError) {
-        console.error('🔗 Signature Link: Deep link fallback failed:', fallbackError);
-        
-        // Even if deep link fails, we can still provide manual input
-        Alert.alert(
-          'Manual Signature Input',
-          `Please open ${provider.displayName} manually and sign this message:\n\n"${challenge.message}"\n\nThen enter the signature in the next screen.`,
-          [
-            { 
-              text: 'Continue', 
-              onPress: () => {
-                console.log('🔗 Signature Link: User continuing to manual signature input after deep link failure');
-              }
-            },
-            { text: 'Cancel', style: 'cancel' }
-          ]
-        );
-
-        return {
-          success: false,
-          error: 'MANUAL_INPUT_REQUIRED',
-          provider: provider.name,
-          challenge: challenge // Include challenge for manual input
-        };
-      }
+      const result = {
+        success: false,
+        error: 'MANUAL_INPUT_REQUIRED',
+        provider: provider.name,
+        challenge: challenge // Include challenge for manual input
+      };
+      
+      console.log('🔗 Signature Link: Returning result from catch block:', {
+        success: result.success,
+        error: result.error,
+        provider: result.provider,
+        hasChallenge: !!result.challenge,
+        challengeNonce: result.challenge?.nonce
+      });
+      
+      return result;
     }
   }
 
@@ -276,14 +263,49 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
    */
   private createSignatureRequestUrl(provider: WalletProviderInfo, challenge: SignatureChallenge): string {
     const baseUrl = provider.deepLinkScheme || `${provider.name}://`;
-    const params = new URLSearchParams({
-      action: 'sign_message',
-      message: challenge.message,
-      app_url: 'wesplit://wallet/linked',
-      nonce: challenge.nonce
-    });
-
-    return `${baseUrl}sign?${params.toString()}`;
+    
+    // Create different deep link formats for different providers
+    switch (provider.name.toLowerCase()) {
+      case 'phantom':
+        // Phantom uses a simpler format that's more likely to work
+        const phantomParams = new URLSearchParams({
+          dapp: 'WeSplit',
+          redirect: 'wesplit://wallet/linked',
+          message: challenge.message,
+          nonce: challenge.nonce
+        });
+        return `${baseUrl}sign?${phantomParams.toString()}`;
+        
+      case 'solflare':
+        // Solflare format
+        const solflareParams = new URLSearchParams({
+          action: 'sign_message',
+          message: challenge.message,
+          callback: 'wesplit://wallet/linked',
+          nonce: challenge.nonce
+        });
+        return `${baseUrl}sign?${solflareParams.toString()}`;
+        
+      case 'backpack':
+        // Backpack format
+        const backpackParams = new URLSearchParams({
+          action: 'sign',
+          message: challenge.message,
+          return_url: 'wesplit://wallet/linked',
+          nonce: challenge.nonce
+        });
+        return `${baseUrl}sign?${backpackParams.toString()}`;
+        
+      default:
+        // Generic format for other wallets
+        const params = new URLSearchParams({
+          action: 'sign_message',
+          message: challenge.message,
+          app_url: 'wesplit://wallet/linked',
+          nonce: challenge.nonce
+        });
+        return `${baseUrl}sign?${params.toString()}`;
+    }
   }
 
   /**

@@ -96,7 +96,7 @@ class ExternalTransferService {
       if (!balanceCheck.hasSufficientBalance) {
         return {
           success: false,
-          error: `Insufficient ${params.currency} balance. Required: ${params.requiredAmount}, Available: ${balanceCheck.currentBalance}`
+          error: `Insufficient ${params.currency} balance. Required: ${balanceCheck.requiredAmount}, Available: ${balanceCheck.currentBalance}`
         };
       }
 

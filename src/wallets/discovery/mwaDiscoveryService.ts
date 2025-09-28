@@ -54,7 +54,7 @@ class MWADiscoveryService {
 
     const providers = includeUnsupported 
       ? Object.values(WALLET_PROVIDER_REGISTRY)
-      : getMWASupportedProviders();
+      : Object.values(WALLET_PROVIDER_REGISTRY); // Show all providers, not just MWA supported ones
 
     const discoveryPromises = providers.map(provider => 
       this.discoverProvider(provider, { timeout, useCache })

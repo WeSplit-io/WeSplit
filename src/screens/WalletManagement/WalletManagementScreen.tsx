@@ -132,7 +132,11 @@ const WalletManagementScreen: React.FC = () => {
                   text: 'Create New Wallet',
                   onPress: async () => {
                     try {
-                      const newWalletResult = await userWalletService.createNewWalletForUnrecoverableUser(currentUser.id.toString());
+                      // Clear existing wallet data first
+                      await userWalletService.clearWalletDataForUser(currentUser.id.toString());
+                      
+                      // Create a new wallet using the existing service
+                      const newWalletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
                       
                       if (newWalletResult.success && newWalletResult.wallet) {
                         Alert.alert(
@@ -310,50 +314,6 @@ const WalletManagementScreen: React.FC = () => {
     Alert.alert('Link External Wallet', 'This will open wallet connection');
   };
 
-  const handleClearWalletData = async () => {
-    if (!currentUser?.id) return;
-
-    Alert.alert(
-      'Clear Wallet Data',
-      'This will permanently delete all stored wallet credentials (private keys, seed phrases, etc.) from this device. This action cannot be undone.\n\nYou will need to import your wallet again to access your funds.\n\nAre you sure you want to continue?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Clear All Data',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('🗑️ Clearing all wallet data for user:', currentUser.id);
-              
-              // Clear all wallet data
-              await secureStorageService.clearAllWalletData(String(currentUser.id));
-              
-              // Clear any cached wallet state
-              await ensureAppWallet(String(currentUser.id));
-              
-              Alert.alert(
-                'Wallet Data Cleared',
-                'All wallet credentials have been removed from this device. You can now import your wallet again.',
-                [{ text: 'OK' }]
-              );
-              
-              console.log('✅ All wallet data cleared successfully');
-            } catch (error) {
-              console.error('❌ Failed to clear wallet data:', error);
-              Alert.alert(
-                'Error',
-                'Failed to clear wallet data. Please try again.',
-                [{ text: 'OK' }]
-              );
-            }
-          },
-        },
-      ]
-    );
-  };
 
   const handleSeedPhrase = async () => {
     try {
@@ -713,16 +673,6 @@ const WalletManagementScreen: React.FC = () => {
           <Icon name="chevron-right" size={16} color={colors.textLightSecondary} />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.optionRow, { borderBottomColor: colors.error }]}
-          onPress={handleClearWalletData}
-        >
-          <View style={styles.optionLeft}>
-            <Icon name="trash" size={20} color={colors.error} />
-            <Text style={[styles.optionText, { color: colors.error }]}>Clear Wallet Data</Text>
-          </View>
-          <Icon name="chevron-right" size={16} color={colors.error} />
-        </TouchableOpacity>
 
         <View style={styles.optionRow}>
           <View style={styles.optionLeft}>
@@ -892,9 +842,6 @@ const WalletManagementScreen: React.FC = () => {
     handleRefresh();
   };
 
-  const handleOpenWalletDebug = () => {
-    navigation.navigate('WalletDebug');
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -907,12 +854,7 @@ const WalletManagementScreen: React.FC = () => {
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Wallet</Text>
-        {__DEV__ && (
-          <TouchableOpacity onPress={handleOpenWalletDebug} style={styles.debugButton}>
-            <Text style={styles.debugButtonText}>Debug</Text>
-          </TouchableOpacity>
-        )}
-        {!__DEV__ && <View style={styles.placeholder} />}
+        <View style={styles.placeholder} />
       </View>
 
       <ScrollView

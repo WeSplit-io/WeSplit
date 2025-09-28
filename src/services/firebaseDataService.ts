@@ -559,6 +559,30 @@ export const firebaseUserService = {
     console.warn('🔥 DEPRECATED: markSeedPhraseVerified should not be used. Seed phrases are now device-only.');
     // This function is kept for compatibility but does nothing
     console.log('🔥 Seed phrase verification is now handled by secureSeedPhraseService');
+  },
+
+  getUserByWalletAddress: async (walletAddress: string): Promise<User | null> => {
+    try {
+      if (__DEV__) { console.log('🔥 getUserByWalletAddress: Searching for user with wallet address:', walletAddress); }
+      
+      const usersRef = collection(db, 'users');
+      const userQuery = query(usersRef, where('wallet_address', '==', walletAddress));
+      const userDocs = await getDocs(userQuery);
+      
+      if (!userDocs.empty) {
+        const userDoc = userDocs.docs[0];
+        const user = firebaseDataTransformers.firestoreToUser(userDoc);
+        
+        if (__DEV__) { console.log('🔥 getUserByWalletAddress: Found user:', user.id, user.name); }
+        return user;
+      }
+      
+      if (__DEV__) { console.log('🔥 getUserByWalletAddress: No user found with wallet address:', walletAddress); }
+      return null;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 getUserByWalletAddress: Error finding user by wallet address:', error); }
+      return null;
+    }
   }
 };
 

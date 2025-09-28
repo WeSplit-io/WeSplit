@@ -898,7 +898,7 @@ class InternalTransferService {
   }
 
   /**
-   * Save transaction to Firebase for history
+   * Save transaction to Firebase for history and send notification to recipient
    */
   private async saveTransactionToFirebase(transactionData: {
     userId: string;
@@ -935,9 +935,86 @@ class InternalTransferService {
 
       await firebaseTransactionService.createTransaction(transaction);
       logger.info('Transaction saved to Firebase', { signature: transactionData.signature }, 'InternalTransferService');
+
+      // Send notification to recipient
+      await this.sendReceivedFundsNotification(transactionData);
     } catch (error) {
       logger.error('Failed to save transaction to Firebase', error, 'InternalTransferService');
       throw error;
+    }
+  }
+
+  /**
+   * Send notification to recipient when they receive funds
+   */
+  private async sendReceivedFundsNotification(transactionData: {
+    userId: string;
+    toAddress: string;
+    amount: number;
+    currency: string;
+    signature: string;
+    companyFee: number;
+    netAmount: number;
+    memo?: string;
+    groupId?: string;
+  }): Promise<void> {
+    try {
+      logger.info('🔔 Sending received funds notification', {
+        to: transactionData.toAddress,
+        amount: transactionData.netAmount,
+        currency: transactionData.currency
+      }, 'InternalTransferService');
+
+      // Find recipient user by wallet address
+      const { firebaseDataService } = await import('../services/firebaseDataService');
+      const recipientUser = await firebaseDataService.user.getUserByWalletAddress(transactionData.toAddress);
+
+      if (!recipientUser) {
+        logger.info('🔔 No user found with wallet address (external wallet):', transactionData.toAddress, 'InternalTransferService');
+        return; // External wallet, no notification needed
+      }
+
+      // Get sender user info
+      const senderUser = await firebaseDataService.user.getCurrentUser(transactionData.userId);
+
+      // Create notification data
+      const notificationData = {
+        userId: recipientUser.id.toString(),
+        title: '💰 Funds Received',
+        message: `You received ${transactionData.netAmount} ${transactionData.currency} from ${senderUser.name}`,
+        type: 'money_received' as const,
+        data: {
+          transactionId: transactionData.signature,
+          amount: transactionData.netAmount,
+          currency: transactionData.currency,
+          senderId: transactionData.userId,
+          senderName: senderUser.name,
+          memo: transactionData.memo || '',
+          timestamp: new Date().toISOString()
+        },
+        is_read: false
+      };
+
+      // Send notification
+      const { sendNotification } = await import('../services/firebaseNotificationService');
+      await sendNotification(
+        notificationData.userId,
+        notificationData.title,
+        notificationData.message,
+        notificationData.type,
+        notificationData.data
+      );
+
+      logger.info('✅ Received funds notification sent successfully', {
+        recipientId: recipientUser.id,
+        recipientName: recipientUser.name,
+        amount: transactionData.netAmount,
+        currency: transactionData.currency
+      }, 'InternalTransferService');
+
+    } catch (error) {
+      logger.error('❌ Error sending received funds notification', error, 'InternalTransferService');
+      // Don't throw error - notification failure shouldn't break the transaction
     }
   }
 
