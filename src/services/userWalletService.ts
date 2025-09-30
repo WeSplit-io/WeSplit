@@ -117,28 +117,31 @@ export class UserWalletService {
         hasValidWalletAddress,
         walletPublicKey: user?.wallet_public_key
         }, 'UserWalletService');
-        
-      // If user has a valid wallet address in Firebase, try to restore it
-      if (hasValidWalletAddress) {
-        logger.info('UserWalletService: User has wallet address in Firebase, attempting to restore', {
+
+      // Check if user has stored wallet credentials (even if database address is missing/invalid)
+      const hasStoredCredentials = await this.hasStoredWalletCredentials(userId);
+      
+      if (hasValidWalletAddress || hasStoredCredentials) {
+        logger.info('UserWalletService: User has wallet data, attempting to restore', {
           userId,
-          walletAddress: existingWalletAddress
+          walletAddress: existingWalletAddress,
+          hasStoredCredentials
         }, 'UserWalletService');
         
         // Try to restore the wallet from seed phrase or private key
-        const restoreResult = await this.restoreExistingWallet(userId, existingWalletAddress);
+        const restoreResult = await this.restoreExistingWallet(userId, existingWalletAddress || '');
         
         if (restoreResult.success) {
           logger.info('UserWalletService: Successfully restored existing wallet', {
           userId, 
-            walletAddress: existingWalletAddress
+            walletAddress: restoreResult.wallet?.address || existingWalletAddress
         }, 'UserWalletService');
         
           return {
             success: true,
             wallet: {
-              address: existingWalletAddress,
-              publicKey: user.wallet_public_key || existingWalletAddress
+              address: restoreResult.wallet?.address || existingWalletAddress,
+              publicKey: restoreResult.wallet?.publicKey || user?.wallet_public_key || existingWalletAddress
             }
           };
         } else {
@@ -184,6 +187,7 @@ export class UserWalletService {
   /**
    * Restore existing wallet for a user
    * This method tries to restore the wallet from stored seed phrase or private key
+   * IMPROVED: More robust restoration with multiple fallback strategies
    */
   private async restoreExistingWallet(userId: string, walletAddress: string): Promise<WalletCreationResult> {
     try {
@@ -192,99 +196,37 @@ export class UserWalletService {
         walletAddress 
       }, 'UserWalletService');
       
-      // First, check if private key already exists in secure storage
-      try {
-        const existingPrivateKey = await secureStorageService.getPrivateKey(userId);
-        if (existingPrivateKey) {
-          logger.info('UserWalletService: Found existing private key in secure storage', { userId }, 'UserWalletService');
-          
-          // Verify the private key matches the wallet address
-          try {
-            const keypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(existingPrivateKey)));
-            if (keypair.publicKey.toBase58() === walletAddress) {
-              logger.info('UserWalletService: Private key matches wallet address, wallet restored', { 
-            userId, 
-                walletAddress 
-      }, 'UserWalletService');
-
-      return {
-        success: true,
-        wallet: {
-                  address: walletAddress,
-                  publicKey: walletAddress,
-                  secretKey: existingPrivateKey
-                }
-              };
-            } else {
-              logger.warn('UserWalletService: Private key does not match wallet address', {
-                userId,
-                expectedAddress: walletAddress,
-                actualAddress: keypair.publicKey.toBase58()
-              }, 'UserWalletService');
-            }
-          } catch (keyError) {
-            logger.warn('UserWalletService: Failed to parse existing private key', { userId, error: keyError }, 'UserWalletService');
-          }
-        }
-      } catch (error) {
-        logger.warn('UserWalletService: Failed to check for existing private key', { userId, error }, 'UserWalletService');
+      // Strategy 1: Try to restore from stored private key
+      const privateKeyResult = await this.tryRestoreFromPrivateKey(userId, walletAddress);
+      if (privateKeyResult.success) {
+        return privateKeyResult;
       }
 
-      // If no private key found, try to restore from seed phrase
-      try {
-        const seedPhrase = await secureStorageService.getSeedPhrase(userId);
-        if (seedPhrase && bip39.validateMnemonic(seedPhrase)) {
-          logger.info('UserWalletService: Found valid seed phrase, attempting to restore wallet', { userId }, 'UserWalletService');
-          
-          // Import wallet from seed phrase
-          const wallet = await consolidatedWalletService.importWallet(seedPhrase);
-          
-          if (wallet && wallet.address === walletAddress) {
-            logger.info('UserWalletService: Successfully restored wallet from seed phrase', { 
-              userId, 
-              walletAddress 
-      }, 'UserWalletService');
-      
-            // Store the private key for future use
-      if (wallet.secretKey) {
-        try {
-          const secretKeyArray = Array.from(new Uint8Array(Buffer.from(wallet.secretKey, 'base64')));
-          await secureStorageService.storePrivateKey(userId, JSON.stringify(secretKeyArray));
-                logger.info('UserWalletService: Stored private key from restored wallet', { userId }, 'UserWalletService');
-        } catch (keyStorageError) {
-                logger.warn('UserWalletService: Failed to store private key from restored wallet', { userId, error: keyStorageError }, 'UserWalletService');
-              }
-            }
-            
-            return {
-              success: true,
-              wallet: {
-                address: walletAddress,
-                publicKey: wallet.publicKey || walletAddress,
-                secretKey: wallet.secretKey
-              }
-            };
-          } else {
-            logger.warn('UserWalletService: Seed phrase does not match wallet address', {
-          userId, 
-              expectedAddress: walletAddress,
-              actualAddress: wallet?.address
-        }, 'UserWalletService');
-          }
-        } else {
-          logger.warn('UserWalletService: No valid seed phrase found', { userId }, 'UserWalletService');
-        }
-      } catch (error) {
-        logger.warn('UserWalletService: Failed to restore from seed phrase', { userId, error }, 'UserWalletService');
+      // Strategy 2: Try to restore from stored seed phrase
+      const seedPhraseResult = await this.tryRestoreFromSeedPhrase(userId, walletAddress);
+      if (seedPhraseResult.success) {
+        return seedPhraseResult;
       }
 
-      // If we get here, we couldn't restore the wallet
-      logger.warn('UserWalletService: Could not restore existing wallet, attempting to fix mismatch', { 
+      // Strategy 3: Try alternative derivation paths from seed phrase
+      const alternativeResult = await this.tryAlternativeDerivationPaths(userId, walletAddress);
+      if (alternativeResult.success) {
+        return alternativeResult;
+      }
+
+      // Strategy 4: If we have any stored credentials, use them even if address doesn't match
+      // This handles cases where the user's wallet was created with different derivation
+      const fallbackResult = await this.tryFallbackRestoration(userId, walletAddress);
+      if (fallbackResult.success) {
+        return fallbackResult;
+      }
+
+      // If all strategies fail, try to fix the wallet mismatch
+      logger.warn('UserWalletService: All restoration strategies failed, attempting to fix mismatch', { 
         userId,
         walletAddress 
       }, 'UserWalletService');
 
-      // Try to fix the wallet mismatch
       return await this.fixWalletMismatch(userId);
 
     } catch (error) {
@@ -293,6 +235,304 @@ export class UserWalletService {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to restore existing wallet'
       };
+    }
+  }
+
+  /**
+   * Check if user has stored wallet credentials (seed phrase or private key)
+   */
+  private async hasStoredWalletCredentials(userId: string): Promise<boolean> {
+    try {
+      // Check for stored seed phrase
+      const seedPhrase = await secureStorageService.getSeedPhrase(userId);
+      if (seedPhrase && bip39.validateMnemonic(seedPhrase)) {
+        logger.info('UserWalletService: Found stored seed phrase', { userId }, 'UserWalletService');
+        return true;
+      }
+
+      // Check for stored private key
+      const privateKey = await secureStorageService.getPrivateKey(userId);
+      if (privateKey) {
+        try {
+          // Try to parse the private key to validate it
+          Keypair.fromSecretKey(new Uint8Array(JSON.parse(privateKey)));
+          logger.info('UserWalletService: Found stored private key', { userId }, 'UserWalletService');
+          return true;
+        } catch (error) {
+          logger.warn('UserWalletService: Found invalid private key', { userId, error }, 'UserWalletService');
+        }
+      }
+
+      logger.info('UserWalletService: No stored wallet credentials found', { userId }, 'UserWalletService');
+      return false;
+    } catch (error) {
+      logger.warn('UserWalletService: Error checking stored credentials', { userId, error }, 'UserWalletService');
+      return false;
+    }
+  }
+
+  /**
+   * Strategy 1: Try to restore from stored private key
+   */
+  private async tryRestoreFromPrivateKey(userId: string, expectedAddress: string): Promise<WalletCreationResult> {
+    try {
+      const existingPrivateKey = await secureStorageService.getPrivateKey(userId);
+      if (!existingPrivateKey) {
+        return { success: false, error: 'No private key found' };
+      }
+
+      logger.info('UserWalletService: Found existing private key, attempting to restore', { userId }, 'UserWalletService');
+      
+      const keypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(existingPrivateKey)));
+      const actualAddress = keypair.publicKey.toBase58();
+      
+      if (actualAddress === expectedAddress) {
+        logger.info('UserWalletService: Private key matches expected address, wallet restored', { 
+          userId, 
+          address: actualAddress 
+        }, 'UserWalletService');
+
+        return {
+          success: true,
+          wallet: {
+            address: actualAddress,
+            publicKey: actualAddress,
+            secretKey: existingPrivateKey
+          }
+        };
+      } else {
+        logger.warn('UserWalletService: Private key address mismatch', {
+          userId,
+          expectedAddress,
+          actualAddress
+        }, 'UserWalletService');
+        return { success: false, error: 'Address mismatch' };
+      }
+    } catch (error) {
+      logger.warn('UserWalletService: Failed to restore from private key', { userId, error }, 'UserWalletService');
+      return { success: false, error: 'Private key restoration failed' };
+    }
+  }
+
+  /**
+   * Strategy 2: Try to restore from stored seed phrase
+   */
+  private async tryRestoreFromSeedPhrase(userId: string, expectedAddress: string): Promise<WalletCreationResult> {
+    try {
+      const seedPhrase = await secureStorageService.getSeedPhrase(userId);
+      if (!seedPhrase || !bip39.validateMnemonic(seedPhrase)) {
+        return { success: false, error: 'No valid seed phrase found' };
+      }
+
+      logger.info('UserWalletService: Found valid seed phrase, attempting to restore', { userId }, 'UserWalletService');
+      
+      // Import wallet from seed phrase using standard derivation path
+      const wallet = await consolidatedWalletService.importWallet(seedPhrase);
+      
+      if (wallet && wallet.address === expectedAddress) {
+        logger.info('UserWalletService: Successfully restored wallet from seed phrase', { 
+          userId, 
+          address: wallet.address 
+        }, 'UserWalletService');
+        
+        // Store the private key for future use
+        if (wallet.secretKey) {
+          try {
+            const secretKeyArray = Array.from(new Uint8Array(Buffer.from(wallet.secretKey, 'base64')));
+            await secureStorageService.storePrivateKey(userId, JSON.stringify(secretKeyArray));
+            logger.info('UserWalletService: Stored private key from restored wallet', { userId }, 'UserWalletService');
+          } catch (keyStorageError) {
+            logger.warn('UserWalletService: Failed to store private key from restored wallet', { userId, error: keyStorageError }, 'UserWalletService');
+          }
+        }
+        
+        return {
+          success: true,
+          wallet: {
+            address: wallet.address,
+            publicKey: wallet.publicKey || wallet.address,
+            secretKey: wallet.secretKey
+          }
+        };
+      } else {
+        logger.warn('UserWalletService: Seed phrase address mismatch', {
+          userId,
+          expectedAddress,
+          actualAddress: wallet?.address
+        }, 'UserWalletService');
+        return { success: false, error: 'Address mismatch' };
+      }
+    } catch (error) {
+      logger.warn('UserWalletService: Failed to restore from seed phrase', { userId, error }, 'UserWalletService');
+      return { success: false, error: 'Seed phrase restoration failed' };
+    }
+  }
+
+  /**
+   * Strategy 3: Try alternative derivation paths from seed phrase
+   */
+  private async tryAlternativeDerivationPaths(userId: string, expectedAddress: string): Promise<WalletCreationResult> {
+    try {
+      const seedPhrase = await secureStorageService.getSeedPhrase(userId);
+      if (!seedPhrase || !bip39.validateMnemonic(seedPhrase)) {
+        return { success: false, error: 'No valid seed phrase for alternative paths' };
+      }
+
+      logger.info('UserWalletService: Trying alternative derivation paths', { userId, expectedAddress }, 'UserWalletService');
+      
+      // Common Solana derivation paths to try
+      const derivationPaths = [
+        "m/44'/501'/0'/0'",    // Standard BIP44 Solana
+        "m/44'/501'/0'",       // Alternative
+        "m/44'/501'/0'/0'/0'", // Extended
+        "m/44'/501'/1'/0'",    // Account 1
+        "m/44'/501'/0'/1'",    // Change 1
+        "m/44'/501'/0'/0'/1'", // Extended change
+      ];
+      
+      for (const path of derivationPaths) {
+        try {
+          logger.info('UserWalletService: Trying derivation path', { path, expectedAddress }, 'UserWalletService');
+          
+          const wallet = await consolidatedWalletService.importWallet(seedPhrase, path);
+          
+          if (wallet && wallet.address === expectedAddress) {
+            logger.info('UserWalletService: Found matching wallet with alternative derivation path', { 
+              path, 
+              address: wallet.address 
+            }, 'UserWalletService');
+            
+            // Store the private key for future use
+            if (wallet.secretKey) {
+              try {
+                const secretKeyArray = Array.from(new Uint8Array(Buffer.from(wallet.secretKey, 'base64')));
+                await secureStorageService.storePrivateKey(userId, JSON.stringify(secretKeyArray));
+                logger.info('UserWalletService: Stored private key from alternative path wallet', { userId }, 'UserWalletService');
+              } catch (keyStorageError) {
+                logger.warn('UserWalletService: Failed to store private key from alternative path wallet', { userId, error: keyStorageError }, 'UserWalletService');
+              }
+            }
+            
+            return {
+              success: true,
+              wallet: {
+                address: wallet.address,
+                publicKey: wallet.publicKey || wallet.address,
+                secretKey: wallet.secretKey
+              }
+            };
+          }
+        } catch (error) {
+          logger.debug('UserWalletService: Derivation path failed', { path, error }, 'UserWalletService');
+          continue;
+        }
+      }
+      
+      logger.warn('UserWalletService: No matching wallet found with any derivation path', { expectedAddress }, 'UserWalletService');
+      return { success: false, error: 'No matching derivation path found' };
+    } catch (error) {
+      logger.warn('UserWalletService: Failed to try alternative derivation paths', { userId, error }, 'UserWalletService');
+      return { success: false, error: 'Alternative derivation paths failed' };
+    }
+  }
+
+  /**
+   * Strategy 4: Fallback restoration - use any available credentials even if address doesn't match
+   * This handles cases where the user's wallet was created with different derivation or the database has wrong address
+   */
+  private async tryFallbackRestoration(userId: string, expectedAddress: string): Promise<WalletCreationResult> {
+    try {
+      logger.info('UserWalletService: Attempting fallback restoration', { userId, expectedAddress }, 'UserWalletService');
+      
+      // Try to get any available credentials
+      const seedPhrase = await secureStorageService.getSeedPhrase(userId);
+      const privateKey = await secureStorageService.getPrivateKey(userId);
+      
+      if (seedPhrase && bip39.validateMnemonic(seedPhrase)) {
+        // Use the seed phrase to create a wallet, even if address doesn't match
+        logger.info('UserWalletService: Using seed phrase for fallback restoration', { userId }, 'UserWalletService');
+        
+        const wallet = await consolidatedWalletService.importWallet(seedPhrase);
+        
+        if (wallet && wallet.address) {
+          logger.warn('UserWalletService: Fallback restoration successful with different address', {
+            userId,
+            expectedAddress,
+            actualAddress: wallet.address
+          }, 'UserWalletService');
+          
+          // Update the database with the correct address
+          try {
+            await firebaseDataService.user.updateUser(userId, {
+              wallet_address: wallet.address,
+              wallet_public_key: wallet.publicKey || wallet.address
+            });
+            logger.info('UserWalletService: Updated database with correct wallet address', { userId, address: wallet.address }, 'UserWalletService');
+          } catch (updateError) {
+            logger.warn('UserWalletService: Failed to update database with correct address', { userId, error: updateError }, 'UserWalletService');
+          }
+          
+          // Store the private key for future use
+          if (wallet.secretKey) {
+            try {
+              const secretKeyArray = Array.from(new Uint8Array(Buffer.from(wallet.secretKey, 'base64')));
+              await secureStorageService.storePrivateKey(userId, JSON.stringify(secretKeyArray));
+            } catch (keyStorageError) {
+              logger.warn('UserWalletService: Failed to store private key in fallback restoration', { userId, error: keyStorageError }, 'UserWalletService');
+            }
+          }
+          
+          return {
+            success: true,
+            wallet: {
+              address: wallet.address,
+              publicKey: wallet.publicKey || wallet.address,
+              secretKey: wallet.secretKey
+            }
+          };
+        }
+      } else if (privateKey) {
+        // Use the private key to create a wallet, even if address doesn't match
+        logger.info('UserWalletService: Using private key for fallback restoration', { userId }, 'UserWalletService');
+        
+        try {
+          const keypair = Keypair.fromSecretKey(new Uint8Array(JSON.parse(privateKey)));
+          const actualAddress = keypair.publicKey.toBase58();
+          
+          logger.warn('UserWalletService: Fallback restoration successful with different address', {
+            userId,
+            expectedAddress,
+            actualAddress
+          }, 'UserWalletService');
+          
+          // Update the database with the correct address
+          try {
+            await firebaseDataService.user.updateUser(userId, {
+              wallet_address: actualAddress,
+              wallet_public_key: actualAddress
+            });
+            logger.info('UserWalletService: Updated database with correct wallet address', { userId, address: actualAddress }, 'UserWalletService');
+          } catch (updateError) {
+            logger.warn('UserWalletService: Failed to update database with correct address', { userId, error: updateError }, 'UserWalletService');
+          }
+          
+          return {
+            success: true,
+            wallet: {
+              address: actualAddress,
+              publicKey: actualAddress,
+              secretKey: privateKey
+            }
+          };
+        } catch (keyError) {
+          logger.warn('UserWalletService: Failed to parse private key in fallback restoration', { userId, error: keyError }, 'UserWalletService');
+        }
+      }
+      
+      return { success: false, error: 'No valid credentials for fallback restoration' };
+    } catch (error) {
+      logger.warn('UserWalletService: Failed fallback restoration', { userId, error }, 'UserWalletService');
+      return { success: false, error: 'Fallback restoration failed' };
     }
   }
 

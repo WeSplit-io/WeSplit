@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   button: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryGreen,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: 8,

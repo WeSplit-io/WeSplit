@@ -57,7 +57,7 @@ const BalanceScreen: React.FC<any> = ({ navigation, route }) => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Balances</Text>
         <TouchableOpacity onPress={handleSettleUp} style={styles.settleButton}>
-          <Icon name="check-circle" size={24} color={colors.primary} />
+          <Icon name="check-circle" size={24} color={colors.primaryGreen} />
         </TouchableOpacity>
       </View>
 

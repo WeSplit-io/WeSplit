@@ -82,6 +82,47 @@ export const styles = StyleSheet.create({
   socialButtonDisabled: {
     opacity: 0.6,
   },
+  // Social authentication section styles
+  privySection: {
+    marginBottom: spacing.xl,
+    paddingTop: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.darkBorder,
+  },
+  privySectionTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textLight,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  socialOptions: {
+    gap: spacing.md,
+  },
+  socialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.darkCard,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.darkBorder,
+  },
+  socialButtonDisabled: {
+    opacity: 0.6,
+  },
+  socialIconContainer: {
+    marginRight: spacing.sm,
+  },
+  socialIcon: {
+    fontSize: 20,
+  },
+  socialButtonText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textLight,
+  },
   separator: {
     flexDirection: 'row',
     alignItems: 'center',

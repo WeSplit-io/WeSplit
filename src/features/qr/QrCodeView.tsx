@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryGreen,
   },
   shareButton: {
-    backgroundColor: colors.primaryBlue,
+    backgroundColor: colors.primaryGreen,
   },
   buttonText: {
     color: colors.white,

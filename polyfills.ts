@@ -1623,5 +1623,55 @@ if (typeof global !== 'undefined' && typeof global.WebSocket === 'undefined') {
       }
     };
   }
+
+  // Polyfill for Node.js 'zlib' module (required by jose library)
+  if (typeof (global as any).zlib === 'undefined') {
+    (global as any).zlib = {
+      inflateRaw: (data: any, callback: Function) => {
+        // No-op implementation - return data as-is
+        console.warn('zlib.inflateRaw called - using no-op implementation');
+        if (callback) {
+          callback(null, data);
+        }
+        return data;
+      },
+      deflateRaw: (data: any, callback: Function) => {
+        // No-op implementation - return data as-is
+        console.warn('zlib.deflateRaw called - using no-op implementation');
+        if (callback) {
+          callback(null, data);
+        }
+        return data;
+      },
+      gzip: (data: any, callback: Function) => {
+        console.warn('zlib.gzip called - using no-op implementation');
+        if (callback) {
+          callback(null, data);
+        }
+        return data;
+      },
+      gunzip: (data: any, callback: Function) => {
+        console.warn('zlib.gunzip called - using no-op implementation');
+        if (callback) {
+          callback(null, data);
+        }
+        return data;
+      },
+      createInflateRaw: () => ({
+        write: () => {},
+        end: () => {},
+        on: () => {},
+        once: () => {},
+        emit: () => {}
+      }),
+      createDeflateRaw: () => ({
+        write: () => {},
+        end: () => {},
+        on: () => {},
+        once: () => {},
+        emit: () => {}
+      })
+    };
+  }
 }
 

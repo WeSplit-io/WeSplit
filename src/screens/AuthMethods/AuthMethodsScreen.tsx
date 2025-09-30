@@ -27,6 +27,7 @@ import { userWalletService } from '../../services/userWalletService';
 import { unifiedUserService } from '../../services/unifiedUserService';
 import { userDataService } from '../../services/userDataService';
 import { sendVerificationCode } from '../../services/firebaseFunctionsService';
+// import { usePrivyAuth } from '../../hooks/usePrivyAuth';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
@@ -46,11 +47,12 @@ const AuthMethodsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { authenticateUser, updateUser } = useApp();
   const { connectWallet } = useWallet();
+  // const { login: privyLogin, authenticated: privyAuthenticated, user: privyUser } = usePrivyAuth();
 
   // State management
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<'google' | 'twitter' | 'apple' | null>(null);
+  const [socialLoading, setSocialLoading] = useState<'google' | 'twitter' | 'apple' | 'privy' | null>(null);
   const [hasCheckedMonthlyVerification, setHasCheckedMonthlyVerification] = useState(false);
   const [hasHandledAuthState, setHasHandledAuthState] = useState(false);
 
@@ -453,6 +455,29 @@ const AuthMethodsScreen: React.FC = () => {
       }
   };
 
+  // Handle social authentication (replaces Privy authentication)
+  const handleSocialAuthWithProvider = async (provider: 'google' | 'twitter' | 'apple') => {
+    setSocialLoading(provider);
+    
+    try {
+      console.log('🚀 Starting social authentication with provider:', provider);
+      
+      // Use consolidated auth service for social login
+      await handleSocialAuth(provider);
+      
+      console.log('✅ Social authentication initiated successfully');
+      
+    } catch (error) {
+      console.error('❌ Social authentication failed:', error);
+      Alert.alert(
+        'Authentication Failed',
+        error instanceof Error ? error.message : `Failed to authenticate with ${provider}. Please try again.`
+      );
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
   // Handle social authentication with improved error handling and user data management
   const handleSocialAuth = async (provider: 'google' | 'twitter' | 'apple') => {
     setSocialLoading(provider);
@@ -539,7 +564,7 @@ const AuthMethodsScreen: React.FC = () => {
   };
 
   // Get loading text for social buttons
-  const getSocialLoadingText = (provider: 'google' | 'twitter' | 'apple') => {
+  const getSocialLoadingText = (provider: 'google' | 'twitter' | 'apple' | 'privy') => {
     switch (provider) {
       case 'google':
         return 'Signing in with Google...';
@@ -547,6 +572,8 @@ const AuthMethodsScreen: React.FC = () => {
         return 'Signing in with Twitter...';
       case 'apple':
         return 'Signing in with Apple...';
+      case 'privy':
+        return 'Signing in with Privy...';
       default:
         return 'Signing in...';
     }
@@ -615,6 +642,62 @@ const AuthMethodsScreen: React.FC = () => {
                 {socialLoading === 'apple' ? getSocialLoadingText('apple') : 'Continue with Apple'}
               </Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Privy Authentication Section */}
+          <View style={styles.privySection}>
+            <Text style={styles.privySectionTitle}>Social Login Options</Text>
+            
+            {/* Social Authentication Options */}
+            <View style={styles.socialOptions}>
+              <TouchableOpacity
+                style={[
+                  styles.socialButton,
+                  (loading || socialLoading === 'google') && styles.socialButtonDisabled
+                ]}
+                onPress={() => handleSocialAuthWithProvider('google')}
+                disabled={loading || socialLoading !== null}
+              >
+                <View style={styles.socialIconContainer}>
+                  <Text style={styles.socialIcon}>🔍</Text>
+                </View>
+                <Text style={styles.socialButtonText}>
+                  {socialLoading === 'google' ? 'Signing in...' : 'Sign in with Google'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.socialButton,
+                  (loading || socialLoading === 'twitter') && styles.socialButtonDisabled
+                ]}
+                onPress={() => handleSocialAuthWithProvider('twitter')}
+                disabled={loading || socialLoading !== null}
+              >
+                <View style={styles.socialIconContainer}>
+                  <Text style={styles.socialIcon}>🐦</Text>
+                </View>
+                <Text style={styles.socialButtonText}>
+                  {socialLoading === 'twitter' ? 'Signing in...' : 'Sign in with Twitter'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.socialButton,
+                  (loading || socialLoading === 'apple') && styles.socialButtonDisabled
+                ]}
+                onPress={() => handleSocialAuthWithProvider('apple')}
+                disabled={loading || socialLoading !== null}
+              >
+                <View style={styles.socialIconContainer}>
+                  <Text style={styles.socialIcon}>🍎</Text>
+                </View>
+                <Text style={styles.socialButtonText}>
+                  {socialLoading === 'apple' ? 'Signing in...' : 'Sign in with Apple'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Separator */}

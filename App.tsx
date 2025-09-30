@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WalletProvider } from './src/context/WalletContext';
 import { AppProvider } from './src/context/AppContext';
 import { WalletLinkingProvider } from './src/context/WalletLinkingContext';
+import PrivyProvider from './src/components/PrivyProvider';
 import { Text, View } from 'react-native';
 import { styles } from './App.styles';
 import NavigationWrapper from './src/components/NavigationWrapper';
@@ -48,6 +49,7 @@ import SendSuccessScreen from './src/screens/Send/SendSuccessScreen';
 import RequestContactsScreen from './src/screens/Request/RequestContactsScreen';
 import RequestAmountScreen from './src/screens/Request/RequestAmountScreen';
 import RequestConfirmationScreen from './src/screens/Request/RequestConfirmationScreen';
+import PrivyDemoScreen from './src/screens/PrivyDemo/PrivyDemoScreen';
 import RequestSuccessScreen from './src/screens/Request/RequestSuccessScreen';
 import GroupsListScreen from './src/screens/GroupsList/GroupsListScreen';
 import WithdrawAmountScreen from './src/screens/Withdraw/WithdrawAmountScreen';
@@ -132,10 +134,11 @@ export default function App() {
   return (
     <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <WalletProvider>
-        <AppProvider>
-          <WalletLinkingProvider>
-            <NavigationWrapper>
+      <PrivyProvider>
+        <WalletProvider>
+          <AppProvider>
+            <WalletLinkingProvider>
+              <NavigationWrapper>
               <Stack.Navigator 
                 initialRouteName="Splash"
                 screenOptions={{
@@ -189,11 +192,13 @@ export default function App() {
                 <Stack.Screen name="ExternalWalletConnection" component={ExternalWalletConnectionScreen} />
                 <Stack.Screen name="ManualSignatureInput" component={ManualSignatureInputScreen} />
                 <Stack.Screen name="SettleUpModal" component={SettleUpModal} />
+                <Stack.Screen name="PrivyDemo" component={PrivyDemoScreen} />
               </Stack.Navigator>
-            </NavigationWrapper>
-          </WalletLinkingProvider>
-        </AppProvider>
-      </WalletProvider>
+              </NavigationWrapper>
+            </WalletLinkingProvider>
+          </AppProvider>
+        </WalletProvider>
+      </PrivyProvider>
     </QueryClientProvider>
     </ErrorBoundary>
   );

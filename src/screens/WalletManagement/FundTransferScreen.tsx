@@ -130,7 +130,7 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <ActivityIndicator size="large" color={colors.primaryGreen} />
         <Text style={styles.loadingText}>Loading linked wallets...</Text>
       </View>
     );
@@ -213,7 +213,7 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
                 value={amount}
                 onChangeText={setAmount}
                 placeholder="Enter amount in SOL"
-                placeholderTextColor={theme.colors.gray}
+                placeholderTextColor={colors.textLightSecondary}
                 keyboardType="numeric"
               />
               <Text style={styles.currencyLabel}>SOL</Text>
@@ -251,28 +251,28 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.darkBackground,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.darkBackground,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: theme.colors.text,
+    color: colors.textLight,
   },
   header: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+    borderBottomColor: colors.darkBorder,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: theme.colors.text,
+    color: colors.textLight,
   },
   scrollView: {
     flex: 1,
@@ -283,19 +283,19 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: theme.colors.text,
+    color: colors.textLight,
     marginBottom: 12,
   },
   walletCard: {
-    backgroundColor: theme.colors.card,
+    backgroundColor: colors.darkCard,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.darkBorder,
     marginBottom: 12,
   },
   selectedWalletCard: {
-    borderColor: theme.colors.primary,
+    borderColor: colors.primaryGreen,
     borderWidth: 2,
   },
   walletHeader: {
@@ -307,10 +307,10 @@ const styles = StyleSheet.create({
   walletName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: theme.colors.text,
+    color: colors.textLight,
   },
   walletTypeBadge: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primaryGreen,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -322,23 +322,23 @@ const styles = StyleSheet.create({
   },
   walletAddress: {
     fontSize: 14,
-    color: theme.colors.text,
+    color: colors.textLight,
     fontFamily: 'monospace',
     marginBottom: 4,
   },
   walletType: {
     fontSize: 14,
-    color: theme.colors.gray,
+    color: colors.textLightSecondary,
     marginBottom: 4,
   },
   walletLinkedDate: {
     fontSize: 14,
-    color: theme.colors.gray,
+    color: colors.textLightSecondary,
     marginBottom: 4,
   },
   walletBalance: {
     fontSize: 14,
-    color: theme.colors.text,
+    color: colors.textLight,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -348,17 +348,17 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: theme.colors.text,
+    color: colors.textLight,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 16,
-    color: theme.colors.gray,
+    color: colors.textLightSecondary,
     textAlign: 'center',
     marginBottom: 24,
   },
   linkWalletButton: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primaryGreen,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -370,31 +370,31 @@ const styles = StyleSheet.create({
   amountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.card,
+    backgroundColor: colors.darkCard,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.darkBorder,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   amountInput: {
     flex: 1,
     fontSize: 18,
-    color: theme.colors.text,
+    color: colors.textLight,
   },
   currencyLabel: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: theme.colors.text,
+    color: colors.textLight,
     marginLeft: 8,
   },
   amountHint: {
     fontSize: 14,
-    color: theme.colors.gray,
+    color: colors.textLightSecondary,
     marginTop: 8,
   },
   transferButton: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primaryGreen,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',

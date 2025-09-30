@@ -6,6 +6,7 @@ export { typography } from './typography';
 // === THEME UTILITIES ===
 // Helper functions for creating consistent styles
 
+// Import the theme objects for use in this file
 import { colors } from './colors';
 import { spacing } from './spacing';
 import { typography } from './typography';

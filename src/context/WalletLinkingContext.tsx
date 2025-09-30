@@ -38,6 +38,12 @@ export const WalletLinkingProvider: React.FC<WalletLinkingProviderProps> = ({ ch
 
   const loadLinkedWallets = async () => {
     try {
+      // Check if wallet service is available and has a wallet loaded
+      if (!consolidatedWalletService || !consolidatedWalletService.isConnected()) {
+        console.log('No wallet connected, skipping linked wallets load');
+        return;
+      }
+
       // In a real app, you would load this from secure storage
       // For now, we'll use a simple approach
       const connectedWallet = await consolidatedWalletService.getWalletInfo();
@@ -46,7 +52,7 @@ export const WalletLinkingProvider: React.FC<WalletLinkingProviderProps> = ({ ch
           address: connectedWallet.address,
           name: connectedWallet.walletName || 'External Wallet',
           provider: 'Unknown', // We'd need to track this
-          balance: connectedWallet.balance,
+          balance: connectedWallet.balance || 0,
           isConnected: true,
           linkedAt: new Date()
         };
@@ -54,6 +60,7 @@ export const WalletLinkingProvider: React.FC<WalletLinkingProviderProps> = ({ ch
       }
     } catch (error) {
       console.error('Error loading linked wallets:', error);
+      // Don't throw the error, just log it and continue
     }
   };
 
