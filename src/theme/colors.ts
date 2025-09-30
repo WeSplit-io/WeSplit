@@ -12,6 +12,12 @@ export const colors = {
   red: '#DC3434',
   red20: 'rgba(220, 52, 52, 0.20)',
   blackOverlay: 'rgba(0, 0, 0, 0.65)',
+  
+  // Gradient colors for React Native
+  gradientStart: '#0A8A5A',
+  gradientEnd: '#53EF97',
+  gradientColors: ['#0A8A5A', '#53EF97'],
+  gradientAngle: 87,
     
 
 

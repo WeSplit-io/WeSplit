@@ -7,6 +7,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.darkBackground,
+    // backgroundColor removed - using gradient instead
   },
   logoContainer: {
     alignItems: 'center',

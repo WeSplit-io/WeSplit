@@ -32,8 +32,8 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroImage: {
-    width: 300,
-    height: 300,
+    width: 580,
+    height: 580,
   },
   messageSection: {
     alignItems: 'flex-start',
@@ -55,10 +55,13 @@ export const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   getStartedButton: {
-    backgroundColor: colors.green,
     borderRadius: spacing.lg,
+    overflow: 'hidden',
+  },
+  gradientButton: {
     paddingVertical: 20,
     alignItems: 'center',
+    borderRadius: spacing.lg,
   },
   getStartedButtonText: {
     color: colors.black,

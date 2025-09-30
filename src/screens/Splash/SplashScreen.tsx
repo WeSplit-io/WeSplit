@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Image, Text, StatusBar, Animated } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { styles } from './styles';
 import { colors } from '../../theme';
 import { useApp } from '../../context/AppContext';
@@ -12,7 +15,7 @@ interface SplashScreenProps {
 const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
   const { state } = useApp();
   const { isAuthenticated, currentUser } = state;
-  
+
   // Animation states
   const [progress] = useState(new Animated.Value(0));
   const [logoOpacity] = useState(new Animated.Value(0));
@@ -21,7 +24,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
     // Start animations
     const startAnimations = () => {
       console.log('🎬 Starting splash screen animations');
-      
+
       // Logo fade in
       Animated.timing(logoOpacity, {
         toValue: 1,
@@ -52,14 +55,14 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
         // Check Firebase auth state
         const firebaseUser = auth.currentUser;
-        
+
         if (firebaseUser && firebaseUser.emailVerified) {
           // User is authenticated and email is verified
           console.log('✅ SplashScreen: User authenticated, checking profile and onboarding status');
-          
+
           // Check if user needs to create a profile (has no name/pseudo)
           const needsProfile = !currentUser?.name || currentUser.name.trim() === '';
-          
+
           if (needsProfile) {
             console.log('🔄 SplashScreen: User needs to create profile (no name), navigating to CreateProfile');
             navigation.replace('CreateProfile', { email: currentUser?.email || '' });
@@ -73,10 +76,10 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
         } else if (isAuthenticated && currentUser) {
           // User is authenticated in app context
           console.log('✅ SplashScreen: User authenticated in app context, checking profile and onboarding status');
-          
+
           // Check if user needs to create a profile (has no name/pseudo)
           const needsProfile = !currentUser.name || currentUser.name.trim() === '';
-          
+
           if (needsProfile) {
             console.log('🔄 SplashScreen: User needs to create profile (no name), navigating to CreateProfile');
             navigation.replace('CreateProfile', { email: currentUser.email });
@@ -105,32 +108,34 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor={colors.darkBackground} barStyle="light-content" />
-      
+
       <Animated.View style={[styles.logoContainer, { opacity: logoOpacity }]}>
-        <Image 
-          source={require('../../../assets/wesplit-logo-new.png')} 
+        <Image
+          source={require('../../../assets/wesplit-logo-new.png')}
           style={styles.logo}
           resizeMode="contain"
         />
       </Animated.View>
-      
+
       <View style={styles.progressContainer}>
         <View style={styles.progressBar}>
-          <Animated.View 
+          <AnimatedLinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
             style={[
-              styles.progressFill, 
-              { 
+              styles.progressFill,
+              {
                 width: progress.interpolate({
                   inputRange: [0, 1],
                   outputRange: ['0%', '100%'],
                 })
               }
-            ]} 
+            ]}
           />
         </View>
-
       </View>
-      
+
     </View>
   );
 };
