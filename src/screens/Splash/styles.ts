@@ -13,9 +13,30 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   logo: {
-    width: 200,
-    height: 80,
+    width: 120,
+    height: 120,
     resizeMode: 'contain',
+  },
+  progressContainer: {
+    width: '40%',
+    marginBottom: spacing.xl,
+  },
+  progressBar: {
+    height: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.greenLight,
+    borderRadius: 3,
+  },
+  debugText: {
+    color: colors.green,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
   taglineContainer: {
     alignItems: 'center',

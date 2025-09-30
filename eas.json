@@ -9,9 +9,6 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "ios": {
-        "prebuildCommand": "cd ios && ./cleanup-react-common.sh"
       }
     },
     "development-simple": {
@@ -19,9 +16,6 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "ios": {
-        "prebuildCommand": "cd ios && ./cleanup-react-common.sh"
       }
     },
     "development-fixed": {
@@ -30,9 +24,6 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
-      },
-      "ios": {
-        "prebuildCommand": "cd ios && ./cleanup-react-common.sh"
       }
     },
     "preview": {
@@ -40,16 +31,11 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "ios": {
-        "prebuildCommand": "cd ios && ./cleanup-react-common.sh"
       }
     },
     "production": {
       "autoIncrement": true,
-      "ios": {
-        "prebuildCommand": "cd ios && ./cleanup-react-common.sh"
-      },
+      
       "env": {
         "EXPO_PUBLIC_FIREBASE_API_KEY": "${EXPO_PUBLIC_FIREBASE_API_KEY}",
         "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "${EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN}",

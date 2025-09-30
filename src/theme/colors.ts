@@ -1,9 +1,10 @@
 export const colors = {
   // === PRIMARY BRAND COLORS (From Figma) ===
   // Root colors
-  green: '#A5EA15',
+  green: '#0A8A5A',
+  greenLight: '#53EF97',
   green10: 'rgba(165, 234, 21, 0.10)',
-  black: '#212121',
+  black: '#061113',
   white: '#FFFFFF',
   white10: 'rgba(255, 255, 255, 0.10)',
   white50: 'rgba(255, 255, 255, 0.50)',
@@ -11,6 +12,7 @@ export const colors = {
   red: '#DC3434',
   red20: 'rgba(220, 52, 52, 0.20)',
   blackOverlay: 'rgba(0, 0, 0, 0.65)',
+    
 
 
 
@@ -18,14 +20,14 @@ export const colors = {
 
 
   // Main brand green - used for primary actions, highlights, and success states
-  primaryGreen: '#A5EA15',
-  primaryGreenDark: '#A5EA15', // Legacy compatibility
+  primaryGreen: '#0A8A5A',
+  primaryGreenDark: '#0A8A5A', // Legacy compatibility
   primaryGreenLight: '#D7FF33',
   primaryGreenAlpha: 'rgba(197, 255, 0, 0.1)',
   
   // === DARK THEME COLORS (From Figma) ===
   // Main dark background used throughout the app
-  darkBackground: '#212121',
+  darkBackground: '#061113',
   darkCard: '#2A2A2A',
   darkCardSecondary: '#1E1E1E',
   darkBorder: '#333333',
@@ -41,11 +43,11 @@ export const colors = {
   
   // === LEGACY COMPATIBILITY ===
   // Keeping existing names for backward compatibility
-  brandGreen: '#C5FF00',
+  brandGreen: '#0A8A5A',
   brandGreenLight: '#C5FF0022',
   darkGray: '#A89B9B',
   BG_COLOR: '#1B1B1B', // Legacy - will be deprecated
-  GREEN: '#C5FF00', // Legacy - will be deprecated  
+  GREEN: '#0A8A5A', // Legacy - will be deprecated  
   GRAY: '#A89B9B', // Legacy - will be deprecated
   
   // === SEMANTIC COLORS ===

@@ -6,7 +6,7 @@ import { WalletProvider } from './src/context/WalletContext';
 import { AppProvider } from './src/context/AppContext';
 import { WalletLinkingProvider } from './src/context/WalletLinkingContext';
 import PrivyProvider from './src/components/PrivyProvider';
-import { Text, View } from 'react-native';
+import { Text, View, Image } from 'react-native';
 import { styles } from './App.styles';
 import NavigationWrapper from './src/components/NavigationWrapper';
 import ErrorBoundary from './src/components/ErrorBoundary';
@@ -71,6 +71,11 @@ const queryClient = new QueryClient();
 // Loading Component
 const LoadingScreen = () => (
   <View style={styles.loadingContainer}>
+    <Image 
+      source={require('./assets/wesplit-logo-new.png')} 
+      style={styles.loadingLogo}
+      resizeMode="contain"
+    />
     <Text style={styles.loadingText}>Loading WeSplit...</Text>
   </View>
 );

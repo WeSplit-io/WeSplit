@@ -8,6 +8,11 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.backgroundSecondary,
   },
+  loadingLogo: {
+    width: 80,
+    height: 80,
+    marginBottom: spacing.lg,
+  },
   loadingText: {
     fontSize: typography.fontSize.lg,
     color: colors.text,

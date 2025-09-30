@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Image, Text, StatusBar } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Image, Text, StatusBar, Animated } from 'react-native';
 import { styles } from './styles';
 import { colors } from '../../theme';
 import { useApp } from '../../context/AppContext';
@@ -12,6 +12,37 @@ interface SplashScreenProps {
 const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
   const { state } = useApp();
   const { isAuthenticated, currentUser } = state;
+  
+  // Animation states
+  const [progress] = useState(new Animated.Value(0));
+  const [logoOpacity] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    // Start animations
+    const startAnimations = () => {
+      console.log('🎬 Starting splash screen animations');
+      
+      // Logo fade in
+      Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }).start(() => {
+        console.log('✅ Logo fade in completed');
+      });
+
+      // Progress bar animation
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: false,
+      }).start(() => {
+        console.log('✅ Progress bar animation completed');
+      });
+    };
+
+    startAnimations();
+  }, []);
 
   useEffect(() => {
     const checkAuthAndNavigate = async () => {
@@ -75,18 +106,31 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar backgroundColor={colors.darkBackground} barStyle="light-content" />
       
-      <View style={styles.logoContainer}>
+      <Animated.View style={[styles.logoContainer, { opacity: logoOpacity }]}>
         <Image 
-          source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} 
+          source={require('../../../assets/wesplit-logo-new.png')} 
           style={styles.logo}
           resizeMode="contain"
         />
+      </Animated.View>
+      
+      <View style={styles.progressContainer}>
+        <View style={styles.progressBar}>
+          <Animated.View 
+            style={[
+              styles.progressFill, 
+              { 
+                width: progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '100%'],
+                })
+              }
+            ]} 
+          />
+        </View>
+
       </View>
       
-      <View style={styles.taglineContainer}>
-        <Text style={styles.tagline}>Split Expenses Seamlessly</Text>
-        <Text style={styles.subtitle}>Track, Split, and Settle with Friends</Text>
-      </View>
     </View>
   );
 };

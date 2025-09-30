@@ -12,9 +12,9 @@ export default {
     sdkVersion: "54.0.0",
     jsEngine: "hermes",
     splash: {
-      image: "./assets/splash-icon.png",
+      image: "./assets/wesplit-logo-new.png",
       resizeMode: "contain",
-      backgroundColor: "#ffffff"
+      backgroundColor: "#1a1a1a"
     },
     ios: {
       supportsTablet: true,
@@ -75,7 +75,9 @@ export default {
       favicon: "./assets/favicon.png"
     },
     plugins: [
-      "./queries.js"
+      "./queries.js",
+      "expo-secure-store",
+      "expo-router"
     ],
     extra: {
       eas: {
