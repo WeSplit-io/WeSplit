@@ -5,11 +5,13 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  ImageBackground,
   RefreshControl,
   ActivityIndicator,
   Alert,
   StyleSheet,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
@@ -38,6 +40,26 @@ const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, disp
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
 
+  // Reset error state when avatar changes
+  useEffect(() => {
+    if (avatar && avatar.trim() !== '') {
+      setHasError(false);
+    }
+  }, [avatar]);
+
+  // Add timeout to prevent infinite loading
+  useEffect(() => {
+    if (isLoading) {
+      const timeout = setTimeout(() => {
+        console.log('⏰ Avatar loading timeout, falling back to initial');
+        setIsLoading(false);
+        setHasError(true);
+      }, 5000); // 5 second timeout
+
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoading]);
+
   // Check if avatar is valid
   const hasValidAvatar = avatar && avatar.trim() !== '' && !hasError;
 
@@ -56,25 +78,31 @@ const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, disp
     <View style={[style, { overflow: 'hidden', position: 'relative' }]}>
       {isLoading && (
         <View style={[
-          StyleSheet.absoluteFill, 
-          { 
-            backgroundColor: colors.darkBorder, 
-            justifyContent: 'center', 
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: colors.darkBorder,
+            justifyContent: 'center',
             alignItems: 'center',
-            zIndex: 10 
+            zIndex: 10
           }
         ]}>
           <ActivityIndicator size="small" color={colors.primaryGreen} />
         </View>
       )}
-      <Image 
-        source={{ uri: avatar }} 
+      <Image
+        source={{ uri: avatar }}
         style={{ width: '100%', height: '100%' }}
         resizeMode="cover"
-        onLoadStart={() => setIsLoading(true)}
-        onLoad={() => setIsLoading(false)}
+        onLoadStart={() => {
+          console.log('🔄 Avatar loading started:', avatar);
+          setIsLoading(true);
+        }}
+        onLoad={() => {
+          console.log('✅ Avatar loaded successfully:', avatar);
+          setIsLoading(false);
+        }}
         onError={(e) => {
-          console.log('❌ Avatar loading error:', e.nativeEvent.error);
+          console.log('❌ Avatar loading error:', e.nativeEvent.error, 'for URL:', avatar);
           setIsLoading(false);
           setHasError(true);
         }}
@@ -87,7 +115,7 @@ const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, disp
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const { state, notifications, loadNotifications, refreshNotifications, updateUser } = useApp();
   const { currentUser, isAuthenticated } = state;
-  const { 
+  const {
     // App wallet state and actions
     appWalletAddress,
     appWalletBalance,
@@ -143,7 +171,24 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [refreshBalance, setRefreshBalance] = useState<number | null>(null); // Local refresh balance
   const [balanceLoaded, setBalanceLoaded] = useState(false); // Track if balance has been loaded
   const [walletUnrecoverable, setWalletUnrecoverable] = useState(false); // Track if wallet is unrecoverable
+  const [moreMenuVisible, setMoreMenuVisible] = useState(false);
 
+  // Function to hash wallet address for display
+  const hashWalletAddress = (address: string): string => {
+    if (!address || address.length < 8) return address;
+    return `${address.slice(0, 4)}...${address.slice(-4)}`;
+  };
+
+  // Function to copy wallet address to clipboard
+  const copyWalletAddress = async (address: string) => {
+    try {
+      await Clipboard.setStringAsync(address);
+      Alert.alert('Copied', 'Wallet address copied to clipboard');
+    } catch (error) {
+      console.error('Failed to copy wallet address:', error);
+      Alert.alert('Error', 'Failed to copy wallet address');
+    }
+  };
 
   // Memoized balance calculations to avoid expensive recalculations
   const userBalances = useMemo(() => {
@@ -215,10 +260,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     try {
       setLoadingUserWallet(true);
       console.log(`💰 Dashboard: Loading user wallet balance... (attempt ${retryCount + 1})`);
-      
+
       // First ensure the user has a wallet
       const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
-      
+
       if (walletResult.success && walletResult.wallet) {
         // Update user's wallet information in app context if it's different
         if (currentUser.wallet_address !== walletResult.wallet.address) {
@@ -228,46 +273,46 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               wallet_public_key: walletResult.wallet.publicKey
             });
           } catch (updateError) {
-              // Keep error logging for debugging
+            // Keep error logging for debugging
             console.error('Failed to update user wallet info in app context:', updateError);
           }
         }
-        
+
         // Now get the balance
         const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
-        
+
         // Check if we got a valid balance
         if (balance && balance.totalUSD !== undefined && balance.totalUSD !== null) {
           console.log('💰 Dashboard: Balance loaded successfully:', balance.totalUSD, 'USD');
-        setUserCreatedWalletBalance(balance);
-        setBalanceLoaded(true);
+          setUserCreatedWalletBalance(balance);
+          setBalanceLoaded(true);
         } else {
           // Balance is invalid, retry
           throw new Error('Invalid balance received');
         }
       } else {
-          // Keep error logging for debugging
+        // Keep error logging for debugging
         console.error('Failed to ensure wallet for dashboard:', walletResult.error);
         throw new Error(walletResult.error || 'Failed to ensure wallet');
       }
     } catch (error) {
       // Keep error logging for debugging
       console.error('Error loading user created wallet balance:', error);
-      
+
       // Check if this is a critical error that should stop retry - don't retry for these
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('User not found') || 
-          errorMessage.includes('User document not found') ||
-          errorMessage.includes('Failed to ensure wallet') ||
-          errorMessage.includes('timestamp.toDate is not a function') ||
-          errorMessage.includes('toDate is not a function') ||
-          errorMessage.includes('Wallet is already working') ||
-          errorMessage.includes('Wallet is marked as unrecoverable') ||
-          errorMessage.includes('unrecoverable')) {
+      if (errorMessage.includes('User not found') ||
+        errorMessage.includes('User document not found') ||
+        errorMessage.includes('Failed to ensure wallet') ||
+        errorMessage.includes('timestamp.toDate is not a function') ||
+        errorMessage.includes('toDate is not a function') ||
+        errorMessage.includes('Wallet is already working') ||
+        errorMessage.includes('Wallet is marked as unrecoverable') ||
+        errorMessage.includes('unrecoverable')) {
         console.log(' Dashboard: Critical error detected, stopping retry loop:', errorMessage);
         setUserCreatedWalletBalance(null);
         setBalanceLoaded(true);
-        
+
         // Check if this is an unrecoverable wallet error
         if (errorMessage.includes('unrecoverable')) {
           setWalletUnrecoverable(true);
@@ -291,19 +336,19 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                     console.log('User chose to create new wallet');
                     // Call the new wallet creation method
                     const newWalletResult = await userWalletService.createNewWalletForUnrecoverableUser(currentUser.id.toString());
-                    
+
                     if (newWalletResult.success && newWalletResult.wallet) {
                       // Update user context with new wallet
                       await updateUser({
                         wallet_address: newWalletResult.wallet.address,
                         wallet_public_key: newWalletResult.wallet.publicKey
                       });
-                      
+
                       // Reset states and reload balance
                       setWalletUnrecoverable(false);
                       setBalanceLoaded(false);
                       loadUserCreatedWalletBalance(0);
-                      
+
                       Alert.alert(
                         'New Wallet Created',
                         `Your new wallet has been created successfully!\n\nAddress: ${newWalletResult.wallet.address}\n\nPlease save your seed phrase securely.`,
@@ -329,10 +374,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             ]
           );
         }
-        
+
         return;
       }
-      
+
       // Auto-retry logic - but only for certain errors, not for User not found
       if (retryCount < 4) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5 seconds
@@ -344,8 +389,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       } else {
         // Max retries reached, give up
         console.error('❌ Dashboard: Max retries reached for balance loading');
-      setUserCreatedWalletBalance(null);
-      setBalanceLoaded(true);
+        setUserCreatedWalletBalance(null);
+        setBalanceLoaded(true);
       }
     } finally {
       setLoadingUserWallet(false);
@@ -434,8 +479,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
                   totalUSD += expense.amount * rate;
                 }
-                }
               }
+            }
           }
 
           usdAmounts[group.id] = totalUSD;
@@ -502,7 +547,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           const requestId = req.id;
           processedRequestIds.add(requestId);
           console.log('📝 Dashboard: Added Firebase request:', requestId, req.senderName, req.amount);
-          
+
           allRequests.push({
             id: req.id,
             type: 'payment_request' as const,
@@ -529,21 +574,21 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           // Filter out notifications with $0 amounts
           const amount = n.data?.amount || 0;
           if (amount <= 0) return false;
-          
+
           // Check if this notification corresponds to a Firebase payment request
           const requestId = n.data?.requestId;
           if (requestId && processedRequestIds.has(requestId)) {
             console.log('🚫 Dashboard: Skipping duplicate notification:', requestId, n.data?.senderName, amount);
             return false; // Skip this notification as we already have the Firebase request
           }
-          
+
           // Also check if we've already processed this notification ID
           const notificationId = String(n.id);
           if (processedNotificationIds.has(notificationId)) {
             console.log('🚫 Dashboard: Skipping duplicate notification ID:', notificationId, n.data?.senderName, amount);
             return false;
           }
-          
+
           // Add to processed set to prevent duplicates within notifications
           processedNotificationIds.add(notificationId);
           console.log('📝 Dashboard: Added notification request:', n.id, n.data?.senderName, amount);
@@ -568,9 +613,9 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         sender: r.data?.senderName || r.data?.fromUser,
         amount: r.data?.amount,
         type: r.type
-          })));
+      })));
       setPaymentRequests(allRequests);
-      
+
       // Mark as initially loaded if this is the first successful load
       if (!initialRequestsLoaded) {
         setInitialRequestsLoaded(true);
@@ -584,8 +629,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         const requests = notifications
           .filter(n =>
             (n.type === 'settlement_request' ||
-             n.type === 'payment_reminder' ||
-             n.type === 'payment_request') &&
+              n.type === 'payment_reminder' ||
+              n.type === 'payment_request') &&
             (n.data?.amount || 0) > 0 // Filter out $0 requests
           )
           .sort((a, b) => {
@@ -654,7 +699,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const updateGroupSummaries = useCallback(async (groups: GroupWithDetails[]) => {
     try {
       const newSummaries: Record<string, { totalAmount: number; memberCount: number; expenseCount: number; hasData: boolean }> = {};
-      
+
       for (const group of groups) {
         let totalAmount = 0;
         let memberCount = group.member_count || group.members?.length || 0;
@@ -670,27 +715,27 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           try {
             const { firebaseDataService } = await import('../../services/firebaseDataService');
             const individualExpenses = await firebaseDataService.expense.getGroupExpenses(group.id.toString());
-            
+
             if (individualExpenses.length > 0) {
               // Calculate total from individual expenses
               const currencyTotals: Record<string, number> = {};
-              
+
               individualExpenses.forEach(expense => {
                 const currency = expense.currency || 'SOL';
                 const amount = expense.amount || 0;
-                
+
                 if (!currencyTotals[currency]) {
                   currencyTotals[currency] = 0;
                 }
                 currencyTotals[currency] += amount;
               });
-              
+
               // Convert to USD for display
               totalAmount = Object.entries(currencyTotals).reduce((sum, [currency, total]) => {
                 const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
                 return sum + (total * rate);
               }, 0);
-              
+
 
             }
           } catch (error) {
@@ -700,7 +745,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         }
 
         const hasData = totalAmount > 0 || memberCount > 0 || expenseCount > 0;
-        
+
         newSummaries[group.id] = {
           totalAmount,
           memberCount,
@@ -708,7 +753,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           hasData
         };
       }
-      
+
       setGroupSummaries(newSummaries);
     } catch (error) {
       // Keep error logging for debugging
@@ -730,9 +775,9 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
     try {
       setLoadingTransactions(true);
-      
+
       const userTransactions = await firebaseTransactionService.getUserTransactions(currentUser.id.toString());
-      
+
       setRealTransactions(userTransactions);
     } catch (error) {
       // Keep error logging for debugging
@@ -772,7 +817,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         ensureAppWallet(currentUser.id.toString()).then(async () => {
           // Get app wallet balance
           await getAppWalletBalance(currentUser.id.toString());
-          
+
           // Update user's wallet information if it's different
           if (appWalletAddress && currentUser.wallet_address !== appWalletAddress) {
             try {
@@ -812,7 +857,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       loadNotifications().then(() => {
         // Add a small delay to ensure notifications are fully processed
         setTimeout(() => {
-        loadPaymentRequests();
+          loadPaymentRequests();
         }, 500);
       });
     }
@@ -827,10 +872,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     try {
       console.log('🔄 Dashboard: Manual refresh triggered');
       setBalanceLoaded(false); // Reset balance loaded flag to allow refresh
-      
+
       // Ensure wallet exists and refresh balance
       const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
-      
+
       // Update user's wallet information if it changed
       if (walletResult.success && walletResult.wallet && currentUser.wallet_address !== walletResult.wallet.address) {
         try {
@@ -842,20 +887,20 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           console.error('Failed to update user wallet info in refresh:', updateError);
         }
       }
-      
+
       // Refresh the wallet balance directly
       if (walletResult.success && walletResult.wallet) {
         console.log('💰 Dashboard: Refreshing wallet balance...');
-        
+
         try {
           setLoadingUserWallet(true);
-          
+
           // Get the balance directly from the service
           const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
-          
+
           if (balance) {
             console.log('💰 Dashboard: New balance detected:', balance.totalUSD ?? 0, 'USD');
-            
+
             // Simple state update without complex setTimeout logic
             setUserCreatedWalletBalance(balance);
             setRefreshBalance(balance.totalUSD ?? 0);
@@ -868,15 +913,15 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           setLoadingUserWallet(false);
         }
       }
-      
+
       await Promise.all([
         refreshGroups(),
         refreshNotifications(),
         loadRealTransactions(), // Refresh real transactions
       ]);
-      
+
       console.log('✅ Dashboard: Refresh completed successfully');
-      
+
     } catch (error) {
       console.error('❌ Dashboard: Error during refresh:', error);
     }
@@ -933,7 +978,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const getTransactionAmount = (transaction: Transaction) => {
     const amount = transaction.amount;
     const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
-    
+
     return {
       amount: amount.toFixed(2),
       color: isIncome ? colors.primaryGreen : colors.textLight
@@ -953,12 +998,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
     try {
       const { firebaseDataService } = await import('../../services/firebaseDataService');
-      
+
       // Fetch all expenses from all groups
       for (const group of groups) {
         try {
           const groupExpenses = await firebaseDataService.expense.getGroupExpenses(group.id.toString());
-          
+
           // Add group info to each expense
           const expensesWithGroupInfo = groupExpenses.map(expense => ({
             ...expense,
@@ -967,7 +1012,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             groupCategory: group.category,
             groupColor: group.color
           }));
-          
+
           allExpenses.push(...expensesWithGroupInfo);
         } catch (error) {
           console.error(`Error fetching expenses for group ${group.id}:`, error);
@@ -1012,13 +1057,13 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         // Determine if current user paid this expense
         const isCurrentUserPaid = String(expense.paid_by) === String(currentUser?.id);
         const transactionType = isCurrentUserPaid ? 'send' : 'receive';
-        
+
         // Use "add an expense" for group expenses, "paid" for actual payments
         const actionText = 'added an expense in';
-        const transactionTitle = isCurrentUserPaid 
+        const transactionTitle = isCurrentUserPaid
           ? `You ${actionText} ${expense.description || 'expense'}`
           : `${payerName} ${actionText} ${expense.description || 'expense'}`;
-        
+
         const transactionNote = `${expense.groupName} • ${expense.currency || 'USDC'}`;
 
         return (
@@ -1049,7 +1094,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             <View style={styles.transactionAvatarNew}>
               <Image
                 source={
-                  transactionType === 'send' 
+                  transactionType === 'send'
                     ? { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' }
                     : { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' }
                 }
@@ -1104,13 +1149,13 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         // Determine if current user paid this expense
         const isCurrentUserPaid = String(thirdExpense.paid_by) === String(currentUser?.id);
         const transactionType = isCurrentUserPaid ? 'send' : 'receive';
-        
+
         // Use "add an expense" for group expenses, "paid" for actual payments
         const actionText = 'add an expense';
-        const transactionTitle = isCurrentUserPaid 
+        const transactionTitle = isCurrentUserPaid
           ? `You ${actionText} ${thirdExpense.description || 'expense'}`
           : `${payerName} ${actionText} ${thirdExpense.description || 'expense'}`;
-        
+
         const transactionNote = `${thirdExpense.groupName} • ${thirdExpense.currency || 'USDC'}`;
 
         const previewComponent = (
@@ -1122,7 +1167,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             <View style={styles.transactionAvatarNew}>
               <Image
                 source={
-                  transactionType === 'send' 
+                  transactionType === 'send'
                     ? { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' }
                     : { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' }
                 }
@@ -1232,7 +1277,15 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      
+      {/* Overlay to close more menu when clicking outside */}
+      {moreMenuVisible && (
+        <TouchableOpacity
+          style={styles.moreMenuOverlay}
+          activeOpacity={1}
+          onPress={() => setMoreMenuVisible(false)}
+        />
+      )}
+
       <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
@@ -1248,7 +1301,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.headerLeft}
             onPress={() => navigation.navigate('Profile')}
           >
@@ -1264,15 +1317,13 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               </Text>
             </View>
           </TouchableOpacity>
-            
+
           <TouchableOpacity
             style={styles.bellContainer}
             onPress={() => navigation.navigate('Notifications')}
           >
-            <Icon
-              name="bell"
-              color={colors.white}
-              size={30}
+            <Image
+              source={require('../../../assets/bell-icon.png')}
               style={styles.bellIcon}
             />
             {unreadNotifications > 0 && (
@@ -1284,19 +1335,23 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
 
         {/* Balance Card */}
-        <View style={[styles.balanceCard, { alignItems: 'flex-start' }]}>
-                      <View style={styles.balanceHeader}>
-              <Text style={styles.balanceLabel}>
-              App Wallet Balance
-              </Text>
+        <ImageBackground
+          source={require('../../../assets/wallet-bg.png')}
+          style={[styles.balanceCard, { alignItems: 'flex-start' }]}
+          resizeMode="cover"
+        >
+          <View style={styles.balanceHeader}>
+            <Text style={styles.balanceLabel}>
+              WeSplit Wallet
+            </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               {/* Auto-refresh Status Indicator */}
               {/* Removed as per edit hint */}
 
-            
+
               {/* QR Code Button for Profile Sharing */}
-              <TouchableOpacity 
-                style={styles.qrCodeIcon} 
+              <TouchableOpacity
+                style={styles.qrCodeIcon}
                 onPress={() => setQrCodeModalVisible(true)}
               >
                 <Image
@@ -1304,10 +1359,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                   style={styles.qrCodeImage}
                 />
               </TouchableOpacity>
-
-
-
-
             </View>
           </View>
 
@@ -1323,22 +1374,32 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               {/* App Wallet Balance Display */}
               <View style={{ flex: 1, alignItems: 'flex-start' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Image
+                  {/*<Image
                     source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fusdc-logo-black.png?alt=media&token=2b33d108-f3aa-471d-b7fe-6166c53c1d56' }}
                     style={styles.balanceUsdcLogo}
-                  />
+                  />*/}
                   <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
-                    {(refreshBalance !== null ? (refreshBalance ?? 0) : (appWalletBalance || userCreatedWalletBalance?.totalUSD || 0)).toFixed(2)}
+                    $ {(refreshBalance !== null ? (refreshBalance ?? 0) : (appWalletBalance || userCreatedWalletBalance?.totalUSD || 0)).toFixed(2)}
                   </Text>
                 </View>
-                
+
               </View>
             </View>
           )}
 
-          <Text style={styles.balanceLimitText}>
-            Balance Limit $1000
-          </Text>
+          {/* Wallet Address with Copy Button */}
+          <TouchableOpacity 
+            style={styles.walletAddressContainer}
+            onPress={() => copyWalletAddress(appWalletAddress || currentUser?.wallet_address || '')}
+          >
+            <Text style={styles.balanceLimitText}>
+              {hashWalletAddress(appWalletAddress || currentUser?.wallet_address || '')}
+            </Text>
+            <Image
+              source={require('../../../assets/copy-icon.png')}
+              style={styles.copyIcon}
+            />
+          </TouchableOpacity>
 
           {/* {!walletConnected && userCreatedWalletBalance && (
             <TouchableOpacity
@@ -1371,7 +1432,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               </Text>
             </TouchableOpacity>
           )}*/}
-        </View>
+        </ImageBackground>
 
         {/* Action Buttons */}
         <View style={styles.actionsGrid}>
@@ -1382,11 +1443,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' }}
-                  style={styles.actionButtonIcon}
+                  source={require('../../../assets/money-send.png')}
+                  style={styles.actionButtonIconNoTint}
                 />
               </View>
-              <Text style={styles.actionButtonText}>Send to</Text>
+              <Text style={styles.actionButtonText}>Send</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -1395,8 +1456,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' }}
-                  style={styles.actionButtonIcon}
+                  source={require('../../../assets/money-recive.png')}
+                  style={styles.actionButtonIconNoTint}
                 />
               </View>
               <Text style={styles.actionButtonText}>Request</Text>
@@ -1408,8 +1469,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-deposit.png?alt=media&token=d832bae5-dc8e-4347-bab5-cfa9621a5c55' }}
-                  style={styles.actionButtonIcon}
+                  source={require('../../../assets/card-add.png')}
+                  style={styles.actionButtonIconNoTint}
                 />
               </View>
               <Text style={styles.actionButtonText}>Deposit</Text>
@@ -1417,19 +1478,60 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => {
-                navigation.navigate('WithdrawAmount');
-              }}
+              onPress={() => setMoreMenuVisible(!moreMenuVisible)}
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-withdraw.png?alt=media&token=8c0da99e-287c-4d19-8515-ba422430b71b' }}
-                  style={styles.actionButtonIcon}
+                  source={require('../../../assets/grid-icon.png')}
+                  style={styles.actionButtonIconNoTint}
+                  tintColor={colors.white}
+                  height={28}
+                  width={28}
                 />
               </View>
-              <Text style={styles.actionButtonText}>Withdraw</Text>
+              <Text style={styles.actionButtonText}>More</Text>
             </TouchableOpacity>
           </View>
+
+          {/* More Menu Dropdown */}
+          {moreMenuVisible && (
+            <View style={styles.moreMenuContainer}>
+              <TouchableOpacity
+                style={styles.moreMenuItem}
+                onPress={() => {
+                  setMoreMenuVisible(false);
+                  navigation.navigate('WithdrawAmount');
+                }}
+              >
+                <Text style={styles.moreMenuText}>Withdraw</Text>
+                <Icon name="chevron-right" size={16} color={colors.white70} />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.moreMenuItem}
+                onPress={() => {
+                  setMoreMenuVisible(false);
+                  // Add other action here
+                  Alert.alert('Coming Soon', 'This feature will be available soon!');
+                }}
+              >
+                <Text style={styles.moreMenuText}>Transfer</Text>
+                <Icon name="chevron-right" size={16} color={colors.white70} />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.moreMenuItem}
+                onPress={() => {
+                  setMoreMenuVisible(false);
+                  // Add other action here
+                  Alert.alert('Coming Soon', 'This feature will be available soon!');
+                }}
+              >
+                <Text style={styles.moreMenuText}>Exchange</Text>
+                <Icon name="chevron-right" size={16} color={colors.white70} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Splits Section */}
@@ -1453,8 +1555,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               </TouchableOpacity>
             </View>
           ) : (
-            <ScrollView 
-              horizontal 
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.groupsGrid}
             >
@@ -1585,7 +1687,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               {/* Show first 2 requests */}
               {paymentRequests.slice(0, 2).map((request, index) => {
                 try {
-                  
+
                   const senderName = request.data?.senderName || request.data?.fromUser || request.title || 'Unknown User';
                   const amount = request.data?.amount || 0;
                   const currency = request.data?.currency || 'USDC';
@@ -1642,7 +1744,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                   );
                 }
               })}
-              
+
               {/* Show preview of 3rd request if it exists */}
               {paymentRequests.length > 2 && (
                 <TouchableOpacity
@@ -1654,7 +1756,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                       {(paymentRequests[2].data?.senderName || 'U').charAt(0).toUpperCase()}
                     </Text>
                   </View>
-                  <View style={[styles.requestContent , styles.requestPreviewContent]}>
+                  <View style={[styles.requestContent, styles.requestPreviewContent]}>
                     <Text style={styles.requestMessageWithAmount}>
                       <Text style={styles.requestSenderName}>
                         {paymentRequests[2].data?.senderName || 'Unknown User'}
@@ -1675,7 +1777,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             </>
           )}
         </View>
-        
+
       </ScrollView>
 
       {/* Wallet Selector Modal */}
@@ -1699,16 +1801,16 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         isGroup={false}
       />
 
-             {/* Transaction Modal */}
-       <TransactionModal
-         visible={transactionModalVisible}
-         onClose={() => {
-           setTransactionModalVisible(false);
-           setSelectedTransaction(null);
-         }}
-         transaction={selectedTransaction}
-         navigation={navigation}
-       />
+      {/* Transaction Modal */}
+      <TransactionModal
+        visible={transactionModalVisible}
+        onClose={() => {
+          setTransactionModalVisible(false);
+          setSelectedTransaction(null);
+        }}
+        transaction={selectedTransaction}
+        navigation={navigation}
+      />
 
       {/* External Wallet Connection Modal */}
       {/* Removed as per edit hint */}
@@ -1718,7 +1820,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   );
 };
 
-export default DashboardScreen; 
+export default DashboardScreen;
 
 
 

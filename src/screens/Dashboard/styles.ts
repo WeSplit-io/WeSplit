@@ -54,7 +54,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: spacing.sm,
+    marginVertical: spacing.md,
     paddingHorizontal: spacing.md,
 
   },
@@ -101,8 +101,8 @@ export const styles = StyleSheet.create({
   
   // Bell icon styling
   bellIcon: {
-    width: 30,
-    height: 30,
+    width: 25,
+    height: 25,
     color: colors.white,
   },
   
@@ -122,12 +122,12 @@ export const styles = StyleSheet.create({
   // Notification badge indicator (green dot)
   bellBadge: {
     position: 'absolute',
-    top: 2,
-    right: 2,
+    top: 4,
+    right: 4,
     backgroundColor: colors.green,
     borderRadius: 6,
-    width: 12,
-    height: 12,
+    width: 14,
+    height: 14,
     borderWidth: 2,
     borderColor: colors.darkBackground,
   },
@@ -142,20 +142,20 @@ export const styles = StyleSheet.create({
   // === BALANCE CARD (MAIN FOCAL POINT) ===
   // Large green card displaying user's balance
   balanceCard: {
-    backgroundColor: GREEN,
     borderRadius: spacing.lg,
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
     marginTop: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     alignItems: 'flex-start',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     minHeight: spacing.balanceCardMinHeight,
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: spacing.xs },
     shadowOpacity: 0.1,
     shadowRadius: spacing.sm,
     elevation: 4,
+    overflow: 'hidden',
   },
   
   // Header row of balance card (label + QR icon)
@@ -164,14 +164,14 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    marginBottom: spacing.itemSpacing,
+    marginBottom: spacing.sm,
   },
   
   // "Your Balance" label
   balanceLabel: {
-    color: colors.black,
+    color: colors.white,
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.regular,
+    fontWeight: typography.fontWeight.light,
   },
   
   // QR code icon container
@@ -187,6 +187,7 @@ export const styles = StyleSheet.create({
   qrCodeImage: {
     width: 25,
     height: 25,
+    tintColor: colors.white,
   },
   
   // Loading and message styles
@@ -201,7 +202,7 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
   },
   activityIndicator: {
-    color: colors.primaryGreen,
+    color: colors.white,
     fontSize: typography.fontSize.xs,
     marginLeft: spacing.sm,
   },
@@ -214,8 +215,8 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
   },
   balanceAmountText: {
-    color: colors.darkBackground,
-    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+    fontWeight: typography.fontWeight.regular,
     fontSize: typography.fontSize.md,
   },
 
@@ -232,21 +233,46 @@ export const styles = StyleSheet.create({
   // === BALANCE AMOUNT (HERO ELEMENT) ===
   // Large dollar amount display
   balanceAmount: {
-    color: colors.black,
+    color: colors.white,
     fontSize: typography.fontSize.hero,
-    fontWeight: typography.fontWeight.extrabold,
+    fontWeight: typography.fontWeight.bold,
     marginBottom: spacing.sm,
     letterSpacing: -2,
     lineHeight: typography.fontSize.hero + spacing.xs,
   },
   
-  // Small limit text below amount
+  // Wallet address text below amount
   balanceLimitText: {
-    color: colors.black,
-    fontSize: typography.fontSize.small,
+    color: colors.white,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.normal,
-    marginTop: spacing.xs,
     opacity: 0.8,
+  },
+  
+  // Wallet address container with copy button
+  walletAddressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+  
+  // Copy button for wallet address
+  copyButton: {
+    padding: spacing.xs,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: spacing.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  // Copy icon
+  copyIcon: {
+    width: 14,
+    height: 14,
+    tintColor: colors.white,
   },
   
   // === LOADING STATES ===
@@ -268,9 +294,10 @@ export const styles = StyleSheet.create({
   // === ACTION BUTTONS GRID ===
   // Container for action buttons below balance card
   actionsGrid: {
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
     marginBottom: spacing.xxl,
     marginTop: 0,
+    position: 'relative',
   },
   
   // Row containing all action buttons
@@ -278,6 +305,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.sm,
   },
   
   // Individual action button container
@@ -285,20 +313,27 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
+    minWidth: 80,
   },
   
   // === ACTION BUTTON CIRCLES ===
-  // Circular button background (default style)
+  // Circular button background (default style) - larger for better touch targets
   actionButtonCircle: {
-    width: spacing.actionButtonSize,
-    height: spacing.actionButtonSize,
-    borderRadius: spacing.actionButtonRadius,
-    backgroundColor: colors.white10,
+    width: 60,
+    height: 60,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.sm,
     display: 'flex',
     position: 'relative',
+    // Border to simulate inset shadow effect
+    borderWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.15)',
+    borderRightColor: 'rgba(10, 138, 90, 0.15)',
+    borderBottomColor: 'rgba(10, 138, 90, 0.15)',
   },
   
   // === ACTION BUTTON ICONS & TEXT ===
@@ -307,6 +342,12 @@ export const styles = StyleSheet.create({
     width: 30,
     height: 30,
     tintColor: colors.textLight,
+  },
+  
+  // Icon without tint to preserve original colors
+  actionButtonIconNoTint: {
+    width: 32,
+    height: 32,
   },
   
   // Icon for request button (dark on green)
@@ -319,8 +360,65 @@ export const styles = StyleSheet.create({
   // Label text below action buttons
   actionButtonText: {
     color: colors.white,
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
+    textAlign: 'center',
+  },
+
+  // === MORE MENU DROPDOWN ===
+  // Container for the more menu dropdown
+  moreMenuContainer: {
+    position: 'absolute',
+    top: 80,
+    right: 0,
+    backgroundColor: colors.darkCard,
+    borderRadius: spacing.md,
+    padding: spacing.sm,
+    minWidth: 160,
+    borderWidth: 1,
+    borderColor: colors.white10,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
+  },
+
+  // Individual menu item
+  moreMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 10,
+    marginBottom: spacing.xs,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    // Border to simulate inset shadow effect (same as actionButtonCircle)
+    borderWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.15)',
+    borderRightColor: 'rgba(10, 138, 90, 0.15)',
+    borderBottomColor: 'rgba(10, 138, 90, 0.15)',
+  },
+
+  // Text in menu item
+  moreMenuText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    flex: 1,
+  },
+
+  // Overlay to close menu when clicking outside
+  moreMenuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
   },
 
   // === REQUESTS SECTION ===
