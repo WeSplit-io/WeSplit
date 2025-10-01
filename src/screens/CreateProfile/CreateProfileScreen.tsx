@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
   ScrollView,
@@ -14,6 +13,8 @@ import {
   Linking,
   KeyboardAvoidingView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { unifiedUserService } from '../../services/unifiedUserService';
@@ -246,18 +247,20 @@ const CreateProfileScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.mainContainer}>
           {/* Logo Section */}
           <View style={styles.logoSection}>
-            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} style={styles.logo} />
+            <Image source={require('../../../assets/wesplit-logo-linear.png')} style={styles.logo} />
           </View>
 
-          {/* Main Content */}
-          <View style={styles.centerContent}>
+          {/* Main Content - Scrollable */}
+          <ScrollView 
+            style={styles.scrollContent}
+            contentContainerStyle={styles.scrollContentContainer}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.centerContent}>
         <Text style={styles.title}>Create Your Profile</Text>
         <Text style={styles.subtitle}>
           Create your initial profile to get started, you can always edit it later.
@@ -269,17 +272,19 @@ const CreateProfileScreen: React.FC = () => {
             <Image source={{ uri: avatar }} style={styles.avatarImage} />
           ) : (
             <View style={styles.avatarPlaceholder}>
-                              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }} style={styles.avatarIcon} />
+              <Image source={require('../../../assets/camera-icon.png')} style={styles.avatarIcon} />
             </View>
           )}
-          <View style={styles.cameraIconContainer}>
-                            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmodify-icon-white.png?alt=media&token=4b1aa40d-4d81-4e40-9d3b-9638bc589e21' }} style={styles.cameraIcon} />
-          </View>
+          {avatar && (
+            <View style={styles.cameraIconContainer}>
+              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmodify-icon-white.png?alt=media&token=4b1aa40d-4d81-4e40-9d3b-9638bc589e21' }} style={styles.cameraIcon} />
+            </View>
+          )}
         </TouchableOpacity>
         
         {/* Pseudo Input */}
         <View style={styles.inputSection}>
-          <Text style={styles.inputLabel}>Pseudo*</Text>
+          <Text style={styles.inputLabel}>Pseudo *</Text>
         <TextInput
           style={styles.input}
             placeholder="Enter your pseudo"
@@ -297,21 +302,33 @@ const CreateProfileScreen: React.FC = () => {
 
         {/* Next Button */}
         <TouchableOpacity
-          style={[styles.nextButton, (!pseudo || isLoading) && styles.nextButtonDisabled]}
+          style={styles.nextButton}
           onPress={handleNext}
           disabled={!pseudo || isLoading}
         >
-          <Text style={styles.nextButtonText}>Next</Text>
+          <LinearGradient
+            colors={(!pseudo || isLoading) ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientButton}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text style={styles.nextButtonText}>Next</Text>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
-      </View>
+            </View>
+          </ScrollView>
 
-          {/* Help Link */}
+          {/* Help Link - Fixed at bottom */}
           <View style={styles.helpSection}>
             <TouchableOpacity onPress={() => Linking.openURL('https://t.me/wesplit_support_bot')}>
               <Text style={styles.helpText}>Need help?</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

@@ -1,9 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, SafeAreaView, Linking, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, Linking, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { verifyCode, sendVerificationCode } from '../../services/firebaseFunctionsService';
 import { useApp } from '../../context/AppContext';
+import { colors } from '../../theme';
 
 const CODE_LENGTH = 4; // 4-digit code
 const RESEND_SECONDS = 30;
@@ -213,28 +216,29 @@ const VerificationScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        <ScrollView 
-          style={styles.scrollContent}
-          contentContainerStyle={styles.scrollContentContainer}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-        {/* Header with Back Button and Logo */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Image
-              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
-              style={styles.iconWrapper}
-            />
-          </TouchableOpacity>
-          <View style={styles.logoSection}>
-            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} style={styles.logo} />
+        <View style={styles.mainContainer}>
+          {/* Header with Back Button and Logo */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Image
+                source={require('../../../assets/chevron-left.png')}
+                style={styles.iconWrapper}
+              />
+            </TouchableOpacity>
+            <View style={styles.logoSection}>
+                <Image source={require('../../../assets/wesplit-logo-linear.png')} style={styles.logo} />
+              </View>
+            <View style={styles.placeholder} />
           </View>
-          <View style={styles.placeholder} />
-        </View>
 
-      {/* Main Content */}
-      <View style={styles.centerContent}>
+          {/* Main Content - Scrollable */}
+          <ScrollView 
+            style={styles.scrollContent}
+            contentContainerStyle={styles.scrollContentContainer}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.centerContent}>
         <View style={styles.mailIconBox}>
           <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmail.png?alt=media&token=5e3ac6e7-79b1-47e7-8087-f7e4c070d222' }} style={styles.mailIcon} />
         </View>
@@ -267,15 +271,22 @@ const VerificationScreen: React.FC = () => {
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         
         <TouchableOpacity 
-          style={[styles.submitButton, verifying && styles.submitButtonDisabled]} 
+          style={styles.submitButton} 
           onPress={handleSubmit}
           disabled={verifying}
         >
-          {verifying ? (
-            <ActivityIndicator color="white" size="small" />
-          ) : (
-          <Text style={styles.submitButtonText}>Submit</Text>
-          )}
+          <LinearGradient
+            colors={verifying ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientButton}
+          >
+            {verifying ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text style={styles.submitButtonText}>Submit</Text>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
         
         {/* Timer and resend */}
@@ -291,15 +302,16 @@ const VerificationScreen: React.FC = () => {
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+            </View>
+          </ScrollView>
 
-      {/* Help Link */}
-      <View style={styles.helpSection}>
-        <TouchableOpacity onPress={() => Linking.openURL('https://t.me/wesplit_support_bot')}>
-          <Text style={styles.helpText}>Need help?</Text>
-        </TouchableOpacity>
-      </View>
-        </ScrollView>
+          {/* Help Link - Fixed at bottom */}
+          <View style={styles.helpSection}>
+            <TouchableOpacity onPress={() => Linking.openURL('https://t.me/wesplit_support_bot')}>
+              <Text style={styles.helpText}>Need help?</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

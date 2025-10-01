@@ -11,6 +11,10 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.black,
   },
+  mainContainer: {
+    flex: 1,
+    paddingHorizontal: spacing.md,
+  },
   // Header styles
   header: {
     position: 'relative',
@@ -38,10 +42,8 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContentContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    justifyContent: 'center',
     flexGrow: 1,
+    justifyContent: 'center',
   },
   logoSection: {
     position: 'absolute',
@@ -58,26 +60,24 @@ export const styles = StyleSheet.create({
     objectFit: 'contain',
   },
   centerContent: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
-    paddingBottom: spacing.xxl,
   },
   mailIconBox: {
     width: spacing.mailIconBoxSize,
     height: spacing.mailIconBoxSize,
     borderRadius: 16,
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
   mailIcon: {
     width: spacing.xl,
     height: spacing.xl,
     resizeMode: 'contain',
-    tintColor: GREEN,
+    tintColor: colors.white,
   },
   title: {
     fontSize: typography.fontSize.xxl,
@@ -89,7 +89,7 @@ export const styles = StyleSheet.create({
   subtitle: {
     fontSize: typography.fontSize.md,
     color: colors.textLight,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xxl,
     textAlign: 'center',
     opacity: 0.8,
   },
@@ -107,24 +107,27 @@ export const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: spacing.codeInputBorder,
     borderColor: GREEN,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white5,
     fontSize: typography.fontSize.xxxl,
-    color: colors.black,
+    color: colors.white,
     textAlign: 'center',
+    textAlignVertical: 'center',
     marginHorizontal: spacing.sm,
     fontWeight: typography.fontWeight.semibold,
+    paddingTop: 0,
+    paddingBottom: 0,
+    includeFontPadding: false,
   },
   submitButton: {
-    backgroundColor: GREEN,
     borderRadius: 16,
-    paddingVertical: 15,
     width: '100%',
-    alignItems: 'center',
     marginBottom: spacing.lg,
+    overflow: 'hidden',
   },
-  submitButtonDisabled: {
-    backgroundColor: colors.white10,
-    color: colors.white50,
+  gradientButton: {
+    paddingVertical: 15,
+    alignItems: 'center',
+    borderRadius: 16,
   },
   submitButtonText: {
     color: colors.black,
@@ -162,7 +165,7 @@ export const styles = StyleSheet.create({
   },
   helpSection: {
     alignItems: 'center',
-    paddingBottom: spacing.xl,
+    paddingTop: spacing.lg,
   },
   helpText: {
     color: colors.white50,

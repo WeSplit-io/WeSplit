@@ -6,6 +6,7 @@ export const colors = {
   green10: 'rgba(165, 234, 21, 0.10)',
   black: '#061113',
   white: '#FFFFFF',
+  white5: 'rgba(255, 255, 255, 0.05)',
   white10: 'rgba(255, 255, 255, 0.10)',
   white50: 'rgba(255, 255, 255, 0.50)',
   white70: 'rgba(255, 255, 255, 0.70)',

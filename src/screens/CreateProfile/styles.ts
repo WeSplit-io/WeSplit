@@ -11,13 +11,21 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.black,
   },
+  mainContainer: {
+    flex: 1,
+    paddingHorizontal: spacing.md,
+  },
   scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
     flexGrow: 1,
+    justifyContent: 'center',
   },
   logoSection: {
     alignItems: 'center',
-    marginTop: spacing.xl,
-    marginBottom: spacing.xl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
   },
   logo: {
     height: 30,
@@ -25,12 +33,9 @@ export const styles = StyleSheet.create({
     objectFit: 'contain',
   },
   centerContent: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
-    paddingHorizontal: spacing.lg,
-
   },
   title: {
     fontSize: typography.fontSize.xxl,
@@ -50,8 +55,8 @@ export const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 170,
-    backgroundColor: 'rgba(165, 234, 21, 0.10)',
-    borderWidth: 0.5,
+    backgroundColor: colors.white5,
+    borderWidth: 1,
     borderColor: colors.white50,
     alignItems: 'center',
     justifyContent: 'center',
@@ -71,10 +76,9 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarIcon: {
-    width: 64,
-    height: 64,
-    tintColor: colors.textLight,
-    opacity: 0.9,
+    width: 48,
+    height: 48,
+    tintColor: colors.white70,
   },
   cameraIconContainer: {
     position: 'absolute',
@@ -83,34 +87,35 @@ export const styles = StyleSheet.create({
     width: spacing.xl,
     height: spacing.xl,
     borderRadius: spacing.md,
-    backgroundColor: GREEN,
+    backgroundColor: colors.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cameraIcon: {
     width: 16,
     height: 16,
-    tintColor: colors.black,
+    tintColor: colors.white,
   },
   inputSection: {
     width: '100%',
     marginBottom: spacing.xl,
   },
   inputLabel: {
-    color: colors.textLight,
+    color: colors.white,
+    fontWeight: typography.fontWeight.medium,
     fontSize: typography.fontSize.md,
     marginBottom: spacing.sm,
   },
   input: {
     width: '100%',
-    backgroundColor: colors.background,
+    backgroundColor: colors.white5,
     borderRadius: 16,
     paddingVertical: 15,
     paddingHorizontal: spacing.lg,
     fontSize: typography.fontSize.md,
-    color: colors.text,
+    color: colors.white,
     borderWidth: 1,
-    borderColor: GREEN,
+    borderColor: colors.green,
   },
   errorText: {
     color: colors.error,
@@ -118,25 +123,25 @@ export const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   nextButton: {
-    backgroundColor: GREEN,
     borderRadius: 16,
-    paddingVertical: 15,
     width: '100%',
-    alignItems: 'center',
     marginBottom: spacing.xl,
+    overflow: 'hidden',
   },
-  nextButtonDisabled: {
-    backgroundColor: colors.white10,
-    color: colors.white50,
+  gradientButton: {
+    paddingVertical: 15,
+    alignItems: 'center',
+    borderRadius: 16,
   },
   nextButtonText: {
-    color: BG_COLOR,
+    color: colors.black,
     fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.normal,
+    fontWeight: typography.fontWeight.medium,
   },
   helpSection: {
     alignItems: 'center',
-    paddingBottom: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   helpText: {
     color: colors.white50,

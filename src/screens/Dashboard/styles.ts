@@ -30,9 +30,6 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.black,
-    paddingHorizontal: 0,
-    paddingTop: 0,
-    
   },
   
   // Scrollable content wrapper
@@ -57,8 +54,8 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    marginVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
 
   },
   
@@ -122,18 +119,15 @@ export const styles = StyleSheet.create({
     borderColor: colors.textLight,
   },
 
-  // Notification badge with count on bell icon
+  // Notification badge indicator (green dot)
   bellBadge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
+    top: 2,
+    right: 2,
     backgroundColor: colors.green,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
+    borderRadius: 6,
+    width: 12,
+    height: 12,
     borderWidth: 2,
     borderColor: colors.darkBackground,
   },

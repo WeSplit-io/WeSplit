@@ -5,11 +5,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  SafeAreaView,
   RefreshControl,
   ActivityIndicator,
   Alert,
+  StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { colors } from '../../theme';
@@ -37,16 +38,13 @@ const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, disp
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  useEffect(() => {
-    if (avatar && avatar.trim() !== '') {
-      setIsLoading(true);
-      setHasError(false);
-    }
-  }, [avatar]);
+  // Check if avatar is valid
+  const hasValidAvatar = avatar && avatar.trim() !== '' && !hasError;
 
-  if (!avatar || avatar.trim() === '' || hasError) {
+  // Fallback to initial if no valid avatar
+  if (!hasValidAvatar) {
     return (
-      <View style={[style, { backgroundColor: colors.brandGreen, borderRadius: style.width / 2, alignItems: 'center', justifyContent: 'center' }]}>
+      <View style={[style, { backgroundColor: colors.brandGreen, alignItems: 'center', justifyContent: 'center' }]}>
         <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.darkBackground }}>
           {displayName.charAt(0).toUpperCase()}
         </Text>
@@ -55,18 +53,28 @@ const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, disp
   }
 
   return (
-    <View style={style}>
+    <View style={[style, { overflow: 'hidden', position: 'relative' }]}>
       {isLoading && (
-        <View style={[style, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.darkBorder, borderRadius: style.width / 2, justifyContent: 'center', alignItems: 'center' }]}>
+        <View style={[
+          StyleSheet.absoluteFill, 
+          { 
+            backgroundColor: colors.darkBorder, 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            zIndex: 10 
+          }
+        ]}>
           <ActivityIndicator size="small" color={colors.primaryGreen} />
         </View>
       )}
       <Image 
         source={{ uri: avatar }} 
-        style={[style, { opacity: isLoading ? 0 : 1 }]}
+        style={{ width: '100%', height: '100%' }}
+        resizeMode="cover"
         onLoadStart={() => setIsLoading(true)}
         onLoad={() => setIsLoading(false)}
-        onError={() => {
+        onError={(e) => {
+          console.log('❌ Avatar loading error:', e.nativeEvent.error);
           setIsLoading(false);
           setHasError(true);
         }}
@@ -1214,7 +1222,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   if (groupsLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.statusBar} />
         <View style={styles.loadingCenter}>
           <ActivityIndicator size="large" color={GREEN} />
           <Text style={styles.loadingText}>Loading your groups...</Text>
@@ -1225,10 +1232,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.statusBar} />
       
-
-
       <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
@@ -1244,48 +1248,37 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-              <AvatarComponent
-                avatar={currentUser?.avatar}
-                displayName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
-                style={styles.profileImage}
-              />
-            </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerLeft}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <AvatarComponent
+              avatar={currentUser?.avatar}
+              displayName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
+              style={styles.profileImage}
+            />
             <View>
               <Text style={styles.welcomeText}>Welcome back,</Text>
               <Text style={styles.userName}>
                 {currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}!
               </Text>
-             {/*  {walletConnected && (
-                <Text style={[styles.welcomeText, { fontSize: 12, color: colors.brandGreen }]}>
-                  💰 External Wallet
-                </Text>
-              )}
-             {!walletConnected && userCreatedWalletBalance && (
-                <Text style={[styles.welcomeText, { fontSize: 12, color: colors.textLightSecondary }]}>
-                  📱 App Wallet
-                </Text>
-              )}*/}
-
             </View>
-          </View>
+          </TouchableOpacity>
             
-            <TouchableOpacity
-              style={styles.bellContainer}
-              onPress={() => navigation.navigate('Notifications')}
-            >
-              <Icon
-                name="bell"
-                color={colors.white}
-                style={styles.bellIcon}
-              />
-              {unreadNotifications > 0 && (
-                <View style={styles.bellBadge}>
-                  <Text style={styles.bellBadgeText}>{unreadNotifications}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.bellContainer}
+            onPress={() => navigation.navigate('Notifications')}
+          >
+            <Icon
+              name="bell"
+              color={colors.white}
+              size={30}
+              style={styles.bellIcon}
+            />
+            {unreadNotifications > 0 && (
+              <View style={styles.bellBadge} />
+            )}
+          </TouchableOpacity>
         </View>
 
 
@@ -1680,85 +1673,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                 </TouchableOpacity>
               )}
             </>
-          )}
-        </View>
-
-        {/* Transactions Section */}
-        <View style={styles.requestsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Transactions</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('TransactionHistory')}>
-              <Text style={styles.seeAllText}>See all</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Show real transactions first, then group transactions as fallback */}
-          {loadingTransactions ? (
-            <View style={styles.emptyRequestsState}>
-              <ActivityIndicator size="small" color={colors.primaryGreen} />
-              <Text style={styles.emptyRequestsText}>Loading transactions...</Text>
-            </View>
-          ) : realTransactions.length > 0 ? (
-            <>
-              {/* Show first 2 real transactions */}
-              {realTransactions.slice(0, 2).map(renderRealTransaction)}
-              
-              {/* Show preview of 3rd transaction if it exists */}
-              {realTransactions.length > 2 && (
-                <TouchableOpacity
-                  style={[styles.requestItemNew, styles.requestPreviewItem]}
-                  onPress={() => navigation.navigate('TransactionHistory')}
-                >
-                  <View style={styles.transactionAvatarNew}>
-                    <Image
-                      source={getTransactionIcon(realTransactions[2])}
-                      style={styles.transactionAvatar}
-                    />
-                  </View>
-                  <View style={[styles.requestContent, styles.requestPreviewContent]}>
-                    <Text style={styles.requestMessageWithAmount}>
-                      <Text style={styles.requestSenderName}>
-                        {getTransactionTitle(realTransactions[2])}
-                      </Text>
-                      {' '}
-                      <Text style={styles.requestAmountGreen}>
-                        {getTransactionAmount(realTransactions[2]).amount} USDC
-                      </Text>
-                    </Text>
-                    <Text style={styles.requestSource}>
-                      {getTransactionSource(realTransactions[2])} • {new Date(realTransactions[2].created_at).toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: true
-                      })}
-                    </Text>
-                  </View>
-                  <View style={styles.requestPreviewOverlay}>
-                    <Text style={styles.requestPreviewText}>+{realTransactions.length - 2} more</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            </>
-          ) : groups.length > 0 ? (
-            <>
-              {/* Show group transactions as fallback */}
-              {loadingGroupTransactions ? (
-                <View style={styles.emptyRequestsState}>
-                  <ActivityIndicator size="small" color={colors.primaryGreen} />
-                  <Text style={styles.emptyRequestsText}>Loading group transactions...</Text>
-                </View>
-              ) : groupTransactions.length > 0 ? (
-                groupTransactions
-              ) : (
-                <View style={styles.emptyRequestsState}>
-                  <Text style={styles.emptyRequestsText}>No recent group transactions</Text>
-                </View>
-              )}
-            </>
-          ) : (
-            <View style={styles.emptyRequestsState}>
-              <Text style={styles.emptyRequestsText}>No recent transactions</Text>
-            </View>
           )}
         </View>
         
