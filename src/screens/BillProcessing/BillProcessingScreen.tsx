@@ -279,7 +279,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.black,
   },
   processingContainer: {
     flex: 1,
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   processingTitle: {
     fontSize: typography.fontSize.xl,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.white,
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.black,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
@@ -322,14 +322,14 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   backButtonText: {
-    color: colors.primary,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: '500',
   },
   headerTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.white,
   },
   proceedButton: {
     padding: spacing.sm,

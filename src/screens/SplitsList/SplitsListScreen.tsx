@@ -317,7 +317,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.black,
   },
   scrollView: {
     flex: 1,
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: typography.fontSize.xxl,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
   headerSubtitle: {
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   quickActionText: {
-    color: colors.text,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
   },
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.white,
     marginBottom: spacing.md,
   },
   splitCard: {
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   splitTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.white,
     marginBottom: spacing.xs,
   },
   splitDate: {
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
   participantsValue: {
     fontSize: typography.fontSize.md,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.white,
   },
   splitFooter: {
     flexDirection: 'row',
@@ -514,7 +514,7 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: typography.fontSize.xl,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.white,
     marginBottom: spacing.sm,
     textAlign: 'center',
   },

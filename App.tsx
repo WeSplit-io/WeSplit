@@ -56,6 +56,12 @@ import BillCameraScreen from './src/screens/BillCamera/BillCameraScreen';
 import BillProcessingScreen from './src/screens/BillProcessing/BillProcessingScreen';
 import SplitDetailsScreen from './src/screens/SplitDetails/SplitDetailsScreen';
 import SplitsListScreen from './src/screens/SplitsList/SplitsListScreen';
+import FairSplitScreen from './src/screens/FairSplit/FairSplitScreen';
+import PaymentConfirmationScreen from './src/screens/PaymentConfirmation/PaymentConfirmationScreen';
+import KastAccountLinkingScreen from './src/screens/KastAccountLinking/KastAccountLinkingScreen';
+import DegenLockScreen from './src/screens/DegenSplit/DegenLockScreen';
+import DegenSpinScreen from './src/screens/DegenSplit/DegenSpinScreen';
+import DegenResultScreen from './src/screens/DegenSplit/DegenResultScreen';
 import WithdrawAmountScreen from './src/screens/Withdraw/WithdrawAmountScreen';
 import WithdrawConfirmationScreen from './src/screens/Withdraw/WithdrawConfirmationScreen';
 import WithdrawSuccessScreen from './src/screens/Withdraw/WithdrawSuccessScreen';
@@ -195,6 +201,12 @@ export default function App() {
                 <Stack.Screen name="BillProcessing" component={BillProcessingScreen} />
                 <Stack.Screen name="SplitDetails" component={SplitDetailsScreen} />
                 <Stack.Screen name="SplitsList" component={SplitsListScreen} />
+                <Stack.Screen name="FairSplit" component={FairSplitScreen} />
+                <Stack.Screen name="PaymentConfirmation" component={PaymentConfirmationScreen} />
+                <Stack.Screen name="KastAccountLinking" component={KastAccountLinkingScreen} />
+                <Stack.Screen name="DegenLock" component={DegenLockScreen} />
+                <Stack.Screen name="DegenSpin" component={DegenSpinScreen} />
+                <Stack.Screen name="DegenResult" component={DegenResultScreen} />
                 <Stack.Screen name="WithdrawAmount" component={WithdrawAmountScreen} />
                 <Stack.Screen name="WithdrawConfirmation" component={WithdrawConfirmationScreen} />
                 <Stack.Screen name="WithdrawSuccess" component={WithdrawSuccessScreen} />

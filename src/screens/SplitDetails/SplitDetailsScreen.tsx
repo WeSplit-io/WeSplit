@@ -1,6 +1,6 @@
 /**
  * Split Details Screen
- * Allows users to edit split details, add participants, and manage the bill split
+ * Screen for editing bill split details, managing participants, and configuring split methods
  */
 
 import React, { useState, useEffect } from 'react';
@@ -9,455 +9,302 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ScrollView,
-  TextInput,
+  Alert,
   SafeAreaView,
   StatusBar,
   Modal,
-  FlatList,
 } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { 
-  BillSplitCreationData, 
-  BillParticipant, 
-  BillItem,
-  BillSplitNavigationParams 
-} from '../../types/billSplitting';
-
-interface RouteParams {
-  splitId?: string;
-  billData?: BillSplitCreationData;
-}
 
 interface SplitDetailsScreenProps {
   navigation: any;
 }
 
 const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation }) => {
-  const route = useRoute();
-  const { splitId, billData } = route.params as RouteParams;
-  
-  const [splitData, setSplitData] = useState<BillSplitCreationData>(
-    billData || {
-      title: '',
-      description: '',
-      totalAmount: 0,
-      currency: 'USD',
-      date: new Date().toISOString().split('T')[0],
-      location: '',
-      merchant: '',
-      billImageUrl: '',
-      items: [],
-      participants: [],
-      settings: {
-        allowPartialPayments: true,
-        requireAllAccept: false,
-        autoCalculate: true,
-        splitMethod: 'equal',
-      },
-    }
-  );
-  
-  const [participants, setParticipants] = useState<BillParticipant[]>([]);
-  const [isEditing, setIsEditing] = useState(false);
-  const [showAddParticipant, setShowAddParticipant] = useState(false);
-  const [newParticipant, setNewParticipant] = useState({
-    name: '',
-    email: '',
-    phoneNumber: '',
-  });
+  const [billName, setBillName] = useState('Restaurant Night');
+  const [totalAmount, setTotalAmount] = useState('65.6');
+  const [showSplitModal, setShowSplitModal] = useState(false);
+  const [selectedSplitType, setSelectedSplitType] = useState<'fair' | 'degen' | null>(null);
+  const [participants, setParticipants] = useState([
+    { id: '1', name: 'PauluneMoon', walletAddress: 'B3gt.....sdgux', status: 'accepted' },
+    { id: '2', name: 'Haxxxoloto', walletAddress: 'C4ht.....kdfux', status: 'accepted' },
+    { id: '3', name: 'Rémi', walletAddress: 'D5iu.....jghux', status: 'pending' },
+    { id: '4', name: 'Florian', walletAddress: 'E6jk.....lhiux', status: 'pending' },
+  ]);
 
-  useEffect(() => {
-    if (splitId) {
-      loadExistingSplit();
-    } else {
-      // Initialize with current user as first participant
-      initializeWithCurrentUser();
-    }
-  }, [splitId]);
-
-  const loadExistingSplit = async () => {
-    // TODO: Load existing split data from backend
-    console.log('Loading existing split:', splitId);
+  const handleAddParticipant = () => {
+    Alert.alert('Add Participant', 'This will open the contacts screen to add more participants');
   };
 
-  const initializeWithCurrentUser = () => {
-    // TODO: Get current user data and add as first participant
-    const currentUserParticipant: BillParticipant = {
-      id: '1',
-      userId: 'current_user_id',
-      name: 'You',
-      email: 'current@user.com',
-      status: 'accepted',
-      amountOwed: 0,
-      items: [],
-    };
-    setParticipants([currentUserParticipant]);
+  const handleSplitBill = () => {
+    console.log('Opening split modal...');
+    setShowSplitModal(true);
   };
 
-  const updateSplitData = (field: keyof BillSplitCreationData, value: any) => {
-    setSplitData(prev => ({ ...prev, [field]: value }));
+  const handleSplitTypeSelection = (type: 'fair' | 'degen') => {
+    console.log('Split type selected:', type);
+    setSelectedSplitType(type);
+    console.log('Current selectedSplitType state:', type);
   };
 
-  const addParticipant = () => {
-    if (!newParticipant.name.trim()) {
-      Alert.alert('Error', 'Please enter a name for the participant');
+  const handleContinue = () => {
+    console.log('Continue button pressed, selectedSplitType:', selectedSplitType);
+    console.log('Modal should close and navigate to FairSplit');
+    
+    if (!selectedSplitType) {
+      Alert.alert('Please select a split type', 'Choose either Fair Split or Degen Split to continue');
       return;
     }
 
-    const participant: BillParticipant = {
-      id: Date.now().toString(),
-      userId: `user_${Date.now()}`,
-      name: newParticipant.name.trim(),
-      email: newParticipant.email.trim(),
-      phoneNumber: newParticipant.phoneNumber.trim(),
-      status: 'pending',
-      amountOwed: 0,
-      items: [],
-    };
-
-    setParticipants(prev => [...prev, participant]);
-    setNewParticipant({ name: '', email: '', phoneNumber: '' });
-    setShowAddParticipant(false);
-  };
-
-  const removeParticipant = (participantId: string) => {
-    Alert.alert(
-      'Remove Participant',
-      'Are you sure you want to remove this participant?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => {
-            setParticipants(prev => prev.filter(p => p.id !== participantId));
-          },
-        },
-      ]
-    );
-  };
-
-  const calculateAmounts = () => {
-    if (splitData.settings.splitMethod === 'equal') {
-      const amountPerPerson = splitData.totalAmount / participants.length;
-      setParticipants(prev =>
-        prev.map(p => ({ ...p, amountOwed: amountPerPerson }))
-      );
-    } else if (splitData.settings.splitMethod === 'by_items') {
-      // Calculate based on items assigned to each participant
-      // This would be more complex in a real implementation
-      const amountPerPerson = splitData.totalAmount / participants.length;
-      setParticipants(prev =>
-        prev.map(p => ({ ...p, amountOwed: amountPerPerson }))
-      );
-    }
-  };
-
-  const saveSplit = async () => {
-    try {
-      // TODO: Save split to backend
-      console.log('Saving split:', { ...splitData, participants });
+    setShowSplitModal(false);
+    
+    if (selectedSplitType === 'fair') {
+      // Navigate to Fair Split screen
+      const billData = {
+        title: billName,
+        totalAmount: parseFloat(totalAmount),
+        date: '10 Mar. 2025',
+        participants: participants.map(p => ({
+          id: p.id,
+          name: p.name,
+          walletAddress: p.walletAddress,
+          status: p.status,
+        })),
+      };
       
-      Alert.alert(
-        'Split Created',
-        'Your bill split has been created successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('SplitsList'),
-          },
-        ]
-      );
-    } catch (error) {
-      console.error('Error saving split:', error);
-      Alert.alert('Error', 'Failed to save split. Please try again.');
-    }
-  };
-
-  const renderParticipant = ({ item }: { item: BillParticipant }) => (
-    <View style={styles.participantCard}>
-      <View style={styles.participantInfo}>
-        <Text style={styles.participantName}>{item.name}</Text>
-        {item.email && <Text style={styles.participantEmail}>{item.email}</Text>}
-        <Text style={styles.participantAmount}>
-          ${item.amountOwed.toFixed(2)}
-        </Text>
-      </View>
+      console.log('Navigating to FairSplit with data:', billData);
+      navigation.navigate('FairSplit', { billData });
+    } else {
+      // Navigate to Degen Lock screen
+      const billData = {
+        name: billName,
+        totalAmount: parseFloat(totalAmount),
+        date: '10 Mar. 2025',
+        participants: participants.map(p => ({
+          id: p.id,
+          name: p.name,
+          walletAddress: p.walletAddress,
+          status: p.status,
+        })),
+      };
       
-      <View style={styles.participantActions}>
-        <View style={[styles.statusBadge, getStatusBadgeStyle(item.status)]}>
-          <Text style={[styles.statusText, getStatusTextStyle(item.status)]}>
-            {item.status}
-          </Text>
-        </View>
-        
-        {item.id !== '1' && (
-          <TouchableOpacity
-            style={styles.removeButton}
-            onPress={() => removeParticipant(item.id)}
-          >
-            <Text style={styles.removeButtonText}>×</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  );
-
-  const getStatusBadgeStyle = (status: string) => {
-    switch (status) {
-      case 'accepted':
-        return { backgroundColor: colors.success + '20' };
-      case 'pending':
-        return { backgroundColor: colors.warning + '20' };
-      case 'declined':
-        return { backgroundColor: colors.error + '20' };
-      default:
-        return { backgroundColor: colors.surface };
+      console.log('Navigating to DegenLock with data:', billData);
+      navigation.navigate('DegenLock', {
+        billData,
+        participants: [
+          { id: '1', name: 'PauluneMoon', userId: 'B3Lz4GJGrl87x892', avatar: '👤' },
+          { id: '2', name: 'Alice', userId: 'A1B2C3D4E5F6G7H8', avatar: '👤' },
+          { id: '3', name: 'Bob', userId: 'B2C3D4E5F6G7H8I9', avatar: '👤' },
+          { id: '4', name: 'Charlie', userId: 'C3D4E5F6G7H8I9J0', avatar: '👤' },
+        ],
+        totalAmount: parseFloat(totalAmount),
+      });
     }
   };
 
-  const getStatusTextStyle = (status: string) => {
-    switch (status) {
-      case 'accepted':
-        return { color: colors.success };
-      case 'pending':
-        return { color: colors.warning };
-      case 'declined':
-        return { color: colors.error };
-      default:
-        return { color: colors.textSecondary };
-    }
+  const handleCloseModal = () => {
+    setShowSplitModal(false);
+    setSelectedSplitType(null);
   };
+
+  // Debug effect to track selectedSplitType changes
+  useEffect(() => {
+    console.log('selectedSplitType state changed to:', selectedSplitType);
+  }, [selectedSplitType]);
+
+  // Debug effect to track modal visibility
+  useEffect(() => {
+    console.log('Modal visibility changed to:', showSplitModal);
+  }, [showSplitModal]);
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton} 
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>← Back</Text>
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>
-          {splitId ? 'Edit Split' : 'Create Split'}
-        </Text>
+        <Text style={styles.headerTitle}>Split the Bill</Text>
         
-        <TouchableOpacity 
-          style={styles.saveButton} 
-          onPress={saveSplit}
-        >
-          <Text style={styles.saveButtonText}>Save</Text>
+        <TouchableOpacity style={styles.editButton}>
+          <Text style={styles.editButtonText}>✏️</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Split Basic Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Split Details</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Title</Text>
-            <TextInput
-              style={styles.textInput}
-              value={splitData.title}
-              onChangeText={(text) => updateSplitData('title', text)}
-              placeholder="Enter split title"
-              placeholderTextColor={colors.textSecondary}
-            />
-          </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Description (Optional)</Text>
-            <TextInput
-              style={[styles.textInput, styles.textArea]}
-              value={splitData.description}
-              onChangeText={(text) => updateSplitData('description', text)}
-              placeholder="Add a description"
-              placeholderTextColor={colors.textSecondary}
-              multiline
-              numberOfLines={3}
-            />
-          </View>
-          
-          <View style={styles.row}>
-            <View style={[styles.inputGroup, styles.halfWidth]}>
-              <Text style={styles.inputLabel}>Date</Text>
-              <TextInput
-                style={styles.textInput}
-                value={splitData.date}
-                onChangeText={(text) => updateSplitData('date', text)}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.textSecondary}
-              />
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Bill Details Card */}
+        <View style={styles.billCard}>
+          <View style={styles.billHeader}>
+            <View style={styles.billTitleContainer}>
+              <Text style={styles.billIcon}>🍽️</Text>
+              <Text style={styles.billTitle}>{billName}</Text>
             </View>
-            
-            <View style={[styles.inputGroup, styles.halfWidth]}>
-              <Text style={styles.inputLabel}>Total Amount</Text>
-              <TextInput
-                style={styles.textInput}
-                value={splitData.totalAmount.toString()}
-                onChangeText={(text) => updateSplitData('totalAmount', parseFloat(text) || 0)}
-                placeholder="0.00"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-              />
+            <Text style={styles.billDate}>10 Mar. 2025</Text>
+          </View>
+          
+          <View style={styles.billAmountContainer}>
+            <Text style={styles.billAmountLabel}>Total Bill</Text>
+            <View style={styles.billAmountRow}>
+              <Text style={styles.billAmountUSDC}>65,6 USDC</Text>
+              <Text style={styles.billAmountEUR}>61,95€</Text>
             </View>
           </View>
           
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Merchant/Location</Text>
-            <TextInput
-              style={styles.textInput}
-              value={splitData.merchant}
-              onChangeText={(text) => updateSplitData('merchant', text)}
-              placeholder="Restaurant, store, etc."
-              placeholderTextColor={colors.textSecondary}
-            />
+          <View style={styles.splitInfoContainer}>
+            <View style={styles.splitInfoLeft}>
+              <Text style={styles.splitInfoLabel}>Split between:</Text>
+              <View style={styles.avatarContainer}>
+                <View style={styles.avatar} />
+                <View style={styles.avatar} />
+                <View style={styles.avatar} />
+                <View style={styles.avatar} />
+                <View style={styles.avatarOverlay}>
+                  <Text style={styles.avatarOverlayText}>+4</Text>
+                </View>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.addButton} onPress={handleAddParticipant}>
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* Participants Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Participants</Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setShowAddParticipant(true)}
-            >
-              <Text style={styles.addButtonText}>+ Add</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.participantsSection}>
+          <Text style={styles.participantsTitle}>In the pool:</Text>
           
-          <FlatList
-            data={participants}
-            renderItem={renderParticipant}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            style={styles.participantsList}
-          />
-          
-          <View style={styles.calculationInfo}>
-            <Text style={styles.calculationText}>
-              Total: ${splitData.totalAmount.toFixed(2)}
-            </Text>
-            <Text style={styles.calculationText}>
-              Per person: ${(splitData.totalAmount / participants.length).toFixed(2)}
-            </Text>
-          </View>
-        </View>
-
-        {/* Split Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Split Settings</Text>
-          
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Split Method</Text>
-            <View style={styles.settingOptions}>
-              <TouchableOpacity
-                style={[
-                  styles.settingOption,
-                  splitData.settings.splitMethod === 'equal' && styles.settingOptionActive
-                ]}
-                onPress={() => updateSplitData('settings', {
-                  ...splitData.settings,
-                  splitMethod: 'equal'
-                })}
-              >
-                <Text style={[
-                  styles.settingOptionText,
-                  splitData.settings.splitMethod === 'equal' && styles.settingOptionTextActive
-                ]}>
-                  Equal
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.settingOption,
-                  splitData.settings.splitMethod === 'by_items' && styles.settingOptionActive
-                ]}
-                onPress={() => updateSplitData('settings', {
-                  ...splitData.settings,
-                  splitMethod: 'by_items'
-                })}
-              >
-                <Text style={[
-                  styles.settingOptionText,
-                  splitData.settings.splitMethod === 'by_items' && styles.settingOptionTextActive
-                ]}>
-                  By Items
-                </Text>
-              </TouchableOpacity>
+          {participants.map((participant) => (
+            <View key={participant.id} style={styles.participantCard}>
+              <View style={styles.participantAvatar} />
+              <View style={styles.participantInfo}>
+                <Text style={styles.participantName}>{participant.name}</Text>
+                <Text style={styles.participantWallet}>{participant.walletAddress}</Text>
+              </View>
+              <View style={styles.participantStatus}>
+                {participant.status === 'accepted' ? (
+                  <Text style={styles.statusAccepted}>✓</Text>
+                ) : (
+                  <Text style={styles.statusPending}>Pending</Text>
+                )}
+              </View>
             </View>
-          </View>
+          ))}
         </View>
       </ScrollView>
 
-      {/* Add Participant Modal */}
+      {/* Bottom Action Button */}
+      <View style={styles.bottomContainer}>
+        <TouchableOpacity style={styles.splitButton} onPress={handleSplitBill}>
+          <Text style={styles.splitButtonText}>Split</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Split Type Selection Modal */}
       <Modal
-        visible={showAddParticipant}
+        visible={showSplitModal}
         animationType="slide"
-        presentationStyle="pageSheet"
+        transparent={true}
+        onRequestClose={handleCloseModal}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowAddParticipant(false)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={handleCloseModal}
+        >
+          <TouchableOpacity 
+            style={styles.modalContainer}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Modal Handle */}
+            <View style={styles.modalHandle} />
             
-            <Text style={styles.modalTitle}>Add Participant</Text>
-            
-            <TouchableOpacity onPress={addParticipant}>
-              <Text style={styles.modalSaveText}>Add</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.modalContent}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Name *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newParticipant.name}
-                onChangeText={(text) => setNewParticipant(prev => ({ ...prev, name: text }))}
-                placeholder="Enter name"
-                placeholderTextColor={colors.textSecondary}
-              />
+            {/* Modal Content */}
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Choose your splitting style</Text>
+              <Text style={styles.modalSubtitle}>
+                Pick how you want to settle the bill with friends.
+              </Text>
+              
+              {/* Split Type Options */}
+              <View style={styles.splitOptionsContainer}>
+                {/* Fair Split Option */}
+                <TouchableOpacity
+                  style={[
+                    styles.splitOption,
+                    selectedSplitType === 'fair' && styles.splitOptionSelected
+                  ]}
+                  onPress={() => handleSplitTypeSelection('fair')}
+                >
+                  <View style={styles.splitOptionIcon}>
+                    <Text style={styles.splitOptionIconText}>⚖️</Text>
+                  </View>
+                  <Text style={styles.splitOptionTitle}>Fair Split</Text>
+                  <Text style={styles.splitOptionDescription}>
+                    Everyone pays their fair share
+                  </Text>
+                </TouchableOpacity>
+                
+                {/* Degen Split Option */}
+                <TouchableOpacity
+                  style={[
+                    styles.splitOption,
+                    selectedSplitType === 'degen' && styles.splitOptionSelected
+                  ]}
+                  onPress={() => handleSplitTypeSelection('degen')}
+                >
+                  <View style={styles.riskyModeLabel}>
+                    <Text style={styles.riskyModeIcon}>🔥</Text>
+                    <Text style={styles.riskyModeText}>Risky mode</Text>
+                  </View>
+                  <View style={styles.splitOptionIcon}>
+                    <Text style={styles.splitOptionIconText}>🎲</Text>
+                  </View>
+                  <Text style={styles.splitOptionTitle}>Degen Split</Text>
+                  <Text style={styles.splitOptionDescription}>
+                    One pays it all, luck decides who
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+               {/* Continue Button */}
+               <TouchableOpacity
+                 style={[
+                   styles.continueButton,
+                   !selectedSplitType && styles.continueButtonDisabled
+                 ]}
+                 onPress={() => {
+                   console.log('Continue button touched!');
+                   handleContinue();
+                 }}
+                 disabled={!selectedSplitType}
+               >
+                 <LinearGradient
+                   colors={selectedSplitType ? [colors.green, colors.greenLight] : [colors.surface, colors.surface]}
+                   start={{ x: 0, y: 0 }}
+                   end={{ x: 1, y: 0 }}
+                   style={styles.continueButtonGradient}
+                 >
+                   <Text style={[
+                     styles.continueButtonText,
+                     !selectedSplitType && styles.continueButtonTextDisabled
+                   ]}>
+                     Continue
+                   </Text>
+                 </LinearGradient>
+               </TouchableOpacity>
             </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Email</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newParticipant.email}
-                onChangeText={(text) => setNewParticipant(prev => ({ ...prev, email: text }))}
-                placeholder="Enter email"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-            
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Phone Number</Text>
-              <TextInput
-                style={styles.textInput}
-                value={newParticipant.phoneNumber}
-                onChangeText={(text) => setNewParticipant(prev => ({ ...prev, phoneNumber: text }))}
-                placeholder="Enter phone number"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="phone-pad"
-              />
-            </View>
-          </View>
-        </SafeAreaView>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
@@ -466,7 +313,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.black,
   },
   header: {
     flexDirection: 'row',
@@ -474,231 +321,333 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.black,
   },
   backButton: {
     padding: spacing.sm,
   },
   backButtonText: {
-    color: colors.primary,
-    fontSize: typography.fontSize.md,
-    fontWeight: '500',
+    color: colors.white,
+    fontSize: typography.fontSize.xl,
+    fontWeight: '600',
   },
   headerTitle: {
+    color: colors.white,
     fontSize: typography.fontSize.lg,
     fontWeight: '600',
-    color: colors.text,
   },
-  saveButton: {
+  editButton: {
     padding: spacing.sm,
   },
-  saveButtonText: {
-    color: colors.primary,
+  editButtonText: {
+    color: colors.white,
     fontSize: typography.fontSize.md,
-    fontWeight: '600',
   },
   content: {
     flex: 1,
+    paddingHorizontal: spacing.lg,
   },
-  section: {
-    margin: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: 8,
+  billCard: {
+    backgroundColor: colors.green,
+    borderRadius: 20,
+    padding: spacing.xl,
+    marginBottom: spacing.xl,
   },
-  sectionHeader: {
+  billHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
+  },
+  billTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  billIcon: {
+    fontSize: typography.fontSize.lg,
+    marginRight: spacing.sm,
+  },
+  billTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.xl,
+    fontWeight: '700',
+  },
+  billDate: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    opacity: 0.9,
+  },
+  billAmountContainer: {
+    marginBottom: spacing.lg,
+  },
+  billAmountLabel: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    marginBottom: spacing.xs,
+  },
+  billAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  billAmountUSDC: {
+    color: colors.white,
+    fontSize: typography.fontSize.xxl,
+    fontWeight: '700',
+    marginRight: spacing.sm,
+  },
+  billAmountEUR: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    opacity: 0.9,
+  },
+  splitInfoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
   },
-  sectionTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.md,
-  },
-  inputGroup: {
-    marginBottom: spacing.md,
-  },
-  inputLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-    fontWeight: '500',
-  },
-  textInput: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: typography.fontSize.md,
-    color: colors.text,
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  halfWidth: {
+  splitInfoLeft: {
     flex: 1,
-    marginRight: spacing.sm,
+  },
+  splitInfoLabel: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    marginBottom: spacing.sm,
+  },
+  avatarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.white,
+    marginRight: -8,
+    borderWidth: 2,
+    borderColor: colors.green,
+  },
+  avatarOverlay: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.black,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: spacing.xs,
+  },
+  avatarOverlayText: {
+    color: colors.white,
+    fontSize: typography.fontSize.xs,
+    fontWeight: '600',
   },
   addButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
+    backgroundColor: colors.black,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   addButtonText: {
     color: colors.white,
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.md,
     fontWeight: '600',
   },
-  participantsList: {
-    marginBottom: spacing.md,
+  participantsSection: {
+    marginBottom: spacing.xl,
+  },
+  participantsTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '600',
+    marginBottom: spacing.lg,
   },
   participantCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    marginBottom: spacing.sm,
+  },
+  participantAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.green,
+    marginRight: spacing.md,
   },
   participantInfo: {
     flex: 1,
   },
   participantName: {
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
-    color: colors.text,
     marginBottom: spacing.xs,
   },
-  participantEmail: {
-    fontSize: typography.fontSize.sm,
+  participantWallet: {
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+    fontSize: typography.fontSize.sm,
   },
-  participantAmount: {
-    fontSize: typography.fontSize.md,
+  participantStatus: {
+    alignItems: 'flex-end',
+  },
+  statusAccepted: {
+    color: colors.green,
+    fontSize: typography.fontSize.lg,
     fontWeight: '600',
-    color: colors.primary,
   },
-  participantActions: {
-    flexDirection: 'row',
+  statusPending: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+  },
+  bottomContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.black,
+  },
+  splitButton: {
+    backgroundColor: colors.green,
+    paddingVertical: spacing.lg,
+    borderRadius: 12,
     alignItems: 'center',
   },
-  statusBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 12,
-    marginRight: spacing.sm,
-  },
-  statusText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  removeButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.error,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeButtonText: {
+  splitButtonText: {
     color: colors.white,
     fontSize: typography.fontSize.lg,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
-  calculationInfo: {
-    padding: spacing.md,
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary,
-  },
-  calculationText: {
-    fontSize: typography.fontSize.md,
-    color: colors.text,
-    fontWeight: '500',
-    marginBottom: spacing.xs,
-  },
-  settingRow: {
-    marginBottom: spacing.md,
-  },
-  settingLabel: {
-    fontSize: typography.fontSize.md,
-    color: colors.text,
-    fontWeight: '500',
-    marginBottom: spacing.sm,
-  },
-  settingOptions: {
-    flexDirection: 'row',
-  },
-  settingOption: {
+  // Modal Styles
+  modalOverlay: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginRight: spacing.sm,
-    alignItems: 'center',
-  },
-  settingOptionActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  settingOptionText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  settingOptionTextActive: {
-    color: colors.white,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    zIndex: 1000,
   },
   modalContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
     backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    height: '65%',
+    minHeight: 400,
   },
-  modalCancelText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.md,
-  },
-  modalTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  modalSaveText: {
-    color: colors.primary,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.textSecondary,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.xl,
   },
   modalContent: {
     flex: 1,
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent', // Debug: make sure content is visible
+  },
+  modalTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.xxl,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  modalSubtitle: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 20,
+  },
+  splitOptionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xl,
+    gap: spacing.md,
+  },
+  splitOption: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderRadius: 16,
     padding: spacing.lg,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    minHeight: 200,
+    justifyContent: 'center',
+    minWidth: 140,
+  },
+  splitOptionSelected: {
+    borderColor: colors.green,
+  },
+  splitOptionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  splitOptionIconText: {
+    fontSize: 28,
+  },
+  splitOptionTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  splitOptionDescription: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: spacing.xs,
+  },
+  riskyModeLabel: {
+    position: 'absolute',
+    top: -6,
+    left: -6,
+    backgroundColor: colors.green,
+    borderRadius: 12,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  riskyModeIcon: {
+    fontSize: typography.fontSize.sm,
+    marginRight: spacing.xs,
+  },
+  riskyModeText: {
+    color: colors.white,
+    fontSize: typography.fontSize.xs,
+    fontWeight: '600',
+  },
+  continueButton: {
+    borderRadius: 12,
+    marginTop: spacing.lg,
+    overflow: 'hidden',
+  },
+  continueButtonDisabled: {
+    opacity: 0.5,
+  },
+  continueButtonGradient: {
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+  },
+  continueButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
+  },
+  continueButtonTextDisabled: {
+    color: colors.textSecondary,
   },
 });
 

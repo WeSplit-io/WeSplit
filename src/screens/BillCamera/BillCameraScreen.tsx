@@ -15,7 +15,7 @@ import {
   SafeAreaView,
   Image,
 } from 'react-native';
-import { Camera } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -28,28 +28,27 @@ interface BillCameraScreenProps {
 }
 
 const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
-  const cameraRef = useRef<Camera>(null);
+  const cameraRef = useRef<CameraView>(null);
   
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [cameraType, setCameraType] = useState<'back' | 'front'>('back');
   const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
   const [isCapturing, setIsCapturing] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('BillCameraScreen: Component mounted, requesting camera permission');
-    requestCameraPermission();
-  }, []);
+    console.log('BillCameraScreen: Component mounted');
+    console.log('BillCameraScreen: Permission status:', permission);
+    console.log('BillCameraScreen: CameraView object:', CameraView);
+  }, [permission]);
 
-  const requestCameraPermission = async () => {
+  const handleRequestPermission = async () => {
     try {
       console.log('BillCameraScreen: Requesting camera permission...');
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      console.log('BillCameraScreen: Camera permission status:', status);
-      setHasPermission(status === 'granted');
+      const result = await requestPermission();
+      console.log('BillCameraScreen: Permission request result:', result);
       
-      if (status !== 'granted') {
-        console.log('BillCameraScreen: Camera permission denied');
+      if (!result.granted) {
         Alert.alert(
           'Camera Permission Required',
           'We need camera access to capture bill images for splitting.',
@@ -58,12 +57,9 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
             { text: 'Settings', onPress: () => {} }
           ]
         );
-      } else {
-        console.log('BillCameraScreen: Camera permission granted');
       }
     } catch (error) {
       console.error('BillCameraScreen: Error requesting camera permission:', error);
-      setHasPermission(false);
     }
   };
 
@@ -125,7 +121,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
   };
 
   const toggleFlash = () => {
-    setFlashMode(flashMode === FlashMode.off ? FlashMode.on : FlashMode.off);
+    setFlashMode(flashMode === 'off' ? 'on' : 'off');
   };
 
   const toggleCameraType = () => {
@@ -134,9 +130,9 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
     );
   };
 
-  console.log('BillCameraScreen: Rendering with hasPermission:', hasPermission);
+  console.log('BillCameraScreen: Rendering with permission:', permission);
 
-  if (hasPermission === null) {
+  if (!permission) {
     console.log('BillCameraScreen: Rendering permission request screen');
     return (
       <SafeAreaView style={styles.container}>
@@ -148,13 +144,13 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>Camera access is required to capture bills</Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={requestCameraPermission}>
+          <TouchableOpacity style={styles.permissionButton} onPress={handleRequestPermission}>
             <Text style={styles.permissionButtonText}>Grant Permission</Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -242,13 +238,12 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
       </View>
 
       <View style={styles.cameraContainer}>
-        {hasPermission ? (
-          <Camera
+        {permission?.granted && CameraView ? (
+          <CameraView
             ref={cameraRef}
             style={styles.camera}
-            type={cameraType}
-            flashMode={flashMode}
-            ratio="4:3"
+            facing={cameraType}
+            flash={flashMode}
           >
           <View style={styles.cameraOverlay}>
             {/* Camera overlay guides */}
@@ -263,10 +258,15 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
               Position the bill within the frame
             </Text>
           </View>
-          </Camera>
+          </CameraView>
         ) : (
           <View style={styles.cameraError}>
-            <Text style={styles.cameraErrorText}>Camera not available</Text>
+            <Text style={styles.cameraErrorText}>
+              {!CameraView ? 'Camera API not available' : 'Camera not available'}
+            </Text>
+            <Text style={styles.cameraErrorSubtext}>
+              {!CameraView ? 'Please check your expo-camera installation' : 'Please grant camera permission'}
+            </Text>
           </View>
         )}
       </View>
@@ -275,7 +275,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
         <View style={styles.controlRow}>
           <TouchableOpacity style={styles.controlButton} onPress={toggleFlash}>
             <Text style={styles.controlButtonText}>
-              {flashMode === FlashMode.off ? 'Flash Off' : 'Flash On'}
+              {flashMode === 'off' ? 'Flash Off' : 'Flash On'}
             </Text>
           </TouchableOpacity>
           
@@ -309,12 +309,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.black,
     padding: spacing.xl,
   },
   permissionText: {
     fontSize: typography.fontSize.lg,
-    color: colors.text,
+    color: colors.white,
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
@@ -377,8 +377,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   cameraErrorText: {
-    color: colors.text,
+    color: colors.white,
     fontSize: typography.fontSize.md,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  cameraErrorSubtext: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
     textAlign: 'center',
   },
   cameraOverlay: {
