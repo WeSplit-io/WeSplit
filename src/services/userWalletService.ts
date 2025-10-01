@@ -153,6 +153,43 @@ export class UserWalletService {
         }
       }
 
+      // Try cross-authentication-method wallet recovery using email
+      if (user?.email) {
+        logger.info('UserWalletService: Attempting cross-auth wallet recovery by email', { 
+          userId, 
+          email: user.email 
+        }, 'UserWalletService');
+        
+        const crossAuthResult = await this.tryCrossAuthWalletRecovery(user.email);
+        if (crossAuthResult.success) {
+          // Store the recovered wallet data for future use
+          await this.storeWalletDataForCrossAuthRecovery(user.email, crossAuthResult.wallet!);
+          return crossAuthResult;
+        }
+      }
+
+      // Try to find wallet by checking all users with the same email
+      if (user?.email) {
+        logger.info('UserWalletService: Attempting to find wallet from other user documents with same email', { 
+          userId, 
+          email: user.email 
+        }, 'UserWalletService');
+        
+        const emailWalletResult = await this.findWalletByEmailAcrossUsers(user.email);
+        if (emailWalletResult.success) {
+          // Update current user with the found wallet
+          await firebaseDataService.user.updateUser(userId, {
+            wallet_address: emailWalletResult.wallet!.address,
+            wallet_public_key: emailWalletResult.wallet!.publicKey
+          });
+          
+          // Store wallet data for current user
+          await this.storeWalletDataForUser(userId, emailWalletResult.wallet!);
+          
+          return emailWalletResult;
+        }
+      }
+
       // User doesn't have a working wallet, create one
       logger.info('UserWalletService: Creating new wallet for user', { 
         userId: userId, 
@@ -268,6 +305,200 @@ export class UserWalletService {
     } catch (error) {
       logger.warn('UserWalletService: Error checking stored credentials', { userId, error }, 'UserWalletService');
       return false;
+    }
+  }
+
+  /**
+   * Try to recover wallet from cross-authentication-method data
+   * This handles cases where users switch auth methods but have the same email
+   */
+  private async tryCrossAuthWalletRecovery(email: string): Promise<WalletCreationResult> {
+    try {
+      logger.info('UserWalletService: Attempting cross-auth wallet recovery', { email }, 'UserWalletService');
+      
+      // Try to get wallet data stored by email
+      const emailWalletData = await secureStorageService.getWalletDataByEmail(email);
+      
+      if (emailWalletData) {
+        logger.info('UserWalletService: Found wallet data by email', { 
+          email, 
+          hasSeedPhrase: !!emailWalletData.seedPhrase,
+          hasPrivateKey: !!emailWalletData.privateKey,
+          walletAddress: emailWalletData.walletAddress
+        }, 'UserWalletService');
+        
+        // Try to restore from seed phrase first
+        if (emailWalletData.seedPhrase) {
+          try {
+            const result = await consolidatedWalletService.importWallet(emailWalletData.seedPhrase);
+            if (result && result.address) {
+              logger.info('UserWalletService: Successfully recovered wallet from email-stored seed phrase', { 
+                email, 
+                walletAddress: result.address 
+              }, 'UserWalletService');
+              
+              return {
+                success: true,
+                wallet: {
+                  address: result.address,
+                  publicKey: result.publicKey || result.address
+                }
+              };
+            }
+          } catch (error) {
+            logger.warn('UserWalletService: Failed to restore from email-stored seed phrase', { email, error }, 'UserWalletService');
+          }
+        }
+        
+        // Try to restore from private key
+        if (emailWalletData.privateKey) {
+          try {
+            const keyData = new Uint8Array(JSON.parse(emailWalletData.privateKey));
+            const keypair = Keypair.fromSecretKey(keyData);
+            
+            logger.info('UserWalletService: Successfully recovered wallet from email-stored private key', { 
+              email, 
+              walletAddress: keypair.publicKey.toBase58() 
+            }, 'UserWalletService');
+            
+            return {
+              success: true,
+              wallet: {
+                address: keypair.publicKey.toBase58(),
+                publicKey: keypair.publicKey.toBase58()
+              }
+            };
+          } catch (error) {
+            logger.warn('UserWalletService: Failed to restore from email-stored private key', { email, error }, 'UserWalletService');
+          }
+        }
+      }
+      
+      logger.info('UserWalletService: No cross-auth wallet data found', { email }, 'UserWalletService');
+      return {
+        success: false,
+        error: 'No cross-auth wallet data found'
+      };
+    } catch (error) {
+      logger.error('UserWalletService: Error in cross-auth wallet recovery', { email, error }, 'UserWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Cross-auth wallet recovery failed'
+      };
+    }
+  }
+
+  /**
+   * Find wallet by checking all user documents with the same email
+   * This handles cases where users have multiple user documents with the same email
+   */
+  private async findWalletByEmailAcrossUsers(email: string): Promise<WalletCreationResult> {
+    try {
+      logger.info('UserWalletService: Searching for wallet across all users with same email', { email }, 'UserWalletService');
+      
+      // Get all users with the same email
+      const usersWithSameEmail = await this.getAllUsersByEmail(email);
+      
+      for (const user of usersWithSameEmail) {
+        if (user.wallet_address && user.wallet_address.trim() !== '' && user.wallet_address !== '11111111111111111111111111111111') {
+          logger.info('UserWalletService: Found user with wallet address', { 
+            userId: user.id, 
+            walletAddress: user.wallet_address,
+            email 
+          }, 'UserWalletService');
+          
+          // Try to restore this wallet
+          const restoreResult = await this.restoreExistingWallet(user.id.toString(), user.wallet_address);
+          if (restoreResult.success) {
+            logger.info('UserWalletService: Successfully restored wallet from another user document', { 
+              originalUserId: user.id,
+              walletAddress: user.wallet_address,
+              email 
+            }, 'UserWalletService');
+            
+            return {
+              success: true,
+              wallet: {
+                address: user.wallet_address,
+                publicKey: user.wallet_public_key || user.wallet_address
+              }
+            };
+          }
+        }
+      }
+      
+      return {
+        success: false,
+        error: 'No wallet found across users with same email'
+      };
+    } catch (error) {
+      logger.error('UserWalletService: Error finding wallet across users', { email, error }, 'UserWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to search across users'
+      };
+    }
+  }
+
+  /**
+   * Get all users with the same email address
+   */
+  private async getAllUsersByEmail(email: string): Promise<any[]> {
+    try {
+      // This would need to be implemented based on your Firebase structure
+      // For now, we'll use the existing method from walletRecoveryService
+      const { walletRecoveryService } = await import('./walletRecoveryService');
+      return await walletRecoveryService.findUsersByEmail(email);
+    } catch (error) {
+      logger.error('UserWalletService: Error getting users by email', { email, error }, 'UserWalletService');
+      return [];
+    }
+  }
+
+  /**
+   * Store wallet data for cross-auth recovery
+   */
+  private async storeWalletDataForCrossAuthRecovery(email: string, wallet: { address: string; publicKey: string }): Promise<void> {
+    try {
+      // Get the current wallet's seed phrase and private key
+      const seedPhrase = await secureStorageService.getSeedPhrase('current');
+      const privateKey = await secureStorageService.getPrivateKey('current');
+      
+      if (seedPhrase || privateKey) {
+        await secureStorageService.storeWalletDataByEmail(email, {
+          seedPhrase: seedPhrase || undefined,
+          privateKey: privateKey || undefined,
+          walletAddress: wallet.address,
+          walletPublicKey: wallet.publicKey
+        });
+        
+        logger.info('UserWalletService: Stored wallet data for cross-auth recovery', { email, walletAddress: wallet.address }, 'UserWalletService');
+      }
+    } catch (error) {
+      logger.warn('UserWalletService: Failed to store wallet data for cross-auth recovery', { email, error }, 'UserWalletService');
+    }
+  }
+
+  /**
+   * Store wallet data for a specific user
+   */
+  private async storeWalletDataForUser(userId: string, wallet: { address: string; publicKey: string }): Promise<void> {
+    try {
+      // Get the current wallet's seed phrase and private key
+      const seedPhrase = await secureStorageService.getSeedPhrase('current');
+      const privateKey = await secureStorageService.getPrivateKey('current');
+      
+      if (seedPhrase) {
+        await secureStorageService.storeSeedPhrase(userId, seedPhrase);
+      }
+      
+      if (privateKey) {
+        await secureStorageService.storePrivateKey(userId, privateKey);
+      }
+      
+      logger.info('UserWalletService: Stored wallet data for user', { userId, walletAddress: wallet.address }, 'UserWalletService');
+    } catch (error) {
+      logger.warn('UserWalletService: Failed to store wallet data for user', { userId, error }, 'UserWalletService');
     }
   }
 
@@ -615,6 +846,40 @@ export class UserWalletService {
         }, 'UserWalletService');
       } catch (seedError) {
         logger.warn('Failed to store seed phrase for user', seedError, 'UserWalletService');
+      }
+
+      // Comprehensive wallet backup for cross-device and cross-auth recovery
+      try {
+        const user = await firebaseDataService.user.getCurrentUser(userId);
+        if (user?.email) {
+          // Import and use the backup service
+          const { walletBackupService } = await import('./walletBackupService');
+          
+          const backupResult = await walletBackupService.backupWallet(userId, user.email, {
+            address: wallet.address,
+            publicKey: wallet.publicKey || wallet.address,
+            keypair: wallet.keypair
+          });
+          
+          if (backupResult.success) {
+            logger.info('UserWalletService: Comprehensive wallet backup successful', { 
+              userId, 
+              email: user.email,
+              backupMethods: backupResult.backupMethods.join(', ')
+            }, 'UserWalletService');
+          } else {
+            logger.warn('UserWalletService: Wallet backup failed', { 
+              userId, 
+              email: user.email,
+              error: backupResult.error
+            }, 'UserWalletService');
+          }
+        }
+      } catch (backupError) {
+        logger.warn('UserWalletService: Failed to backup wallet data', { 
+          userId, 
+          error: backupError 
+        }, 'UserWalletService');
       }
 
       logger.info('Wallet creation completed successfully', {

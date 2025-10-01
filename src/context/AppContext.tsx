@@ -922,10 +922,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // User operations
   const authenticateUser = useCallback(async (user: User, method: 'wallet' | 'email' | 'guest' | 'social') => {
-    // ALWAYS clear wallet data for current user before authenticating new user
-    // This ensures no wallet data from previous user interferes with new user
-    if (state.currentUser) {
-      console.log('🔄 AppContext: Clearing current user wallet data before authentication');
+    // Only clear wallet data if this is a DIFFERENT user (different email)
+    // This prevents wallet loss when users switch authentication methods but are the same person
+    if (state.currentUser && state.currentUser.email !== user.email) {
+      console.log('🔄 AppContext: Different user detected (different email), clearing wallet data');
       
       try {
         // Import services
@@ -938,11 +938,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Also clear any generic wallet data that might be stored
         await secureStorageService.clearAllWalletData();
         
-        console.log('✅ AppContext: Cleared current user wallet data');
+        console.log('✅ AppContext: Cleared wallet data for different user');
       } catch (error) {
         console.warn('⚠️ AppContext: Failed to clear current user wallet data:', error);
         // Continue with authentication even if clearing fails
       }
+    } else if (state.currentUser && state.currentUser.email === user.email) {
+      console.log('✅ AppContext: Same user detected (same email), preserving wallet data');
     }
     
     dispatch({ type: 'AUTHENTICATE_USER', payload: { user, method } });

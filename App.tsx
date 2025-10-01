@@ -52,6 +52,10 @@ import RequestConfirmationScreen from './src/screens/Request/RequestConfirmation
 import PrivyDemoScreen from './src/screens/PrivyDemo/PrivyDemoScreen';
 import RequestSuccessScreen from './src/screens/Request/RequestSuccessScreen';
 import GroupsListScreen from './src/screens/GroupsList/GroupsListScreen';
+import BillCameraScreen from './src/screens/BillCamera/BillCameraScreen';
+import BillProcessingScreen from './src/screens/BillProcessing/BillProcessingScreen';
+import SplitDetailsScreen from './src/screens/SplitDetails/SplitDetailsScreen';
+import SplitsListScreen from './src/screens/SplitsList/SplitsListScreen';
 import WithdrawAmountScreen from './src/screens/Withdraw/WithdrawAmountScreen';
 import WithdrawConfirmationScreen from './src/screens/Withdraw/WithdrawConfirmationScreen';
 import WithdrawSuccessScreen from './src/screens/Withdraw/WithdrawSuccessScreen';
@@ -187,6 +191,10 @@ export default function App() {
                 <Stack.Screen name="RequestConfirmation" component={RequestConfirmationScreen} />
                 <Stack.Screen name="RequestSuccess" component={RequestSuccessScreen} />
                 <Stack.Screen name="GroupsList" component={GroupsListScreen} />
+                <Stack.Screen name="BillCamera" component={BillCameraScreen} />
+                <Stack.Screen name="BillProcessing" component={BillProcessingScreen} />
+                <Stack.Screen name="SplitDetails" component={SplitDetailsScreen} />
+                <Stack.Screen name="SplitsList" component={SplitsListScreen} />
                 <Stack.Screen name="WithdrawAmount" component={WithdrawAmountScreen} />
                 <Stack.Screen name="WithdrawConfirmation" component={WithdrawConfirmationScreen} />
                 <Stack.Screen name="WithdrawSuccess" component={WithdrawSuccessScreen} />

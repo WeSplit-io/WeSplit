@@ -32,7 +32,7 @@ const getImageFromPath = (path: string) => {
 const navItems = [
   { icon: 'home-icon-default.png', label: 'Home', route: 'Dashboard' },
   { icon: 'wallet-icon-default.png', label: 'Wallet', route: 'WalletManagement' },
-  { icon: 'folder-icon-default.png', label: 'Groups', route: 'GroupsList', isSpecial: true },
+  { icon: 'folder-icon-default.png', label: 'Splits', route: 'BillCamera', isSpecial: true },
   { icon: 'book-icon-default.png', label: 'Contact', route: 'Contacts' },
   { icon: 'profile-icon-default.png', label: 'Profile', route: 'Profile' },
 ];

@@ -20,6 +20,7 @@ import { logger } from './loggingService';
 import Constants from 'expo-constants';
 import { unifiedUserService } from './unifiedUserService';
 import { userWalletService } from './userWalletService';
+import { firebaseDataService } from './firebaseDataService';
 
 // Environment variable helper
 const getEnvVar = (key: string): string => {
@@ -129,11 +130,60 @@ class SimplifiedAuthService {
       }
 
 
-      // Step 2: Ensure user has a wallet (this is the key part)
-      const walletResult = await userWalletService.ensureUserWallet(userResult.user.id.toString());
+      // Step 2: Ensure user has a wallet with comprehensive recovery
+      let walletResult = await userWalletService.ensureUserWallet(userResult.user.id.toString());
+
+      // If wallet creation/restoration failed, try backup recovery
+      if (!walletResult.success && userResult.user.email) {
+        logger.info('SimplifiedAuth: Wallet creation failed, attempting backup recovery', { 
+          userId: userResult.user.id,
+          email: userResult.user.email,
+          error: walletResult.error 
+        }, 'SimplifiedAuth');
+        
+        try {
+          const { walletBackupService } = await import('./walletBackupService');
+          const backupRecoveryResult = await walletBackupService.restoreWalletFromBackup(
+            userResult.user.id.toString(),
+            userResult.user.email
+          );
+          
+          if (backupRecoveryResult.success && backupRecoveryResult.wallet) {
+            logger.info('SimplifiedAuth: Backup recovery successful', { 
+              userId: userResult.user.id,
+              email: userResult.user.email,
+              walletAddress: backupRecoveryResult.wallet.address,
+              method: backupRecoveryResult.method
+            }, 'SimplifiedAuth');
+            
+            // Update user with recovered wallet
+            await firebaseDataService.user.updateUser(userResult.user.id.toString(), {
+              wallet_address: backupRecoveryResult.wallet.address,
+              wallet_public_key: backupRecoveryResult.wallet.publicKey
+            });
+            
+            walletResult = {
+              success: true,
+              wallet: backupRecoveryResult.wallet
+            };
+          } else {
+            logger.warn('SimplifiedAuth: Backup recovery also failed', { 
+              userId: userResult.user.id,
+              email: userResult.user.email,
+              error: backupRecoveryResult.error
+            }, 'SimplifiedAuth');
+          }
+        } catch (backupError) {
+          logger.warn('SimplifiedAuth: Backup recovery process failed', { 
+            userId: userResult.user.id,
+            email: userResult.user.email,
+            error: backupError
+          }, 'SimplifiedAuth');
+        }
+      }
 
       if (!walletResult.success) {
-        logger.warn('Failed to ensure user wallet, continuing without wallet', { 
+        logger.warn('Failed to ensure user wallet after all recovery attempts, continuing without wallet', { 
           userId: userResult.user.id,
           error: walletResult.error 
         }, 'SimplifiedAuth');

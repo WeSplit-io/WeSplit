@@ -32,6 +32,7 @@ export class WalletRecoveryService {
   /**
    * Attempt to recover existing wallet for a user
    * This is called during login/email validation to prevent wallet loss
+   * ENHANCED: Now handles cross-authentication-method wallet recovery
    */
   async recoverExistingWallet(options: WalletRecoveryOptions): Promise<WalletRecoveryResult> {
     try {
@@ -57,6 +58,7 @@ export class WalletRecoveryService {
       }
 
       // Step 2: Check if there are other user documents with the same email that have wallets
+      // This handles the case where user switched authentication methods
       const usersWithSameEmail = await this.findUsersByEmail(email);
       const usersWithWallets = usersWithSameEmail.filter(user => 
         user.wallet_address && user.wallet_address.trim() !== ''

@@ -77,10 +77,13 @@ const SimplifiedAuthMethodsScreen: React.FC = () => {
       console.log('🔍 AuthMethods: Handling authenticated user:', firebaseUser.uid);
 
 
-      // Clear wallet state for user switch (if different user)
-      if (state.currentUser && state.currentUser.id !== firebaseUser.uid) {
-        console.log('🔄 AuthMethods: Different user detected, clearing wallet state');
+      // Clear wallet state for user switch (if different user by email)
+      // This prevents wallet loss when users switch authentication methods but are the same person
+      if (state.currentUser && state.currentUser.email !== firebaseUser.email) {
+        console.log('🔄 AuthMethods: Different user detected (different email), clearing wallet state');
         clearAllWalletStateForUserSwitch();
+      } else if (state.currentUser && state.currentUser.email === firebaseUser.email) {
+        console.log('✅ AuthMethods: Same user detected (same email), preserving wallet state');
       }
 
       // Use simplified auth service to authenticate user and ensure wallet

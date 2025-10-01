@@ -1432,24 +1432,24 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Groups Section */}
+        {/* Splits Section */}
         <View style={styles.groupsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Groups</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('GroupsList')}>
+            <Text style={styles.sectionTitle}>Splits</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('SplitsList')}>
               <Text style={styles.seeAllText}>See all</Text>
             </TouchableOpacity>
           </View>
 
           {groups.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No groups yet</Text>
-              <Text style={styles.emptyStateSubtext}>Create a group to start splitting expenses</Text>
+              <Text style={styles.emptyStateText}>No splits yet</Text>
+              <Text style={styles.emptyStateSubtext}>Capture a bill to start splitting expenses</Text>
               <TouchableOpacity
                 style={styles.createGroupButton}
-                onPress={() => navigation.navigate('CreateGroup')}
+                onPress={() => navigation.navigate('BillCamera')}
               >
-                <Text style={styles.createGroupButtonText}>Create Your First Group</Text>
+                <Text style={styles.createGroupButtonText}>Capture Your First Bill</Text>
               </TouchableOpacity>
             </View>
           ) : (

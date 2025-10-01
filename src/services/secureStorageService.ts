@@ -282,6 +282,7 @@ class SecureStorageService {
 
   /**
    * Clear all wallet-related data for a user (comprehensive cleanup)
+   * ENHANCED: Now supports email-based wallet data clearing for cross-auth recovery
    */
   async clearAllWalletData(userId: string): Promise<void> {
     try {
@@ -313,6 +314,56 @@ class SecureStorageService {
       logger.info(`Cleared all wallet data for user: ${userId}`, null, 'SecureStorage');
     } catch (error) {
       logger.error(`Failed to clear all wallet data for: ${userId}`, error, 'SecureStorage');
+      throw error;
+    }
+  }
+
+  /**
+   * Get wallet data by email (for cross-authentication-method recovery)
+   * This allows wallet recovery when users switch auth methods but have the same email
+   */
+  async getWalletDataByEmail(email: string): Promise<{
+    seedPhrase?: string;
+    privateKey?: string;
+    walletAddress?: string;
+    walletPublicKey?: string;
+  } | null> {
+    try {
+      // Try to find wallet data stored with email-based key
+      const emailKey = `wallet_data_${email.toLowerCase()}`;
+      const encryptedData = await AsyncStorage.getItem(emailKey);
+      
+      if (encryptedData) {
+        const parsedData = JSON.parse(encryptedData);
+        const decryptedData = await this.decrypt(parsedData.encrypted, parsedData.iv);
+        return JSON.parse(decryptedData);
+      }
+      
+      return null;
+    } catch (error) {
+      logger.warn('Failed to get wallet data by email', { email, error }, 'SecureStorage');
+      return null;
+    }
+  }
+
+  /**
+   * Store wallet data by email (for cross-authentication-method persistence)
+   * This allows wallet persistence when users switch auth methods but have the same email
+   */
+  async storeWalletDataByEmail(email: string, walletData: {
+    seedPhrase?: string;
+    privateKey?: string;
+    walletAddress?: string;
+    walletPublicKey?: string;
+  }): Promise<void> {
+    try {
+      const emailKey = `wallet_data_${email.toLowerCase()}`;
+      const secureData = await this.encrypt(JSON.stringify(walletData));
+      await AsyncStorage.setItem(emailKey, JSON.stringify(secureData));
+      
+      logger.info(`Stored wallet data by email for ${email}`, null, 'SecureStorage');
+    } catch (error) {
+      logger.error('Failed to store wallet data by email', { email, error }, 'SecureStorage');
       throw error;
     }
   }
