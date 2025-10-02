@@ -16,12 +16,16 @@ import {
   StatusBar,
   Image,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import NavBar from '../../components/NavBar';
+import UserAvatar from '../../components/UserAvatar';
 import { BillSplitSummary } from '../../types/billSplitting';
+import { SplitStorageService, Split } from '../../services/splitStorageService';
+import { useApp } from '../../context/AppContext';
 
 type FilterType = 'all' | 'pending' | 'completed' | 'draft';
 
@@ -30,63 +34,53 @@ interface SplitsListScreenProps {
 }
 
 const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
+  const { state } = useApp();
+  const { currentUser } = state;
+  
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const [splits, setSplits] = useState<BillSplitSummary[]>([]);
+  const [splits, setSplits] = useState<Split[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadSplits();
-  }, []);
+    if (currentUser?.id) {
+      loadSplits();
+    }
+  }, [currentUser?.id]);
 
   const loadSplits = async () => {
+    if (!currentUser?.id) {
+      console.log('🔍 SplitsListScreen: No current user, skipping load');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // TODO: Load splits from backend
-      // For now, using mock data
-      const mockSplits: BillSplitSummary[] = [
-        {
-          id: '1',
-          title: 'Dinner at Restaurant',
-          totalAmount: 85.50,
-          currency: 'USD',
-          date: '2024-01-15',
-          participantCount: 4,
-          acceptedCount: 3,
-          status: 'active',
-          createdBy: 'current_user',
-          createdAt: '2024-01-15T19:30:00Z',
-        },
-        {
-          id: '2',
-          title: 'Coffee Meeting',
-          totalAmount: 24.75,
-          currency: 'USD',
-          date: '2024-01-14',
-          participantCount: 3,
-          acceptedCount: 3,
-          status: 'completed',
-          createdBy: 'current_user',
-          createdAt: '2024-01-14T10:15:00Z',
-        },
-        {
-          id: '3',
-          title: 'Grocery Shopping',
-          totalAmount: 156.30,
-          currency: 'USD',
-          date: '2024-01-13',
-          participantCount: 2,
-          acceptedCount: 1,
-          status: 'pending',
-          createdBy: 'other_user',
-          createdAt: '2024-01-13T16:45:00Z',
-        },
-      ];
+      console.log('🔍 SplitsListScreen: Loading splits for user:', currentUser.id);
       
-      setSplits(mockSplits);
+      const result = await SplitStorageService.getUserSplits(currentUser.id);
+      
+      if (result.success && result.splits) {
+        console.log('🔍 SplitsListScreen: Loaded splits:', {
+          count: result.splits.length,
+          splits: result.splits.map(s => ({
+            id: s.id,
+            title: s.title,
+            status: s.status,
+            totalAmount: s.totalAmount,
+            participantsCount: s.participants.length
+          }))
+        });
+        setSplits(result.splits);
+      } else {
+        console.log('🔍 SplitsListScreen: Failed to load splits:', result.error);
+        Alert.alert('Error', result.error || 'Failed to load splits');
+        setSplits([]);
+      }
     } catch (error) {
-      console.error('Error loading splits:', error);
+      console.error('🔍 SplitsListScreen: Error loading splits:', error);
       Alert.alert('Error', 'Failed to load splits');
+      setSplits([]);
     } finally {
       setIsLoading(false);
     }
@@ -114,16 +108,25 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     }
   }, [navigation]);
 
-  const handleSplitPress = useCallback((split: BillSplitSummary) => {
+  const handleSplitPress = useCallback((split: Split) => {
     try {
-      // TODO: Navigate to split details
-      console.log('Opening split:', split.id);
-      Alert.alert('Split Details', `Opening split: ${split.title}`);
+      console.log('🔍 SplitsListScreen: Opening split:', {
+        id: split.id,
+        title: split.title,
+        status: split.status
+      });
+      
+      // Navigate to split details screen
+      navigation.navigate('SplitDetails', {
+        splitId: split.id,
+        splitData: split,
+        isEditing: false
+      });
     } catch (err) {
       console.error('❌ SplitsListScreen: Error navigating to split details:', err);
       Alert.alert('Navigation Error', 'Failed to open split details');
     }
-  }, []);
+  }, [navigation]);
 
   const renderFilterButton = (filter: FilterType, label: string) => {
     const isActive = activeFilter === filter;
@@ -139,7 +142,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     );
   };
 
-  const renderSplitCard = (split: BillSplitSummary) => (
+  const renderSplitCard = (split: Split) => (
     <TouchableOpacity
       key={split.id}
       style={styles.splitCard}
@@ -163,30 +166,68 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         </View>
       </View>
       
-      <View style={styles.splitDetails}>
-        <View style={styles.amountContainer}>
-          <Text style={styles.amountLabel}>Total</Text>
-          <Text style={styles.amountValue}>
-            ${split.totalAmount.toFixed(2)}
-          </Text>
+        <View style={styles.splitDetails}>
+          <View style={styles.amountContainer}>
+            <Text style={styles.amountLabel}>Total</Text>
+            <Text style={styles.amountValue}>
+              ${split.totalAmount.toFixed(2)}
+            </Text>
+          </View>
+          
+          <View style={styles.participantsContainer}>
+            <Text style={styles.participantsLabel}>Participants</Text>
+            <Text style={styles.participantsValue}>
+              {split.participants.filter(p => p.status === 'accepted' || p.status === 'paid').length}/{split.participants.length}
+            </Text>
+          </View>
         </View>
         
-        <View style={styles.participantsContainer}>
-          <Text style={styles.participantsLabel}>Participants</Text>
-          <Text style={styles.participantsValue}>
-            {split.acceptedCount}/{split.participantCount}
-          </Text>
-        </View>
-      </View>
+        {/* Participant Avatars */}
+        {split.participants.length > 0 && (
+          <View style={styles.participantAvatarsContainer}>
+            <Text style={styles.participantAvatarsLabel}>Participants:</Text>
+            <View style={styles.participantAvatars}>
+              {split.participants.slice(0, 4).map((participant, index) => (
+                <UserAvatar
+                  key={participant.userId}
+                  userId={participant.userId}
+                  userName={participant.name}
+                  size={32}
+                  style={[
+                    styles.participantAvatar,
+                    index > 0 && styles.participantAvatarOverlap
+                  ]}
+                />
+              ))}
+              {split.participants.length > 4 && (
+                <View style={[styles.participantAvatar, styles.participantAvatarOverlay]}>
+                  <Text style={styles.participantAvatarOverlayText}>
+                    +{split.participants.length - 4}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
       
       <View style={styles.splitFooter}>
         <Text style={styles.createdBy}>
-          {split.createdBy === 'current_user' ? 'Created by you' : 'Created by others'}
+          {split.creatorId === currentUser?.id ? 'Created by you' : `Created by ${split.creatorName}`}
         </Text>
         <Text style={styles.createdAt}>
           {new Date(split.createdAt).toLocaleDateString()}
         </Text>
       </View>
+      
+      {/* Wallet Information - Only show for creators */}
+      {split.creatorId === currentUser?.id && split.walletAddress && (
+        <View style={styles.walletInfo}>
+          <Text style={styles.walletLabel}>Split Wallet:</Text>
+          <Text style={styles.walletAddress} numberOfLines={1} ellipsizeMode="middle">
+            {split.walletAddress}
+          </Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 
@@ -272,7 +313,12 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         </View>
 
         {/* Splits List */}
-        {displaySplits.length === 0 ? (
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading splits...</Text>
+          </View>
+        ) : displaySplits.length === 0 ? (
           <View style={styles.emptyState}>
             <Image 
               source={{ 
@@ -534,6 +580,68 @@ const styles = StyleSheet.create({
   createFirstButtonText: {
     color: colors.white,
     fontSize: typography.fontSize.md,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xxl,
+  },
+  loadingText: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    marginTop: spacing.md,
+  },
+  walletInfo: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  walletLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.xs,
+    marginBottom: spacing.xs,
+  },
+  walletAddress: {
+    color: colors.green,
+    fontSize: typography.fontSize.sm,
+    fontFamily: 'monospace',
+  },
+  participantAvatarsContainer: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  participantAvatarsLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.xs,
+    marginBottom: spacing.xs,
+  },
+  participantAvatars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  participantAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.black,
+  },
+  participantAvatarOverlap: {
+    marginLeft: -8,
+  },
+  participantAvatarOverlay: {
+    backgroundColor: colors.green,
+    borderColor: colors.black,
+  },
+  participantAvatarOverlayText: {
+    color: colors.white,
+    fontSize: typography.fontSize.xs,
     fontWeight: '600',
   },
 });

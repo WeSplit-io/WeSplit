@@ -17,6 +17,8 @@ import {
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { styles } from './DegenSpinStyles';
+import { NotificationService } from '../../services/notificationService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -33,20 +35,40 @@ interface Participant {
 }
 
 const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) => {
-  const { billData, participants, totalAmount } = route.params;
+  const { billData, participants, totalAmount, splitWallet, processedBillData, splitData } = route.params;
   
   const [isSpinning, setIsSpinning] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [hasSpun, setHasSpun] = useState(false);
+  const [winner, setWinner] = useState(null);
   
   const spinAnimation = useRef(new Animated.Value(0)).current;
   const cardScale = useRef(new Animated.Value(1)).current;
+
+  // Send spin available notifications when screen loads
+  useEffect(() => {
+    const sendSpinNotifications = async () => {
+      const participantIds = participants.map(p => p.id);
+      const billName = billData?.title || 'Restaurant Night';
+
+      await NotificationService.sendBulkNotifications(
+        participantIds,
+        'split_spin_available',
+        {
+          splitWalletId: splitWallet.id,
+          billName,
+        }
+      );
+    };
+
+    sendSpinNotifications();
+  }, []);
 
   // Convert participants to the format we need
   const participantCards: Participant[] = participants.map((p: any, index: number) => ({
     id: p.id || `participant_${index}`,
     name: p.name || `User ${index + 1}`,
-    userId: p.userId || `user_${index}`,
+    userId: p.userId || p.id || `user_${index}`,
     avatar: p.avatar,
   }));
 
@@ -97,6 +119,8 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
           participants,
           totalAmount,
           selectedParticipant: participantCards[finalIndex],
+          splitWallet,
+          processedBillData,
         });
       }, 2000);
     });
@@ -176,7 +200,9 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
               >
                 <View style={styles.cardContent}>
                   <View style={styles.cardProfileIcon}>
-                    <Text style={styles.cardProfileIconText}>👤</Text>
+                    <Text style={styles.cardProfileIconText}>
+                      {participant.name.charAt(0).toUpperCase()}
+                    </Text>
                   </View>
                   <View style={styles.cardTextContainer}>
                     <Text style={styles.cardName}>{participant.name}</Text>
@@ -219,176 +245,5 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.black,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.xl,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    justifyContent: 'space-between',
-  },
-  billInfoCard: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: spacing.lg,
-    marginTop: spacing.xl,
-    marginHorizontal: spacing.sm,
-  },
-  billInfoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  billIcon: {
-    fontSize: 16,
-    marginRight: spacing.sm,
-  },
-  billTitle: {
-    color: colors.black,
-    fontSize: typography.fontSize.xl,
-    fontWeight: '700',
-  },
-  billDate: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.md,
-    marginBottom: spacing.md,
-  },
-  billTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  billTotalLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.md,
-  },
-  billTotalAmount: {
-    color: colors.black,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '700',
-  },
-  spinContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  cardsWheel: {
-    width: 300,
-    height: 300,
-    position: 'relative',
-  },
-  participantCard: {
-    position: 'absolute',
-    width: 140,
-    height: 180,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    left: 80, // Center the card
-    top: 60,
-    overflow: 'hidden',
-  },
-  cardContent: {
-    flex: 1,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  cardProfileIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.green,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  cardProfileIconText: {
-    fontSize: 16,
-  },
-  cardTextContainer: {
-    flex: 1,
-  },
-  cardName: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  cardId: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-  },
-  cardGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    backgroundColor: colors.green,
-    opacity: 0.3,
-  },
-  centerIndicator: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  centerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.green,
-  },
-  buttonContainer: {
-    marginBottom: spacing.xl,
-  },
-  spinButton: {
-    backgroundColor: colors.green,
-    borderRadius: 25,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    marginHorizontal: spacing.sm,
-  },
-  spinButtonDisabled: {
-    backgroundColor: colors.surface,
-  },
-  spinButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '700',
-  },
-  spinButtonTextDisabled: {
-    color: colors.textSecondary,
-  },
-});
 
 export default DegenSpinScreen;

@@ -7,7 +7,7 @@ import { Linking, Alert } from 'react-native';
 import { firebaseDataService } from './firebaseDataService';
 
 export interface DeepLinkData {
-  action: 'join' | 'invite' | 'profile' | 'send' | 'transfer' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback';
+  action: 'join' | 'invite' | 'profile' | 'send' | 'transfer' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback' | 'join-split';
   inviteId?: string;
   groupId?: string;
   groupName?: string;
@@ -21,6 +21,7 @@ export interface DeepLinkData {
   oauthProvider?: 'google' | 'twitter' | 'apple';
   oauthCode?: string;
   oauthError?: string;
+  splitInvitationData?: string; // JSON string for split invitation data
 }
 
 /**
@@ -116,6 +117,22 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
           oauthProvider: params[0] as 'google' | 'twitter' | 'apple',
           oauthCode: params[1],
           oauthError: params[2]
+        };
+      
+      case 'join-split':
+        // Handle split invitation deep links
+        // Format: wesplit://join-split?data=<encoded_invitation_data>
+        const urlObj = new URL(url);
+        const dataParam = urlObj.searchParams.get('data');
+        
+        if (!dataParam) {
+          console.warn('🔥 Join-split action missing data parameter');
+          return null;
+        }
+        
+        return {
+          action: 'join-split',
+          splitInvitationData: dataParam
         };
       
       default:
@@ -329,6 +346,29 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
         console.log('🔥 OAuth callback received:', linkData);
         // Handle OAuth callback - this will be processed by the OAuth services
         // The OAuth services will handle the code exchange and user authentication
+        break;
+      
+      case 'join-split':
+        if (!currentUser?.id) {
+          console.warn('🔥 User not authenticated, cannot join split');
+          Alert.alert('Authentication Required', 'Please log in to join the split.');
+          navigation.navigate('AuthMethods');
+          return;
+        }
+
+        if (!linkData.splitInvitationData) {
+          console.warn('🔥 Missing split invitation data');
+          Alert.alert('Invalid Link', 'This split invitation link is not valid.');
+          return;
+        }
+
+        console.log('🔥 Attempting to join split with invitation data:', linkData.splitInvitationData);
+        
+        // Navigate to SplitJoin screen with the invitation data
+        navigation.navigate('SplitJoin', {
+          shareableLink: url, // Pass the original URL
+          splitInvitationData: linkData.splitInvitationData
+        });
         break;
       
       default:

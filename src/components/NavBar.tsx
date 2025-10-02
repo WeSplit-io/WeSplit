@@ -35,8 +35,8 @@ const navItems = [
   { icon: 'wallet-icon-default.png', label: 'Wallet', route: 'WalletManagement' },
   // Center green split button -> first step camera
   { icon: 'split-icon.png', label: 'Split', route: 'BillCamera', isSpecial: true },
-  // Pools (groups) tab
-  { icon: 'pool-icon.png', label: 'Pools', route: 'GroupsList' },
+  // Pools (splits) tab
+  { icon: 'pool-icon.png', label: 'Pools', route: 'SplitsList' },
   // Keep Contacts at the end
   { icon: 'users-icon.png', label: 'Contact', route: 'Contacts' },
 ];
@@ -65,6 +65,9 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
       if (route === 'Contacts') {
         // Navigate to standalone contacts screen
         navigation.navigate(route, {});
+      } else if (route === 'SplitsList') {
+        // Navigate to splits list screen
+        navigation.navigate(route, {});
       } else {
         navigation.navigate(route);
       }
@@ -83,7 +86,10 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
     if (route === 'Contacts' && currentRoute === 'Contacts') {
       return true;
     }
-    if (route === 'GroupsList' && currentRoute === 'GroupDetails') {
+    if (route === 'SplitsList' && currentRoute === 'SplitsList') {
+      return true;
+    }
+    if (route === 'SplitsList' && currentRoute === 'SplitDetails') {
       return true;
     }
     

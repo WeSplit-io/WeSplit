@@ -17,6 +17,11 @@ import {
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { styles } from './DegenResultStyles';
+import { SplitWalletService } from '../../services/splitWalletService';
+import { CastIntegrationService } from '../../services/castIntegrationService';
+import { NotificationService } from '../../services/notificationService';
+import { useApp } from '../../context/AppContext';
 
 interface DegenResultScreenProps {
   navigation: any;
@@ -31,29 +36,121 @@ interface SelectedParticipant {
 }
 
 const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route }) => {
-  const { billData, participants, totalAmount, selectedParticipant } = route.params;
+  const { billData, participants, totalAmount, selectedParticipant, splitWallet, processedBillData, splitData } = route.params;
+  const { state } = useApp();
+  const { currentUser } = state;
   
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Determine if current user is the winner (winner pays nothing, losers pay their share)
+  const isWinner = currentUser && selectedParticipant && 
+    selectedParticipant.id === currentUser.id.toString();
+
+  // Send winner/loser notifications when screen loads
+  React.useEffect(() => {
+    const sendResultNotifications = async () => {
+      if (!selectedParticipant || !splitWallet) return;
+
+      const billName = billData?.title || 'Restaurant Night';
+      const winnerId = selectedParticipant.id;
+      const loserIds = participants.filter(p => p.id !== winnerId).map(p => p.id);
+
+      // Send winner notification
+      await NotificationService.sendWinnerNotification(
+        winnerId,
+        splitWallet.id,
+        billName
+      );
+
+      // Send loser notifications
+      await NotificationService.sendBulkNotifications(
+        loserIds,
+        'split_loser',
+        {
+          splitWalletId: splitWallet.id,
+          billName,
+          amount: totalAmount,
+        }
+      );
+    };
+
+    sendResultNotifications();
+  }, []);
+
   const handleSettlePayment = async () => {
+    if (!currentUser?.id || !splitWallet) {
+      Alert.alert('Error', 'Missing required data for payment');
+      return;
+    }
+
     setIsProcessing(true);
     
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('🔍 DegenResultScreen: Processing degen split payment...');
       
-      Alert.alert(
-        'Payment Settled',
-        `You have successfully paid ${totalAmount} USDC for the bill.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('SplitsList'),
-          },
-        ]
-      );
+      if (isWinner) {
+        // Winner pays nothing - just unlock their funds
+        console.log('🔍 DegenResultScreen: Winner - unlocking funds');
+        
+        // Unlock the winner's funds (they get their money back)
+        const unlockResult = await SplitWalletService.unlockSplitWallet(
+          splitWallet.id,
+          currentUser.id.toString()
+        );
+
+        if (!unlockResult.success) {
+          Alert.alert('Error', unlockResult.error || 'Failed to unlock funds');
+          return;
+        }
+
+        Alert.alert(
+          'Congratulations! 🎉',
+          'You won the degen split! Your locked funds have been returned to you.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('SplitsList'),
+            },
+          ]
+        );
+      } else {
+        // Loser pays their share - unlock funds and pay the bill
+        console.log('🔍 DegenResultScreen: Loser - paying share');
+        
+        const loserShare = totalAmount / participants.length;
+        
+        // Get Cast account for the merchant
+        const merchantName = processedBillData?.merchant?.name || billData?.name || 'Unknown Merchant';
+        const castAccount = CastIntegrationService.getCastAccount(merchantName);
+        
+        // Send payment to Cast account
+        const paymentResult = await SplitWalletService.sendToCastAccount(
+          splitWallet.id,
+          castAccount.address,
+          totalAmount, // Send the full bill amount
+          'USDC'
+        );
+
+        if (!paymentResult.success) {
+          Alert.alert('Error', paymentResult.error || 'Failed to send payment to Cast account');
+          return;
+        }
+
+        Alert.alert(
+          'Payment Complete',
+          `You paid your share of ${loserShare.toFixed(2)} USDC. The full bill of ${totalAmount} USDC has been sent to ${merchantName}.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('SplitsList'),
+            },
+          ]
+        );
+      }
+
     } catch (error) {
-      Alert.alert('Error', 'Failed to process payment. Please try again.');
+      console.error('Error settling payment:', error);
+      Alert.alert('Error', 'Failed to settle payment. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -116,26 +213,34 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       <View style={styles.content}>
         {/* Result Title */}
         <View style={styles.resultTitleContainer}>
-          <Text style={styles.resultTitle}>You're the Loser!</Text>
+          <Text style={styles.resultTitle}>
+            {isWinner ? "🎉 You're the Winner!" : "😅 You're the Loser!"}
+          </Text>
         </View>
 
-        {/* Loser Avatar */}
+        {/* Avatar */}
         <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>🐒</Text>
+          <View style={[styles.avatar, isWinner && styles.winnerAvatar]}>
+            <Text style={styles.avatarText}>
+              {isWinner ? "🏆" : currentUser?.name?.charAt(0).toUpperCase() || "🐒"}
+            </Text>
           </View>
         </View>
 
-        {/* Amount to Pay */}
+        {/* Amount */}
         <View style={styles.amountContainer}>
-          <Text style={styles.amountText}>-{totalAmount} USDC</Text>
+          <Text style={[styles.amountText, isWinner && styles.winnerAmountText]}>
+            {isWinner ? "FREE!" : `-${totalAmount} USDC`}
+          </Text>
         </View>
 
         {/* Result Message */}
         <View style={styles.messageContainer}>
           <Text style={styles.messageText}>
-            You covered the total bill: {totalAmount} USDC.{'\n'}
-            (Better luck next time 🍀)
+            {isWinner 
+              ? `Congratulations! You don't have to pay anything! 🍀\nThe bill of ${totalAmount} USDC will be split among the other participants.`
+              : `You covered the total bill: ${totalAmount} USDC.\n(Better luck next time 🍀)`
+            }
           </Text>
         </View>
 
@@ -144,44 +249,46 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           <Text style={styles.shareButtonText}>Share on X</Text>
         </TouchableOpacity>
 
-        {/* Payment Options */}
-        <View style={styles.paymentOptionsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.paymentButton,
-              styles.settleButton,
-              isProcessing && styles.paymentButtonDisabled
-            ]}
-            onPress={handleSettlePayment}
-            disabled={isProcessing}
-          >
-            <Text style={[
-              styles.paymentButtonText,
-              styles.settleButtonText,
-              isProcessing && styles.paymentButtonTextDisabled
-            ]}>
-              {isProcessing ? 'Processing...' : 'Settle Payment'}
-            </Text>
-          </TouchableOpacity>
+        {/* Payment Options - Only show for losers */}
+        {!isWinner && (
+          <View style={styles.paymentOptionsContainer}>
+            <TouchableOpacity
+              style={[
+                styles.paymentButton,
+                styles.settleButton,
+                isProcessing && styles.paymentButtonDisabled
+              ]}
+              onPress={handleSettlePayment}
+              disabled={isProcessing}
+            >
+              <Text style={[
+                styles.paymentButtonText,
+                styles.settleButtonText,
+                isProcessing && styles.paymentButtonTextDisabled
+              ]}>
+                {isProcessing ? 'Processing...' : 'Settle Payment'}
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.paymentButton,
-              styles.kastButton,
-              isProcessing && styles.paymentButtonDisabled
-            ]}
-            onPress={handlePayWithKast}
-            disabled={isProcessing}
-          >
-            <Text style={[
-              styles.paymentButtonText,
-              styles.kastButtonText,
-              isProcessing && styles.paymentButtonTextDisabled
-            ]}>
-              {isProcessing ? 'Processing...' : 'Pay with KAST'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[
+                styles.paymentButton,
+                styles.kastButton,
+                isProcessing && styles.paymentButtonDisabled
+              ]}
+              onPress={handlePayWithKast}
+              disabled={isProcessing}
+            >
+              <Text style={[
+                styles.paymentButtonText,
+                styles.kastButtonText,
+                isProcessing && styles.paymentButtonTextDisabled
+              ]}>
+                {isProcessing ? 'Processing...' : 'Pay with KAST'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Bill Details */}
         <View style={styles.billDetailsContainer}>
@@ -208,169 +315,5 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.black,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.xl,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-  },
-  resultTitleContainer: {
-    marginTop: spacing.xl,
-    marginBottom: spacing.lg,
-  },
-  resultTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.xxl,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  avatarContainer: {
-    marginBottom: spacing.xl,
-  },
-  avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 4,
-    borderColor: colors.green,
-  },
-  avatarText: {
-    fontSize: 48,
-  },
-  amountContainer: {
-    backgroundColor: colors.error,
-    borderRadius: 12,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    marginBottom: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.error,
-  },
-  amountText: {
-    color: colors.white,
-    fontSize: typography.fontSize.xxl,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  messageContainer: {
-    marginBottom: spacing.xl,
-    paddingHorizontal: spacing.lg,
-  },
-  messageText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  shareButton: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  shareButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-  },
-  paymentOptionsContainer: {
-    width: '100%',
-    marginBottom: spacing.xl,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.sm,
-  },
-  paymentButton: {
-    borderRadius: 12,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: spacing.xs,
-  },
-  paymentButtonDisabled: {
-    opacity: 0.6,
-  },
-  settleButton: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  kastButton: {
-    backgroundColor: colors.green,
-  },
-  paymentButtonText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '700',
-  },
-  settleButtonText: {
-    color: colors.white,
-  },
-  kastButtonText: {
-    color: colors.white,
-  },
-  paymentButtonTextDisabled: {
-    color: colors.textSecondary,
-  },
-  billDetailsContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.lg,
-    width: '100%',
-    marginBottom: spacing.xl,
-  },
-  billDetailsTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    marginBottom: spacing.md,
-  },
-  billDetailsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  billDetailsLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.md,
-  },
-  billDetailsValue: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: '500',
-  },
-});
 
 export default DegenResultScreen;
