@@ -10,9 +10,8 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
     backgroundColor: colors.darkBackground,
   },
   backButton: {
@@ -21,8 +20,8 @@ export const styles = StyleSheet.create({
   iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
   },
   headerTitle: {
     fontSize: typography.fontSize.lg,
@@ -40,7 +39,8 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: spacing.xl,
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingBottom: 150, // Add more bottom padding for NavBar and extra scrolling space
   },
   
@@ -48,13 +48,11 @@ export const styles = StyleSheet.create({
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
     borderRadius: 16,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.white10,
   },
   profileAvatar: {
     width: 60,
@@ -120,22 +118,26 @@ export const styles = StyleSheet.create({
     objectFit: 'contain',
   },
   chevronIcon: {
-    width: 20,
-    height: 20,
+    width: 16,
+    height: 16,
     tintColor: colors.textLightSecondary,
     objectFit: 'contain',
   },
   
   // Menu Items
+  menuItemsContainer: {
+    backgroundColor: colors.white5,
+    borderRadius: 16,
+    paddingVertical: 8,
+
+
+  },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white10,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.white10,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginVertical: 2,
   },
   menuItemText: {
     flex: 1,
@@ -153,7 +155,7 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.textLight,
     marginTop: 20,
-    marginBottom: 20,
+    marginBottom: 15,
     fontWeight: typography.fontWeight.medium,
   },
   

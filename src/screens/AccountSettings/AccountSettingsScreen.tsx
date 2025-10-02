@@ -9,19 +9,24 @@ import {
   Alert, 
   Image,
   Platform,
-  ActionSheetIOS
+  ActionSheetIOS,
+  StatusBar
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
-import { colors } from '../../theme/colors';
+import { colors, spacing } from '../../theme';
 import * as ImagePicker from 'expo-image-picker';
 import styles from './styles';
+
 
 const AccountSettingsScreen = ({ navigation }: any) => {
   const { state, updateUser } = useApp();
   const { currentUser } = state;
   const nav = useNavigation();
+  const insets = useSafeAreaInsets();
   
   // Form states
   const [pseudo, setPseudo] = useState(currentUser?.name || '');
@@ -216,12 +221,13 @@ const AccountSettingsScreen = ({ navigation }: any) => {
   const displayName = currentUser?.name || 'PauluneMoon';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            source={require('../../../assets/chevron-left.png')}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -241,12 +247,14 @@ const AccountSettingsScreen = ({ navigation }: any) => {
                 <Image source={{ uri: currentUser.avatar }} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                  <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media' }} style={styles.avatarIcon} />
+                  <Image source={require('../../../assets/camera-icon.png')} style={styles.avatarIcon} />
                 </View>
               )}
-              <View style={styles.cameraIconContainer}>
-                                  <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmodify-icon-white.png?alt=media&token=4b1aa40d-4d81-4e40-9d3b-9638bc589e21' }} style={styles.cameraIcon} />
-              </View>
+              {(avatar || currentUser?.avatar) && (
+                <View style={styles.cameraIconContainer}>
+                  <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmodify-icon-white.png?alt=media&token=4b1aa40d-4d81-4e40-9d3b-9638bc589e21' }} style={styles.cameraIcon} />
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -288,22 +296,25 @@ const AccountSettingsScreen = ({ navigation }: any) => {
       </View>
 
       {/* Fixed Save Button at Bottom */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity 
-          style={[
-            styles.saveButton, 
-            !hasChanges && styles.saveButtonDisabled
-          ]} 
           onPress={handleSaveProfile}
           disabled={!hasChanges}
         >
-          <Text style={[
-            styles.saveButtonText,
-            !hasChanges && styles.saveButtonTextDisabled
-          ]}>Save</Text>
+          <LinearGradient
+            colors={!hasChanges ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientButton}
+          >
+            <Text style={[
+              styles.saveButtonText,
+              !hasChanges && styles.saveButtonTextDisabled
+            ]}>Save</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

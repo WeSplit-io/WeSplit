@@ -10,7 +10,7 @@ export default StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
     backgroundColor: colors.darkBackground,
@@ -21,8 +21,8 @@ export default StyleSheet.create({
   iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
   },
   headerTitle: {
     fontSize: typography.fontSize.lg,
@@ -37,7 +37,7 @@ export default StyleSheet.create({
   },
   scrollContent: {
     flex: 1,
-    padding: spacing.xl,
+    padding: spacing.lg,
   },
   bottomSpacing: {
     height: spacing.xl,
@@ -62,8 +62,8 @@ export default StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 170,
-    backgroundColor: 'rgba(165, 234, 21, 0.10)',
-    borderWidth: 0.5,
+    backgroundColor: colors.white5,
+    borderWidth: 1,
     borderColor: colors.white50,
     alignItems: 'center',
     justifyContent: 'center',
@@ -82,10 +82,9 @@ export default StyleSheet.create({
     justifyContent: 'center',
   },
   avatarIcon: {
-    width: 64,
-    height: 64,
-    tintColor: colors.textLight,
-    opacity: 0.9,
+    width: 48,
+    height: 48,
+    tintColor: colors.white70,
   },
   cameraIconContainer: {
     position: 'absolute',
@@ -94,14 +93,14 @@ export default StyleSheet.create({
     width: spacing.xl,
     height: spacing.xl,
     borderRadius: spacing.md,
-    backgroundColor: '#A5EA15',
+    backgroundColor: colors.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cameraIcon: {
     width: 16,
     height: 16,
-    tintColor: colors.black,
+    tintColor: colors.white,
   },
   
   // Input Groups
@@ -115,9 +114,9 @@ export default StyleSheet.create({
     marginBottom: spacing.sm,
   },
   input: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white5,
     borderRadius: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     fontSize: typography.fontSize.md,
     color: colors.textLight,
@@ -157,6 +156,11 @@ export default StyleSheet.create({
   },
   saveButtonDisabled: {
     backgroundColor: colors.white10,
+  },
+  gradientButton: {
+    borderRadius: 16,
+    paddingVertical: 20,
+    alignItems: 'center',
   },
   saveButtonText: {
     color: colors.black,
