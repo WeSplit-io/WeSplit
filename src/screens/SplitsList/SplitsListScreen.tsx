@@ -25,6 +25,7 @@ import NavBar from '../../components/NavBar';
 import UserAvatar from '../../components/UserAvatar';
 import { BillSplitSummary } from '../../types/billSplitting';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
+import { priceManagementService } from '../../services/priceManagementService';
 import { useApp } from '../../context/AppContext';
 
 type FilterType = 'all' | 'pending' | 'completed' | 'draft';
@@ -68,10 +69,61 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
             title: s.title,
             status: s.status,
             totalAmount: s.totalAmount,
-            participantsCount: s.participants.length
+            date: s.date,
+            createdAt: s.createdAt,
+            participantsCount: s.participants.length,
+            participants: s.participants.map(p => ({
+              userId: p.userId,
+              name: p.name,
+              status: p.status
+            }))
           }))
         });
-        setSplits(result.splits);
+        
+        // Fix existing splits where creator has 'pending' status and validate prices
+        const updatedSplits = await Promise.all(result.splits.map(async (split) => {
+          // Get authoritative price from centralized price management
+          const billId = split.billId || split.id;
+          const authoritativePrice = priceManagementService.getBillPrice(billId);
+          
+          let updatedSplit = split;
+          
+          // Update price if authoritative price is available
+          if (authoritativePrice) {
+            console.log('💰 SplitsListScreen: Using authoritative price for split:', {
+              splitId: split.id,
+              originalAmount: split.totalAmount,
+              authoritativeAmount: authoritativePrice.amount
+            });
+            updatedSplit = {
+              ...split,
+              totalAmount: authoritativePrice.amount
+            };
+          }
+          
+          const creatorParticipant = updatedSplit.participants.find(p => p.userId === updatedSplit.creatorId);
+          if (creatorParticipant && creatorParticipant.status === 'pending') {
+            console.log('🔍 SplitsListScreen: Fixing creator status for split:', updatedSplit.id);
+            try {
+              await SplitStorageService.updateParticipantStatus(
+                updatedSplit.firebaseDocId || updatedSplit.id,
+                updatedSplit.creatorId,
+                'accepted'
+              );
+              // Update the local split data
+              const updatedParticipants = updatedSplit.participants.map(p => 
+                p.userId === updatedSplit.creatorId ? { ...p, status: 'accepted' as const } : p
+              );
+              return { ...updatedSplit, participants: updatedParticipants };
+            } catch (error) {
+              console.error('🔍 SplitsListScreen: Error updating creator status:', error);
+              return updatedSplit;
+            }
+          }
+          return updatedSplit;
+        }));
+        
+        setSplits(updatedSplits);
       } else {
         console.log('🔍 SplitsListScreen: Failed to load splits:', result.error);
         Alert.alert('Error', result.error || 'Failed to load splits');
@@ -155,7 +207,18 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
             {split.title}
           </Text>
           <Text style={styles.splitDate}>
-            {new Date(split.date).toLocaleDateString()}
+            {split.date ? (() => {
+              try {
+                const date = new Date(split.date);
+                if (isNaN(date.getTime())) {
+                  return 'Invalid Date';
+                }
+                return date.toLocaleDateString();
+              } catch (error) {
+                console.warn('🔍 SplitsListScreen: Error parsing date:', split.date, error);
+                return 'Invalid Date';
+              }
+            })() : 'No Date'}
           </Text>
         </View>
         
@@ -177,7 +240,12 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           <View style={styles.participantsContainer}>
             <Text style={styles.participantsLabel}>Participants</Text>
             <Text style={styles.participantsValue}>
-              {split.participants.filter(p => p.status === 'accepted' || p.status === 'paid').length}/{split.participants.length}
+              {split.participants.filter(p => 
+                p.status === 'accepted' || 
+                p.status === 'paid' || 
+                p.status === 'locked' ||
+                p.userId === split.creatorId // Always include the creator
+              ).length}/{split.participants.length}
             </Text>
           </View>
         </View>
@@ -215,7 +283,18 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           {split.creatorId === currentUser?.id ? 'Created by you' : `Created by ${split.creatorName}`}
         </Text>
         <Text style={styles.createdAt}>
-          {new Date(split.createdAt).toLocaleDateString()}
+          {split.createdAt ? (() => {
+            try {
+              const date = new Date(split.createdAt);
+              if (isNaN(date.getTime())) {
+                return 'Invalid Date';
+              }
+              return date.toLocaleDateString();
+            } catch (error) {
+              console.warn('🔍 SplitsListScreen: Error parsing createdAt:', split.createdAt, error);
+              return 'Invalid Date';
+            }
+          })() : 'No Date'}
         </Text>
       </View>
       

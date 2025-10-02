@@ -34,9 +34,12 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl, // Add bottom padding for phone UI
     justifyContent: 'space-between',
+    flexGrow: 1,
   },
   billCard: {
     backgroundColor: colors.green,
@@ -186,5 +189,60 @@ export const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: colors.white,
     opacity: 0.3,
+  },
+
+  // === ROULETTE BUTTON STYLES ===
+  rouletteContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  rouletteButton: {
+    backgroundColor: colors.primaryGreen,
+    borderRadius: 16,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+    shadowColor: colors.primaryGreen,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  rouletteButtonDisabled: {
+    backgroundColor: colors.surface,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  rouletteButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rouletteButtonIcon: {
+    fontSize: typography.fontSize.lg,
+    marginRight: spacing.sm,
+  },
+  rouletteButtonText: {
+    color: colors.black,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    textAlign: 'center',
+  },
+  rouletteButtonTextDisabled: {
+    color: colors.textSecondary,
+  },
+  rouletteStatusContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  rouletteStatusText: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
   },
 });

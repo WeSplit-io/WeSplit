@@ -38,6 +38,8 @@ import { createPaymentRequest, getReceivedPaymentRequests } from '../../services
 import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
 import { firebaseTransactionService, firebaseDataService } from '../../services/firebaseDataService';
 import { generateProfileLink } from '../../services/deepLinkHandler';
+import { SplitStorageService, Split } from '../../services/splitStorageService';
+import { priceManagementService } from '../../services/priceManagementService';
 
 // Avatar component with loading state and error handling
 const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
@@ -179,6 +181,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [balanceLoaded, setBalanceLoaded] = useState(false); // Track if balance has been loaded
   const [walletUnrecoverable, setWalletUnrecoverable] = useState(false); // Track if wallet is unrecoverable
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+  const [recentSplits, setRecentSplits] = useState<Split[]>([]);
+  const [loadingSplits, setLoadingSplits] = useState(false);
 
   // Function to hash wallet address for display
   const hashWalletAddress = (address: string): string => {
@@ -194,6 +198,39 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     } catch (error) {
       console.error('Failed to copy wallet address:', error);
       Alert.alert('Error', 'Failed to copy wallet address');
+    }
+  };
+
+  // Helper functions for split status
+  const getSplitStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return colors.primaryGreen;
+      case 'locked':
+        return colors.warning;
+      case 'completed':
+        return colors.success;
+      case 'cancelled':
+        return colors.error;
+      case 'draft':
+      default:
+        return colors.textSecondary;
+    }
+  };
+
+  const getSplitStatusText = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'locked':
+        return 'Locked';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'draft':
+      default:
+        return 'Draft';
     }
   };
 
@@ -999,6 +1036,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         refreshGroups(),
         refreshNotifications(),
         loadRealTransactions(), // Refresh real transactions
+        loadRecentSplits(), // Refresh recent splits
       ]);
 
       console.log('✅ Dashboard: Refresh completed successfully');
@@ -1289,6 +1327,75 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   useEffect(() => {
     loadAllGroupExpenses();
   }, [loadAllGroupExpenses]);
+
+  // Load recent splits
+  const loadRecentSplits = useCallback(async () => {
+    if (!currentUser?.id) {
+      return;
+    }
+
+    setLoadingSplits(true);
+    try {
+      console.log('🔍 Dashboard: Loading recent splits for user:', currentUser.id);
+      
+      const result = await SplitStorageService.getUserSplits(currentUser.id.toString());
+      
+      if (result.success && result.splits) {
+        // Get the 3 most recent splits and validate prices
+        const recentSplits = result.splits.slice(0, 3).map(split => {
+          // Get authoritative price from centralized price management
+          const billId = split.billId || split.id;
+          const authoritativePrice = priceManagementService.getBillPrice(billId);
+          
+          if (authoritativePrice) {
+            console.log('💰 Dashboard: Using authoritative price for split:', {
+              splitId: split.id,
+              originalAmount: split.totalAmount,
+              authoritativeAmount: authoritativePrice.amount
+            });
+            
+            // Update the split with the authoritative price
+            return {
+              ...split,
+              totalAmount: authoritativePrice.amount
+            };
+          } else {
+            console.log('💰 Dashboard: No authoritative price found for split:', split.id);
+            return split;
+          }
+        });
+        
+        console.log('🔍 Dashboard: Loaded recent splits:', {
+          count: recentSplits.length,
+          splits: recentSplits.map(s => ({
+            id: s.id,
+            title: s.title,
+            status: s.status,
+            totalAmount: s.totalAmount,
+            date: s.date,
+            createdAt: s.createdAt,
+            participantsCount: s.participants.length
+          }))
+        });
+        setRecentSplits(recentSplits);
+      } else {
+        console.log('🔍 Dashboard: Failed to load splits:', result.error);
+        setRecentSplits([]);
+      }
+    } catch (error) {
+      console.error('🔍 Dashboard: Error loading recent splits:', error);
+      setRecentSplits([]);
+    } finally {
+      setLoadingSplits(false);
+    }
+  }, [currentUser?.id]);
+
+  // Load recent splits when component mounts or user changes
+  useEffect(() => {
+    if (currentUser?.id && isAuthenticated) {
+      loadRecentSplits();
+    }
+  }, [currentUser?.id, isAuthenticated]);
 
   // Render real transaction from Firebase
   const renderRealTransaction = (transaction: Transaction) => {
@@ -1582,16 +1689,21 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         </View>
 
 
-        {/* Pools Section */}
+        {/* Splits Section */}
         <View style={styles.groupsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Pools</Text>
+            <Text style={styles.sectionTitle}>Recent Splits</Text>
             <TouchableOpacity onPress={() => navigation.navigate('SplitsList')}>
               <Text style={styles.seeAllText}>See all</Text>
             </TouchableOpacity>
           </View>
 
-          {groups.length === 0 ? (
+          {loadingSplits ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={colors.primaryGreen} />
+              <Text style={styles.loadingText}>Loading splits...</Text>
+            </View>
+          ) : recentSplits.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>No splits yet</Text>
               <Text style={styles.emptyStateSubtext}>Capture a bill to start splitting expenses</Text>
@@ -1612,81 +1724,83 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             </View>
           ) : (
             <View style={styles.groupsGrid}>
-              {groups
-                .sort((a, b) => {
-                  // Sort by highest USD value first (same as GroupsList)
-                  const aUSD = groupAmountsInUSD[a.id] || 0;
-                  const bUSD = groupAmountsInUSD[b.id] || 0;
-                  return bUSD - aUSD;
-                })
-                .slice(0, 2).map((group, index) => {
-                  try {
-                    // Use the new summary function that works with available data
-                    const summary = getGroupSummary(group);
-                    const isOwner = group.created_by === Number(currentUser?.id);
+              {recentSplits.map((split, index) => {
+                try {
+                  const isCreator = split.creatorId === currentUser?.id?.toString();
+                  const statusColor = getSplitStatusColor(split.status);
+                  const statusText = getSplitStatusText(split.status);
 
-                    return (
-                      <TouchableOpacity
-                        key={group.id}
-                        style={styles.groupGridCardFullWidth}
-                        onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
-                      >
-                        {/* Left: Icon */}
-                        <GroupIcon
-                          category={group.category || 'trip'}
-                          size={40}
-                        />
-                        
-                        {/* Center: Name and Role */}
-                        <View style={styles.groupGridNameContainer}>
-                          <Text style={styles.groupGridName}>{group.name}</Text>
-                          <View style={styles.groupGridRoleContainer}>
-                            <Image
-                              source={isOwner ? require('../../../assets/award-icon.png') : require('../../../assets/user-icon.png')}
-                              style={styles.groupGridRoleIcon}
-                            />
-                            <Text style={styles.groupGridRole}>
-                              {isOwner ? 'Owner' : 'Member'}
-                            </Text>
-                          </View>
-                        </View>
-
-                        {/* Right: Member Avatars */}
-                        {summary.hasData ? (
-                          <View style={styles.memberAvatars}>
-                            {group.members && group.members.slice(0, 3).map((member, i) => (
-                              <AvatarComponent
-                                key={`${member.id}-${i}`}
-                                avatar={member.avatar}
-                                displayName={(member.name || member.email || 'U') as string}
-                                style={styles.memberAvatar}
-                              />
-                            ))}
-                          {summary.memberCount > 3 && (
-                            <View style={styles.memberAvatarMore}>
-                              <Text style={styles.memberAvatarMoreText}>
-                                +{summary.memberCount - 3}
-                              </Text>
-                            </View>
-                          )}
-                          </View>
-                        ) : (
-                          <View style={styles.memberAvatarsEmpty}>
-                            <Text style={styles.inactiveText}>No activity</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  } catch (error) {
-                    console.error(`Error rendering group ${group.id}:`, error);
-                    // Return a placeholder if there's an error with this group
-                    return (
-                      <View key={group.id} style={styles.groupGridCardFullWidth}>
-                        <Text style={styles.errorText}>Error loading group</Text>
+                  return (
+                    <TouchableOpacity
+                      key={split.id}
+                      style={styles.groupGridCardFullWidth}
+                      onPress={() => navigation.navigate('SplitDetails', { 
+                        splitId: split.id,
+                        splitData: split 
+                      })}
+                    >
+                      {/* Left: Icon */}
+                      <View style={styles.splitIconContainer}>
+                        <Text style={styles.splitIcon}>
+                          {split.splitType === 'fair' ? '⚖️' : '🎲'}
+                        </Text>
                       </View>
-                    );
-                  }
-                })}
+                      
+                      {/* Center: Name and Role */}
+                      <View style={styles.groupGridNameContainer}>
+                        <Text style={styles.groupGridName}>{split.title}</Text>
+                        <View style={styles.groupGridRoleContainer}>
+                          <Image
+                            source={isCreator ? require('../../../assets/award-icon.png') : require('../../../assets/user-icon.png')}
+                            style={styles.groupGridRoleIcon}
+                          />
+                          <Text style={styles.groupGridRole}>
+                            {isCreator ? 'Creator' : 'Participant'}
+                          </Text>
+                        </View>
+                        <View style={styles.splitStatusContainer}>
+                          <View style={[styles.splitStatusDot, { backgroundColor: statusColor }]} />
+                          <Text style={[styles.splitStatusText, { color: statusColor }]}>
+                            {statusText}
+                          </Text>
+                        </View>
+                        {/* Add date display */}
+                        <Text style={styles.splitDate}>
+                          {split.date ? (() => {
+                            try {
+                              const date = new Date(split.date);
+                              if (isNaN(date.getTime())) {
+                                return 'Invalid Date';
+                              }
+                              return date.toLocaleDateString();
+                            } catch (error) {
+                              console.warn('🔍 Dashboard: Error parsing split date:', split.date, error);
+                              return 'Invalid Date';
+                            }
+                          })() : 'No Date'}
+                        </Text>
+                      </View>
+
+                      {/* Right: Amount and Participants */}
+                      <View style={styles.splitInfoContainer}>
+                        <Text style={styles.splitAmount}>
+                          {split.totalAmount.toFixed(2)} {split.currency}
+                        </Text>
+                        <Text style={styles.splitParticipants}>
+                          {split.participants.length} participant{split.participants.length !== 1 ? 's' : ''}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                } catch (error) {
+                  console.error(`Error rendering split ${split.id}:`, error);
+                  return (
+                    <View key={split.id} style={styles.groupGridCardFullWidth}>
+                      <Text style={styles.errorText}>Error loading split</Text>
+                    </View>
+                  );
+                }
+              })}
             </View>
           )}
         </View>

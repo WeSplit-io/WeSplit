@@ -715,8 +715,70 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
-  
 
+  // === SPLIT CARD STYLES ===
+  // Container for split icon
+  splitIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+
+  // Split type icon
+  splitIcon: {
+    fontSize: 20,
+  },
+
+  // Container for split status
+  splitStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+
+  // Status indicator dot
+  splitStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: spacing.xs,
+  },
+
+  // Status text
+  splitStatusText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+  },
+
+  // Container for split amount and participants info
+  splitInfoContainer: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+
+  // Split amount text
+  splitAmount: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xs,
+  },
+
+  // Split participants count
+  splitParticipants: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.xs,
+  },
+
+  // Split date text
+  splitDate: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.xs,
+  },
 
 }); 

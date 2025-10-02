@@ -92,6 +92,20 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         const processedData = BillAnalysisService.processBillData(analysisResult.data, currentUser);
         setCurrentProcessedBillData(processedData);
       
+        // Set the authoritative price in the price management service immediately
+        const { priceManagementService } = await import('../../services/priceManagementService');
+        priceManagementService.setBillPrice(
+          processedData.id,
+          processedData.totalAmount,
+          processedData.currency || 'USDC'
+        );
+        
+        console.log('💰 BillProcessingScreen: Set authoritative price:', {
+          billId: processedData.id,
+          totalAmount: processedData.totalAmount,
+          currency: processedData.currency || 'USDC'
+        });
+      
         // Update legacy state for backward compatibility
         setExtractedItems(processedData.items.map(item => ({
           id: item.id,
@@ -169,7 +183,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
     
     if (!currentProcessedData) {
       // Create processed data from current state
-      const billId = `bill_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const billId = `split_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       
       currentProcessedData = {
         id: billId,

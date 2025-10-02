@@ -70,9 +70,10 @@ export class BillAnalysisService {
 
   /**
    * Generate a unique bill ID
+   * Use consistent format that matches other services
    */
   private static generateBillId(): string {
-    return `bill_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    return `split_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   }
 
   /**

@@ -164,7 +164,7 @@ export class SplitWalletService {
         participants: participants.map(p => ({
           ...p,
           amountPaid: 0,
-          status: 'pending',
+          status: p.userId === creatorId ? 'locked' : 'pending', // Creator should be locked (accepted)
         })),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -180,6 +180,28 @@ export class SplitWalletService {
         totalAmount: splitWallet.totalAmount,
         currency: splitWallet.currency,
         participantsCount: splitWallet.participants.length
+      });
+
+      // Validate participant data to prevent corruption
+      const totalParticipantAmounts = splitWallet.participants.reduce((sum, p) => sum + p.amountOwed, 0);
+      if (Math.abs(totalParticipantAmounts - splitWallet.totalAmount) > 0.01) {
+        console.warn('🔍 SplitWalletService: Participant amounts do not match total amount:', {
+          totalParticipantAmounts,
+          totalAmount: splitWallet.totalAmount,
+          difference: Math.abs(totalParticipantAmounts - splitWallet.totalAmount)
+        });
+      }
+
+      // Ensure all participants have amountPaid = 0 initially
+      splitWallet.participants.forEach(participant => {
+        if (participant.amountPaid !== 0) {
+          console.warn('🔍 SplitWalletService: Participant has non-zero amountPaid on creation:', {
+            userId: participant.userId,
+            name: participant.name,
+            amountPaid: participant.amountPaid
+          });
+          participant.amountPaid = 0; // Force reset to 0
+        }
       });
       
       logger.info('Validating split wallet data', {
@@ -624,14 +646,27 @@ export class SplitWalletService {
       }
 
       // Send transaction from participant's wallet to split wallet
+      // Note: The participantId should be the actual user ID, and the transaction service
+      // will look up the user's wallet information from the database
+      console.log('🔍 SplitWalletService: Sending USDC transaction:', {
+        toAddress: wallet.walletAddress,
+        amount,
+        fromUserId: participantId,
+        memo: `Split payment for bill ${wallet.billId}`,
+        participantWalletAddress: participant.walletAddress,
+        participantName: participant.name
+      });
+      
       const transactionResult = await consolidatedTransactionService.sendUsdcTransaction(
         wallet.walletAddress, // Send TO the split wallet
         amount,
-        participantId, // The participant is the sender
+        participantId, // The participant is the sender (user ID)
         `Split payment for bill ${wallet.billId}`,
         undefined,
         'medium'
       );
+      
+      console.log('🔍 SplitWalletService: Transaction result:', transactionResult);
 
       if (!transactionResult.success) {
         return {
@@ -802,6 +837,59 @@ export class SplitWalletService {
   }
 
   /**
+   * Get split wallet completion percentage
+   */
+  static async getSplitWalletCompletion(splitWalletId: string): Promise<{
+    success: boolean;
+    completionPercentage?: number;
+    totalAmount?: number;
+    collectedAmount?: number;
+    remainingAmount?: number;
+    participantsPaid?: number;
+    totalParticipants?: number;
+    error?: string;
+  }> {
+    try {
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = result.wallet;
+      
+      // Calculate collected amount from participant payments
+      const collectedAmount = wallet.participants.reduce((sum, p) => sum + p.amountPaid, 0);
+      const totalAmount = wallet.totalAmount;
+      const remainingAmount = totalAmount - collectedAmount;
+      const completionPercentage = Math.round((collectedAmount / totalAmount) * 100);
+      
+      // Count participants who have paid
+      const participantsPaid = wallet.participants.filter(p => p.amountPaid > 0).length;
+      const totalParticipants = wallet.participants.length;
+
+      return {
+        success: true,
+        completionPercentage,
+        totalAmount,
+        collectedAmount,
+        remainingAmount,
+        participantsPaid,
+        totalParticipants,
+      };
+
+    } catch (error) {
+      logger.error('Failed to get split wallet completion', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
    * Allow a participant to pay their share to the split wallet
    * This is the main method participants use to send their payment
    */
@@ -849,6 +937,22 @@ export class SplitWalletService {
         return {
           success: false,
           error: `Payment amount (${amount}) exceeds your remaining amount (${remainingAmount})`,
+        };
+      }
+
+      // Check if amount is valid (greater than 0)
+      if (amount <= 0) {
+        return {
+          success: false,
+          error: 'Payment amount must be greater than 0',
+        };
+      }
+
+      // Check if participant has a valid wallet address
+      if (!participant.walletAddress || participant.walletAddress === 'No wallet address' || participant.walletAddress === 'Unknown wallet') {
+        return {
+          success: false,
+          error: 'Participant does not have a valid wallet address. Please ensure the user has connected their wallet.',
         };
       }
 
@@ -912,6 +1016,156 @@ export class SplitWalletService {
   }
 
   /**
+   * Repair corrupted split wallet data
+   * This fixes cases where amountOwed and amountPaid are swapped or incorrect
+   */
+  static async repairSplitWalletData(splitWalletId: string): Promise<{
+    success: boolean;
+    error?: string;
+    repaired?: boolean;
+  }> {
+    try {
+      console.log('🔧 SplitWalletService: Starting data repair for split wallet:', splitWalletId);
+
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = result.wallet;
+      let needsRepair = false;
+      const updatedParticipants = wallet.participants.map(participant => {
+        // Check for data corruption: amountOwed = 0 but amountPaid > 0
+        if (participant.amountOwed === 0 && participant.amountPaid > 0) {
+          console.log('🔧 SplitWalletService: Found corrupted data for participant:', {
+            userId: participant.userId,
+            name: participant.name,
+            amountOwed: participant.amountOwed,
+            amountPaid: participant.amountPaid,
+            status: participant.status
+          });
+
+          needsRepair = true;
+          
+          // Calculate correct amountOwed based on total amount and number of participants
+          const correctAmountOwed = wallet.totalAmount / wallet.participants.length;
+          
+          // Don't reset amountPaid - preserve payment data
+          // Only fix the amountOwed if it's clearly wrong
+          return {
+            ...participant,
+            amountOwed: correctAmountOwed,
+            // Keep amountPaid as is to preserve payment history
+            status: participant.amountPaid >= correctAmountOwed ? 'paid' as const : 'locked' as const,
+          };
+        }
+        
+        return participant;
+      });
+
+      if (!needsRepair) {
+        console.log('🔧 SplitWalletService: No data corruption found');
+        return {
+          success: true,
+          repaired: false,
+        };
+      }
+
+      // Update the wallet with repaired data
+      await updateDoc(doc(db, 'splitWallets', wallet.firebaseDocId || splitWalletId), {
+        participants: updatedParticipants,
+        updatedAt: new Date().toISOString(),
+      });
+
+      console.log('🔧 SplitWalletService: Data repair completed successfully');
+
+      return {
+        success: true,
+        repaired: true,
+      };
+
+    } catch (error) {
+      console.log('🔧 SplitWalletService: Error during data repair:', error);
+      logger.error('Failed to repair split wallet data', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Update participant payment status
+   */
+  static async updateParticipantPaymentStatus(
+    splitWalletId: string,
+    participantId: string,
+    amountPaid: number,
+    status: SplitWalletParticipant['status']
+  ): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      console.log('🔍 SplitWalletService: Updating participant payment status:', {
+        splitWalletId,
+        participantId,
+        amountPaid,
+        status
+      });
+
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = result.wallet;
+      const participantIndex = wallet.participants.findIndex(p => p.userId === participantId);
+      if (participantIndex === -1) {
+        return {
+          success: false,
+          error: 'Participant not found in this split',
+        };
+      }
+
+      // Update the participant
+      const updatedParticipants = [...wallet.participants];
+      updatedParticipants[participantIndex] = {
+        ...updatedParticipants[participantIndex],
+        amountPaid,
+        status,
+        paidAt: status === 'paid' ? new Date().toISOString() : undefined,
+      };
+
+      // Update the wallet in Firebase
+      await updateDoc(doc(db, 'splitWallets', wallet.firebaseDocId || splitWalletId), {
+        participants: updatedParticipants,
+        updatedAt: new Date().toISOString(),
+      });
+
+      console.log('🔍 SplitWalletService: Successfully updated participant payment status');
+
+      return {
+        success: true,
+      };
+
+    } catch (error) {
+      console.log('🔍 SplitWalletService: Error updating participant payment status:', error);
+      logger.error('Failed to update participant payment status', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
    * Unlock funds for a specific participant (for degen split winners)
    */
   static async unlockSplitWallet(splitWalletId: string, participantId: string): Promise<SplitWalletResult> {
@@ -937,10 +1191,10 @@ export class SplitWalletService {
         };
       }
 
-      // Update participant status to unlocked
+      // Update participant status to locked (unlocked means they can access funds)
       const updatedParticipants = wallet.participants.map(p => 
         p.userId === participantId 
-          ? { ...p, status: 'unlocked' as const }
+          ? { ...p, status: 'locked' as const }
           : p
       );
 

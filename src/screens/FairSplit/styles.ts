@@ -36,6 +36,9 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.md,
   },
+  headerSpacer: {
+    width: 40, // Same width as the back button to maintain balance
+  },
   content: {
     flex: 1,
     paddingHorizontal: spacing.lg,
@@ -126,6 +129,11 @@ export const styles = StyleSheet.create({
   progressLabel: {
     color: colors.textSecondary,
     fontSize: typography.fontSize.sm,
+  },
+  progressSubtext: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.xs,
+    marginTop: spacing.xs,
   },
   splitMethodContainer: {
     marginBottom: spacing.xl,

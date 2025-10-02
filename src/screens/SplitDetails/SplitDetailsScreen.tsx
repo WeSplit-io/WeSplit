@@ -31,10 +31,18 @@ import { SplitStorageService, Split } from '../../services/splitStorageService';
 import { SplitWalletService } from '../../services/splitWalletService';
 import UserAvatar from '../../components/UserAvatar';
 import QRCode from 'react-native-qrcode-svg';
+import { 
+  SplitDetailsNavigationParams, 
+  SplitDataConverter, 
+  UnifiedBillData, 
+  UnifiedParticipant 
+} from '../../types/splitNavigation';
 
 interface SplitDetailsScreenProps {
   navigation: any;
-  route?: any;
+  route?: {
+    params?: SplitDetailsNavigationParams;
+  };
 }
 
 const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, route }) => {
@@ -66,7 +74,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   
   const [billName, setBillName] = useState(processedBillData?.title || billData?.title || 'Restaurant Night');
   const [totalAmount, setTotalAmount] = useState(
-    processedBillData?.totalAmount?.toString() || billData?.totalAmount?.toString() || '65.6'
+    processedBillData?.totalAmount?.toString() || billData?.totalAmount?.toString() || '28.69'
   );
   const [showSplitModal, setShowSplitModal] = useState(false);
   const [selectedSplitType, setSelectedSplitType] = useState<'fair' | 'degen' | null>(null);
@@ -369,7 +377,9 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             status: 'pending' as const,
           })),
           items: processedBillData.items,
-          merchant: processedBillData.merchant,
+           merchant: {
+             name: processedBillData.merchant,
+           },
           date: processedBillData.date,
           // Include wallet information in split data
           walletId: walletToUse.id,
@@ -395,21 +405,28 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         if (result.success && result.split) {
           console.log('🔍 SplitDetailsScreen: Split saved/updated successfully:', result.split.id);
           
-          // Navigate to the appropriate split screen with the split data and wallet
+          // Convert data to unified format
+          const unifiedBillData = processedBillData ? 
+            SplitDataConverter.processBillDataToUnified(processedBillData) : 
+            undefined;
+          const unifiedParticipants = SplitDataConverter.participantsToUnified(participants);
+
+          // Navigate to the appropriate split screen with the unified data
           if (type === 'fair') {
             navigation.navigate('FairSplit', {
-              billData: processedBillData,
+              billData: unifiedBillData,
+              processedBillData: processedBillData,
               splitData: result.split,
               splitWallet: walletToUse,
             });
           } else {
             navigation.navigate('DegenLock', {
-              billData: processedBillData,
+              billData: unifiedBillData,
+              processedBillData: processedBillData,
               splitData: result.split,
               splitWallet: walletToUse,
-              participants: participants,
+              participants: unifiedParticipants,
               totalAmount: processedBillData.totalAmount,
-              processedBillData: processedBillData,
             });
           }
         } else {
@@ -426,6 +443,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const handleContinue = () => {
     console.log('Continue button pressed, selectedSplitType:', selectedSplitType);
     console.log('Modal should close and navigate to FairSplit');
+    console.log('🔍 SplitDetailsScreen: Current splitWallet state:', splitWallet ? {
+      id: splitWallet.id,
+      walletAddress: splitWallet.walletAddress,
+      participants: splitWallet.participants?.length || 0
+    } : 'No wallet');
     
     if (!selectedSplitType) {
       Alert.alert('Please select a split type', 'Choose either Fair Split or Degen Split to continue');
@@ -434,55 +456,49 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
     setShowSplitModal(false);
     
+    // Convert data to unified format
+    const unifiedBillData: UnifiedBillData = {
+      id: processedBillData?.id || billData?.id || `split_${Date.now()}`,
+      title: billName,
+      totalAmount: parseFloat(totalAmount),
+      currency: processedBillData?.currency || billData?.currency || 'USD',
+      date: processedBillData?.date || billData?.date || '10 Mar. 2025',
+      merchant: processedBillData?.merchant || billData?.merchant,
+      location: processedBillData?.location || billData?.location,
+      participants: participants,
+    };
+    
+    const unifiedParticipants = SplitDataConverter.participantsToUnified(participants);
+
     if (selectedSplitType === 'fair') {
-      // Navigate to Fair Split screen
-      const fairSplitData = {
-        title: billName,
-        totalAmount: parseFloat(totalAmount),
-        date: processedBillData?.date || billData?.date || '10 Mar. 2025',
-        participants: participants.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          walletAddress: p.walletAddress,
-          status: p.status,
-        })),
-      };
+      console.log('🔍 SplitDetailsScreen: Navigating to FairSplit with wallet:', splitWallet ? {
+        id: splitWallet.id,
+        walletAddress: splitWallet.walletAddress,
+        participants: splitWallet.participants?.length || 0
+      } : 'No wallet');
       
-      console.log('Navigating to FairSplit with data:', fairSplitData);
       navigation.navigate('FairSplit', { 
-        billData: fairSplitData,
+        billData: unifiedBillData,
         processedBillData,
         analysisResult,
+        splitWallet: splitWallet, // Pass the existing wallet
+        splitData: splitData, // Pass the split data
       });
     } else {
-      // Navigate to Degen Lock screen
-      const degenSplitData = {
-        name: billName,
-        totalAmount: parseFloat(totalAmount),
-        date: processedBillData?.date || billData?.date || '10 Mar. 2025',
-        participants: participants.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          walletAddress: p.walletAddress,
-          status: p.status,
-        })),
-      };
+      console.log('🔍 SplitDetailsScreen: Navigating to DegenLock with wallet:', splitWallet ? {
+        id: splitWallet.id,
+        walletAddress: splitWallet.walletAddress,
+        participants: splitWallet.participants?.length || 0
+      } : 'No wallet');
       
-      // Convert participants to the format expected by DegenLock
-      const degenParticipants = participants.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        userId: p.walletAddress, // Use wallet address as userId
-        avatar: '👤',
-      }));
-      
-      console.log('Navigating to DegenLock with data:', degenSplitData);
       navigation.navigate('DegenLock', {
-        billData: degenSplitData,
-        participants: degenParticipants,
+        billData: unifiedBillData,
+        participants: unifiedParticipants,
         totalAmount: parseFloat(totalAmount),
         processedBillData,
         analysisResult,
+        splitWallet: splitWallet, // Pass the existing wallet
+        splitData: splitData, // Pass the split data
       });
     }
   };
@@ -533,10 +549,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         currency: processedBillData?.currency || billData?.currency || 'USD',
         date: processedBillData?.date || billData?.date || new Date().toISOString().split('T')[0],
         merchant: processedBillData?.merchant || billData?.merchant || 'Unknown Merchant',
-        billImageUrl: billData?.billImageUrl,
+        billImageUrl: (billData as any)?.billImageUrl,
         items: processedBillData?.items || billData?.items || [],
         participants: participants,
-        settings: processedBillData?.settings || billData?.settings || {
+        settings: processedBillData?.settings || (billData as any)?.settings || {
           allowPartialPayments: true,
           requireAllAccept: false,
           autoCalculate: true,
@@ -594,7 +610,42 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     };
 
     checkExistingSplit();
-  }, [currentUser, processedBillData, splitData, splitWallet, isCreatingWallet]);
+  }, [currentUser?.id, splitData?.walletId, processedBillData?.id]); // Removed isCreatingWallet to prevent loop
+
+  // Set authoritative price in price management service when component loads
+  useEffect(() => {
+    const setAuthoritativePrice = async () => {
+      if (processedBillData?.id && processedBillData?.totalAmount) {
+        const { priceManagementService } = await import('../../services/priceManagementService');
+        const { PriceDebugger } = await import('../../utils/priceDebugger');
+        
+        // Debug current state
+        PriceDebugger.debugBillAmounts(processedBillData.id, {
+          processedBillData,
+          billData,
+          routeParams: { totalAmount: parseFloat(totalAmount) }
+        });
+        
+        const existingPrice = priceManagementService.getBillPrice(processedBillData.id);
+        
+        if (!existingPrice) {
+          priceManagementService.setBillPrice(
+            processedBillData.id,
+            processedBillData.totalAmount,
+            processedBillData.currency || 'USDC'
+          );
+          
+          console.log('💰 SplitDetailsScreen: Set authoritative price:', {
+            billId: processedBillData.id,
+            totalAmount: processedBillData.totalAmount,
+            currency: processedBillData.currency || 'USDC'
+          });
+        }
+      }
+    };
+    
+    setAuthoritativePrice();
+  }, [processedBillData?.id, processedBillData?.totalAmount]);
 
   // Debug effect to track selectedSplitType changes
   useEffect(() => {

@@ -10,6 +10,7 @@ export interface NFCService {
   isEnabledAsync(): Promise<boolean>;
   requestTechnologyAsync(technologies: any[]): Promise<void>;
   writeTagAsync(message: any): Promise<void>;
+  getTagAsync?(): Promise<any>;
   closeTechnologyAsync(): Promise<void>;
 }
 
@@ -25,9 +26,14 @@ export class NFCSplitService {
         return this.nfcModule;
       }
 
-      // Dynamically import NFC module
-      const NFC = await import('expo-nfc');
-      this.nfcModule = NFC;
+      // Dynamically import NFC module with error handling
+      try {
+        const NFC = await import('expo-nfc');
+        this.nfcModule = NFC;
+      } catch (importError) {
+        logger.warn('NFC module not available', { error: importError }, 'NFCSplitService');
+        return null;
+      }
       return this.nfcModule;
     } catch (error) {
       logger.error('Failed to initialize NFC module', error, 'NFCSplitService');
@@ -88,7 +94,7 @@ export class NFCSplitService {
       }
 
       // Start NFC session
-      await NFC.requestTechnologyAsync([NFC.NfcTech?.Ndef || 'Ndef']);
+      await NFC.requestTechnologyAsync(['Ndef']);
       
       // Create NDEF message
       const ndefMessage = {
@@ -149,10 +155,10 @@ export class NFCSplitService {
       }
 
       // Start NFC session
-      await NFC.requestTechnologyAsync([NFC.NfcTech?.Ndef || 'Ndef']);
+      await NFC.requestTechnologyAsync(['Ndef']);
       
       // Read the tag
-      const tag = await NFC.getTagAsync();
+      const tag = NFC.getTagAsync ? await NFC.getTagAsync() : null;
       
       if (tag && tag.ndefMessage && tag.ndefMessage.length > 0) {
         const record = tag.ndefMessage[0];
