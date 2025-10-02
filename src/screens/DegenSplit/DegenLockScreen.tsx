@@ -12,12 +12,16 @@ import {
   SafeAreaView,
   StatusBar,
   Animated,
-  PanGestureHandler,
-  State,
+  Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { styles } from './DegenLockStyles';
+import { SplitWalletService } from '../../services/splitWalletService';
+import { NotificationService } from '../../services/notificationService';
+import { useApp } from '../../context/AppContext';
 
 interface DegenLockScreenProps {
   navigation: any;
@@ -25,37 +29,155 @@ interface DegenLockScreenProps {
 }
 
 const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) => {
-  const { billData, participants, totalAmount } = route.params;
+  const { billData, participants, totalAmount, processedBillData, splitData } = route.params;
+  const { state } = useApp();
+  const { currentUser } = state;
+  const insets = useSafeAreaInsets();
   
   const [isLocked, setIsLocked] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
+  const [splitWallet, setSplitWallet] = useState(null);
+  const [lockedParticipants, setLockedParticipants] = useState([]);
   
   const slideAnimation = useRef(new Animated.Value(0)).current;
   const lockProgress = useRef(new Animated.Value(0)).current;
 
-  const handleSlideToLock = () => {
+  // Debug: Log the received data
+  console.log('🔍 DegenLockScreen: Received route params:', {
+    billData: billData ? { title: billData.title, totalAmount: billData.totalAmount } : null,
+    participants: participants ? participants.length : 'undefined',
+    totalAmount,
+    processedBillData: processedBillData ? { title: processedBillData.title, totalAmount: processedBillData.totalAmount } : null,
+    splitData: splitData ? { id: splitData.id, title: splitData.title } : null,
+  });
+
+  // Validate required data
+  if (!participants || !Array.isArray(participants) || participants.length === 0) {
+    console.error('🔍 DegenLockScreen: Invalid participants data:', participants);
+    Alert.alert('Error', 'Invalid participants data. Please try again.');
+    navigation.goBack();
+    return null;
+  }
+
+  const handleSlideToLock = async () => {
     if (isLocked || isLocking) return;
     
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    // Additional validation for participants
+    if (!participants || !Array.isArray(participants) || participants.length === 0) {
+      Alert.alert('Error', 'No participants found. Please try again.');
+      return;
+    }
+
     setIsLocking(true);
     
-    // Animate the lock progress
-    Animated.timing(lockProgress, {
-      toValue: 1,
-      duration: 2000,
-      useNativeDriver: false,
-    }).start(() => {
-      setIsLocked(true);
-      setIsLocking(false);
+    try {
+      console.log('🔍 DegenLockScreen: Starting degen split wallet creation...');
+      console.log('🔍 DegenLockScreen: Participants data:', participants);
       
-      // Navigate to Degen Spin screen after a short delay
-      setTimeout(() => {
-        navigation.navigate('DegenSpin', {
-          billData,
-          participants,
+      // Use existing split data if available, otherwise create new split wallet
+      let walletToUse = splitWallet;
+      
+      if (!walletToUse && splitData) {
+        // If we have split data from SplitDetails, use it
+        const billId = splitData.billId || processedBillData?.id || `bill_${Date.now()}`;
+        const splitWalletResult = await SplitWalletService.createSplitWallet(
+          billId,
+          currentUser.id.toString(),
           totalAmount,
-        });
-      }, 1000);
-    });
+          'USDC',
+          participants.map(p => ({
+            userId: p.id,
+            name: p.name,
+            walletAddress: p.walletAddress || p.userId,
+            amountOwed: totalAmount, // Each participant locks the FULL amount in degen split
+          }))
+        );
+
+        if (!splitWalletResult.success) {
+          Alert.alert('Error', splitWalletResult.error || 'Failed to create split wallet');
+          setIsLocking(false);
+          return;
+        }
+        
+        walletToUse = splitWalletResult.wallet;
+        setSplitWallet(walletToUse);
+      }
+
+      if (!walletToUse) {
+        Alert.alert('Error', 'No split wallet available');
+        setIsLocking(false);
+        return;
+      }
+
+      // Lock the current user's amount in the split wallet
+      const lockResult = await SplitWalletService.lockParticipantAmount(
+        walletToUse.id,
+        currentUser.id.toString(),
+        totalAmount
+      );
+
+      if (!lockResult.success) {
+        Alert.alert('Error', lockResult.error || 'Failed to lock amount');
+        setIsLocking(false);
+        return;
+      }
+
+      // Update locked participants list
+      setLockedParticipants(prev => [...prev, currentUser.id.toString()]);
+
+      // Send lock required notifications to all other participants
+      const otherParticipantIds = participants
+        .filter(p => p.id !== currentUser.id.toString())
+        .map(p => p.id);
+      
+      const billName = billData?.title || processedBillData?.title || 'Restaurant Night';
+
+      if (otherParticipantIds.length > 0) {
+        await NotificationService.sendBulkNotifications(
+          otherParticipantIds,
+          'split_lock_required',
+          {
+            splitWalletId: walletToUse.id,
+            billName,
+            amount: totalAmount, // Each participant needs to lock the full amount
+          }
+        );
+      }
+
+      console.log('🔍 DegenLockScreen: Successfully locked amount for degen split');
+
+      // Animate the lock progress
+      Animated.timing(lockProgress, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: false,
+      }).start(() => {
+        setIsLocked(true);
+        setIsLocking(false);
+        
+        // Navigate to Degen Spin screen after a short delay
+        setTimeout(() => {
+          navigation.navigate('DegenSpin', {
+            billData,
+            participants,
+            totalAmount,
+            splitWallet: walletToUse,
+            processedBillData,
+            splitData,
+          });
+        }, 1000);
+      });
+
+    } catch (error) {
+      console.error('🔍 DegenLockScreen: Error in degen split:', error);
+      Alert.alert('Error', 'Failed to lock amount. Please try again.');
+      setIsLocking(false);
+    }
   };
 
   const handleBack = () => {
@@ -127,15 +249,15 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
             <Text style={styles.lockIcon}>🔒</Text>
           </View>
           <Text style={styles.instructionsTitle}>
-            Lock {totalAmount} USDC to split the Bill
+            Lock {totalAmount} USDC for Degen Split
           </Text>
           <Text style={styles.instructionsSubtitle}>
-            Your share is unlocked after the split is done!
+            Everyone locks the full amount. Winner pays nothing, losers pay their share!
           </Text>
         </View>
 
         {/* Slide to Lock Button */}
-        <View style={styles.slideContainer}>
+        <View style={[styles.slideContainer, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
           <TouchableOpacity
             style={[
               styles.slideButton,
@@ -172,188 +294,5 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.black,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.xl,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    justifyContent: 'space-between',
-  },
-  billCard: {
-    backgroundColor: colors.green,
-    borderRadius: 16,
-    padding: spacing.lg,
-    marginTop: spacing.xl,
-  },
-  billCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  billIcon: {
-    fontSize: 16,
-    marginRight: spacing.sm,
-  },
-  billTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.xl,
-    fontWeight: '700',
-  },
-  billDate: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    marginBottom: spacing.md,
-    opacity: 0.9,
-  },
-  totalBillRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  totalBillLabel: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    opacity: 0.9,
-  },
-  totalBillAmount: {
-    color: colors.white,
-    fontSize: typography.fontSize.xxl,
-    fontWeight: '700',
-  },
-  progressContainer: {
-    alignItems: 'center',
-    marginVertical: spacing.xl,
-  },
-  progressCircle: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  progressFill: {
-    position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    borderWidth: 8,
-    borderColor: colors.green,
-    borderTopColor: 'transparent',
-    borderRightColor: 'transparent',
-  },
-  progressInner: {
-    alignItems: 'center',
-  },
-  progressPercentage: {
-    color: colors.green,
-    fontSize: typography.fontSize.xxl,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  progressAmount: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  instructionsContainer: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: spacing.xl,
-    marginBottom: spacing.lg,
-    alignItems: 'center',
-    marginHorizontal: spacing.sm,
-  },
-  lockIconContainer: {
-    marginBottom: spacing.md,
-  },
-  lockIcon: {
-    fontSize: 32,
-  },
-  instructionsTitle: {
-    color: colors.black,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  instructionsSubtitle: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.md,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  slideContainer: {
-    marginBottom: spacing.xl,
-  },
-  slideButton: {
-    backgroundColor: colors.green,
-    borderRadius: 25,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-    marginHorizontal: spacing.sm,
-  },
-  slideButtonDisabled: {
-    backgroundColor: colors.surface,
-  },
-  slideButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  slideButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '700',
-    marginRight: spacing.sm,
-  },
-  slideButtonTextDisabled: {
-    color: colors.textSecondary,
-  },
-  slideButtonArrow: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '700',
-  },
-  slideProgress: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    height: '100%',
-    backgroundColor: colors.white,
-    opacity: 0.3,
-  },
-});
 
 export default DegenLockScreen;

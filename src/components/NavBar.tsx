@@ -65,6 +65,9 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
       if (route === 'Contacts') {
         // Navigate to standalone contacts screen
         navigation.navigate(route, {});
+      } else if (route === 'SplitsList') {
+        // Navigate to splits list screen
+        navigation.navigate(route, {});
       } else {
         navigation.navigate(route);
       }
@@ -84,6 +87,11 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
       return true;
     }
     if (route === 'GroupsList' && currentRoute === 'GroupDetails') {
+      return true;
+    }
+    
+    // Special case: if we're on SplitsList, consider Pools tab active
+    if (route === 'SplitsList' && currentRoute === 'SplitsList') {
       return true;
     }
     

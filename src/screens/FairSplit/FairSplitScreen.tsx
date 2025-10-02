@@ -14,10 +14,15 @@ import {
   SafeAreaView,
   StatusBar,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { styles } from './styles';
+import { SplitWalletService, SplitWallet } from '../../services/splitWalletService';
+import { NotificationService } from '../../services/notificationService';
+import { useApp } from '../../context/AppContext';
 
 interface Participant {
   id: string;
@@ -34,33 +39,90 @@ interface FairSplitScreenProps {
 }
 
 const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) => {
-  const { billData } = route.params || {};
+  const { billData, processedBillData } = route.params || {};
+  const { state } = useApp();
+  const { currentUser } = state;
+  
+  // Debug: Log the current user data
+  console.log('🔍 FairSplitScreen: Current user from context:', {
+    currentUser: currentUser ? {
+      id: currentUser.id,
+      name: currentUser.name,
+      email: currentUser.email,
+      wallet_address: currentUser.wallet_address,
+      wallet_public_key: currentUser.wallet_public_key
+    } : null,
+    isAuthenticated: state.isAuthenticated,
+    authMethod: state.authMethod
+  });
   
   console.log('FairSplitScreen received billData:', billData);
   
   const [splitMethod, setSplitMethod] = useState<'equal' | 'manual'>('equal');
+  const [isCreatingWallet, setIsCreatingWallet] = useState(false);
+  const [splitWallet, setSplitWallet] = useState<SplitWallet | null>(null);
   
-  // Initialize participants from route params or use default data
+  // Initialize participants from route params or use current user as creator
   const [participants, setParticipants] = useState<Participant[]>(() => {
+    console.log('🔍 FairSplitScreen: Initializing participants with currentUser:', {
+      currentUser: currentUser ? {
+        id: currentUser.id,
+        name: currentUser.name,
+        wallet_address: currentUser.wallet_address,
+        email: currentUser.email
+      } : null,
+      billDataParticipants: billData?.participants
+    });
+
     if (billData?.participants && billData.participants.length > 0) {
       // Convert SplitDetailsScreen participants to FairSplitScreen format
-      return billData.participants.map((p: any, index: number) => ({
-        id: p.id || `participant_${index}`,
-        name: p.name || `Participant ${index + 1}`,
-        walletAddress: p.walletAddress || `${p.name?.substring(0, 4)}.....${Math.random().toString(36).substring(2, 6)}`,
-        amountOwed: 0, // Will be calculated based on split method
-        amountLocked: index < 2 ? 8.325 : 0, // Simulate some locked amounts
-        status: index < 2 ? 'locked' : 'pending' as 'pending' | 'locked' | 'confirmed',
-      }));
+      // But replace mock data with real user data when possible
+      const mappedParticipants = billData.participants.map((p: any, index: number) => {
+        // If this participant is the current user, use real data
+        if (currentUser && p.name === 'You' && p.walletAddress === 'Your wallet address') {
+          return {
+            id: currentUser.id.toString(),
+            name: currentUser.name,
+            walletAddress: currentUser.wallet_address,
+            amountOwed: 0, // Will be calculated based on split method
+            amountLocked: 0, // Start with no locked amounts
+            status: 'pending' as 'pending' | 'locked' | 'confirmed',
+          };
+        }
+        
+        // For other participants, use the provided data
+        return {
+          id: p.id || `participant_${index}`,
+          name: p.name || `Participant ${index + 1}`,
+          walletAddress: p.walletAddress || p.wallet_address || 'Unknown',
+          amountOwed: 0, // Will be calculated based on split method
+          amountLocked: 0, // Start with no locked amounts
+          status: 'pending' as 'pending' | 'locked' | 'confirmed',
+        };
+      });
+      
+      console.log('🔍 FairSplitScreen: Mapped participants from billData:', mappedParticipants);
+      return mappedParticipants;
     }
     
-    // Default participants if none provided
-    return [
-      { id: '1', name: 'PauluneMoon', walletAddress: 'B3gt.....sdgux', amountOwed: 8.325, amountLocked: 8.325, status: 'locked' },
-      { id: '2', name: 'Haxxxoloto', walletAddress: 'C4ht.....kdfux', amountOwed: 8.325, amountLocked: 8.325, status: 'locked' },
-      { id: '3', name: 'Rémi', walletAddress: 'D5iu.....jghux', amountOwed: 8.325, amountLocked: 0, status: 'pending' },
-      { id: '4', name: 'Florian', walletAddress: 'E6jk.....lhiux', amountOwed: 8.325, amountLocked: 0, status: 'pending' },
-    ];
+    // If no participants provided, start with just the current user as creator
+    if (currentUser) {
+      const currentUserParticipant = {
+        id: currentUser.id.toString(),
+        name: currentUser.name,
+        walletAddress: currentUser.wallet_address || 'No wallet address',
+        amountOwed: 0, // Will be calculated
+        amountLocked: 0,
+        status: 'pending' as 'pending' | 'locked' | 'confirmed',
+      };
+      
+      console.log('🔍 FairSplitScreen: Created current user participant:', currentUserParticipant);
+      return [currentUserParticipant];
+    }
+    
+    // Fallback if no current user
+    console.log('🔍 FairSplitScreen: No current user, returning empty participants');
+    return [];
   });
 
   const totalAmount = billData?.totalAmount || 65.6;
@@ -91,7 +153,114 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     );
   };
 
+  const handleCreateSplitWallet = async () => {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    console.log('🔍 FairSplitScreen: Creating split wallet with participants:', {
+      currentUser: {
+        id: currentUser.id,
+        name: currentUser.name,
+        wallet_address: currentUser.wallet_address
+      },
+      participants: participants.map(p => ({
+        id: p.id,
+        name: p.name,
+        walletAddress: p.walletAddress,
+        amountOwed: p.amountOwed
+      })),
+      totalAmount
+    });
+
+    setIsCreatingWallet(true);
+
+    try {
+      const billId = processedBillData?.id || `bill_${Date.now()}`;
+      const splitWalletResult = await SplitWalletService.createSplitWallet(
+        billId,
+        currentUser.id.toString(),
+        totalAmount,
+        'USDC',
+        participants.map(p => ({
+          userId: p.id,
+          name: p.name,
+          walletAddress: p.walletAddress,
+          amountOwed: p.amountOwed,
+        }))
+      );
+
+      if (!splitWalletResult.success) {
+        Alert.alert('Error', splitWalletResult.error || 'Failed to create split wallet');
+        setIsCreatingWallet(false);
+        return;
+      }
+
+      setSplitWallet(splitWalletResult.wallet);
+      Alert.alert(
+        'Split Wallet Created!',
+        'Your split wallet has been created. Participants can now send their payments.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Send notifications to participants
+              sendPaymentNotifications(splitWalletResult.wallet!);
+            },
+          },
+        ]
+      );
+
+    } catch (error) {
+      console.error('Error creating split wallet:', error);
+      Alert.alert('Error', 'Failed to create split wallet. Please try again.');
+    } finally {
+      setIsCreatingWallet(false);
+    }
+  };
+
+  const sendPaymentNotifications = async (wallet: SplitWallet) => {
+    const participantIds = wallet.participants.map(p => p.userId);
+    const billName = billData?.title || 'Restaurant Night';
+
+    await NotificationService.sendBulkNotifications(
+      participantIds,
+      'split_payment_required',
+      {
+        splitWalletId: wallet.id,
+        billName,
+        amount: totalAmount / participants.length, // Equal split amount
+      }
+    );
+  };
+
+  const handlePayMyShare = () => {
+    if (!splitWallet || !currentUser?.id) {
+      Alert.alert('Error', 'Split wallet not created yet');
+      return;
+    }
+
+    const participant = splitWallet.participants.find(p => p.userId === currentUser.id.toString());
+    if (!participant) {
+      Alert.alert('Error', 'You are not a participant in this split');
+      return;
+    }
+
+    // Navigate to payment screen
+    navigation.navigate('SplitPayment', {
+      splitWalletId: splitWallet.id,
+      billName: billData?.title || 'Restaurant Night',
+      totalAmount: totalAmount,
+    });
+  };
+
   const handleConfirmSplit = () => {
+    if (!splitWallet) {
+      Alert.alert('Error', 'Please create the split wallet first');
+      return;
+    }
+
     if (totalLocked < totalAmount) {
       Alert.alert(
         'Incomplete Payment',
@@ -106,6 +275,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       participants,
       totalAmount,
       totalLocked,
+      splitWallet,
     });
   };
 
@@ -219,299 +389,124 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
         {/* Participants List */}
         <View style={styles.participantsContainer}>
-          {participants.map((participant) => (
-            <View key={participant.id} style={styles.participantCard}>
-              <View style={styles.participantAvatar} />
-              <View style={styles.participantInfo}>
-                <Text style={styles.participantName}>{participant.name}</Text>
-                <Text style={styles.participantWallet}>{participant.walletAddress}</Text>
-              </View>
-              
-              <View style={styles.participantAmountContainer}>
-                {splitMethod === 'manual' ? (
-                  <TextInput
-                    style={styles.amountInput}
-                    value={participant.amountOwed.toString()}
-                    onChangeText={(text) => handleAmountChange(participant.id, text)}
-                    keyboardType="numeric"
-                    placeholder="0.00"
-                    placeholderTextColor={colors.textSecondary}
-                  />
-                ) : (
-                  <Text style={styles.participantAmount}>
-                    ${participant.amountOwed.toFixed(3)}
+          {participants.map((participant) => {
+            const isCurrentUser = currentUser && participant.id === currentUser.id.toString();
+            const displayName = isCurrentUser ? `${participant.name} (You)` : participant.name;
+            const shortWalletAddress = participant.walletAddress 
+              ? `${participant.walletAddress.substring(0, 4)}...${participant.walletAddress.substring(participant.walletAddress.length - 4)}`
+              : 'Unknown';
+            
+            console.log('🔍 FairSplitScreen: Rendering participant:', {
+              participant,
+              isCurrentUser,
+              displayName,
+              shortWalletAddress,
+              originalWalletAddress: participant.walletAddress
+            });
+            
+            return (
+              <View key={participant.id} style={styles.participantCard}>
+                <View style={styles.participantAvatar}>
+                  <Text style={styles.participantAvatarText}>
+                    {participant.name.charAt(0).toUpperCase()}
                   </Text>
-                )}
-                <Text style={[styles.participantStatus, { color: getStatusColor(participant.status) }]}>
-                  {getStatusText(participant.status)}
-                </Text>
+                </View>
+                <View style={styles.participantInfo}>
+                  <Text style={styles.participantName}>{displayName}</Text>
+                  <Text style={styles.participantWallet}>{shortWalletAddress}</Text>
+                </View>
+                
+                <View style={styles.participantAmountContainer}>
+                  {splitMethod === 'manual' ? (
+                    <TextInput
+                      style={styles.amountInput}
+                      value={participant.amountOwed.toString()}
+                      onChangeText={(text) => handleAmountChange(participant.id, text)}
+                      keyboardType="numeric"
+                      placeholder="0.00"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                  ) : (
+                    <Text style={styles.participantAmount}>
+                      ${participant.amountOwed.toFixed(3)}
+                    </Text>
+                  )}
+                  <Text style={[styles.participantStatus, { color: getStatusColor(participant.status) }]}>
+                    {getStatusText(participant.status)}
+                  </Text>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </ScrollView>
 
-      {/* Confirm Split Button */}
+      {/* Action Buttons */}
       <View style={styles.bottomContainer}>
-        <TouchableOpacity 
-          style={[
-            styles.confirmButton,
-            totalLocked < totalAmount && styles.confirmButtonDisabled
-          ]} 
-          onPress={handleConfirmSplit}
-          disabled={totalLocked < totalAmount}
-        >
-          <Text style={[
-            styles.confirmButtonText,
-            totalLocked < totalAmount && styles.confirmButtonTextDisabled
-          ]}>
-            Confirm Split
-          </Text>
-        </TouchableOpacity>
+        {!splitWallet ? (
+          <View style={styles.testButtonsContainer}>
+            <TouchableOpacity 
+              style={styles.createWalletButton} 
+              onPress={handleCreateSplitWallet}
+              disabled={isCreatingWallet}
+            >
+              {isCreatingWallet ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.createWalletButtonText}>
+                  Create Split Wallet
+                </Text>
+              )}
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.createWalletButton, { backgroundColor: colors.secondary, marginTop: spacing.sm }]} 
+              onPress={async () => {
+                console.log('🧪 Testing split wallet creation...');
+                const result = await SplitWalletService.testSplitWalletCreation();
+                Alert.alert(
+                  result.success ? 'Test Successful!' : 'Test Failed',
+                  result.success ? `Wallet created with ID: ${result.walletId}` : result.error || 'Unknown error'
+                );
+              }}
+            >
+              <Text style={styles.createWalletButtonText}>
+                Test Split Wallet Creation
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity 
+              style={styles.payButton} 
+              onPress={handlePayMyShare}
+            >
+              <Text style={styles.payButtonText}>
+                Pay My Share
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                styles.confirmButton,
+                totalLocked < totalAmount && styles.confirmButtonDisabled
+              ]} 
+              onPress={handleConfirmSplit}
+              disabled={totalLocked < totalAmount}
+            >
+              <Text style={[
+                styles.confirmButtonText,
+                totalLocked < totalAmount && styles.confirmButtonTextDisabled
+              ]}>
+                Confirm Split
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.black,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.xl,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-  },
-  editButton: {
-    padding: spacing.sm,
-  },
-  editButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-  },
-  billCard: {
-    backgroundColor: colors.green,
-    borderRadius: 20,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
-  },
-  billHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.lg,
-  },
-  billTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  billIcon: {
-    fontSize: typography.fontSize.lg,
-    marginRight: spacing.sm,
-  },
-  billTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.xl,
-    fontWeight: '700',
-  },
-  billDate: {
-    color: colors.white,
-    fontSize: typography.fontSize.sm,
-    opacity: 0.9,
-  },
-  billAmountContainer: {
-    marginBottom: spacing.lg,
-  },
-  billAmountLabel: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    marginBottom: spacing.xs,
-  },
-  billAmountUSDC: {
-    color: colors.white,
-    fontSize: typography.fontSize.xxl,
-    fontWeight: '700',
-  },
-  progressContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-  progressCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 6,
-    borderColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  progressFill: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 6,
-    borderColor: colors.green,
-    borderTopColor: 'transparent',
-    borderRightColor: 'transparent',
-  },
-  progressInner: {
-    alignItems: 'center',
-  },
-  progressPercentage: {
-    color: colors.green,
-    fontSize: typography.fontSize.xl,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  progressAmount: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-  },
-  progressLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-  },
-  splitMethodContainer: {
-    marginBottom: spacing.xl,
-  },
-  splitMethodLabel: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    marginBottom: spacing.md,
-  },
-  splitMethodOptions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  splitMethodOption: {
-    flex: 1,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.surface,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-  },
-  splitMethodOptionActive: {
-    backgroundColor: colors.green,
-    borderColor: colors.green,
-  },
-  splitMethodOptionText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-  },
-  splitMethodOptionTextActive: {
-    color: colors.white,
-  },
-  participantsContainer: {
-    marginBottom: spacing.xl,
-  },
-  participantCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  participantAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.green,
-    marginRight: spacing.md,
-  },
-  participantInfo: {
-    flex: 1,
-  },
-  participantName: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-  },
-  participantWallet: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-  },
-  participantAmountContainer: {
-    alignItems: 'flex-end',
-  },
-  participantAmount: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-  },
-  amountInput: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 6,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    textAlign: 'right',
-    minWidth: 80,
-    marginBottom: spacing.xs,
-  },
-  participantStatus: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: '600',
-  },
-  bottomContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    backgroundColor: colors.black,
-  },
-  confirmButton: {
-    backgroundColor: colors.green,
-    borderRadius: 25,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    marginHorizontal: spacing.sm,
-  },
-  confirmButtonDisabled: {
-    backgroundColor: colors.surface,
-  },
-  confirmButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '700',
-  },
-  confirmButtonTextDisabled: {
-    color: colors.textSecondary,
-  },
-});
 
 export default FairSplitScreen;

@@ -20,12 +20,20 @@ import { useRoute } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { styles } from './BillProcessingStyles';
 import { BillItem, OCRProcessingResult, BillSplitCreationData } from '../../types/billSplitting';
+import { BillAnalysisData, BillAnalysisResult, ProcessedBillData } from '../../types/billAnalysis';
+import { BillAnalysisService } from '../../services/billAnalysisService';
+import { MockBillAnalysisService } from '../../services/mockBillAnalysisService';
 import { billOCRService } from '../../services/billOCRService';
+import { useApp } from '../../context/AppContext';
 
 interface RouteParams {
   imageUri: string;
   billData?: Partial<BillSplitCreationData>;
+  processedBillData?: ProcessedBillData;
+  analysisResult?: BillAnalysisResult;
+  isEditing?: boolean;
 }
 
 interface BillProcessingScreenProps {
@@ -34,38 +42,81 @@ interface BillProcessingScreenProps {
 
 const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation }) => {
   const route = useRoute();
-  const { imageUri, billData } = route.params as RouteParams;
+  const { imageUri, billData, processedBillData, analysisResult, isEditing } = route.params as RouteParams;
+  const { state } = useApp();
+  const { currentUser } = state;
   
-  const [isProcessing, setIsProcessing] = useState(true);
-  const [processingResult, setProcessingResult] = useState<OCRProcessingResult | null>(null);
-  const [extractedItems, setExtractedItems] = useState<BillItem[]>([]);
-  const [totalAmount, setTotalAmount] = useState(0);
-  const [merchant, setMerchant] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isProcessing, setIsProcessing] = useState(!isEditing);
+  const [processingResult, setProcessingResult] = useState<BillAnalysisResult | null>(analysisResult || null);
+  const [currentProcessedBillData, setCurrentProcessedBillData] = useState<ProcessedBillData | null>(processedBillData || null);
+  const [extractedItems, setExtractedItems] = useState<BillItem[]>(
+    isEditing && processedBillData ? 
+      processedBillData.items.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        category: item.category,
+        participants: item.participants,
+      })) : 
+      []
+  );
+  const [totalAmount, setTotalAmount] = useState(
+    isEditing && processedBillData ? processedBillData.totalAmount : 0
+  );
+  const [merchant, setMerchant] = useState(
+    isEditing && processedBillData ? processedBillData.merchant : ''
+  );
+  const [date, setDate] = useState(
+    isEditing && processedBillData ? processedBillData.date : new Date().toISOString().split('T')[0]
+  );
 
   useEffect(() => {
-    processBillImage();
-  }, []);
+    if (!isEditing) {
+      processBillImage();
+    }
+  }, [isEditing]);
 
   const processBillImage = async () => {
     setIsProcessing(true);
     
     try {
-      // Use the actual OCR service
-      const result = await billOCRService.processBillImage(imageUri);
+      // Use mock service to simulate your Python OCR service
+      // Replace this with actual API call to your Python service
+      const analysisResult = await MockBillAnalysisService.analyzeBillImage(imageUri);
       
-      setProcessingResult(result);
+      setProcessingResult(analysisResult);
       
-      if (result.success) {
-        setExtractedItems(result.extractedItems);
-        setTotalAmount(result.totalAmount);
-        // Extract merchant name from raw text (simplified)
-        setMerchant(extractMerchantName(result.rawText));
+      if (analysisResult.success && analysisResult.data) {
+        // Process the structured data with current user information
+        const processedData = BillAnalysisService.processBillData(analysisResult.data, currentUser);
+        setCurrentProcessedBillData(processedData);
+      
+        // Update legacy state for backward compatibility
+        setExtractedItems(processedData.items.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          category: item.category,
+          participants: item.participants,
+        })));
+        setTotalAmount(processedData.totalAmount);
+        setMerchant(processedData.merchant);
+        setDate(processedData.date);
       } else {
-        Alert.alert('Processing Failed', result.error || 'Failed to process bill image');
+        Alert.alert('Processing Failed', analysisResult.error || 'Failed to process bill image');
       }
+      
     } catch (error) {
       console.error('Error processing bill:', error);
+      const errorResult: BillAnalysisResult = {
+        success: false,
+        error: 'Failed to process bill image. Please try again.',
+        processingTime: 0,
+        confidence: 0,
+      };
+      setProcessingResult(errorResult);
       Alert.alert('Error', 'Failed to process bill image. Please try again.');
     } finally {
       setIsProcessing(false);
@@ -113,24 +164,82 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
   };
 
   const proceedToSplitDetails = () => {
+    // If in edit mode, use existing processed data or create new one
+    let currentProcessedData = currentProcessedBillData;
+    
+    if (!currentProcessedData) {
+      // Create processed data from current state
+      const billId = `bill_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      
+      currentProcessedData = {
+        id: billId,
+        title: `${merchant} - ${date}`,
+        merchant: merchant,
+        location: '',
+        date: date,
+        time: new Date().toLocaleTimeString(),
+        currency: 'USD',
+        totalAmount: totalAmount,
+        subtotal: totalAmount * 0.9, // Estimate
+        tax: totalAmount * 0.1, // Estimate
+        items: extractedItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          category: item.category,
+          participants: item.participants,
+          isSelected: true,
+        })),
+        participants: [],
+        settings: {
+          allowPartialPayments: true,
+          requireAllAccept: false,
+          autoCalculate: true,
+          splitMethod: 'equal',
+          taxIncluded: true,
+        },
+        originalAnalysis: {} as BillAnalysisData,
+      };
+    }
+
+    // Validate the processed data
+    const validation = BillAnalysisService.validateBillData(currentProcessedData);
+    if (!validation.isValid) {
+      Alert.alert('Validation Error', validation.errors.join('\n'));
+      return;
+    }
+
+    // Convert to legacy format for backward compatibility
     const billData: BillSplitCreationData = {
-      title: `${merchant} - ${date}`,
-      totalAmount,
-      currency: 'USD',
-      date,
-      merchant,
+      title: currentProcessedData.title,
+      totalAmount: currentProcessedData.totalAmount,
+      currency: currentProcessedData.currency,
+      date: currentProcessedData.date,
+      merchant: currentProcessedData.merchant,
       billImageUrl: imageUri,
-      items: extractedItems,
-      participants: [],
-      settings: {
-        allowPartialPayments: true,
-        requireAllAccept: false,
-        autoCalculate: true,
-        splitMethod: 'by_items',
-      },
+      items: currentProcessedData.items.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        category: item.category,
+        participants: item.participants,
+      })),
+      participants: currentProcessedData.participants.map(p => ({
+        id: p.id,
+        name: p.name,
+        walletAddress: p.walletAddress,
+        status: p.status,
+      })),
+      settings: currentProcessedData.settings,
     };
 
-    navigation.navigate('SplitDetails', { billData });
+    navigation.navigate('SplitDetails', { 
+      billData,
+      processedBillData: currentProcessedData,
+      analysisResult: processingResult,
+    });
   };
 
   const retakePhoto = () => {
@@ -140,10 +249,10 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
   if (isProcessing) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+        <StatusBar barStyle="light-content" backgroundColor={colors.black} />
         
         <View style={styles.processingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.green} />
           <Text style={styles.processingTitle}>Processing Bill</Text>
           <Text style={styles.processingSubtitle}>
             Analyzing your bill image and extracting items...
@@ -162,14 +271,14 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={retakePhoto}>
-          <Text style={styles.backButtonText}>← Retake</Text>
+          <Text style={styles.backButtonText}>{isEditing ? '← Back' : '← Retake'}</Text>
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>Review Bill</Text>
+        <Text style={styles.headerTitle}>{isEditing ? 'Edit Bill' : 'Review Bill'}</Text>
         
         <TouchableOpacity style={styles.proceedButton} onPress={proceedToSplitDetails}>
           <Text style={styles.proceedButtonText}>Next</Text>
@@ -202,14 +311,40 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
             <Text style={styles.detailValue}>{merchant}</Text>
           </View>
           
+          {processedBillData?.location && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Location:</Text>
+              <Text style={styles.detailValue}>{processedBillData.location}</Text>
+            </View>
+          )}
+          
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Date:</Text>
             <Text style={styles.detailValue}>{date}</Text>
           </View>
           
+          {processedBillData?.time && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Time:</Text>
+              <Text style={styles.detailValue}>{processedBillData.time}</Text>
+            </View>
+          )}
+          
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Total Amount:</Text>
-            <Text style={styles.detailValue}>${totalAmount.toFixed(2)}</Text>
+            <Text style={styles.detailLabel}>Subtotal:</Text>
+            <Text style={styles.detailValue}>${processedBillData?.subtotal.toFixed(2) || totalAmount.toFixed(2)}</Text>
+          </View>
+          
+          {processedBillData?.tax && processedBillData.tax > 0 && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Tax:</Text>
+              <Text style={styles.detailValue}>${processedBillData.tax.toFixed(2)}</Text>
+            </View>
+          )}
+          
+          <View style={[styles.detailRow, styles.finalTotal]}>
+            <Text style={styles.finalTotalLabel}>Total Amount:</Text>
+            <Text style={styles.finalTotalValue}>${totalAmount.toFixed(2)}</Text>
           </View>
         </View>
 
@@ -245,6 +380,13 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
                   <Text style={styles.fieldValue}>${item.price.toFixed(2)}</Text>
                 </View>
                 
+                {item.category && (
+                  <View style={styles.itemField}>
+                    <Text style={styles.fieldLabel}>Category</Text>
+                    <Text style={styles.fieldValue}>{item.category}</Text>
+                  </View>
+                )}
+                
                 {item.quantity && item.quantity > 1 && (
                   <View style={styles.itemField}>
                     <Text style={styles.fieldLabel}>Quantity</Text>
@@ -276,237 +418,5 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
-  processingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  processingTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: '600',
-    color: colors.white,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  processingSubtitle: {
-    fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-  },
-  processingSteps: {
-    alignItems: 'flex-start',
-  },
-  processingStep: {
-    fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.black,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: '500',
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    color: colors.white,
-  },
-  proceedButton: {
-    padding: spacing.sm,
-  },
-  proceedButtonText: {
-    color: colors.primary,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-  },
-  content: {
-    flex: 1,
-  },
-  imageContainer: {
-    margin: spacing.lg,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-  },
-  billImage: {
-    width: '100%',
-    height: 200,
-    resizeMode: 'cover',
-  },
-  resultsContainer: {
-    margin: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-  },
-  resultsTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.sm,
-  },
-  confidenceText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.success,
-    marginBottom: spacing.xs,
-  },
-  processingTimeText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-  },
-  detailsContainer: {
-    margin: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  detailLabel: {
-    fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  detailValue: {
-    fontSize: typography.fontSize.md,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  itemsContainer: {
-    margin: spacing.lg,
-  },
-  itemsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  itemsTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  addButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 6,
-  },
-  addButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.sm,
-    fontWeight: '600',
-  },
-  itemCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  itemIndex: {
-    fontSize: typography.fontSize.sm,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  removeButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.error,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: 'bold',
-  },
-  itemFields: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  itemField: {
-    flex: 1,
-    minWidth: '50%',
-    marginBottom: spacing.sm,
-  },
-  fieldLabel: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  fieldValue: {
-    fontSize: typography.fontSize.md,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  totalContainer: {
-    margin: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  totalLabel: {
-    fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
-  },
-  totalValue: {
-    fontSize: typography.fontSize.md,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  finalTotal: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  finalTotalLabel: {
-    fontSize: typography.fontSize.lg,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  finalTotalValue: {
-    fontSize: typography.fontSize.lg,
-    color: colors.primary,
-    fontWeight: '700',
-  },
-});
 
 export default BillProcessingScreen;
