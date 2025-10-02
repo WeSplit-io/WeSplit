@@ -11,7 +11,7 @@ export const platformUtils = {
 
   // === NAVIGATION BAR SPECIFIC ===
   navBar: {
-    height: Platform.OS === 'ios' ? 95 : 90,
+    height: Platform.OS === 'ios' ? 80 : 75,
     paddingBottom: Platform.OS === 'ios' ? 24 : 20,
     iconSize: 28, // Consistent icon size across platforms
     specialButtonSize: 54, // Smaller size to fit within NavBar

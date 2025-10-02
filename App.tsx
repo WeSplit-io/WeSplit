@@ -158,6 +158,50 @@ export default function App() {
                 initialRouteName="Splash"
                 screenOptions={{
                   headerShown: false,
+                  cardStyle: {
+                    backgroundColor: '#061113',
+                  },
+                  animationEnabled: true,
+                  gestureEnabled: true,
+                  animationTypeForReplace: 'push',
+                  transitionSpec: {
+                    open: {
+                      animation: 'spring',
+                      config: {
+                        stiffness: 1500,
+                        damping: 600,
+                        mass: 2,
+                        useNativeDriver: true,
+                      },
+                    },
+                    close: {
+                      animation: 'timing',
+                      config: {
+                        duration: 150,
+                        useNativeDriver: true,
+                      },
+                    },
+                  },
+                  cardStyleInterpolator: ({ current, next, layouts }) => {
+                    return {
+                      cardStyle: {
+                        opacity: current.progress.interpolate({
+                          inputRange: [0, 0.5, 1],
+                          outputRange: [0.95, 0.98, 1],
+                          extrapolate: 'clamp',
+                        }),
+                        transform: [
+                          {
+                            scale: current.progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [0.98, 1],
+                              extrapolate: 'clamp',
+                            }),
+                          },
+                        ],
+                      },
+                    };
+                  },
                 }}
               >
                 <Stack.Screen name="Splash" component={SplashScreen} /> 

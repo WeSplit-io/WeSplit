@@ -23,29 +23,33 @@ import platformUtils from '../utils/platformUtils';
 export const styles = StyleSheet.create({
   // === MAIN CONTAINER ===
   container: {
-    paddingBottom: platformUtils.navBar.paddingBottom,
-    borderRadius: 25,
-    backgroundColor: colors.black,
+    paddingBottom: spacing.sm,
+    borderRadius: 20,
+    backgroundColor: '#121D1F',
     borderWidth: 0.5,
     borderColor: colors.white50,
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
+    left: spacing.md, // Float: add horizontal insets
+    right: spacing.md, // Float: add horizontal insets
+    bottom: 20, // Lift from bottom for floating effect
     height: platformUtils.navBar.height,
+    zIndex: 9999, // Maximum layer priority
+    elevation: 9999, // Maximum Android elevation
+    width: undefined, // Prevent width inheritance
+    top: undefined, // Explicitly undefined to prevent layout issues
     // Platform-specific shadow handling
     ...platformUtils.shadows.large,
   },
 
   // === SCROLL CONTENT ===
   scrollContent: {
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.sm,
     alignItems: 'flex-end', // Align items to bottom
     justifyContent: 'space-around',
     flexDirection: 'row',
     flex: 1,
     paddingTop: platformUtils.navBar.contentPaddingTop,
-    paddingBottom: platformUtils.navBar.contentPaddingBottom,
+    paddingBottom: spacing.sm,
   },
 
   // === NAV ITEMS ===
@@ -56,6 +60,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     height: '100%', // Take full height
     paddingVertical: 0,
+    position: 'relative', // For top indicator
   },
 
   // === NAV LABELS ===
@@ -74,6 +79,16 @@ export const styles = StyleSheet.create({
     fontWeight: '600' as const,
   },
 
+  // === ACTIVE TOP INDICATOR ===
+  topIndicator: {
+    position: 'absolute',
+    top: 0,
+    height: 3,
+    width: 35,
+    borderRadius: 2,
+    backgroundColor: colors.green,
+  },
+
   // === SPECIAL BUTTON (CENTER GROUPS BUTTON) ===
   specialNavItem: {
     alignItems: 'center',
@@ -85,22 +100,21 @@ export const styles = StyleSheet.create({
     width: platformUtils.navBar.specialButtonSize,
     height: platformUtils.navBar.specialButtonSize,
     borderRadius: platformUtils.navBar.specialButtonSize / 2,
-    backgroundColor: colors.green,
     justifyContent: 'center',
     alignItems: 'center',
-    // Platform-specific shadow for special button
+    // Custom drop shadow for special button
     ...Platform.select({
       ios: {
-        shadowColor: colors.green,
+        shadowColor: '#A5EA15', // rgba(165, 234, 21, 1)
         shadowOffset: {
           width: 0,
-          height: 2,
+          height: 5,
         },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
+        shadowOpacity: 0.2,
+        shadowRadius: 29.808,
       },
       android: {
-        elevation: 5,
+        elevation: 8, // Higher elevation for stronger shadow effect
       },
     }),
     marginBottom: 0, // Remove margin for better alignment
@@ -108,7 +122,7 @@ export const styles = StyleSheet.create({
   specialButtonImage: {
     width: platformUtils.iconSizes.specialButtonIcon,
     height: platformUtils.iconSizes.specialButtonIcon,
-    tintColor: colors.black,
+    tintColor: colors.white,
     resizeMode: 'contain' as const,
   },
   navIcon: {

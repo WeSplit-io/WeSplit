@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Image } from 'react-native';
+import { colors } from '../theme';
 
 // Image mapping for group categories
 const GROUP_IMAGES: { [key: string]: any } = {
@@ -12,14 +13,12 @@ const GROUP_IMAGES: { [key: string]: any } = {
 
 interface GroupIconProps {
   category: string;
-  color: string;
   size?: number;
   style?: any;
 }
 
 const GroupIcon: React.FC<GroupIconProps> = ({ 
   category, 
-  color, 
   size = 40,
   style 
 }) => {
@@ -34,8 +33,8 @@ const GroupIcon: React.FC<GroupIconProps> = ({
         {
           width: size,
           height: size,
-          borderRadius: size * 0.25, // 25% of size for rounded corners
-          backgroundColor: color,
+          borderRadius: 8, // Fixed border radius for design consistency
+          backgroundColor: '#404040', // Dark gray background as shown in design
           alignItems: 'center',
           justifyContent: 'center',
         },
@@ -48,6 +47,7 @@ const GroupIcon: React.FC<GroupIconProps> = ({
           width: size * 0.5, // 50% of container size
           height: size * 0.5,
           resizeMode: 'contain',
+          tintColor: colors.white, // Apply white tint to make icons white
         }}
       />
     </View>

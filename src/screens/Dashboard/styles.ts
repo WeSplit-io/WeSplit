@@ -41,12 +41,7 @@ export const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: spacing.bottomNavSpace,
   },
-  
-  // Status bar spacing (iOS)
-  statusBar: {
-    height: spacing.profileImageSize,
-    backgroundColor: BG_COLOR,
-  },
+
 
   // === HEADER SECTION ===
   // Main header containing user info and notifications
@@ -101,24 +96,11 @@ export const styles = StyleSheet.create({
   
   // Bell icon styling
   bellIcon: {
-    width: 25,
-    height: 25,
+    width: 23,
+    height: 23,
     color: colors.white,
   },
   
-  // Red notification dot on bell icon
-  bellDot: {
-    position: 'absolute',
-    top: spacing.xs + spacing.xs / 2,
-    right: spacing.xs + spacing.xs / 2,
-    width: spacing.bellDotSize,
-    height: spacing.bellDotSize,
-    borderRadius: spacing.bellDotRadius,
-    backgroundColor: colors.green,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.textLight,
-  },
-
   // Notification badge indicator (green dot)
   bellBadge: {
     position: 'absolute',
@@ -130,13 +112,6 @@ export const styles = StyleSheet.create({
     height: 14,
     borderWidth: 2,
     borderColor: colors.darkBackground,
-  },
-
-  // Text inside notification badge
-  bellBadgeText: {
-    color: colors.black,
-    fontSize: 11,
-    fontWeight: 'bold',
   },
 
   // === BALANCE CARD (MAIN FOCAL POINT) ===
@@ -200,11 +175,6 @@ export const styles = StyleSheet.create({
     color: colors.textLight,
     marginTop: spacing.md,
     fontSize: typography.fontSize.md,
-  },
-  activityIndicator: {
-    color: colors.white,
-    fontSize: typography.fontSize.xs,
-    marginLeft: spacing.sm,
   },
   inactiveText: {
     color: colors.textSecondary,
@@ -338,23 +308,10 @@ export const styles = StyleSheet.create({
   
   // === ACTION BUTTON ICONS & TEXT ===
   // Icon inside action button (default)
-  actionButtonIcon: {
-    width: 30,
-    height: 30,
-    tintColor: colors.textLight,
-  },
-  
   // Icon without tint to preserve original colors
   actionButtonIconNoTint: {
     width: 32,
     height: 32,
-  },
-  
-  // Icon for request button (dark on green)
-  actionButtonIconRequest: {
-    width: 24,
-    height: 24,
-    tintColor: BG_COLOR,
   },
   
   // Label text below action buttons
@@ -369,20 +326,28 @@ export const styles = StyleSheet.create({
   // Container for the more menu dropdown
   moreMenuContainer: {
     position: 'absolute',
-    top: 80,
-    right: 0,
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.md,
+    top: 160,
+    right: 20,
+    backgroundColor: '#121D1F',
+    borderRadius: 15,
     padding: spacing.sm,
-    minWidth: 160,
+    minWidth: 230,
+    // Border to simulate inset shadow effect (same as actionButtonCircle)
     borderWidth: 1,
-    borderColor: colors.white10,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.15)',
+    borderRightColor: 'rgba(10, 138, 90, 0.15)',
+    borderBottomColor: 'rgba(10, 138, 90, 0.15)',
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 8,
     zIndex: 1000,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
   },
 
   // Individual menu item
@@ -394,13 +359,8 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: 10,
     marginBottom: spacing.xs,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    // Border to simulate inset shadow effect (same as actionButtonCircle)
-    borderWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.15)',
-    borderLeftColor: 'rgba(255, 255, 255, 0.15)',
-    borderRightColor: 'rgba(10, 138, 90, 0.15)',
-    borderBottomColor: 'rgba(10, 138, 90, 0.15)',
+    backgroundColor: 'transparent',
+    minHeight: 44, // Minimum touch target size
   },
 
   // Text in menu item
@@ -411,6 +371,13 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
 
+  // Chevron icon in menu item
+  moreMenuChevron: {
+    width: 16,
+    height: 16,
+    tintColor: colors.white70,
+  },
+
   // Overlay to close menu when clicking outside
   moreMenuOverlay: {
     position: 'absolute',
@@ -418,13 +385,13 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 999,
+    zIndex: 998, // Lower than menu
   },
 
   // === REQUESTS SECTION ===
   // Container for requests list
   requestsSection: {
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
     marginBottom: spacing.lg,
   },
   
@@ -433,108 +400,6 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.medium,
-  },
-  
-  // Individual request card
-  requestCard: {
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.radiusMd,
-    padding: spacing.md,
-    marginBottom: spacing.itemSpacing,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-  },
-  
-  // Header of a request card (from user, amount, send button)
-  requestHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  
-  // Info about the request (from user, amount)
-  requestInfo: {
-    flex: 1,
-  },
-  
-  // Name of the user who sent the request
-  requestFromUser: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    marginBottom: spacing.xs,
-  },
-  
-  // Amount of the request
-  requestAmount: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-  },
-  
-  // Button to send the request
-  requestSendButton: {
-    backgroundColor: GREEN,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: spacing.radiusSm,
-  },
-  
-  // Text on the send request button
-  requestSendButtonText: {
-    color: BG_COLOR,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-  },
-  
-  // Message from the request sender
-  requestMessage: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.normal,
-  },
-  
-  // Individual request item (new style for mockup)
-  requestItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.white10,
-    borderRadius: spacing.md,
-    padding: spacing.md,
-    borderWidth: 1.5,
-    borderColor: colors.white50,
-  },
-  
-  // Request avatar
-  requestAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.darkCard,
-    marginRight: spacing.md,
-  },
-  
-  // Request details container
-  requestDetails: {
-    flex: 1,
-  },
-  
-  // Request name
-  requestName: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    marginBottom: spacing.xs / 2,
-  },
-  
-  // Request date
-  requestDate: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.normal,
   },
   
   // Empty requests state
@@ -556,18 +421,16 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
     marginBottom: spacing.md,
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.lg,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.md,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.white50,
   },
   
   // Request avatar for new design
   requestAvatarNew: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 10,
     backgroundColor: colors.primaryGreen,
     marginRight: spacing.md,
     justifyContent: 'center',
@@ -580,23 +443,9 @@ export const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: colors.primaryGreen + '10',
-    marginRight: spacing.md,
+    marginRight: spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  
-  // Request avatar image
-  requestAvatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  
-  // Transaction icon
-  transactionIcon: {
-    width: 24,
-    height: 24,
-    tintColor: colors.white,
   },
   
   // Request content container
@@ -609,14 +458,14 @@ export const styles = StyleSheet.create({
   requestSenderName: {
     color: colors.white,
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: typography.fontWeight.medium,
     marginBottom: spacing.xs / 2,
   },
   
   // Request message with amount
   requestMessageWithAmount: {
     color: colors.textLight,
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.normal,
     marginBottom: spacing.xs / 2,
   },
@@ -624,7 +473,7 @@ export const styles = StyleSheet.create({
   // Request amount in green
   requestAmountGreen: {
     color: GREEN,
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
   },
   
@@ -640,7 +489,7 @@ export const styles = StyleSheet.create({
     backgroundColor: GREEN,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: spacing.radiusRound,
+    borderRadius: 10,
     minWidth: 80,
     alignItems: 'center',
     justifyContent: 'center',
@@ -648,7 +497,7 @@ export const styles = StyleSheet.create({
   
   // Send button text
   requestSendButtonTextNew: {
-    color: colors.black,
+    color: colors.white,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
   },
@@ -688,7 +537,7 @@ export const styles = StyleSheet.create({
   // === GROUPS SECTION ===
   // Container for groups list
   groupsSection: {
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
     marginBottom: spacing.xl,
   },
   
@@ -714,192 +563,104 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.normal,
   },
   
-  // Grid layout for groups
+  // Grid layout for groups (full-width vertical layout)
   groupsGrid: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: spacing.md,
+    alignItems: 'stretch',
   },
   
-  // Individual group card in grid
-  groupGridCard: {
-    width: 280,
-    borderRadius: spacing.lg,
-    padding: 18,
-    minHeight: 140,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  
-  // Group card background gradient
-  groupGridCardGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: spacing.lg,
-    backgroundColor: '#A5EA15', // Start color of the gradient
-  },
-  
-  // Group card gradient overlay for darker effect
-  groupGridCardGradientOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: spacing.lg,
-  },
-  
-  // Group card background image
-  groupGridCardImage: {
-    position: 'absolute',
-    top: spacing.xs,
-    right: spacing.xs,
-    width: 60,
-    height: 60,
-    opacity: 1,
-    zIndex: -1,
-  },
-  
-  // Left grid card (with special positioning)
-  groupGridCardLeft: {
-    marginRight: spacing.sm / 2,
-  },
-  
-  // Right grid card (with special positioning)
-  groupGridCardRight: {
-    marginLeft: spacing.sm / 2,
-  },
-  
-  // Header of group grid card
-  groupGridHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  
-  // Icon container in group grid
-  groupGridIcon: {
-    width: 40,
-    height: 40 ,
-    backgroundColor: colors.white,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  
-  // Icon SVG in group grid
-  groupGridIconSvg: {
-    width: 20,
-    height: 20,
-    tintColor: colors.black,
-  },
-  
-  // Amount container in group grid
-  groupGridAmountContainer: {
+  // Full-width group card (matches design with horizontal layout)
+  groupGridCardFullWidth: {
+    width: '100%',
+    backgroundColor: colors.white5,
+    borderRadius: 16,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 10,
   },
+  
+  // Container for group name and role
+  groupGridNameContainer: {
+    flexDirection: 'column',
+    flex: 1,
+    marginLeft: 0, // Remove left margin for horizontal layout
+  },
+  
   balanceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
   },
   
-  // USDC logo
-  usdcLogo: {
-    width: 20,
-    height: 20,
-  },
-  
-  // USDC logo for balance display
-  balanceUsdcLogo: {
-    width: 35,
-    height: 35,
-    marginRight: 4,
-
-  },
-  
-  // Amount text in group grid
-  groupGridAmount: {
-    color: colors.black,
-    fontSize: 22,
-    fontWeight: typography.fontWeight.bold,
-  },
-  
   // Group name in grid
   groupGridName: {
-    color: colors.black,
-    fontSize: 22,
+    color: colors.white,
+    fontSize: 18,
     fontWeight: typography.fontWeight.bold,
-    marginBottom: spacing.sm,
+    marginBottom: 4, // Smaller margin for horizontal layout
   },
   
   // Role container in group grid
   groupGridRoleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
     gap: spacing.xs,
   },
   
   // Role icon in group grid
   groupGridRoleIcon: {
-    marginRight: spacing.xs,
+    width: 16,
+    height: 16,
+    marginRight: 0, // Remove marginRight since we use gap in parent
+    flexShrink: 0, // Prevent icon from shrinking
+    tintColor: colors.white70, // Apply tint color like the Icon component
   },
   
-  // Role text in group grid
+  // Role text in group grid  
   groupGridRole: {
-    color: colors.black,
-    fontSize: 16,
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.normal,
   },
   
-  // Member avatars container
+  // Member avatars container (horizontal layout)
   memberAvatars: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 0, // Don't take up flex space
   },
   
-  // Individual member avatar
+  // Empty member avatars container
+  memberAvatarsEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  // Individual member avatar (overlapping style)
   memberAvatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.black,
-    marginRight: -spacing.xs,
-    borderWidth: 2,
-    borderColor: colors.green,
+    backgroundColor: colors.white10,
+    marginLeft: -8, // Negative margin for overlapping effect
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  
-  // Member avatar image
-  memberAvatarImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  
-  // Member avatar text (fallback)
-  memberAvatarText: {
-    color: colors.white,
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
+    overflow: 'hidden',
   },
   
   // More members indicator (+4)
   memberAvatarMore: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 14,
     backgroundColor: colors.black,
+    marginLeft: -8,
+    borderWidth: 2,
+    borderColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: spacing.xs,
   },
   
   // Text inside more members indicator
@@ -909,17 +670,10 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
   },
   
-  // Group grid navigation arrow
-  groupGridArrow: {
-    position: 'absolute',
-    bottom: 18,
-    right: 18,
-  },
-  
   // Empty state for groups when no groups exist
   emptyState: {
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.md,
   },
   
   // Text for the empty state
@@ -940,9 +694,9 @@ export const styles = StyleSheet.create({
   
   // Button to create a new group
   createGroupButton: {
-    backgroundColor: GREEN,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
     borderRadius: spacing.radiusMd,
   },
   
@@ -952,78 +706,17 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
   },
-  
-  // Individual group card
-  groupCard: {
-    backgroundColor: colors.darkCard,
+
+  // Gradient wrapper for the CTA button
+  createGroupButtonGradient: {
     borderRadius: spacing.radiusMd,
-    marginBottom: spacing.itemSpacing,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-  },
-  
-  // Content of a group card (name, members, amounts)
-  groupCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
-    padding: spacing.md,
+    justifyContent: 'center',
   },
   
-  // Info about the group (name, members)
-  groupInfo: {
-    flex: 1,
-  },
   
-  // Name of the group
-  groupName: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    marginBottom: spacing.xs,
-  },
-  
-  // Number of members in the group
-  groupMembers: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.normal,
-  },
-  
-  // Amounts displayed for the group (USD, Crypto)
-  groupAmounts: {
-    alignItems: 'flex-end',
-  },
-  
-  // USD amount for the group
-  groupUSDAmount: {
-    color: GREEN,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    marginBottom: spacing.xs,
-  },
-  
-  // Crypto amount for the group
-  groupCryptoAmount: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.normal,
-  },
-  connectWalletButton: {
-    backgroundColor: colors.white,
-    borderRadius: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginTop: spacing.sm,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  connectWalletButtonText: {
-    color: colors.black,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
-  },
 
 
 }); 

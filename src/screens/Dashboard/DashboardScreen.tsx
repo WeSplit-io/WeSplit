@@ -11,6 +11,7 @@ import {
   Alert,
   StyleSheet,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -28,11 +29,14 @@ import { useWallet } from '../../context/WalletContext';
 import { useGroupList } from '../../hooks/useGroupData';
 import { GroupWithDetails, Expense, GroupMember, Transaction } from '../../types';
 import { formatCryptoAmount } from '../../utils/cryptoUtils';
+// Static image imports to avoid Metro dynamic require resolution issues
+import awardIcon from '../../../assets/award-icon.png';
+import userIcon from '../../../assets/user-icon.png';
 import { getTotalSpendingInUSDC } from '../../services/priceService';
 import { getUserNotifications } from '../../services/firebaseNotificationService';
 import { createPaymentRequest, getReceivedPaymentRequests } from '../../services/firebasePaymentRequestService';
 import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
-import { firebaseTransactionService } from '../../services/firebaseDataService';
+import { firebaseTransactionService, firebaseDataService } from '../../services/firebaseDataService';
 import { generateProfileLink } from '../../services/deepLinkHandler';
 
 // Avatar component with loading state and error handling
@@ -67,7 +71,7 @@ const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, disp
   if (!hasValidAvatar) {
     return (
       <View style={[style, { backgroundColor: colors.brandGreen, alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.darkBackground }}>
+        <Text style={{ fontSize: 14, fontWeight: 'medium', color: colors.white }}>
           {displayName.charAt(0).toUpperCase()}
         </Text>
       </View>
@@ -126,11 +130,14 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   // Use efficient group list hook
   const {
-    groups,
+    groups: originalGroups,
     loading: groupsLoading,
     refreshing,
     refresh: refreshGroups
   } = useGroupList();
+
+  // Use only dynamic groups from context
+  const groups = originalGroups;
 
   // Load groups when screen comes into focus
   useFocusEffect(
@@ -335,7 +342,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                   try {
                     console.log('User chose to create new wallet');
                     // Call the new wallet creation method
-                    const newWalletResult = await userWalletService.createNewWalletForUnrecoverableUser(currentUser.id.toString());
+                    const newWalletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
 
                     if (newWalletResult.success && newWalletResult.wallet) {
                       // Update user context with new wallet
@@ -437,6 +444,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       for (const group of groups) {
         try {
           let totalUSD = 0;
+
+          // Dynamic groups only – no test pool overrides
 
           // Check if we have expenses_by_currency data
           if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency) && group.expenses_by_currency.length > 0) {
@@ -605,7 +614,78 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         return dateB - dateA; // Latest first
       });
 
+      
+      // Enrich requests with sender avatars if missing
+      try {
+        const senderIds = Array.from(new Set(
+          allRequests
+            .map(r => r.data?.senderId)
+            .filter((id: any) => id !== undefined && id !== null)
+            .map((id: any) => String(id))
+        ));
 
+        if (senderIds.length > 0) {
+          const profiles = await Promise.all(
+            senderIds.map(async (id) => {
+              try {
+                const profile = await firebaseDataService.user.getCurrentUser(id);
+                return { id, avatar: profile?.avatar || '' };
+              } catch (e) {
+                return { id, avatar: '' };
+              }
+            })
+          );
+
+          const idToAvatar: Record<string, string> = {};
+          profiles.forEach(p => { idToAvatar[p.id] = p.avatar; });
+
+          allRequests.forEach(r => {
+            if (!r.data) r.data = {};
+            const sid = r.data.senderId ? String(r.data.senderId) : undefined;
+            const existing = r.data.senderAvatar && r.data.senderAvatar.trim() !== '';
+            if (!existing && sid && idToAvatar[sid]) {
+              r.data.senderAvatar = idToAvatar[sid];
+            }
+          });
+        }
+
+        // Fallback: for any remaining without avatar, try group members
+        const requestsNeedingAvatar = allRequests.filter(r => !r.data?.senderAvatar || r.data.senderAvatar.trim() === '');
+        const groupIds = Array.from(new Set(
+          requestsNeedingAvatar
+            .map(r => r.data?.groupId)
+            .filter((gid: any) => gid !== undefined && gid !== null)
+            .map((gid: any) => String(gid))
+        ));
+
+        if (groupIds.length > 0) {
+          // fetch members for each group once
+          const groupMembersEntries = await Promise.all(groupIds.map(async (gid) => {
+            try {
+              const members = await firebaseDataService.group.getGroupMembers(gid);
+              return [gid, members] as const;
+            } catch (e) {
+              return [gid, []] as const;
+            }
+          }));
+
+          const groupIdToMembers: Record<string, any[]> = {};
+          groupMembersEntries.forEach(([gid, members]) => { groupIdToMembers[gid] = Array.isArray(members) ? [...members] : []; });
+
+          requestsNeedingAvatar.forEach(r => {
+            const gid = r.data?.groupId ? String(r.data.groupId) : undefined;
+            const sid = r.data?.senderId ? String(r.data.senderId) : undefined;
+            if (!gid || !sid) return;
+            const members = groupIdToMembers[gid] || [];
+            const m = members.find((mm: any) => String(mm.id) === sid || String(mm.user_id) === sid);
+            if (m && m.avatar && m.avatar.trim() !== '') {
+              r.data.senderAvatar = m.avatar;
+            }
+          });
+        }
+      } catch (e) {
+        console.log('⚠️ Dashboard: Could not enrich sender avatars:', e);
+      }
 
       console.log('✅ Dashboard: Payment requests loaded successfully:', allRequests.length);
       console.log('📋 Dashboard: Final requests:', allRequests.map(r => ({
@@ -648,6 +728,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   // Improved group summary for dashboard display
   const getGroupSummary = useCallback((group: GroupWithDetails) => {
+    // Dynamic groups only – no special casing
     try {
       let totalAmount = 0;
       let memberCount = 0;
@@ -1282,7 +1363,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         <TouchableOpacity
           style={styles.moreMenuOverlay}
           activeOpacity={1}
-          onPress={() => setMoreMenuVisible(false)}
+          onPress={() => {
+            console.log('🔄 Dashboard: Overlay clicked - closing menu');
+            setMoreMenuVisible(false);
+          }}
         />
       )}
 
@@ -1388,7 +1472,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           )}
 
           {/* Wallet Address with Copy Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.walletAddressContainer}
             onPress={() => copyWalletAddress(appWalletAddress || currentUser?.wallet_address || '')}
           >
@@ -1478,7 +1562,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => setMoreMenuVisible(!moreMenuVisible)}
+              onPress={() => {
+                console.log('🔄 Dashboard: Opening more menu');
+                setMoreMenuVisible(!moreMenuVisible);
+              }}
             >
               <View style={styles.actionButtonCircle}>
                 <Image
@@ -1492,52 +1579,13 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               <Text style={styles.actionButtonText}>More</Text>
             </TouchableOpacity>
           </View>
-
-          {/* More Menu Dropdown */}
-          {moreMenuVisible && (
-            <View style={styles.moreMenuContainer}>
-              <TouchableOpacity
-                style={styles.moreMenuItem}
-                onPress={() => {
-                  setMoreMenuVisible(false);
-                  navigation.navigate('WithdrawAmount');
-                }}
-              >
-                <Text style={styles.moreMenuText}>Withdraw</Text>
-                <Icon name="chevron-right" size={16} color={colors.white70} />
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.moreMenuItem}
-                onPress={() => {
-                  setMoreMenuVisible(false);
-                  // Add other action here
-                  Alert.alert('Coming Soon', 'This feature will be available soon!');
-                }}
-              >
-                <Text style={styles.moreMenuText}>Transfer</Text>
-                <Icon name="chevron-right" size={16} color={colors.white70} />
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.moreMenuItem}
-                onPress={() => {
-                  setMoreMenuVisible(false);
-                  // Add other action here
-                  Alert.alert('Coming Soon', 'This feature will be available soon!');
-                }}
-              >
-                <Text style={styles.moreMenuText}>Exchange</Text>
-                <Icon name="chevron-right" size={16} color={colors.white70} />
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
 
-        {/* Splits Section */}
+
+        {/* Pools Section */}
         <View style={styles.groupsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Splits</Text>
+            <Text style={styles.sectionTitle}>Pools</Text>
             <TouchableOpacity onPress={() => navigation.navigate('SplitsList')}>
               <Text style={styles.seeAllText}>See all</Text>
             </TouchableOpacity>
@@ -1550,16 +1598,20 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               <TouchableOpacity
                 style={styles.createGroupButton}
                 onPress={() => navigation.navigate('BillCamera')}
+                activeOpacity={0.9}
               >
-                <Text style={styles.createGroupButtonText}>Capture Your First Bill</Text>
+                <LinearGradient
+                  colors={[colors.gradientStart, colors.gradientEnd]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.createGroupButtonGradient}
+                >
+                  <Text style={styles.createGroupButtonText}>Split your First Bill</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.groupsGrid}
-            >
+            <View style={styles.groupsGrid}>
               {groups
                 .sort((a, b) => {
                   // Sort by highest USD value first (same as GroupsList)
@@ -1576,95 +1628,66 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                     return (
                       <TouchableOpacity
                         key={group.id}
-                        style={[
-                          styles.groupGridCard,
-                          index === 0 ? styles.groupGridCardLeft : styles.groupGridCardRight
-                        ]}
+                        style={styles.groupGridCardFullWidth}
                         onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
                       >
-                        {/* Background */}
-                        <View style={styles.groupGridCardGradient} />
-                        <View style={styles.groupGridCardGradientOverlay} />
-                        <View style={styles.groupGridHeader}>
-                          <GroupIcon
-                            category={group.category || 'trip'}
-                            color={group.color || '#A5EA15'}
-                            size={40}
-                          />
-                          {/* Show USD-converted total */}
-                          <View style={styles.groupGridAmountContainer}>
+                        {/* Left: Icon */}
+                        <GroupIcon
+                          category={group.category || 'trip'}
+                          size={40}
+                        />
+                        
+                        {/* Center: Name and Role */}
+                        <View style={styles.groupGridNameContainer}>
+                          <Text style={styles.groupGridName}>{group.name}</Text>
+                          <View style={styles.groupGridRoleContainer}>
                             <Image
-                              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fusdc-logo-black.png?alt=media&token=2b33d108-f3aa-471d-b7fe-6166c53c1d56' }}
-                              style={styles.usdcLogo}
+                              source={isOwner ? require('../../../assets/award-icon.png') : require('../../../assets/user-icon.png')}
+                              style={styles.groupGridRoleIcon}
                             />
-                            <Text style={styles.groupGridAmount}>
-                              {(groupSummaries[group.id]?.totalAmount || groupAmountsInUSD[group.id] || 0).toFixed(2)}
+                            <Text style={styles.groupGridRole}>
+                              {isOwner ? 'Owner' : 'Member'}
                             </Text>
                           </View>
                         </View>
-                        <Text style={styles.groupGridName}>{group.name}</Text>
-                        <View style={styles.groupGridRoleContainer}>
-                          <Icon
-                            name={isOwner ? "award" : "users"}
-                            size={16}
-                            color={colors.black}
-                            style={styles.groupGridRoleIcon}
-                          />
-                          <Text style={styles.groupGridRole}>
-                            {isOwner ? 'Owner' : 'Member'}
-                          </Text>
-                        </View>
+
+                        {/* Right: Member Avatars */}
                         {summary.hasData ? (
                           <View style={styles.memberAvatars}>
-                            {/* Show member avatars */}
                             {group.members && group.members.slice(0, 3).map((member, i) => (
-                              <View key={`${member.id}-${i}`} style={styles.memberAvatar}>
-                                {member.avatar && member.avatar.trim() !== '' ? (
-                                  <Image
-                                    source={{ uri: member.avatar }}
-                                    style={styles.memberAvatarImage}
-                                  />
-                                ) : (
-                                  <Text style={styles.memberAvatarText}>
-                                    {((member.name || member.email || 'U') as string).charAt(0).toUpperCase()}
-                                  </Text>
-                                )}
-                              </View>
+                              <AvatarComponent
+                                key={`${member.id}-${i}`}
+                                avatar={member.avatar}
+                                displayName={(member.name || member.email || 'U') as string}
+                                style={styles.memberAvatar}
+                              />
                             ))}
-                            {summary.memberCount > 3 && (
-                              <View style={styles.memberAvatarMore}>
-                                <Text style={styles.memberAvatarMoreText}>
-                                  +{summary.memberCount - 3}
-                                </Text>
-                              </View>
-                            )}
-
+                          {summary.memberCount > 3 && (
+                            <View style={styles.memberAvatarMore}>
+                              <Text style={styles.memberAvatarMoreText}>
+                                +{summary.memberCount - 3}
+                              </Text>
+                            </View>
+                          )}
                           </View>
                         ) : (
-                          <View style={styles.memberAvatars}>
-                            <Text style={styles.inactiveText}>No activity yet</Text>
+                          <View style={styles.memberAvatarsEmpty}>
+                            <Text style={styles.inactiveText}>No activity</Text>
                           </View>
                         )}
-                        {/* Navigation arrow */}
-                        <View style={styles.groupGridArrow}>
-                          <Icon name="chevron-right" size={20} color={colors.black} />
-                        </View>
                       </TouchableOpacity>
                     );
                   } catch (error) {
                     console.error(`Error rendering group ${group.id}:`, error);
                     // Return a placeholder if there's an error with this group
                     return (
-                      <View key={group.id} style={[
-                        styles.groupGridCard,
-                        index === 0 ? styles.groupGridCardLeft : styles.groupGridCardRight
-                      ]}>
+                      <View key={group.id} style={styles.groupGridCardFullWidth}>
                         <Text style={styles.errorText}>Error loading group</Text>
                       </View>
                     );
                   }
                 })}
-            </ScrollView>
+            </View>
           )}
         </View>
 
@@ -1696,18 +1719,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
                   return (
                     <View key={request.id || index} style={styles.requestItemNew}>
-                      <View style={styles.requestAvatarNew}>
-                        {senderAvatar && senderAvatar.trim() !== '' ? (
-                          <Image
-                            source={{ uri: senderAvatar }}
-                            style={styles.requestAvatarImage}
-                          />
-                        ) : (
-                          <Text style={styles.balanceAmountText}>
-                            {(senderName || 'U').charAt(0).toUpperCase()}
-                          </Text>
-                        )}
-                      </View>
+                      <AvatarComponent
+                        avatar={senderAvatar || ''}
+                        displayName={senderName || 'U'}
+                        style={styles.requestAvatarNew}
+                      />
                       <View style={styles.requestContent}>
                         <Text style={styles.requestMessageWithAmount}>
                           <Text style={styles.requestSenderName}>{senderName}</Text> requested a payment of{' '}
@@ -1715,9 +1731,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                             {amount.toFixed(1)} USDC
                           </Text>
                         </Text>
-                        <Text style={styles.requestSource}>
-                          from {source}
-                        </Text>
+                        
                       </View>
                       <TouchableOpacity
                         style={styles.requestSendButtonNew}
@@ -1779,6 +1793,57 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         </View>
 
       </ScrollView>
+
+      {/* More Menu Dropdown - Outside ScrollView */}
+      {moreMenuVisible && (
+        <View style={styles.moreMenuContainer}>
+          <TouchableOpacity
+            style={styles.moreMenuItem}
+            activeOpacity={0.7}
+            onPress={() => {
+              console.log('🚀 WITHDRAW BUTTON CLICKED!');
+              setMoreMenuVisible(false);
+              navigation.navigate('WithdrawAmount');
+            }}
+          >
+            <Text style={styles.moreMenuText}>Widthdraw</Text>
+            <Image
+              source={require('../../../assets/chevron-right.png')}
+              style={styles.moreMenuChevron}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.moreMenuItem}
+            onPress={() => {
+              setMoreMenuVisible(false);
+              // Add other action here
+              Alert.alert('Coming Soon', 'This feature will be available soon!');
+            }}
+          >
+            <Text style={styles.moreMenuText}>Link KAST card</Text>
+            <Image
+              source={require('../../../assets/chevron-right.png')}
+              style={styles.moreMenuChevron}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.moreMenuItem}
+            onPress={() => {
+              setMoreMenuVisible(false);
+              // Add other action here
+              Alert.alert('Coming Soon', 'This feature will be available soon!');
+            }}
+          >
+            <Text style={styles.moreMenuText}>Link external wallet</Text>
+            <Image
+              source={require('../../../assets/chevron-right.png')}
+              style={styles.moreMenuChevron}
+            />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Wallet Selector Modal */}
       <WalletSelectorModal
