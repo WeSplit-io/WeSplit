@@ -5,15 +5,90 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.black,
+    position: 'relative',
+  },
+  
+  navBarWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,  
+    bottom: 0,
+    zIndex: 9999,
   },
   
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     minHeight: 60,
+  },
+
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+
+  welcomeText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.normal,
+    marginBottom: spacing.xs,
+  },
+
+  userName: {
+    color: colors.white,
+    fontSize: typography.fontSize.xxxl,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.xs,
+  },
+
+  bellContainer: {
+    position: 'relative',
+    padding: spacing.sm,
+  },
+
+  bellIcon: {
+    width: 23,
+    height: 23,
+    color: colors.white,
+  },
+
+  priceLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+  },
+
+  priceLoadingText: {
+    color: colors.black,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    marginLeft: spacing.sm,
+  },
+
+  balanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    marginBottom: spacing.md,
+  },
+
+  walletAddressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+
+  copyIcon: {
+    width: 14,
+    height: 14,
+    tintColor: colors.white,
+    marginLeft: spacing.xs,
   },
   
   backButton: {
@@ -73,20 +148,20 @@ export const styles = StyleSheet.create({
   // === BALANCE CARD (MAIN FOCAL POINT) ===
   // Large green card displaying user's balance
   balanceCard: {
-    backgroundColor: colors.green,
     borderRadius: spacing.lg,
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
     marginTop: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     alignItems: 'flex-start',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     minHeight: spacing.balanceCardMinHeight,
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: spacing.xs },
     shadowOpacity: 0.1,
     shadowRadius: spacing.sm,
     elevation: 4,
+    overflow: 'hidden',
   },
   // Header row of balance card (label + QR icon)
   balanceHeader: {
@@ -94,14 +169,14 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    marginBottom: spacing.itemSpacing,
+    marginBottom: spacing.sm,
   },
   
   // "Your Balance" label
   balanceLabel: {
-    color: colors.black,
+    color: colors.white,
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.regular,
+    fontWeight: typography.fontWeight.light,
   },
   
   // QR code icon container
@@ -117,13 +192,14 @@ export const styles = StyleSheet.create({
   qrCodeImage: {
     width: 25,
     height: 25,
+    tintColor: colors.white,
   },
   
   // Large dollar amount display
   balanceAmount: {
-    color: colors.black,
+    color: colors.white,
     fontSize: typography.fontSize.hero,
-    fontWeight: typography.fontWeight.extrabold,
+    fontWeight: typography.fontWeight.bold,
     marginBottom: spacing.sm,
     letterSpacing: -2,
     lineHeight: typography.fontSize.hero + spacing.xs,
@@ -131,17 +207,18 @@ export const styles = StyleSheet.create({
   
   // Small limit text below amount
   balanceLimitText: {
-    color: colors.black,
-    fontSize: typography.fontSize.small,
+    color: colors.white,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.normal,
-    marginTop: spacing.xs,
     opacity: 0.8,
   },
   // === ACTION BUTTONS GRID ===
   // Container for action buttons below balance card
   actionsGrid: {
-    marginBottom: spacing.xxl,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.lg,
     marginTop: 0,
+    position: 'relative',
   },
   
   // Row containing all action buttons
@@ -149,6 +226,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.sm,
   },
   
   // Individual action button container
@@ -156,20 +234,27 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
+    minWidth: 80,
   },
   
   // === ACTION BUTTON CIRCLES ===
   // Circular button background (default style)
   actionButtonCircle: {
-    width: spacing.actionButtonSize,
-    height: spacing.actionButtonSize,
-    borderRadius: spacing.actionButtonRadius,
-    backgroundColor: colors.white10,
+    width: 60,
+    height: 60,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.sm,
     display: 'flex',
     position: 'relative',
+    // Border to simulate inset shadow effect
+    borderWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.15)',
+    borderRightColor: 'rgba(10, 138, 90, 0.15)',
+    borderBottomColor: 'rgba(10, 138, 90, 0.15)',
   },
   
   // === ACTION BUTTON ICONS & TEXT ===
@@ -177,7 +262,13 @@ export const styles = StyleSheet.create({
   actionButtonIcon: {
     width: 30,
     height: 30,
-    tintColor: colors.textLight,
+
+  },
+
+  // Icon inside action button (no tint)
+  actionButtonIconNoTint: {
+    width: 32,
+    height: 32,
   },
   
   // Icon for request button (dark on green)
@@ -190,14 +281,14 @@ export const styles = StyleSheet.create({
   // Label text below action buttons
   actionButtonText: {
     color: colors.white,
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
   },
   
   // Sections
   section: {
-    marginBottom: spacing.lg,
-    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    marginHorizontal: spacing.md,
   },
   
   sectionHeader: {
@@ -251,6 +342,177 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
+  // Row with two side-by-side mini cards
+  externalCardsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+
+  externalMiniCard: {
+    flex: 1,
+    backgroundColor: colors.white10,
+    borderRadius: spacing.radiusLg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.white50,
+  },
+
+  // Styles pour les cartes connectées (avec détails d'adresse)
+  externalMiniCardConnected: {
+    flex: 1,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.radiusLg,
+    padding: spacing.md,
+  },
+
+  // Styles pour les cartes non-connectées (design centré simple)
+  externalMiniCardSimple: {
+    flex: 1,
+    backgroundColor: colors.white10,
+    borderRadius: spacing.radiusLg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.white50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  externalMiniCardLeft: {},
+  externalMiniCardRight: {},
+
+  externalMiniHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+
+  externalMiniIcon: {
+    width: 15,
+    height: 15,
+    tintColor: colors.white70,
+  },
+
+  externalMiniTitle: {
+    color: colors.white70,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.normal,
+  },
+
+  externalMiniBodyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+
+  externalMiniAddress: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.medium,
+  },
+
+  externalMiniCopyIcon: {
+    width: 14,
+    height: 14,
+    tintColor: colors.white70,
+  },
+
+  externalMiniFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  externalMiniProvider: {
+    color: colors.white50,
+    fontSize: typography.fontSize.sm,
+  },
+
+  kastIconBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    backgroundColor: colors.black,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: spacing.sm,
+
+  },
+  kastIconBoxSmall: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    backgroundColor: colors.black,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+
+  kastIconText: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+  },
+
+  kastCardText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+  },
+
+  // Styles for link wallet state
+  linkWalletBodyRow: {
+    marginBottom: spacing.md,
+  },
+
+  linkWalletMainText: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.medium,
+  },
+
+  linkWalletFooterRow: {
+    justifyContent: 'flex-start',
+  },
+
+  linkWalletSubText: {
+    color: colors.white50,
+    fontSize: typography.fontSize.sm,
+  },
+
+  // Styles pour les cartes de lien simple
+  linkCardIconContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+
+  linkCardIcon: {
+    width: 30,
+    height: 30,
+    tintColor: colors.white70,
+  },
+
+  linkCardText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.normal,
+    textAlign: 'center',
+  },
+
+  kastIconImage: {
+    width: 30,
+    height: 30,
+  },
+  kastIconImageSmall: {
+    width: 20,
+    height: 20,
+    marginBottom: 0,
+  },
+
   externalWalletAddress: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -293,9 +555,9 @@ export const styles = StyleSheet.create({
   
   // Options
   optionsContainer: {
-    marginBottom: spacing.lg,
-    marginHorizontal: spacing.lg,
-    backgroundColor: colors.white10,
+    marginBottom: spacing.xxl,
+    marginHorizontal: spacing.md,
+    backgroundColor: colors.white5,
     padding: spacing.md,
     borderRadius: spacing.radiusMd,
     gap: 10,
@@ -409,11 +671,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
     marginBottom: spacing.sm,
-    backgroundColor: colors.darkCard,
-    borderRadius: spacing.radiusMd,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.md,
     padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.white50,
   },
   
   transactionAvatarNew: {
@@ -429,7 +689,6 @@ export const styles = StyleSheet.create({
   transactionIcon: {
     width: 20,
     height: 20,
-    tintColor: colors.black,
   },
 
   transactionDetails: {
@@ -527,7 +786,7 @@ export const styles = StyleSheet.create({
   
   // Seed Phrase Styles
   instructionsContainer: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
     marginTop: spacing.md, // réduit l'écart vertical
     marginBottom: spacing.sm, // ajoute un petit espace sous les instructions

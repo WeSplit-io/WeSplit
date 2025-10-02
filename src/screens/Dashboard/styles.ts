@@ -243,6 +243,8 @@ export const styles = StyleSheet.create({
     width: 14,
     height: 14,
     tintColor: colors.white,
+    marginLeft: spacing.xs,
+
   },
   
   // === LOADING STATES ===
