@@ -11,7 +11,7 @@ import { colors } from '../theme/colors';
 
 export interface NotificationData {
   id: string;
-  type: 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'payment_reminder' | 'general' | 'expense_added' | 'group_invite' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification';
+  type: 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'payment_reminder' | 'general' | 'expense_added' | 'group_invite' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'group_payment_sent' | 'group_payment_received' | 'split_completed' | 'degen_all_locked' | 'degen_ready_to_roll' | 'roulette_result' | 'contact_added';
   title: string;
   message: string;
   created_at: string;
@@ -38,6 +38,13 @@ export interface NotificationData {
     status?: string;
     warningType?: string;
     severity?: string;
+    splitWalletId?: string;
+    billName?: string;
+    loserId?: string;
+    loserName?: string;
+    addedByName?: string;
+    addedAt?: string;
+    type?: string;
   };
 }
 
@@ -176,6 +183,31 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Finfo-icon.png?alt=media&token=4322bde0-8be0-43bd-aed8-a1c250f93853' };
     }
     
+    // For money sent/received, use wallet icon
+    if (notification.type === 'money_sent' || notification.type === 'money_received') {
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' };
+    }
+    
+    // For group payment sent/received, use user icon
+    if (notification.type === 'group_payment_sent' || notification.type === 'group_payment_received') {
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
+    }
+    
+    // For split completed, use award icon
+    if (notification.type === 'split_completed') {
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Faward-icon.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' };
+    }
+    
+    // For degen split notifications, use dice icon
+    if (notification.type === 'degen_all_locked' || notification.type === 'degen_ready_to_roll' || notification.type === 'roulette_result') {
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fdice-icon.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' };
+    }
+    
+    // For contact added, use user icon
+    if (notification.type === 'contact_added') {
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
+    }
+    
     // Default fallback
     return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
   };
@@ -207,6 +239,24 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
         return '#FF6B6B';
       case 'system_notification':
         return '#45B7D1';
+      case 'money_sent':
+        return '#A5EA15';
+      case 'money_received':
+        return '#A5EA15';
+      case 'group_payment_sent':
+        return '#A5EA15';
+      case 'group_payment_received':
+        return '#A5EA15';
+      case 'split_completed':
+        return '#A5EA15';
+      case 'degen_all_locked':
+        return '#FF6B6B';
+      case 'degen_ready_to_roll':
+        return '#A5EA15';
+      case 'roulette_result':
+        return '#A5EA15';
+      case 'contact_added':
+        return '#A5EA15';
       default:
         return '#A89B9B';
     }
@@ -307,6 +357,78 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
           disabled: false,
           backgroundColor: colors.green,
           textColor: colors.black
+        };
+      case 'money_sent':
+        return {
+          show: true,
+          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'money_received':
+        return {
+          show: true,
+          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'group_payment_sent':
+        return {
+          show: true,
+          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'group_payment_received':
+        return {
+          show: true,
+          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'split_completed':
+        return {
+          show: true,
+          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'degen_all_locked':
+        return {
+          show: true,
+          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'degen_ready_to_roll':
+        return {
+          show: true,
+          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'roulette_result':
+        return {
+          show: true,
+          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'contact_added':
+        return {
+          show: true,
+          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
         };
       default:
         return {

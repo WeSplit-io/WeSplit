@@ -912,7 +912,11 @@ class InternalTransferService {
     groupId?: string;
   }): Promise<void> {
     try {
-      const { firebaseTransactionService } = await import('../services/firebaseDataService');
+      const { firebaseTransactionService, firebaseDataService } = await import('../services/firebaseDataService');
+      
+      // Find recipient user by wallet address to get their user ID
+      const recipientUser = await firebaseDataService.user.getUserByWalletAddress(transactionData.toAddress);
+      const recipientUserId = recipientUser ? recipientUser.id.toString() : transactionData.toAddress; // Fallback to address if no user found
       
       const transaction = {
         id: transactionData.signature,
@@ -920,7 +924,7 @@ class InternalTransferService {
         amount: transactionData.amount,
         currency: transactionData.currency,
         from_user: transactionData.userId,
-        to_user: transactionData.toAddress,
+        to_user: recipientUserId, // Use user ID instead of wallet address
         from_wallet: '', // Will be filled by the service
         to_wallet: transactionData.toAddress,
         tx_hash: transactionData.signature,
@@ -934,7 +938,12 @@ class InternalTransferService {
       };
 
       await firebaseTransactionService.createTransaction(transaction);
-      logger.info('Transaction saved to Firebase', { signature: transactionData.signature }, 'InternalTransferService');
+      logger.info('Transaction saved to Firebase', { 
+        signature: transactionData.signature,
+        from_user: transactionData.userId,
+        to_user: recipientUserId,
+        to_wallet: transactionData.toAddress
+      }, 'InternalTransferService');
 
       // Send notification to recipient
       await this.sendReceivedFundsNotification(transactionData);

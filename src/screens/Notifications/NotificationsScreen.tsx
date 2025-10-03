@@ -316,8 +316,9 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             });
             console.log('🔍 DEBUG: Successfully navigated to SendAmount screen');
             
-            // Delete the notification after successful navigation
-            await deleteNotification(notificationId);
+            // Mark notification as in progress but don't delete it yet
+            // It will be deleted when the payment process is completed
+            console.log('🔍 DEBUG: Payment request notification marked as in progress, will be deleted after payment completion');
             
           } catch (navError) {
             console.log('🔍 DEBUG: Navigation error (non-critical):', navError);
@@ -353,8 +354,9 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             navigation.navigate('GroupDetails', { groupId });
             console.log('🔍 DEBUG: Successfully navigated to GroupDetails screen');
             
-            // Delete the notification after successful navigation
-            await deleteNotification(notificationId);
+            // Mark notification as in progress but don't delete it yet
+            // It will be deleted when the group join process is completed
+            console.log('🔍 DEBUG: Group invite notification marked as in progress, will be deleted after group join completion');
             
           } catch (navError) {
             console.log('🔍 DEBUG: Group navigation error (non-critical):', navError);
@@ -393,7 +395,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               [notificationId]: 'completed'
             }));
 
-            // Delete the notification after successful group join
+            // Mark notification as completed and delete it after successful group join
             await deleteNotification(notificationId);
 
             // Fade animation
@@ -545,14 +547,13 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               notificationId: notificationId
             });
             
-            // Delete the notification after successful navigation
-            await deleteNotification(notificationId);
-            
-            // Mark as completed
+            // Mark notification as completed and delete it after successful navigation
             setActionStates(prev => ({
               ...prev,
               [notificationId]: 'completed'
             }));
+            
+            await deleteNotification(notificationId);
 
             // Fade animation
             Animated.timing(fadeAnimations[notificationId], {
@@ -572,14 +573,13 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               transactionId: transactionId 
             });
             
-            // Delete the notification after successful navigation
-            await deleteNotification(notificationId);
-            
-            // Mark as completed
+            // Mark notification as completed and delete it after successful navigation
             setActionStates(prev => ({
               ...prev,
               [notificationId]: 'completed'
             }));
+            
+            await deleteNotification(notificationId);
 
             // Fade animation
             Animated.timing(fadeAnimations[notificationId], {
@@ -607,13 +607,14 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               notificationId: notificationId
             });
             
-            // Delete the notification after successful navigation
-            await deleteNotification(notificationId);
+            // Mark notification as in progress but don't delete it yet
+            // It will be deleted when the payment process is completed
+            console.log('🔍 DEBUG: Group payment request notification marked as in progress, will be deleted after payment completion');
             
-            // Mark as completed
+            // Mark as in progress
             setActionStates(prev => ({
               ...prev,
-              [notificationId]: 'completed'
+              [notificationId]: 'pending'
             }));
 
             // Fade animation
@@ -634,14 +635,13 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               groupId: groupId 
             });
             
-            // Delete the notification after successful navigation
-            await deleteNotification(notificationId);
-            
-            // Mark as completed
+            // Mark notification as completed and delete it after successful navigation
             setActionStates(prev => ({
               ...prev,
               [notificationId]: 'completed'
             }));
+            
+            await deleteNotification(notificationId);
 
             // Fade animation
             Animated.timing(fadeAnimations[notificationId], {
@@ -654,8 +654,9 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         } else if (notification.type === 'system_warning') {
           // Handle system warning notification
           try {
-            // Dismiss system warning by marking as read
+            // Dismiss system warning by marking as read and deleting
             await firebaseDataService.notification.markNotificationAsRead(notificationId);
+            await deleteNotification(notificationId);
             
             // Mark as completed
             setActionStates(prev => ({
@@ -689,12 +690,20 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           
           if (groupId) {
             // Navigate to settlement screen
-            navigation.navigate('SettleUp', { groupId });
+            navigation.navigate('SettleUp', { 
+              groupId,
+              fromNotification: true,
+              notificationId: notificationId
+            });
             
-            // Mark as completed
+            // Mark notification as in progress but don't delete it yet
+            // It will be deleted when the settlement process is completed
+            console.log('🔍 DEBUG: Settlement request notification marked as in progress, will be deleted after settlement completion');
+            
+            // Mark as in progress
             setActionStates(prev => ({
               ...prev,
-              [notificationId]: 'completed'
+              [notificationId]: 'pending'
             }));
 
             // Fade animation
@@ -712,11 +721,196 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           if (groupId) {
             navigation.navigate('GroupDetails', { groupId });
             
+            // Mark notification as completed and delete it after successful navigation
             setActionStates(prev => ({
               ...prev,
               [notificationId]: 'completed'
             }));
+            
+            await deleteNotification(notificationId);
 
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else if (notification.type === 'money_sent' || notification.type === 'money_received') {
+          // Handle money sent/received notifications
+          const transactionId = notification.data?.transactionId;
+          
+          if (transactionId) {
+            // Navigate to transaction details
+            navigation.navigate('TransactionHistory', { 
+              transactionId: transactionId 
+            });
+            
+            // Mark notification as completed and delete it after successful navigation
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+            
+            await deleteNotification(notificationId);
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else if (notification.type === 'group_payment_sent' || notification.type === 'group_payment_received') {
+          // Handle group payment sent/received notifications
+          const groupId = notification.data?.groupId;
+          const transactionId = notification.data?.transactionId;
+          
+          if (groupId) {
+            // Navigate to group details
+            navigation.navigate('GroupDetails', { 
+              groupId: groupId,
+              transactionId: transactionId
+            });
+            
+            // Mark notification as completed and delete it after successful navigation
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+            
+            await deleteNotification(notificationId);
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else if (notification.type === 'split_completed') {
+          // Handle split completed notification
+          const splitWalletId = notification.data?.splitWalletId;
+          
+          if (splitWalletId) {
+            // Navigate to split details
+            navigation.navigate('SplitDetails', { 
+              splitWalletId: splitWalletId 
+            });
+            
+            // Mark notification as completed and delete it after successful navigation
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+            
+            await deleteNotification(notificationId);
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else if (notification.type === 'degen_all_locked') {
+          // Handle degen all locked notification
+          const splitWalletId = notification.data?.splitWalletId;
+          
+          if (splitWalletId) {
+            // Navigate to degen spin screen
+            navigation.navigate('DegenSpin', { 
+              splitWalletId: splitWalletId 
+            });
+            
+            // Mark notification as completed and delete it after successful navigation
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+            
+            await deleteNotification(notificationId);
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else if (notification.type === 'degen_ready_to_roll') {
+          // Handle degen ready to roll notification
+          const splitWalletId = notification.data?.splitWalletId;
+          
+          if (splitWalletId) {
+            // Navigate to degen spin screen
+            navigation.navigate('DegenSpin', { 
+              splitWalletId: splitWalletId 
+            });
+            
+            // Mark notification as completed and delete it after successful navigation
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+            
+            await deleteNotification(notificationId);
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else if (notification.type === 'roulette_result') {
+          // Handle roulette result notification
+          const splitWalletId = notification.data?.splitWalletId;
+          
+          if (splitWalletId) {
+            // Navigate to degen result screen
+            navigation.navigate('DegenResult', { 
+              splitWalletId: splitWalletId 
+            });
+            
+            // Mark notification as completed and delete it after successful navigation
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+            
+            await deleteNotification(notificationId);
+
+            // Fade animation
+            Animated.timing(fadeAnimations[notificationId], {
+              toValue: 0.6,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+
+        } else if (notification.type === 'contact_added') {
+          // Handle contact added notification
+          const addedByName = notification.data?.addedByName;
+          
+          if (addedByName) {
+            // Navigate to contacts screen
+            navigation.navigate('Contacts');
+            
+            // Mark notification as completed and delete it after successful navigation
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+            
+            await deleteNotification(notificationId);
+
+            // Fade animation
             Animated.timing(fadeAnimations[notificationId], {
               toValue: 0.6,
               duration: 300,

@@ -721,6 +721,9 @@ export class SplitWalletService {
 
       logger.info('Split wallet locked successfully', { splitWalletId }, 'SplitWalletService');
 
+      // Send notifications for degen split lock completion
+      await this.sendDegenLockCompletionNotifications(updatedWallet);
+
       return {
         success: true,
         wallet: updatedWallet,
@@ -925,6 +928,9 @@ export class SplitWalletService {
         amount: wallet.totalAmount,
         transactionSignature: transactionResult.signature,
       }, 'SplitWalletService');
+
+      // Send completion notifications to all participants
+      await this.sendSplitCompletionNotifications(wallet);
 
       return {
         success: true,
@@ -1499,6 +1505,176 @@ export class SplitWalletService {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
       };
+    }
+  }
+
+  /**
+   * Send completion notifications to all participants when fair split is completed
+   */
+  private static async sendSplitCompletionNotifications(wallet: SplitWallet): Promise<void> {
+    try {
+      const { sendNotificationsToUsers } = await import('./firebaseNotificationService');
+      
+      // Get all participant user IDs
+      const participantIds = wallet.participants.map(p => p.userId);
+      
+      // Send notification to all participants
+      await sendNotificationsToUsers(
+        participantIds,
+        '🎉 Split Completed!',
+        `The "${wallet.billName}" split has been completed successfully! All payments have been processed.`,
+        'general',
+        {
+          splitWalletId: wallet.id,
+          billName: wallet.billName,
+          totalAmount: wallet.totalAmount,
+          currency: wallet.currency,
+          completedAt: new Date().toISOString(),
+          type: 'split_completed'
+        }
+      );
+
+      logger.info('Split completion notifications sent successfully', {
+        splitWalletId: wallet.id,
+        billName: wallet.billName,
+        participantCount: participantIds.length
+      }, 'SplitWalletService');
+
+    } catch (error) {
+      logger.error('Failed to send split completion notifications', error, 'SplitWalletService');
+      // Don't throw error - notification failure shouldn't break the split completion
+    }
+  }
+
+  /**
+   * Send lock completion notifications for degen splits
+   */
+  private static async sendDegenLockCompletionNotifications(wallet: SplitWallet): Promise<void> {
+    try {
+      const { sendNotificationsToUsers } = await import('./firebaseNotificationService');
+      
+      // Get all participant user IDs
+      const participantIds = wallet.participants.map(p => p.userId);
+      
+      // Send notification to all participants that locking is complete
+      await sendNotificationsToUsers(
+        participantIds,
+        '🔒 All Funds Locked!',
+        `All participants have locked their funds for "${wallet.billName}". The creator can now roll the roulette!`,
+        'general',
+        {
+          splitWalletId: wallet.id,
+          billName: wallet.billName,
+          totalAmount: wallet.totalAmount,
+          currency: wallet.currency,
+          lockedAt: new Date().toISOString(),
+          type: 'degen_all_locked'
+        }
+      );
+
+      // Send special notification to creator that they can roll
+      const { sendNotification } = await import('./firebaseNotificationService');
+      await sendNotification(
+        wallet.creatorId,
+        '🎲 Ready to Roll!',
+        `All participants have locked their funds for "${wallet.billName}". You can now roll the roulette to determine the loser!`,
+        'general',
+        {
+          splitWalletId: wallet.id,
+          billName: wallet.billName,
+          totalAmount: wallet.totalAmount,
+          currency: wallet.currency,
+          lockedAt: new Date().toISOString(),
+          type: 'degen_ready_to_roll'
+        }
+      );
+
+      logger.info('Degen lock completion notifications sent successfully', {
+        splitWalletId: wallet.id,
+        billName: wallet.billName,
+        participantCount: participantIds.length,
+        creatorId: wallet.creatorId
+      }, 'SplitWalletService');
+
+    } catch (error) {
+      logger.error('Failed to send degen lock completion notifications', error, 'SplitWalletService');
+      // Don't throw error - notification failure shouldn't break the locking process
+    }
+  }
+
+  /**
+   * Public method to send roulette result notifications
+   * This should be called when the roulette is rolled
+   */
+  static async notifyRouletteResult(
+    splitWalletId: string,
+    loserId: string,
+    loserName: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      await this.sendRouletteResultNotifications(result.wallet, loserId, loserName);
+      
+      return { success: true };
+    } catch (error) {
+      logger.error('Failed to notify roulette result', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Send roulette result notifications
+   */
+  private static async sendRouletteResultNotifications(
+    wallet: SplitWallet, 
+    loserId: string, 
+    loserName: string
+  ): Promise<void> {
+    try {
+      const { sendNotificationsToUsers } = await import('./firebaseNotificationService');
+      
+      // Get all participant user IDs
+      const participantIds = wallet.participants.map(p => p.userId);
+      
+      // Send notification to all participants about the result
+      await sendNotificationsToUsers(
+        participantIds,
+        '🎲 Roulette Result!',
+        `The roulette has been rolled for "${wallet.billName}". ${loserName} is the unlucky one who will pay the full amount!`,
+        'general',
+        {
+          splitWalletId: wallet.id,
+          billName: wallet.billName,
+          totalAmount: wallet.totalAmount,
+          currency: wallet.currency,
+          loserId,
+          loserName,
+          rolledAt: new Date().toISOString(),
+          type: 'roulette_result'
+        }
+      );
+
+      logger.info('Roulette result notifications sent successfully', {
+        splitWalletId: wallet.id,
+        billName: wallet.billName,
+        loserId,
+        loserName,
+        participantCount: participantIds.length
+      }, 'SplitWalletService');
+
+    } catch (error) {
+      logger.error('Failed to send roulette result notifications', error, 'SplitWalletService');
+      // Don't throw error - notification failure shouldn't break the roulette process
     }
   }
 }

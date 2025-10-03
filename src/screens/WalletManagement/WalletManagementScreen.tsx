@@ -253,23 +253,30 @@ const WalletManagementScreen: React.FC = () => {
           let senderName = 'Unknown';
 
           try {
-            if (isIncoming && tx.from_user) {
+            // Always fetch both sender and recipient names for proper display
+            if (tx.from_user) {
               const sender = await firebaseDataService.user.getCurrentUser(tx.from_user);
               senderName = sender.name || 'Unknown';
+              if (__DEV__) {
+                console.log('🔍 Fetched sender:', { userId: tx.from_user, name: senderName });
+              }
             }
-            if (isOutgoing && tx.to_user) {
+            if (tx.to_user) {
               const recipient = await firebaseDataService.user.getCurrentUser(tx.to_user);
               recipientName = recipient.name || 'Unknown';
+              if (__DEV__) {
+                console.log('🔍 Fetched recipient:', { userId: tx.to_user, name: recipientName });
+              }
             }
           } catch (error) {
-            console.log('Could not fetch user details for transaction:', tx.id);
+            console.log('Could not fetch user details for transaction:', tx.id, error);
           }
 
           return {
             id: tx.id,
             type: tx.type || 'send',
-            recipient: isIncoming ? senderName : recipientName,
-            sender: isOutgoing ? senderName : recipientName,
+            recipient: isIncoming ? senderName : recipientName, // For incoming: show sender name, for outgoing: show recipient name
+            sender: isIncoming ? recipientName : senderName,    // For incoming: show recipient name, for outgoing: show sender name
             note: tx.note || '',
             amount: tx.amount || 0,
             date: tx.created_at || new Date().toISOString(),

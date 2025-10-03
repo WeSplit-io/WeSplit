@@ -213,6 +213,27 @@ export async function handleAddContactFromProfile(linkData: DeepLinkData, curren
     
     console.log('🔥 Successfully added contact via deep link:', newContact);
     
+    // Send notification to the added contact
+    try {
+      const { sendNotification } = await import('./firebaseNotificationService');
+      await sendNotification(
+        linkData.userId,
+        '👋 New Contact Added You!',
+        `${linkData.userName} has added you as a contact. You can now easily send money to each other!`,
+        'general',
+        {
+          addedBy: currentUserId,
+          addedByName: linkData.userName,
+          addedAt: new Date().toISOString(),
+          type: 'contact_added'
+        }
+      );
+      console.log('🔥 Contact add notification sent successfully');
+    } catch (notificationError) {
+      console.error('🔥 Failed to send contact add notification:', notificationError);
+      // Don't fail the contact addition if notification fails
+    }
+    
     return {
       success: true,
       contactName: linkData.userName,

@@ -10,7 +10,8 @@ import {
   Image,
   Platform,
   ActionSheetIOS,
-  StatusBar
+  StatusBar,
+  ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -19,11 +20,12 @@ import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { colors, spacing } from '../../theme';
 import * as ImagePicker from 'expo-image-picker';
+import AccountDeletionService, { DeletionProgress } from '../../services/accountDeletionService';
 import styles from './styles';
 
 
 const AccountSettingsScreen = ({ navigation }: any) => {
-  const { state, updateUser } = useApp();
+  const { state, updateUser, logoutUser } = useApp();
   const { currentUser } = state;
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
@@ -34,6 +36,10 @@ const AccountSettingsScreen = ({ navigation }: any) => {
   const [avatar, setAvatar] = useState<string | null>(currentUser?.avatar || null);
   const [pseudoError, setPseudoError] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  
+  // Account deletion states
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deletionProgress, setDeletionProgress] = useState<DeletionProgress | null>(null);
 
   // Update form values when currentUser changes
   useEffect(() => {
@@ -173,22 +179,141 @@ const AccountSettingsScreen = ({ navigation }: any) => {
     nav.goBack();
   };
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User information not available');
+      return;
+    }
+
+    // First, show a warning about data deletion
     Alert.alert(
       'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone.',
+      'This will permanently delete your account and ALL associated data including:\n\n• All your splits and transactions\n• Group memberships\n• Payment history\n• Notifications\n• Contacts\n\nThis action cannot be undone. Are you sure?',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'Delete', 
-          style: 'destructive', 
-          onPress: () => {
-            Alert.alert('Account Deleted', 'Your account has been deleted successfully');
-            navigation.navigate('AuthMethods');
-          }
+          text: 'Show Data Summary', 
+          onPress: () => showDataSummaryAndConfirm()
         }
       ]
     );
+  };
+
+  const showDataSummaryAndConfirm = async () => {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User information not available');
+      return;
+    }
+
+    try {
+      setIsDeletingAccount(true);
+      
+      // Get data summary
+      const summary = await AccountDeletionService.getUserDataSummary(currentUser.id.toString()) as {
+        splits: number;
+        notifications: number;
+        transactions: number;
+        groups: number;
+        contacts: number;
+        wallets: number;
+        payments: number;
+        settlements: number;
+        totalItems: number;
+      };
+      
+      setIsDeletingAccount(false);
+      
+      const summaryText = `Your account contains:\n\n• ${summary.splits} splits\n• ${summary.notifications} notifications\n• ${summary.transactions} transactions\n• ${summary.groups} groups\n• ${summary.contacts} contacts\n• ${summary.wallets} wallets\n• ${summary.payments} payment requests\n• ${summary.settlements} settlements\n\nTotal: ${summary.totalItems} items will be deleted.`;
+      
+      Alert.alert(
+        'Data Summary',
+        summaryText,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Delete Everything', 
+            style: 'destructive', 
+            onPress: () => confirmAccountDeletion()
+          }
+        ]
+      );
+    } catch (error) {
+      setIsDeletingAccount(false);
+      Alert.alert('Error', 'Failed to load data summary. Please try again.');
+    }
+  };
+
+  const confirmAccountDeletion = () => {
+    Alert.alert(
+      'Final Confirmation',
+      'This is your last chance to cancel. Your account and ALL data will be permanently deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'DELETE ACCOUNT', 
+          style: 'destructive', 
+          onPress: () => performAccountDeletion()
+        }
+      ]
+    );
+  };
+
+  const performAccountDeletion = async () => {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User information not available');
+      return;
+    }
+
+    try {
+      setIsDeletingAccount(true);
+      setDeletionProgress(null);
+
+      const result = await AccountDeletionService.deleteUserAccount(
+        currentUser.id.toString(),
+        (progress) => {
+          setDeletionProgress(progress);
+        }
+      );
+
+      setIsDeletingAccount(false);
+      setDeletionProgress(null);
+
+      if (result.success) {
+        Alert.alert(
+          'Account Deleted',
+          `Your account has been successfully deleted.\n\nDeleted ${result.totalDeleted} items across ${result.deletedCollections.length} collections.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Clear user context and navigate to auth
+                logoutUser();
+                navigation.navigate('AuthMethods');
+              }
+            }
+          ]
+        );
+      } else {
+        const errorMessage = result.errors.length > 0 
+          ? result.errors.join('\n\n')
+          : 'Unknown error occurred during deletion';
+        
+        Alert.alert(
+          'Deletion Failed',
+          `Some data could not be deleted:\n\n${errorMessage}\n\nPlease contact support if this issue persists.`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      setIsDeletingAccount(false);
+      setDeletionProgress(null);
+      
+      Alert.alert(
+        'Deletion Error',
+        `An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again or contact support.`,
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleBackPress = () => {
@@ -285,10 +410,65 @@ const AccountSettingsScreen = ({ navigation }: any) => {
           </View>
 
           {/* Delete Account Button */}
-          <TouchableOpacity style={styles.deleteAccountButton} onPress={handleDeleteAccount}>
-            <Icon name="trash-2" size={20} color="#FF6B6B" />
-            <Text style={styles.deleteAccountText}>Delete Account</Text>
+          <TouchableOpacity 
+            style={[styles.deleteAccountButton, isDeletingAccount && { opacity: 0.6 }]} 
+            onPress={handleDeleteAccount}
+            disabled={isDeletingAccount}
+          >
+            {isDeletingAccount ? (
+              <ActivityIndicator size="small" color="#FF6B6B" />
+            ) : (
+              <Icon name="trash-2" size={20} color="#FF6B6B" />
+            )}
+            <Text style={[styles.deleteAccountText, isDeletingAccount && { opacity: 0.6 }]}>
+              {isDeletingAccount ? 'Deleting Account...' : 'Delete Account'}
+            </Text>
           </TouchableOpacity>
+
+          {/* Deletion Progress */}
+          {deletionProgress && (
+            <View style={{
+              backgroundColor: colors.white5,
+              borderRadius: spacing.md,
+              padding: spacing.md,
+              marginBottom: spacing.lg,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}>
+              <Text style={{
+                color: colors.textLight,
+                fontSize: 14,
+                fontWeight: '500',
+                marginBottom: spacing.sm,
+                textAlign: 'center',
+              }}>
+                {deletionProgress.currentStep} ({Math.round(deletionProgress.progress)}%)
+              </Text>
+              <View style={{
+                height: 4,
+                backgroundColor: colors.white10,
+                borderRadius: 2,
+                marginBottom: spacing.sm,
+                overflow: 'hidden',
+              }}>
+                <View 
+                  style={{
+                    height: '100%',
+                    backgroundColor: '#FF6B6B',
+                    borderRadius: 2,
+                    width: `${deletionProgress.progress}%`
+                  }} 
+                />
+              </View>
+              <Text style={{
+                color: colors.white70,
+                fontSize: 12,
+                textAlign: 'center',
+              }}>
+                Processing {deletionProgress.currentCollection}...
+              </Text>
+            </View>
+          )}
 
           {/* Extra space for bottom padding */}
           <View style={styles.bottomSpacing} />

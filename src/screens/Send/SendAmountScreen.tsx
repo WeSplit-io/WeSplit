@@ -74,6 +74,8 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
       description: note.trim(),
       groupId,
       isSettlement,
+      fromNotification: route.params?.fromNotification,
+      notificationId: route.params?.notificationId,
     });
   };
 

@@ -219,6 +219,8 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         companyFee: transactionResult.companyFee,
         netAmount: transactionResult.netAmount,
         blockchainFee: transactionResult.fee,
+        fromNotification: route.params?.fromNotification,
+        notificationId: route.params?.notificationId,
       });
     } catch (error) {
       console.error('Send error:', error);

@@ -146,6 +146,47 @@ export default StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
     marginLeft: spacing.sm,
   },
+  deleteAccountButtonDisabled: {
+    opacity: 0.6,
+  },
+  deleteAccountTextDisabled: {
+    color: '#FF6B6B',
+    opacity: 0.6,
+  },
+  
+  // Deletion Progress
+  deletionProgressContainer: {
+    backgroundColor: colors.white5,
+    borderRadius: spacing.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  deletionProgressText: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: colors.white10,
+    borderRadius: 2,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#FF6B6B',
+    borderRadius: 2,
+  },
+  deletionProgressSubtext: {
+    color: colors.white70,
+    fontSize: typography.fontSize.xs,
+    textAlign: 'center',
+  },
   
   // Save Button
   saveButton: {

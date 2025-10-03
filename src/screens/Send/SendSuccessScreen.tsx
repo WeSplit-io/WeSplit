@@ -1,11 +1,46 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, Image } from 'react-native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import { NotificationCompletionService } from '../../services/notificationCompletionService';
 
 const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
-  const { contact, amount, description, groupId, transactionId, isSettlement } = route.params || {};
+  const { contact, amount, description, groupId, transactionId, isSettlement, fromNotification, notificationId } = route.params || {};
+
+  // Complete notification process when payment is successful
+  useEffect(() => {
+    const completeNotificationProcess = async () => {
+      if (fromNotification && notificationId && transactionId) {
+        try {
+          console.log('🔍 SendSuccess: Completing notification process for payment request');
+          
+          // Get current user ID from navigation state or context
+          // For now, we'll use a placeholder - in a real app, you'd get this from context
+          const currentUserId = 'current_user_id'; // This should be replaced with actual user ID
+          
+          await NotificationCompletionService.completePaymentRequestNotification(
+            notificationId,
+            currentUserId,
+            {
+              amount: amount || 0,
+              currency: 'USDC',
+              recipientId: contact?.id || '',
+              transactionId: transactionId,
+              groupId: groupId
+            }
+          );
+          
+          console.log('🔍 SendSuccess: Notification process completed successfully');
+        } catch (error) {
+          console.error('🔍 SendSuccess: Failed to complete notification process:', error);
+          // Don't fail the success screen if notification completion fails
+        }
+      }
+    };
+
+    completeNotificationProcess();
+  }, [fromNotification, notificationId, transactionId, amount, contact, groupId]);
 
   const handleBackHome = () => {
     if (isSettlement && groupId) {
