@@ -16,6 +16,7 @@ import {
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { FallbackDataService } from '../../utils/fallbackDataService';
 
 interface PaymentConfirmationScreenProps {
   navigation: any;
@@ -109,9 +110,9 @@ const PaymentConfirmationScreen: React.FC<PaymentConfirmationScreenProps> = ({ n
             <View style={styles.billHeader}>
               <View style={styles.billTitleContainer}>
                 <Text style={styles.billIcon}>🧾</Text>
-                <Text style={styles.billTitle}>{billData?.title || 'Restaurant Night'}</Text>
+                <Text style={styles.billTitle}>{MockupDataService.getBillName()}</Text>
               </View>
-              <Text style={styles.billDate}>10 Mar. 2025</Text>
+              <Text style={styles.billDate}>{FallbackDataService.generateBillDate(processedBillData, billData, true)}</Text>
             </View>
             
             <View style={styles.billAmountContainer}>

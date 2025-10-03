@@ -29,6 +29,9 @@ import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
 import { SplitWalletService } from '../../services/splitWalletService';
+import { FallbackDataService } from '../../utils/fallbackDataService';
+import { MockupDataService } from '../../data/mockupData';
+import { QRCodeService } from '../../services/qrCodeService';
 import UserAvatar from '../../components/UserAvatar';
 import QRCode from 'react-native-qrcode-svg';
 import { 
@@ -72,9 +75,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     authMethod: state.authMethod
   });
   
-  const [billName, setBillName] = useState(processedBillData?.title || billData?.title || 'Restaurant Night');
+  const [billName, setBillName] = useState(
+    MockupDataService.getBillName() // Use unified mockup data
+  );
   const [totalAmount, setTotalAmount] = useState(
-    processedBillData?.totalAmount?.toString() || billData?.totalAmount?.toString() || '28.69'
+    MockupDataService.getBillAmount().toString() // Use unified mockup data
   );
   const [showSplitModal, setShowSplitModal] = useState(false);
   const [selectedSplitType, setSelectedSplitType] = useState<'fair' | 'degen' | null>(null);
@@ -148,15 +153,19 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     }
 
     // Generate QR code data when opening the modal
-    const invitationData = SplitInvitationService.generateInvitationData(
-      processedBillData?.id || billData?.id || `split_${Date.now()}`,
+    const splitId = processedBillData?.id || billData?.id || `split_${Date.now()}`;
+    const walletAddress = splitWallet?.walletAddress || 'wallet_address_placeholder';
+    
+    const qrData = QRCodeService.generateSplitInvitationQR(
+      splitId,
       billName,
       parseFloat(totalAmount),
-      processedBillData?.currency || 'USD',
-      currentUser.id.toString()
+      processedBillData?.currency || 'USDC',
+      currentUser.name || 'Unknown User',
+      participants.length,
+      selectedSplitType || 'fair',
+      walletAddress
     );
-
-    const qrData = SplitInvitationService.generateQRCodeData(invitationData);
     setQrCodeData(qrData);
     setShowAddFriendsModal(true);
   };
@@ -337,7 +346,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           const walletResult = await SplitWalletService.createSplitWallet(
             processedBillData.id,
             currentUser.id.toString(),
-            processedBillData.totalAmount,
+            MockupDataService.getBillAmount(), // Use unified mockup data
             processedBillData.currency || 'USDC',
             participants.map((p: any) => ({
               userId: p.id,
@@ -360,10 +369,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         
         const splitData = {
           billId: processedBillData.id,
-          title: processedBillData.title,
-          description: `Split for ${processedBillData.title}`,
-          totalAmount: processedBillData.totalAmount,
-          currency: processedBillData.currency,
+          title: MockupDataService.getBillName(), // Use unified mockup data
+          description: `Split for ${MockupDataService.getBillName()}`,
+          totalAmount: MockupDataService.getBillAmount(), // Use unified mockup data
+          currency: 'USDC', // Always use USDC for consistency
           splitType: type,
           status: 'draft' as const,
           creatorId: currentUser.id.toString(),
@@ -372,15 +381,17 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             userId: p.id,
             name: p.name,
             walletAddress: p.walletAddress,
-            amountOwed: p.amountOwed,
+            amountOwed: MockupDataService.getBillAmount() / participants.length, // Equal split with unified data
             amountPaid: 0,
             status: 'pending' as const,
           })),
-          items: processedBillData.items,
-           merchant: {
-             name: processedBillData.merchant,
-           },
-          date: processedBillData.date,
+          items: MockupDataService.getPrimaryBillData().items, // Use unified mockup data items
+          merchant: {
+            name: MockupDataService.getMerchantName(), // Use unified mockup data
+            address: MockupDataService.getLocation(), // Use unified mockup data
+            phone: '(415) 555-0123',
+          },
+          date: MockupDataService.getBillDate(), // Use unified mockup data
           // Include wallet information in split data
           walletId: walletToUse.id,
           walletAddress: walletToUse.walletAddress,
@@ -462,9 +473,9 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       title: billName,
       totalAmount: parseFloat(totalAmount),
       currency: processedBillData?.currency || billData?.currency || 'USD',
-      date: processedBillData?.date || billData?.date || '10 Mar. 2025',
-      merchant: processedBillData?.merchant || billData?.merchant,
-      location: processedBillData?.location || billData?.location,
+      date: MockupDataService.getBillDate(), // Use unified mockup data
+      merchant: MockupDataService.getMerchantName(), // Use unified mockup data
+      location: MockupDataService.getLocation(), // Use unified mockup data
       participants: participants,
     };
     
@@ -547,8 +558,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         title: billName,
         totalAmount: parseFloat(totalAmount),
         currency: processedBillData?.currency || billData?.currency || 'USD',
-        date: processedBillData?.date || billData?.date || new Date().toISOString().split('T')[0],
-        merchant: processedBillData?.merchant || billData?.merchant || 'Unknown Merchant',
+        date: MockupDataService.getBillDate(), // Use unified mockup data
+        merchant: MockupDataService.getMerchantName(), // Use unified mockup data
         billImageUrl: (billData as any)?.billImageUrl,
         items: processedBillData?.items || billData?.items || [],
         participants: participants,
@@ -615,15 +626,18 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // Set authoritative price in price management service when component loads
   useEffect(() => {
     const setAuthoritativePrice = async () => {
-      if (processedBillData?.id && processedBillData?.totalAmount) {
+      if (processedBillData?.id) {
         const { priceManagementService } = await import('../../services/priceManagementService');
         const { PriceDebugger } = await import('../../utils/priceDebugger');
+        
+        // Always use unified mockup data amount for consistency
+        const unifiedAmount = MockupDataService.getBillAmount();
         
         // Debug current state
         PriceDebugger.debugBillAmounts(processedBillData.id, {
           processedBillData,
           billData,
-          routeParams: { totalAmount: parseFloat(totalAmount) }
+          routeParams: { totalAmount: unifiedAmount }
         });
         
         const existingPrice = priceManagementService.getBillPrice(processedBillData.id);
@@ -631,21 +645,21 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         if (!existingPrice) {
           priceManagementService.setBillPrice(
             processedBillData.id,
-            processedBillData.totalAmount,
-            processedBillData.currency || 'USDC'
+            unifiedAmount, // Use unified mockup data amount
+            'USDC'
           );
           
-          console.log('💰 SplitDetailsScreen: Set authoritative price:', {
+          console.log('💰 SplitDetailsScreen: Set authoritative price with unified data:', {
             billId: processedBillData.id,
-            totalAmount: processedBillData.totalAmount,
-            currency: processedBillData.currency || 'USDC'
+            totalAmount: unifiedAmount,
+            currency: 'USDC'
           });
         }
       }
     };
     
     setAuthoritativePrice();
-  }, [processedBillData?.id, processedBillData?.totalAmount]);
+  }, [processedBillData?.id]);
 
   // Debug effect to track selectedSplitType changes
   useEffect(() => {
@@ -684,7 +698,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               <Text style={styles.billIcon}>🍽️</Text>
               <Text style={styles.billTitle}>{billName}</Text>
             </View>
-            <Text style={styles.billDate}>10 Mar. 2025</Text>
+            <Text style={styles.billDate}>
+              {(() => {
+                // Always use mockup data for consistency
+                const { MockupDataService } = require('../../data/mockupData');
+                return MockupDataService.getBillDate();
+              })()}
+            </Text>
           </View>
           
           <View style={styles.billAmountContainer}>

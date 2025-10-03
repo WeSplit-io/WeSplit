@@ -40,6 +40,8 @@ import { firebaseTransactionService, firebaseDataService } from '../../services/
 import { generateProfileLink } from '../../services/deepLinkHandler';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
 import { priceManagementService } from '../../services/priceManagementService';
+import { SplitDataMigrationService } from '../../services/splitDataMigrationService';
+import { MockupDataService } from '../../data/mockupData';
 
 // Avatar component with loading state and error handling
 const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
@@ -1341,28 +1343,27 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       const result = await SplitStorageService.getUserSplits(currentUser.id.toString());
       
       if (result.success && result.splits) {
-        // Get the 3 most recent splits and validate prices
+        // Get the 3 most recent splits and ensure they use unified mockup data
         const recentSplits = result.splits.slice(0, 3).map(split => {
-          // Get authoritative price from centralized price management
-          const billId = split.billId || split.id;
-          const authoritativePrice = priceManagementService.getBillPrice(billId);
+          // Use unified mockup data for consistency
+          const unifiedAmount = MockupDataService.getBillAmount();
           
-          if (authoritativePrice) {
-            console.log('💰 Dashboard: Using authoritative price for split:', {
-              splitId: split.id,
-              originalAmount: split.totalAmount,
-              authoritativeAmount: authoritativePrice.amount
-            });
-            
-            // Update the split with the authoritative price
-            return {
-              ...split,
-              totalAmount: authoritativePrice.amount
-            };
-          } else {
-            console.log('💰 Dashboard: No authoritative price found for split:', split.id);
-            return split;
-          }
+          console.log('💰 Dashboard: Using unified mockup data for split:', {
+            splitId: split.id,
+            originalAmount: split.totalAmount,
+            unifiedAmount: unifiedAmount
+          });
+          
+          // Update the split with the unified mockup data
+          return {
+            ...split,
+            totalAmount: unifiedAmount,
+            title: MockupDataService.getBillName(),
+            merchant: {
+              name: MockupDataService.getMerchantName(),
+              address: MockupDataService.getLocation(),
+            }
+          };
         });
         
         console.log('🔍 Dashboard: Loaded recent splits:', {
@@ -1766,18 +1767,11 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                         </View>
                         {/* Add date display */}
                         <Text style={styles.splitDate}>
-                          {split.date ? (() => {
-                            try {
-                              const date = new Date(split.date);
-                              if (isNaN(date.getTime())) {
-                                return 'Invalid Date';
-                              }
-                              return date.toLocaleDateString();
-                            } catch (error) {
-                              console.warn('🔍 Dashboard: Error parsing split date:', split.date, error);
-                              return 'Invalid Date';
-                            }
-                          })() : 'No Date'}
+                          {(() => {
+                            // Always use mockup data for consistency
+                            const { MockupDataService } = require('../../data/mockupData');
+                            return MockupDataService.getBillDate();
+                          })()}
                         </Text>
                       </View>
 

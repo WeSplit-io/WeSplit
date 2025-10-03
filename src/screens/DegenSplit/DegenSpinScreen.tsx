@@ -19,6 +19,7 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { styles } from './DegenSpinStyles';
 import { NotificationService } from '../../services/notificationService';
+import { FallbackDataService } from '../../utils/fallbackDataService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -49,7 +50,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
   useEffect(() => {
     const sendSpinNotifications = async () => {
       const participantIds = participants.map(p => p.id);
-      const billName = billData?.title || 'Restaurant Night';
+      const billName = MockupDataService.getBillName(); // Use unified mockup data
 
       await NotificationService.sendBulkNotifications(
         participantIds,
@@ -168,9 +169,24 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
         <View style={styles.billInfoCard}>
           <View style={styles.billInfoHeader}>
             <Text style={styles.billIcon}>🍽️</Text>
-            <Text style={styles.billTitle}>{billData.name || 'Restaurant Night'}</Text>
+            <Text style={styles.billTitle}>{MockupDataService.getBillName()}</Text>
           </View>
-          <Text style={styles.billDate}>{billData.date || '10 May 2025'}</Text>
+          <Text style={styles.billDate}>
+            {(() => {
+              try {
+                const date = FallbackDataService.generateBillDate(processedBillData, billData, true);
+                console.log('🔍 DegenSpinScreen: Generated date:', date);
+                return date;
+              } catch (error) {
+                console.error('🔍 DegenSpinScreen: Error generating date:', error);
+                return new Date().toLocaleDateString('en-US', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                });
+              }
+            })()}
+          </Text>
           <View style={styles.billTotalRow}>
             <Text style={styles.billTotalLabel}>Total Bill</Text>
             <Text style={styles.billTotalAmount}>{totalAmount} USDC</Text>

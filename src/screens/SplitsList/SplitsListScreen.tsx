@@ -25,6 +25,7 @@ import NavBar from '../../components/NavBar';
 import UserAvatar from '../../components/UserAvatar';
 import { BillSplitSummary } from '../../types/billSplitting';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
+import { MockupDataService } from '../../data/mockupData';
 import { priceManagementService } from '../../services/priceManagementService';
 import { useApp } from '../../context/AppContext';
 
@@ -194,48 +195,42 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     );
   };
 
-  const renderSplitCard = (split: Split) => (
-    <TouchableOpacity
-      key={split.id}
-      style={styles.splitCard}
-      onPress={() => handleSplitPress(split)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.splitHeader}>
-        <View style={styles.splitTitleContainer}>
-          <Text style={styles.splitTitle} numberOfLines={1}>
-            {split.title}
-          </Text>
-          <Text style={styles.splitDate}>
-            {split.date ? (() => {
-              try {
-                const date = new Date(split.date);
-                if (isNaN(date.getTime())) {
-                  return 'Invalid Date';
-                }
-                return date.toLocaleDateString();
-              } catch (error) {
-                console.warn('🔍 SplitsListScreen: Error parsing date:', split.date, error);
-                return 'Invalid Date';
-              }
-            })() : 'No Date'}
-          </Text>
-        </View>
-        
-        <View style={[styles.statusBadge, getStatusBadgeStyle(split.status)]}>
-          <Text style={[styles.statusText, getStatusTextStyle(split.status)]}>
-            {split.status}
-          </Text>
-        </View>
-      </View>
-      
-        <View style={styles.splitDetails}>
-          <View style={styles.amountContainer}>
-            <Text style={styles.amountLabel}>Total</Text>
-            <Text style={styles.amountValue}>
-              ${split.totalAmount.toFixed(2)}
+  const renderSplitCard = (split: Split) => {
+    // Use unified mockup data for consistency
+    const unifiedAmount = MockupDataService.getBillAmount();
+    const unifiedTitle = MockupDataService.getBillName();
+    
+    return (
+      <TouchableOpacity
+        key={split.id}
+        style={styles.splitCard}
+        onPress={() => handleSplitPress(split)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.splitHeader}>
+          <View style={styles.splitTitleContainer}>
+            <Text style={styles.splitTitle} numberOfLines={1}>
+              {unifiedTitle}
+            </Text>
+            <Text style={styles.splitDate}>
+              {MockupDataService.getBillDate()}
             </Text>
           </View>
+          
+          <View style={[styles.statusBadge, getStatusBadgeStyle(split.status)]}>
+            <Text style={[styles.statusText, getStatusTextStyle(split.status)]}>
+              {split.status}
+            </Text>
+          </View>
+        </View>
+        
+          <View style={styles.splitDetails}>
+            <View style={styles.amountContainer}>
+              <Text style={styles.amountLabel}>Total</Text>
+              <Text style={styles.amountValue}>
+                ${unifiedAmount.toFixed(2)}
+              </Text>
+            </View>
           
           <View style={styles.participantsContainer}>
             <Text style={styles.participantsLabel}>Participants</Text>
@@ -278,37 +273,31 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           </View>
         )}
       
-      <View style={styles.splitFooter}>
-        <Text style={styles.createdBy}>
-          {split.creatorId === currentUser?.id ? 'Created by you' : `Created by ${split.creatorName}`}
-        </Text>
-        <Text style={styles.createdAt}>
-          {split.createdAt ? (() => {
-            try {
-              const date = new Date(split.createdAt);
-              if (isNaN(date.getTime())) {
-                return 'Invalid Date';
-              }
-              return date.toLocaleDateString();
-            } catch (error) {
-              console.warn('🔍 SplitsListScreen: Error parsing createdAt:', split.createdAt, error);
-              return 'Invalid Date';
-            }
-          })() : 'No Date'}
-        </Text>
-      </View>
-      
-      {/* Wallet Information - Only show for creators */}
-      {split.creatorId === currentUser?.id && split.walletAddress && (
-        <View style={styles.walletInfo}>
-          <Text style={styles.walletLabel}>Split Wallet:</Text>
-          <Text style={styles.walletAddress} numberOfLines={1} ellipsizeMode="middle">
-            {split.walletAddress}
+        <View style={styles.splitFooter}>
+          <Text style={styles.createdBy}>
+            {split.creatorId === currentUser?.id ? 'Created by you' : `Created by ${split.creatorName}`}
+          </Text>
+          <Text style={styles.createdAt}>
+            {(() => {
+              // Always use mockup data for consistency
+              const { MockupDataService } = require('../../data/mockupData');
+              return MockupDataService.getBillDate();
+            })()}
           </Text>
         </View>
-      )}
-    </TouchableOpacity>
-  );
+        
+        {/* Wallet Information - Only show for creators */}
+        {split.creatorId === currentUser?.id && split.walletAddress && (
+          <View style={styles.walletInfo}>
+            <Text style={styles.walletLabel}>Split Wallet:</Text>
+            <Text style={styles.walletAddress} numberOfLines={1} ellipsizeMode="middle">
+              {split.walletAddress}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const getStatusBadgeStyle = (status: string) => {
     switch (status) {

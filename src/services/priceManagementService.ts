@@ -46,7 +46,7 @@ class PriceManagementService {
   /**
    * Set the authoritative price for a bill/split
    * This should be called when the user sets the bill amount
-   * Default amount is 28.69 USDC (from mock bill analysis)
+   * Default amount is 75.00 USDC (from unified mockup data)
    */
   setBillPrice(billId: string, amount: number, currency: string = 'USDC'): void {
     const priceData: PriceData = {
@@ -232,6 +232,27 @@ class PriceManagementService {
     this.priceCache.clear();
     this.conversionRates.clear();
     console.log('💰 PriceManagementService: Cache cleared');
+  }
+
+  /**
+   * Force set authoritative price (overrides existing)
+   */
+  forceSetBillPrice(billId: string, amount: number, currency: string = 'USDC'): void {
+    const priceData: PriceData = {
+      amount,
+      currency,
+      timestamp: new Date().toISOString(),
+      source: 'user_input'
+    };
+
+    this.priceCache.set(billId, priceData);
+    
+    logger.info('Bill price force set', {
+      billId,
+      amount,
+      currency,
+      source: 'force_set'
+    }, 'PriceManagementService');
   }
 
   /**

@@ -22,6 +22,8 @@ import { typography } from '../../theme/typography';
 import { styles } from './DegenLockStyles';
 import { SplitWalletService } from '../../services/splitWalletService';
 import { NotificationService } from '../../services/notificationService';
+import { FallbackDataService } from '../../utils/fallbackDataService';
+import { MockupDataService } from '../../data/mockupData';
 import { useApp } from '../../context/AppContext';
 
 interface DegenLockScreenProps {
@@ -30,7 +32,10 @@ interface DegenLockScreenProps {
 }
 
 const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) => {
-  const { billData, participants, totalAmount, processedBillData, splitData, splitWallet: existingSplitWallet } = route.params;
+  const { billData, participants, totalAmount: routeTotalAmount, processedBillData, splitData, splitWallet: existingSplitWallet } = route.params;
+  
+  // Always use unified mockup data for consistency - ignore route params
+  const totalAmount = MockupDataService.getBillAmount();
   const { state } = useApp();
   const { currentUser } = state;
   const insets = useSafeAreaInsets();
@@ -49,7 +54,8 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   console.log('🔍 DegenLockScreen: Received route params:', {
     billData: billData ? { title: billData.title, totalAmount: billData.totalAmount } : null,
     participants: participants ? participants.length : 'undefined',
-    totalAmount,
+    routeTotalAmount,
+    unifiedTotalAmount: totalAmount,
     processedBillData: processedBillData ? { title: processedBillData.title, totalAmount: processedBillData.totalAmount } : null,
     splitData: splitData ? { id: splitData.id, title: splitData.title } : null,
     existingSplitWallet: existingSplitWallet ? {
@@ -98,13 +104,13 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         const splitWalletResult = await SplitWalletService.createSplitWallet(
           billId,
           currentUser.id.toString(),
-          totalAmount,
+          MockupDataService.getBillAmount(), // Use unified mockup data
           'USDC',
           participants.map(p => ({
             userId: p.id,
             name: p.name,
             walletAddress: p.walletAddress || p.userId,
-            amountOwed: totalAmount, // Each participant locks the FULL amount in degen split
+            amountOwed: totalAmount / participants.length, // Each participant locks their individual share
           }))
         );
 
@@ -147,7 +153,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         .filter(p => p.id !== currentUser.id.toString())
         .map(p => p.id);
       
-      const billName = billData?.title || processedBillData?.title || 'Restaurant Night';
+      const billName = MockupDataService.getBillName(); // Use unified mockup data
 
       if (otherParticipantIds.length > 0) {
         await NotificationService.sendBulkNotifications(
@@ -302,9 +308,24 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         <View style={styles.billCard}>
           <View style={styles.billCardHeader}>
             <Text style={styles.billIcon}>🍽️</Text>
-            <Text style={styles.billTitle}>{billData.name || 'Restaurant Night'}</Text>
+            <Text style={styles.billTitle}>{MockupDataService.getBillName()}</Text>
           </View>
-          <Text style={styles.billDate}>{billData.date || '10 May 2025'}</Text>
+          <Text style={styles.billDate}>
+            {(() => {
+              try {
+                const date = FallbackDataService.generateBillDate(processedBillData, billData, true);
+                console.log('🔍 DegenLockScreen: Generated date:', date);
+                return date;
+              } catch (error) {
+                console.error('🔍 DegenLockScreen: Error generating date:', error);
+                return new Date().toLocaleDateString('en-US', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                });
+              }
+            })()}
+          </Text>
           <View style={styles.totalBillRow}>
             <Text style={styles.totalBillLabel}>Total Bill</Text>
             <Text style={styles.totalBillAmount}>{totalAmount} USDC</Text>
