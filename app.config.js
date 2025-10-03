@@ -45,7 +45,9 @@ export default {
       permissions: [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
       ],
       intentFilters: [
         {
@@ -77,7 +79,8 @@ export default {
     plugins: [
       "./queries.js",
       "expo-secure-store",
-      "expo-router"
+      "expo-router",
+      "expo-notifications"
     ],
     extra: {
       eas: {

@@ -6,6 +6,8 @@
 import { logger } from './loggingService';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 
 export interface NotificationData {
   id: string;
@@ -28,6 +30,86 @@ export interface NotificationResult {
 }
 
 export class NotificationService {
+  /**
+   * Initialize push notifications
+   */
+  static async initializePushNotifications(): Promise<boolean> {
+    try {
+      if (!Device.isDevice) {
+        console.log('Must use physical device for Push Notifications');
+        return false;
+      }
+
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        console.log('Failed to get push token for push notification!');
+        return false;
+      }
+
+      // Configure notification behavior
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+        }),
+      });
+
+      logger.info('Push notifications initialized successfully', {}, 'NotificationService');
+      return true;
+    } catch (error) {
+      logger.error('Failed to initialize push notifications', error, 'NotificationService');
+      return false;
+    }
+  }
+
+  /**
+   * Get push notification token
+   */
+  static async getPushToken(): Promise<string | null> {
+    try {
+      const token = await Notifications.getExpoPushTokenAsync();
+      return token.data;
+    } catch (error) {
+      logger.error('Failed to get push token', error, 'NotificationService');
+      return null;
+    }
+  }
+
+  /**
+   * Send push notification
+   */
+  static async sendPushNotification(
+    title: string,
+    body: string,
+    data?: any
+  ): Promise<boolean> {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data,
+          sound: 'default',
+        },
+        trigger: null, // Send immediately
+      });
+
+      logger.info('Push notification sent successfully', { title, body }, 'NotificationService');
+      return true;
+    } catch (error) {
+      logger.error('Failed to send push notification', error, 'NotificationService');
+      return false;
+    }
+  }
+
   /**
    * Send notification to lock currency for Degen Split
    */
@@ -55,6 +137,18 @@ export class NotificationService {
         ...notification,
         createdAt: serverTimestamp(),
       });
+
+      // Send push notification
+      await this.sendPushNotification(
+        notification.title,
+        notification.message,
+        {
+          type: notification.type,
+          splitWalletId: notification.splitWalletId,
+          billName: notification.billName,
+          amount: notification.amount
+        }
+      );
 
       logger.info('Lock required notification sent', {
         userId,

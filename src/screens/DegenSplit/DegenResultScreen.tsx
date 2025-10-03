@@ -21,6 +21,7 @@ import { styles } from './DegenResultStyles';
 import { SplitWalletService } from '../../services/splitWalletService';
 import { CastIntegrationService } from '../../services/castIntegrationService';
 import { NotificationService } from '../../services/notificationService';
+import { FallbackDataService } from '../../utils/fallbackDataService';
 import { useApp } from '../../context/AppContext';
 
 interface DegenResultScreenProps {
@@ -51,7 +52,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     const sendResultNotifications = async () => {
       if (!selectedParticipant || !splitWallet) return;
 
-      const billName = billData?.title || 'Restaurant Night';
+      const billName = MockupDataService.getBillName(); // Use unified mockup data
       const winnerId = selectedParticipant.id;
       const loserIds = participants.filter(p => p.id !== winnerId).map(p => p.id);
 
@@ -69,13 +70,86 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         {
           splitWalletId: splitWallet.id,
           billName,
-          amount: totalAmount,
+          amount: totalAmount / participants.length, // Each loser pays their share
         }
       );
     };
 
     sendResultNotifications();
   }, []);
+
+  // Check if all losers have paid their shares
+  React.useEffect(() => {
+    const checkPaymentCompletion = async () => {
+      if (!splitWallet || !selectedParticipant) return;
+
+      try {
+        const result = await SplitWalletService.getSplitWallet(splitWallet.id);
+        if (!result.success || !result.wallet) return;
+
+        const wallet = result.wallet;
+        const winnerId = selectedParticipant.id;
+        const losers = wallet.participants.filter(p => p.userId !== winnerId);
+        const allLosersPaid = losers.every(loser => loser.status === 'paid');
+
+        if (allLosersPaid && losers.length > 0) {
+          // Get merchant address if available
+          const merchantAddress = processedBillData?.merchant?.address || billData?.merchant?.address;
+          
+          // Complete the split and send funds to merchant
+          const completionResult = await SplitWalletService.completeSplitWallet(
+            splitWallet.id,
+            merchantAddress
+          );
+
+          if (completionResult.success) {
+            // Send completion notifications
+            await NotificationService.sendBulkNotifications(
+              [winnerId, ...losers.map(l => l.userId)],
+              'split_payment_required', // Use existing notification type
+              {
+                splitWalletId: splitWallet.id,
+                billName: MockupDataService.getBillName(), // Use unified mockup data
+                winnerName: selectedParticipant.name,
+              }
+            );
+
+            // Show completion alert
+            Alert.alert(
+              'Degen Split Complete! 🎉',
+              merchantAddress 
+                ? `All losers have paid their shares. The total amount of ${wallet.totalAmount} USDC has been sent to the merchant. ${selectedParticipant.name} won and paid nothing!`
+                : `All losers have paid their shares. ${selectedParticipant.name} won and paid nothing!`,
+              [
+                {
+                  text: 'OK',
+                  onPress: () => navigation.navigate('SplitsList'),
+                },
+              ]
+            );
+          } else {
+            console.error('Failed to complete degen split:', completionResult.error);
+            Alert.alert(
+              'Degen Split Complete (Partial)',
+              'All losers have paid their shares, but there was an issue sending funds to the merchant. Please contact support.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => navigation.navigate('SplitsList'),
+                },
+              ]
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Error checking payment completion:', error);
+      }
+    };
+
+    // Check every 5 seconds
+    const interval = setInterval(checkPaymentCompletion, 5000);
+    return () => clearInterval(interval);
+  }, [splitWallet, selectedParticipant]);
 
   const handleSettlePayment = async () => {
     if (!currentUser?.id || !splitWallet) {
@@ -114,38 +188,19 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           ]
         );
       } else {
-        // Loser pays their share - unlock funds and pay the bill
-        console.log('🔍 DegenResultScreen: Loser - paying share');
+        // Loser pays their share - navigate to payment screen
+        console.log('🔍 DegenResultScreen: Loser - navigating to payment screen');
         
         const loserShare = totalAmount / participants.length;
         
-        // Get Cast account for the merchant
-        const merchantName = processedBillData?.merchant?.name || billData?.name || 'Unknown Merchant';
-        const castAccount = CastIntegrationService.getCastAccount(merchantName);
-        
-        // Send payment to Cast account
-        const paymentResult = await SplitWalletService.sendToCastAccount(
-          splitWallet.id,
-          castAccount.address,
-          totalAmount, // Send the full bill amount
-          'USDC'
-        );
-
-        if (!paymentResult.success) {
-          Alert.alert('Error', paymentResult.error || 'Failed to send payment to Cast account');
-          return;
-        }
-
-        Alert.alert(
-          'Payment Complete',
-          `You paid your share of ${loserShare.toFixed(2)} USDC. The full bill of ${totalAmount} USDC has been sent to ${merchantName}.`,
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.navigate('SplitsList'),
-            },
-          ]
-        );
+        // Navigate to payment screen for the loser to pay their share
+        navigation.navigate('SplitPayment', {
+          splitWalletId: splitWallet.id,
+          billName: MockupDataService.getBillName(), // Use unified mockup data
+          totalAmount: loserShare, // Loser only pays their share
+          isDegenLoser: true,
+          winnerName: selectedParticipant.name,
+        });
       }
 
     } catch (error) {
@@ -295,11 +350,26 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           <Text style={styles.billDetailsTitle}>Bill Details</Text>
           <View style={styles.billDetailsRow}>
             <Text style={styles.billDetailsLabel}>Event:</Text>
-            <Text style={styles.billDetailsValue}>{billData.name || 'Restaurant Night'}</Text>
+            <Text style={styles.billDetailsValue}>{MockupDataService.getBillName()}</Text>
           </View>
           <View style={styles.billDetailsRow}>
             <Text style={styles.billDetailsLabel}>Date:</Text>
-            <Text style={styles.billDetailsValue}>{billData.date || '10 May 2025'}</Text>
+            <Text style={styles.billDetailsValue}>
+              {(() => {
+                try {
+                  const date = FallbackDataService.generateBillDate(processedBillData, billData, true);
+                  console.log('🔍 DegenResultScreen: Generated date:', date);
+                  return date;
+                } catch (error) {
+                  console.error('🔍 DegenResultScreen: Error generating date:', error);
+                  return new Date().toLocaleDateString('en-US', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                  });
+                }
+              })()}
+            </Text>
           </View>
           <View style={styles.billDetailsRow}>
             <Text style={styles.billDetailsLabel}>Total Amount:</Text>

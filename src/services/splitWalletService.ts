@@ -23,6 +23,7 @@ export interface SplitWallet {
   participants: SplitWalletParticipant[];
   createdAt: string;
   updatedAt: string;
+  completedAt?: string; // When the split was completed
   firebaseDocId?: string; // Firebase document ID for direct access
 }
 
@@ -287,6 +288,140 @@ export class SplitWalletService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Force reset split wallet to unified mockup data
+   * This completely resets the wallet with correct amounts and clears all payments
+   */
+  static async forceResetSplitWallet(splitWalletId: string): Promise<SplitWalletResult> {
+    try {
+      console.log('🔧 SplitWalletService: Force resetting split wallet:', { splitWalletId });
+
+      // Get the current wallet
+      const currentWalletResult = await this.getSplitWallet(splitWalletId);
+      if (!currentWalletResult.success || !currentWalletResult.wallet) {
+        return {
+          success: false,
+          error: 'Split wallet not found'
+        };
+      }
+
+      const currentWallet = currentWalletResult.wallet;
+      const { MockupDataService } = await import('../data/mockupData');
+      const unifiedAmount = MockupDataService.getBillAmount();
+
+      // Completely reset the wallet with unified mockup data
+      const resetWallet: SplitWallet = {
+        ...currentWallet,
+        totalAmount: unifiedAmount,
+        currency: 'USDC',
+        participants: currentWallet.participants.map(p => ({
+          ...p,
+          amountOwed: unifiedAmount / currentWallet.participants.length,
+          amountPaid: 0, // Reset all payments
+          status: 'pending' as const, // Reset all statuses
+          transactionSignature: undefined, // Clear transaction signatures
+          paidAt: undefined // Clear payment timestamps
+        }))
+      };
+
+      // Update the wallet in Firebase
+      const docId = currentWallet.firebaseDocId || splitWalletId;
+      await updateDoc(doc(db, 'splitWallets', docId), {
+        totalAmount: resetWallet.totalAmount,
+        currency: resetWallet.currency,
+        participants: resetWallet.participants,
+        updatedAt: new Date().toISOString(),
+      });
+
+      console.log('✅ SplitWalletService: Split wallet force reset successfully:', {
+        splitWalletId,
+        oldAmount: currentWallet.totalAmount,
+        newAmount: unifiedAmount,
+        participantsReset: currentWallet.participants.length
+      });
+
+      return {
+        success: true,
+        wallet: resetWallet
+      };
+
+    } catch (error) {
+      console.error('❌ SplitWalletService: Error force resetting split wallet:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Update split wallet total amount
+   * This is used for migration when the wallet amount needs to be corrected
+   */
+  static async updateSplitWalletAmount(splitWalletId: string, newTotalAmount: number, currency: string = 'USDC'): Promise<SplitWalletResult> {
+    try {
+      console.log('🔍 SplitWalletService: Updating split wallet amount:', {
+        splitWalletId,
+        newTotalAmount,
+        currency
+      });
+      
+
+      // Get the current wallet
+      const currentWalletResult = await this.getSplitWallet(splitWalletId);
+      if (!currentWalletResult.success || !currentWalletResult.wallet) {
+        return {
+          success: false,
+          error: 'Split wallet not found'
+        };
+      }
+
+      const currentWallet = currentWalletResult.wallet;
+      const oldAmount = currentWallet.totalAmount;
+
+      // Update the wallet with new amount
+      const updatedWallet: SplitWallet = {
+        ...currentWallet,
+        totalAmount: newTotalAmount,
+        currency,
+        participants: currentWallet.participants.map(p => ({
+          ...p,
+          amountOwed: newTotalAmount / currentWallet.participants.length, // Recalculate equal split
+          amountPaid: 0, // Reset payment amounts since we're changing the total
+          status: 'pending' as const // Reset status to pending
+        }))
+      };
+
+      // Update the wallet in Firebase
+      const docId = currentWallet.firebaseDocId || splitWalletId;
+      await updateDoc(doc(db, 'splitWallets', docId), {
+        totalAmount: updatedWallet.totalAmount,
+        currency: updatedWallet.currency,
+        participants: updatedWallet.participants,
+        updatedAt: new Date().toISOString(),
+      });
+
+      console.log('✅ SplitWalletService: Split wallet amount updated successfully:', {
+        splitWalletId,
+        oldAmount,
+        newTotalAmount,
+        currency
+      });
+
+      return {
+        success: true,
+        wallet: updatedWallet
+      };
+
+    } catch (error) {
+      console.error('❌ SplitWalletService: Error updating split wallet amount:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
@@ -866,6 +1001,20 @@ export class SplitWalletService {
       const remainingAmount = totalAmount - collectedAmount;
       const completionPercentage = Math.round((collectedAmount / totalAmount) * 100);
       
+      console.log('🔍 SplitWalletService: getSplitWalletCompletion calculation:', {
+        walletId: splitWalletId,
+        totalAmount,
+        collectedAmount,
+        remainingAmount,
+        completionPercentage,
+        participants: wallet.participants.map(p => ({
+          userId: p.userId,
+          amountOwed: p.amountOwed,
+          amountPaid: p.amountPaid,
+          status: p.status
+        }))
+      });
+      
       // Count participants who have paid
       const participantsPaid = wallet.participants.filter(p => p.amountPaid > 0).length;
       const totalParticipants = wallet.participants.length;
@@ -1271,6 +1420,81 @@ export class SplitWalletService {
 
     } catch (error) {
       logger.error('Failed to cancel split wallet', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Complete split wallet - mark as completed and optionally send funds to merchant
+   */
+  static async completeSplitWallet(
+    splitWalletId: string,
+    merchantAddress?: string
+  ): Promise<SplitWalletResult> {
+    try {
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = result.wallet;
+
+      // Verify all participants have paid
+      const allParticipantsPaid = wallet.participants.every(p => p.status === 'paid');
+      if (!allParticipantsPaid) {
+        return {
+          success: false,
+          error: 'Not all participants have paid their shares',
+        };
+      }
+
+      // If merchant address is provided, send the total amount to the merchant
+      if (merchantAddress) {
+        const merchantPaymentResult = await this.sendToCastAccount(
+          splitWalletId,
+          merchantAddress,
+          `Payment for bill ${wallet.billId}`
+        );
+
+        if (!merchantPaymentResult.success) {
+          return {
+            success: false,
+            error: merchantPaymentResult.error || 'Failed to send payment to merchant',
+          };
+        }
+      }
+
+      // Update wallet status to completed
+      const docId = wallet.firebaseDocId || splitWalletId;
+      await updateDoc(doc(db, 'splitWallets', docId), {
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      logger.info('Split wallet completed successfully', {
+        splitWalletId,
+        merchantAddress,
+        totalAmount: wallet.totalAmount
+      }, 'SplitWalletService');
+
+      return {
+        success: true,
+        wallet: {
+          ...wallet,
+          status: 'completed',
+          completedAt: new Date().toISOString(),
+        },
+      };
+
+    } catch (error) {
+      logger.error('Failed to complete split wallet', error, 'SplitWalletService');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',

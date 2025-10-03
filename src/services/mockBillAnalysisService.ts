@@ -2,21 +2,25 @@
  * Mock Bill Analysis Service
  * This simulates the Python OCR service output and can be easily replaced
  * with actual API calls to your Python service
+ * Now processes real AI/OCR data and converts to unified format
  */
 
 import { BillAnalysisData, BillAnalysisResult } from '../types/billAnalysis';
+import { MockupDataService } from '../data/mockupData';
+import { BillDataProcessor, IncomingBillData } from './billDataProcessor';
 
 export class MockBillAnalysisService {
   /**
    * Simulate bill analysis from image
    * In production, this would call your Python OCR service
+   * Now processes real AI/OCR data structure
    */
   static async analyzeBillImage(imageUri: string): Promise<BillAnalysisResult> {
     // Simulate processing delay
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Mock data based on your example
-    const mockData: BillAnalysisData = {
+    // Simulate receiving real AI/OCR data (this would come from your AI service)
+    const incomingData: IncomingBillData = {
       category: "Food & Drinks",
       country: "USA",
       currency: "USD",
@@ -52,138 +56,94 @@ export class MockBillAnalysisService {
       }
     };
 
+    // Process the incoming data using our processor
+    const processedData = BillDataProcessor.processIncomingBillData(incomingData);
+    
+    // Convert back to BillAnalysisData format for compatibility
+    const mockData: BillAnalysisData = {
+      category: incomingData.category,
+      country: incomingData.country,
+      currency: incomingData.currency,
+      store: {
+        name: incomingData.store.name,
+        location: {
+          address: incomingData.store.location.address,
+          city: incomingData.store.location.city,
+          state: incomingData.store.location.state,
+          zip_code: incomingData.store.location.zip_code,
+          phone: incomingData.store.location.phone
+        },
+        store_id: incomingData.store.store_id
+      },
+      transaction: {
+        date: incomingData.transaction.date,
+        time: incomingData.transaction.time,
+        order_id: incomingData.transaction.order_id,
+        employee: incomingData.transaction.employee,
+        items: incomingData.transaction.items,
+        sub_total: incomingData.transaction.sub_total,
+        sales_tax: incomingData.transaction.sales_tax,
+        order_total: incomingData.transaction.order_total,
+        calculated_total: incomingData.transaction.calculated_total
+      }
+    };
+
     return {
       success: true,
       data: mockData,
       processingTime: 2.5,
       confidence: 0.95,
-      rawText: "FIVE GUYS\n36 West 48th St\nNew York, NY 10022\n(212) 997-1270\n\nOrder: AAANCF3G4CCJ\nDate: 2/11/2017\nTime: 2:50:56 PM\nEmployee: Tiffany m\n\nCheeseburger $8.19\nMayo $0.00\nBacon Cheeseburger $9.19\nBacon $0.00\nJalapeno Peppers $0.00\nLittle Cajun Fry $2.99\nRegular Soda $2.99\n\nSubtotal: $26.35\nTax: $2.34\nTotal: $28.69",
+      rawText: `${incomingData.store.name}\n${incomingData.store.location.address}\n${incomingData.store.location.city}, ${incomingData.store.location.state} ${incomingData.store.location.zip_code}\n${incomingData.store.location.phone}\n\nOrder: ${incomingData.transaction.order_id}\nDate: ${incomingData.transaction.date}\nTime: ${incomingData.transaction.time}\nEmployee: ${incomingData.transaction.employee}\n\n${incomingData.transaction.items.map(item => `${item.name} $${item.price.toFixed(2)}`).join('\n')}\n\nSubtotal: $${incomingData.transaction.sub_total.toFixed(2)}\nTax: $${incomingData.transaction.sales_tax.toFixed(2)}\nTotal: $${incomingData.transaction.order_total.toFixed(2)}`,
     };
   }
 
   /**
    * Simulate different bill types for testing
+   * Now uses unified mockup data for consistency
    */
   static async analyzeBillImageWithType(imageUri: string, billType: 'restaurant' | 'coffee' | 'grocery' = 'restaurant'): Promise<BillAnalysisResult> {
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    let mockData: BillAnalysisData;
-
-    switch (billType) {
-      case 'coffee':
-        mockData = {
-          category: "Food & Drinks",
-          country: "USA",
-          currency: "USD",
-          store: {
-            name: "STARBUCKS",
-            location: {
-              address: "123 Main St",
-              city: "San Francisco",
-              state: "CA",
-              zip_code: "94102",
-              phone: "(415) 555-0123"
-            },
-            store_id: "SF-2222"
-          },
-          transaction: {
-            date: "3/15/2024",
-            time: "9:30:15 AM",
-            order_id: "SB123456",
-            employee: "Alex",
-            items: [
-              { name: "Grande Latte", price: 4.95 },
-              { name: "Blueberry Muffin", price: 2.95 },
-              { name: "Bottle Water", price: 1.50 }
-            ],
-            sub_total: 9.40,
-            sales_tax: 0.75,
-            order_total: 10.15,
-            calculated_total: 10.15
-          }
-        };
-        break;
-
-      case 'grocery':
-        mockData = {
-          category: "Groceries",
-          country: "USA",
-          currency: "USD",
-          store: {
-            name: "WHOLE FOODS",
-            location: {
-              address: "456 Market St",
-              city: "San Francisco",
-              state: "CA",
-              zip_code: "94105",
-              phone: "(415) 555-0456"
-            },
-            store_id: "SF-3333"
-          },
-          transaction: {
-            date: "3/20/2024",
-            time: "6:45:30 PM",
-            order_id: "WF789012",
-            employee: "Maria",
-            items: [
-              { name: "Organic Bananas", price: 3.99 },
-              { name: "Almond Milk", price: 4.49 },
-              { name: "Whole Grain Bread", price: 2.99 },
-              { name: "Greek Yogurt", price: 5.99 },
-              { name: "Spinach", price: 2.49 }
-            ],
-            sub_total: 19.95,
-            sales_tax: 1.60,
-            order_total: 21.55,
-            calculated_total: 21.55
-          }
-        };
-        break;
-
-      default: // restaurant
-        mockData = {
-          category: "Food & Drinks",
-          country: "USA",
-          currency: "USD",
-          store: {
-            name: "FIVE GUYS",
-            location: {
-              address: "36 West 48th St",
-              city: "New York",
-              state: "NY",
-              zip_code: "10022",
-              phone: "(212) 997-1270"
-            },
-            store_id: "NY-1111"
-          },
-          transaction: {
-            date: "2/11/2017",
-            time: "2:50:56 PM",
-            order_id: "AAANCF3G4CCJ",
-            employee: "Tiffany m",
-            items: [
-              { name: "Cheeseburger", price: 8.19 },
-              { name: "Mayo", price: 0.00 },
-              { name: "Bacon Cheeseburger", price: 9.19 },
-              { name: "Bacon", price: 0.00 },
-              { name: "Jalapeno Peppers", price: 0.00 },
-              { name: "Little Cajun Fry", price: 2.99 },
-              { name: "Regular Soda", price: 2.99 }
-            ],
-            sub_total: 26.35,
-            sales_tax: 2.34,
-            order_total: 28.69,
-            calculated_total: 28.69
-          }
-        };
-    }
+    // Use unified mockup data for consistency across all bill types
+    const mockupData = MockupDataService.getPrimaryBillData();
+    
+    const mockData: BillAnalysisData = {
+      category: billType === 'grocery' ? "Groceries" : "Food & Drinks",
+      country: "USA",
+      currency: "USD",
+      store: {
+        name: mockupData.merchant,
+        location: {
+          address: mockupData.location,
+          city: "San Francisco",
+          state: "CA",
+          zip_code: "94102",
+          phone: "(415) 555-0123"
+        },
+        store_id: "SF-001"
+      },
+      transaction: {
+        date: mockupData.date,
+        time: mockupData.time,
+        order_id: `GS${billType.toUpperCase()}001`,
+        employee: "Server",
+        items: mockupData.items.map(item => ({
+          name: item.name,
+          price: item.price
+        })),
+        sub_total: mockupData.subtotal,
+        sales_tax: mockupData.tax,
+        order_total: mockupData.totalAmount,
+        calculated_total: mockupData.totalAmount
+      }
+    };
 
     return {
       success: true,
       data: mockData,
       processingTime: 1.5,
       confidence: 0.92,
-      rawText: `Mock raw text for ${billType} bill`,
+      rawText: `Mock raw text for ${billType} bill - ${mockupData.merchant} - Total: $${mockupData.totalAmount.toFixed(2)}`,
     };
   }
 
