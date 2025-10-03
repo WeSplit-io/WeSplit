@@ -267,10 +267,10 @@ WeSplit/
 ## 🏗️ **Technical Architecture**
 
 - **Frontend**: React Native with Expo
-- **Backend**: Node.js/Express with SQLite
+- **Backend**: Node.js/Express (Firebase-only)
 - **Blockchain**: Solana Web3.js integration
 - **Payment Gateway**: MoonPay for fiat onramps
-- **Database**: SQLite for local development
+- **Database**: Firebase Firestore (cloud-native)
 
 ## 🔧 **Advanced Development**
 

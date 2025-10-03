@@ -6,14 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "migrate": "node scripts/migrate-to-firebase.js",
-    "sync": "node scripts/cli-tools.js",
-    "extract-firebase": "node scripts/extract-firebase-config.js",
-    "sync-status": "curl -s http://localhost:3000/api/sync/status | jq",
-    "sync-full": "curl -X POST http://localhost:3000/api/sync/full",
-    "sync-incremental": "curl -X POST http://localhost:3000/api/sync/incremental",
-    "backup-db": "node -e \"const fs = require('fs'); const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19); fs.copyFileSync('wesplit.db', `wesplit.backup.${date}.db`); console.log('Database backed up successfully');\"",
-    "reset-db": "node reset-db.js"
+    "extract-firebase": "node scripts/extract-firebase-config.js"
   },
   "dependencies": {
     "@sentry/node": "^9.36.0",
@@ -27,8 +20,7 @@
     "firebase-admin": "^13.4.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^7.0.5",
-    "sqlite3": "^5.1.7"
+    "nodemailer": "^7.0.5"
   },
   "devDependencies": {
     "@react-native-community/cli": "latest",

@@ -6,22 +6,11 @@ module.exports = {
     environment: process.env.NODE_ENV || 'production'
   },
 
-  // Database Configuration
+  // Database Configuration (Firebase-only)
   database: {
-    url: process.env.DATABASE_URL || 'sqlite:./wesplit.db',
-    backup: {
-      enabled: process.env.DATABASE_BACKUP_ENABLED === 'true',
-      interval: parseInt(process.env.DATABASE_BACKUP_INTERVAL) || 3600000 // 1 hour
-    },
-    connection: {
-      busyTimeout: 5000,
-      pragmas: {
-        journal_mode: 'WAL',
-        synchronous: 'NORMAL',
-        cache_size: -64000, // 64MB
-        temp_store: 'MEMORY'
-      }
-    }
+    type: 'firebase',
+    projectId: process.env.FIREBASE_PROJECT_ID || 'your-firebase-project-id',
+    // Note: SQLite configuration removed - app now uses Firebase-only architecture
   },
 
   // JWT Configuration
@@ -144,7 +133,7 @@ module.exports = {
     interval: parseInt(process.env.HEALTH_CHECK_INTERVAL) || 30000,
     timeout: parseInt(process.env.HEALTH_CHECK_TIMEOUT) || 5000,
     endpoints: {
-      database: true,
+      firebase: true, // Firebase health check instead of database
       external: true,
       memory: true
     }

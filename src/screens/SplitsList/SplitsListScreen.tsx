@@ -334,31 +334,6 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
   }, [navigation]);
 
 
-  const renderSplitCard = (split: Split) => {
-    const isActive = split.status === 'active';
-    const isClosed = split.status === 'completed' || split.status === 'cancelled';
-    const isCreator = split.creatorId === currentUser?.id?.toString();
-
-    return (
-      <TouchableOpacity
-        key={split.id}
-        style={styles.splitCard}
-        onPress={() => handleSplitPress(split)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.splitCardTop}>
-          <View style={styles.splitCardLeft}>
-            {/* Icône de pool dynamique (par défaut) */}
-            <View style={styles.splitCardIcon}>
-              <Image
-                source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-group.png?alt=media&token=group-icon-token' }}
-                style={{ width: 24, height: 24 }}
-                resizeMode="contain"
-                onError={() => {
-                  console.log('Pool icon failed to load, using fallback');
-                }}
-              />
-            </View>
 
   const renderSplitCard = (split: Split) => {
     // Use unified mockup data for consistency
@@ -436,7 +411,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
               )}
             </View>
           </View>
-        )}
+        </View>
       
         <View style={styles.splitFooter}>
           <Text style={styles.createdBy}>

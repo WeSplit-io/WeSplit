@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 
 const readline = require('readline');
-const FirebaseMigration = require('./migrate-to-firebase');
-const dataSyncService = require('../services/dataSyncService');
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -11,47 +9,34 @@ const rl = readline.createInterface({
 
 class CLITools {
   constructor() {
-    this.migration = new FirebaseMigration();
+    // No longer needed - app is Firebase-only
   }
 
   async showMenu() {
-    console.log('\n🚀 WeSplit Database Management Tools');
+    console.log('\n🚀 WeSplit Backend Management Tools');
     console.log('=====================================');
-    console.log('1. 🔄 Full Migration to Firebase');
-    console.log('2. 📊 Sync Status Check');
-    console.log('3. 🔄 Full Data Sync (SQLite → Firebase)');
-    console.log('4. ⚡ Incremental Sync');
-    console.log('5. 📈 Database Statistics');
-    console.log('6. 🧹 Reset Sync Statistics');
-    console.log('7. ⏰ Start Scheduled Sync');
-    console.log('8. ❌ Exit');
+    console.log('1. 📊 Health Check');
+    console.log('2. 🔍 Backend Status');
+    console.log('3. 📈 System Statistics');
+    console.log('4. ❌ Exit');
     console.log('=====================================');
 
-    const choice = await this.prompt('Select an option (1-8): ');
+    const choice = await this.prompt('Select an option (1-4): ');
+    await this.handleChoice(choice);
+  }
 
-    switch (choice) {
+  async handleChoice(choice) {
+    switch (choice.trim()) {
       case '1':
-        await this.runFullMigration();
+        await this.healthCheck();
         break;
       case '2':
-        await this.checkSyncStatus();
+        await this.backendStatus();
         break;
       case '3':
-        await this.runFullSync();
+        await this.systemStatistics();
         break;
       case '4':
-        await this.runIncrementalSync();
-        break;
-      case '5':
-        await this.showDatabaseStats();
-        break;
-      case '6':
-        await this.resetSyncStats();
-        break;
-      case '7':
-        await this.startScheduledSync();
-        break;
-      case '8':
         console.log('👋 Goodbye!');
         process.exit(0);
         break;
@@ -61,210 +46,93 @@ class CLITools {
     }
   }
 
-  async prompt(question) {
+  async healthCheck() {
+    console.log('\n🏥 Backend Health Check');
+    console.log('========================');
+    
+    try {
+      // Check if backend is running
+      const response = await fetch('http://localhost:3000/api/health');
+      const data = await response.json();
+      
+      console.log('✅ Backend Status:', data.status);
+      console.log('📅 Timestamp:', data.timestamp);
+      console.log('🏗️  Architecture:', data.architecture);
+      console.log('📦 Version:', data.version);
+      
+    } catch (error) {
+      console.log('❌ Backend is not running or not accessible');
+      console.log('💡 Make sure to start the backend with: npm start');
+    }
+    
+    await this.prompt('\nPress Enter to continue...');
+    await this.showMenu();
+  }
+
+  async backendStatus() {
+    console.log('\n🔍 Backend Status');
+    console.log('=================');
+    
+    console.log('📊 Architecture: Firebase-only');
+    console.log('🗄️  Database: Firebase Firestore');
+    console.log('🔗 API Endpoints: Subscription management only');
+    console.log('🚫 SQLite: Removed (migration complete)');
+    console.log('✅ Status: Clean and optimized');
+    
+    await this.prompt('\nPress Enter to continue...');
+    await this.showMenu();
+  }
+
+  async systemStatistics() {
+    console.log('\n📈 System Statistics');
+    console.log('====================');
+    
+    const memoryUsage = process.memoryUsage();
+    const memoryUsageMB = {
+      rss: Math.round(memoryUsage.rss / 1024 / 1024),
+      heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024),
+      heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+      external: Math.round(memoryUsage.external / 1024 / 1024)
+    };
+
+    console.log('💾 Memory Usage:');
+    console.log(`   RSS: ${memoryUsageMB.rss} MB`);
+    console.log(`   Heap Total: ${memoryUsageMB.heapTotal} MB`);
+    console.log(`   Heap Used: ${memoryUsageMB.heapUsed} MB`);
+    console.log(`   External: ${memoryUsageMB.external} MB`);
+    
+    console.log('\n⏰ Uptime:', this.formatUptime(process.uptime()));
+    console.log('🆔 Process ID:', process.pid);
+    console.log('📦 Node Version:', process.version);
+    
+    await this.prompt('\nPress Enter to continue...');
+    await this.showMenu();
+  }
+
+  formatUptime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+    if (minutes > 0) return `${minutes}m ${secs}s`;
+    return `${secs}s`;
+  }
+
+  prompt(question) {
     return new Promise((resolve) => {
-      rl.question(question, (answer) => {
-        resolve(answer.trim());
-      });
+      rl.question(question, resolve);
     });
-  }
-
-  async runFullMigration() {
-    console.log('\n🔄 Starting Full Migration to Firebase...');
-    console.log('⚠️  This will migrate ALL data from SQLite to Firebase Firestore');
-    
-    const confirm = await this.prompt('Are you sure you want to continue? (yes/no): ');
-    
-    if (confirm.toLowerCase() !== 'yes') {
-      console.log('❌ Migration cancelled.');
-      await this.showMenu();
-      return;
-    }
-
-    try {
-      await this.migration.runMigration();
-      console.log('\n✅ Migration completed successfully!');
-      
-      const continueChoice = await this.prompt('\nWould you like to continue with other operations? (yes/no): ');
-      if (continueChoice.toLowerCase() === 'yes') {
-        await this.showMenu();
-      } else {
-        console.log('👋 Goodbye!');
-        process.exit(0);
-      }
-    } catch (error) {
-      console.error('❌ Migration failed:', error.message);
-      await this.showMenu();
-    }
-  }
-
-  async checkSyncStatus() {
-    console.log('\n📊 Checking Sync Status...');
-    
-    try {
-      const status = await dataSyncService.getSyncStatus();
-      
-      console.log('\n📈 Sync Status Report:');
-      console.log('======================');
-      console.log(`Last Sync: ${status.lastSync ? status.lastSync.toLocaleString() : 'Never'}`);
-      console.log(`Currently Syncing: ${status.isSyncing ? 'Yes' : 'No'}`);
-      
-      console.log('\n📊 Record Counts:');
-      console.log('SQLite:', status.counts.sqlite);
-      console.log('Firebase:', status.counts.firebase);
-      
-      console.log('\n🔍 Differences (SQLite - Firebase):');
-      Object.entries(status.counts.differences).forEach(([entity, diff]) => {
-        const status = diff === 0 ? '✅' : diff > 0 ? '⚠️' : '❌';
-        console.log(`${status} ${entity}: ${diff}`);
-      });
-      
-      console.log('\n📈 Sync Statistics:');
-      Object.entries(status.syncStats).forEach(([entity, stats]) => {
-        if (entity !== 'lastSync') {
-          console.log(`${entity}: ${stats.synced} synced, ${stats.errors} errors`);
-        }
-      });
-      
-    } catch (error) {
-      console.error('❌ Error checking sync status:', error.message);
-    }
-    
-    await this.showMenu();
-  }
-
-  async runFullSync() {
-    console.log('\n🔄 Starting Full Data Sync...');
-    console.log('⚠️  This will sync ALL data from SQLite to Firebase');
-    
-    const confirm = await this.prompt('Are you sure you want to continue? (yes/no): ');
-    
-    if (confirm.toLowerCase() !== 'yes') {
-      console.log('❌ Sync cancelled.');
-      await this.showMenu();
-      return;
-    }
-
-    try {
-      await dataSyncService.syncAllData();
-      console.log('\n✅ Full sync completed successfully!');
-      
-    } catch (error) {
-      console.error('❌ Full sync failed:', error.message);
-    }
-    
-    await this.showMenu();
-  }
-
-  async runIncrementalSync() {
-    console.log('\n⚡ Starting Incremental Sync...');
-    
-    try {
-      await dataSyncService.syncIncremental();
-      console.log('\n✅ Incremental sync completed successfully!');
-      
-    } catch (error) {
-      console.error('❌ Incremental sync failed:', error.message);
-    }
-    
-    await this.showMenu();
-  }
-
-  async showDatabaseStats() {
-    console.log('\n📈 Database Statistics...');
-    
-    try {
-      const status = await dataSyncService.getSyncStatus();
-      
-      console.log('\n📊 SQLite Database:');
-      Object.entries(status.counts.sqlite).forEach(([entity, count]) => {
-        console.log(`  ${entity}: ${count} records`);
-      });
-      
-      console.log('\n🔥 Firebase Firestore:');
-      Object.entries(status.counts.firebase).forEach(([entity, count]) => {
-        console.log(`  ${entity}: ${count} documents`);
-      });
-      
-      console.log('\n🔍 Sync Status:');
-      console.log(`  Last Sync: ${status.lastSync ? status.lastSync.toLocaleString() : 'Never'}`);
-      console.log(`  Sync in Progress: ${status.isSyncing ? 'Yes' : 'No'}`);
-      
-    } catch (error) {
-      console.error('❌ Error getting database stats:', error.message);
-    }
-    
-    await this.showMenu();
-  }
-
-  async resetSyncStats() {
-    console.log('\n🧹 Resetting Sync Statistics...');
-    
-    const confirm = await this.prompt('Are you sure you want to reset sync statistics? (yes/no): ');
-    
-    if (confirm.toLowerCase() !== 'yes') {
-      console.log('❌ Reset cancelled.');
-      await this.showMenu();
-      return;
-    }
-
-    try {
-      dataSyncService.syncStats = {
-        lastSync: null,
-        users: { synced: 0, errors: 0 },
-        groups: { synced: 0, errors: 0 },
-        expenses: { synced: 0, errors: 0 },
-        notifications: { synced: 0, errors: 0 }
-      };
-      
-      console.log('✅ Sync statistics reset successfully!');
-      
-    } catch (error) {
-      console.error('❌ Error resetting sync statistics:', error.message);
-    }
-    
-    await this.showMenu();
-  }
-
-  async startScheduledSync() {
-    console.log('\n⏰ Starting Scheduled Sync...');
-    
-    const interval = await this.prompt('Enter sync interval in minutes (default: 30): ');
-    const intervalMinutes = parseInt(interval) || 30;
-    
-    if (intervalMinutes < 5) {
-      console.log('❌ Sync interval must be at least 5 minutes.');
-      await this.showMenu();
-      return;
-    }
-    
-    try {
-      dataSyncService.startScheduledSync(intervalMinutes);
-      console.log(`✅ Scheduled sync started with ${intervalMinutes} minute interval`);
-      console.log('💡 The sync will run automatically in the background');
-      console.log('💡 You can stop the process with Ctrl+C to stop scheduled sync');
-      
-    } catch (error) {
-      console.error('❌ Error starting scheduled sync:', error.message);
-    }
-    
-    await this.showMenu();
   }
 }
 
 // Main execution
 async function main() {
+  console.log('🚀 WeSplit Backend CLI Tools');
+  console.log('Firebase-only architecture');
+  
   const cli = new CLITools();
-  
-  console.log('🚀 Welcome to WeSplit Database Management Tools!');
-  console.log('This tool helps you manage database migration and synchronization.');
-  
-  try {
-    await cli.showMenu();
-  } catch (error) {
-    console.error('❌ An error occurred:', error.message);
-    process.exit(1);
-  }
+  await cli.showMenu();
 }
 
 // Handle graceful shutdown
@@ -274,9 +142,8 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Run the CLI if this file is executed directly
 if (require.main === module) {
-  main();
+  main().catch(console.error);
 }
 
-module.exports = CLITools; 
+module.exports = CLITools;

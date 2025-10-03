@@ -1,7 +1,6 @@
-// Core entity types that match the backend database schema
-// Support both SQLite (number) and Firebase (string) user IDs
+// Core entity types for Firebase-only architecture
 export interface User {
-  id: number | string; // Support both SQLite (number) and Firebase (string) IDs
+  id: string; // Firebase document ID
   name: string;
   email: string;
   wallet_address: string;
@@ -55,12 +54,12 @@ export interface ExpenseSplit {
 
 // Core expense entity
 export interface Expense {
-  id: number | string; // Support both SQLite (number) and Firebase (string) IDs
+  id: string; // Firebase document ID
   description: string;
   amount: number;
   currency: string;
-  paid_by: number | string; // Support both SQLite (number) and Firebase (string) IDs
-  group_id: number | string; // Support both SQLite (number) and Firebase (string) IDs
+  paid_by: string; // Firebase user ID
+  group_id: string; // Firebase group ID
   category: string;
   created_at: string;
   updated_at?: string;
@@ -97,14 +96,14 @@ export interface ExpenseByCurrency {
 
 // Core group entity
 export interface Group {
-  id: number | string; // Support both SQLite (number) and Firebase (string) IDs
+  id: string; // Firebase document ID
   name: string;
   description: string;
   category: string;
   currency: string;
   icon: string;
   color: string;
-  created_by: number | string; // Support both SQLite (number) and Firebase (string) IDs
+  created_by: string; // Firebase user ID
   created_at: string;
   updated_at: string;
   
@@ -124,7 +123,7 @@ export interface GroupWithDetails extends Group {
 
 // Balance calculation result
 export interface Balance {
-  userId: number | string; // Support both SQLite (number) and Firebase (string) IDs
+  userId: string; // Firebase user ID
   userName: string;
   userAvatar?: string;
   amount: number;
@@ -143,7 +142,7 @@ export interface SettlementCalculation {
 
 // Settlement transaction
 export interface SettlementTransaction {
-  userId: number | string; // Support both SQLite (number) and Firebase (string) IDs
+  userId: string; // Firebase user ID
   amount: number;
   currency: string;
   address: string;
@@ -167,9 +166,8 @@ export interface InviteLinkData {
 
 // Notification types
 export interface Notification {
-  id: string | number; // Support both SQLite (number) and Firebase (string) IDs
-  user_id?: number | string; // Legacy field for SQLite compatibility
-  userId?: string; // Firebase field
+  id: string; // Firebase document ID
+  userId: string; // Firebase user ID
   type: 'expense_added' | 'payment_reminder' | 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'general' | 'group_invite' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'group_payment_sent' | 'group_payment_received';
   title: string;
   message: string;

@@ -1,7 +1,7 @@
 /**
  * Account Deletion Service
- * Handles complete deletion of user account and all associated data
- * This service ensures GDPR compliance and complete data removal
+ * Handles complete deletion of user account and all associated data from Firebase
+ * This service ensures GDPR compliance and complete data removal (Firebase-only architecture)
  */
 
 import { 
@@ -162,15 +162,9 @@ export class AccountDeletionService {
         }
       }
 
-      // Delete from SQLite database if needed
-      try {
-        await this.deleteUserFromSQLite(userId);
-        logger.info('Deleted user from SQLite database', { userId }, 'AccountDeletionService');
-      } catch (error) {
-        const errorMsg = `Failed to delete from SQLite: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        result.errors.push(errorMsg);
-        logger.error('Error deleting from SQLite', error, 'AccountDeletionService');
-      }
+      // Note: SQLite deletion removed - app now uses Firebase-only architecture
+      // All user data is stored in Firebase collections and deleted above
+      logger.info('Firebase-only deletion completed - no SQLite cleanup needed', { userId }, 'AccountDeletionService');
 
       result.success = result.errors.length === 0;
       
@@ -313,99 +307,9 @@ export class AccountDeletionService {
   }
 
   /**
-   * Delete user from SQLite database
-   * This handles all SQLite tables with user-related data
+   * Note: SQLite deletion methods removed - app now uses Firebase-only architecture
+   * All user data is stored in Firebase collections and deleted in the main deletion flow
    */
-  private static async deleteUserFromSQLite(userId: string): Promise<void> {
-    try {
-      logger.info('Starting SQLite deletion process', { userId }, 'AccountDeletionService');
-      
-      // Define SQLite deletion steps in dependency order
-      const sqliteDeletionSteps = [
-        // 1. Delete notifications (has CASCADE delete)
-        { table: 'notifications', field: 'user_id', value: userId },
-        
-        // 2. Delete payment reminders
-        { table: 'payment_reminders', field: 'sender_id', value: userId },
-        { table: 'payment_reminders', field: 'recipient_id', value: userId },
-        
-        // 3. Delete personal settlements
-        { table: 'personal_settlements', field: 'user_id', value: userId },
-        { table: 'personal_settlements', field: 'recipient_id', value: userId },
-        
-        // 4. Delete expenses (paid by user)
-        { table: 'expenses', field: 'paid_by', value: userId },
-        
-        // 5. Delete group memberships
-        { table: 'group_members', field: 'user_id', value: userId },
-        
-        // 6. Delete groups created by user (after memberships are removed)
-        { table: 'groups', field: 'created_by', value: userId },
-        
-        // 7. Delete verification codes (by email)
-        { table: 'verification_codes', field: 'email', value: userId, isEmailField: true },
-        
-        // 8. Delete user record last
-        { table: 'users', field: 'id', value: userId }
-      ];
-
-      // Execute SQLite deletions via backend API
-      for (const step of sqliteDeletionSteps) {
-        try {
-          await this.executeSQLiteDeletion(step.table, step.field, step.value, step.isEmailField);
-          logger.info(`Deleted from SQLite table: ${step.table}`, { userId, field: step.field }, 'AccountDeletionService');
-        } catch (error) {
-          logger.error(`Failed to delete from SQLite table: ${step.table}`, error, 'AccountDeletionService');
-          // Continue with other tables even if one fails
-        }
-      }
-      
-      logger.info('SQLite deletion process completed', { userId }, 'AccountDeletionService');
-      
-    } catch (error) {
-      logger.error('Error in SQLite deletion process', error, 'AccountDeletionService');
-      throw error;
-    }
-  }
-
-  /**
-   * Execute a single SQLite deletion operation
-   */
-  private static async executeSQLiteDeletion(
-    table: string, 
-    field: string, 
-    value: string, 
-    isEmailField: boolean = false
-  ): Promise<void> {
-    try {
-      // For now, we'll use a placeholder implementation
-      // In production, this should call the backend API
-      logger.info(`Would delete from ${table} where ${field} = ${value}`, {}, 'AccountDeletionService');
-      
-      // TODO: Implement actual SQLite deletion via backend API
-      // const response = await fetch(`${API_BASE_URL}/admin/delete-user-data`, {
-      //   method: 'POST',
-      //   headers: { 
-      //     'Content-Type': 'application/json',
-      //     'Authorization': `Bearer ${adminToken}`
-      //   },
-      //   body: JSON.stringify({
-      //     table,
-      //     field,
-      //     value,
-      //     isEmailField
-      //   })
-      // });
-      
-      // if (!response.ok) {
-      //   throw new Error(`SQLite deletion failed: ${response.statusText}`);
-      // }
-      
-    } catch (error) {
-      logger.error(`SQLite deletion failed for ${table}`, error, 'AccountDeletionService');
-      throw error;
-    }
-  }
 
   /**
    * Get comprehensive user data summary before deletion (for confirmation)

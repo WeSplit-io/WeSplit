@@ -164,9 +164,7 @@ class MonitoringService {
   // Health check
   async healthCheck() {
     try {
-      // Check database connection
-      const pool = require('../db');
-      await pool.query('SELECT 1');
+      // Note: Database check removed - app now uses Firebase-only architecture
       
       // Check memory usage
       const memoryUsage = process.memoryUsage();
