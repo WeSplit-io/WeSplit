@@ -9,45 +9,196 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   Alert,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   Image,
   RefreshControl,
   ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { styles } from './styles';
 import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
 import NavBar from '../../components/NavBar';
 import UserAvatar from '../../components/UserAvatar';
 import { BillSplitSummary } from '../../types/billSplitting';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
 import { priceManagementService } from '../../services/priceManagementService';
 import { useApp } from '../../context/AppContext';
+import { firebaseDataService } from '../../services/firebaseDataService';
 
-type FilterType = 'all' | 'pending' | 'completed' | 'draft';
 
 interface SplitsListScreenProps {
   navigation: any;
 }
 
+// Avatar component with loading state and error handling (from DashboardScreen)
+const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  // Reset error state when avatar changes
+  useEffect(() => {
+    if (avatar && avatar.trim() !== '') {
+      setHasError(false);
+    }
+  }, [avatar]);
+
+  // Add timeout to prevent infinite loading
+  useEffect(() => {
+    if (isLoading) {
+      const timeout = setTimeout(() => {
+        console.log('⏰ Avatar loading timeout, falling back to initial');
+        setIsLoading(false);
+        setHasError(true);
+      }, 5000); // 5 second timeout
+
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoading]);
+
+  // Check if avatar is valid
+  const hasValidAvatar = avatar && avatar.trim() !== '' && !hasError;
+
+  // Fallback to initial if no valid avatar
+  if (!hasValidAvatar) {
+    return (
+      <View style={[style, { backgroundColor: colors.brandGreen, alignItems: 'center', justifyContent: 'center' }]}>
+        <Text style={{ fontSize: 14, fontWeight: 'medium', color: colors.white }}>
+          {displayName.charAt(0).toUpperCase()}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[style, { overflow: 'hidden', position: 'relative' }]}>
+      {isLoading && (
+        <View style={[
+          StyleSheet.absoluteFill,
+          {
+            backgroundColor: colors.darkBorder,
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10
+          }
+        ]}>
+          <ActivityIndicator size="small" color={colors.primaryGreen} />
+        </View>
+      )}
+      <Image
+        source={{ uri: avatar }}
+        style={{ width: '100%', height: '100%' }}
+        resizeMode="cover"
+        onLoadStart={() => {
+          console.log('🔄 Avatar loading started:', avatar);
+          setIsLoading(true);
+        }}
+        onLoad={() => {
+          console.log('✅ Avatar loaded successfully:', avatar);
+          setIsLoading(false);
+        }}
+        onError={(e) => {
+          console.log('❌ Avatar loading error:', e.nativeEvent.error, 'for URL:', avatar);
+          setIsLoading(false);
+          setHasError(true);
+        }}
+      />
+    </View>
+  );
+};
+
 const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
   const { state } = useApp();
   const { currentUser } = state;
-  
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+
   const [splits, setSplits] = useState<Split[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'closed'>('all');
+  const [participantAvatars, setParticipantAvatars] = useState<Record<string, string>>({});
+
+  // Load participant avatars dynamically
+  const loadParticipantAvatars = useCallback(async (splits: Split[]) => {
+    try {
+      const userIds = new Set<string>();
+
+      // Collect all unique user IDs from splits
+      splits.forEach(split => {
+        split.participants.forEach(participant => {
+          if (participant.userId) {
+            userIds.add(participant.userId);
+          }
+        });
+      });
+
+      if (userIds.size === 0) return;
+
+      // Fetch user profiles in parallel
+      const avatarPromises = Array.from(userIds).map(async (userId) => {
+        try {
+          const profile = await firebaseDataService.user.getCurrentUser(userId);
+          return { userId, avatar: profile?.avatar || '' };
+        } catch (error) {
+          console.error(`Error fetching avatar for user ${userId}:`, error);
+          return { userId, avatar: '' };
+        }
+      });
+
+      const avatarResults = await Promise.all(avatarPromises);
+
+      // Create avatar mapping
+      const avatarMap: Record<string, string> = {};
+      avatarResults.forEach(({ userId, avatar }) => {
+        avatarMap[userId] = avatar;
+      });
+
+      setParticipantAvatars(avatarMap);
+    } catch (error) {
+      console.error('Error loading participant avatars:', error);
+    }
+  }, []);
+
+  // Pool de test pour le design
+  const testPool: Split = {
+    id: 'test-pool-1',
+    title: 'Hackathon Solana',
+    status: 'active',
+    totalAmount: 1250.00,
+    currency: 'USDC',
+    splitType: 'fair',
+    date: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    creatorId: (currentUser?.id || 'test-user').toString(),
+    creatorName: 'Test User',
+    participants: [
+      { userId: 'user1', name: 'Alice', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
+      { userId: 'user2', name: 'Bob', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
+      { userId: 'user3', name: 'Charlie', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
+      { userId: 'user4', name: 'David', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
+      { userId: 'user5', name: 'Eve', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
+      { userId: 'user6', name: 'Frank', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
+      { userId: 'user7', name: 'Grace', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
+    ],
+    billId: 'test-bill-1',
+    firebaseDocId: 'test-doc-1',
+  };
 
   useEffect(() => {
     if (currentUser?.id) {
       loadSplits();
     }
   }, [currentUser?.id]);
+
+  // Load participant avatars when splits change
+  useEffect(() => {
+    if (splits.length > 0) {
+      loadParticipantAvatars(splits);
+    }
+  }, [splits, loadParticipantAvatars]);
 
   const loadSplits = async () => {
     if (!currentUser?.id) {
@@ -58,9 +209,9 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     setIsLoading(true);
     try {
       console.log('🔍 SplitsListScreen: Loading splits for user:', currentUser.id);
-      
-      const result = await SplitStorageService.getUserSplits(currentUser.id);
-      
+
+      const result = await SplitStorageService.getUserSplits(String(currentUser.id));
+
       if (result.success && result.splits) {
         console.log('🔍 SplitsListScreen: Loaded splits:', {
           count: result.splits.length,
@@ -79,15 +230,15 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
             }))
           }))
         });
-        
+
         // Fix existing splits where creator has 'pending' status and validate prices
         const updatedSplits = await Promise.all(result.splits.map(async (split) => {
           // Get authoritative price from centralized price management
           const billId = split.billId || split.id;
           const authoritativePrice = priceManagementService.getBillPrice(billId);
-          
+
           let updatedSplit = split;
-          
+
           // Update price if authoritative price is available
           if (authoritativePrice) {
             console.log('💰 SplitsListScreen: Using authoritative price for split:', {
@@ -100,7 +251,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
               totalAmount: authoritativePrice.amount
             };
           }
-          
+
           const creatorParticipant = updatedSplit.participants.find(p => p.userId === updatedSplit.creatorId);
           if (creatorParticipant && creatorParticipant.status === 'pending') {
             console.log('🔍 SplitsListScreen: Fixing creator status for split:', updatedSplit.id);
@@ -111,7 +262,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
                 'accepted'
               );
               // Update the local split data
-              const updatedParticipants = updatedSplit.participants.map(p => 
+              const updatedParticipants = updatedSplit.participants.map(p =>
                 p.userId === updatedSplit.creatorId ? { ...p, status: 'accepted' as const } : p
               );
               return { ...updatedSplit, participants: updatedParticipants };
@@ -122,8 +273,13 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           }
           return updatedSplit;
         }));
-        
-        setSplits(updatedSplits);
+
+        // Ajouter la pool de test pour le design
+        const allSplits = [testPool, ...updatedSplits];
+        setSplits(allSplits);
+
+        // Load participant avatars
+        loadParticipantAvatars(allSplits);
       } else {
         console.log('🔍 SplitsListScreen: Failed to load splits:', result.error);
         Alert.alert('Error', result.error || 'Failed to load splits');
@@ -144,12 +300,6 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     setRefreshing(false);
   }, []);
 
-  const getFilteredSplits = useCallback(() => {
-    if (activeFilter === 'all') {
-      return splits;
-    }
-    return splits.filter(split => split.status === activeFilter);
-  }, [splits, activeFilter]);
 
   const handleCreateSplit = useCallback(() => {
     try {
@@ -160,6 +310,8 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     }
   }, [navigation]);
 
+
+
   const handleSplitPress = useCallback((split: Split) => {
     try {
       console.log('🔍 SplitsListScreen: Opening split:', {
@@ -167,7 +319,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         title: split.title,
         status: split.status
       });
-      
+
       // Navigate to split details screen
       navigation.navigate('SplitDetails', {
         splitId: split.id,
@@ -180,140 +332,113 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     }
   }, [navigation]);
 
-  const renderFilterButton = (filter: FilterType, label: string) => {
-    const isActive = activeFilter === filter;
+
+  const renderSplitCard = (split: Split) => {
+    const isActive = split.status === 'active';
+    const isClosed = split.status === 'completed' || split.status === 'cancelled';
+    const isCreator = split.creatorId === currentUser?.id?.toString();
+
     return (
       <TouchableOpacity
-        style={[styles.filterButton, isActive && styles.filterButtonActive]}
-        onPress={() => setActiveFilter(filter)}
+        key={split.id}
+        style={styles.splitCard}
+        onPress={() => handleSplitPress(split)}
+        activeOpacity={0.7}
       >
-        <Text style={[styles.filterButtonText, isActive && styles.filterButtonTextActive]}>
-          {label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
+        <View style={styles.splitCardTop}>
+          <View style={styles.splitCardLeft}>
+            {/* Icône de pool dynamique (par défaut) */}
+            <View style={styles.splitCardIcon}>
+              <Image
+                source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-group.png?alt=media&token=group-icon-token' }}
+                style={{ width: 24, height: 24 }}
+                resizeMode="contain"
+                onError={() => {
+                  console.log('Pool icon failed to load, using fallback');
+                }}
+              />
+            </View>
 
-  const renderSplitCard = (split: Split) => (
-    <TouchableOpacity
-      key={split.id}
-      style={styles.splitCard}
-      onPress={() => handleSplitPress(split)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.splitHeader}>
-        <View style={styles.splitTitleContainer}>
-          <Text style={styles.splitTitle} numberOfLines={1}>
-            {split.title}
-          </Text>
-          <Text style={styles.splitDate}>
-            {split.date ? (() => {
-              try {
-                const date = new Date(split.date);
-                if (isNaN(date.getTime())) {
-                  return 'Invalid Date';
-                }
-                return date.toLocaleDateString();
-              } catch (error) {
-                console.warn('🔍 SplitsListScreen: Error parsing date:', split.date, error);
-                return 'Invalid Date';
-              }
-            })() : 'No Date'}
-          </Text>
-        </View>
-        
-        <View style={[styles.statusBadge, getStatusBadgeStyle(split.status)]}>
-          <Text style={[styles.statusText, getStatusTextStyle(split.status)]}>
-            {split.status}
-          </Text>
-        </View>
-      </View>
-      
-        <View style={styles.splitDetails}>
-          <View style={styles.amountContainer}>
-            <Text style={styles.amountLabel}>Total</Text>
-            <Text style={styles.amountValue}>
-              ${split.totalAmount.toFixed(2)}
+            {/* Contenu principal */}
+            <View style={styles.splitCardContent}>
+              <Text style={styles.splitCardTitle} numberOfLines={1}>
+                {split.title}
+              </Text>
+              <View style={styles.splitCardRole}>
+                <Image
+                  source={isCreator ? require('../../../assets/award-icon.png') : require('../../../assets/user-icon.png')}
+                  style={styles.splitCardRoleIcon}
+                  resizeMode="contain"
+                />
+                <Text style={styles.splitCardSubtitle}>{isCreator ? 'Creator' : 'Participant'}</Text>
+              </View>
+
+
+            </View>
+
+          </View>
+
+
+
+
+
+          <View style={styles.splitCardStatus}>
+            <View style={[
+              styles.splitCardStatusDot,
+              { backgroundColor: isActive ? colors.green : colors.red }
+            ]} />
+            <Text style={styles.splitCardStatusText}>
+              {isActive ? 'Active' : isClosed ? 'Closed' : split.status}
             </Text>
           </View>
-          
-          <View style={styles.participantsContainer}>
-            <Text style={styles.participantsLabel}>Participants</Text>
-            <Text style={styles.participantsValue}>
-              {split.participants.filter(p => 
-                p.status === 'accepted' || 
-                p.status === 'paid' || 
-                p.status === 'locked' ||
-                p.userId === split.creatorId // Always include the creator
-              ).length}/{split.participants.length}
-            </Text>
-          </View>
+
         </View>
-        
-        {/* Participant Avatars */}
-        {split.participants.length > 0 && (
-          <View style={styles.participantAvatarsContainer}>
-            <Text style={styles.participantAvatarsLabel}>Participants:</Text>
+
+        <View style={styles.splitCardBottom}>
+
+          {/* Avatars des membres dynamiques */}
+          <View style={styles.splitCardMembers}>
             <View style={styles.participantAvatars}>
-              {split.participants.slice(0, 4).map((participant, index) => (
-                <UserAvatar
+              {split.participants.slice(0, 3).map((participant, index) => (
+                <AvatarComponent
                   key={participant.userId}
-                  userId={participant.userId}
-                  userName={participant.name}
-                  size={32}
+                  avatar={participantAvatars[participant.userId]}
+                  displayName={participant.name}
                   style={[
                     styles.participantAvatar,
                     index > 0 && styles.participantAvatarOverlap
                   ]}
                 />
               ))}
-              {split.participants.length > 4 && (
+              {split.participants.length > 3 && (
                 <View style={[styles.participantAvatar, styles.participantAvatarOverlay]}>
-                  <Text style={styles.participantAvatarOverlayText}>
-                    +{split.participants.length - 4}
+                  <Text style={[styles.participantAvatarOverlayText]}>
+                    +{split.participants.length - 3}
                   </Text>
                 </View>
               )}
             </View>
           </View>
-        )}
-      
-      <View style={styles.splitFooter}>
-        <Text style={styles.createdBy}>
-          {split.creatorId === currentUser?.id ? 'Created by you' : `Created by ${split.creatorName}`}
-        </Text>
-        <Text style={styles.createdAt}>
-          {split.createdAt ? (() => {
-            try {
-              const date = new Date(split.createdAt);
-              if (isNaN(date.getTime())) {
-                return 'Invalid Date';
-              }
-              return date.toLocaleDateString();
-            } catch (error) {
-              console.warn('🔍 SplitsListScreen: Error parsing createdAt:', split.createdAt, error);
-              return 'Invalid Date';
-            }
-          })() : 'No Date'}
-        </Text>
-      </View>
-      
-      {/* Wallet Information - Only show for creators */}
-      {split.creatorId === currentUser?.id && split.walletAddress && (
-        <View style={styles.walletInfo}>
-          <Text style={styles.walletLabel}>Split Wallet:</Text>
-          <Text style={styles.walletAddress} numberOfLines={1} ellipsizeMode="middle">
-            {split.walletAddress}
-          </Text>
+
+          <Image
+            source={require('../../../assets/chevron-right.png')}
+            style={styles.splitCardArrow}
+            resizeMode="contain"
+          />
+
+
         </View>
-      )}
-    </TouchableOpacity>
-  );
+
+
+
+      </TouchableOpacity>
+    );
+  };
 
   const getStatusBadgeStyle = (status: string) => {
     switch (status) {
       case 'active':
-        return { backgroundColor: colors.primary + '20' };
+        return { backgroundColor: colors.green + '20' };
       case 'completed':
         return { backgroundColor: colors.success + '20' };
       case 'pending':
@@ -328,7 +453,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
   const getStatusTextStyle = (status: string) => {
     switch (status) {
       case 'active':
-        return { color: colors.primary };
+        return { color: colors.green };
       case 'completed':
         return { color: colors.success };
       case 'pending':
@@ -340,12 +465,27 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     }
   };
 
+  const getFilteredSplits = useCallback(() => {
+    if (activeFilter === 'all') {
+      return splits;
+    }
+    return splits.filter(split => {
+      if (activeFilter === 'active') {
+        return split.status === 'active';
+      }
+      if (activeFilter === 'closed') {
+        return split.status === 'completed' || split.status === 'cancelled';
+      }
+      return true;
+    });
+  }, [splits, activeFilter]);
+
   const displaySplits = getFilteredSplits();
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-      
+
       <ScrollView
         style={styles.scrollView}
         refreshControl={
@@ -354,81 +494,142 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Bill Splits</Text>
-          <Text style={styles.headerSubtitle}>
-            Manage your shared expenses
-          </Text>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
+          <Text style={styles.headerTitle}>Pools</Text>
           <TouchableOpacity
-            style={styles.createButton}
             onPress={handleCreateSplit}
+            activeOpacity={0.8}
           >
-            <View style={styles.createButtonIcon}>
-              <Text style={styles.createButtonIconText}>📷</Text>
-            </View>
-            <Text style={styles.createButtonText}>Capture Bill</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={styles.quickActionButton}
-            onPress={() => {
-              // TODO: Navigate to manual split creation
-              Alert.alert('Manual Split', 'Manual split creation coming soon!');
-            }}
-          >
-            <Text style={styles.quickActionText}>Manual Split</Text>
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.newPoolButton}
+            >
+              <Text style={styles.newPoolButtonIcon}>+</Text>
+              <Text style={styles.newPoolButtonText}>New Pool</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
         {/* Filter Tabs */}
         <View style={styles.filtersContainer}>
-          {renderFilterButton('all', 'All')}
-          {renderFilterButton('pending', 'Pending')}
-          {renderFilterButton('active', 'Active')}
-          {renderFilterButton('completed', 'Completed')}
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            onPress={() => setActiveFilter('all')}
+            activeOpacity={0.8}
+          >
+            {activeFilter === 'all' ? (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.filterButton}
+              >
+                <Text style={styles.filterButtonTextActive}>
+                  All
+                </Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.filterButton}>
+                <Text style={styles.filterButtonText}>
+                  All
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            onPress={() => setActiveFilter('active')}
+            activeOpacity={0.8}
+          >
+            {activeFilter === 'active' ? (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.filterButton}
+              >
+                <Text style={styles.filterButtonTextActive}>
+                  Active
+                </Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.filterButton}>
+                <Text style={styles.filterButtonText}>
+                  Active
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            onPress={() => setActiveFilter('closed')}
+            activeOpacity={0.8}
+          >
+            {activeFilter === 'closed' ? (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.filterButton}
+              >
+                <Text style={styles.filterButtonTextActive}>
+                  Closed
+                </Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.filterButton}>
+                <Text style={styles.filterButtonText}>
+                  Closed
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Splits List */}
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <ActivityIndicator size="large" color={colors.green} />
             <Text style={styles.loadingText}>Loading splits...</Text>
           </View>
-        ) : displaySplits.length === 0 ? (
+        ) : splits.length === 0 ? (
+          // Global empty state when there are no pools at all
           <View style={styles.emptyState}>
-            <Image 
-              source={{ 
-                uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fgroup-enpty-state.png?alt=media&token=c3f4dae7-1628-4d8a-9836-e413e3824ebd' 
-              }} 
-              style={styles.emptyStateIcon} 
+            <Image
+              source={require('../../../assets/pool-empty-icon.png')}
+              style={styles.emptyStateIcon}
             />
-            <Text style={styles.emptyStateTitle}>No splits found</Text>
-            <Text style={styles.emptyStateSubtitle}>
-              {activeFilter === 'all'
-                ? "Create your first bill split to start sharing expenses"
-                : activeFilter === 'pending'
-                  ? "No pending splits"
-                  : activeFilter === 'active'
-                    ? "No active splits"
-                    : "No completed splits"}
-            </Text>
-            {activeFilter === 'all' && (
-              <TouchableOpacity
+            <View style={styles.emptyStateContent}>
+              <Text style={styles.emptyStateTitle}>It's empty here</Text>
+              <Text style={styles.emptyStateSubtitle}>
+                Pools let you bring people together and share expenses seamlessly. Create one to kick things off!
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.createFirstButtonWrapper}
+              onPress={handleCreateSplit}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
                 style={styles.createFirstButton}
-                onPress={handleCreateSplit}
               >
-                <Text style={styles.createFirstButtonText}>Create Your First Split</Text>
-              </TouchableOpacity>
-            )}
+                <Text style={styles.createFirstButtonText}>Create my first pool</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        ) : displaySplits.length === 0 ? (
+          // Compact empty state for tabs (e.g., Closed) with no results
+          <View style={styles.emptyTabState}>
+            <Text style={styles.emptyTabText}>No pools found</Text>
           </View>
         ) : (
           <View style={styles.splitsContainer}>
-            <Text style={styles.sectionTitle}>
-              {activeFilter === 'all' ? 'All Splits' : `${activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)} Splits`}
-            </Text>
             {displaySplits.map(renderSplitCard)}
           </View>
         )}
@@ -439,290 +640,5 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: '700',
-    color: colors.white,
-    marginBottom: spacing.xs,
-  },
-  headerSubtitle: {
-    fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  createButton: {
-    flex: 1,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginRight: spacing.sm,
-    alignItems: 'center',
-  },
-  createButtonIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.white + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  createButtonIconText: {
-    fontSize: 24,
-  },
-  createButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-  },
-  quickActionButton: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginLeft: spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickActionText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-  },
-  filtersContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  filterButton: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    marginHorizontal: spacing.xs,
-    borderRadius: 8,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-  },
-  filterButtonActive: {
-    backgroundColor: colors.primary,
-  },
-  filterButtonText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  filterButtonTextActive: {
-    color: colors.white,
-    fontWeight: '600',
-  },
-  splitsContainer: {
-    paddingHorizontal: spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    color: colors.white,
-    marginBottom: spacing.md,
-  },
-  splitCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  splitHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  splitTitleContainer: {
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  splitTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    color: colors.white,
-    marginBottom: spacing.xs,
-  },
-  splitDate: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-  },
-  statusBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  splitDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  amountContainer: {
-    alignItems: 'center',
-  },
-  amountLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  amountValue: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  participantsContainer: {
-    alignItems: 'center',
-  },
-  participantsLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  participantsValue: {
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-    color: colors.white,
-  },
-  splitFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  createdBy: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-  },
-  createdAt: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xxl,
-  },
-  emptyStateIcon: {
-    width: 120,
-    height: 120,
-    marginBottom: spacing.lg,
-  },
-  emptyStateTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: '600',
-    color: colors.white,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  emptyStateSubtitle: {
-    fontSize: typography.fontSize.md,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: spacing.xl,
-  },
-  createFirstButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: 8,
-  },
-  createFirstButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
-  },
-  loadingText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.md,
-    marginTop: spacing.md,
-  },
-  walletInfo: {
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  walletLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.xs,
-    marginBottom: spacing.xs,
-  },
-  walletAddress: {
-    color: colors.green,
-    fontSize: typography.fontSize.sm,
-    fontFamily: 'monospace',
-  },
-  participantAvatarsContainer: {
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  participantAvatarsLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.xs,
-    marginBottom: spacing.xs,
-  },
-  participantAvatars: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  participantAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.black,
-  },
-  participantAvatarOverlap: {
-    marginLeft: -8,
-  },
-  participantAvatarOverlay: {
-    backgroundColor: colors.green,
-    borderColor: colors.black,
-  },
-  participantAvatarOverlayText: {
-    color: colors.white,
-    fontSize: typography.fontSize.xs,
-    fontWeight: '600',
-  },
-});
 
 export default SplitsListScreen;
