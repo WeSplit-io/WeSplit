@@ -32,7 +32,7 @@ import { secureStorageService } from '../../services/secureStorageService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
-import QRCodeModal from '../../components/QRCodeModal';
+import { QRCodeScreen } from '../QRCode';
 import { generateProfileLink } from '../../services/deepLinkHandler';
 
 const WalletManagementScreen: React.FC = () => {
@@ -64,7 +64,7 @@ const WalletManagementScreen: React.FC = () => {
   const [showMultiSignActivated, setShowMultiSignActivated] = useState(false);
   const [sliderValue] = useState(new Animated.Value(0));
   const [isSliderActive, setIsSliderActive] = useState(false);
-  const [qrCodeModalVisible, setQrCodeModalVisible] = useState(false);
+  const [showQRCodeScreen, setShowQRCodeScreen] = useState(false);
   const [isKastConnected, setIsKastConnected] = useState(true); // Simulation pour le design
   const [isExternalWalletSimulated, setIsExternalWalletSimulated] = useState(true); // Simulation pour External wallet
 
@@ -941,7 +941,7 @@ const WalletManagementScreen: React.FC = () => {
               {/* QR Code Button for Profile Sharing */}
               <TouchableOpacity
                 style={styles.qrCodeIcon}
-                onPress={() => setQrCodeModalVisible(true)}
+                onPress={() => setShowQRCodeScreen(true)}
               >
                 <Image
                   source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fqr-code-scan.png?alt=media&token=3fc388bd-fdf7-4863-a8b1-9313490d6382' }}
@@ -1137,20 +1137,25 @@ const WalletManagementScreen: React.FC = () => {
 
       <NavBar currentRoute="WalletManagement" navigation={navigation} />
 
-      {/* QR Code Modal */}
-      <QRCodeModal
-        visible={qrCodeModalVisible}
-        onClose={() => setQrCodeModalVisible(false)}
-        qrValue={generateProfileLink(
-          currentUser?.id?.toString() || '',
-          currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
-          currentUser?.email,
-          currentUser?.wallet_address
-        )}
-        title="Share your profile QR code"
-        displayName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
-        isGroup={false}
-      />
+      {/* QR Code Screen */}
+      <Modal
+        visible={showQRCodeScreen}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setShowQRCodeScreen(false)}
+      >
+        <QRCodeScreen
+          onBack={() => setShowQRCodeScreen(false)}
+          userPseudo={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
+          userWallet={currentUser?.wallet_address || ''}
+          qrValue={generateProfileLink(
+            currentUser?.id?.toString() || '',
+            currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
+            currentUser?.email,
+            currentUser?.wallet_address
+          )}
+        />
+      </Modal>
     </SafeAreaView>
   );
 };

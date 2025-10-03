@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   StyleSheet,
+  Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
@@ -21,7 +22,7 @@ import AuthGuard from '../../components/AuthGuard';
 import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
 import WalletSelectorModal from '../../components/WalletSelectorModal';
-import QRCodeModal from '../../components/QRCodeModal';
+import { QRCodeScreen } from '../QRCode';
 import GroupIcon from '../../components/GroupIcon';
 import TransactionModal from '../../components/TransactionModal';
 import { useApp } from '../../context/AppContext';
@@ -169,7 +170,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [loadingUserWallet, setLoadingUserWallet] = useState(false);
   const [connectingWallet, setConnectingWallet] = useState(false);
   const [walletSelectorVisible, setWalletSelectorVisible] = useState(false);
-  const [qrCodeModalVisible, setQrCodeModalVisible] = useState(false);
+  const [showQRCodeScreen, setShowQRCodeScreen] = useState(false);
   const [groupSummaries, setGroupSummaries] = useState<Record<string, { totalAmount: number; memberCount: number; expenseCount: number; hasData: boolean }>>({});
   const [transactionModalVisible, setTransactionModalVisible] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -1544,7 +1545,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               {/* QR Code Button for Profile Sharing */}
               <TouchableOpacity
                 style={styles.qrCodeIcon}
-                onPress={() => setQrCodeModalVisible(true)}
+                onPress={() => setShowQRCodeScreen(true)}
               >
                 <Image
                   source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fqr-code-scan.png?alt=media&token=3fc388bd-fdf7-4863-a8b1-9313490d6382' }}
@@ -1959,20 +1960,25 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         onClose={() => setWalletSelectorVisible(false)}
       />
 
-      {/* QR Code Modal */}
-      <QRCodeModal
-        visible={qrCodeModalVisible}
-        onClose={() => setQrCodeModalVisible(false)}
-        qrValue={generateProfileLink(
-          currentUser?.id?.toString() || '',
-          currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
-          currentUser?.email,
-          currentUser?.wallet_address
-        )}
-        title="Share your profile QR code"
-        displayName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
-        isGroup={false}
-      />
+      {/* QR Code Screen */}
+      <Modal
+        visible={showQRCodeScreen}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setShowQRCodeScreen(false)}
+      >
+        <QRCodeScreen
+          onBack={() => setShowQRCodeScreen(false)}
+          userPseudo={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
+          userWallet={currentUser?.wallet_address || ''}
+          qrValue={generateProfileLink(
+            currentUser?.id?.toString() || '',
+            currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
+            currentUser?.email,
+            currentUser?.wallet_address
+          )}
+        />
+      </Modal>
 
       {/* Transaction Modal */}
       <TransactionModal

@@ -32,11 +32,9 @@ export const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
+    padding: 4,
     backgroundColor: colors.white5,
     borderRadius: 16,
-    padding: 4,
     marginBottom: spacing.md,
     width: '100%',
     marginTop: spacing.md,
@@ -91,7 +89,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.screenPaddingHorizontal,
+    paddingHorizontal: spacing.sm,
   },
   avatar: {
     width: spacing.xxl + spacing.sm,

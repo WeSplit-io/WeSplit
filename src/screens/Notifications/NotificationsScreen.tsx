@@ -1089,64 +1089,6 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
 
 
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-
-    const diffInWeeks = Math.floor(diffInDays / 7);
-    return `${diffInWeeks}w ago`;
-  };
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
-
-  const isToday = (dateString: string) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    return date.toDateString() === today.toDateString();
-  };
-
-  const isYesterday = (dateString: string) => {
-    const date = new Date(dateString);
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    return date.toDateString() === yesterday.toDateString();
-  };
-
-  const getSectionTitle = (dateString: string) => {
-    if (isToday(dateString)) return 'Today';
-    if (isYesterday(dateString)) return 'Yesterday';
-    return 'Earlier';
-  };
-
-  const groupNotificationsByDate = (notifications: any[]) => {
-    const grouped: { [key: string]: any[] } = {};
-
-    notifications.forEach(notification => {
-      const sectionTitle = getSectionTitle(notification.created_at);
-      if (!grouped[sectionTitle]) {
-        grouped[sectionTitle] = [];
-      }
-      grouped[sectionTitle].push(notification);
-    });
-
-    return grouped;
-  };
 
   // Transform real notifications to match NotificationData interface
   const getDisplayNotifications = (): NotificationData[] => {
@@ -1171,9 +1113,6 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
   const filteredNotifications = getDisplayNotifications();
 
-  const groupedNotifications = groupNotificationsByDate(filteredNotifications);
-  const unreadCount = filteredNotifications.filter((n: NotificationData) => !n.is_read).length;
-
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -1191,17 +1130,11 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            source={require('../../../assets/chevron-left.png')}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        {unreadCount > 0 && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
-          </View>
-        )}
-
         <View style={styles.placeholder} />
       </View>
 
@@ -1237,7 +1170,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           />
         }
       >
-        {Object.keys(groupedNotifications).length === 0 ? (
+        {filteredNotifications.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fnotif-empty-state.png?alt=media&token=c2a67bb0-0e1b-40b0-9467-6e239f41a166' }} style={styles.emptyStateIcon} />
             <Text style={styles.emptyTitle}>No notifications yet</Text>
@@ -1247,20 +1180,15 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             </Text>
           </View>
         ) : (
-          Object.entries(groupedNotifications).map(([sectionTitle, sectionNotifications]) => (
-            <View key={sectionTitle}>
-              <Text style={styles.sectionHeader}>{sectionTitle}</Text>
-              {sectionNotifications.map((notification) => (
-                <NotificationCard
-                  key={notification.id}
-                  notification={notification}
-                  onPress={handleNotificationPress}
-                  onActionPress={notificationActionHandler}
-                  actionState={actionStates[notification.id]}
-                  fadeAnimation={fadeAnimations[notification.id]}
-                />
-              ))}
-            </View>
+          filteredNotifications.map((notification) => (
+            <NotificationCard
+              key={notification.id}
+              notification={notification}
+              onPress={handleNotificationPress}
+              onActionPress={notificationActionHandler}
+              actionState={actionStates[notification.id]}
+              fadeAnimation={fadeAnimations[notification.id]}
+            />
           ))
         )}
       </ScrollView>

@@ -88,6 +88,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
           placeholder="Search contacts"
+          hideToggleBar={true}
         />
       </View>
       

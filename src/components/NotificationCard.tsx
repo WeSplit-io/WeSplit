@@ -7,7 +7,9 @@ import {
   Alert,
   Animated
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
+import styles from './NotificationCard.styles';
 
 export interface NotificationData {
   id: string;
@@ -126,90 +128,105 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
     }
   }, [actionState, buttonScaleAnim]);
   const getNotificationImage = () => {
-    // For payment requests, use requester avatar or default user icon
+    // For payment requests, use requester avatar or sender avatar
     if (notification.type === 'payment_request' || notification.type === 'payment_reminder') {
       return notification.data?.requesterAvatar 
         ? { uri: notification.data.requesterAvatar }
-        : { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
+        : notification.data?.senderAvatar
+        ? { uri: notification.data.senderAvatar }
+        : require('../../assets/user-icon-black.png');
     }
     
     // For settlement notifications, use wallet icon
     if (notification.type === 'settlement_request' || notification.type === 'settlement_notification') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' };
+      return require('../../assets/wallet-icon-default.png');
     }
     
     // For funding notifications, use wallet icon
     if (notification.type === 'funding_notification') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' };
+      return require('../../assets/wallet-icon-default.png');
     }
     
     // For expense added, use book icon
     if (notification.type === 'expense_added') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fbook-icon-default.png?alt=media&token=ec1254bb-72d6-49eb-a107-5e82b714e031' };
+      return require('../../assets/book-icon-default.png');
     }
     
-    // For group invites, use folder icon
+    // For group invites, use pool icon
     if (notification.type === 'group_invite') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ffolder-icon-default.png?alt=media&token=4d7d12ca-1b6f-4f42-a594-cb3de91f777a' };
+      return require('../../assets/pool-icon.png');
     }
     
     // For general notifications, use user icon
     if (notification.type === 'general') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
+      return require('../../assets/user-icon-black.png');
     }
     
     // For payment received, use wallet icon
     if (notification.type === 'payment_received') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' };
+      return require('../../assets/wallet-icon-default.png');
     }
     
-    // For group payment requests, use user icon
+    // For group payment requests, use sender avatar or user icon
     if (notification.type === 'group_payment_request') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
+      return notification.data?.senderAvatar
+        ? { uri: notification.data.senderAvatar }
+        : require('../../assets/user-icon-black.png');
     }
     
-    // For group added, use folder icon
+    // For group added, use pool icon
     if (notification.type === 'group_added') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ffolder-icon-default.png?alt=media&token=4d7d12ca-1b6f-4f42-a594-cb3de91f777a' };
+      return require('../../assets/pool-icon.png');
     }
     
     // For system warnings, use warning icon
     if (notification.type === 'system_warning') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwarning-icon.png?alt=media&token=5be5bba3-97cd-4e87-b872-4c3e82a6a4b8' };
+      return require('../../assets/warning-icon.png');
     }
     
     // For system notifications, use info icon
     if (notification.type === 'system_notification') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Finfo-icon.png?alt=media&token=4322bde0-8be0-43bd-aed8-a1c250f93853' };
+      return require('../../assets/info-icon.png');
     }
     
-    // For money sent/received, use wallet icon
-    if (notification.type === 'money_sent' || notification.type === 'money_received') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' };
+    // For money sent, use send icon
+    if (notification.type === 'money_sent') {
+      return require('../../assets/icon-send.png');
     }
     
-    // For group payment sent/received, use user icon
-    if (notification.type === 'group_payment_sent' || notification.type === 'group_payment_received') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
+    // For money received, use wallet icon
+    if (notification.type === 'money_received') {
+      return require('../../assets/wallet-icon-default.png');
+    }
+    
+    // For group payment sent, use send icon
+    if (notification.type === 'group_payment_sent') {
+      return require('../../assets/icon-send.png');
+    }
+    
+    // For group payment received, use wallet icon
+    if (notification.type === 'group_payment_received') {
+      return require('../../assets/wallet-icon-default.png');
     }
     
     // For split completed, use award icon
     if (notification.type === 'split_completed') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Faward-icon.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' };
+      return require('../../assets/award-icon.png');
     }
     
     // For degen split notifications, use dice icon
     if (notification.type === 'degen_all_locked' || notification.type === 'degen_ready_to_roll' || notification.type === 'roulette_result') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fdice-icon.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' };
+      // Note: dice-icon.png doesn't exist in assets, using a fallback
+      return require('../../assets/user-icon-black.png');
     }
     
     // For contact added, use user icon
     if (notification.type === 'contact_added') {
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
+      return require('../../assets/user-icon-black.png');
     }
     
     // Default fallback
-    return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser-icon-black.png?alt=media&token=7f585090-000c-4f3a-96cc-73fd062225b4' };
+    return require('../../assets/user-icon-black.png');
   };
 
   const getNotificationIconColor = () => {
@@ -441,9 +458,27 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
     }
   };
 
-  const formatTime = (dateString: string) => {
+  const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+
+    // If less than 1 hour ago, show "X minutes ago"
+    if (diffInMinutes < 60) {
+      if (diffInMinutes < 1) return 'Just now';
+      return `${diffInMinutes}m ago`;
+    }
+
+    // If less than 24 hours ago, show "X hours ago"
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    }
+
+    // If more than 24 hours ago, show date and time
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
@@ -475,68 +510,27 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       }}
     >
       <TouchableOpacity
-        style={[
-          {
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: colors.white10,
-            borderRadius: 16,
-            padding: 16,
-            marginBottom: 12,
-            marginTop: 8,
-            borderWidth: 0.5,
-            borderColor: colors.white50,
-            minHeight: 80,
-          },
-          !notification.is_read && {
-            backgroundColor: colors.green10,
-            borderColor: colors.green,
-            borderWidth: 1,
-          }
-        ]}
+        style={styles.container}
         onPress={() => onPress(notification)}
       >
-      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
+      <View style={styles.contentWrapper}>
         <View style={[
-          {
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: 12,
-          },
+          styles.iconContainer,
           { backgroundColor: getNotificationIconColor() + '20' }
         ]}>
           <Image
             source={getNotificationImage()}
-            style={{
-              width: 20,
-              height: 20,
-              borderRadius: 10,
-              tintColor: '#FFF',
-            }}
+            style={styles.icon}
           />
         </View>
         
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{
-            fontSize: 14,
-            color: '#E0E0E0',
-            lineHeight: 20,
-            marginBottom: 8,
-            flexShrink: 1,
-          }} numberOfLines={2}>
+        <View style={styles.textContainer}>
+          <Text style={styles.message} numberOfLines={2}>
             {notification.message.split(/(\d+\.?\d*\s*USDC|Rémi G\.|Haxxxoloto|Hackathon Solana)/).map((part: string, index: number) => {
               // Check if this part is a USDC amount
               if (/\d+\.?\d*\s*USDC/.test(part)) {
                 return (
-                  <Text key={index} style={{
-                    fontSize: 13,
-                    color: '#A5EA15',
-                    fontWeight: '600',
-                    marginTop: 4,
-                  }}>
+                  <Text key={index} style={styles.amount}>
                     {part}
                   </Text>
                 );
@@ -544,11 +538,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
               // Check if this part is a user name or group name
               if (/Rémi G\.|Haxxxoloto|Hackathon Solana/.test(part)) {
                 return (
-                  <Text key={index} style={{
-                    fontSize: 14,
-                    color: '#E0E0E0',
-                    fontWeight: '600',
-                  }}>
+                  <Text key={index} style={styles.userName}>
                     {part}
                   </Text>
                 );
@@ -556,41 +546,50 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
               return part;
             })}
           </Text>
-          <Text style={{
-            fontSize: 12,
-            color: '#A89B9B',
-            marginTop: 2,
-          }}>
-            {formatTime(notification.created_at)}
+          <Text style={styles.dateTime}>
+            {formatDateTime(notification.created_at)}
           </Text>
         </View>
       </View>
       
       {actionConfig.show && (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'flex-end', marginLeft: 8 }}>
+        <View style={styles.actionWrapper}>
           <TouchableOpacity
-            style={{
-              backgroundColor: actionConfig.backgroundColor,
-              borderRadius: 16,
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-              alignSelf: 'flex-start',
-              marginTop: 4,
-              minWidth: 60,
-              alignItems: 'center',
-              opacity: actionConfig.disabled ? 0.6 : 1,
-            }}
+            style={[
+              styles.actionButton,
+              { opacity: actionConfig.disabled ? 0.6 : 1 }
+            ]}
             onPress={handleActionPress}
             disabled={actionConfig.disabled}
           >
             <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-              <Text style={{
-                color: actionConfig.textColor,
-                fontSize: 14,
-                fontWeight: '500',
-              }}>
-                {actionConfig.text}
-              </Text>
+              {actionConfig.disabled || actionConfig.backgroundColor === '#A8A8A8' || actionConfig.backgroundColor === '#FF6B6B' ? (
+                <View style={[
+                  styles.actionButtonDisabled,
+                  { backgroundColor: actionConfig.backgroundColor }
+                ]}>
+                  <Text style={[
+                    styles.actionButtonText,
+                    { color: actionConfig.textColor }
+                  ]}>
+                    {actionConfig.text}
+                  </Text>
+                </View>
+              ) : (
+                <LinearGradient
+                  colors={[colors.greenLight, colors.green]}
+                  style={styles.gradientButton}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Text style={[
+                    styles.actionButtonText,
+                    { color: actionConfig.textColor }
+                  ]}>
+                    {actionConfig.text}
+                  </Text>
+                </LinearGradient>
+              )}
             </Animated.View>
           </TouchableOpacity>
         </View>

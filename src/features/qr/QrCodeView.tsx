@@ -50,6 +50,7 @@ export interface QrCodeViewProps {
   // Styling
   containerStyle?: ViewStyle;
   qrContainerStyle?: ViewStyle;
+  qrContainerBackgroundColor?: string;
   textStyle?: TextStyle;
   buttonStyle?: ViewStyle;
   buttonTextStyle?: TextStyle;
@@ -81,6 +82,7 @@ const QrCodeView: React.FC<QrCodeViewProps> = ({
   reference,
   containerStyle,
   qrContainerStyle,
+  qrContainerBackgroundColor,
   textStyle,
   buttonStyle,
   buttonTextStyle,
@@ -148,7 +150,11 @@ const QrCodeView: React.FC<QrCodeViewProps> = ({
       )}
       
       {/* QR Code Container */}
-      <View style={[styles.qrContainer, qrContainerStyle]}>
+      <View style={[
+        styles.qrContainer, 
+        qrContainerStyle,
+        qrContainerBackgroundColor && { backgroundColor: qrContainerBackgroundColor }
+      ]}>
         <QRCode
           value={qrValue}
           size={size}
@@ -219,10 +225,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   qrContainer: {
-    backgroundColor: colors.white,
-    padding: 16,
     borderRadius: 12,
-    marginBottom: 16,
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
