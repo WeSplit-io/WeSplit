@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Image, Alert, Linking } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Image, Alert, Linking, Animated } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Icon from './Icon';
 import { useApp } from '../context/AppContext';
@@ -63,6 +63,11 @@ const ContactsList: React.FC<ContactsListProps> = ({
   const [scanned, setScanned] = useState(false);
   const [isProcessingQR, setIsProcessingQR] = useState(false);
   const [qrInputValue, setQrInputValue] = useState('');
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
     loadContacts();
@@ -439,6 +444,49 @@ const ContactsList: React.FC<ContactsListProps> = ({
     setIsProcessingQR(false);
   };
 
+  // Animation function for tab changes
+  const animateTabChange = (callback: () => void) => {
+    if (isAnimating) return;
+    
+    setIsAnimating(true);
+    
+    // Fade out and slide out current content
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: -20,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Execute the callback (tab change)
+      callback();
+      
+      // Reset slide position
+      slideAnim.setValue(20);
+      
+      // Fade in and slide in new content
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setIsAnimating(false);
+      });
+    });
+  };
+
   const renderContact = (item: UserContact, section: 'friends' | 'others' | 'all' | 'favorite') => (
     <TouchableOpacity
       key={`${section}-${item.id}`}
@@ -522,7 +570,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
             <View style={styles.tabsContainer}>
               <TouchableOpacity
                 style={[styles.tab, activeTab === 'All' && styles.tabActive]}
-                onPress={() => onTabChange?.('All')}
+                onPress={() => animateTabChange(() => onTabChange?.('All'))}
+                disabled={isAnimating}
               >
                 <Text style={[styles.tabText, activeTab === 'All' && styles.tabTextActive]}>
                   All
@@ -530,7 +579,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.tab, activeTab === 'Favorite' && styles.tabActive]}
-                onPress={() => onTabChange?.('Favorite')}
+                onPress={() => animateTabChange(() => onTabChange?.('Favorite'))}
+                disabled={isAnimating}
               >
                 <Text style={[styles.tabText, activeTab === 'Favorite' && styles.tabTextActive]}>
                   Favorite
@@ -538,7 +588,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.tab, activeTab === 'Search' && styles.tabActive]}
-                onPress={() => onTabChange?.('Search')}
+                onPress={() => animateTabChange(() => onTabChange?.('Search'))}
+                disabled={isAnimating}
               >
                 <Text style={[styles.tabText, activeTab === 'Search' && styles.tabTextActive]}>
                   Search
@@ -561,12 +612,21 @@ const ContactsList: React.FC<ContactsListProps> = ({
             </View>
           )}
           {/* Content */}
-          <ScrollView
-            style={styles.contactsScrollView}
-            contentContainerStyle={styles.scrollViewContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+          <Animated.View 
+            style={[
+              styles.animatedContentContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              }
+            ]}
           >
+            <ScrollView
+              style={styles.contactsScrollView}
+              contentContainerStyle={styles.scrollViewContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
             {/* All Tab Content */}
             {activeTab === 'All' && (
               <>
@@ -691,7 +751,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
                 </Text>
               </View>
             )}
-          </ScrollView>
+            </ScrollView>
+          </Animated.View>
         </>
       ) : (
         <View style={styles.qrScannerContainer}>

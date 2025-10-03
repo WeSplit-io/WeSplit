@@ -38,7 +38,7 @@ const navItems = [
   // Pools (splits) tab
   { icon: 'pool-icon.png', label: 'Pools', route: 'SplitsList' },
   // Keep Contacts at the end
-  { icon: 'users-icon.png', label: 'Contact', route: 'Contacts' },
+  { icon: 'users-icon.png', label: 'Contacts', route: 'Contacts' },
 ];
 
 interface NavBarProps {

@@ -32,12 +32,10 @@ export const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.green10,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.white5,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.white10,
     padding: 4,
     marginBottom: spacing.md,
     width: '100%',
@@ -51,9 +49,18 @@ export const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
   tabActive: {
     backgroundColor: colors.green,
+    shadowColor: colors.green,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   tabText: {
     fontSize: typography.fontSize.sm,
@@ -64,6 +71,9 @@ export const styles = StyleSheet.create({
     color: colors.black,
   },
   contactsScrollView: {
+    flex: 1,
+  },
+  animatedContentContainer: {
     flex: 1,
   },
   sectionContainer: {
@@ -87,13 +97,13 @@ export const styles = StyleSheet.create({
     width: spacing.xxl + spacing.sm,
     height: spacing.xxl + spacing.sm,
     borderRadius: spacing.xxl,
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.white10,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
   },
   avatarText: {
-    color: colors.darkBackground,
+    color: colors.white70,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
   },

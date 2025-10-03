@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
 import NavBar from '../../components/NavBar';
 import ContactsList from '../../components/ContactsList';
@@ -70,12 +71,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
-            style={{ width: 24, height: 24 }}
-          />
-        </TouchableOpacity>
+        <View style={styles.placeholder} />
         <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
         <View style={styles.placeholder} />
       </View>
@@ -92,6 +88,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
           placeholder="Search contacts"
+          hideToggleBar={true}
         />
       </View>
       

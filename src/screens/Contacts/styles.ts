@@ -28,7 +28,7 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   searchContainer: {
     flexDirection: 'row',
