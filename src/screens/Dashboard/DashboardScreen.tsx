@@ -1910,12 +1910,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             style={styles.moreMenuItem}
             activeOpacity={0.7}
             onPress={() => {
-              console.log('🚀 WITHDRAW BUTTON CLICKED!');
+              console.log('🚀 MANAGE LINKED CARDS CLICKED!');
               setMoreMenuVisible(false);
-              navigation.navigate('WithdrawAmount');
+              navigation.navigate('LinkedCards');
             }}
           >
-            <Text style={styles.moreMenuText}>Widthdraw</Text>
+            <Text style={styles.moreMenuText}>Manage Linked Cards</Text>
             <Image
               source={require('../../../assets/chevron-right.png')}
               style={styles.moreMenuChevron}

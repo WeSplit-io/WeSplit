@@ -9,8 +9,192 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
+import { StyleSheet } from 'react-native';
 import { colors } from '../../theme/colors';
-import { styles } from './styles';
+import { spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
+
+// Temporary inline styles to fix the import issue
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.black,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.screenPaddingHorizontal,
+    paddingVertical: 16,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  placeholder: {
+    width: 40,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
+  },
+  instructionsContainer: {
+    marginBottom: spacing.xl,
+  },
+  instructionsTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.sm,
+  },
+  instructionsText: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    lineHeight: 24,
+  },
+  progressContainer: {
+    marginBottom: spacing.xl,
+  },
+  progressText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.sm,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: colors.white10,
+    borderRadius: 2,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.brandGreen,
+    borderRadius: 2,
+  },
+  currentWordContainer: {
+    backgroundColor: colors.white10,
+    borderRadius: spacing.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  currentWordLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.sm,
+  },
+  currentWordText: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  enteredWordsContainer: {
+    marginBottom: spacing.xl,
+  },
+  enteredWordsLabel: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.md,
+  },
+  enteredWordsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  enteredWordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.lg,
+    marginBottom: spacing.sm,
+    width: '48%',
+  },
+  enteredWordNumber: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    marginRight: spacing.sm,
+  },
+  enteredWord: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+  },
+  wordSelectionContainer: {
+    marginBottom: spacing.xl,
+  },
+  wordSelectionLabel: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.md,
+  },
+  wordSelectionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  wordSelectionButton: {
+    backgroundColor: colors.white10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.lg,
+    marginBottom: spacing.sm,
+    width: '48%',
+    alignItems: 'center',
+  },
+  wordSelectionButtonSelected: {
+    backgroundColor: colors.brandGreen,
+  },
+  wordSelectionButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+  },
+  wordSelectionButtonTextSelected: {
+    color: colors.black,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xl,
+  },
+  clearButton: {
+    backgroundColor: colors.white10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: spacing.lg,
+    flex: 1,
+    marginRight: spacing.sm,
+    alignItems: 'center',
+  },
+  clearButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+  },
+  confirmButton: {
+    backgroundColor: colors.brandGreen,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: spacing.lg,
+    flex: 1,
+    marginLeft: spacing.sm,
+    alignItems: 'center',
+  },
+  confirmButtonDisabled: {
+    backgroundColor: colors.white10,
+  },
+  confirmButtonText: {
+    color: colors.black,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+});
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
 

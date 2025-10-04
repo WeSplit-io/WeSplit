@@ -1031,7 +1031,7 @@ const WalletManagementScreen: React.FC = () => {
             <TouchableOpacity
               style={styles.actionButton}
               onPress={() => {
-                navigation.navigate('WithdrawAmount');
+                navigation.navigate('LinkedCards');
               }}
             >
               <View style={styles.actionButtonCircle}>
@@ -1040,7 +1040,7 @@ const WalletManagementScreen: React.FC = () => {
                   style={styles.actionButtonIconNoTint}
                 />
               </View>
-              <Text style={styles.actionButtonText}>Withdraw</Text>
+              <Text style={styles.actionButtonText}>Manage Linked Cards</Text>
             </TouchableOpacity>
           </View>
         </View>

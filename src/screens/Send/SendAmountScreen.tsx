@@ -9,24 +9,46 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 
 const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
-  const { contact, groupId, prefilledAmount, prefilledNote, isSettlement } = route.params || {};
+  const { 
+    destinationType, 
+    contact, 
+    wallet, 
+    groupId, 
+    prefilledAmount, 
+    prefilledNote, 
+    isSettlement 
+  } = route.params || {};
+  
   const [amount, setAmount] = useState(prefilledAmount ? prefilledAmount.toString() : '');
   const [showAddNote, setShowAddNote] = useState(!!prefilledNote || isSettlement);
   const [note, setNote] = useState(prefilledNote || '');
   const [noteInputWidth, setNoteInputWidth] = useState(60);
   const [maxNoteInputWidth, setMaxNoteInputWidth] = useState(0);
+  const [selectedChip, setSelectedChip] = useState<'25' | '50' | '100' | null>(null);
   const noteTextRef = useRef<RNText>(null);
+  
+  const { state } = useApp();
+  const { currentUser } = state;
+  const { appWalletBalance, appWalletConnected } = useWallet();
 
-  // Debug logging to ensure contact data is passed correctly
+  // Debug logging to ensure data is passed correctly
   useEffect(() => {
-    console.log('💰 SendAmount: Contact data received:', {
-      name: contact?.name || 'No name',
-      email: contact?.email,
-      wallet: contact?.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet',
-      fullWallet: contact?.wallet_address,
-      id: contact?.id
+    console.log('💰 SendAmount: Data received:', {
+      destinationType,
+      contact: contact ? {
+        name: contact.name || 'No name',
+        email: contact.email,
+        wallet: contact.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet',
+        fullWallet: contact.wallet_address,
+        id: contact.id
+      } : null,
+      wallet: wallet ? {
+        name: wallet.name,
+        address: wallet.address,
+        id: wallet.id
+      } : null
     });
-  }, [contact]);
+  }, [destinationType, contact, wallet]);
 
   useEffect(() => {
     // Mesure la largeur du texte (note ou placeholder)
@@ -54,6 +76,20 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
     // Allow empty string or valid number
     setAmount(cleaned);
+    
+    // Clear chip selection when user manually edits amount
+    if (selectedChip) {
+      setSelectedChip(null);
+    }
+  };
+
+  const handleChipPress = (percentage: '25' | '50' | '100') => {
+    if (appWalletBalance !== null) {
+      const percentageValue = parseInt(percentage);
+      const calculatedAmount = (appWalletBalance * percentageValue) / 100;
+      setAmount(calculatedAmount.toFixed(2));
+      setSelectedChip(percentage);
+    }
   };
 
   const handleContinue = () => {
@@ -63,20 +99,39 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
       return;
     }
 
-    if (!contact) {
-      Alert.alert('Error', 'Contact information is missing');
-      return;
+    if (destinationType === 'friend') {
+      if (!contact) {
+        Alert.alert('Error', 'Contact information is missing');
+        return;
+      }
+      
+      navigation.navigate('SendConfirmation', {
+        contact,
+        amount: numAmount,
+        description: note.trim(),
+        groupId,
+        isSettlement,
+        fromNotification: route.params?.fromNotification,
+        notificationId: route.params?.notificationId,
+      });
+    } else if (destinationType === 'external') {
+      if (!wallet) {
+        Alert.alert('Error', 'Wallet information is missing');
+        return;
+      }
+      
+      // Calculate fees (3% withdrawal fee for external wallets)
+      const withdrawalFee = numAmount * 0.03;
+      const totalWithdraw = numAmount - withdrawalFee;
+      
+      navigation.navigate('WithdrawConfirmation', {
+        amount: numAmount,
+        withdrawalFee,
+        totalWithdraw,
+        walletAddress: wallet.address,
+        description: note.trim(),
+      });
     }
-
-    navigation.navigate('SendConfirmation', {
-      contact,
-      amount: numAmount,
-      description: note.trim(),
-      groupId,
-      isSettlement,
-      fromNotification: route.params?.fromNotification,
-      notificationId: route.params?.notificationId,
-    });
   };
 
 
@@ -87,6 +142,28 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
   };
 
+  const getRecipientInfo = () => {
+    if (destinationType === 'friend' && contact) {
+      return {
+        name: contact.name || formatWalletAddress(contact.wallet_address || ''),
+        email: contact.wallet_address
+          ? formatWalletAddress(contact.wallet_address)
+          : contact.email || '',
+        avatar: contact.avatar || contact.photoURL,
+        walletAddress: contact.wallet_address
+      };
+    } else if (destinationType === 'external' && wallet) {
+      return {
+        name: wallet.name,
+        email: formatWalletAddress(wallet.address),
+        avatar: null,
+        walletAddress: wallet.address
+      };
+    }
+    return null;
+  };
+
+  const recipientInfo = getRecipientInfo();
   const isAmountValid = amount.length > 0 && parseFloat(amount) > 0;
 
   return (
@@ -95,7 +172,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            source={require('../../../assets/chevron-left.png')}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -107,29 +184,29 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
 
       {/* Recipient Info */}
-      <View style={styles.recipientAvatarContainer}>
-        <View style={styles.recipientAvatar}>
-          {contact?.avatar || contact?.photoURL ? (
-            <Image
-              source={{ uri: contact.avatar || contact.photoURL }}
-              style={{ width: '100%', height: '100%', borderRadius: 999 }}
-              resizeMode="cover"
-            />
-          ) : (
-            <Text style={[styles.recipientAvatarText, { fontSize: 18 }]}>
-              {contact?.name ? contact.name.charAt(0).toUpperCase() : formatWalletAddress(contact?.wallet_address || '').charAt(0).toUpperCase()}
-            </Text>
-          )}
+      {recipientInfo && (
+        <View style={styles.recipientAvatarContainer}>
+          <View style={styles.recipientAvatar}>
+            {recipientInfo.avatar ? (
+              <Image
+                source={{ uri: recipientInfo.avatar }}
+                style={{ width: '100%', height: '100%', borderRadius: 999 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={[styles.recipientAvatarText, { fontSize: 18 }]}>
+                {recipientInfo.name.charAt(0).toUpperCase()}
+              </Text>
+            )}
+          </View>
+          <Text style={styles.recipientName}>
+            {recipientInfo.name}
+          </Text>
+          <Text style={styles.recipientEmail}>
+            {recipientInfo.email}
+          </Text>
         </View>
-        <Text style={styles.recipientName}>
-          {contact?.name || formatWalletAddress(contact?.wallet_address || '')}
-        </Text>
-        <Text style={styles.recipientEmail}>
-          {contact?.wallet_address
-            ? formatWalletAddress(contact.wallet_address)
-            : contact?.email || ''}
-        </Text>
-      </View>
+      )}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -163,6 +240,48 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
               />
               <Text style={styles.amountCardCurrency}>USDC</Text>
             </View>
+
+            {/* Quick Amount Chips - Only for External Wallet */}
+            {destinationType === 'external' && appWalletBalance !== null && (
+              <View style={styles.quickAmountChips}>
+                <TouchableOpacity 
+                  style={[
+                    styles.quickAmountChip,
+                    selectedChip === '25' && styles.quickAmountChipSelected
+                  ]}
+                  onPress={() => handleChipPress('25')}
+                >
+                  <Text style={[
+                    styles.quickAmountChipText,
+                    selectedChip === '25' && styles.quickAmountChipTextSelected
+                  ]}>25%</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[
+                    styles.quickAmountChip,
+                    selectedChip === '50' && styles.quickAmountChipSelected
+                  ]}
+                  onPress={() => handleChipPress('50')}
+                >
+                  <Text style={[
+                    styles.quickAmountChipText,
+                    selectedChip === '50' && styles.quickAmountChipTextSelected
+                  ]}>50%</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[
+                    styles.quickAmountChip,
+                    selectedChip === '100' && styles.quickAmountChipSelected
+                  ]}
+                  onPress={() => handleChipPress('100')}
+                >
+                  <Text style={[
+                    styles.quickAmountChipText,
+                    selectedChip === '100' && styles.quickAmountChipTextSelected
+                  ]}>100%</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Add Note Section */}
             {!showAddNote ? (

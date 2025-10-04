@@ -140,10 +140,7 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
-            style={{ width: 24, height: 24 }}
-          />
+          <Icon name="chevron-left" size={24} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Withdraw</Text>
         <View style={styles.placeholder} />
@@ -168,13 +165,13 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
             <View style={styles.alertContainer}>
               <Icon name="alert-triangle" size={20} color="#FFF" />
               <Text style={styles.alertText}>
-                {__DEV__ ? 'App Wallet not connected (DEV MODE - can still test)' : 'App Wallet not connected'}
+                App Wallet not connected
               </Text>
             </View>
           )}
 
-          {/* Dev Mode Indicator */}
-          {__DEV__ && (
+          {/* Dev Mode Indicator - Hidden */}
+          {false && __DEV__ && (
             <View style={styles.devAlertContainer}>
               <Icon name="code" size={20} color={colors.black} />
               <Text style={styles.devAlertText}>
@@ -310,8 +307,8 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* Dev Testing Section */}
-          {__DEV__ && (
+          {/* Dev Testing Section - Hidden */}
+          {false && __DEV__ && (
             <View style={styles.devTestingSection}>
               <Text style={styles.devTestingTitle}>🧪 Dev Testing</Text>
               

@@ -23,8 +23,8 @@ export const styles = StyleSheet.create({
   iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
   },
   headerTitle: {
     ...typography.textStyles.h6,
@@ -543,29 +543,28 @@ export const styles = StyleSheet.create({
   // === MOCKUP-BASED SEND CONTACTS STYLES ===
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: colors.darkBackground,
-    borderRadius: spacing.md,
-    padding: spacing.xs,
+    marginHorizontal: spacing.md,
     marginBottom: spacing.lg,
-    gap: 20,
+    borderBottomWidth: 1,
+    borderColor: colors.white50,
   },
   tab: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 16,
+    flex: 1,
+    paddingVertical: spacing.sm,
     alignItems: 'center',
-    backgroundColor: colors.white10,
+    marginBottom: -1,
   },
   activeTab: {
-    backgroundColor: colors.green,
+    borderBottomWidth: 2,
+    borderColor: colors.green,
   },
   tabText: {
-    color: colors.white70,
+    color: colors.textSecondary,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.regular,
   },
   activeTabText: {
-    color: colors.black,
+    color: colors.white,
     fontWeight: typography.fontWeight.semibold,
   },
   mockupSearchContainer: {
@@ -985,36 +984,7 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: typography.fontWeight.medium,
   },
-  // === SEND TABS STYLES ===
-  sendTabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: colors.darkBackground,
-    borderRadius: spacing.lg,
-    marginHorizontal: spacing.screenPaddingHorizontal,
-    marginVertical: spacing.lg,
-    padding: spacing.xs,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.textLight,
-  },
-  sendTab: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: spacing.md,
-    alignItems: 'center',
-  },
-  sendTabActive: {
-    backgroundColor: colors.brandGreen,
-  },
-  sendTabText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-  },
-  sendTabTextActive: {
-    color: colors.darkBackground,
-    fontWeight: typography.fontWeight.semibold,
-  },
+
   // === SEND QR CODE STYLES ===
   sendQRTabContainer: {
     flex: 1,
@@ -1231,6 +1201,157 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
     zIndex: 1,
     textAlign: 'center',
+  },
+
+  // === EXTERNAL WALLET STYLES ===
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.screenPaddingHorizontal,
+    paddingBottom: 100,
+  },
+  emptyStateIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 40,
+    backgroundColor: colors.white5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  emptyStateIconText: {
+    fontSize: 32,
+  },
+  emptyStateIconImage: {
+    width: 32,
+    height: 32,
+  },
+  emptyStateTitle: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  emptyStateSubtitle: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+    lineHeight: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  connectWalletButton: {
+    backgroundColor: colors.brandGreen,
+    borderRadius: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+  },
+  connectWalletButtonText: {
+    color: colors.darkBackground,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  walletsList: {
+    flex: 1,
+  },
+  walletRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.darkBackground,
+    borderRadius: spacing.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: spacing.borderWidthThin,
+    borderColor: colors.textLight,
+  },
+  walletIcon: {
+    width: spacing.xxl + spacing.sm,
+    height: spacing.xxl + spacing.sm,
+    borderRadius: spacing.xxl,
+    backgroundColor: colors.brandGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  walletIconText: {
+    fontSize: typography.fontSize.md,
+  },
+  walletIconImage: {
+    width: 20,
+    height: 20,
+  },
+  walletInfo: {
+    flex: 1,
+  },
+  walletName: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.xs / 2,
+  },
+  walletAddress: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+  },
+  walletActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scanButton: {
+    padding: spacing.sm,
+    borderRadius: spacing.sm,
+    backgroundColor: colors.white10,
+  },
+  scanButtonText: {
+    fontSize: typography.fontSize.sm,
+  },
+  addWalletButton: {
+    backgroundColor: colors.white10,
+    borderRadius: spacing.lg,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.md,
+    borderWidth: spacing.borderWidthThin,
+    borderColor: colors.textLight,
+    borderStyle: 'dashed',
+  },
+  addWalletButtonText: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+  },
+
+  // === QUICK AMOUNT CHIPS STYLES ===
+  quickAmountChips: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  quickAmountChip: {
+    backgroundColor: colors.white10,
+    borderRadius: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: spacing.borderWidthThin,
+    borderColor: colors.white50,
+  },
+  quickAmountChipSelected: {
+    backgroundColor: colors.brandGreen,
+    borderColor: colors.brandGreen,
+  },
+  quickAmountChipText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+  },
+  quickAmountChipTextSelected: {
+    color: colors.black,
+    fontWeight: typography.fontWeight.semibold,
   },
 
 }); 

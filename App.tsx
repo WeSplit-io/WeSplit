@@ -46,6 +46,7 @@ import SendScreen from './src/screens/Send/SendScreen';
 import SendAmountScreen from './src/screens/Send/SendAmountScreen';
 import SendConfirmationScreen from './src/screens/Send/SendConfirmationScreen';
 import SendSuccessScreen from './src/screens/Send/SendSuccessScreen';
+import LinkedCardsScreen from './src/screens/LinkedCards/LinkedCardsScreen';
 import RequestContactsScreen from './src/screens/Request/RequestContactsScreen';
 import RequestAmountScreen from './src/screens/Request/RequestAmountScreen';
 import RequestConfirmationScreen from './src/screens/Request/RequestConfirmationScreen';
@@ -238,6 +239,7 @@ export default function App() {
                 <Stack.Screen name="SendAmount" component={SendAmountScreen} />
                 <Stack.Screen name="SendConfirmation" component={SendConfirmationScreen} />
                 <Stack.Screen name="SendSuccess" component={SendSuccessScreen} />
+                <Stack.Screen name="LinkedCards" component={LinkedCardsScreen} />
                 <Stack.Screen name="RequestContacts" component={RequestContactsScreen} />
                 <Stack.Screen name="RequestAmount" component={RequestAmountScreen} />
                 <Stack.Screen name="RequestConfirmation" component={RequestConfirmationScreen} />
