@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -8,8 +8,11 @@ import {
   ScrollView, 
   Alert,
   KeyboardAvoidingView,
-  Platform 
+  Platform,
+  Animated,
+  Dimensions
 } from 'react-native';
+import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import { colors } from '../theme';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -22,6 +25,8 @@ interface AddDestinationSheetProps {
   onSaved: (destination: any) => void;
 }
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   visible,
   onClose,
@@ -33,6 +38,72 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   const [chain, setChain] = useState('solana');
   const [identifier, setIdentifier] = useState('');
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+
+  // Animation refs
+  const translateY = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  const handleGestureEvent = Animated.event(
+    [{ nativeEvent: { translationY: translateY } }],
+    { useNativeDriver: true }
+  );
+
+  const handleStateChange = (event: PanGestureHandlerGestureEvent) => {
+    const { translationY, state } = event.nativeEvent;
+
+    if (state === 2) { // BEGAN
+      opacity.setValue(1);
+    } else if (state === 4 || state === 5) { // END or CANCELLED
+      if (translationY > 100) { // Threshold to close modal
+        Animated.parallel([
+          Animated.timing(translateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          handleClose();
+          translateY.setValue(0);
+          opacity.setValue(0);
+        });
+      } else {
+        Animated.parallel([
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }
+  };
+
+  // Animate in when modal becomes visible
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
 
   const resetForm = () => {
     setAddress('');
@@ -74,6 +145,16 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
+  const isFormValid = () => {
+    if (!name.trim()) return false;
+    
+    if (destinationType === 'wallet') {
+      return address.trim().length > 0;
+    } else {
+      return identifier.trim().length > 0;
+    }
+  };
+
   const handleSave = () => {
     if (!validateForm()) {
       return;
@@ -94,153 +175,212 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
 
   const renderWalletForm = () => (
     <View style={styles.formSection}>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Address</Text>
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            value={address}
-            onChangeText={setAddress}
-            placeholder="Enter wallet address"
-            placeholderTextColor={colors.textSecondary}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <TouchableOpacity style={styles.qrButton}>
-            <Text style={styles.qrButtonText}>📷</Text>
-          </TouchableOpacity>
-        </View>
-        {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
-      </View>
+      <Text style={styles.inputLabel}>Wallet Address</Text>
+      <TextInput
+        style={styles.inputField}
+        value={address}
+        onChangeText={setAddress}
+        placeholder="Enter wallet address"
+        placeholderTextColor={colors.textSecondary}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Name</Text>
-        <TextInput
-          style={styles.textInput}
-          value={name}
-          onChangeText={setName}
-          placeholder="e.g., Cold Wallet, Treasury"
-          placeholderTextColor={colors.textSecondary}
-        />
-        {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Chain</Text>
-        <View style={styles.selectContainer}>
-          <Text style={styles.selectText}>Solana</Text>
-        </View>
-      </View>
+      <Text style={styles.inputLabel}>Name</Text>
+      <TextInput
+        style={styles.inputField}
+        value={name}
+        onChangeText={setName}
+        placeholder="e.g., Cold Wallet, Treasury"
+        placeholderTextColor={colors.textSecondary}
+        autoCapitalize="words"
+        autoCorrect={false}
+      />
+      {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
     </View>
   );
 
   const renderKastForm = () => (
     <View style={styles.formSection}>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Card Identifier</Text>
-        <TextInput
-          style={styles.textInput}
-          value={identifier}
-          onChangeText={setIdentifier}
-          placeholder="Enter card token or last 4 digits"
-          placeholderTextColor={colors.textSecondary}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {errors.identifier && <Text style={styles.errorText}>{errors.identifier}</Text>}
-      </View>
+      <Text style={styles.inputLabel}>Card Address</Text>
+      <TextInput
+        style={styles.inputField}
+        value={identifier}
+        onChangeText={setIdentifier}
+        placeholder="Enter card address"
+        placeholderTextColor={colors.textSecondary}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      {errors.identifier && <Text style={styles.errorText}>{errors.identifier}</Text>}
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Name</Text>
-        <TextInput
-          style={styles.textInput}
-          value={name}
-          onChangeText={setName}
-          placeholder="e.g., Team Card, Marketing"
-          placeholderTextColor={colors.textSecondary}
-        />
-        {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-      </View>
+      <Text style={styles.inputLabel}>Name</Text>
+      <TextInput
+        style={styles.inputField}
+        value={name}
+        onChangeText={setName}
+        placeholder="e.g., Team Card, Marketing"
+        placeholderTextColor={colors.textSecondary}
+        autoCapitalize="words"
+        autoCorrect={false}
+      />
+      {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
     </View>
   );
 
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent={true}
       onRequestClose={handleClose}
+      statusBarTranslucent={true}
     >
-      <View style={styles.modalOverlay}>
-        <KeyboardAvoidingView
-          style={styles.modalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={styles.modalContent}>
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <View style={styles.grabHandle} />
-              <Text style={styles.modalTitle}>Add Destination</Text>
-              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
+      <Animated.View style={[styles.modalOverlay, { opacity }]}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            activeOpacity={1}
+            onPress={handleClose}
+          />
+          
+          <PanGestureHandler
+            onGestureEvent={handleGestureEvent}
+            onHandlerStateChange={handleStateChange}
+          >
+            <Animated.View
+              style={[
+                styles.modalContent,
+                {
+                  transform: [{ translateY }],
+                },
+              ]}
+            >
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.keyboardAvoidingView}
+              >
+                {/* Handle bar for slide down */}
+                <View style={styles.grabHandle} />
 
-            {/* Segmented Control */}
-            <View style={styles.segmentedControl}>
-              <TouchableOpacity
-                style={[
-                  styles.segment,
-                  destinationType === 'wallet' && styles.segmentActive
-                ]}
-                onPress={() => setDestinationType('wallet')}
-              >
-                <Text style={[
-                  styles.segmentText,
-                  destinationType === 'wallet' && styles.segmentTextActive
-                ]}>
-                  Wallet
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.segment,
-                  destinationType === 'kast' && styles.segmentActive
-                ]}
-                onPress={() => setDestinationType('kast')}
-              >
-                <Text style={[
-                  styles.segmentText,
-                  destinationType === 'kast' && styles.segmentTextActive
-                ]}>
-                  KAST Card
-                </Text>
-              </TouchableOpacity>
-            </View>
+                {/* Header */}
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Add Wallet or Card</Text>
+                </View>
 
-            {/* Form Content */}
-            <ScrollView style={styles.formContent} showsVerticalScrollIndicator={false}>
-              {destinationType === 'wallet' ? renderWalletForm() : renderKastForm()}
-            </ScrollView>
+                {/* Segmented Control */}
+                <View style={styles.segmentedControl}>
+                  <TouchableOpacity
+                    style={[
+                      styles.segment,
+                      destinationType === 'wallet' && styles.segmentActive
+                    ]}
+                    onPress={() => setDestinationType('wallet')}
+                  >
+                    <Text style={[
+                      styles.segmentText,
+                      destinationType === 'wallet' && styles.segmentTextActive
+                    ]}>
+                      Wallet
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.segment,
+                      destinationType === 'kast' && styles.segmentActive
+                    ]}
+                    onPress={() => setDestinationType('kast')}
+                  >
+                    <Text style={[
+                      styles.segmentText,
+                      destinationType === 'kast' && styles.segmentTextActive
+                    ]}>
+                      Kast Card
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-            {/* Actions */}
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={handleClose}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={handleSave}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
+                {/* Form Content */}
+                <View style={styles.formContent}>
+                  {destinationType === 'wallet' ? (
+                    <View>
+                      <Text style={styles.inputLabel}>Wallet Address</Text>
+                      <TextInput
+                        style={styles.inputField}
+                        value={address}
+                        onChangeText={setAddress}
+                        placeholder="Enter wallet address"
+                        placeholderTextColor={colors.textSecondary}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
+
+                      <Text style={styles.inputLabel}>Name</Text>
+                      <TextInput
+                        style={styles.inputField}
+                        value={name}
+                        onChangeText={setName}
+                        placeholder="e.g., Cold Wallet, Treasury"
+                        placeholderTextColor={colors.textSecondary}
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                      />
+                      {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+                    </View>
+                  ) : (
+                    <View>
+                      <Text style={styles.inputLabel}>Card Adress</Text>
+                      <TextInput
+                        style={styles.inputField}
+                        value={identifier}
+                        onChangeText={setIdentifier}
+                        placeholder="Enter card address"
+                        placeholderTextColor={colors.textSecondary}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      {errors.identifier && <Text style={styles.errorText}>{errors.identifier}</Text>}
+
+                      <Text style={styles.inputLabel}>Name</Text>
+                      <TextInput
+                        style={styles.inputField}
+                        value={name}
+                        onChangeText={setName}
+                        placeholder="e.g., Team Card, Marketing"
+                        placeholderTextColor={colors.textSecondary}
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                      />
+                      {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+                    </View>
+                  )}
+                </View>
+
+                {/* Actions */}
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[
+                      styles.saveButton,
+                      !isFormValid() && styles.saveButtonDisabled
+                    ]}
+                    onPress={handleSave}
+                    disabled={!isFormValid()}
+                  >
+                    <Text style={[
+                      styles.saveButtonText,
+                      !isFormValid() && styles.saveButtonTextDisabled
+                    ]}>
+                      Save
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </KeyboardAvoidingView>
+            </Animated.View>
+          </PanGestureHandler>
+        </View>
+      </Animated.View>
     </Modal>
   );
 };

@@ -110,7 +110,7 @@ export const styles = StyleSheet.create({
   
   headerTitle: {
     color: colors.white,
-    fontSize: typography.fontSize.lg,
+    fontSize: 20,
     fontWeight: typography.fontWeight.semibold,
     flex: 1,
     textAlign: 'center',
@@ -216,7 +216,7 @@ export const styles = StyleSheet.create({
   // Container for action buttons below balance card
   actionsGrid: {
     marginHorizontal: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xxxl,
     marginTop: 0,
     position: 'relative',
   },
@@ -225,8 +225,8 @@ export const styles = StyleSheet.create({
   actionButtonsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing.sm,
+    alignItems: 'flex-start',
+    gap: 5,
   },
   
   // Individual action button container
@@ -283,6 +283,7 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
+    textAlign: 'center',
   },
   
   // Sections

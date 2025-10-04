@@ -27,7 +27,6 @@ import { firebaseDataService } from '../../services/firebaseDataService';
 import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
 import { multiSigService } from '../../services/multiSigService';
 import { MultiSignStateService } from '../../services/multiSignStateService';
-import { secureSeedPhraseService } from '../../services/secureSeedPhraseService';
 import { secureStorageService } from '../../services/secureStorageService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -65,8 +64,6 @@ const WalletManagementScreen: React.FC = () => {
   const [sliderValue] = useState(new Animated.Value(0));
   const [isSliderActive, setIsSliderActive] = useState(false);
   const [showQRCodeScreen, setShowQRCodeScreen] = useState(false);
-  const [isKastConnected, setIsKastConnected] = useState(true); // Simulation pour le design
-  const [isExternalWalletSimulated, setIsExternalWalletSimulated] = useState(true); // Simulation pour External wallet
 
 
   // Load multi-sign state on component mount
@@ -315,46 +312,6 @@ const WalletManagementScreen: React.FC = () => {
     navigation.goBack();
   };
 
-  const handleChangeExternalWallet = () => {
-    // This will open the wallet selector modal
-    // For now, just show an alert
-    Alert.alert('Change External Wallet', 'This will open wallet selection');
-  };
-
-  const handleLinkExternalWallet = () => {
-    // This will open wallet connection flow
-    Alert.alert('Link External Wallet', 'This will open wallet connection');
-  };
-
-
-  const handleSeedPhrase = async () => {
-    try {
-      if (!currentUser?.id) return;
-
-      console.log('🔐 WalletManagement: Preparing secure seed phrase access...');
-
-      // Initialize secure wallet (generates if needed, retrieves if exists)
-      const { address, isNew } = await secureSeedPhraseService.initializeSecureWallet(currentUser.id.toString());
-
-      if (isNew) {
-        console.log('🔐 WalletManagement: New secure wallet created for user:', currentUser.id);
-        Alert.alert(
-          'Secure Wallet Created',
-          'Your single app wallet has been created. Your 12-word seed phrase is stored securely on your device only and can be used to export your wallet to external providers like Phantom and Solflare.',
-          [{ text: 'OK' }]
-        );
-      } else {
-        console.log('🔐 WalletManagement: Existing app wallet seed phrase retrieved for user:', currentUser.id);
-      }
-
-      console.log('🔐 WalletManagement: Secure seed phrase access prepared successfully');
-
-      navigation.navigate('SeedPhraseView');
-    } catch (error) {
-      console.error('🔐 WalletManagement: Error preparing secure seed phrase access:', error);
-      Alert.alert('Error', 'Failed to prepare secure seed phrase access. Please try again.');
-    }
-  };
 
   const handleCopyAddress = async (address: string) => {
     try {
@@ -600,165 +557,6 @@ const WalletManagementScreen: React.FC = () => {
     }
     return 0;
   };
-
-  const renderWalletOverview = () => (
-    <View>
-      {/* External Wallet Section - For funding/withdrawals */}
-      <View style={styles.section}>
-       {/* <View style={styles.sectionHeader}>
-          {externalWalletConnected && walletInfo && (
-            <TouchableOpacity onPress={handleChangeExternalWallet}>
-              <Text style={styles.changeButton}>Change</Text>
-            </TouchableOpacity>
-          )}
-        </View>*/}
-
-        <View style={styles.externalCardsRow}>
-          {/* External wallet card (left) */}
-          {(externalWalletConnected && walletInfo) || isExternalWalletSimulated ? (
-            <View style={[styles.externalMiniCardConnected, styles.externalMiniCardLeft]}>
-              <View style={styles.externalMiniHeaderRow}>
-                <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-white.png?alt=media&token=96e009f8-b451-4dbd-80da-65fcb315ecb2' }} style={styles.externalMiniIcon} />
-                <Text style={styles.externalMiniTitle}>External wallet</Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.externalMiniBodyRow}
-                onPress={() => handleCopyAddress(isExternalWalletSimulated ? 'B3xd5K8J7M9N2QwE4Rt6Yu8Io9Pl0ZdCvBnMkLqWsErTyUiOpAsDfGhJkLzXcVbN' : walletInfo?.address || '')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.externalMiniAddress}>
-                  {formatAddress(isExternalWalletSimulated ? 'B3xd5K8J7M9N2QwE4Rt6Yu8Io9Pl0ZdCvBnMkLqWsErTyUiOpAsDfGhJkLzXcVbN' : (walletInfo?.address || ''))}
-                </Text>
-                <Image source={require('../../../assets/copy-icon.png')} style={styles.externalMiniCopyIcon} />
-              </TouchableOpacity>
-              <View style={styles.externalMiniFooterRow}>
-                <Text style={styles.externalMiniProvider}>{isExternalWalletSimulated ? 'Phantom Wallet' : (walletInfo?.walletName || 'External Wallet')}</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    Alert.alert(
-                      'Unlink wallet',
-                      'Are you sure you want to unlink your external wallet?',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Unlink', style: 'destructive', onPress: () => setIsExternalWalletSimulated(false) },
-                      ]
-                    );
-                  }}
-                >
-                  <Icon name="trash-2" size={16} color={colors.white70} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.externalMiniCardSimple, styles.externalMiniCardLeft]}
-              activeOpacity={0.9}
-              onPress={() => setIsExternalWalletSimulated(true)}
-            >
-              <View style={styles.linkCardIconContainer}>
-                <Image 
-                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-white.png?alt=media&token=96e009f8-b451-4dbd-80da-65fcb315ecb2' }} 
-                  style={styles.linkCardIcon} 
-                />
-              </View>
-              <Text style={styles.linkCardText}>Link an external wallet</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Kast card (right) */}
-          {isKastConnected ? (
-            <View style={[styles.externalMiniCardConnected, styles.externalMiniCardRight]}>
-              <View style={styles.externalMiniHeaderRow}>
-                <View style={styles.kastIconBoxSmall}>
-                  <Image 
-                    source={require('../../../assets/kast-logo.png')} 
-                    style={styles.kastIconImageSmall}
-                  />
-                </View>
-                <Text style={styles.externalMiniTitle}>Kast Card</Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.externalMiniBodyRow}
-                onPress={() => handleCopyAddress(walletInfo?.address || 'Kast123...xyz')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.externalMiniAddress}>{formatAddress(walletInfo?.address || 'Kast123...xyz')}</Text>
-                <Image source={require('../../../assets/copy-icon.png')} style={styles.externalMiniCopyIcon} />
-              </TouchableOpacity>
-              <View style={styles.externalMiniFooterRow}>
-                <Text style={styles.externalMiniProvider}>Kast Card</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    Alert.alert(
-                      'Unlink Kast Card',
-                      'Are you sure you want to unlink your Kast Card?',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Unlink', style: 'destructive', onPress: () => setIsKastConnected(false) },
-                      ]
-                    );
-                  }}
-                >
-                  <Icon name="trash-2" size={16} color={colors.white70} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.externalMiniCardSimple, styles.externalMiniCardRight]}
-              activeOpacity={0.9}
-              onPress={() => setIsKastConnected(true)}
-            >
-              <View style={styles.kastIconBox}>
-                  <Image 
-                    source={require('../../../assets/kast-logo.png')} 
-                    style={styles.kastIconImage}
-                  />
-              </View>
-              <Text style={styles.kastCardText}>Connect your Kast card</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Wallet Management Options */}
-      <View style={styles.optionsContainer}>
-        <TouchableOpacity
-          style={styles.optionRow}
-          onPress={handleSeedPhrase}
-        >
-          <View style={styles.optionLeft}>
-            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fid-icon-white.png?alt=media&token=247ae71e-f5c2-4193-ba3a-c1fc3ddaa5d0' }} style={styles.optionIcon} />
-            <Text style={styles.optionText}>Seed phrase</Text>
-          </View>
-          <Icon name="chevron-right" size={16} color={colors.textLightSecondary} />
-        </TouchableOpacity>
-
-
-        <View style={[styles.optionRow, { display: 'none' }]}>
-          <View style={styles.optionLeft}>
-            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fscan-icon-white.png?alt=media&token=c284a318-5a38-4ac6-a660-c7219af4360f' }} style={styles.optionIcon} />
-            <View>
-              <Text style={styles.optionText}>Multi-sign</Text>
-              {multiSignEnabled && multiSignRemainingDays > 0 && (
-                <Text style={styles.optionSubtext}>
-                  Expires in {multiSignRemainingDays} day{multiSignRemainingDays !== 1 ? 's' : ''}
-                </Text>
-              )}
-            </View>
-          </View>
-          <Switch
-            value={multiSignEnabled}
-            onValueChange={handleMultiSignToggle}
-            trackColor={{ false: colors.border, true: colors.primaryGreen }}
-            thumbColor={multiSignEnabled ? colors.white : colors.white}
-            ios_backgroundColor={colors.white10}
-            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-          />
-        </View>
-      </View>
-    </View>
-  );
 
   const renderTransactions = () => (
     <View style={styles.section}>
@@ -1036,17 +834,15 @@ const WalletManagementScreen: React.FC = () => {
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={require('../../../assets/widthdraw-icon.png')}
+                  source={require('../../../assets/link-icon.png')}
                   style={styles.actionButtonIconNoTint}
                 />
               </View>
-              <Text style={styles.actionButtonText}>Manage Linked Cards</Text>
+              <Text style={styles.actionButtonText}>Linked Wallets</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Wallet Overview */}
-        {renderWalletOverview()}
 
         {/* Transactions Section */}
         {renderTransactions()}

@@ -183,7 +183,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [refreshBalance, setRefreshBalance] = useState<number | null>(null); // Local refresh balance
   const [balanceLoaded, setBalanceLoaded] = useState(false); // Track if balance has been loaded
   const [walletUnrecoverable, setWalletUnrecoverable] = useState(false); // Track if wallet is unrecoverable
-  const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [recentSplits, setRecentSplits] = useState<Split[]>([]);
   const [loadingSplits, setLoadingSplits] = useState(false);
 
@@ -1467,17 +1466,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Overlay to close more menu when clicking outside */}
-      {moreMenuVisible && (
-        <TouchableOpacity
-          style={styles.moreMenuOverlay}
-          activeOpacity={1}
-          onPress={() => {
-            console.log('🔄 Dashboard: Overlay clicked - closing menu');
-            setMoreMenuVisible(false);
-          }}
-        />
-      )}
 
       <ScrollView
         style={styles.scrollContainer}
@@ -1672,20 +1660,16 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             <TouchableOpacity
               style={styles.actionButton}
               onPress={() => {
-                console.log('🔄 Dashboard: Opening more menu');
-                setMoreMenuVisible(!moreMenuVisible);
+                navigation.navigate('LinkedCards');
               }}
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={require('../../../assets/grid-icon.png')}
+                  source={require('../../../assets/link-icon.png')}
                   style={styles.actionButtonIconNoTint}
-                  tintColor={colors.white}
-                  height={28}
-                  width={28}
                 />
               </View>
-              <Text style={styles.actionButtonText}>More</Text>
+              <Text style={styles.actionButtonText}>Linked Wallets</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1903,56 +1887,6 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
       </ScrollView>
 
-      {/* More Menu Dropdown - Outside ScrollView */}
-      {moreMenuVisible && (
-        <View style={styles.moreMenuContainer}>
-          <TouchableOpacity
-            style={styles.moreMenuItem}
-            activeOpacity={0.7}
-            onPress={() => {
-              console.log('🚀 MANAGE LINKED CARDS CLICKED!');
-              setMoreMenuVisible(false);
-              navigation.navigate('LinkedCards');
-            }}
-          >
-            <Text style={styles.moreMenuText}>Manage Linked Cards</Text>
-            <Image
-              source={require('../../../assets/chevron-right.png')}
-              style={styles.moreMenuChevron}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.moreMenuItem}
-            onPress={() => {
-              setMoreMenuVisible(false);
-              // Add other action here
-              Alert.alert('Coming Soon', 'This feature will be available soon!');
-            }}
-          >
-            <Text style={styles.moreMenuText}>Link KAST card</Text>
-            <Image
-              source={require('../../../assets/chevron-right.png')}
-              style={styles.moreMenuChevron}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.moreMenuItem}
-            onPress={() => {
-              setMoreMenuVisible(false);
-              // Add other action here
-              Alert.alert('Coming Soon', 'This feature will be available soon!');
-            }}
-          >
-            <Text style={styles.moreMenuText}>Link external wallet</Text>
-            <Image
-              source={require('../../../assets/chevron-right.png')}
-              style={styles.moreMenuChevron}
-            />
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* Wallet Selector Modal */}
       <WalletSelectorModal

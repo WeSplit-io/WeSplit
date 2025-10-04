@@ -5,6 +5,7 @@ import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
+import { secureSeedPhraseService } from '../../services/secureSeedPhraseService';
 import { styles } from './styles';
 
 // Helper function to safely load images with fallback
@@ -149,8 +150,33 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
     navigation.navigate('AccountSettings');
   };
 
-  const handleWallet = () => {
-    navigation.navigate('WalletManagement');
+  const handleSeedPhrase = async () => {
+    try {
+      if (!currentUser?.id) return;
+
+      console.log('🔐 ProfileScreen: Preparing secure seed phrase access...');
+
+      // Initialize secure wallet (generates if needed, retrieves if exists)
+      const { address, isNew } = await secureSeedPhraseService.initializeSecureWallet(currentUser.id.toString());
+
+      if (isNew) {
+        console.log('🔐 ProfileScreen: New secure wallet created for user:', currentUser.id);
+        Alert.alert(
+          'Secure Wallet Created',
+          'Your single app wallet has been created. Your 12-word seed phrase is stored securely on your device only and can be used to export your wallet to external providers like Phantom and Solflare.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        console.log('🔐 ProfileScreen: Existing app wallet seed phrase retrieved for user:', currentUser.id);
+      }
+
+      console.log('🔐 ProfileScreen: Secure seed phrase access prepared successfully');
+
+      navigation.navigate('SeedPhraseView');
+    } catch (error) {
+      console.error('🔐 ProfileScreen: Error preparing secure seed phrase access:', error);
+      Alert.alert('Error', 'Failed to prepare secure seed phrase access. Please try again.');
+    }
   };
 
   const handleTransactionHistory = () => {
@@ -233,13 +259,13 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={handleWallet}>
+          <TouchableOpacity style={styles.menuItem} onPress={handleSeedPhrase}>
             <SafeImage
-              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-wallet-icon.png?alt=media&token=f88a0ca7-0c4f-4c67-919e-0c26b253317a' }}
+              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fid-icon-white.png?alt=media&token=247ae71e-f5c2-4193-ba3a-c1fc3ddaa5d0' }}
               style={styles.menuIcon}
               fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
             />
-            <Text style={styles.menuItemText}>Wallet</Text>
+            <Text style={styles.menuItemText}>Seed phrase</Text>
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
               style={styles.chevronIcon}

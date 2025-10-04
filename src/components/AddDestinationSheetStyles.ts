@@ -7,23 +7,23 @@ export const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    maxHeight: '80%',
   },
   modalContent: {
-    backgroundColor: colors.darkBackground,
+    backgroundColor: '#121D1F',
     borderTopLeftRadius: spacing.xxl,
     borderTopRightRadius: spacing.xxl,
     paddingTop: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
+    maxHeight: '90%',
+    minHeight: 500,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   modalHeader: {
     alignItems: 'center',
     marginBottom: spacing.lg,
-    position: 'relative',
   },
   grabHandle: {
     width: 40,
@@ -31,47 +31,33 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.textSecondary,
     borderRadius: 2,
     marginBottom: spacing.md,
+    alignSelf: 'center',
   },
   modalTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     color: colors.textLight,
   },
-  closeButton: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.white10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeButtonText: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-  },
   segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: colors.white10,
-    borderRadius: spacing.lg,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.md,
     padding: spacing.xs,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
+    
   },
   segment: {
     flex: 1,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: spacing.md,
+    borderRadius: 12,
     alignItems: 'center',
   },
   segmentActive: {
     backgroundColor: colors.brandGreen,
   },
   segmentText: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
   },
@@ -80,55 +66,28 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
   },
   formContent: {
-    flex: 1,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   formSection: {
     marginBottom: spacing.lg,
   },
-  inputGroup: {
-    marginBottom: spacing.lg,
-  },
   inputLabel: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
     marginBottom: spacing.sm,
+    marginTop: spacing.md,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white10,
-    borderRadius: spacing.lg,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.textLight,
-    paddingHorizontal: spacing.md,
-  },
-  textInput: {
-    flex: 1,
-    color: colors.textLight,
-    fontSize: typography.fontSize.md,
-    paddingVertical: spacing.md,
-  },
-  qrButton: {
-    padding: spacing.sm,
-    borderRadius: spacing.sm,
-    backgroundColor: colors.brandGreen,
-  },
-  qrButtonText: {
-    fontSize: typography.fontSize.sm,
-  },
-  selectContainer: {
-    backgroundColor: colors.white10,
-    borderRadius: spacing.lg,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.textLight,
+  inputField: {
+    backgroundColor: colors.white5,
+    borderRadius: spacing.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-  },
-  selectText: {
     color: colors.textLight,
     fontSize: typography.fontSize.md,
+    height: 50,
+    marginBottom: spacing.sm,
+    minHeight: 50,
   },
   errorText: {
     color: colors.error || '#FF6B6B',
@@ -136,31 +95,25 @@ export const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   modalActions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: colors.white10,
-    borderRadius: spacing.lg,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
+    marginTop: 'auto',
+    paddingTop: spacing.md,
   },
   saveButton: {
-    flex: 1,
     backgroundColor: colors.brandGreen,
-    borderRadius: spacing.lg,
+    borderRadius: spacing.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
+    width: '100%',
+  },
+  saveButtonDisabled: {
+    backgroundColor: colors.white10,
   },
   saveButtonText: {
     color: colors.black,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
+  },
+  saveButtonTextDisabled: {
+    color: colors.textSecondary,
   },
 });

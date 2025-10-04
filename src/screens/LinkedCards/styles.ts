@@ -22,8 +22,8 @@ export const styles = StyleSheet.create({
   iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
   },
   headerTitle: {
     fontSize: 20,
@@ -34,14 +34,18 @@ export const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.brandGreen,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addButtonText: {
-    color: colors.black,
-    fontSize: 18,
+    color: colors.white,
+    fontSize: 25,
     fontWeight: 'bold',
+  },
+  addButtonIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
   },
   content: {
     flex: 1,
@@ -58,7 +62,11 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
   },
   section: {
-    marginBottom: spacing.xl,
+    marginVertical: spacing.xl,
+  },
+  destinationItemContainer: {
+    position: 'relative',
+    marginBottom: spacing.sm,
   },
   sectionTitle: {
     fontSize: typography.fontSize.lg,
@@ -69,12 +77,9 @@ export const styles = StyleSheet.create({
   destinationItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.white5,
     borderRadius: spacing.lg,
     padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.textLight,
   },
   destinationIcon: {
     width: spacing.xxl + spacing.sm,
@@ -108,7 +113,6 @@ export const styles = StyleSheet.create({
   actionButton: {
     padding: spacing.sm,
     borderRadius: spacing.sm,
-    backgroundColor: colors.white10,
   },
   actionButtonText: {
     color: colors.textLight,
@@ -143,5 +147,96 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     lineHeight: spacing.lg,
+  },
+  emptyCategoryText: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+    paddingVertical: spacing.lg,
+  },
+  destinationIconImage: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
+  },
+  kastCardIcon: {
+    width: spacing.xxl + spacing.sm,
+    height: spacing.xxl + spacing.sm,
+    borderRadius: spacing.xxl,
+    marginRight: spacing.md,
+    resizeMode: 'contain',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 60,
+    right: 0,
+    backgroundColor: '#121D1F',
+    borderRadius: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.white10,
+    overflow: 'hidden',
+    zIndex: 1000,
+    minWidth: 110,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  dropdownItemIcon: {
+    width: 16,
+    height: 16,
+    marginRight: spacing.sm,
+    resizeMode: 'contain',
+  },
+  dropdownItemText: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.md,
+  },
+  globalEmptyState: {
+    alignItems: 'center',
+    paddingTop: 150,
+    paddingHorizontal: spacing.md,
+  },
+  globalEmptyStateIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.white10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  globalEmptyStateIconImage: {
+    width: 40,
+    height: 40,
+    resizeMode: 'contain',
+  },
+  globalEmptyStateTitle: {
+    color: colors.textLight,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  globalEmptyStateSubtitle: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+    lineHeight: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  globalEmptyStateButton: {
+    backgroundColor: colors.brandGreen,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: spacing.md,
+    width: '100%',
+  },
+  globalEmptyStateButtonText: {
+    color: colors.black,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    textAlign: 'center',
   },
 });
