@@ -265,7 +265,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
                 tintColor="white"
               />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Linked Cards</Text>
+            <Text style={styles.headerTitle}>Linked Wallets</Text>
             <TouchableOpacity 
               style={styles.addButton}
               onPress={() => setShowAddModal(true)}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, Alert, ScrollView, Image, Animated, PanResponder } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ScrollView, Image, Animated, PanResponder } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
@@ -115,18 +116,26 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
 // --- End AppleSlider ---
 
 const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
-  const { contact, amount, description, groupId, isSettlement } = route.params || {};
+  const { contact, wallet, destinationType, amount, description, groupId, isSettlement } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
+  const insets = useSafeAreaInsets();
 
-  // Debug logging to ensure contact data is passed correctly
+  // Determine recipient based on destination type
+  const recipient = destinationType === 'external' ? wallet : contact;
+  const recipientName = destinationType === 'external' 
+    ? (wallet?.name || `Wallet ${wallet?.address?.substring(0, 6)}...${wallet?.address?.substring(wallet?.address?.length - 6)}`)
+    : (contact?.name || 'Unknown');
+  const recipientAddress = destinationType === 'external' ? wallet?.address : contact?.wallet_address;
+
+  // Debug logging to ensure recipient data is passed correctly
   useEffect(() => {
-    console.log('💰 SendConfirmation: Contact data received:', {
-      name: contact?.name || 'No name',
-      email: contact?.email,
-      wallet: contact?.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet',
-      fullWallet: contact?.wallet_address,
-      id: contact?.id
+    console.log('💰 SendConfirmation: Recipient data received:', {
+      destinationType,
+      name: recipientName,
+      address: recipientAddress ? `${recipientAddress.substring(0, 6)}...${recipientAddress.substring(recipientAddress.length - 6)}` : 'No address',
+      fullAddress: recipientAddress,
+      id: recipient?.id
     });
     console.log('💰 SendConfirmation: Transaction details:', {
       amount,
@@ -134,7 +143,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       groupId,
       isSettlement
     });
-  }, [contact, amount, description, groupId, isSettlement]);
+  }, [destinationType, recipientName, recipientAddress, amount, description, groupId, isSettlement]);
   const [sending, setSending] = useState(false);
 
   const handleConfirmSend = async () => {
@@ -144,7 +153,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         return;
       }
 
-      if (!contact?.wallet_address) {
+      if (!recipientAddress) {
         Alert.alert('Error', 'Recipient wallet address is missing');
         return;
       }
@@ -173,22 +182,37 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       
       console.log('💰 Transaction fee estimate:', feeEstimate);
 
-      // Send transaction using existing wallet service
-      const transactionResult = await consolidatedTransactionService.sendUsdcTransaction(
-        contact.wallet_address,
-        amount,
-        currentUser.id,
-        description || (isSettlement ? 'Settlement payment' : 'Payment'),
-        groupId?.toString(),
-        'medium'
-      );
+      // Send transaction using appropriate service based on destination type
+      let transactionResult: any;
+      if (destinationType === 'external') {
+        // For external wallets, use external transfer service
+        const { externalTransferService } = await import('../../transfer/sendExternal');
+        transactionResult = await externalTransferService.sendExternalTransfer({
+          to: recipientAddress,
+          amount: amount,
+          currency: 'USDC',
+          memo: description || 'External wallet transfer',
+          userId: currentUser.id.toString(),
+          priority: 'medium'
+        });
+      } else {
+        // For friends/internal transfers, use existing service
+        transactionResult = await consolidatedTransactionService.sendUsdcTransaction(
+          recipientAddress,
+          amount,
+          currentUser.id,
+          description || (isSettlement ? 'Settlement payment' : 'Payment'),
+          groupId?.toString(),
+          'medium'
+        );
+      }
 
       console.log('✅ Transaction successful:', {
-        signature: transactionResult.signature,
-        txId: transactionResult.txId,
+        signature: transactionResult.signature || transactionResult.transactionId,
+        txId: transactionResult.txId || transactionResult.transactionId,
         companyFee: transactionResult.companyFee,
         netAmount: transactionResult.netAmount,
-        blockchainFee: transactionResult.fee,
+        blockchainFee: transactionResult.fee || 0,
       });
 
       // If this is a settlement payment, record the settlement
@@ -209,16 +233,18 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
 
       // Navigate to success screen with real transaction data
       navigation.navigate('SendSuccess', {
-        contact,
+        contact: destinationType === 'external' ? null : contact,
+        wallet: destinationType === 'external' ? wallet : null,
+        destinationType,
         amount,
         description,
         groupId,
         isSettlement,
-        transactionId: transactionResult.signature,
-        txId: transactionResult.txId,
+        transactionId: transactionResult.signature || transactionResult.transactionId,
+        txId: transactionResult.txId || transactionResult.transactionId,
         companyFee: transactionResult.companyFee,
         netAmount: transactionResult.netAmount,
-        blockchainFee: transactionResult.fee,
+        blockchainFee: transactionResult.fee || 0,
         fromNotification: route.params?.fromNotification,
         notificationId: route.params?.notificationId,
       });
@@ -372,12 +398,12 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            source={require('../../../assets/chevron-left.png')}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -402,18 +428,21 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.mockupRecipientCard}>
           <View style={styles.mockupRecipientAvatar}>
             <Text style={styles.mockupRecipientAvatarText}>
-              {contact?.name ? contact.name.charAt(0).toUpperCase() : (contact?.wallet_address ? contact.wallet_address.substring(0, 1).toUpperCase() : 'U')}
+              {destinationType === 'external' 
+                ? (wallet?.name ? wallet.name.charAt(0).toUpperCase() : (wallet?.address ? wallet.address.substring(0, 1).toUpperCase() : 'W'))
+                : (contact?.name ? contact.name.charAt(0).toUpperCase() : (contact?.wallet_address ? contact.wallet_address.substring(0, 1).toUpperCase() : 'U'))
+              }
             </Text>
           </View>
           <View style={styles.mockupRecipientInfo}>
             <Text style={styles.mockupRecipientName}>
-              {contact?.name || (contact?.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'Unknown')}
+              {recipientName}
             </Text>
-            {contact?.wallet_address ? (
+            {recipientAddress ? (
               <Text style={styles.walletAddressText} numberOfLines={1} ellipsizeMode="middle">
-                {`${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.slice(-4)}`}
+                {`${recipientAddress.substring(0, 6)}...${recipientAddress.slice(-4)}`}
               </Text>
-            ) : contact?.email ? (
+            ) : destinationType === 'friend' && contact?.email ? (
               <Text style={styles.mockupRecipientEmail}>{contact.email}</Text>
             ) : null}
           </View>
@@ -437,7 +466,9 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         {/* Transaction Details Card (mockup style) */}
         <View style={styles.mockupTransactionDetails}>
           <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Amount to recipient</Text>
+            <Text style={styles.mockupFeeLabel}>
+              {destinationType === 'external' ? 'Amount to wallet' : 'Amount to recipient'}
+            </Text>
             <Text style={styles.mockupFeeValue}>{netAmount.toFixed(2)} USDC</Text>
           </View>
           <View style={styles.mockupFeeRow}>
@@ -450,11 +481,15 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           </View>
           <View style={styles.mockupFeeRowSeparator} />
           <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Total you'll pay</Text>
+            <Text style={styles.mockupFeeLabel}>
+              {destinationType === 'external' ? 'Total you\'ll pay' : 'Total you\'ll pay'}
+            </Text>
             <Text style={[styles.mockupFeeValue, { color: colors.brandGreen, fontWeight: 'bold' }]}>{totalAmount.toFixed(2)} USDC</Text>
           </View>
           <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Destination account</Text>
+            <Text style={styles.mockupFeeLabel}>
+              {destinationType === 'external' ? 'Destination wallet' : 'Destination account'}
+            </Text>
             <Text style={styles.mockupFeeValue}>{destinationAccount ? `${destinationAccount.substring(0, 4)}...${destinationAccount.slice(-4)}` : ''}</Text>
           </View>
           <View style={styles.mockupFeeRow}>
@@ -470,7 +505,10 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       {/* AppleSlider for confirmation */}
       <View style={styles.appleSliderContainerWrapper}>
         <Text style={styles.walletInfoText}>
-          Double check the person you're sending money to!
+          {destinationType === 'external' 
+            ? 'Double check the wallet you\'re withdrawing to!'
+            : 'Double check the person you\'re sending money to!'
+          }
         </Text>
         
         {/* Wallet Error Display */}
@@ -551,7 +589,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           text={walletLoading ? "Loading wallet..." : walletError ? "Wallet Error" : "Sign transaction"}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

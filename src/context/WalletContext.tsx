@@ -184,10 +184,31 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     const loadStoredWallets = async () => {
       try {
         const stored = await AsyncStorage.getItem('storedWallets');
+        let wallets: StoredWallet[] = [];
+        
         if (stored) {
-          const wallets = JSON.parse(stored);
-          setAvailableWallets(wallets);
+          wallets = JSON.parse(stored);
         }
+        
+        // Add test external wallet for design testing
+        const testExternalWallet: StoredWallet = {
+          id: 'test_external_wallet_001',
+          name: 'Test Phantom Wallet',
+          address: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM',
+          secretKey: '', // External wallets don't expose secret keys
+          isAppGenerated: false,
+          createdAt: new Date().toISOString(),
+          lastUsed: new Date().toISOString()
+        };
+        
+        // Check if test wallet already exists
+        const testWalletExists = wallets.some(w => w.id === testExternalWallet.id);
+        if (!testWalletExists) {
+          wallets.push(testExternalWallet);
+          await saveWalletsToStorage(wallets);
+        }
+        
+        setAvailableWallets(wallets);
       } catch (error) {
         console.error('Error loading stored wallets:', error);
       }

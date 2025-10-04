@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Image, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NavBar from '../../components/NavBar';
 import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
@@ -19,6 +20,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     appWalletConnected,
     ensureAppWallet 
   } = useWallet();
+  const insets = useSafeAreaInsets();
   
   const [activeTab, setActiveTab] = useState<'friends' | 'external'>(initialTab || 'friends');
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,7 +128,17 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   );
 
   const renderExternalWalletTab = () => {
-    if (availableWallets.length === 0) {
+    // Add test KAST card to the list
+    const testKastCard = {
+      id: 'kast-test-card',
+      name: 'KAST Card Test',
+      address: 'kast_1234567890abcdef',
+      type: 'kast'
+    };
+
+    const allDestinations = [...availableWallets, testKastCard];
+
+    if (allDestinations.length === 0) {
       return (
         <View style={styles.emptyStateContainer}>
           <View style={styles.emptyStateIcon}>
@@ -151,32 +163,32 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
 
     return (
       <ScrollView style={styles.walletsList} showsVerticalScrollIndicator={false}>
-        {availableWallets.map((wallet) => (
+        {allDestinations.map((destination) => (
           <TouchableOpacity
-            key={wallet.id}
+            key={destination.id}
             style={styles.walletRow}
-            onPress={() => handleSelectWallet(wallet)}
+            onPress={() => handleSelectWallet(destination)}
           >
-            <View style={styles.walletIcon}>
+            {(destination as any).type === 'kast' ? (
               <Image
-                source={require('../../../assets/link-icon.png')}
-                style={styles.walletIconImage}
+                source={require('../../../assets/kast-logo.png')}
+                style={[styles.kastIcon]}
               />
-            </View>
+            ) : (
+              <View style={styles.walletIcon}>
+                <Image
+                  source={require('../../../assets/wallet-icon-white.png')}
+                  style={styles.walletIconImage}
+                />
+              </View>
+            )}
             <View style={styles.walletInfo}>
-              <Text style={styles.walletName}>{wallet.name}</Text>
+              <Text style={styles.walletName}>{destination.name}</Text>
               <Text style={styles.walletAddress}>
-                {formatWalletAddress(wallet.address)}
+                {formatWalletAddress(destination.address)}
               </Text>
             </View>
-            <View style={styles.walletActions}>
-              <TouchableOpacity 
-                style={styles.scanButton}
-                onPress={handleScanQR}
-              >
-                <Text style={styles.scanButtonText}>📷</Text>
-              </TouchableOpacity>
-            </View>
+            
           </TouchableOpacity>
         ))}
         
@@ -191,7 +203,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -229,8 +241,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
         {activeTab === 'friends' ? renderFriendsTab() : renderExternalWalletTab()}
       </View>
       
-      <NavBar currentRoute="Send" navigation={navigation} />
-    </SafeAreaView>
+    </View>
   );
 };
 

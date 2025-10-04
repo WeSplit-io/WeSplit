@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Text as RNText } from 'react-native';
-import { View, Text, TouchableOpacity, TextInput, SafeAreaView, Alert, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { GroupMember } from '../../types';
 import { useApp } from '../../context/AppContext';
@@ -9,16 +10,17 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 
 const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
-  const { 
-    destinationType, 
-    contact, 
-    wallet, 
-    groupId, 
-    prefilledAmount, 
-    prefilledNote, 
-    isSettlement 
+  const {
+    destinationType,
+    contact,
+    wallet,
+    groupId,
+    prefilledAmount,
+    prefilledNote,
+    isSettlement
   } = route.params || {};
-  
+  const insets = useSafeAreaInsets();
+
   const [amount, setAmount] = useState(prefilledAmount ? prefilledAmount.toString() : '');
   const [showAddNote, setShowAddNote] = useState(!!prefilledNote || isSettlement);
   const [note, setNote] = useState(prefilledNote || '');
@@ -26,7 +28,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const [maxNoteInputWidth, setMaxNoteInputWidth] = useState(0);
   const [selectedChip, setSelectedChip] = useState<'25' | '50' | '100' | null>(null);
   const noteTextRef = useRef<RNText>(null);
-  
+
   const { state } = useApp();
   const { currentUser } = state;
   const { appWalletBalance, appWalletConnected } = useWallet();
@@ -63,7 +65,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
     // Allow empty string, numbers, and decimal separators (both . and ,)
     // First, convert commas to dots for consistency
     let cleaned = value.replace(/,/g, '.');
-    
+
     // Then remove any other non-numeric characters except dots
     cleaned = cleaned.replace(/[^0-9.]/g, '');
 
@@ -76,7 +78,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
     // Allow empty string or valid number
     setAmount(cleaned);
-    
+
     // Clear chip selection when user manually edits amount
     if (selectedChip) {
       setSelectedChip(null);
@@ -104,7 +106,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
         Alert.alert('Error', 'Contact information is missing');
         return;
       }
-      
+
       navigation.navigate('SendConfirmation', {
         contact,
         amount: numAmount,
@@ -119,17 +121,14 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
         Alert.alert('Error', 'Wallet information is missing');
         return;
       }
-      
-      // Calculate fees (3% withdrawal fee for external wallets)
-      const withdrawalFee = numAmount * 0.03;
-      const totalWithdraw = numAmount - withdrawalFee;
-      
-      navigation.navigate('WithdrawConfirmation', {
+
+      navigation.navigate('SendConfirmation', {
+        destinationType: 'external',
+        wallet,
         amount: numAmount,
-        withdrawalFee,
-        totalWithdraw,
-        walletAddress: wallet.address,
         description: note.trim(),
+        groupId,
+        isSettlement: false,
       });
     }
   };
@@ -167,7 +166,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const isAmountValid = amount.length > 0 && parseFloat(amount) > 0;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -215,7 +214,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1,  paddingHorizontal: 0, paddingBottom: 120 }}
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 0, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -239,49 +238,52 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
                 blurOnSubmit={true}
               />
               <Text style={styles.amountCardCurrency}>USDC</Text>
+             
+             
+              {/* Quick Amount Chips - Only for External Wallet */}
+              {destinationType === 'external' && appWalletBalance !== null && (
+                <View style={styles.quickAmountChips}>
+                  <TouchableOpacity
+                    style={[
+                      styles.quickAmountChip,
+                      selectedChip === '25' && styles.quickAmountChipSelected
+                    ]}
+                    onPress={() => handleChipPress('25')}
+                  >
+                    <Text style={[
+                      styles.quickAmountChipText,
+                      selectedChip === '25' && styles.quickAmountChipTextSelected
+                    ]}>25%</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.quickAmountChip,
+                      selectedChip === '50' && styles.quickAmountChipSelected
+                    ]}
+                    onPress={() => handleChipPress('50')}
+                  >
+                    <Text style={[
+                      styles.quickAmountChipText,
+                      selectedChip === '50' && styles.quickAmountChipTextSelected
+                    ]}>50%</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.quickAmountChip,
+                      selectedChip === '100' && styles.quickAmountChipSelected
+                    ]}
+                    onPress={() => handleChipPress('100')}
+                  >
+                    <Text style={[
+                      styles.quickAmountChipText,
+                      selectedChip === '100' && styles.quickAmountChipTextSelected
+                    ]}>100%</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
-            {/* Quick Amount Chips - Only for External Wallet */}
-            {destinationType === 'external' && appWalletBalance !== null && (
-              <View style={styles.quickAmountChips}>
-                <TouchableOpacity 
-                  style={[
-                    styles.quickAmountChip,
-                    selectedChip === '25' && styles.quickAmountChipSelected
-                  ]}
-                  onPress={() => handleChipPress('25')}
-                >
-                  <Text style={[
-                    styles.quickAmountChipText,
-                    selectedChip === '25' && styles.quickAmountChipTextSelected
-                  ]}>25%</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[
-                    styles.quickAmountChip,
-                    selectedChip === '50' && styles.quickAmountChipSelected
-                  ]}
-                  onPress={() => handleChipPress('50')}
-                >
-                  <Text style={[
-                    styles.quickAmountChipText,
-                    selectedChip === '50' && styles.quickAmountChipTextSelected
-                  ]}>50%</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[
-                    styles.quickAmountChip,
-                    selectedChip === '100' && styles.quickAmountChipSelected
-                  ]}
-                  onPress={() => handleChipPress('100')}
-                >
-                  <Text style={[
-                    styles.quickAmountChipText,
-                    selectedChip === '100' && styles.quickAmountChipTextSelected
-                  ]}>100%</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+
 
             {/* Add Note Section */}
             {!showAddNote ? (
@@ -364,7 +366,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
