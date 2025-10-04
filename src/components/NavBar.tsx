@@ -44,9 +44,10 @@ const navItems = [
 interface NavBarProps {
   navigation: any;
   currentRoute?: string;
+  customStyle?: any;
 }
 
-const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
+const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }) => {
   const handleNavigation = (route: string) => {
     if (!route) {
       console.warn('NavBar: No route provided for navigation');
@@ -97,7 +98,7 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, customStyle]}>
       <View style={styles.scrollContent}>
         {navItems.map((item, index) => {
           const isActive = isActiveRoute(item.route);

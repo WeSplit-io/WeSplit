@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import NavBar from '../../components/NavBar';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { formatKastIdentifier } from '../../utils/sendUtils';
@@ -312,7 +311,6 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
             )}
           </ScrollView>
           
-          <NavBar currentRoute="LinkedCards" navigation={navigation} />
           
           {/* Add Destination Modal */}
           <AddDestinationSheet
