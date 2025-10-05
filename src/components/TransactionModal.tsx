@@ -236,26 +236,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 nestedScrollEnabled={true}
                 scrollEventThrottle={16}
               >
-                {/* Transaction Icon Container */}
-                <View style={styles.transactionIconContainer}>
-                  <View style={styles.transactionIcon}>
-                    <Image
-                      source={getTransactionIcon(transaction)}
-                      style={styles.transactionIconImage}
-                    />
-                  </View>
-                </View>
-
-                {/* Transaction Info */}
-                <View style={styles.transactionInfo}>
-                  <Text style={styles.transactionTitle}>
-                    {getTransactionTitle(transaction)}
-                  </Text>
-                  <Text style={[styles.transactionAmount, { color }]}>
-                    {amount} {transaction.currency}
-                  </Text>
-                </View>
-
+               
                   {/* Transaction Details */}
                   <View style={styles.transactionDetailsContainer}>
                     <View style={styles.transactionDetailRow}>

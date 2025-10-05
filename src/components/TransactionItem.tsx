@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.white5,
     borderRadius: 12,
     marginBottom: 12,
   },

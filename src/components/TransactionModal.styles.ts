@@ -4,7 +4,7 @@ import { colors, spacing, typography } from '../theme';
 export const styles = StyleSheet.create({
   transactionModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: colors.blackOverlay,
     justifyContent: 'flex-end',
   },
   transactionOverlayTouchable: {
@@ -12,7 +12,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   transactionModalContent: {
-    backgroundColor: colors.black,
+    backgroundColor: colors.blackWhite5,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: spacing.lg,
@@ -27,14 +27,14 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.white50,
     borderRadius: 2,
     alignSelf: 'center',
-    marginBottom: 30,
+    marginBottom: 25,
   },
   transactionModalTitle: {
     fontSize: 18,
     fontWeight: '500',
     color: colors.white,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 25,
   },
   transactionContent: {
     flex: 1,
@@ -42,52 +42,8 @@ export const styles = StyleSheet.create({
   transactionContentContainer: {
     paddingBottom: spacing.bottomSafeArea,
   },
-  transactionIconContainer: {
-    backgroundColor: colors.green,
-    width: '100%',
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  transactionIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 30,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  transactionIconImage: {
-    width: 30,
-    height: 30,
-    tintColor: colors.black,
-  },
-  transactionInfo: {
-    alignItems: 'center',
-    marginBottom: 32,
-    backgroundColor: colors.green10,
-    width: '100%',
-    padding: 16,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-  },
-  transactionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.white,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  transactionAmount: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.white,
-    textAlign: 'center',
-  },
   transactionDetailsContainer: {
-    backgroundColor: colors.black,
+    backgroundColor: colors.white5,
     borderRadius: 12,
     padding: 16,
     width: '100%',
@@ -127,7 +83,7 @@ export const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.green,
-    paddingVertical: 16,
+    paddingVertical: spacing.md,
     paddingHorizontal: 24,
     width: '100%',
     alignItems: 'center',

@@ -24,8 +24,8 @@ export default StyleSheet.create({
   iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
   },
   headerTitle: {
     ...typography.textStyles.h6,
@@ -43,11 +43,9 @@ export default StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: spacing.xs,
     paddingVertical: spacing.xs,
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     borderRadius: 16,
     marginHorizontal: spacing.screenPadding,
-    borderWidth: 1,
-    borderColor: colors.white10,
     padding: 4,
     marginBottom: spacing.md,
   },
@@ -132,7 +130,7 @@ export default StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.white5,
     borderRadius: 12,
     marginBottom: 12,
   },
@@ -140,20 +138,17 @@ export default StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.darkCardSecondary,
+    backgroundColor: colors.white5,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
-    borderWidth: 1,
-    borderColor: colors.primaryGreen,
+    marginRight: 10,
   },
   transactionIconContainerIncome: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.white5,
   },
   transactionIcon: {
     width: 24,
     height: 24,
-    tintColor: colors.textLight,
   },
   transactionIconIncome: {
     tintColor: colors.darkBackground,
@@ -163,13 +158,13 @@ export default StyleSheet.create({
     marginRight: 16,
   },
   transactionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.textLight,
-    marginBottom: 4,
+    marginBottom: 10,
   },
   transactionSource: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.textLightSecondary,
   },
   transactionAmountContainer: {
@@ -177,7 +172,7 @@ export default StyleSheet.create({
   },
   transactionAmount: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 4,
   },
   transactionAmountIncome: {

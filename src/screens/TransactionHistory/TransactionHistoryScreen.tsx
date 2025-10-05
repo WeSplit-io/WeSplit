@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   RefreshControl,
@@ -10,6 +9,7 @@ import {
   Image,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
@@ -479,11 +479,9 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
             styles.transactionAmount,
             isIncome ? styles.transactionAmountIncome : styles.transactionAmountExpense
           ]}>
-            {isIncome ? '+' : '-'}{amount}
+            {isIncome ? '+' : '-'}{amount} USDC
           </Text>
-          <Text style={styles.transactionTime}>
-            {transaction.time}
-          </Text>
+          
         </View>
       </TouchableOpacity>
     );
@@ -516,7 +514,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            source={require('../../../assets/chevron-left.png')}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
