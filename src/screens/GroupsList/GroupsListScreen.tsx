@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, SafeAreaView, Image, Alert, Animated } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Image, Alert, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import GroupIcon from '../../components/GroupIcon';

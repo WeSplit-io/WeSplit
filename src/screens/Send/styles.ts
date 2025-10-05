@@ -771,7 +771,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.white10,
     borderRadius: 16,
     paddingVertical: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     alignItems: 'center',
     width: '100%',
   },
@@ -1009,7 +1009,7 @@ export const styles = StyleSheet.create({
   mockupBackHomeButton: {
     backgroundColor: colors.brandGreen,
     borderRadius: 16,
-    paddingVertical: 16,
+    paddingVertical: spacing.md,
     paddingHorizontal: 48,
     alignItems: 'center',
     width: '100%',
@@ -1183,7 +1183,6 @@ export const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: colors.darkBackground,
-    paddingBottom: 16,
     paddingTop: 8,
     alignItems: 'center',
     borderTopWidth: 0,
@@ -1194,7 +1193,6 @@ export const styles = StyleSheet.create({
   // AppleSlider styles (adapted from WalletManagement)
   appleSliderContainerWrapper: {
     marginHorizontal: spacing.screenPaddingHorizontal,
-    paddingBottom: spacing.bottomSafeArea,
     // width: '100%', // supprimé pour éviter le débordement
   },
   appleSliderContainer: {

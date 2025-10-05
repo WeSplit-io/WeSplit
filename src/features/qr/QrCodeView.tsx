@@ -226,14 +226,6 @@ const styles = StyleSheet.create({
   },
   qrContainer: {
     borderRadius: 12,
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   subtext: {
     fontSize: 14,
@@ -244,6 +236,7 @@ const styles = StyleSheet.create({
   addressContainer: {
     width: '100%',
     marginBottom: 20,
+    paddingHorizontal: 20,
   },
   addressLabel: {
     fontSize: 14,
@@ -260,12 +253,13 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     gap: 12,
+    width: '100%',
   },
   button: {
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
-    minWidth: 80,
+    minWidth: 100,
     alignItems: 'center',
   },
   copyButton: {

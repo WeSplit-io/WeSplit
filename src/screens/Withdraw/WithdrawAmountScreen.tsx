@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, TextInput, SafeAreaView, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';

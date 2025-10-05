@@ -3,11 +3,11 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
   Image,
   Clipboard,
 } from 'react-native';
+import SafeAreaWrapper from '../../components/SafeAreaWrapper';
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
@@ -136,34 +136,38 @@ const SeedPhraseViewScreen: React.FC = () => {
     );
   };
 
+  const handleDone = () => {
+    navigation.navigate('Profile' as never);
+  };
+
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaWrapper style={styles.container} top>
         <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            source={require('../../../assets/chevron-left.png')}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
           <Text style={styles.headerTitle}>Seed phrase</Text>
           <View style={styles.placeholder} />
         </View>
-        <View style={styles.content}>
+        <View style={styles.loaderSeedPhraseContainer}>
           <Text style={styles.instructionsText}>Loading seed phrase...</Text>
         </View>
-      </SafeAreaView>
+      </SafeAreaWrapper>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaWrapper style={styles.container} top>
         <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            source={require('../../../assets/chevron-left.png')}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -181,17 +185,25 @@ const SeedPhraseViewScreen: React.FC = () => {
             </Text>
           </View>
         </View>
-      </SafeAreaView>
+        
+        {/* Done Button */}
+        <TouchableOpacity 
+          style={styles.doneButtonFixed}
+          onPress={handleDone}
+        >
+          <Text style={styles.doneButtonText}>Done</Text>
+        </TouchableOpacity>
+      </SafeAreaWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaWrapper style={styles.container} top>
       {/* Header */}
       <View style={styles.header}>
       <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            source={require('../../../assets/chevron-left.png')}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -223,7 +235,7 @@ const SeedPhraseViewScreen: React.FC = () => {
               <Text style={styles.blurredText}>Tap to reveal your seed phrase</Text>
               <Text style={styles.blurredSubtext}>Make sure no one is watching your screen.</Text>
               <View style={styles.revealButton}>
-                <Icon name="eye" size={20} color={colors.white} />
+                <Image source={require('../../../assets/eye-icon.png')} style={styles.iconWrapper} />
                 <Text style={styles.revealButtonText}>View</Text>
               </View>
             </TouchableOpacity>
@@ -247,20 +259,21 @@ const SeedPhraseViewScreen: React.FC = () => {
               onPress={handleCopySeedPhrase}
             >
               <Text style={styles.copyButtonText}>Copy Seed Phrase</Text>
-              <Icon name="copy" size={20} color={colors.black} />
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={styles.exportButton}
-              onPress={handleShowExportInstructions}
-            >
-              <Text style={styles.exportButtonText}>Export Instructions</Text>
-              <Icon name="external-link" size={20} color={colors.primaryGreen} />
-            </TouchableOpacity>
           </View>
         )}
+
       </View>
-    </SafeAreaView>
+      
+      {/* Done Button - Fixed at bottom */}
+      <TouchableOpacity 
+        style={styles.doneButtonFixed}
+        onPress={handleDone}
+      >
+        <Text style={styles.doneButtonText}>Done</Text>
+      </TouchableOpacity>
+    </SafeAreaWrapper>
   );
 };
 

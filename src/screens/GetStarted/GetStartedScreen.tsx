@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, SafeAreaView, StatusBar, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StatusBar, Linking } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from './styles';
 import { colors } from '../../theme';

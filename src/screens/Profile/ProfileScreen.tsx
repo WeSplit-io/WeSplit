@@ -261,7 +261,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
 
           <TouchableOpacity style={styles.menuItem} onPress={handleSeedPhrase}>
             <SafeImage
-              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fid-icon-white.png?alt=media&token=247ae71e-f5c2-4193-ba3a-c1fc3ddaa5d0' }}
+              source={require('../../../assets/eye-icon.png')}
               style={styles.menuIcon}
               fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
             />

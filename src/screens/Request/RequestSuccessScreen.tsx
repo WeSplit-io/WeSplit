@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
@@ -62,31 +63,13 @@ const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
             {getCurrentDate()}
           </Text>
 
-          {/* Additional Info */}
-          {contact && (
-            <Text style={[styles.mockupSuccessDate, {
-              fontSize: 14,
-              marginBottom: 20,
-              color: colors.textSecondary,
-            }]}>
-              Sent to {contact.name || contact.email || 'Unknown'}
-            </Text>
-          )}
+         
 
-          {amount && (
-            <Text style={[styles.mockupSuccessDate, {
-              fontSize: 16,
-              marginBottom: 10,
-              color: colors.primaryGreen,
-              fontWeight: '600',
-            }]}>
-              ${amount} USDC
-            </Text>
-          )}
+          
 
          </View>
         {/* Back Home Button collé en bas */}
-        <View style={{width: '100%', paddingBottom: 24, alignItems: 'center'}}>
+        <View style={{width: '100%', alignItems: 'center'}}>
           <TouchableOpacity 
             style={[styles.mockupBackHomeButton, {
               paddingVertical: 16,

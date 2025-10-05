@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Text as RNText } from 'react-native';
 import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { GroupMember } from '../../types';
 import { useApp } from '../../context/AppContext';
@@ -19,7 +19,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
     prefilledNote,
     isSettlement
   } = route.params || {};
-  const insets = useSafeAreaInsets();
+  
 
   const [amount, setAmount] = useState(prefilledAmount ? prefilledAmount.toString() : '');
   const [showAddNote, setShowAddNote] = useState(!!prefilledNote || isSettlement);
@@ -166,7 +166,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const isAmountValid = amount.length > 0 && parseFloat(amount) > 0;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.container} edges={['top','bottom']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -382,7 +382,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 };
 

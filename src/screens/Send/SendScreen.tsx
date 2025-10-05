@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import NavBar from '../../components/NavBar';
 import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
@@ -20,7 +20,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     appWalletConnected,
     ensureAppWallet 
   } = useWallet();
-  const insets = useSafeAreaInsets();
+  
   
   const [activeTab, setActiveTab] = useState<'friends' | 'external'>(initialTab || 'friends');
   const [searchQuery, setSearchQuery] = useState('');
@@ -203,7 +203,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.container} edges={['top','bottom']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -241,7 +241,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
         {activeTab === 'friends' ? renderFriendsTab() : renderExternalWalletTab()}
       </View>
       
-    </View>
+    </SafeAreaView>
   );
 };
 

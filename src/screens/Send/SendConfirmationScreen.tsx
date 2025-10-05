@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Alert, ScrollView, Image, Animated, PanResponder } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
@@ -119,7 +119,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, wallet, destinationType, amount, description, groupId, isSettlement } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
-  const insets = useSafeAreaInsets();
+  
 
   // Determine recipient based on destination type
   const recipient = destinationType === 'external' ? wallet : contact;
@@ -398,7 +398,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   });
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.container} edges={['top','bottom']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -594,7 +594,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           text={walletLoading ? "Loading wallet..." : walletError ? "Wallet Error" : "Sign transaction"}
         />
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

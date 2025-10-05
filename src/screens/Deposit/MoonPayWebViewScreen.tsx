@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, Alert, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import Icon from '../../components/Icon';
 import { useWallet } from '../../context/WalletContext';
@@ -140,8 +141,8 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
-            style={{ width: 24, height: 24 }}
+            source={require('../../../assets/chevron-left.png')}
+            style={styles.iconWrapper}
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>MoonPay</Text>

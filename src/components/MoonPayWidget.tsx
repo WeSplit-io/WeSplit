@@ -293,14 +293,14 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
                 </Text>
 
                 <View style={styles.walletInfo}>
-                  <Text style={styles.walletLabel}>Wallet Address:</Text>
+                  <Text style={styles.walletLabel}>Wallet Address</Text>
                   <Text style={styles.input}>
                     {appWalletAddress ? `${appWalletAddress.slice(0, 8)}...${appWalletAddress.slice(-8)}` : 'Not available'}
                   </Text>
                 </View>
 
                 <View style={styles.amountInput}>
-                  <Text style={styles.amountLabel}>Amount (USDC):</Text>
+                  <Text style={styles.amountLabel}>Amount (USDC)</Text>
                   <TextInput
                     style={styles.input}
                     value={amount}
@@ -339,9 +339,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: colors.black,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: colors.blackWhite5,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     padding: 24,
     paddingTop: 16,
     maxHeight: '80%',
@@ -352,14 +352,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white70,
     borderRadius: 2,
     alignSelf: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.white,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   content: {
     alignItems: 'center',
@@ -368,16 +368,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.white70,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 25,
   },
   walletInfo: {
     width: '100%',
     marginBottom: 15,
   },
   walletLabel: {
-    fontSize: 14,
+    fontSize: 16,
     color: colors.white,
-    marginBottom: 5,
+    marginBottom: 10,
   },
   walletAddress: {
     fontSize: 12,
@@ -388,21 +388,19 @@ const styles = StyleSheet.create({
   },
   amountInput: {
     width: '100%',
-    marginBottom: 20,
+    marginBottom: 25,
   },
   amountLabel: {
-    fontSize: 14,
+    fontSize: 16,
     color: colors.white,
-    marginBottom: 5,
+    marginBottom: 10,
   },
   input: {
-    borderWidth: 1,
-    borderColor: colors.white50,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     color: colors.white,
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
   },
   purchaseButton: {
     backgroundColor: colors.green,
@@ -423,9 +421,10 @@ const styles = StyleSheet.create({
   },
   disclaimer: {
     fontSize: 12,
-      color: colors.white70,
+    color: colors.white70,
     textAlign: 'center',
     marginTop: 10,
+    marginBottom: 10,
   },
 });
 

@@ -104,8 +104,8 @@ export const styles = StyleSheet.create({
   iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
   },
   
   headerTitle: {
@@ -745,7 +745,10 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.xl,
   },
-
+  loaderSeedPhraseContainer: {
+    alignItems: 'center',
+    paddingVertical: 300,
+  },
   loader: {
     marginBottom: spacing.md,
   },
@@ -795,7 +798,7 @@ export const styles = StyleSheet.create({
   
   instructionsTitle: {
     color: colors.white,
-    fontSize: 24,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     marginBottom: spacing.md,
     textAlign: 'center',
@@ -818,19 +821,11 @@ export const styles = StyleSheet.create({
     minHeight: 180,
     marginTop: 50, // réduit l'écart avec les instructions
     marginBottom: spacing.lg,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: spacing.xs },
-    shadowOpacity: 0.08,
-    shadowRadius: spacing.sm,
-    elevation: 2,
     marginHorizontal: spacing.lg,
-    borderWidth: 0.5,
-    borderColor: colors.white10,
+    backgroundColor: colors.white5,
   },
   
   blurredContainer: {
-    backgroundColor: colors.green10,
-    borderRadius: spacing.lg,
     padding: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
@@ -847,7 +842,6 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
     borderRadius: spacing.lg,
   },
   
@@ -894,7 +888,6 @@ export const styles = StyleSheet.create({
   seedWordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.green10, // pill plus claire
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 10,
@@ -902,7 +895,9 @@ export const styles = StyleSheet.create({
     width: '48%', // deux colonnes
     marginVertical: 2,
     marginHorizontal: 0,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.white50,
   },
   
   seedWordNumber: {
@@ -1151,7 +1146,7 @@ export const styles = StyleSheet.create({
 
   actionButtonsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     marginTop: spacing.xl,
   },
 
@@ -1382,7 +1377,6 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: spacing.radiusMd,
-    marginTop: spacing.lg,
     alignSelf: 'center',
   },
   
@@ -1390,6 +1384,28 @@ export const styles = StyleSheet.create({
     color: colors.black,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
-    marginRight: spacing.sm,
   },
+
+
+  // Fixed done button at bottom of screen
+  doneButtonFixed: {
+    position: 'absolute',
+    bottom: spacing.xl,
+    left: spacing.md,
+    right: spacing.md,
+    backgroundColor: colors.black,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: spacing.radiusMd,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.green,
+  },
+  doneButtonText: {
+    color: colors.green,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+  },
+
+
 }); 

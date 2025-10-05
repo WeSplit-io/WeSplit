@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
@@ -8,7 +8,7 @@ import { NotificationCompletionService } from '../../services/notificationComple
 
 const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, wallet, destinationType, amount, description, groupId, transactionId, isSettlement, fromNotification, notificationId } = route.params || {};
-  const insets = useSafeAreaInsets();
+  
 
   // Complete notification process when payment is successful
   useEffect(() => {
@@ -66,7 +66,7 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   return (
-    <View style={[{flex: 1, backgroundColor: colors.darkBackground}, { paddingTop: insets.top }]}>
+    <SafeAreaView style={{flex: 1, backgroundColor: colors.darkBackground}} edges={['top','bottom']}>
       <View style={[styles.mockupSuccessContainer, {flex: 1, justifyContent: 'space-between', paddingBottom: 0}]}>  
         <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
           {/* Success Icon */}
@@ -95,7 +95,7 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
         {/* Back Home Button collé en bas */}
-        <View style={{width: '100%', paddingBottom: 24, alignItems: 'center'}}>
+        <View style={{width: '100%', alignItems: 'center'}}>
           <TouchableOpacity 
             style={[styles.mockupBackHomeButton, {
               paddingVertical: 16,
@@ -114,7 +114,7 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

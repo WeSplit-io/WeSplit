@@ -4,16 +4,20 @@ import { colors, spacing, typography } from '../../theme';
 export default StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#181818',
     paddingHorizontal: 20,
-    paddingTop: 40,
   },
   backButton: {
-    padding: 8,
+  },
+  iconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 20,
+    height: 20,
+    margin: 8,
+
   },
   content: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingVertical: spacing.xl,
   },
   mainContent: {
     marginTop: spacing.md,
@@ -53,12 +57,10 @@ export default StyleSheet.create({
     gap: spacing.lg,
   },
   paymentMethodCard: {
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
     borderRadius: 16,
     padding: spacing.lg,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.white10,
   },
   paymentMethodIcon: {
     marginBottom: spacing.md,
@@ -229,7 +231,6 @@ export default StyleSheet.create({
   },
   qrSection: {
     alignItems: 'center',
-    padding: spacing.lg,
     marginBottom: spacing.md,
     width: '100%',
     justifyContent: 'center',
@@ -240,7 +241,6 @@ export default StyleSheet.create({
     borderRadius: 30,
     padding: spacing.lg,
     borderWidth: 5,
-    borderColor: colors.green,
     
   },
   copyButton: {
@@ -356,9 +356,7 @@ export default StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#181818',
   },
   headerTitle: {
     fontSize: 20,

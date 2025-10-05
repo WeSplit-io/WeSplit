@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, Share, SafeAreaView, Image, TextInput, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Share, Image, TextInput, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import { QrCodeView } from '@features/qr';
@@ -165,7 +166,7 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Icon name="arrow-left" size={24} color="#212121" />
+            <Image source={require('../../../assets/chevron-left.png')} style={styles.iconWrapper} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Crypto Transfer</Text>
           <View style={{ width: 24 }} />
@@ -173,7 +174,7 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
 
         <View style={styles.content}>
           {/* External Wallet Section */}
-          {!externalWalletConnected && (
+          {/* {!externalWalletConnected && ( *
             <View style={styles.transferSection}>
               <Text style={styles.sectionTitle}>Connect External Wallet</Text>
               <Text style={styles.sectionDescription}>
@@ -189,17 +190,17 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
                 </Text>
               </TouchableOpacity>
             </View>
-          )}
+          )} */}
 
           {/* Divider */}
           {externalWalletConnected && <View style={styles.divider} />}
 
           {/* QR Code Section for External Wallet Transfers */}
           <View style={styles.qrSection}>
-            <Text style={styles.sectionTitle}>External Wallet Transfer</Text>
+            {/*<Text style={styles.sectionTitle}>External Wallet Transfer</Text>
             <Text style={styles.sectionDescription}>
               Share this QR code to trigger external wallet transfers (Phantom, Metamask, etc.) to your app wallet
-            </Text>
+            </Text>*/}
             
             {depositAddress ? (
               <View style={styles.qrContainer}>
@@ -210,8 +211,7 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
                   amount={transferAmount ? parseFloat(transferAmount) : undefined}
                   label="WeSplit Deposit"
                   message={`Deposit to ${currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}`}
-                  size={200}
-                  backgroundColor={colors.white}
+                  size={250}
                   color="#000"
                   caption="Scan to deposit USDC"
                   showButtons={true}
@@ -228,29 +228,7 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
             )}
           </View>
 
-          {/* Wallet Address Display */}
-          {depositAddress && (
-            <View style={styles.addressDisplay}>
-              <Text style={styles.addressLabel}>App Wallet Address</Text>
-              <Text style={styles.addressValue} numberOfLines={2} ellipsizeMode="middle">
-                {depositAddress}
-              </Text>
-            </View>
-          )}
-
-          {/* Action Buttons */}
-          {depositAddress && (
-            <View style={styles.actionButtonsContainer}>
-              <TouchableOpacity style={styles.actionButton} onPress={handleCopy}>
-                <Icon name="copy" size={18} color="#212121" />
-                <Text style={styles.actionButtonText}>Copy Address</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-                <Icon name="share-2" size={18} color="#212121" />
-                <Text style={styles.actionButtonText}>Share Address</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          
 
 
 
@@ -259,8 +237,8 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
             <Text style={styles.tipTitle}>Tip</Text>
             <Text style={styles.tipText}>
               {isGroupWallet
-                ? 'Share this QR code to trigger external wallet transfers to the shared group wallet.'
-                : 'Share this QR code to trigger external wallet transfers (Phantom, Metamask, etc.) to your app wallet. Only send Solana (SOL) or Solana-based tokens.'
+                ? 'Only send USDC Solana-based to the shared group wallet.'
+                : 'Only send USDC Solana-based to your app wallet.'
               }
             </Text>
           </View>

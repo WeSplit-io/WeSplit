@@ -23,8 +23,8 @@ export const styles = StyleSheet.create({
   iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
   },
   headerTitle: {
     ...typography.textStyles.h6,
@@ -493,10 +493,9 @@ export const styles = StyleSheet.create({
   },
   mockupContinueButton: {
     backgroundColor: colors.white10,
-    borderRadius: spacing.lg,
+    borderRadius: spacing.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
-    marginBottom: spacing.lg,
     width: '100%',
   },
   mockupContinueButtonActive: {
@@ -1223,16 +1222,15 @@ export const styles = StyleSheet.create({
   },
   requestAmountCardMockup: {
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.white50,
     marginHorizontal: 16,
     marginBottom: 24,
     alignItems: 'center',
     minHeight: 180,
+    overflow: 'hidden',
   },
   requestAmountCardHeader: {
     alignItems: 'center',
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
     padding: 24,
     width: '100%',
   },
@@ -1280,7 +1278,7 @@ export const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: colors.darkBackground,
-    paddingBottom: 16,
+    paddingBottom: spacing.md,
     paddingTop: 8,
     alignItems: 'center',
     borderTopWidth: 0,
@@ -1330,6 +1328,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 48,
     alignItems: 'center',
     width: '100%',
+    marginBottom: spacing.md,
   },
   mockupBackHomeButtonText: {
     color: colors.black,

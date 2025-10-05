@@ -1,18 +1,39 @@
 export const colors = {
+
+  // === FINAL COLORS ===
+
+    // White colors
+    white: '#FFFFFF',
+    white5: 'rgba(255, 255, 255, 0.05)',
+    white10: 'rgba(255, 255, 255, 0.10)',
+    white50: 'rgba(255, 255, 255, 0.50)',
+    white70: 'rgba(255, 255, 255, 0.70)',
+
+    // Black colors
+    blackOverlay: 'rgba(0, 0, 0, 0.65)',
+    black: '#061113',
+    blackWhite5: '#121D1F',
+
+
+    // Green colors
+
+    // Gradient colors
+
+    // Utility colors
+
+
+
+
+
+    // =======DEPRECIATED=======
+
   // === PRIMARY BRAND COLORS (From Figma) ===
   // Root colors
   green: '#0A8A5A',
   greenLight: '#53EF97',
   green10: 'rgba(165, 234, 21, 0.10)',
-  black: '#061113',
-  white: '#FFFFFF',
-  white5: 'rgba(255, 255, 255, 0.05)',
-  white10: 'rgba(255, 255, 255, 0.10)',
-  white50: 'rgba(255, 255, 255, 0.50)',
-  white70: 'rgba(255, 255, 255, 0.70)',
   red: '#DC3434',
   red20: 'rgba(220, 52, 52, 0.20)',
-  blackOverlay: 'rgba(0, 0, 0, 0.65)',
   
   // Gradient colors for React Native
   gradientStart: '#0A8A5A',

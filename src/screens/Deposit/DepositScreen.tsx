@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, SafeAreaView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import MoonPayWidget from '../../components/MoonPayWidget';
@@ -102,8 +103,8 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
-            style={{ width: 24, height: 24 }}
+            source={require('../../../assets/chevron-left.png')}
+            style={styles.iconWrapper}
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
@@ -112,9 +113,7 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
 
       <View style={styles.content}>
         <View style={styles.mainContent}>
-        <Text style={styles.instructions}>
-          Choose how you want to fund {isGroupWallet ? walletName : 'your wallet'}
-        </Text>
+       
         
         {/* Payment Method Selection */}
         <View style={styles.paymentMethodsContainer}>
