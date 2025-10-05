@@ -81,7 +81,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
           {
             backgroundColor: sliderValue.interpolate({
               inputRange: [0, maxSlideDistance],
-              outputRange: [colors.green10, colors.brandGreen],
+              outputRange: [colors.white5, colors.brandGreen],
             }),
           },
         ]}
@@ -427,12 +427,34 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         {/* Recipient Card */}
         <View style={styles.mockupRecipientCard}>
           <View style={styles.mockupRecipientAvatar}>
-            <Text style={styles.mockupRecipientAvatarText}>
-              {destinationType === 'external' 
-                ? (wallet?.name ? wallet.name.charAt(0).toUpperCase() : (wallet?.address ? wallet.address.substring(0, 1).toUpperCase() : 'W'))
-                : (contact?.name ? contact.name.charAt(0).toUpperCase() : (contact?.wallet_address ? contact.wallet_address.substring(0, 1).toUpperCase() : 'U'))
-              }
-            </Text>
+            {destinationType === 'friend' && contact?.avatar ? (
+              <Image
+                source={{ uri: contact.avatar }}
+                style={{ width: '100%', height: '100%', borderRadius: 999 }}
+                resizeMode="cover"
+              />
+            ) : destinationType === 'external' && (wallet as any)?.type === 'kast' ? (
+              <Image
+                source={require('../../../assets/kast-logo.png')}
+                style={[styles.recipientKastIcon]}
+              />
+            ) : destinationType === 'external' ? (
+              <View style={styles.recipientWalletIcon}>
+                <Image
+                  source={require('../../../assets/wallet-icon-white.png')}
+                  style={styles.recipientWalletIconImage}
+                />
+              </View>
+            ) : (
+              <View style={styles.mockupRecipientAvatarTextWrapper}>
+              <Text style={styles.mockupRecipientAvatarText}>
+                {destinationType === 'external' 
+                  ? (wallet?.name ? wallet.name.charAt(0).toUpperCase() : (wallet?.address ? wallet.address.substring(0, 1).toUpperCase() : 'W'))
+                  : (contact?.name ? contact.name.charAt(0).toUpperCase() : (contact?.wallet_address ? contact.wallet_address.substring(0, 1).toUpperCase() : 'U'))
+                }
+              </Text>
+              </View>
+            )}
           </View>
           <View style={styles.mockupRecipientInfo}>
             <Text style={styles.mockupRecipientName}>
@@ -452,8 +474,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.sentAmountContainer}>
           <Text style={styles.sentAmountLabel}>Sent amount</Text>
           <View style={styles.sentAmountValueContainer}>
-                          <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fusdc-logo-white.png?alt=media&token=fb534b70-6bb8-4803-8bea-e8e60b1cd0cc' }} style={{ width: 32, height: 32, marginRight: 8 }} />
-            <Text style={styles.sentAmountValue}>{amount}</Text>
+            <Text style={styles.sentAmountValue}>{amount} USDC</Text>
           </View>
           {description && (
             <View style={[styles.mockupNoteContainer, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }] }>
@@ -472,11 +493,11 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
             <Text style={styles.mockupFeeValue}>{netAmount.toFixed(2)} USDC</Text>
           </View>
           <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Company fee ({consolidatedTransactionService.getCompanyFeeStructure().percentage * 100}%)</Text>
+            <Text style={styles.mockupFeeLabel}>WeSplit fees ({consolidatedTransactionService.getCompanyFeeStructure().percentage * 100}%)</Text>
             <Text style={styles.mockupFeeValue}>{companyFee.toFixed(2)} USDC</Text>
           </View>
           <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Blockchain fee (Company covered)</Text>
+            <Text style={styles.mockupFeeLabel}>Gas fees (Covered)</Text>
             <Text style={styles.mockupFeeValue}>Free</Text>
           </View>
           <View style={styles.mockupFeeRowSeparator} />
@@ -564,23 +585,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Company Gas Coverage Info */}
-        {hasExistingWallet && !walletError && (
-          <View style={{ 
-            backgroundColor: '#4CAF50', 
-            padding: 12, 
-            borderRadius: 8, 
-            marginBottom: 16,
-            marginHorizontal: 20
-          }}>
-            <Text style={{ color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
-              🏦 Gas Fees Covered by Company
-            </Text>
-            <Text style={{ color: 'white', textAlign: 'center', marginTop: 4, fontSize: 12 }}>
-              We cover all blockchain transaction fees for you
-            </Text>
-          </View>
-        )}
+       
         
         <AppleSlider
           onSlideComplete={handleConfirmSend}

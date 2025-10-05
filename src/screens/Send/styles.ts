@@ -651,10 +651,37 @@ export const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: spacing.xxl + spacing.lg,
-    backgroundColor: colors.brandGreen,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
+    overflow: 'hidden',
+  },
+  recipientWalletIcon: {
+    width: '100%',
+    height: '100%',
+    borderRadius: spacing.xxl,
+    backgroundColor: colors.white10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recipientKastIcon: {
+    width: '100%',
+    height: '100%',
+    borderRadius: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  recipientWalletIconImage: {
+    width: 25,
+    height: 25,
+  },
+  recipientAvatarTextWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.brandGreen,
   },
   recipientAvatarText: {
     color: colors.black,
@@ -761,30 +788,36 @@ export const styles = StyleSheet.create({
   },
   // === MOCKUP-BASED SEND CONFIRMATION STYLES ===
   mockupRecipientCard: {
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
     borderRadius: spacing.lg,
     paddingHorizontal: spacing.screenPaddingHorizontal,
     paddingVertical: 15,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.lg,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.textLight,
     marginTop: spacing.lg,
   },
   mockupRecipientAvatar: {
     width: spacing.xxl + spacing.sm,
     height: spacing.xxl + spacing.sm,
     borderRadius: spacing.xxl,
-    backgroundColor: colors.brandGreen,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
+    overflow: 'hidden',
+  },
+  mockupRecipientAvatarTextWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.brandGreen,
   },
   mockupRecipientAvatarText: {
     color: colors.darkBackground,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
+    
   },
   mockupRecipientInfo: {
     flex: 1,
@@ -793,7 +826,7 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: typography.fontWeight.medium,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   mockupRecipientEmail: {
     color: colors.white70,
@@ -802,11 +835,9 @@ export const styles = StyleSheet.create({
   sentAmountContainer: {
     alignItems: 'flex-start',
     marginBottom: spacing.lg,
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
     borderRadius: spacing.lg,
     padding: spacing.lg,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.textLight,
     width: '100%',
   },
   sentAmountValueContainer: {
@@ -814,9 +845,6 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     marginBottom: spacing.md,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.white50,
-    paddingBottom: spacing.md,
     width: '100%',
   },
   sentAmountLabel: {
@@ -830,7 +858,7 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
   },
   mockupTransactionDetails: {
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
     borderRadius: spacing.lg,
     padding: spacing.lg,
     width: '100%',
@@ -874,12 +902,20 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
   },
   mockupNoteContainer: {
-    alignItems: 'center',
+    justifyContent: 'flex-start',
+    borderTopWidth: 0.5,
+    borderTopColor: colors.white50,
+    paddingTop: spacing.md,
+    width: '100%',
+
+
+
   },
   mockupNoteText: {
     color: colors.white,
     fontSize: 16,
     textAlign: 'left',
+    width: '95%',
   },
   walletInfoContainer: {
     backgroundColor: colors.darkBackground,
@@ -1164,7 +1200,7 @@ export const styles = StyleSheet.create({
   appleSliderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.brandGreen,

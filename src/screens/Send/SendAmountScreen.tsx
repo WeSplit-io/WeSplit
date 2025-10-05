@@ -186,16 +186,32 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
       {recipientInfo && (
         <View style={styles.recipientAvatarContainer}>
           <View style={styles.recipientAvatar}>
-            {recipientInfo.avatar ? (
+            {destinationType === 'friend' && recipientInfo.avatar ? (
               <Image
                 source={{ uri: recipientInfo.avatar }}
                 style={{ width: '100%', height: '100%', borderRadius: 999 }}
                 resizeMode="cover"
               />
+            ) : destinationType === 'external' && (wallet as any)?.type === 'kast' ? (
+              <Image
+                source={require('../../../assets/kast-logo.png')}
+                style={[styles.recipientKastIcon]}
+              />
+            ) : destinationType === 'external' ? (
+              <View style={styles.recipientWalletIcon}>
+                <Image
+                  source={require('../../../assets/wallet-icon-white.png')}
+                  style={styles.recipientWalletIconImage}
+                />
+              </View>
             ) : (
+              <View style={styles.recipientAvatarTextWrapper}>
               <Text style={[styles.recipientAvatarText, { fontSize: 18 }]}>
-                {recipientInfo.name.charAt(0).toUpperCase()}
-              </Text>
+                  {recipientInfo.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+     
+     
             )}
           </View>
           <Text style={styles.recipientName}>

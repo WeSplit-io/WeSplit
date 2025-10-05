@@ -89,7 +89,7 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
           }]}>{getCurrentDate()}</Text>
 
           <TouchableOpacity onPress={() => navigation.navigate('TransactionHistory')}>
-            <Text style={[styles.mockupSuccessDescription, { color: colors.primaryGreen, textDecorationLine: 'underline' }]}>
+            <Text style={styles.mockupSuccessDescription}>
               View transaction details
             </Text>
           </TouchableOpacity>
