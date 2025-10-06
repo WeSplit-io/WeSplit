@@ -12,9 +12,10 @@ import {
   Alert,
   Dimensions,
   StatusBar,
-  SafeAreaView,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../../theme/colors';
@@ -177,25 +178,47 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={colors.black} />
         
-        <View style={styles.previewContainer}>
-          <Image source={{ uri: capturedImage }} style={styles.previewImage} />
+        {/* Header with Back Button and Title */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={retakePicture}
+          >
+            <Image 
+              source={require('../../../assets/chevron-left.png')} 
+              style={styles.backButtonIcon}
+            />
+          </TouchableOpacity>
           
-          <View style={styles.previewOverlay}>
-            <Text style={styles.previewTitle}>Bill Captured</Text>
-            <Text style={styles.previewSubtitle}>
-              Review your bill image and proceed to process it
-            </Text>
-          </View>
+          <Text style={styles.headerTitle}>Check Image</Text>
+          
+          <View style={styles.headerSpacer} />
         </View>
 
+        {/* Full Height Image */}
+        <View style={styles.fullHeightImageContainer}>
+          <Image source={{ uri: capturedImage }} style={styles.fullHeightImage} />
+        </View>
+
+        {/* Bottom Actions */}
         <View style={styles.previewActions}>
           <TouchableOpacity style={styles.retakeButton} onPress={retakePicture}>
             <Text style={styles.retakeButtonText}>Retake</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.processButton} onPress={processBill}>
-            <Text style={styles.processButtonText}>Process Bill</Text>
-          </TouchableOpacity>
+          <LinearGradient
+            colors={[colors.green, colors.greenBlue]}
+            style={styles.processButton}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <TouchableOpacity 
+              style={styles.processButtonTouchable}
+              onPress={processBill}
+            >
+              <Text style={styles.processButtonText}>Continue</Text>
+            </TouchableOpacity>
+          </LinearGradient>
         </View>
       </SafeAreaView>
     );
@@ -205,39 +228,24 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
+      {/* Header with Back Button and Title */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton} 
-          onPress={() => {
-            try {
-              navigation.navigate('SplitsList');
-            } catch (error) {
-              console.error('Error navigating to SplitsList:', error);
-              navigation.goBack();
-            }
-          }}
+          onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>← Splits</Text>
+          <Image 
+            source={require('../../../assets/chevron-left.png')} 
+            style={styles.backButtonIcon}
+          />
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>Capture Bill</Text>
+        <Text style={styles.headerTitle}>Scan your receipt</Text>
         
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerActionButton} onPress={pickImageFromGallery}>
-            <Text style={styles.headerActionText}>Gallery</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerActionButton} onPress={() => {
-            try {
-              navigation.navigate('SplitsList');
-            } catch (error) {
-              console.error('Error navigating to SplitsList:', error);
-            }
-          }}>
-            <Text style={styles.headerActionText}>Splits</Text>
-          </TouchableOpacity>
-        </View>
+        <View style={styles.headerSpacer} />
       </View>
 
+      {/* Camera View - Full Screen */}
       <View style={styles.cameraContainer}>
         {permission?.granted && CameraView ? (
           <CameraView
@@ -245,57 +253,57 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
             style={styles.camera}
             facing={cameraType}
             flash={flashMode}
-          >
-          <View style={styles.cameraOverlay}>
-            {/* Camera overlay guides */}
-            <View style={styles.overlayFrame}>
-              <View style={styles.corner} style={[styles.corner, styles.topLeft]} />
-              <View style={styles.corner} style={[styles.corner, styles.topRight]} />
-              <View style={styles.corner} style={[styles.corner, styles.bottomLeft]} />
-              <View style={styles.corner} style={[styles.corner, styles.bottomRight]} />
-            </View>
-            
-            <Text style={styles.overlayText}>
-              Position the bill within the frame
-            </Text>
-          </View>
-          </CameraView>
+          />
         ) : (
           <View style={styles.cameraError}>
             <Text style={styles.cameraErrorText}>
               {!CameraView ? 'Camera API not available' : 'Camera not available'}
             </Text>
-            <Text style={styles.cameraErrorSubtext}>
-              {!CameraView ? 'Please check your expo-camera installation' : 'Please grant camera permission'}
-            </Text>
           </View>
         )}
       </View>
 
-      <View style={styles.controls}>
-        <View style={styles.controlRow}>
-          <TouchableOpacity style={styles.controlButton} onPress={toggleFlash}>
-            <Text style={styles.controlButtonText}>
-              {flashMode === 'off' ? 'Flash Off' : 'Flash On'}
-            </Text>
-          </TouchableOpacity>
-          
+      {/* Bottom Buttons */}
+      <View style={styles.bottomButtons}>
+        {/* Manual Button - Bottom Left */}
+        <TouchableOpacity 
+          style={styles.bottomLeftButton} 
+          onPress={() => {
+            try {
+              navigation.navigate('BillEdit');
+            } catch (error) {
+              console.error('Error navigating to BillEdit:', error);
+              navigation.goBack();
+            }
+          }}
+        >
+        <Image source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fkeyboard-icon.png?alt=media&token=b8e9177e-c02a-4e57-97c4-15748efaa7e9'}} style={styles.bottomLeftButtonIcon} />
+          <Text style={styles.bottomLeftButtonText}>Manual</Text>
+        </TouchableOpacity>
+
+        {/* Capture Button - Bottom Center */}
+        <LinearGradient
+          colors={[colors.green, colors.greenBlue]}
+          style={[styles.captureButton, isCapturing && styles.captureButtonDisabled]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
           <TouchableOpacity 
-            style={[styles.captureButton, isCapturing && styles.captureButtonDisabled]} 
+            style={styles.captureButtonTouchable}
             onPress={takePicture}
             disabled={isCapturing}
           >
             <View style={styles.captureButtonInner} />
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.controlButton} onPress={toggleCameraType}>
-            <Text style={styles.controlButtonText}>Flip</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <Text style={styles.instructions}>
-          Tap the camera button to capture your bill, or select from gallery
-        </Text>
+        </LinearGradient>
+
+        {/* Gallery Button - Bottom Right */}
+        <TouchableOpacity 
+          style={styles.bottomRightButton} 
+          onPress={pickImageFromGallery}
+        >
+          <Image source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmedia-icon.png?alt=media&token=27a24ab9-8512-4cd7-9520-fdaf6f9883a9'}} style={styles.bottomRightButtonIcon} />
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

@@ -13,6 +13,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
+    gap: spacing.lg,
   },
   processingTitle: {
     fontSize: typography.fontSize.xl,

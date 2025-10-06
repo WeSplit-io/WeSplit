@@ -267,17 +267,9 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         
         <View style={styles.processingContainer}>
           <ActivityIndicator size="large" color={colors.green} />
-          <Text style={styles.processingTitle}>Processing Bill</Text>
           <Text style={styles.processingSubtitle}>
-            Analyzing your bill image and extracting items...
+            Analyzing your image...
           </Text>
-          
-          <View style={styles.processingSteps}>
-            <Text style={styles.processingStep}>✓ Image captured</Text>
-            <Text style={styles.processingStep}>🔄 Extracting text</Text>
-            <Text style={styles.processingStep}>⏳ Identifying items</Text>
-            <Text style={styles.processingStep}>⏳ Calculating totals</Text>
-          </View>
         </View>
       </SafeAreaView>
     );
