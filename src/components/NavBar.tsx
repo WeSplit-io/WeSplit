@@ -32,7 +32,7 @@ const getImageFromPath = (path: string) => {
 
 const navItems = [
   { icon: 'home-icon-default.png', label: 'Home', route: 'Dashboard' },
-  { icon: 'wallet-icon-default.png', label: 'Wallet', route: 'WalletManagement' },
+  { icon: 'wallet-icon-default.png', label: 'Rewards', route: 'Rewards' },
   // Center green split button -> first step camera
   { icon: 'split-icon.png', label: 'Split', route: 'BillCamera', isSpecial: true },
   // Pools (splits) tab

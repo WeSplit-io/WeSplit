@@ -31,18 +31,15 @@ import { useGroupList } from '../../hooks/useGroupData';
 import { GroupWithDetails, Expense, GroupMember, Transaction } from '../../types';
 import { formatCryptoAmount } from '../../utils/cryptoUtils';
 // Static image imports to avoid Metro dynamic require resolution issues
-import awardIcon from '../../../assets/award-icon.png';
-import userIcon from '../../../assets/user-icon.png';
+// import awardIcon from '../../../assets/award-icon.png';
+// import userIcon from '../../../assets/user-icon.png';
 import { getTotalSpendingInUSDC } from '../../services/priceService';
 import { getUserNotifications } from '../../services/firebaseNotificationService';
 import { createPaymentRequest, getReceivedPaymentRequests } from '../../services/firebasePaymentRequestService';
 import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
 import { firebaseTransactionService, firebaseDataService } from '../../services/firebaseDataService';
 import { generateProfileLink } from '../../services/deepLinkHandler';
-import { SplitStorageService, Split } from '../../services/splitStorageService';
-import { priceManagementService } from '../../services/priceManagementService';
-import { SplitDataMigrationService } from '../../services/splitDataMigrationService';
-import { MockupDataService } from '../../data/mockupData';
+// Removed split-related imports
 
 // Avatar component with loading state and error handling
 const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
@@ -183,8 +180,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [refreshBalance, setRefreshBalance] = useState<number | null>(null); // Local refresh balance
   const [balanceLoaded, setBalanceLoaded] = useState(false); // Track if balance has been loaded
   const [walletUnrecoverable, setWalletUnrecoverable] = useState(false); // Track if wallet is unrecoverable
-  const [recentSplits, setRecentSplits] = useState<Split[]>([]);
-  const [loadingSplits, setLoadingSplits] = useState(false);
+  // Removed recent splits state
 
   // Function to hash wallet address for display
   const hashWalletAddress = (address: string): string => {
@@ -1037,8 +1033,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       await Promise.all([
         refreshGroups(),
         refreshNotifications(),
-        loadRealTransactions(), // Refresh real transactions
-        loadRecentSplits(), // Refresh recent splits
+        loadRealTransactions(),
       ]);
 
       console.log('✅ Dashboard: Refresh completed successfully');
@@ -1675,116 +1670,9 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         </View>
 
 
-        {/* Splits Section */}
-        <View style={styles.groupsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Splits</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('SplitsList')}>
-              <Text style={styles.seeAllText}>See all</Text>
-            </TouchableOpacity>
-          </View>
+        
 
-          {loadingSplits ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={colors.primaryGreen} />
-              <Text style={styles.loadingText}>Loading splits...</Text>
-            </View>
-          ) : recentSplits.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No splits yet</Text>
-              <Text style={styles.emptyStateSubtext}>Capture a bill to start splitting expenses</Text>
-              <TouchableOpacity
-                style={styles.createGroupButton}
-                onPress={() => navigation.navigate('BillCamera')}
-                activeOpacity={0.9}
-              >
-                <LinearGradient
-                  colors={[colors.gradientStart, colors.gradientEnd]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.createGroupButtonGradient}
-                >
-                  <Text style={styles.createGroupButtonText}>Split your First Bill</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.groupsGrid}>
-              {recentSplits.map((split, index) => {
-                try {
-                  const isCreator = split.creatorId === currentUser?.id?.toString();
-                  const statusColor = getSplitStatusColor(split.status);
-                  const statusText = getSplitStatusText(split.status);
-
-                  return (
-                    <TouchableOpacity
-                      key={split.id}
-                      style={styles.groupGridCardFullWidth}
-                      onPress={() => navigation.navigate('SplitDetails', { 
-                        splitId: split.id,
-                        splitData: split 
-                      })}
-                    >
-                      {/* Left: Icon */}
-                      <View style={styles.splitIconContainer}>
-                        <Text style={styles.splitIcon}>
-                          {split.splitType === 'fair' ? '⚖️' : '🎲'}
-                        </Text>
-                      </View>
-                      
-                      {/* Center: Name and Role */}
-                      <View style={styles.groupGridNameContainer}>
-                        <Text style={styles.groupGridName}>{split.title}</Text>
-                        <View style={styles.groupGridRoleContainer}>
-                          <Image
-                            source={isCreator ? require('../../../assets/award-icon.png') : require('../../../assets/user-icon.png')}
-                            style={styles.groupGridRoleIcon}
-                          />
-                          <Text style={styles.groupGridRole}>
-                            {isCreator ? 'Creator' : 'Participant'}
-                          </Text>
-                        </View>
-                        <View style={styles.splitStatusContainer}>
-                          <View style={[styles.splitStatusDot, { backgroundColor: statusColor }]} />
-                          <Text style={[styles.splitStatusText, { color: statusColor }]}>
-                            {statusText}
-                          </Text>
-                        </View>
-                        {/* Add date display */}
-                        <Text style={styles.splitDate}>
-                          {(() => {
-                            // Always use mockup data for consistency
-                            const { MockupDataService } = require('../../data/mockupData');
-                            return MockupDataService.getBillDate();
-                          })()}
-                        </Text>
-                      </View>
-
-                      {/* Right: Amount and Participants */}
-                      <View style={styles.splitInfoContainer}>
-                        <Text style={styles.splitAmount}>
-                          {split.totalAmount.toFixed(2)} {split.currency}
-                        </Text>
-                        <Text style={styles.splitParticipants}>
-                          {split.participants.length} participant{split.participants.length !== 1 ? 's' : ''}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                } catch (error) {
-                  console.error(`Error rendering split ${split.id}:`, error);
-                  return (
-                    <View key={split.id} style={styles.groupGridCardFullWidth}>
-                      <Text style={styles.errorText}>Error loading split</Text>
-                    </View>
-                  );
-                }
-              })}
-            </View>
-          )}
-        </View>
-
-        {/* Requests Section */}
+        {/* Requests Section (first) */}
         <View style={styles.requestsSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Requests</Text>
@@ -1881,6 +1769,33 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                   </View>
                 </TouchableOpacity>
               )}
+            </>
+          )}
+        </View>
+
+        {/* Transactions Section (second) */}
+        <View style={styles.requestsSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Transactions</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('TransactionHistory')}>
+              <Text style={styles.seeAllText}>See all</Text>
+            </TouchableOpacity>
+          </View>
+
+          {loadingTransactions || realTransactions.length === 0 ? (
+            realTransactions.length === 0 ? (
+              <View style={styles.emptyRequestsState}>
+                <Text style={styles.emptyRequestsText}>No transactions</Text>
+              </View>
+            ) : (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={colors.primaryGreen} />
+                <Text style={styles.loadingText}>Loading transactions...</Text>
+              </View>
+            )
+          ) : (
+            <>
+              {realTransactions.slice(0, 3).map(t => renderRealTransaction(t))}
             </>
           )}
         </View>

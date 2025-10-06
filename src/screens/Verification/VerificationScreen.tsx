@@ -221,12 +221,12 @@ const VerificationScreen: React.FC = () => {
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
               <Image
-                source={require('../../../assets/chevron-left.png')}
+                source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-left.png?alt=media&token=6b27382f-b023-4b4c-912c-96fd9139d704'}}
                 style={styles.iconWrapper}
               />
             </TouchableOpacity>
             <View style={styles.logoSection}>
-                <Image source={require('../../../assets/wesplit-logo-linear.png')} style={styles.logo} />
+                <Image source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-linear.png?alt=media&token=5e5caa7b-8b46-4ec2-9d7d-20ea1f56096f'}} style={styles.logo} />
               </View>
             <View style={styles.placeholder} />
           </View>

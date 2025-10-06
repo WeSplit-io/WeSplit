@@ -9,7 +9,7 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.screenPadding,
     paddingTop: spacing.xl,
   },
   logoSection: {
@@ -38,6 +38,7 @@ export const styles = StyleSheet.create({
   messageSection: {
     alignItems: 'flex-start',
     marginBottom: spacing.xl,
+    paddingHorizontal: spacing.xs,
   },
   headline: {
     fontSize: typography.fontSize.title,
@@ -52,14 +53,14 @@ export const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   buttonSection: {
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.md,
   },
   getStartedButton: {
-    borderRadius: spacing.lg,
+    borderRadius: spacing.md,
     overflow: 'hidden',
   },
   gradientButton: {
-    paddingVertical: 20,
+    paddingVertical: spacing.md2,
     alignItems: 'center',
     borderRadius: spacing.lg,
   },

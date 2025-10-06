@@ -69,6 +69,7 @@ import WithdrawAmountScreen from './src/screens/Withdraw/WithdrawAmountScreen';
 import WithdrawConfirmationScreen from './src/screens/Withdraw/WithdrawConfirmationScreen';
 import WithdrawSuccessScreen from './src/screens/Withdraw/WithdrawSuccessScreen';
 import WalletManagementScreen from './src/screens/WalletManagement/WalletManagementScreen';
+import RewardsScreen from './src/screens/Rewards/RewardsScreen';
 import SeedPhraseViewScreen from './src/screens/WalletManagement/SeedPhraseViewScreen';
 import SeedPhraseVerifyScreen from './src/screens/WalletManagement/SeedPhraseVerifyScreen';
 import { ContactsScreen } from './src/screens/Contacts';
@@ -261,6 +262,7 @@ export default function App() {
                 <Stack.Screen name="WithdrawConfirmation" component={WithdrawConfirmationScreen} />
                 <Stack.Screen name="WithdrawSuccess" component={WithdrawSuccessScreen} />
         <Stack.Screen name="WalletManagement" component={WalletManagementScreen} />
+        <Stack.Screen name="Rewards" component={RewardsScreen} />
         <Stack.Screen name="SeedPhraseView" component={SeedPhraseViewScreen} />
                 <Stack.Screen name="SeedPhraseVerify" component={SeedPhraseVerifyScreen} />
                 <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />

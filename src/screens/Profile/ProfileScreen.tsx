@@ -183,6 +183,10 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
     navigation.navigate('TransactionHistory');
   };
 
+  const handleWalletManagement = () => {
+    navigation.navigate('WalletManagement');
+  };
+
   const handleVerifyAccount = () => {
     Alert.alert('Verify Account', 'Account verification feature coming soon!');
   };
@@ -245,6 +249,19 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
         {/* Account Details Section */}
         <Text style={styles.sectionTitle}>Account details</Text>
         <View style={styles.menuItemsContainer}>
+          <TouchableOpacity style={styles.menuItem} onPress={handleWalletManagement}>
+            <SafeImage
+              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' }}
+              style={styles.menuIcon}
+              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+            />
+            <Text style={styles.menuItemText}>Wallet</Text>
+            <SafeImage
+              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
+              style={styles.chevronIcon}
+              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={handleAccountInfo}>
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-account-icon.png?alt=media&token=29c78193-1d31-4c25-9cd6-ba301a241554' }}

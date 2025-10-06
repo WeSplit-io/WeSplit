@@ -21,6 +21,9 @@ export const styles = StyleSheet.create({
   scrollContentContainer: {
     flexGrow: 1,
     justifyContent: 'center',
+    paddingBottom: spacing.lg,
+  },
+  buttonContainer: {
   },
   logoSection: {
     alignItems: 'center',
@@ -115,7 +118,7 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     color: colors.white,
     borderWidth: 1,
-    borderColor: colors.green,
+    borderColor: colors.white50,
   },
   errorText: {
     color: colors.error,
@@ -125,7 +128,6 @@ export const styles = StyleSheet.create({
   nextButton: {
     borderRadius: 16,
     width: '100%',
-    marginBottom: spacing.xl,
     overflow: 'hidden',
   },
   gradientButton: {

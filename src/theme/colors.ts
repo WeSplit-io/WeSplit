@@ -16,10 +16,17 @@ export const colors = {
 
 
     // Green colors
+    green: '#A5EA15',
+    greenBlue: '#53EF97',
+
 
     // Gradient colors
+    gradientStart: '#A5EA15',
+    gradientEnd: '#53EF97',
 
     // Utility colors
+    red: '#DC3434',
+    red20: 'rgba(220, 52, 52, 0.20)',
 
 
 
@@ -27,30 +34,13 @@ export const colors = {
 
     // =======DEPRECIATED=======
 
-  // === PRIMARY BRAND COLORS (From Figma) ===
-  // Root colors
-  green: '#0A8A5A',
+
   greenLight: '#53EF97',
   green10: 'rgba(165, 234, 21, 0.10)',
-  red: '#DC3434',
-  red20: 'rgba(220, 52, 52, 0.20)',
-  
-  // Gradient colors for React Native
-  gradientStart: '#0A8A5A',
-  gradientEnd: '#53EF97',
-  gradientColors: ['#0A8A5A', '#53EF97'],
-  gradientAngle: 87,
-    
-
-
-
-
-
 
   // Main brand green - used for primary actions, highlights, and success states
   primaryGreen: '#0A8A5A',
-  primaryGreenDark: '#0A8A5A', // Legacy compatibility
-  primaryGreenLight: '#D7FF33',
+  
   primaryGreenAlpha: 'rgba(197, 255, 0, 0.1)',
   
   // === DARK THEME COLORS (From Figma) ===
@@ -87,18 +77,10 @@ export const colors = {
   errorBackground: 'rgba(244, 67, 54, 0.1)',
   info: '#2196F3',
   infoBackground: 'rgba(33, 150, 243, 0.1)',
-  
-  // === WALLET & CRYPTO COLORS ===
-  solana: '#9945FF',
-  usdc: '#2775CA',
-  cryptoGreen: '#00D4AA',
-  cryptoRed: '#FF6B9D',
+    
   
   // === NEUTRAL COLORS ===
-  transparent: 'transparent',
   overlay: 'rgba(0, 0, 0, 0.5)',
-  overlayLight: 'rgba(0, 0, 0, 0.3)',
-  overlayDark: 'rgba(0, 0, 0, 0.8)',
   
   // === SURFACE COLORS ===
   surface: '#2A2A2A',
@@ -127,29 +109,13 @@ export const colors = {
   buttonDisabledText: '#666666',
   buttonDanger: '#F44336',
   buttonDangerText: '#FFFFFF',
-  
-  // === NAVIGATION COLORS ===
-  navBackground: '#1B1B1B',
-  navBorder: '#333333',
-  tabActive: '#C5FF00',
-  tabInactive: '#808080',
+    
   
   // === CARD & CONTAINER COLORS ===
   cardBackground: '#2A2A2A',
   cardBorder: '#333333',
   cardShadow: 'rgba(0, 0, 0, 0.3)',
   
-  // === QR CODE & OVERLAYS ===
-  qrCodeOverlay: 'rgba(27, 27, 27, 0.12)',
-  qrCodeBackground: '#FFFFFF',
-  qrCodeBorder: '#E0E0E0',
-  
-  // === STATUS INDICATORS ===
-  online: '#4CAF50',
-  offline: '#757575',
-  pending: '#FF9800',
-  confirmed: '#4CAF50',
-  failed: '#F44336',
   
   // === LIGHT THEME FALLBACKS ===
   // For screens that might need light theme variants
@@ -166,8 +132,5 @@ export const colors = {
   shadowMedium: 'rgba(0, 0, 0, 0.2)',
   shadowDark: 'rgba(0, 0, 0, 0.4)',
   
-  // === NOTIFICATION COLORS ===
-  notificationDot: '#C5FF00',
-  notificationBackground: '#2A2A2A',
-  notificationBorder: '#404040',
+  
 }; 

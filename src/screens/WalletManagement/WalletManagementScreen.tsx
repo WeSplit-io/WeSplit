@@ -707,7 +707,12 @@ const WalletManagementScreen: React.FC = () => {
 
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.placeholder} />
+        <TouchableOpacity onPress={handleBack} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+          <Image
+            source={require('../../../assets/chevron-left.png')}
+            style={{ width: 20, height: 20, tintColor: colors.white }}
+          />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Wallet</Text>
         <View style={styles.placeholder} />
       </View>

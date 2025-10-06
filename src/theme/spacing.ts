@@ -30,6 +30,7 @@ export const spacing = {
   xs: 4,
   sm: 8,
   md: 16,
+  md2: 20,
   lg: 24,
   xl: 32,
   xxl: 40,
@@ -37,8 +38,8 @@ export const spacing = {
   
   // === COMPONENT SPECIFIC SPACING ===
   // Screen-level padding and margins
-  screenPadding: 20,
-  screenPaddingHorizontal: 20,
+  screenPadding: 16,
+  screenPaddingHorizontal: 16,
   screenPaddingVertical: 24,
   screenMargin: 16,
   

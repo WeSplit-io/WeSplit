@@ -12,6 +12,7 @@ import {
   Platform,
   Linking 
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { styles } from './styles';
 import { colors } from '../../theme';
@@ -603,42 +604,42 @@ const AuthMethodsScreen: React.FC = () => {
           <View style={styles.socialSection}>
             <TouchableOpacity
               style={[
-                styles.socialButton, 
-                (loading || socialLoading === 'google') && styles.socialButtonDisabled
+                styles.socialButtonLight, 
+                (loading || socialLoading === 'google') && styles.socialButtonLightDisabled
               ]}
               onPress={() => handleSocialAuth('google')}
               disabled={loading || socialLoading !== null}
             >
-              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fgoogle.png?alt=media&token=76efeba8-dc73-4ed3-bf5c-f28bd0ae6fdd' }} style={styles.socialIcon} />
-              <Text style={styles.socialButtonText}>
+              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fgoogle.png?alt=media&token=76efeba8-dc73-4ed3-bf5c-f28bd0ae6fdd' }} style={styles.socialImageIcon} />
+              <Text style={styles.socialButtonTextDark}>
                 {socialLoading === 'google' ? getSocialLoadingText('google') : 'Continue with Google'}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
-                styles.socialButton, 
-                (loading || socialLoading === 'twitter') && styles.socialButtonDisabled
+                styles.socialButtonLight, 
+                (loading || socialLoading === 'twitter') && styles.socialButtonLightDisabled
               ]}
               onPress={() => handleSocialAuth('twitter')}
               disabled={loading || socialLoading !== null}
             >
-              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftwitter.png?alt=media&token=470228c6-cb4e-4c39-9c40-563b7e707c43' }} style={styles.socialIcon} />
-              <Text style={styles.socialButtonText}>
+              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftwitter.png?alt=media&token=470228c6-cb4e-4c39-9c40-563b7e707c43' }} style={styles.socialImageIcon} />
+              <Text style={styles.socialButtonTextDark}>
                 {socialLoading === 'twitter' ? getSocialLoadingText('twitter') : 'Continue with Twitter'}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
-                styles.socialButton, 
-                (loading || socialLoading === 'apple') && styles.socialButtonDisabled
+                styles.socialButtonLight, 
+                (loading || socialLoading === 'apple') && styles.socialButtonLightDisabled
               ]}
               onPress={() => handleSocialAuth('apple')}
               disabled={loading || socialLoading !== null}
             >
-              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fapple.png?alt=media&token=783e0e17-b215-4532-896b-6333cc667c5b' }} style={styles.socialIcon} />
-              <Text style={styles.socialButtonText}>
+              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fapple.png?alt=media&token=783e0e17-b215-4532-896b-6333cc667c5b' }} style={styles.socialImageIcon} />
+              <Text style={styles.socialButtonTextDark}>
                 {socialLoading === 'apple' ? getSocialLoadingText('apple') : 'Continue with Apple'}
               </Text>
             </TouchableOpacity>
@@ -659,7 +660,7 @@ const AuthMethodsScreen: React.FC = () => {
                 disabled={loading || socialLoading !== null}
               >
                 <View style={styles.socialIconContainer}>
-                  <Text style={styles.socialIcon}>🔍</Text>
+                  <Text style={styles.socialEmoji}>🔍</Text>
                 </View>
                 <Text style={styles.socialButtonText}>
                   {socialLoading === 'google' ? 'Signing in...' : 'Sign in with Google'}
@@ -675,7 +676,7 @@ const AuthMethodsScreen: React.FC = () => {
                 disabled={loading || socialLoading !== null}
               >
                 <View style={styles.socialIconContainer}>
-                  <Text style={styles.socialIcon}>🐦</Text>
+                  <Text style={styles.socialEmoji}>🐦</Text>
                 </View>
                 <Text style={styles.socialButtonText}>
                   {socialLoading === 'twitter' ? 'Signing in...' : 'Sign in with Twitter'}
@@ -691,7 +692,7 @@ const AuthMethodsScreen: React.FC = () => {
                 disabled={loading || socialLoading !== null}
               >
                 <View style={styles.socialIconContainer}>
-                  <Text style={styles.socialIcon}>🍎</Text>
+                  <Text style={styles.socialEmoji}>🍎</Text>
                 </View>
                 <Text style={styles.socialButtonText}>
                   {socialLoading === 'apple' ? 'Signing in...' : 'Sign in with Apple'}
@@ -741,7 +742,18 @@ const AuthMethodsScreen: React.FC = () => {
             {loading ? (
               <ActivityIndicator color={colors.black} />
             ) : (
-              <Text style={styles.nextButtonText}>Next</Text>
+              (!email || loading || socialLoading !== null) ? (
+                <Text style={[styles.nextButtonText, styles.nextButtonTextDisabled]}>Next</Text>
+              ) : (
+                <LinearGradient
+                  colors={[colors.gradientStart, colors.gradientEnd]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.gradientNextButton}
+                >
+                  <Text style={styles.nextButtonText}>Next</Text>
+                </LinearGradient>
+              )
             )}
           </TouchableOpacity>
 

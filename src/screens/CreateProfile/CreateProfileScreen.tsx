@@ -250,7 +250,7 @@ const CreateProfileScreen: React.FC = () => {
         <View style={styles.mainContainer}>
           {/* Logo Section */}
           <View style={styles.logoSection}>
-            <Image source={require('../../../assets/wesplit-logo-linear.png')} style={styles.logo} />
+            <Image source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-linear.png?alt=media&token=5e5caa7b-8b46-4ec2-9d7d-20ea1f56096f'}} style={styles.logo} />
           </View>
 
           {/* Main Content - Scrollable */}
@@ -261,66 +261,68 @@ const CreateProfileScreen: React.FC = () => {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.centerContent}>
-        <Text style={styles.title}>Create Your Profile</Text>
-        <Text style={styles.subtitle}>
-          Create your initial profile to get started, you can always edit it later.
-        </Text>
+              <Text style={styles.title}>Create Your Profile</Text>
+              <Text style={styles.subtitle}>
+                Create your initial profile to get started, you can always edit it later.
+              </Text>
 
-        {/* Profile Picture */}
-        <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
-          {avatar ? (
-            <Image source={{ uri: avatar }} style={styles.avatarImage} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Image source={require('../../../assets/camera-icon.png')} style={styles.avatarIcon} />
-            </View>
-          )}
-          {avatar && (
-            <View style={styles.cameraIconContainer}>
-              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmodify-icon-white.png?alt=media&token=4b1aa40d-4d81-4e40-9d3b-9638bc589e21' }} style={styles.cameraIcon} />
-            </View>
-          )}
-        </TouchableOpacity>
-        
-        {/* Pseudo Input */}
-        <View style={styles.inputSection}>
-          <Text style={styles.inputLabel}>Pseudo *</Text>
-        <TextInput
-          style={styles.input}
-            placeholder="Enter your pseudo"
-            placeholderTextColor={colors.white50}
-          value={pseudo}
-          onChangeText={(text) => {
-            setPseudo(text);
-            setError(''); // Clear error when user types
-          }}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        </View>
-
-        {/* Next Button */}
-        <TouchableOpacity
-          style={styles.nextButton}
-          onPress={handleNext}
-          disabled={!pseudo || isLoading}
-        >
-          <LinearGradient
-            colors={(!pseudo || isLoading) ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.gradientButton}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="white" size="small" />
-            ) : (
-              <Text style={styles.nextButtonText}>Next</Text>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
+              {/* Profile Picture */}
+              <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
+                {avatar ? (
+                  <Image source={{ uri: avatar }} style={styles.avatarImage} />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Image source={require('../../../assets/camera-icon.png')} style={styles.avatarIcon} />
+                  </View>
+                )}
+                {avatar && (
+                  <View style={styles.cameraIconContainer}>
+                    <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmodify-icon-white.png?alt=media&token=4b1aa40d-4d81-4e40-9d3b-9638bc589e21' }} style={styles.cameraIcon} />
+                  </View>
+                )}
+              </TouchableOpacity>
+              
+              {/* Pseudo Input */}
+              <View style={styles.inputSection}>
+                <Text style={styles.inputLabel}>Pseudo *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your pseudo"
+                  placeholderTextColor={colors.white50}
+                  value={pseudo}
+                  onChangeText={(text) => {
+                    setPseudo(text);
+                    setError(''); // Clear error when user types
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              </View>
             </View>
           </ScrollView>
+
+          {/* Next Button - Fixed at bottom */}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.nextButton}
+              onPress={handleNext}
+              disabled={!pseudo || isLoading}
+            >
+              <LinearGradient
+                colors={(!pseudo || isLoading) ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientButton}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.nextButtonText}>Next</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
 
           {/* Help Link - Fixed at bottom */}
           <View style={styles.helpSection}>

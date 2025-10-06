@@ -58,7 +58,7 @@ export const styles = StyleSheet.create({
   socialSection: {
     marginBottom: spacing.xl,
   },
-  socialButton: {
+  socialButtonLight: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.textLight,
@@ -68,18 +68,18 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.md,
     justifyContent: 'center',
   },
-  socialIcon: {
+  socialImageIcon: {
     width: 24,
     height: 24,
     objectFit: 'contain',
     marginRight: spacing.sm,
   },
-  socialButtonText: {
+  socialButtonTextDark: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
     color: colors.darkBackground,
   },
-  socialButtonDisabled: {
+  socialButtonLightDisabled: {
     opacity: 0.6,
   },
   // Social authentication section styles
@@ -115,7 +115,7 @@ export const styles = StyleSheet.create({
   socialIconContainer: {
     marginRight: spacing.sm,
   },
-  socialIcon: {
+  socialEmoji: {
     fontSize: 20,
   },
   socialButtonText: {
@@ -156,20 +156,27 @@ export const styles = StyleSheet.create({
     color: colors.black,
   },
   nextButton: {
-    backgroundColor: colors.green,
     borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: spacing.xl,
+  },
+  gradientNextButton: {
     paddingVertical: 15,
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    borderRadius: 16,
   },
   nextButtonDisabled: {
     backgroundColor: colors.white10,
-    color: colors.white50,
+    alignItems: 'center',
+    paddingVertical: 15,
   },
   nextButtonText: {
     fontSize: 20,
     fontWeight: typography.fontWeight.semibold,
     color: colors.black,
+  },
+  nextButtonTextDisabled: {
+    color: colors.white50,
   },
   helpSection: {
     alignItems: 'center',

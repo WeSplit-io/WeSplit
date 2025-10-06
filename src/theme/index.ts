@@ -145,6 +145,7 @@ export const layoutStyles = {
     justifyContent: 'space-between' as const,
     alignItems: 'center' as const,
   },
+  
 };
 
 // === THEME OBJECT ===
