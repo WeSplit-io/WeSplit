@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Text as RNText } from 'react-native';
 import { View, Text, TouchableOpacity, Image, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { UserContact } from '../../types';
@@ -83,7 +84,7 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Image
-            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            source={require('../../../assets/chevron-left.png')}
             style={styles.iconWrapper}
           />
         </TouchableOpacity>
@@ -92,21 +93,37 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
 
       {/* Action Toggle - Using NotificationsScreen design */}
       <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeAction === 'send' && styles.activeTab]}
-          onPress={() => handleActionToggle('send')}
-        >
-          <Text style={[styles.tabText, activeAction === 'send' && styles.activeTabText]}>
-            Send
-          </Text>
+        <TouchableOpacity style={styles.tab} onPress={() => handleActionToggle('send')}>
+          {activeAction === 'send' ? (
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.tabActive}
+            >
+              <Text style={[styles.tabText, styles.activeTabText]}>Send</Text>
+            </LinearGradient>
+          ) : (
+            <View style={styles.tab}>
+              <Text style={styles.tabText}>Send</Text>
+            </View>
+          )}
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeAction === 'request' && styles.activeTab]}
-          onPress={() => handleActionToggle('request')}
-        >
-          <Text style={[styles.tabText, activeAction === 'request' && styles.activeTabText]}>
-            Request
-          </Text>
+        <TouchableOpacity style={styles.tab} onPress={() => handleActionToggle('request')}>
+          {activeAction === 'request' ? (
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.tabActive}
+            >
+              <Text style={[styles.tabText, styles.activeTabText]}>Request</Text>
+            </LinearGradient>
+          ) : (
+            <View style={styles.tab}>
+              <Text style={styles.tabText}>Request</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -229,20 +246,21 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
 
         {/* Continue Button fixed at bottom */}
         <View style={styles.amountCardContinueButtonWrapper}>
-          <TouchableOpacity
-            style={[
-              styles.mockupContinueButton,
-              isAmountValid && styles.mockupContinueButtonActive,
-            ]}
-            onPress={handleContinue}
-            disabled={!isAmountValid}
-          >
-            <Text style={[
-              styles.mockupContinueButtonText,
-              isAmountValid && styles.mockupContinueButtonTextActive,
-            ]}>
-              Continue
-            </Text>
+          <TouchableOpacity onPress={handleContinue} disabled={!isAmountValid} activeOpacity={0.8} style={{ width: '100%' }}>
+            {isAmountValid ? (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.mockupContinueButton}
+              >
+                <Text style={styles.mockupContinueButtonTextActive}>Continue</Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.mockupContinueButton}>
+                <Text style={styles.mockupContinueButtonText}>Continue</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

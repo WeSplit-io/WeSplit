@@ -75,7 +75,7 @@ export const styles = StyleSheet.create({
     lineHeight: platformUtils.typography.lineHeight.navLabel,
   },
   navLabelActive: {
-    color: colors.green,
+    color: colors.greenBlue,
     fontWeight: '600' as const,
   },
 
@@ -86,7 +86,7 @@ export const styles = StyleSheet.create({
     height: 3,
     width: 35,
     borderRadius: 2,
-    backgroundColor: colors.green,
+    // backgroundColor removed in favor of LinearGradient in component
   },
 
   // === SPECIAL BUTTON (CENTER GROUPS BUTTON) ===
@@ -122,7 +122,7 @@ export const styles = StyleSheet.create({
   specialButtonImage: {
     width: platformUtils.iconSizes.specialButtonIcon,
     height: platformUtils.iconSizes.specialButtonIcon,
-    tintColor: colors.white,
+    tintColor: colors.black,
     resizeMode: 'contain' as const,
   },
   navIcon: {
@@ -133,6 +133,6 @@ export const styles = StyleSheet.create({
     // Remove padding to ensure consistent sizing
   },
   navIconActive: {
-    tintColor: colors.green,
+    tintColor: colors.greenBlue,
   },
 }); 

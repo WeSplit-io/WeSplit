@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import NavBar from '../../components/NavBar';
 import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
@@ -225,6 +226,18 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
           <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
             Friends
           </Text>
+          {activeTab === 'friends' ? (
+            <View style={styles.tabIndicatorContainer}>
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ height: 2, width: '100%' }}
+              />
+            </View>
+          ) : (
+            <View style={styles.tabIndicatorPlaceholder} />
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'external' && styles.activeTab]}
@@ -233,6 +246,18 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
           <Text style={[styles.tabText, activeTab === 'external' && styles.activeTabText]}>
             External Wallet
           </Text>
+          {activeTab === 'external' ? (
+            <View style={styles.tabIndicatorContainer}>
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ height: 2, width: '100%' }}
+              />
+            </View>
+          ) : (
+            <View style={styles.tabIndicatorPlaceholder} />
+          )}
         </TouchableOpacity>
       </View>
 

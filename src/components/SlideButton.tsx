@@ -10,6 +10,7 @@ import { PanGestureHandler } from 'react-native-gesture-handler';
 import { PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import Icon from './Icon';
 import { colors, spacing, typography } from '../theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface SlideButtonProps {
   onSlideComplete: () => void;
@@ -76,8 +77,8 @@ const SlideButton: React.FC<SlideButtonProps> = ({
     extrapolate: 'clamp',
   });
 
-  // Green background width that follows the thumb
-  const greenWidth = translateX.interpolate({
+  // Track width that follows the thumb
+  const trackWidth = translateX.interpolate({
     inputRange: [0, SLIDE_DISTANCE],
     outputRange: [THUMB_SIZE + 4, CONTAINER_WIDTH - 4],
     extrapolate: 'clamp',
@@ -85,51 +86,63 @@ const SlideButton: React.FC<SlideButtonProps> = ({
 
   return (
     <View style={[styles.outerContainer, disabled && styles.disabled]}>
-      {/* Background container with border */}
-      <View style={styles.container}>
-        {/* Animated green background */}
-        <Animated.View
-          style={[
-            styles.greenBackground,
-            {
-              width: greenWidth,
-            },
-          ]}
-        />
-        
-        {/* Text overlay */}
-        <View style={styles.textContainer}>
-          <Text style={[styles.text, (completed || loading) && styles.textCompleted]}>
-            {loading ? 'Processing...' : completed ? 'Completed!' : text}
-          </Text>
-        </View>
-
-        {/* Sliding thumb */}
-        <PanGestureHandler
-          onGestureEvent={handleGestureEvent}
-          onHandlerStateChange={handleStateChange}
-          enabled={!disabled && !loading && !completed}
-        >
-          <Animated.View
-            style={[
-              styles.thumb,
-              {
-                transform: [{ translateX: clampedTranslateX }],
-                opacity: completed ? 0 : 1,
-              },
-            ]}
-          >
-            <Icon name="chevron-right" size={24} color={colors.darkBackground} />
+      <LinearGradient
+        colors={[colors.gradientStart, colors.gradientEnd]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.gradientBorder}
+      >
+        <View style={styles.container}>
+          {/* Animated gradient track under text */}
+          <Animated.View style={[styles.gradientTrackMask, { width: trackWidth }]}>
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientTrack}
+            />
           </Animated.View>
-        </PanGestureHandler>
 
-        {/* Success checkmark */}
-        {completed && (
-          <View style={styles.checkmark}>
-            <Icon name="check" size={24} color={colors.darkBackground} />
+          {/* Text overlay */}
+          <View style={styles.textContainer}>
+            <Text style={[styles.text, (completed || loading) && styles.textCompleted]}>
+              {loading ? 'Processing...' : completed ? 'Completed!' : text}
+            </Text>
           </View>
-        )}
-      </View>
+
+          {/* Sliding thumb */}
+          <PanGestureHandler
+            onGestureEvent={handleGestureEvent}
+            onHandlerStateChange={handleStateChange}
+            enabled={!disabled && !loading && !completed}
+          >
+            <Animated.View
+              style={[
+                styles.thumb,
+                {
+                  transform: [{ translateX: clampedTranslateX }],
+                  opacity: completed ? 0 : 1,
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.thumbGradient}
+              />
+              <Icon name="chevron-right" size={24} color={colors.darkBackground} />
+            </Animated.View>
+          </PanGestureHandler>
+
+          {/* Success checkmark */}
+          {completed && (
+            <View style={styles.checkmark}>
+              <Icon name="check" size={24} color={colors.darkBackground} />
+            </View>
+          )}
+        </View>
+      </LinearGradient>
     </View>
   );
 };
@@ -139,6 +152,10 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginBottom: spacing.lg,
   },
+  gradientBorder: {
+    borderRadius: spacing.lg,
+    padding: 2,
+  },
   disabled: {
     opacity: 0.5,
   },
@@ -146,17 +163,23 @@ const styles = StyleSheet.create({
     height: SLIDER_HEIGHT,
     backgroundColor: colors.darkBackground,
     borderRadius: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.textLight,
     position: 'relative',
+    overflow: 'hidden',
   },
-  greenBackground: {
+  gradientTrackMask: {
     position: 'absolute',
     left: 2,
     top: 2,
     height: SLIDER_HEIGHT - 4,
-    backgroundColor: colors.brandGreen,
     borderRadius: spacing.lg - 2,
+    overflow: 'hidden',
+  },
+  gradientTrack: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
   },
   textContainer: {
     position: 'absolute',
@@ -181,7 +204,6 @@ const styles = StyleSheet.create({
     top: 4,
     width: THUMB_SIZE,
     height: THUMB_SIZE,
-    backgroundColor: colors.textLight,
     borderRadius: THUMB_SIZE / 2,
     justifyContent: 'center',
     alignItems: 'center',
@@ -190,6 +212,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+  },
+  thumbGradient: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: THUMB_SIZE / 2,
   },
   checkmark: {
     position: 'absolute',

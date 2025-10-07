@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Text as RNText } from 'react-native';
 import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { GroupMember } from '../../types';
@@ -365,20 +366,21 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
         {/* Continue Button fixed at bottom */}
         <View style={styles.amountCardContinueButtonWrapper}>
-          <TouchableOpacity
-            style={[
-              styles.mockupContinueButton,
-              isAmountValid && styles.mockupContinueButtonActive,
-            ]}
-            onPress={handleContinue}
-            disabled={!isAmountValid}
-          >
-            <Text style={[
-              styles.mockupContinueButtonText,
-              isAmountValid && styles.mockupContinueButtonTextActive,
-            ]}>
-              Continue
-            </Text>
+          <TouchableOpacity onPress={handleContinue} disabled={!isAmountValid} activeOpacity={0.8} style={{ width: '100%' }}>
+            {isAmountValid ? (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.mockupContinueButton}
+              >
+                <Text style={styles.mockupContinueButtonTextActive}>Continue</Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.mockupContinueButton}>
+                <Text style={styles.mockupContinueButtonText}>Continue</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

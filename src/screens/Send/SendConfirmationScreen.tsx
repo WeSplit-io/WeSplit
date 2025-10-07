@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Alert, ScrollView, Image, Animated, PanResponder } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ScrollView, Image, Animated, PanResponder, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
@@ -74,27 +75,36 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
   });
 
   return (
-    <View style={[styles.appleSliderContainer, disabled && { opacity: 0.5 }]} {...panResponder.panHandlers}>
-      <Animated.View
-        style={[
-          styles.appleSliderTrack,
-          {
-            backgroundColor: sliderValue.interpolate({
-              inputRange: [0, maxSlideDistance],
-              outputRange: [colors.white5, colors.brandGreen],
-            }),
-          },
-        ]}
-      >
+    <LinearGradient
+      colors={[colors.gradientStart, colors.gradientEnd]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.appleSliderGradientBorder}
+    >
+      <View style={[styles.appleSliderContainer, disabled && { opacity: 0.5 }]} {...panResponder.panHandlers}>
+      <Animated.View style={styles.appleSliderTrack}>
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            opacity: sliderValue.interpolate({ inputRange: [0, maxSlideDistance], outputRange: [0, 1] }) as any,
+            borderRadius: 999,
+          }}
+        >
+          <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              borderRadius: 999,
+            }}
+          />
+        </Animated.View>
         <Animated.Text
           style={[
             styles.appleSliderText,
-            {
-              color: sliderValue.interpolate({
-                inputRange: [0, maxSlideDistance],
-                outputRange: [colors.white50, colors.black],
-              }),
-            },
+            { color: colors.white }
           ]}
         >
           {loading ? 'Signing...' : text}
@@ -108,9 +118,19 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
           },
         ]}
       >
+        <LinearGradient
+          colors={[colors.gradientStart, colors.gradientEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            borderRadius: 30,
+          }}
+        />
         <Icon name="chevron-right" size={20} color={colors.black} />
       </Animated.View>
-    </View>
+      </View>
+    </LinearGradient>
   );
 };
 // --- End AppleSlider ---

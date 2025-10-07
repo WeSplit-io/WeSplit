@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   RefreshControl,
@@ -11,6 +10,8 @@ import {
   Image,
   Animated
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
 import NotificationCard, { NotificationData } from '../../components/NotificationCard';
 import { useApp } from '../../context/AppContext';
@@ -1141,20 +1142,38 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'all' && styles.activeTab]}
+          style={styles.tab}
           onPress={() => setActiveTab('all')}
         >
-          <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
-            All
-          </Text>
+          {activeTab === 'all' ? (
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.tabGradient}
+            >
+              <Text style={styles.activeTabText}>All</Text>
+            </LinearGradient>
+          ) : (
+            <Text style={styles.tabText}>All</Text>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'requests' && styles.activeTab]}
+          style={styles.tab}
           onPress={() => setActiveTab('requests')}
         >
-          <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>
-            Requests
-          </Text>
+          {activeTab === 'requests' ? (
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.tabGradient}
+            >
+              <Text style={styles.activeTabText}>Requests</Text>
+            </LinearGradient>
+          ) : (
+            <Text style={styles.tabText}>Requests</Text>
+          )}
         </TouchableOpacity>
       </View>
 

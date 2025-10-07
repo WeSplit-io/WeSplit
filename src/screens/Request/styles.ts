@@ -508,6 +508,8 @@ export const styles = StyleSheet.create({
   },
   mockupContinueButtonTextActive: {
     color: colors.black,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
   },
   // QR Tab Styles
   mockupQRTabContent: {

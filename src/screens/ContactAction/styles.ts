@@ -39,25 +39,34 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: spacing.xs,
     paddingVertical: spacing.xs,
-    backgroundColor: colors.green10,
+    backgroundColor: colors.white5,
     borderRadius: 16,
     marginHorizontal: spacing.screenPadding,
-    borderWidth: 1,
-    borderColor: colors.white10,
-    padding: 4,
+    padding: 5,
     marginBottom: spacing.md,
   },
   tab: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
     borderRadius: 12,
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
   },
-  activeTab: {
+  tabActive: {
     backgroundColor: colors.green,
+    width: '100%',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+
+
+  },
+  
+  activeTab: {
+    backgroundColor: 'transparent',
   },
   tabText: {
     fontSize: typography.fontSize.sm,
@@ -101,15 +110,15 @@ export const styles = StyleSheet.create({
   amountCardMockup: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.white50,
     marginHorizontal: 16,
     marginBottom: 24,
     alignItems: 'center',
     minHeight: 180,
+    overflow: 'hidden',
   },
   amountCardHeader: {
     alignItems: 'center',
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
     padding: 24,
     width: '100%',
   },
@@ -180,6 +189,8 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   mockupContinueButtonTextActive: {
-    color: colors.darkBackground,
+    color: colors.black,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
   },
 }); 

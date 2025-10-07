@@ -20,7 +20,7 @@ import { colors, spacing, typography } from '../../theme';
 
 // Legacy color constants for compatibility - will be deprecated
 export const BG_COLOR = colors.darkBackground;
-export const GREEN = colors.brandGreen;
+export const GREEN = colors.green;
 export const GRAY = colors.darkGray;
 
 export const styles = StyleSheet.create({
@@ -68,7 +68,7 @@ export const styles = StyleSheet.create({
     height: spacing.profileImageSize,
     borderRadius: spacing.profileImageSize / 2,
     marginRight: spacing.itemSpacing,
-    backgroundColor: colors.border,
+    backgroundColor: colors.white10,
   },
   
   // Welcome text above user name
@@ -118,6 +118,8 @@ export const styles = StyleSheet.create({
   // Large green card displaying user's balance
   balanceCard: {
     borderRadius: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.white10,
     marginHorizontal: spacing.md,
     marginTop: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -176,6 +178,14 @@ export const styles = StyleSheet.create({
     marginTop: spacing.md,
     fontSize: typography.fontSize.md,
   },
+
+  // Container for generic loading rows
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+  },
   inactiveText: {
     color: colors.textSecondary,
     fontSize: typography.fontSize.xs,
@@ -190,15 +200,7 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
   },
 
-  // Transaction avatar styles 
-  transactionAvatar: {
-    backgroundColor: colors.primaryGreen,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
 
   // === BALANCE AMOUNT (HERO ELEMENT) ===
   // Large dollar amount display
@@ -432,23 +434,13 @@ export const styles = StyleSheet.create({
   requestAvatarNew: {
     width: 40,
     height: 40,
-    borderRadius: 10,
-    backgroundColor: colors.primaryGreen,
+    borderRadius: 30,
+    backgroundColor: colors.white10,
     marginRight: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
-  // Transaction avatar with green10 background
-  transactionAvatarNew: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primaryGreen + '10',
-    marginRight: spacing.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
   
   // Request content container
   requestContent: {
@@ -474,7 +466,7 @@ export const styles = StyleSheet.create({
   
   // Request amount in green
   requestAmountGreen: {
-    color: GREEN,
+    color: colors.greenBlue,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
   },
@@ -488,10 +480,19 @@ export const styles = StyleSheet.create({
   
   // Send button for new design
   requestSendButtonNew: {
-    backgroundColor: GREEN,
-    paddingHorizontal: spacing.lg,
+    backgroundColor: 'transparent',
     paddingVertical: spacing.sm,
     borderRadius: 10,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Gradient content for the send button
+  requestSendButtonGradient: {
+    borderRadius: 10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     minWidth: 80,
     alignItems: 'center',
     justifyContent: 'center',
@@ -499,7 +500,7 @@ export const styles = StyleSheet.create({
   
   // Send button text
   requestSendButtonTextNew: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
   },
@@ -783,4 +784,73 @@ export const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
 
+
+  //transaction styles
+  // New request item style matching the mockup
+  TransactionItemNew: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.md,
+    padding: spacing.md,
+  },
+  
+  // Transaction avatar with green10 background
+  transactionAvatarNew: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.white10,
+    marginRight: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+    // Transaction avatar styles 
+    transactionAvatar: {
+      width: 24,
+      height: 24,
+      objectFit: 'contain',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  
+  // Request content container
+  transactionContent: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  
+  // Request sender name
+  transactionSenderName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textLight,
+    marginBottom: 10,
+  },
+  
+  // Request message with amount
+  transactionMessageWithAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.white,
+    marginBottom: 10,
+  },
+  
+  // Request amount in green
+  transactionAmountGreen: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+  },
+  
+  // Request source info
+  transactionSource: {
+    color: colors.white70,
+    fontSize: 12,
+  },
+  
+  
 }); 
+

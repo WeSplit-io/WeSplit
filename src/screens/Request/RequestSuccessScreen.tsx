@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme';
@@ -44,7 +45,7 @@ const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
           {/* Success Icon */}
           <View style={styles.mockupSuccessIcon}>
-            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsuccess-icon.png?alt=media&token=6cf1d0fb-7a48-4c4c-aa4c-3c3f76c54f07' }} style={styles.mockupSuccessIconImage} />
+            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsucess-icon-new.png?alt=media&token=5ee14802-562e-45d1-bc4a-deeb584d2904' }} style={styles.mockupSuccessIconImage} />
           </View>
 
           {/* Success Title */}
@@ -70,21 +71,25 @@ const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
          </View>
         {/* Back Home Button collé en bas */}
         <View style={{width: '100%', alignItems: 'center'}}>
-          <TouchableOpacity 
-            style={[styles.mockupBackHomeButton, {
-              paddingVertical: 16,
-              paddingHorizontal: 48,
-              borderRadius: 12,
-              minWidth: '70%',
-            }]} 
-            onPress={handleBackHome}
-          >
-            <Text style={[styles.mockupBackHomeButtonText, {
-              fontSize: 16,
-              fontWeight: '600',
-            }]}> 
-              Back Home
-            </Text>
+          <TouchableOpacity onPress={handleBackHome} activeOpacity={0.85} style={{ width: '100%' }}>
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientEnd]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.mockupBackHomeButton, {
+                paddingVertical: 16,
+                paddingHorizontal: 48,
+                borderRadius: 12,
+                width: '100%'
+              }]}
+            >
+              <Text style={[styles.mockupBackHomeButtonText, {
+                fontSize: 16,
+                fontWeight: '600',
+              }]}> 
+                Back Home
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>

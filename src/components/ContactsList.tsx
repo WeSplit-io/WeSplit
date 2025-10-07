@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Image, Alert, Linking, Animated } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { LinearGradient } from 'expo-linear-gradient';
 import Icon from './Icon';
 import { useApp } from '../context/AppContext';
 import { useGroupData } from '../hooks/useGroupData';
@@ -569,31 +570,58 @@ const ContactsList: React.FC<ContactsListProps> = ({
           {showTabs && (
             <View style={styles.tabsContainer}>
               <TouchableOpacity
-                style={[styles.tab, activeTab === 'All' && styles.tabActive]}
+                style={styles.tab}
                 onPress={() => animateTabChange(() => onTabChange?.('All'))}
                 disabled={isAnimating}
               >
-                <Text style={[styles.tabText, activeTab === 'All' && styles.tabTextActive]}>
-                  All
-                </Text>
+                {activeTab === 'All' ? (
+                  <LinearGradient
+                    colors={[colors.gradientStart, colors.gradientEnd]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.tabGradient}
+                  >
+                    <Text style={styles.tabTextActive}>All</Text>
+                  </LinearGradient>
+                ) : (
+                  <Text style={styles.tabText}>All</Text>
+                )}
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.tab, activeTab === 'Favorite' && styles.tabActive]}
+                style={styles.tab}
                 onPress={() => animateTabChange(() => onTabChange?.('Favorite'))}
                 disabled={isAnimating}
               >
-                <Text style={[styles.tabText, activeTab === 'Favorite' && styles.tabTextActive]}>
-                  Favorite
-                </Text>
+                {activeTab === 'Favorite' ? (
+                  <LinearGradient
+                    colors={[colors.gradientStart, colors.gradientEnd]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.tabGradient}
+                  >
+                    <Text style={styles.tabTextActive}>Favorite</Text>
+                  </LinearGradient>
+                ) : (
+                  <Text style={styles.tabText}>Favorite</Text>
+                )}
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.tab, activeTab === 'Search' && styles.tabActive]}
+                style={styles.tab}
                 onPress={() => animateTabChange(() => onTabChange?.('Search'))}
                 disabled={isAnimating}
               >
-                <Text style={[styles.tabText, activeTab === 'Search' && styles.tabTextActive]}>
-                  Search
-                </Text>
+                {activeTab === 'Search' ? (
+                  <LinearGradient
+                    colors={[colors.gradientStart, colors.gradientEnd]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.tabGradient}
+                  >
+                    <Text style={styles.tabTextActive}>Search</Text>
+                  </LinearGradient>
+                ) : (
+                  <Text style={styles.tabText}>Search</Text>
+                )}
               </TouchableOpacity>
             </View>
           )}

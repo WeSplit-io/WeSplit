@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import MaskedView from '@react-native-masked-view/masked-view';
 import { colors } from '../theme';
 import NavIcon from './NavIcon';
 import { styles } from './NavBar.styles';
@@ -18,7 +19,7 @@ const getImageFromPath = (path: string) => {
     case 'home-icon-default.png':
       return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fhome-icon-default.png?alt=media&token=73d79921-5d1c-4c9e-acdb-7f669321db27' };
     case 'wallet-icon-default.png':
-      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' };
+      return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Freward-icon.png?alt=media&token=02dc6cb6-7c94-463e-8dd5-9ed1710b9f1a' };
     case 'split-icon.png':
       return require('../../assets/split-icon.png');
     case 'pool-icon.png':
@@ -32,11 +33,11 @@ const getImageFromPath = (path: string) => {
 
 const navItems = [
   { icon: 'home-icon-default.png', label: 'Home', route: 'Dashboard' },
-  { icon: 'wallet-icon-default.png', label: 'Rewards', route: 'Rewards' },
-  // Center green split button -> first step camera
-  { icon: 'split-icon.png', label: 'Split', route: 'BillCamera', isSpecial: true },
   // Pools (splits) tab
   { icon: 'pool-icon.png', label: 'Pools', route: 'SplitsList' },
+  // Center green split button -> first step camera
+  { icon: 'split-icon.png', label: 'Split', route: 'BillCamera', isSpecial: true },
+  { icon: 'wallet-icon-default.png', label: 'Rewards', route: 'Rewards' },
   // Keep Contacts at the end
   { icon: 'users-icon.png', label: 'Contacts', route: 'Contacts' },
 ];
@@ -112,7 +113,7 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
             >
               {item.isSpecial ? (
                 <LinearGradient
-                  colors={[colors.green, '#4CAF50']}
+                  colors={[colors.green, colors.greenBlue]}
                   style={styles.specialButton}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
@@ -123,26 +124,85 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
                   />
                 </LinearGradient>
               ) : isImagePath(item.icon) ? (
-                <Image 
-                  source={getImageFromPath(item.icon)} 
-                  style={[styles.navIcon, isActive && styles.navIconActive]} 
-                />
+                isActive ? (
+                  <MaskedView
+                    maskElement={
+                      <Image
+                        source={getImageFromPath(item.icon)}
+                        style={styles.navIcon}
+                      />
+                    }
+                  >
+                    <LinearGradient
+                      colors={[colors.green, colors.greenBlue]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.navIcon}
+                    />
+                  </MaskedView>
+                ) : (
+                  <Image 
+                    source={getImageFromPath(item.icon)} 
+                    style={styles.navIcon} 
+                  />
+                )
               ) : (
-                <NavIcon 
-                  name={item.icon} 
-                  size={24} 
-                  isActive={isActive}
-                />
+                isActive ? (
+                  <MaskedView
+                    maskElement={
+                      <NavIcon 
+                        name={item.icon} 
+                        size={24}
+                        isActive={false}
+                      />
+                    }
+                  >
+                    <LinearGradient
+                      colors={[colors.green, colors.greenBlue]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={{ width: 24, height: 24 }}
+                    />
+                  </MaskedView>
+                ) : (
+                  <NavIcon 
+                    name={item.icon} 
+                    size={24} 
+                    isActive={false}
+                  />
+                )
               )}
               {!item.isSpecial && isActive && (
-                <View style={styles.topIndicator} />
+                <LinearGradient
+                  colors={[colors.green, colors.greenBlue]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.topIndicator}
+                />
               )}
-              <Text style={[
-                styles.navLabel, 
-                isActive && styles.navLabelActive
-              ]}>
-                {item.label}
-              </Text>
+              {isActive ? (
+                <MaskedView
+                  maskElement={
+                    <Text style={[styles.navLabel]}>
+                      {item.label}
+                    </Text>
+                  }
+                >
+                  <LinearGradient
+                    colors={[colors.green, colors.greenBlue]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Text style={[styles.navLabel, { opacity: 0 }]}>
+                      {item.label}
+                    </Text>
+                  </LinearGradient>
+                </MaskedView>
+              ) : (
+                <Text style={styles.navLabel}>
+                  {item.label}
+                </Text>
+              )}
             </TouchableOpacity>
           );
         })}

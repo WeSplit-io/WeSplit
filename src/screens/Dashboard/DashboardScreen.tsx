@@ -19,27 +19,23 @@ import { useFocusEffect } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { colors } from '../../theme';
 import AuthGuard from '../../components/AuthGuard';
-import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
 import WalletSelectorModal from '../../components/WalletSelectorModal';
 import { QRCodeScreen } from '../QRCode';
-import GroupIcon from '../../components/GroupIcon';
 import TransactionModal from '../../components/TransactionModal';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { useGroupList } from '../../hooks/useGroupData';
 import { GroupWithDetails, Expense, GroupMember, Transaction } from '../../types';
 import { formatCryptoAmount } from '../../utils/cryptoUtils';
-// Static image imports to avoid Metro dynamic require resolution issues
-// import awardIcon from '../../../assets/award-icon.png';
-// import userIcon from '../../../assets/user-icon.png';
 import { getTotalSpendingInUSDC } from '../../services/priceService';
 import { getUserNotifications } from '../../services/firebaseNotificationService';
 import { createPaymentRequest, getReceivedPaymentRequests } from '../../services/firebasePaymentRequestService';
 import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
 import { firebaseTransactionService, firebaseDataService } from '../../services/firebaseDataService';
 import { generateProfileLink } from '../../services/deepLinkHandler';
-// Removed split-related imports
+import { SplitStorageService } from '../../services/splitStorageService';
+import { MockupDataService } from '../../data/mockupData';
 
 // Avatar component with loading state and error handling
 const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
@@ -72,7 +68,7 @@ const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, disp
   // Fallback to initial if no valid avatar
   if (!hasValidAvatar) {
     return (
-      <View style={[style, { backgroundColor: colors.brandGreen, alignItems: 'center', justifyContent: 'center' }]}>
+      <View style={[style, { backgroundColor: colors.white10, alignItems: 'center', justifyContent: 'center' }]}>
         <Text style={{ fontSize: 14, fontWeight: 'medium', color: colors.white }}>
           {displayName.charAt(0).toUpperCase()}
         </Text>
@@ -180,7 +176,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [refreshBalance, setRefreshBalance] = useState<number | null>(null); // Local refresh balance
   const [balanceLoaded, setBalanceLoaded] = useState(false); // Track if balance has been loaded
   const [walletUnrecoverable, setWalletUnrecoverable] = useState(false); // Track if wallet is unrecoverable
-  // Removed recent splits state
+  const [loadingSplits, setLoadingSplits] = useState(false);
+  const [recentSplits, setRecentSplits] = useState<any[]>([]);
 
   // Function to hash wallet address for display
   const hashWalletAddress = (address: string): string => {
@@ -1339,7 +1336,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       
       if (result.success && result.splits) {
         // Get the 3 most recent splits and ensure they use unified mockup data
-        const recentSplits = result.splits.slice(0, 3).map(split => {
+        const recentSplits = result.splits.slice(0, 3).map((split: any) => {
           // Use unified mockup data for consistency
           const unifiedAmount = MockupDataService.getBillAmount();
           
@@ -1363,7 +1360,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         
         console.log('🔍 Dashboard: Loaded recent splits:', {
           count: recentSplits.length,
-          splits: recentSplits.map(s => ({
+          splits: recentSplits.map((s: any) => ({
             id: s.id,
             title: s.title,
             status: s.status,
@@ -1407,7 +1404,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     return (
       <TouchableOpacity
         key={transaction.id}
-        style={styles.requestItemNew}
+        style={styles.TransactionItemNew}
         onPress={() => {
           setSelectedTransaction(transaction);
           setTransactionModalVisible(true);
@@ -1415,31 +1412,31 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       >
         <View style={[
           styles.transactionAvatarNew,
-          isIncome && { backgroundColor: colors.primaryGreen + '20' }
         ]}>
           <Image
             source={getTransactionIcon(transaction)}
             style={[
               styles.transactionAvatar,
-              isIncome && { tintColor: colors.primaryGreen }
             ]}
           />
         </View>
-        <View style={styles.requestContent}>
-          <Text style={styles.requestMessageWithAmount}>
-            <Text style={styles.requestSenderName}>{getTransactionTitle(transaction)}</Text>
+
+        <View style={styles.transactionContent}>
+          <Text style={styles.transactionMessageWithAmount}>
+            <Text style={styles.transactionSenderName}>{getTransactionTitle(transaction)}</Text>
             {' '}
-            <Text style={[
-              styles.requestAmountGreen,
-              { color: isIncome ? colors.primaryGreen : colors.textLight }
-            ]}>
-              {isIncome ? '+' : '-'}{amount} USDC
-            </Text>
+            
           </Text>
-          <Text style={styles.requestSource}>
+          <Text style={styles.transactionSource}>
             {getTransactionSource(transaction)} • {transactionTime}
           </Text>
         </View>
+        <Text style={[
+              styles.transactionAmountGreen,
+              
+            ]}>
+              {isIncome ? '+' : '-'}{amount} USDC
+            </Text>
       </TouchableOpacity>
     );
   };
@@ -1503,7 +1500,10 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
               style={styles.bellIcon}
             />
             {unreadNotifications > 0 && (
-              <View style={styles.bellBadge} />
+              <LinearGradient
+                colors={[colors.green, colors.greenBlue]}
+                style={styles.bellBadge}
+              />
             )}
           </TouchableOpacity>
         </View>
@@ -1512,7 +1512,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
         {/* Balance Card */}
         <ImageBackground
-          source={require('../../../assets/wallet-bg.png')}
+          source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-bg-linear.png?alt=media&token=4347e0cd-056e-4681-a066-0fd74a563013'}}
           style={[styles.balanceCard, { alignItems: 'flex-start' }]}
           resizeMode="cover"
         >
@@ -1619,7 +1619,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={require('../../../assets/money-send.png')}
+                  source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmoney-send-new.png?alt=media&token=fa4e03f4-bd17-4596-bb92-a08965316743'}}
                   style={styles.actionButtonIconNoTint}
                 />
               </View>
@@ -1632,7 +1632,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={require('../../../assets/money-recive.png')}
+                  source={{uri:'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmoney-recive-new.png?alt=media&token=a45426d1-9bf2-4f65-8067-7f76d62216fa'}}
                   style={styles.actionButtonIconNoTint}
                 />
               </View>
@@ -1645,7 +1645,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
             >
               <View style={styles.actionButtonCircle}>
                 <Image
-                  source={require('../../../assets/card-add.png')}
+                  source={{uri:'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fcard-add-new.png?alt=media&token=8ca9ad64-c616-4f4c-9f3d-2be39c3091f2'}}
                   style={styles.actionButtonIconNoTint}
                 />
               </View>
@@ -1721,7 +1721,14 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                           Alert.alert('Send Payment', `Send ${amount.toFixed(2)} ${currency} to ${senderName}?`);
                         }}
                       >
-                        <Text style={styles.requestSendButtonTextNew}>Send</Text>
+                        <LinearGradient
+                          colors={[colors.green, colors.greenLight]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.requestSendButtonGradient}
+                        >
+                          <Text style={styles.requestSendButtonTextNew}>Send</Text>
+                        </LinearGradient>
                       </TouchableOpacity>
                     </View>
                   );

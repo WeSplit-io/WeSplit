@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
@@ -499,12 +500,21 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
 
   const renderTabButton = (tab: TabType, label: string) => (
     <TouchableOpacity
-      style={[styles.tabButton, activeTab === tab && styles.activeTabButton]}
+      style={styles.tabButton}
       onPress={() => setActiveTab(tab)}
     >
-      <Text style={[styles.tabButtonText, activeTab === tab && styles.activeTabButtonText]}>
-        {label}
-      </Text>
+      {activeTab === tab ? (
+        <LinearGradient
+          colors={[colors.gradientStart, colors.gradientEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.tabGradient}
+        >
+          <Text style={styles.activeTabButtonText}>{label}</Text>
+        </LinearGradient>
+      ) : (
+        <Text style={styles.tabButtonText}>{label}</Text>
+      )}
     </TouchableOpacity>
   );
 

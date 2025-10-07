@@ -66,13 +66,13 @@ export const styles = StyleSheet.create({
     width: spacing.xxl + spacing.screenPadding,
     height: spacing.xxl + spacing.screenPadding,
     borderRadius: spacing.iconSize,
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.green,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
   },
   avatarText: {
-    color: colors.darkBackground,
+    color: colors.black,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
   },
@@ -550,13 +550,11 @@ export const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    paddingVertical: spacing.sm,
     alignItems: 'center',
     marginBottom: -1,
   },
   activeTab: {
-    borderBottomWidth: 2,
-    borderColor: colors.green,
+    // Gradient indicator is rendered in component
   },
   tabText: {
     color: colors.textSecondary,
@@ -566,6 +564,20 @@ export const styles = StyleSheet.create({
   activeTabText: {
     color: colors.white,
     fontWeight: typography.fontWeight.semibold,
+  },
+  tabIndicatorContainer: {
+    height: 2,
+    width: '100%',
+    marginTop: 10,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  tabIndicatorPlaceholder: {
+    height: 2,
+    width: '100%',
+    marginTop: 6,
+    borderRadius: 2,
+    backgroundColor: 'transparent',
   },
   mockupSearchContainer: {
     flexDirection: 'row',
@@ -785,6 +797,8 @@ export const styles = StyleSheet.create({
   },
   mockupContinueButtonTextActive: {
     color: colors.black,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
   },
   // === MOCKUP-BASED SEND CONFIRMATION STYLES ===
   mockupRecipientCard: {
@@ -952,15 +966,16 @@ export const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   mockupSuccessIcon: {
-    width: 150,
-    height: 150,
+    width: 200,
+    height: 200,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
   mockupSuccessIconImage: {
-    width: 150,
-    height: 150,
+    height: 200,
+    width: 200,
+    objectFit: 'contain',
   },
   mockupSuccessTitle: {
     color: colors.white,
@@ -974,6 +989,7 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: typography.fontWeight.medium,
     textAlign: 'center',
+    marginBottom: 100,
   },
   mockupSuccessDate: {
     color: colors.textSecondary,
@@ -1195,20 +1211,22 @@ export const styles = StyleSheet.create({
     marginHorizontal: spacing.screenPaddingHorizontal,
     // width: '100%', // supprimé pour éviter le débordement
   },
+  appleSliderGradientBorder: {
+    borderRadius: 999,
+    padding: 1,
+    marginTop: 16,
+    marginBottom: 8,
+  },
   appleSliderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white5,
+    backgroundColor: colors.blackWhite5,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.brandGreen,
     position: 'relative',
     overflow: 'hidden',
     minHeight: 70,
     padding: 5,
     height: 70,
-    marginTop: 16,
-    marginBottom: 8,
     // width: '100%', // supprimé pour éviter le débordement
   },
   appleSliderTrack: {

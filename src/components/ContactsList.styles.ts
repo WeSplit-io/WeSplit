@@ -32,7 +32,7 @@ export const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
-    padding: 4,
+    padding: 5,
     backgroundColor: colors.white5,
     borderRadius: 16,
     marginBottom: spacing.md,
@@ -41,8 +41,7 @@ export const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    paddingHorizontal: spacing.screenPaddingHorizontal,
-    paddingVertical: spacing.sm,
+
     borderRadius: 12,
     backgroundColor: 'transparent',
     alignItems: 'center',
@@ -52,13 +51,15 @@ export const styles = StyleSheet.create({
   tabActive: {
     backgroundColor: colors.green,
     shadowColor: colors.green,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+
+  },
+  tabGradient: {
+    paddingHorizontal: spacing.screenPaddingHorizontal,
+    paddingVertical: spacing.sm,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
   },
   tabText: {
     fontSize: typography.fontSize.sm,
@@ -67,6 +68,7 @@ export const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: colors.black,
+    fontWeight: typography.fontWeight.medium,
   },
   contactsScrollView: {
     flex: 1,
@@ -119,7 +121,7 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
   },
   mutualGroupsText: {
-    color: colors.brandGreen,
+    color: colors.greenBlue,
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.medium,
   },
@@ -179,7 +181,6 @@ export const styles = StyleSheet.create({
     color: colors.white,
     borderBottomWidth: 2,
     borderBottomColor: colors.green,
-
   },
   toggleUnderline: {
     height: 3,
@@ -215,7 +216,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.darkBackground,
   },
   permissionButton: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.greenBlue,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: spacing.sm,
@@ -252,7 +253,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   scanAgainButton: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.greenBlue,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: spacing.sm,
@@ -289,7 +290,7 @@ export const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   scanButton: {
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.greenBlue,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: spacing.sm,
@@ -328,7 +329,7 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     top: spacing.md,
     right: spacing.md,
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.greenBlue,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: spacing.sm,
@@ -400,7 +401,7 @@ export const styles = StyleSheet.create({
   startScanButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.greenBlue,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.lg,
     borderRadius: spacing.lg,

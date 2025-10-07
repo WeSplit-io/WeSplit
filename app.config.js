@@ -80,7 +80,8 @@ export default {
       "./queries.js",
       "expo-secure-store",
       "expo-router",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-web-browser"
     ],
     extra: {
       eas: {
