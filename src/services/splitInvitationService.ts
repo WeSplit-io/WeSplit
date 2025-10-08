@@ -129,15 +129,72 @@ export class SplitInvitationService {
         }
       }
 
-      // TODO: Implement actual split joining logic
-      // This would involve:
-      // 1. Fetching the split from the database
-      // 2. Adding the user as a participant
-      // 3. Sending notifications
-      // 4. Updating split status
+      // Implement actual split joining logic
+      // 1. Fetch the split from the database
+      const { SplitStorageService } = await import('./splitStorageService');
+      const splitResult = await SplitStorageService.getSplit(invitationData.splitId);
+      
+      if (!splitResult.success || !splitResult.split) {
+        return {
+          success: false,
+          error: 'Split not found or has been deleted',
+        };
+      }
 
-      // For now, simulate successful join
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const split = splitResult.split;
+
+      // 2. Check if user is already a participant
+      const existingParticipant = split.participants.find(p => p.userId === userId);
+      if (existingParticipant) {
+        return {
+          success: false,
+          error: 'You are already a participant in this split',
+        };
+      }
+
+      // 3. Get the actual user data
+      const { firebaseDataService } = await import('./firebaseDataService');
+      const userData = await firebaseDataService.user.getCurrentUser(userId);
+      
+      if (!userData) {
+        return {
+          success: false,
+          error: 'User data not found',
+        };
+      }
+
+      // 4. Add the user as a participant
+      const newParticipant = {
+        userId: userId,
+        name: userData.name || 'Unknown User',
+        email: userData.email || '',
+        walletAddress: userData.wallet_address || userData.wallet_public_key || '',
+        amountOwed: invitationData.totalAmount / (split.participants.length + 1), // Equal split
+        amountPaid: 0,
+        status: 'accepted' as const,
+      };
+
+      const addResult = await SplitStorageService.addParticipant(invitationData.splitId, newParticipant);
+      if (!addResult.success) {
+        return {
+          success: false,
+          error: addResult.error || 'Failed to join split',
+        };
+      }
+
+      // 5. Send confirmation notification to the creator
+      const { sendNotification } = await import('./firebaseNotificationService');
+      await sendNotification(
+        invitationData.creatorId,
+        'User Joined Your Split',
+        `A user has joined your split "${invitationData.billName}". The split is ready to begin!`,
+        'group_added',
+        {
+          splitId: invitationData.splitId,
+          billName: invitationData.billName,
+          totalAmount: invitationData.totalAmount,
+        }
+      );
 
       logger.info('User successfully joined split', {
         splitId: invitationData.splitId,

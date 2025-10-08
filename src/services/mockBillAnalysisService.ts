@@ -19,40 +19,38 @@ export class MockBillAnalysisService {
     // Simulate processing delay
     await new Promise(resolve => setTimeout(resolve, 2000));
 
+    // Use unified mockup data for consistency across all bill processing
+    const mockupData = MockupDataService.getPrimaryBillData();
+    
     // Simulate receiving real AI/OCR data (this would come from your AI service)
     const incomingData: IncomingBillData = {
       category: "Food & Drinks",
       country: "USA",
       currency: "USD",
       store: {
-        name: "FIVE GUYS",
+        name: mockupData.merchant,
         location: {
-          address: "36 West 48th St",
-          city: "New York",
-          state: "NY",
-          zip_code: "10022",
-          phone: "(212) 997-1270"
+          address: mockupData.location,
+          city: "San Francisco",
+          state: "CA",
+          zip_code: "94102",
+          phone: "(415) 555-0123"
         },
-        store_id: "NY-1111"
+        store_id: "SF-001"
       },
       transaction: {
-        date: "2/11/2017",
-        time: "2:50:56 PM",
-        order_id: "AAANCF3G4CCJ",
-        employee: "Tiffany m",
-        items: [
-          { name: "Cheeseburger", price: 8.19 },
-          { name: "Mayo", price: 0.00 },
-          { name: "Bacon Cheeseburger", price: 9.19 },
-          { name: "Bacon", price: 0.00 },
-          { name: "Jalapeno Peppers", price: 0.00 },
-          { name: "Little Cajun Fry", price: 2.99 },
-          { name: "Regular Soda", price: 2.99 }
-        ],
-        sub_total: 26.35,
-        sales_tax: 2.34,
-        order_total: 28.69,
-        calculated_total: 28.69
+        date: mockupData.date,
+        time: mockupData.time,
+        order_id: "GSREST001",
+        employee: "Server",
+        items: mockupData.items.map(item => ({
+          name: item.name,
+          price: item.price
+        })),
+        sub_total: mockupData.subtotal,
+        sales_tax: mockupData.tax,
+        order_total: mockupData.totalAmount,
+        calculated_total: mockupData.totalAmount
       }
     };
 

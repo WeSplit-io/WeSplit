@@ -95,33 +95,14 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       console.log('🔍 DegenLockScreen: Starting degen split wallet creation...');
       console.log('🔍 DegenLockScreen: Participants data:', participants);
       
-      // Use existing split wallet if available, otherwise create new one
+      // Use existing split wallet - wallet should already be created during bill processing
       let walletToUse = splitWallet;
       
       if (!walletToUse) {
-        console.log('🔍 DegenLockScreen: No existing wallet, creating new one...');
-        const billId = splitData?.billId || processedBillData?.id || `split_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        const splitWalletResult = await SplitWalletService.createSplitWallet(
-          billId,
-          currentUser.id.toString(),
-          MockupDataService.getBillAmount(), // Use unified mockup data
-          'USDC',
-          participants.map(p => ({
-            userId: p.id,
-            name: p.name,
-            walletAddress: p.walletAddress || p.userId,
-            amountOwed: totalAmount / participants.length, // Each participant locks their individual share
-          }))
-        );
-
-        if (!splitWalletResult.success) {
-          Alert.alert('Error', splitWalletResult.error || 'Failed to create split wallet');
-          setIsLocking(false);
-          return;
-        }
-        
-        walletToUse = splitWalletResult.wallet;
-        setSplitWallet(walletToUse);
+        console.error('🔍 DegenLockScreen: No existing wallet found! Wallet should have been created during bill processing.');
+        Alert.alert('Error', 'No split wallet found. Please go back and create the split again.');
+        setIsLocking(false);
+        return;
       } else {
         console.log('🔍 DegenLockScreen: Using existing split wallet:', walletToUse.id);
       }

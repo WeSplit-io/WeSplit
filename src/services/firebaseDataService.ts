@@ -316,23 +316,49 @@ const updateGroupExpenseCount = async (groupId: string) => {
 // User services
 export const firebaseUserService = {
   getCurrentUser: async (userId: string): Promise<User> => {
-    // First try to get the document by document ID
-    const userDoc = await getDoc(doc(db, 'users', userId));
-    if (userDoc.exists()) {
-      return firebaseDataTransformers.firestoreToUser(userDoc);
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // First try to get the document by document ID
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (userDoc.exists()) {
+          return firebaseDataTransformers.firestoreToUser(userDoc);
+        }
+        
+        // If not found by document ID, try to find by the 'id' field
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('id', '==', userId));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const userDoc = querySnapshot.docs[0];
+          return firebaseDataTransformers.firestoreToUser(userDoc);
+        }
+        
+        throw new Error('User not found');
+      } catch (error) {
+        lastError = error as Error;
+        
+        // Check if this is a Firebase internal assertion failure
+        if (error instanceof Error && error.message.includes('FIRESTORE') && error.message.includes('INTERNAL ASSERTION FAILED')) {
+          console.warn(`Firebase assertion failure on attempt ${attempt}/${maxRetries}, retrying...`, error.message);
+          
+          if (attempt < maxRetries) {
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+            continue;
+          }
+        }
+        
+        // For non-Firebase assertion errors or final attempt, throw immediately
+        throw error;
+      }
     }
     
-    // If not found by document ID, try to find by the 'id' field
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('id', '==', userId));
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-      const userDoc = querySnapshot.docs[0];
-      return firebaseDataTransformers.firestoreToUser(userDoc);
-    }
-    
-    throw new Error('User not found');
+    // If we get here, all retries failed
+    throw lastError || new Error('User not found after retries');
   },
 
   createUser: async (userData: Omit<User, 'id' | 'created_at'>): Promise<User> => {

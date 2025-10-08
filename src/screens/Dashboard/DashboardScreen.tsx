@@ -177,6 +177,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const [balanceLoaded, setBalanceLoaded] = useState(false); // Track if balance has been loaded
   const [walletUnrecoverable, setWalletUnrecoverable] = useState(false); // Track if wallet is unrecoverable
   const [loadingSplits, setLoadingSplits] = useState(false);
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0); // Track consecutive failures for circuit breaker
   const [recentSplits, setRecentSplits] = useState<any[]>([]);
 
   // Function to hash wallet address for display
@@ -325,6 +326,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           console.log('💰 Dashboard: Balance loaded successfully:', balance.totalUSD, 'USD');
           setUserCreatedWalletBalance(balance);
           setBalanceLoaded(true);
+          setConsecutiveFailures(0); // Reset failure counter on success
         } else {
           // Balance is invalid, retry
           throw new Error('Invalid balance received');
@@ -347,9 +349,24 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         errorMessage.includes('toDate is not a function') ||
         errorMessage.includes('Wallet is already working') ||
         errorMessage.includes('Wallet is marked as unrecoverable') ||
-        errorMessage.includes('unrecoverable')) {
+        errorMessage.includes('unrecoverable') ||
+        errorMessage.includes('FIRESTORE') && errorMessage.includes('INTERNAL ASSERTION FAILED')) {
         console.log(' Dashboard: Critical error detected, stopping retry loop:', errorMessage);
-        setUserCreatedWalletBalance(null);
+        
+        // Handle Firebase assertion failures more gracefully
+        if (errorMessage.includes('FIRESTORE') && errorMessage.includes('INTERNAL ASSERTION FAILED')) {
+          console.warn(' Dashboard: Firebase assertion failure detected, showing fallback UI');
+          // Set a fallback balance to prevent infinite loading
+          setUserCreatedWalletBalance({
+            solBalance: 0,
+            usdcBalance: 0,
+            totalUSD: 0,
+            address: currentUser?.wallet_address || '',
+            isConnected: false
+          });
+        } else {
+          setUserCreatedWalletBalance(null);
+        }
         setBalanceLoaded(true);
 
         // Check if this is an unrecoverable wallet error
@@ -417,10 +434,19 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         return;
       }
 
+      // Circuit breaker: if we have too many consecutive failures, stop retrying
+      if (consecutiveFailures >= 3) {
+        console.error('❌ Dashboard: Circuit breaker triggered - too many consecutive failures');
+        setUserCreatedWalletBalance(null);
+        setBalanceLoaded(true);
+        return;
+      }
+
       // Auto-retry logic - but only for certain errors, not for User not found
-      if (retryCount < 4) {
-        const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5 seconds
-        console.log(`🔄 Dashboard: Auto-retrying balance load in ${delay}ms... (attempt ${retryCount + 1}/5)`);
+      if (retryCount < 2) { // Reduced from 4 to 2 retries
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Reduced max delay to 3 seconds
+        console.log(`🔄 Dashboard: Auto-retrying balance load in ${delay}ms... (attempt ${retryCount + 1}/3)`);
+        setConsecutiveFailures(prev => prev + 1);
         setTimeout(() => {
           loadUserCreatedWalletBalance(retryCount + 1);
         }, delay);
@@ -428,18 +454,20 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       } else {
         // Max retries reached, give up
         console.error('❌ Dashboard: Max retries reached for balance loading');
+        setConsecutiveFailures(prev => prev + 1);
         setUserCreatedWalletBalance(null);
         setBalanceLoaded(true);
       }
     } finally {
       setLoadingUserWallet(false);
     }
-  }, [currentUser?.id, currentUser?.wallet_address, updateUser, loadingUserWallet]);
+  }, [currentUser?.id, currentUser?.wallet_address, updateUser, loadingUserWallet, consecutiveFailures]);
 
   // Reset balance loaded flag and unrecoverable state when user changes
   useEffect(() => {
     setBalanceLoaded(false);
     setWalletUnrecoverable(false);
+    setConsecutiveFailures(0); // Reset failure counter when user changes
   }, [currentUser?.id]);
 
   // Auto-refresh balance periodically to keep it up-to-date

@@ -73,6 +73,9 @@ export interface SplitDetailsNavigationParams extends SplitNavigationParams {
   splitId?: string;
   splitData?: Split;
   isEditing?: boolean;
+  selectedContact?: any; // Contact selected from ContactsScreen
+  isFromNotification?: boolean; // Whether opened from notification
+  notificationId?: string; // Notification ID for deletion after join
 }
 
 /**

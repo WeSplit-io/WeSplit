@@ -204,16 +204,15 @@ export class SplitStorageService {
         orderBy('createdAt', 'desc')
       );
       
-      // Get splits where user is participant
-      const participantQuery = query(
+      // Get all splits and filter for participants (array-contains doesn't work well with complex objects)
+      const allSplitsQuery = query(
         splitsRef,
-        where('participants', 'array-contains', { userId }),
         orderBy('createdAt', 'desc')
       );
 
-      const [creatorSnapshot, participantSnapshot] = await Promise.all([
+      const [creatorSnapshot, allSplitsSnapshot] = await Promise.all([
         getDocs(creatorQuery),
-        getDocs(participantQuery)
+        getDocs(allSplitsQuery)
       ]);
 
       const splits: Split[] = [];
@@ -230,10 +229,22 @@ export class SplitStorageService {
       });
 
       // Add participant splits (avoid duplicates)
-      participantSnapshot.docs.forEach(doc => {
+      allSplitsSnapshot.docs.forEach(doc => {
         const splitData = doc.data() as Split;
         splitData.firebaseDocId = doc.id;
-        if (!seenIds.has(splitData.id)) {
+        
+        // Check if user is a participant in this split
+        const isParticipant = splitData.participants.some(participant => 
+          participant.userId === userId
+        );
+        
+        if (isParticipant && !seenIds.has(splitData.id)) {
+          console.log('🔍 SplitStorageService: Found participant split:', {
+            splitId: splitData.id,
+            splitTitle: splitData.title,
+            participantCount: splitData.participants.length,
+            userId
+          });
           splits.push(splitData);
           seenIds.add(splitData.id);
         }
@@ -245,7 +256,7 @@ export class SplitStorageService {
       console.log('🔍 SplitStorageService: Found splits:', {
         total: splits.length,
         creatorSplits: creatorSnapshot.docs.length,
-        participantSplits: participantSnapshot.docs.length
+        allSplits: allSplitsSnapshot.docs.length
       });
 
       return {

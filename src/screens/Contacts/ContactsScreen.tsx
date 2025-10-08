@@ -15,7 +15,7 @@ interface ContactsScreenProps {
 }
 
 const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) => {
-  const { action, onContactSelect } = route.params || {};
+  const { action, onContactSelect, splitId, splitName, returnRoute } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
   
@@ -26,6 +26,17 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
     if (action === 'send' && onContactSelect) {
       // If we're in send mode, call the callback
       onContactSelect(contact);
+    } else if (action === 'split') {
+      // If we're in split mode, navigate back with the selected contact
+      if (returnRoute) {
+        navigation.navigate(returnRoute, {
+          selectedContact: contact,
+          splitId: splitId,
+          splitName: splitName,
+        });
+      } else {
+        navigation.goBack();
+      }
     } else {
       // Navigate to the new ContactAction screen with toggle
       navigation.navigate('ContactAction', { selectedContact: contact });
@@ -63,6 +74,8 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
   const getHeaderTitle = () => {
     if (action === 'send') {
       return 'Select Contact';
+    } else if (action === 'split') {
+      return 'Add to Split';
     }
     return 'Contacts';
   };

@@ -15,6 +15,7 @@ import {
   Image,
   SafeAreaView,
   StatusBar,
+  TextInput,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
@@ -27,6 +28,7 @@ import { BillAnalysisService } from '../../services/billAnalysisService';
 import { MockBillAnalysisService } from '../../services/mockBillAnalysisService';
 import { billOCRService } from '../../services/billOCRService';
 import { useApp } from '../../context/AppContext';
+import { SplitStorageService } from '../../services/splitStorageService';
 
 interface RouteParams {
   imageUri: string;
@@ -34,6 +36,8 @@ interface RouteParams {
   processedBillData?: ProcessedBillData;
   analysisResult?: BillAnalysisResult;
   isEditing?: boolean;
+  existingSplitId?: string; // ID of existing split to update
+  existingSplitData?: any; // Existing split data to update
 }
 
 interface BillProcessingScreenProps {
@@ -42,7 +46,7 @@ interface BillProcessingScreenProps {
 
 const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation }) => {
   const route = useRoute();
-  const { imageUri, billData, processedBillData, analysisResult, isEditing } = route.params as RouteParams;
+  const { imageUri, billData, processedBillData, analysisResult, isEditing, existingSplitId, existingSplitData } = route.params as RouteParams;
   const { state } = useApp();
   const { currentUser } = state;
   
@@ -62,14 +66,39 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
       []
   );
   const [totalAmount, setTotalAmount] = useState(
+    isEditing && existingSplitData ? existingSplitData.totalAmount :
     isEditing && processedBillData ? processedBillData.totalAmount : 0
   );
   const [merchant, setMerchant] = useState(
+    isEditing && existingSplitData ? existingSplitData.merchant?.name || '' :
     isEditing && processedBillData ? processedBillData.merchant : ''
   );
   const [date, setDate] = useState(
+    isEditing && existingSplitData ? existingSplitData.date :
     isEditing && processedBillData ? processedBillData.date : new Date().toISOString().split('T')[0]
   );
+  
+  // New state for the redesigned form
+  const [selectedCategory, setSelectedCategory] = useState('restaurant');
+  const [billName, setBillName] = useState(
+    isEditing && existingSplitData ? existingSplitData.title : 
+    isEditing && processedBillData ? processedBillData.title : 'Restaurant Night'
+  );
+  const [amount, setAmount] = useState(
+    isEditing && existingSplitData ? existingSplitData.totalAmount.toString() :
+    isEditing && processedBillData ? processedBillData.totalAmount.toString() : '61.95'
+  );
+  const [currency, setCurrency] = useState('EUR');
+  const [convertedAmount, setConvertedAmount] = useState('65.6');
+
+  // Category options with icons
+  const categories = [
+    { id: 'restaurant', icon: 'RES', name: 'Restaurant' },
+    { id: 'travel', icon: 'TVL', name: 'Travel' },
+    { id: 'home', icon: 'HOM', name: 'Home' },
+    { id: 'entertainment', icon: 'ENT', name: 'Entertainment' },
+    { id: 'shopping', icon: 'SHP', name: 'Shopping' },
+  ];
 
   useEffect(() => {
     if (!isEditing) {
@@ -89,7 +118,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
       
       if (analysisResult.success && analysisResult.data) {
         // Process the structured data with current user information
-        const processedData = BillAnalysisService.processBillData(analysisResult.data, currentUser);
+        const processedData = BillAnalysisService.processBillData(analysisResult.data, currentUser || undefined);
         setCurrentProcessedBillData(processedData);
       
         // Set the authoritative price in the price management service immediately
@@ -177,31 +206,31 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
     setTotalAmount(newTotal);
   };
 
-  const proceedToSplitDetails = () => {
+  const proceedToSplitDetails = async () => {
     // If in edit mode, use existing processed data or create new one
     let currentProcessedData = currentProcessedBillData;
     
     if (!currentProcessedData) {
       // Create processed data from current state
-      const billId = `split_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const billId = existingSplitData?.billId || `split_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       
-      currentProcessedData = {
-        id: billId,
-        title: `${merchant} - ${date}`,
-        merchant: merchant,
-        location: '',
-        date: date,
-        time: new Date().toLocaleTimeString(),
-        currency: 'USD',
-        totalAmount: totalAmount,
-        subtotal: totalAmount * 0.9, // Estimate
-        tax: totalAmount * 0.1, // Estimate
+       currentProcessedData = {
+         id: billId,
+         title: billName,
+         merchant: merchant || 'Restaurant',
+         location: '',
+         date: date,
+         time: new Date().toLocaleTimeString(),
+         currency: 'USDC',
+         totalAmount: parseFloat(convertedAmount),
+         subtotal: parseFloat(convertedAmount) * 0.9, // Estimate
+         tax: parseFloat(convertedAmount) * 0.1, // Estimate
         items: extractedItems.map(item => ({
           id: item.id,
           name: item.name,
           price: item.price,
-          quantity: item.quantity,
-          category: item.category,
+          quantity: item.quantity || 1,
+          category: item.category || 'Other',
           participants: item.participants,
           isSelected: true,
         })),
@@ -210,7 +239,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
           allowPartialPayments: true,
           requireAllAccept: false,
           autoCalculate: true,
-          splitMethod: 'equal',
+          splitMethod: 'equal' as const,
           taxIncluded: true,
         },
         originalAnalysis: {} as BillAnalysisData,
@@ -218,42 +247,131 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
     }
 
     // Validate the processed data
-    const validation = BillAnalysisService.validateBillData(currentProcessedData);
-    if (!validation.isValid) {
-      Alert.alert('Validation Error', validation.errors.join('\n'));
+    if (currentProcessedData) {
+      const validation = BillAnalysisService.validateBillData(currentProcessedData);
+      if (!validation.isValid) {
+        Alert.alert('Validation Error', validation.errors.join('\n'));
+        return;
+      }
+    }
+
+    // If editing an existing split, update it in the database
+    if (isEditing && existingSplitId && currentUser && currentProcessedData) {
+      try {
+        console.log('🔍 BillProcessingScreen: Updating existing split:', existingSplitId);
+        
+        const updatedSplitData = {
+          billId: currentProcessedData.id,
+          title: currentProcessedData.title,
+          description: `Split for ${currentProcessedData.title}`,
+          totalAmount: currentProcessedData.totalAmount,
+          currency: currentProcessedData.currency,
+          splitType: existingSplitData?.splitType || 'fair',
+          status: existingSplitData?.status || 'draft',
+          creatorId: currentUser.id.toString(),
+          creatorName: currentUser.name,
+          participants: existingSplitData?.participants || [], // Keep existing participants
+          items: currentProcessedData.items.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            category: item.category,
+            participants: item.participants,
+          })),
+          merchant: {
+            name: currentProcessedData.merchant,
+            address: currentProcessedData.location,
+            phone: '(415) 555-0123',
+          },
+          date: currentProcessedData.date,
+          updatedAt: new Date().toISOString(),
+        };
+
+        const updateResult = await SplitStorageService.updateSplit(existingSplitId, updatedSplitData);
+        
+        if (updateResult.success) {
+          console.log('🔍 BillProcessingScreen: Split updated successfully');
+          
+          // Navigate back to SplitDetails with updated data
+          navigation.navigate('SplitDetails', { 
+            billData: {
+              title: currentProcessedData.title,
+              totalAmount: currentProcessedData.totalAmount,
+              currency: currentProcessedData.currency,
+              date: currentProcessedData.date,
+              merchant: currentProcessedData.merchant,
+              billImageUrl: imageUri,
+              items: currentProcessedData.items.map(item => ({
+                id: item.id,
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity,
+                category: item.category,
+                participants: item.participants,
+              })),
+              participants: currentProcessedData.participants.map(p => ({
+                id: p.id,
+                name: p.name,
+                walletAddress: p.walletAddress,
+                status: p.status,
+                amountOwed: p.amountOwed,
+                items: p.items,
+              })),
+              settings: currentProcessedData.settings,
+            },
+            processedBillData: currentProcessedData,
+            analysisResult: processingResult,
+            splitData: updateResult.split, // Pass the updated split data
+          });
+        } else {
+          console.log('🔍 BillProcessingScreen: Failed to update split:', updateResult.error);
+          Alert.alert('Error', updateResult.error || 'Failed to update split');
+        }
+      } catch (error) {
+        console.error('🔍 BillProcessingScreen: Error updating split:', error);
+        Alert.alert('Error', 'Failed to update split');
+      }
       return;
     }
 
     // Convert to legacy format for backward compatibility
-    const billData: BillSplitCreationData = {
-      title: currentProcessedData.title,
-      totalAmount: currentProcessedData.totalAmount,
-      currency: currentProcessedData.currency,
-      date: currentProcessedData.date,
-      merchant: currentProcessedData.merchant,
-      billImageUrl: imageUri,
-      items: currentProcessedData.items.map(item => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        category: item.category,
-        participants: item.participants,
-      })),
-      participants: currentProcessedData.participants.map(p => ({
-        id: p.id,
-        name: p.name,
-        walletAddress: p.walletAddress,
-        status: p.status,
-      })),
-      settings: currentProcessedData.settings,
-    };
+    if (currentProcessedData) {
+      const billData: BillSplitCreationData = {
+        title: currentProcessedData.title,
+        totalAmount: currentProcessedData.totalAmount,
+        currency: currentProcessedData.currency,
+        date: currentProcessedData.date,
+        merchant: currentProcessedData.merchant,
+        billImageUrl: imageUri,
+        items: currentProcessedData.items.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          category: item.category,
+          participants: item.participants,
+        })),
+        participants: currentProcessedData.participants.map(p => ({
+          name: p.name,
+          walletAddress: p.walletAddress,
+          userId: p.id,
+          email: '', // Add empty email field
+        })),
+        settings: {
+          allowPartialPayments: currentProcessedData.settings.allowPartialPayments,
+          requireAllAccept: currentProcessedData.settings.requireAllAccept,
+          autoCalculate: currentProcessedData.settings.autoCalculate,
+          splitMethod: currentProcessedData.settings.splitMethod === 'manual' ? 'custom' : currentProcessedData.settings.splitMethod,
+        },
+      };
 
-    navigation.navigate('SplitDetails', { 
-      billData,
-      processedBillData: currentProcessedData,
-      analysisResult: processingResult,
-    });
+      navigation.navigate('SplitDetails', { 
+        billData,
+        processedBillData: currentProcessedData,
+        analysisResult: processingResult,
+      });
+    }
   };
 
   const retakePhoto = () => {
@@ -279,147 +397,100 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={retakePhoto}>
-          <Text style={styles.backButtonText}>{isEditing ? '← Back' : '← Retake'}</Text>
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>{isEditing ? 'Edit Bill' : 'Review Bill'}</Text>
+        <Text style={styles.headerTitle}>Edit Bill</Text>
         
-        <TouchableOpacity style={styles.proceedButton} onPress={proceedToSplitDetails}>
-          <Text style={styles.proceedButtonText}>Next</Text>
+        <TouchableOpacity style={styles.cameraButton}>
+          <Text style={styles.cameraButtonText}>CAMERA</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Bill Image Preview */}
-        <View style={styles.imageContainer}>
-          <Image source={{ uri: imageUri }} style={styles.billImage} />
-        </View>
-
-        {/* Processing Results */}
-        {processingResult && (
-          <View style={styles.resultsContainer}>
-            <Text style={styles.resultsTitle}>Processing Results</Text>
-            <Text style={styles.confidenceText}>
-              Confidence: {Math.round(processingResult.confidence * 100)}%
-            </Text>
-            <Text style={styles.processingTimeText}>
-              Processing time: {processingResult.processingTime}s
-            </Text>
-          </View>
-        )}
-
-        {/* Bill Details */}
-        <View style={styles.detailsContainer}>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Merchant:</Text>
-            <Text style={styles.detailValue}>{merchant}</Text>
-          </View>
-          
-          {processedBillData?.location && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Location:</Text>
-              <Text style={styles.detailValue}>{processedBillData.location}</Text>
-            </View>
-          )}
-          
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Date:</Text>
-            <Text style={styles.detailValue}>{date}</Text>
-          </View>
-          
-          {processedBillData?.time && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Time:</Text>
-              <Text style={styles.detailValue}>{processedBillData.time}</Text>
-            </View>
-          )}
-          
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Subtotal:</Text>
-            <Text style={styles.detailValue}>${processedBillData?.subtotal.toFixed(2) || totalAmount.toFixed(2)}</Text>
-          </View>
-          
-          {processedBillData?.tax && processedBillData.tax > 0 && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Tax:</Text>
-              <Text style={styles.detailValue}>${processedBillData.tax.toFixed(2)}</Text>
-            </View>
-          )}
-          
-          <View style={[styles.detailRow, styles.finalTotal]}>
-            <Text style={styles.finalTotalLabel}>Total Amount:</Text>
-            <Text style={styles.finalTotalValue}>${totalAmount.toFixed(2)}</Text>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Category Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Category</Text>
+          <View style={styles.categoryContainer}>
+            {categories.map((category) => (
+              <TouchableOpacity
+                key={category.id}
+                style={[
+                  styles.categoryButton,
+                  selectedCategory === category.id && styles.categoryButtonSelected
+                ]}
+                onPress={() => setSelectedCategory(category.id)}
+              >
+                <Text style={styles.categoryIcon}>{category.icon}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
-        {/* Extracted Items */}
-        <View style={styles.itemsContainer}>
-          <View style={styles.itemsHeader}>
-            <Text style={styles.itemsTitle}>Bill Items</Text>
-            <TouchableOpacity style={styles.addButton} onPress={addItem}>
-              <Text style={styles.addButtonText}>+ Add Item</Text>
+        {/* Name Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Name</Text>
+          <TextInput
+            style={styles.textInput}
+            value={billName}
+            onChangeText={setBillName}
+            placeholder="Enter bill name"
+            placeholderTextColor={colors.textSecondary}
+          />
+        </View>
+
+        {/* Date Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Date</Text>
+          <View style={styles.dateContainer}>
+            <TextInput
+              style={styles.dateInput}
+              value={date}
+              onChangeText={setDate}
+              placeholder="DD/MM/YYYY"
+              placeholderTextColor={colors.textSecondary}
+            />
+            <TouchableOpacity style={styles.calendarButton}>
+              <Text style={styles.calendarIcon}>DATE</Text>
             </TouchableOpacity>
           </View>
-
-          {extractedItems.map((item, index) => (
-            <View key={item.id} style={styles.itemCard}>
-              <View style={styles.itemHeader}>
-                <Text style={styles.itemIndex}>#{index + 1}</Text>
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => removeItem(item.id)}
-                >
-                  <Text style={styles.removeButtonText}>×</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.itemFields}>
-                <View style={styles.itemField}>
-                  <Text style={styles.fieldLabel}>Name</Text>
-                  <Text style={styles.fieldValue}>{item.name || 'Unnamed Item'}</Text>
-                </View>
-                
-                <View style={styles.itemField}>
-                  <Text style={styles.fieldLabel}>Price</Text>
-                  <Text style={styles.fieldValue}>${item.price.toFixed(2)}</Text>
-                </View>
-                
-                {item.category && (
-                  <View style={styles.itemField}>
-                    <Text style={styles.fieldLabel}>Category</Text>
-                    <Text style={styles.fieldValue}>{item.category}</Text>
-                  </View>
-                )}
-                
-                {item.quantity && item.quantity > 1 && (
-                  <View style={styles.itemField}>
-                    <Text style={styles.fieldLabel}>Quantity</Text>
-                    <Text style={styles.fieldValue}>{item.quantity}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          ))}
         </View>
 
-        {/* Total Summary */}
-        <View style={styles.totalContainer}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Subtotal:</Text>
-            <Text style={styles.totalValue}>${totalAmount.toFixed(2)}</Text>
+        {/* Amount Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Amount</Text>
+          <View style={styles.amountContainer}>
+            <TextInput
+              style={styles.amountInput}
+              value={amount}
+              onChangeText={setAmount}
+              placeholder="0.00"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="numeric"
+            />
+            <View style={styles.currencyContainer}>
+              <Text style={styles.currencyText}>{currency} €</Text>
+              <Text style={styles.dropdownIcon}>▼</Text>
+            </View>
           </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Tax:</Text>
-            <Text style={styles.totalValue}>$0.00</Text>
-          </View>
-          <View style={[styles.totalRow, styles.finalTotal]}>
-            <Text style={styles.finalTotalLabel}>Total:</Text>
-            <Text style={styles.finalTotalValue}>${totalAmount.toFixed(2)}</Text>
+          
+          {/* Total Display */}
+          <View style={styles.totalDisplay}>
+            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalAmount}>{convertedAmount} USDC</Text>
           </View>
         </View>
       </ScrollView>
+
+      {/* Save Button */}
+      <View style={styles.bottomContainer}>
+        <TouchableOpacity style={styles.saveButton} onPress={proceedToSplitDetails}>
+          <Text style={styles.saveButtonText}>Save</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };

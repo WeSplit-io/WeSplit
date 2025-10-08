@@ -112,12 +112,13 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
   const processBill = () => {
     if (capturedImage) {
       try {
-        navigation.navigate('BillProcessing', {
+        navigation.navigate('SplitDetails', {
           imageUri: capturedImage,
+          isNewBill: true, // Flag to indicate this is a new bill from camera
         });
       } catch (error) {
-        console.error('Error navigating to BillProcessing:', error);
-        Alert.alert('Navigation Error', 'Failed to open bill processing screen');
+        console.error('Error navigating to SplitDetails:', error);
+        Alert.alert('Navigation Error', 'Failed to open split details screen');
       }
     }
   };

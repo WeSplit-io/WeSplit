@@ -218,6 +218,13 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.lg,
     fontWeight: '700',
   },
+  splitButtonDisabled: {
+    backgroundColor: colors.surface,
+    opacity: 0.6,
+  },
+  splitButtonTextDisabled: {
+    color: colors.textSecondary,
+  },
   // Modal Styles
   modalOverlay: {
     flex: 1,
@@ -466,6 +473,20 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontWeight: '600',
   },
+  addContactsButton: {
+    flex: 1,
+    backgroundColor: colors.green,
+    borderRadius: 12,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.md,
+  },
+  addContactsButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+  },
   
   // Split Wallet Section Styles
   splitWalletSection: {
@@ -607,5 +628,17 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
+  },
+  processingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.black,
+  },
+  processingSubtitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    marginTop: spacing.lg,
+    textAlign: 'center',
   },
 });

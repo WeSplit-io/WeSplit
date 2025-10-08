@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -194,6 +195,16 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     }
   }, [currentUser?.id]);
 
+  // Refresh splits when screen comes into focus (e.g., after joining a split)
+  useFocusEffect(
+    useCallback(() => {
+      if (currentUser?.id) {
+        console.log('🔍 SplitsListScreen: Screen focused, refreshing splits');
+        loadSplits();
+      }
+    }, [currentUser?.id])
+  );
+
   // Load participant avatars when splits change
   useEffect(() => {
     if (splits.length > 0) {
@@ -321,6 +332,22 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         status: split.status
       });
 
+      // Debug: Log the split data being passed to navigation
+      console.log('🔍 SplitsListScreen: Navigating to SplitDetails with split data:', {
+        splitId: split.id,
+        splitTitle: split.title,
+        splitObject: split,
+        splitKeys: Object.keys(split),
+        splitType: typeof split,
+        hasParticipants: !!split.participants,
+        participantsCount: split.participants?.length || 0,
+        // Additional debugging
+        splitStringified: JSON.stringify(split, null, 2),
+        splitHasId: !!split.id,
+        splitIdType: typeof split.id,
+        splitIdValue: split.id
+      });
+
       // Navigate to split details screen
       navigation.navigate('SplitDetails', {
         splitId: split.id,
@@ -336,9 +363,9 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
 
   const renderSplitCard = (split: Split) => {
-    // Use unified mockup data for consistency
-    const unifiedAmount = MockupDataService.getBillAmount();
-    const unifiedTitle = MockupDataService.getBillName();
+    // Use actual split data
+    const splitAmount = split.totalAmount;
+    const splitTitle = split.title;
     
     return (
       <TouchableOpacity
@@ -350,10 +377,10 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         <View style={styles.splitHeader}>
           <View style={styles.splitTitleContainer}>
             <Text style={styles.splitTitle} numberOfLines={1}>
-              {unifiedTitle}
+              {splitTitle}
             </Text>
             <Text style={styles.splitDate}>
-              {MockupDataService.getBillDate()}
+              {split.date}
             </Text>
           </View>
           
@@ -368,7 +395,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
             <View style={styles.amountContainer}>
               <Text style={styles.amountLabel}>Total</Text>
               <Text style={styles.amountValue}>
-                ${unifiedAmount.toFixed(2)}
+                ${splitAmount.toFixed(2)}
               </Text>
             </View>
           

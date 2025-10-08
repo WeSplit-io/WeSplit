@@ -26,13 +26,15 @@ interface RouteParams {
   nfcPayload?: string;
   shareableLink?: string;
   splitInvitationData?: string; // From deep link
+  splitId?: string; // From notification
+  isFromNotification?: boolean;
 }
 
 const SplitJoinScreen: React.FC = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const { currentUser } = useApp();
-  const { invitationData, qrCodeData, nfcPayload, shareableLink, splitInvitationData } = route.params as RouteParams;
+  const { invitationData, qrCodeData, nfcPayload, shareableLink, splitInvitationData, splitId, isFromNotification } = route.params as RouteParams;
 
   const [isLoading, setIsLoading] = useState(false);
   const [parsedInvitation, setParsedInvitation] = useState<SplitInvitationData | null>(null);
@@ -57,6 +59,26 @@ const SplitJoinScreen: React.FC = () => {
         invitation = SplitInvitationService.parseNFCPayload(nfcPayload);
       } else if (shareableLink) {
         invitation = SplitInvitationService.validateInvitationURL(shareableLink);
+      } else if (splitId && isFromNotification) {
+        // Handle splitId from notification - create invitation data from split
+        const { SplitStorageService } = await import('../../services/splitStorageService');
+        const splitResult = await SplitStorageService.getSplit(splitId);
+        
+        if (splitResult.success && splitResult.split) {
+          const split = splitResult.split;
+          invitation = {
+            splitId: split.id,
+            billName: split.title,
+            totalAmount: split.totalAmount,
+            currency: split.currency,
+            creatorId: split.creatorId,
+            creatorName: split.creatorName,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
+          };
+        } else {
+          setError('Split not found or has been deleted');
+          return;
+        }
       }
 
       if (!invitation) {
