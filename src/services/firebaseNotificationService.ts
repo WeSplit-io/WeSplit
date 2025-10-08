@@ -27,7 +27,7 @@ export interface Notification {
   user_id?: string | number; // Legacy field for compatibility
   title: string;
   message: string;
-  type: 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'payment_reminder' | 'general' | 'expense_added' | 'group_invite' | 'split_invite' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'group_payment_sent' | 'group_payment_received' | 'split_completed' | 'degen_all_locked' | 'degen_ready_to_roll' | 'roulette_result' | 'contact_added';
+  type: 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'payment_reminder' | 'general' | 'expense_added' | 'group_invite' | 'split_invite' | 'split_confirmed' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'group_payment_sent' | 'group_payment_received' | 'split_completed' | 'degen_all_locked' | 'degen_ready_to_roll' | 'roulette_result' | 'contact_added' | 'split_spin_available' | 'split_winner' | 'split_loser' | 'split_lock_required';
   data?: any; // Additional data for the notification
   is_read: boolean;
   created_at: string;

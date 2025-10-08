@@ -76,6 +76,8 @@ export interface SplitDetailsNavigationParams extends SplitNavigationParams {
   selectedContact?: any; // Contact selected from ContactsScreen
   isFromNotification?: boolean; // Whether opened from notification
   notificationId?: string; // Notification ID for deletion after join
+  shareableLink?: string; // Shareable link for deep link invitations
+  splitInvitationData?: string; // Encoded split invitation data from deep links
 }
 
 /**

@@ -17,6 +17,7 @@ export interface SplitInvitationQRData {
   totalAmount: number;
   currency: string;
   creatorName: string;
+  creatorId: string;
   participantCount: number;
   splitType: 'fair' | 'degen';
   walletAddress: string;
@@ -48,6 +49,7 @@ export class QRCodeService {
     totalAmount: number,
     currency: string,
     creatorName: string,
+    creatorId: string,
     participantCount: number,
     splitType: 'fair' | 'degen',
     walletAddress: string
@@ -60,6 +62,7 @@ export class QRCodeService {
       totalAmount,
       currency,
       creatorName,
+      creatorId,
       participantCount,
       splitType,
       walletAddress,
@@ -203,6 +206,7 @@ export class QRCodeService {
       data.totalAmount &&
       data.currency &&
       data.creatorName &&
+      data.creatorId &&
       data.participantCount &&
       data.splitType &&
       data.walletAddress &&

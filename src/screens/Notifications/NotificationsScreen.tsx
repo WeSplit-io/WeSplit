@@ -278,14 +278,74 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             return;
           }
 
-          // Get the requester data from the notification
+          // Check if this is a split payment notification
           const notificationData = notification.data as any;
+          if (notificationData?.splitId && notificationData?.splitWalletId) {
+            // This is a split payment notification - navigate to SplitPayment screen
+            console.log('🔍 DEBUG: Split payment notification detected:', {
+              splitId: notificationData.splitId,
+              splitWalletId: notificationData.splitWalletId,
+              participantAmount: notificationData.participantAmount,
+              billName: notificationData.billName
+            });
+
+            try {
+              // Load full split data from database to determine correct navigation
+              const { SplitStorageService } = await import('../../services/splitStorageService');
+              const splitResult = await SplitStorageService.getSplit(notificationData.splitId);
+              
+              if (splitResult.success && splitResult.split) {
+                const split = splitResult.split;
+                console.log('🔍 NotificationsScreen: Loaded split data for navigation:', {
+                  splitId: split.id,
+                  splitType: split.splitType,
+                  splitMethod: split.splitMethod,
+                  status: split.status
+                });
+                
+                // Navigate to the correct screen based on split type
+                if (split.splitType === 'fair') {
+                  navigation.navigate('FairSplit', {
+                    splitData: split,
+                    isFromNotification: true,
+                    notificationId: notificationId,
+                  });
+                } else if (split.splitType === 'degen') {
+                  navigation.navigate('DegenLock', {
+                    splitData: split,
+                    isFromNotification: true,
+                    notificationId: notificationId,
+                  });
+                } else {
+                  // Fallback to FairSplit for unknown types
+                  navigation.navigate('FairSplit', {
+                    splitData: split,
+                    isFromNotification: true,
+                    notificationId: notificationId,
+                  });
+                }
+                
+                showToast('Opening split details...');
+                return;
+              } else {
+                console.error('🔍 NotificationsScreen: Failed to load split data:', splitResult.error);
+                showToast('Error loading split data', 'error');
+                return;
+              }
+            } catch (error) {
+              console.error('Error navigating to split details:', error);
+              showToast('Error opening split details', 'error');
+              return;
+            }
+          }
+
+          // Handle regular payment requests (non-split)
           const requesterId = notificationData?.senderId || notificationData?.requester || notificationData?.sender;
           const amount = notification.data?.amount;
           const currency = notification.data?.currency || 'USDC';
           const groupId = notification.data?.groupId;
 
-          console.log('🔍 DEBUG: Payment request notification data:', {
+          console.log('🔍 DEBUG: Regular payment request notification data:', {
             requesterId,
             amount,
             currency,
@@ -984,6 +1044,180 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               duration: 300,
               useNativeDriver: true,
             }).start();
+          }
+
+        } else if (notification.type === 'split_lock_required') {
+          // Handle split lock required notification
+          const splitWalletId = notification.data?.splitWalletId;
+          const billName = notification.data?.billName;
+          
+          if (splitWalletId) {
+            // Navigate to degen lock screen
+            navigation.navigate('DegenLock', {
+              splitWalletId,
+              billName,
+              isFromNotification: true,
+              notificationId: notificationId,
+            });
+            showToast('Opening degen split...');
+          }
+          
+          // Mark as read and delete
+          try {
+            await firebaseDataService.notification.markNotificationAsRead(notificationId);
+            await deleteNotification(notificationId);
+            
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+            
+            // Fade out animation
+            if (fadeAnimations[notificationId]) {
+              Animated.timing(fadeAnimations[notificationId], {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }).start();
+            }
+          } catch (error) {
+            console.error('Error handling split lock required notification:', error);
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'error'
+            }));
+            throw error;
+          }
+
+        } else if (notification.type === 'split_spin_available') {
+          // Handle split spin available notification
+          const splitWalletId = notification.data?.splitWalletId;
+          const billName = notification.data?.billName;
+          
+          if (splitWalletId) {
+            // Navigate to degen spin screen
+            navigation.navigate('DegenSpin', {
+              splitWalletId,
+              billName,
+              isFromNotification: true,
+              notificationId: notificationId,
+            });
+            showToast('Opening spin screen...');
+          }
+          
+          // Mark as read and delete
+          try {
+            await firebaseDataService.notification.markNotificationAsRead(notificationId);
+            await deleteNotification(notificationId);
+            
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+            
+            // Fade out animation
+            if (fadeAnimations[notificationId]) {
+              Animated.timing(fadeAnimations[notificationId], {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }).start();
+            }
+          } catch (error) {
+            console.error('Error handling split spin available notification:', error);
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'error'
+            }));
+            throw error;
+          }
+
+        } else if (notification.type === 'split_winner') {
+          // Handle split winner notification
+          const splitWalletId = notification.data?.splitWalletId;
+          const billName = notification.data?.billName;
+          
+          if (splitWalletId) {
+            // Navigate to degen result screen
+            navigation.navigate('DegenResult', {
+              splitWalletId,
+              billName,
+              isFromNotification: true,
+              notificationId: notificationId,
+            });
+            showToast('Opening result screen...');
+          }
+          
+          // Mark as read and delete
+          try {
+            await firebaseDataService.notification.markNotificationAsRead(notificationId);
+            await deleteNotification(notificationId);
+            
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+            
+            // Fade out animation
+            if (fadeAnimations[notificationId]) {
+              Animated.timing(fadeAnimations[notificationId], {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }).start();
+            }
+          } catch (error) {
+            console.error('Error handling split winner notification:', error);
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'error'
+            }));
+            throw error;
+          }
+
+        } else if (notification.type === 'split_loser') {
+          // Handle split loser notification
+          const splitWalletId = notification.data?.splitWalletId;
+          const billName = notification.data?.billName;
+          const amount = notification.data?.amount;
+          
+          if (splitWalletId) {
+            // Navigate to degen result screen
+            navigation.navigate('DegenResult', {
+              splitWalletId,
+              billName,
+              amount,
+              isFromNotification: true,
+              notificationId: notificationId,
+            });
+            showToast('Opening result screen...');
+          }
+          
+          // Mark as read and delete
+          try {
+            await firebaseDataService.notification.markNotificationAsRead(notificationId);
+            await deleteNotification(notificationId);
+            
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'completed'
+            }));
+            
+            // Fade out animation
+            if (fadeAnimations[notificationId]) {
+              Animated.timing(fadeAnimations[notificationId], {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }).start();
+            }
+          } catch (error) {
+            console.error('Error handling split loser notification:', error);
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'error'
+            }));
+            throw error;
           }
 
         } else {

@@ -36,33 +36,74 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl, // Add bottom padding for phone UI
-    justifyContent: 'space-between',
   },
-  billInfoCard: {
+  // Main participant card styles (matching the design)
+  mainParticipantCard: {
     backgroundColor: colors.surface,
     borderRadius: 16,
     padding: spacing.lg,
     marginTop: spacing.xl,
     marginHorizontal: spacing.sm,
+    height: 200,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  billInfoHeader: {
+  participantNameContainer: {
+    position: 'absolute',
+    left: spacing.lg,
+    top: spacing.lg,
+    bottom: spacing.lg,
+    justifyContent: 'center',
+  },
+  participantName: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '600',
+    transform: [{ rotate: '-90deg' }],
+    marginBottom: spacing.md,
+  },
+  participantId: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    transform: [{ rotate: '-90deg' }],
+  },
+  cardIcon: {
+    position: 'absolute',
+    top: spacing.lg,
+    right: spacing.lg,
+  },
+  cardIconText: {
+    fontSize: typography.fontSize.lg,
+    color: colors.white,
+  },
+  // Bill summary styles
+  billSummaryContainer: {
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    padding: spacing.lg,
+    marginHorizontal: spacing.sm,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  billSummaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
   },
-  billIcon: {
-    fontSize: 16,
-    marginRight: spacing.sm,
-  },
-  billTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.xl,
-    fontWeight: '700',
-  },
-  billDate: {
-    color: colors.textSecondary,
+  billSummaryIcon: {
     fontSize: typography.fontSize.md,
-    marginBottom: spacing.md,
+  },
+  billSummaryTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
+  billSummaryDate: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
   },
   billTotalRow: {
     flexDirection: 'row',
@@ -78,58 +119,90 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.lg,
     fontWeight: '700',
   },
-  spinContainer: {
-    flex: 1,
+  // Roulette container styles
+  rouletteContainer: {
+    height: 280,
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
+    overflow: 'hidden', // Hide cards that go out of bounds for cleaner look
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
+    width: '100%',
   },
-  cardsWheel: {
-    width: 300,
-    height: 300,
-    position: 'relative',
+  rouletteCards: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 180, // Match card height
+    justifyContent: 'flex-start', // Start from left for infinite effect
+    width: '200%', // Wider to accommodate more cards
+    paddingHorizontal: spacing.lg,
+    backgroundColor: 'rgba(0, 255, 0, 0.1)', // Temporary green background for debugging
   },
-  participantCard: {
-    position: 'absolute',
+  rouletteCard: {
     width: 140,
     height: 180,
     backgroundColor: colors.surface,
     borderRadius: 16,
-    left: 80, // Center the card
-    top: 60,
+    marginHorizontal: spacing.xs,
+    position: 'relative',
     overflow: 'hidden',
+    shadowColor: colors.black,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    flexShrink: 0, // Prevent cards from shrinking
+    alignSelf: 'center', // Center each card vertically
+    borderWidth: 2, // Temporary border for debugging
+    borderColor: 'yellow', // Temporary border color for debugging
   },
-  cardContent: {
-    flex: 1,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    zIndex: 2,
+  selectedCard: {
+    transform: [{ scale: 1.1 }],
+    shadowOpacity: 0.5,
+    elevation: 12,
   },
-  cardProfileIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.green,
+  // Roulette card content styles
+  rouletteCardContent: {
+    position: 'absolute',
+    left: spacing.lg,
+    top: spacing.lg,
+    bottom: spacing.lg,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
   },
-  cardProfileIconText: {
-    fontSize: 16,
-  },
-  cardTextContainer: {
-    flex: 1,
-  },
-  cardName: {
+  rouletteCardName: {
     color: colors.white,
     fontSize: typography.fontSize.lg,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
+    fontWeight: '600',
+    transform: [{ rotate: '-90deg' }],
+    marginBottom: spacing.md,
   },
-  cardId: {
+  rouletteCardId: {
     color: colors.textSecondary,
     fontSize: typography.fontSize.sm,
+    transform: [{ rotate: '-90deg' }],
+  },
+  rouletteCardIcon: {
+    position: 'absolute',
+    top: spacing.lg,
+    right: spacing.lg,
+  },
+  rouletteCardIconText: {
+    fontSize: typography.fontSize.lg,
+    color: colors.white,
+  },
+  // Green gradient for roulette cards
+  rouletteCardGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    backgroundColor: colors.green,
+    opacity: 0.8,
   },
   cardGradient: {
     position: 'absolute',

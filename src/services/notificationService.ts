@@ -120,6 +120,14 @@ export class NotificationService {
     amount: number
   ): Promise<NotificationResult> {
     try {
+      console.log('🔍 NotificationService: Creating lock required notification:', {
+        userId,
+        splitWalletId,
+        billName,
+        amount,
+        amountType: typeof amount
+      });
+      
       const notification: NotificationData = {
         id: `notification_${Date.now()}_${userId}`,
         userId,
@@ -132,6 +140,8 @@ export class NotificationService {
         isRead: false,
         createdAt: new Date().toISOString(),
       };
+      
+      console.log('🔍 NotificationService: Notification object:', notification);
 
       await addDoc(collection(db, 'notifications'), {
         ...notification,
@@ -162,6 +172,13 @@ export class NotificationService {
       };
 
     } catch (error) {
+      console.error('[ERROR] [NotificationService] Failed to send lock required notification', error);
+      console.error('[ERROR] [NotificationService] Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        code: (error as any)?.code,
+        customData: (error as any)?.customData
+      });
       logger.error('Failed to send lock required notification', error, 'NotificationService');
       return {
         success: false,
@@ -364,6 +381,12 @@ export class NotificationService {
     notificationType: NotificationData['type'],
     data: Partial<NotificationData>
   ): Promise<{ success: boolean; sent: number; failed: number; errors: string[] }> {
+    console.log('🔍 NotificationService: sendBulkNotifications called with:', {
+      userIds,
+      notificationType,
+      data
+    });
+    
     const results = await Promise.allSettled(
       userIds.map(userId => {
         switch (notificationType) {

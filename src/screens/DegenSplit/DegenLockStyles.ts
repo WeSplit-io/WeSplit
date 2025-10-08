@@ -245,4 +245,131 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     textAlign: 'center',
   },
+  // Participants list styles
+  participantsContainer: {
+    marginVertical: spacing.lg,
+  },
+  participantCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  participantAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.green,
+    marginRight: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  participantAvatarText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+  },
+  participantInfo: {
+    flex: 1,
+  },
+  participantName: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+  },
+  participantWallet: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+  },
+  participantAmountContainer: {
+    alignItems: 'flex-end',
+  },
+  participantAmount: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 12,
+    minWidth: 80,
+    textAlign: 'center',
+  },
+  // Modal styles
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'flex-end',
+    zIndex: 1000,
+  },
+  modalContainer: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: spacing.md,
+    paddingBottom: Math.max(spacing.xl, 34), // Account for safe area
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.textSecondary,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalContent: {
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+  },
+  modalIconContainer: {
+    marginBottom: spacing.lg,
+  },
+  modalLockIcon: {
+    fontSize: 48,
+  },
+  modalTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  modalSubtitle: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 22,
+  },
+  modalSlideButton: {
+    backgroundColor: colors.green,
+    borderRadius: 12,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalSlideButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSlideButtonIcon: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
+    marginRight: spacing.sm,
+  },
+  modalSlideButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
+  },
 });

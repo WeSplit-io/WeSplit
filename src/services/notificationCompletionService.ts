@@ -8,7 +8,7 @@ import { firebaseDataService } from './firebaseDataService';
 
 export interface NotificationCompletionData {
   notificationId: string;
-  processType: 'payment_request' | 'group_invite' | 'split_invite' | 'split_action' | 'contact_add' | 'settlement_request';
+  processType: 'payment_request' | 'group_invite' | 'split_invite' | 'split_confirmed' | 'split_action' | 'contact_add' | 'settlement_request' | 'split_lock_required' | 'split_spin_available' | 'split_winner' | 'split_loser';
   userId: string;
   completedAt: string;
   processData?: any;
@@ -174,6 +174,28 @@ export class NotificationCompletionService {
       'settlement_request',
       userId,
       settlementData
+    );
+  }
+
+  /**
+   * Complete split confirmed notification after successful payment
+   */
+  static async completeSplitConfirmedNotification(
+    notificationId: string,
+    userId: string,
+    paymentData: {
+      splitId: string;
+      billName: string;
+      amount: number;
+      currency: string;
+      transactionId: string;
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    return this.completeNotificationProcess(
+      notificationId,
+      'split_confirmed',
+      userId,
+      paymentData
     );
   }
 }

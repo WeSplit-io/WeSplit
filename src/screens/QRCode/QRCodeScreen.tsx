@@ -16,6 +16,8 @@ import { styles } from './QRCodeScreen.styles';
 import { colors } from '../../theme';
 import { parseUri, extractRecipientAddress, isSolanaPayUri } from '@features/qr/solanaPay';
 import { isValidSolanaAddress } from '@libs/validation';
+import { QRCodeService } from '../../services/qrCodeService';
+import { SplitInvitationService } from '../../services/splitInvitationService';
 
 // Fonction pour hacher l'adresse du wallet
 const hashWalletAddress = (address: string): string => {
@@ -32,6 +34,7 @@ interface QRCodeScreenProps {
   userPseudo: string;
   userWallet: string;
   qrValue: string;
+  navigation?: any; // Add navigation prop for split invitations
 }
 
 type TabType = 'myCode' | 'scan';
@@ -41,6 +44,7 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
   userPseudo,
   userWallet,
   qrValue,
+  navigation,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('myCode');
   const [permission, requestPermission] = useCameraPermissions();
@@ -76,6 +80,55 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
     console.log('QR Code scanned:', data);
     
     try {
+      // Check if it's a split invitation QR code
+      const qrData = QRCodeService.parseQRCode(data);
+      if (qrData && qrData.type === 'split_invitation') {
+        if (QRCodeService.validateSplitInvitationQR(qrData)) {
+          const splitData = qrData.data;
+          
+          // Convert QR data to split invitation data format
+          const invitationData = {
+            type: 'split_invitation' as const,
+            splitId: splitData.splitId,
+            billName: splitData.billName,
+            totalAmount: splitData.totalAmount,
+            currency: splitData.currency,
+            creatorId: splitData.creatorId,
+            creatorName: splitData.creatorName,
+            timestamp: qrData.timestamp,
+          };
+          
+          // Generate shareable link from invitation data
+          const shareableLink = SplitInvitationService.generateShareableLink(invitationData);
+          
+          // Navigate to SplitDetails screen with the invitation data
+          if (navigation) {
+            navigation.navigate('SplitDetails', {
+              shareableLink: shareableLink,
+              splitInvitationData: JSON.stringify(invitationData)
+            });
+          } else {
+            Alert.alert(
+              'Split Invitation Found',
+              `Bill: ${splitData.billName}\nAmount: ${splitData.totalAmount} ${splitData.currency}\nCreator: ${splitData.creatorName}`,
+              [
+                { text: 'OK', onPress: () => resetScanner() }
+              ]
+            );
+          }
+          return;
+        } else {
+          Alert.alert(
+            'Invalid Split Invitation',
+            'This QR code contains an invalid split invitation',
+            [
+              { text: 'OK', onPress: () => resetScanner() }
+            ]
+          );
+          return;
+        }
+      }
+      
       // Check if it's a Solana Pay URI
       if (isSolanaPayUri(data)) {
         const parsed = parseUri(data);
@@ -119,7 +172,7 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
       // Unsupported QR code
       Alert.alert(
         'Unsupported QR Code',
-        'This QR code is not a valid Solana address or USDC payment request',
+        'This QR code is not a valid Solana address, USDC payment request, or split invitation',
         [
           { text: 'OK', onPress: () => resetScanner() }
         ]

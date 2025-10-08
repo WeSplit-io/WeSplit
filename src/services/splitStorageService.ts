@@ -29,6 +29,7 @@ export interface Split {
   totalAmount: number;
   currency: string;
   splitType: 'fair' | 'degen';
+  splitMethod?: 'equal' | 'manual'; // Locked split method after confirmation
   status: 'draft' | 'active' | 'locked' | 'completed' | 'cancelled';
   creatorId: string;
   creatorName: string;
@@ -143,7 +144,7 @@ export class SplitStorageService {
    */
   static async getSplit(splitId: string): Promise<SplitResult> {
     try {
-      console.log('🔍 SplitStorageService: Getting split with ID:', splitId);
+      // Getting split with ID - Removed log to prevent infinite logging
 
       // First try by Firebase document ID
       if (splitId.length > 20 && !splitId.startsWith('split_')) {
@@ -193,7 +194,7 @@ export class SplitStorageService {
    */
   static async getUserSplits(userId: string): Promise<SplitListResult> {
     try {
-      console.log('🔍 SplitStorageService: Getting splits for user:', userId);
+      // Getting splits for user - Removed log to prevent infinite logging
 
       const splitsRef = collection(db, this.COLLECTION_NAME);
       
@@ -239,12 +240,7 @@ export class SplitStorageService {
         );
         
         if (isParticipant && !seenIds.has(splitData.id)) {
-          console.log('🔍 SplitStorageService: Found participant split:', {
-            splitId: splitData.id,
-            splitTitle: splitData.title,
-            participantCount: splitData.participants.length,
-            userId
-          });
+          // Found participant split - Removed log to prevent infinite logging
           splits.push(splitData);
           seenIds.add(splitData.id);
         }
@@ -253,11 +249,7 @@ export class SplitStorageService {
       // Sort by creation date
       splits.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      console.log('🔍 SplitStorageService: Found splits:', {
-        total: splits.length,
-        creatorSplits: creatorSnapshot.docs.length,
-        allSplits: allSplitsSnapshot.docs.length
-      });
+      // Found splits - Removed log to prevent infinite logging
 
       return {
         success: true,

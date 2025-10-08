@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Text as RNText } from 'react-native';
-import { View, Text, TouchableOpacity, Image, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Image, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
@@ -53,14 +53,16 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
   const handleContinue = () => {
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) {
-      // Show error or handle invalid amount
+      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
       return;
     }
 
     if (activeAction === 'send') {
       navigation.navigate('SendAmount', {
+        destinationType: 'friend',
         contact: selectedContact,
         prefilledAmount: numAmount,
+        prefilledNote: note.trim(),
       });
     } else {
       navigation.navigate('RequestAmount', {

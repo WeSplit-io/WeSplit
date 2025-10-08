@@ -13,7 +13,7 @@ import styles from './NotificationCard.styles';
 
 export interface NotificationData {
   id: string;
-  type: 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'payment_reminder' | 'general' | 'expense_added' | 'group_invite' | 'split_invite' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'group_payment_sent' | 'group_payment_received' | 'split_completed' | 'degen_all_locked' | 'degen_ready_to_roll' | 'roulette_result' | 'contact_added';
+  type: 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'payment_reminder' | 'general' | 'expense_added' | 'group_invite' | 'split_invite' | 'split_confirmed' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'group_payment_sent' | 'group_payment_received' | 'split_completed' | 'degen_all_locked' | 'degen_ready_to_roll' | 'roulette_result' | 'contact_added' | 'split_spin_available' | 'split_winner' | 'split_loser' | 'split_lock_required';
   title: string;
   message: string;
   created_at: string;
@@ -47,6 +47,11 @@ export interface NotificationData {
     currency?: string;
     inviterName?: string;
     inviterId?: string;
+    participantAmount?: number;
+    creatorName?: string;
+    creatorId?: string;
+    splitWalletId?: string;
+    splitWalletAddress?: string;
     loserId?: string;
     loserName?: string;
     addedByName?: string;
@@ -254,6 +259,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
         return colors.green;
       case 'group_invite':
       case 'split_invite':
+      case 'split_confirmed':
         return colors.green;
       case 'general':
         return '#A89B9B';
@@ -318,6 +324,46 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
         return {
           show: true,
           text: isCompleted ? 'Joined' : isPending ? 'Joining...' : 'Join',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'split_confirmed':
+        return {
+          show: true,
+          text: isCompleted ? 'Paid' : isPending ? 'Opening...' : 'Pay Now',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'split_lock_required':
+        return {
+          show: true,
+          text: isCompleted ? 'Locked' : isPending ? 'Locking...' : 'Lock Funds',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'split_spin_available':
+        return {
+          show: true,
+          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View Spin',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'split_winner':
+        return {
+          show: true,
+          text: isCompleted ? 'Claimed' : isPending ? 'Claiming...' : 'Claim Funds',
+          disabled: isCompleted || isPending,
+          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
+          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
+        };
+      case 'split_loser':
+        return {
+          show: true,
+          text: isCompleted ? 'Paid' : isPending ? 'Processing...' : 'Pay Now',
           disabled: isCompleted || isPending,
           backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
           textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
@@ -513,6 +559,16 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
         Alert.alert('Send Payment', 'Navigate to send payment screen');
       } else if (notification.type === 'group_invite' || notification.type === 'split_invite' || notification.type === 'expense_added') {
         Alert.alert('View Details', 'Navigate to details screen');
+      } else if (notification.type === 'split_confirmed') {
+        Alert.alert('Pay Your Share', 'Navigate to payment screen');
+      } else if (notification.type === 'split_lock_required') {
+        Alert.alert('Lock Funds', 'Navigate to lock funds screen');
+      } else if (notification.type === 'split_spin_available') {
+        Alert.alert('View Spin', 'Navigate to spin screen');
+      } else if (notification.type === 'split_winner') {
+        Alert.alert('Claim Funds', 'Navigate to claim funds screen');
+      } else if (notification.type === 'split_loser') {
+        Alert.alert('Pay Now', 'Navigate to payment screen');
       } else if (notification.type === 'settlement_request') {
         Alert.alert('Settle Up', 'Navigate to settlement screen');
       }

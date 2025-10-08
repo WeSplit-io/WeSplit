@@ -51,6 +51,8 @@ interface SplitDetailsScreenProps {
       imageUri?: string;
       isNewBill?: boolean;
       selectedContact?: any;
+      shareableLink?: string;
+      splitInvitationData?: string;
     };
   };
 }
@@ -68,7 +70,9 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     isNewBill,
     selectedContact,
     isFromNotification,
-    notificationId
+    notificationId,
+    shareableLink,
+    splitInvitationData
   } = route?.params || {};
   
   const { state } = useApp();
@@ -746,6 +750,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       parseFloat(totalAmount),
       processedBillData?.currency || 'USDC',
       currentUser.name || 'Unknown User',
+      currentUser.id.toString(),
       participants.length,
       selectedSplitType || 'fair',
       walletAddress
@@ -1807,6 +1812,85 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       });
     }
   }, [splitWallet]);
+
+  // Handle split invitation from deep links (QR code, NFC, shareable links)
+  useEffect(() => {
+    const handleSplitInvitation = async () => {
+      if (!splitInvitationData || !currentUser?.id) {
+        return;
+      }
+
+      console.log('🔍 SplitDetailsScreen: Handling split invitation from deep link:', {
+        hasSplitInvitationData: !!splitInvitationData,
+        hasCurrentUser: !!currentUser?.id,
+        shareableLink: shareableLink
+      });
+
+      try {
+        // Parse the invitation data
+        const invitationData = SplitInvitationService.parseInvitationData(splitInvitationData);
+        if (!invitationData) {
+          console.error('🔍 SplitDetailsScreen: Failed to parse split invitation data');
+          Alert.alert('Invalid Invitation', 'This split invitation is not valid.');
+          return;
+        }
+
+        console.log('🔍 SplitDetailsScreen: Parsed invitation data:', {
+          splitId: invitationData.splitId,
+          billName: invitationData.billName,
+          totalAmount: invitationData.totalAmount,
+          creatorId: invitationData.creatorId
+        });
+
+        // Check if user can join this split
+        const canJoinResult = await SplitInvitationService.canUserJoinSplit(invitationData.splitId, currentUser.id);
+        if (!canJoinResult.canJoin) {
+          console.error('🔍 SplitDetailsScreen: User cannot join split:', canJoinResult.reason);
+          Alert.alert('Cannot Join Split', canJoinResult.reason || 'You cannot join this split.');
+          return;
+        }
+
+        // Join the split using the invitation service
+        const joinResult = await SplitInvitationService.joinSplit(invitationData, currentUser.id);
+        if (joinResult.success) {
+          console.log('🔍 SplitDetailsScreen: Successfully joined split via deep link:', joinResult.splitId);
+          
+          // Load the split data to display it
+          const splitResult = await SplitStorageService.getSplit(invitationData.splitId);
+          if (splitResult.success && splitResult.split) {
+            setCurrentSplitData(splitResult.split);
+            setBillName(splitResult.split.title);
+            setTotalAmount(splitResult.split.totalAmount.toString());
+            setSelectedSplitType(splitResult.split.splitType);
+            
+            // Transform participants to unified format
+            const transformedParticipants = splitResult.split.participants.map((p: any) => ({
+              id: p.userId,
+              name: p.name,
+              walletAddress: p.walletAddress,
+              status: p.status,
+              amountOwed: p.amountOwed,
+              amountPaid: p.amountPaid || 0,
+              userId: p.userId,
+              email: p.email || '',
+              items: [],
+            }));
+            setParticipants(transformedParticipants);
+            
+            Alert.alert('Success!', `You have successfully joined "${splitResult.split.title}" split!`);
+          }
+        } else {
+          console.error('🔍 SplitDetailsScreen: Failed to join split via deep link:', joinResult.error);
+          Alert.alert('Error', joinResult.error || 'Failed to join split. Please try again.');
+        }
+      } catch (error) {
+        console.error('🔍 SplitDetailsScreen: Error handling split invitation:', error);
+        Alert.alert('Error', 'Failed to process split invitation. Please try again.');
+      }
+    };
+
+    handleSplitInvitation();
+  }, [splitInvitationData, currentUser?.id, shareableLink]);
 
   // Set authoritative price in price management service when component loads
   useEffect(() => {

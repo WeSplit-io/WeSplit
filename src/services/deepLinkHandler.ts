@@ -122,18 +122,23 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
       case 'join-split':
         // Handle split invitation deep links
         // Format: wesplit://join-split?data=<encoded_invitation_data>
-        const urlObj = new URL(url);
-        const dataParam = urlObj.searchParams.get('data');
-        
-        if (!dataParam) {
-          console.warn('🔥 Join-split action missing data parameter');
+        try {
+          const urlObj = new URL(url);
+          const dataParam = urlObj.searchParams.get('data');
+          
+          if (!dataParam) {
+            console.warn('🔥 Join-split action missing data parameter');
+            return null;
+          }
+          
+          return {
+            action: 'join-split',
+            splitInvitationData: dataParam
+          };
+        } catch (urlError) {
+          console.warn('🔥 Error parsing join-split URL:', urlError);
           return null;
         }
-        
-        return {
-          action: 'join-split',
-          splitInvitationData: dataParam
-        };
       
       default:
         console.warn('🔥 Unknown deep link action:', action);

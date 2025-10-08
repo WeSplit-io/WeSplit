@@ -538,15 +538,15 @@ export class SplitWalletService {
    */
   static async getSplitWallet(splitWalletId: string): Promise<SplitWalletResult> {
     try {
-      console.log('🔍 SplitWalletService: Getting split wallet with ID:', splitWalletId);
+      // Getting split wallet with ID - Removed log to prevent infinite logging
       
       // First, try to get by Firebase document ID (if it looks like a Firebase doc ID)
       if (splitWalletId.length > 20 && !splitWalletId.startsWith('split_wallet_')) {
-        console.log('🔍 SplitWalletService: Trying to get by Firebase document ID');
+        // Trying to get by Firebase document ID - Removed log to prevent infinite logging
         const walletDoc = await getDoc(doc(db, 'splitWallets', splitWalletId));
         
         if (walletDoc.exists()) {
-          console.log('🔍 SplitWalletService: Found wallet by Firebase document ID');
+          // Found wallet by Firebase document ID - Removed log to prevent infinite logging
           return {
             success: true,
             wallet: walletDoc.data() as SplitWallet,
@@ -555,13 +555,13 @@ export class SplitWalletService {
       }
       
       // If not found by document ID, try to find by internal ID
-      console.log('🔍 SplitWalletService: Trying to get by internal ID');
+      // Trying to get by internal ID - Removed log to prevent infinite logging
       const walletsRef = collection(db, 'splitWallets');
       const q = query(walletsRef, where('id', '==', splitWalletId));
       const querySnapshot = await getDocs(q);
       
       if (!querySnapshot.empty) {
-        console.log('🔍 SplitWalletService: Found wallet by internal ID');
+        // Found wallet by internal ID - Removed log to prevent infinite logging
         const walletData = querySnapshot.docs[0].data() as SplitWallet;
         // Add the Firebase document ID to the wallet data
         walletData.firebaseDocId = querySnapshot.docs[0].id;
@@ -641,9 +641,23 @@ export class SplitWalletService {
 
       const wallet = walletResult.wallet;
       
+      console.log('🔍 SplitWalletService: Current wallet participants:', {
+        walletParticipants: wallet.participants.map(p => ({
+          userId: p.userId,
+          name: p.name,
+          status: p.status,
+          amountPaid: p.amountPaid
+        })),
+        lookingForParticipantId: participantId
+      });
+      
       // Find the participant
       const participant = wallet.participants.find(p => p.userId === participantId);
       if (!participant) {
+        console.error('🔍 SplitWalletService: Participant not found in wallet:', {
+          participantId,
+          availableParticipants: wallet.participants.map(p => p.userId)
+        });
         return {
           success: false,
           error: 'Participant not found in split wallet',
@@ -940,6 +954,86 @@ export class SplitWalletService {
 
     } catch (error) {
       logger.error('Failed to send payment to Cast account', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Send funds from split wallet to an address for Degen Split payments
+   * This version accepts 'locked' status for participants (used in Degen Split)
+   */
+  static async sendDegenSplitPayment(
+    splitWalletId: string,
+    recipientAddress: string,
+    description?: string
+  ): Promise<PaymentResult> {
+    try {
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = result.wallet;
+
+      // Check if all participants have locked their funds (for Degen Split)
+      const allLocked = wallet.participants.every(p => p.status === 'locked' || p.status === 'paid');
+      if (!allLocked) {
+        return {
+          success: false,
+          error: 'Not all participants have locked their funds for the Degen Split',
+        };
+      }
+
+      // Calculate total amount collected in the split wallet
+      const totalCollected = wallet.participants.reduce((sum, p) => sum + p.amountPaid, 0);
+      
+      // Check if we have collected the full amount
+      if (totalCollected < wallet.totalAmount) {
+        return {
+          success: false,
+          error: `Insufficient funds collected. Required: ${wallet.totalAmount} USDC, Collected: ${totalCollected} USDC`,
+        };
+      }
+
+      // Send payment from split wallet to recipient address
+      // The creator has custody of the split wallet, so they initiate the transaction
+      const transactionResult = await consolidatedTransactionService.sendUsdcTransaction(
+        recipientAddress,
+        wallet.totalAmount,
+        wallet.creatorId, // Creator has custody and initiates the transaction
+        description || `Degen Split payment for ${wallet.billId}`,
+        undefined,
+        'high' // High priority for final payment
+      );
+
+      if (!transactionResult.success) {
+        return {
+          success: false,
+          error: transactionResult.error || 'Failed to send payment',
+        };
+      }
+
+      logger.info('Degen Split payment sent successfully', {
+        splitWalletId,
+        recipientAddress,
+        amount: wallet.totalAmount,
+        transactionSignature: transactionResult.transactionSignature
+      }, 'SplitWalletService');
+
+      return {
+        success: true,
+        transactionSignature: transactionResult.transactionSignature,
+        amount: wallet.totalAmount,
+      };
+
+    } catch (error) {
+      logger.error('Failed to send Degen Split payment', error, 'SplitWalletService');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
