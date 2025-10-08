@@ -385,8 +385,8 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
 
         console.log('🔥 Attempting to join split with invitation data:', linkData.splitInvitationData);
         
-        // Navigate to SplitJoin screen with the invitation data
-        navigation.navigate('SplitJoin', {
+        // Navigate to SplitDetails screen with the invitation data
+        navigation.navigate('SplitDetails', {
           shareableLink: url, // Pass the original URL
           splitInvitationData: linkData.splitInvitationData
         });

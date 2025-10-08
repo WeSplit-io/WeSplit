@@ -63,7 +63,6 @@ import KastAccountLinkingScreen from './src/screens/KastAccountLinking/KastAccou
 import DegenLockScreen from './src/screens/DegenSplit/DegenLockScreen';
 import DegenSpinScreen from './src/screens/DegenSplit/DegenSpinScreen';
 import DegenResultScreen from './src/screens/DegenSplit/DegenResultScreen';
-import SplitJoinScreen from './src/screens/SplitJoin/SplitJoinScreen';
 import SplitPaymentScreen from './src/screens/SplitPayment/SplitPaymentScreen';
 import WithdrawAmountScreen from './src/screens/Withdraw/WithdrawAmountScreen';
 import WithdrawConfirmationScreen from './src/screens/Withdraw/WithdrawConfirmationScreen';
@@ -256,7 +255,6 @@ export default function App() {
                 <Stack.Screen name="DegenLock" component={DegenLockScreen} />
                 <Stack.Screen name="DegenSpin" component={DegenSpinScreen} />
                 <Stack.Screen name="DegenResult" component={DegenResultScreen} />
-                <Stack.Screen name="SplitJoin" component={SplitJoinScreen} />
                 <Stack.Screen name="SplitPayment" component={SplitPaymentScreen} />
                 <Stack.Screen name="WithdrawAmount" component={WithdrawAmountScreen} />
                 <Stack.Screen name="WithdrawConfirmation" component={WithdrawConfirmationScreen} />

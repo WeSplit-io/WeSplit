@@ -163,31 +163,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     }
   }, []);
 
-  // Pool de test pour le design
-  const testPool: Split = {
-    id: 'test-pool-1',
-    title: 'Hackathon Solana',
-    status: 'active',
-    totalAmount: 1250.00,
-    currency: 'USDC',
-    splitType: 'fair',
-    date: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    creatorId: (currentUser?.id || 'test-user').toString(),
-    creatorName: 'Test User',
-    participants: [
-      { userId: 'user1', name: 'Alice', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
-      { userId: 'user2', name: 'Bob', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
-      { userId: 'user3', name: 'Charlie', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
-      { userId: 'user4', name: 'David', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
-      { userId: 'user5', name: 'Eve', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
-      { userId: 'user6', name: 'Frank', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
-      { userId: 'user7', name: 'Grace', status: 'accepted', walletAddress: '', amountOwed: 0, amountPaid: 0 },
-    ],
-    billId: 'test-bill-1',
-    firebaseDocId: 'test-doc-1',
-  };
+  // Test pool for design (removed hardcoded data)
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -199,7 +175,9 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       if (currentUser?.id) {
-        console.log('🔍 SplitsListScreen: Screen focused, refreshing splits');
+        if (__DEV__) {
+          console.log('🔍 SplitsListScreen: Screen focused, refreshing splits');
+        }
         loadSplits();
       }
     }, [currentUser?.id])
@@ -286,12 +264,11 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           return updatedSplit;
         }));
 
-        // Ajouter la pool de test pour le design
-        const allSplits = [testPool, ...updatedSplits];
-        setSplits(allSplits);
+        // Set the splits without test data
+        setSplits(updatedSplits);
 
         // Load participant avatars
-        loadParticipantAvatars(allSplits);
+        loadParticipantAvatars(updatedSplits);
       } else {
         console.log('🔍 SplitsListScreen: Failed to load splits:', result.error);
         Alert.alert('Error', result.error || 'Failed to load splits');

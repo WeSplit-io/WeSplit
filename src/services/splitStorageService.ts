@@ -367,14 +367,15 @@ export class SplitStorageService {
   }
 
   /**
-   * Add participant to split
+   * Add participant to split or update existing participant
    */
   static async addParticipant(splitId: string, participant: SplitParticipant): Promise<SplitResult> {
     try {
-      console.log('🔍 SplitStorageService: Adding participant to split:', {
+      console.log('🔍 SplitStorageService: Adding/updating participant in split:', {
         splitId,
         participantName: participant.name,
-        participantId: participant.userId
+        participantId: participant.userId,
+        status: participant.status
       });
 
       const splitResult = await this.getSplit(splitId);
@@ -385,24 +386,38 @@ export class SplitStorageService {
       const split = splitResult.split;
       
       // Check if participant already exists
-      const existingParticipant = split.participants.find(p => p.userId === participant.userId);
-      if (existingParticipant) {
-        return {
-          success: false,
-          error: 'Participant already exists in this split',
+      const existingParticipantIndex = split.participants.findIndex(p => p.userId === participant.userId);
+      
+      let updatedParticipants: SplitParticipant[];
+      
+      if (existingParticipantIndex >= 0) {
+        // Participant exists, update their status and data
+        console.log('🔍 SplitStorageService: Participant exists, updating status from', 
+          split.participants[existingParticipantIndex].status, 'to', participant.status);
+        
+        updatedParticipants = [...split.participants];
+        updatedParticipants[existingParticipantIndex] = {
+          ...updatedParticipants[existingParticipantIndex],
+          ...participant,
+          // Preserve original joinedAt if it exists
+          joinedAt: updatedParticipants[existingParticipantIndex].joinedAt || new Date().toISOString(),
         };
+      } else {
+        // Participant doesn't exist, add them
+        console.log('🔍 SplitStorageService: Participant does not exist, adding new participant');
+        updatedParticipants = [...split.participants, {
+          ...participant,
+          joinedAt: new Date().toISOString(),
+        }];
       }
-
-      // Add participant
-      const updatedParticipants = [...split.participants, participant];
       
       return await this.updateSplit(splitId, {
         participants: updatedParticipants,
       });
 
     } catch (error) {
-      console.log('🔍 SplitStorageService: Error adding participant:', error);
-      logger.error('Failed to add participant', error, 'SplitStorageService');
+      console.log('🔍 SplitStorageService: Error adding/updating participant:', error);
+      logger.error('Failed to add/update participant', error, 'SplitStorageService');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',

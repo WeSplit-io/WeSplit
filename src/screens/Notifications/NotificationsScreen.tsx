@@ -24,7 +24,7 @@ import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc
 import { db } from '../../config/firebase';
 
 const NotificationsScreen: React.FC<any> = ({ navigation }) => {
-  const { state, notifications, loadNotifications, refreshNotifications, acceptGroupInvitation } = useApp();
+  const { state, notifications, loadNotifications, refreshNotifications, acceptGroupInvitation, acceptSplitInvitation } = useApp();
 
   // Function to fetch user data from Firebase
   const fetchUserData = async (userId: string) => {
@@ -102,6 +102,17 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       const groupId = notification.data?.groupId;
       if (groupId) {
         navigation.navigate('GroupDetails', { groupId });
+      }
+    } else if (notification.type === 'split_invite') {
+      // Handle split invitation - navigate to SplitDetailsScreen
+      const splitId = notification.data?.splitId;
+      if (splitId) {
+        console.log('🔍 NotificationsScreen: Navigating to SplitDetailsScreen for split invitation:', splitId);
+        navigation.navigate('SplitDetails', { 
+          splitId: splitId,
+          isFromNotification: true,
+          notificationId: notification.id
+        });
       }
     }
   };
@@ -340,38 +351,76 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             useNativeDriver: true,
           }).start();
 
-        } else if (notification.type === 'group_invite') {
-          // Handle group invitation (could be group or split)
-          const groupId = notification.data?.groupId;
+        } else if (notification.type === 'split_invite') {
+          // Handle split invitation
           const splitId = notification.data?.splitId;
-          const inviteLink = notification.data?.inviteLink;
           
-          if (!groupId && !splitId) {
-            throw new Error('Missing group or split data in notification');
+          if (!splitId) {
+            throw new Error('Missing split data in notification');
           }
 
-          // Navigate to appropriate screen based on notification type
-          console.log('🔍 DEBUG: About to navigate based on notification type');
+          // Accept the split invitation using AppContext method
+          console.log('🔍 NotificationsScreen: Accepting split invitation:', splitId);
           try {
-            if (splitId) {
-              // This is a split invitation - navigate directly to SplitDetailsScreen
-              console.log('🔍 DEBUG: Navigating to SplitDetails for split invitation:', splitId);
-              navigation.navigate('SplitDetails', { 
-                splitId: splitId,
-                isFromNotification: true,
-                notificationId: notificationId // Pass the notification ID for deletion
+            const result = await acceptSplitInvitation(notificationId, splitId);
+            
+            if (result.success) {
+              // Update action state
+              setActionStates(prev => ({
+                ...prev,
+                [notificationId]: 'completed'
+              }));
+
+              // Fade animation
+              Animated.timing(fadeAnimations[notificationId], {
+                toValue: 0.6,
+                duration: 300,
+                useNativeDriver: true,
+              }).start(() => {
+                // Navigate to SplitDetailsScreen after animation
+                navigation.navigate('SplitDetails', { 
+                  splitId: splitId,
+                  isFromNotification: true
+                });
               });
-            } else if (groupId) {
-              // This is a group invitation
-              console.log('🔍 DEBUG: Navigating to GroupDetails for group invitation:', groupId);
-              navigation.navigate('GroupDetails', { groupId });
+              
+              showToast('Successfully joined the split!');
+            } else {
+              throw new Error(result.error || 'Failed to join split');
             }
-            console.log('🔍 DEBUG: Successfully navigated to appropriate screen');
+          } catch (error) {
+            // Check if this is a stopTracking error (non-critical)
+            if (error instanceof Error && error.message.includes('stopTracking')) {
+              console.log('🔍 NotificationsScreen: Non-critical stopTracking error in split invitation:', error.message);
+              // Don't treat this as an error, just log it
+              setActionStates(prev => ({
+                ...prev,
+                [notificationId]: 'completed'
+              }));
+              return; // Exit early, don't re-throw
+            }
             
-            // Mark notification as in progress but don't delete it yet
-            // It will be deleted when the join process is completed
-            console.log('🔍 DEBUG: Invitation notification marked as in progress, will be deleted after join completion');
-            
+            console.error('🔍 NotificationsScreen: Error accepting split invitation:', error);
+            setActionStates(prev => ({
+              ...prev,
+              [notificationId]: 'error'
+            }));
+            throw error;
+          }
+        } else if (notification.type === 'group_invite') {
+          // Handle group invitation
+          const groupId = notification.data?.groupId;
+          const inviteLink = notification.data?.inviteLink;
+          
+          if (!groupId) {
+            throw new Error('Missing group data in notification');
+          }
+
+          // Navigate to group details
+          console.log('🔍 DEBUG: Navigating to GroupDetails for group invitation:', groupId);
+          try {
+            navigation.navigate('GroupDetails', { groupId });
+            console.log('🔍 DEBUG: Successfully navigated to GroupDetails');
           } catch (navError) {
             console.log('🔍 DEBUG: Navigation error (non-critical):', navError);
             // Even if navigation fails, we don't want to show an error to the user
@@ -384,8 +433,8 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           }
           
           try {
-            // Only try to join group if this is actually a group invitation (not a split)
-            if (groupId && !splitId) {
+            // Join group invitation
+            if (groupId) {
               // Extract inviteId from inviteLink if available
               let inviteId = groupId; // Default to groupId
               
@@ -402,16 +451,11 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                 inviteId,
                 currentUserId.toString()
               );
-            } else if (splitId) {
-              // For split invitations, we don't need to call joinGroupViaInvite
-              // The navigation to SplitDetailsScreen will handle the split joining
-              console.log('🔍 DEBUG: Split invitation - no group join needed, navigation handled above');
-            }
 
 
 
-            // Only mark as completed and delete for group invitations
-            if (groupId && !splitId) {
+            // Mark as completed and delete for group invitations
+            if (groupId) {
               // Update action state
               setActionStates(prev => ({
                 ...prev,
@@ -430,23 +474,11 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                 // Navigate to group details after animation
                 navigation.navigate('GroupDetails', { groupId });
               });
-            } else if (splitId) {
-              // For split invitations, just mark as completed but don't delete yet
-              // The SplitDetailsScreen will handle the actual joining
-              setActionStates(prev => ({
-                ...prev,
-                [notificationId]: 'completed'
-              }));
-              console.log('🔍 DEBUG: Split invitation marked as completed, will be handled by SplitDetailsScreen');
             }
+            showToast('Successfully joined the group!');
+          }
 
-            if (groupId && !splitId) {
-              showToast('Successfully joined the group!');
-            } else if (splitId) {
-              showToast('Opening split details...');
-            }
-
-          } catch (error) {
+        } catch (error) {
             console.error('❌ NotificationsScreen: Error joining group:', error);
             
             // If the joinGroupViaInvite fails, try alternative approach

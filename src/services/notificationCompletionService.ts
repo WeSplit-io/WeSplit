@@ -8,7 +8,7 @@ import { firebaseDataService } from './firebaseDataService';
 
 export interface NotificationCompletionData {
   notificationId: string;
-  processType: 'payment_request' | 'group_invite' | 'split_action' | 'contact_add' | 'settlement_request';
+  processType: 'payment_request' | 'group_invite' | 'split_invite' | 'split_action' | 'contact_add' | 'settlement_request';
   userId: string;
   completedAt: string;
   processData?: any;
@@ -95,6 +95,25 @@ export class NotificationCompletionService {
       'group_invite',
       userId,
       groupData
+    );
+  }
+
+  /**
+   * Complete split invitation notification after successful split join
+   */
+  static async completeSplitInvitationNotification(
+    notificationId: string,
+    userId: string,
+    splitData: {
+      splitId: string;
+      splitTitle: string;
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    return this.completeNotificationProcess(
+      notificationId,
+      'split_invite',
+      userId,
+      splitData
     );
   }
 

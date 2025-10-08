@@ -12,6 +12,7 @@ export interface SplitInvitationData {
   totalAmount: number;
   currency: string;
   creatorId: string;
+  creatorName?: string;
   timestamp: string;
   expiresAt?: string;
 }
@@ -146,9 +147,69 @@ export class SplitInvitationService {
       // 2. Check if user is already a participant
       const existingParticipant = split.participants.find(p => p.userId === userId);
       if (existingParticipant) {
+        // If user is already accepted, they're already in the split
+        if (existingParticipant.status === 'accepted') {
+          return {
+            success: true,
+            splitId: invitationData.splitId,
+            message: `You are already a participant in "${invitationData.billName}" split`,
+          };
+        }
+        
+        // If user is pending or invited, update their status to accepted
+        if (existingParticipant.status === 'pending' || existingParticipant.status === 'invited') {
+          logger.info('User is pending/invited, updating status to accepted', {
+            splitId: invitationData.splitId,
+            userId,
+            currentStatus: existingParticipant.status,
+          }, 'SplitInvitationService');
+          
+          // Update the participant status to accepted
+          const updatedParticipant = {
+            ...existingParticipant,
+            status: 'accepted' as const,
+            joinedAt: new Date().toISOString(),
+          };
+          
+          const updateResult = await SplitStorageService.addParticipant(invitationData.splitId, updatedParticipant);
+          if (!updateResult.success) {
+            return {
+              success: false,
+              error: updateResult.error || 'Failed to update participant status',
+            };
+          }
+          
+          // Send confirmation notification to the creator
+          const { sendNotification } = await import('./firebaseNotificationService');
+          await sendNotification(
+            invitationData.creatorId,
+            'User Joined Your Split',
+            `A user has joined your split "${invitationData.billName}". The split is ready to begin!`,
+            'group_added',
+            {
+              splitId: invitationData.splitId,
+              billName: invitationData.billName,
+              totalAmount: invitationData.totalAmount,
+            }
+          );
+          
+          logger.info('User successfully joined split (status updated)', {
+            splitId: invitationData.splitId,
+            userId,
+            previousStatus: existingParticipant.status,
+          }, 'SplitInvitationService');
+          
+          return {
+            success: true,
+            splitId: invitationData.splitId,
+            message: `Successfully joined "${invitationData.billName}" split`,
+          };
+        }
+        
+        // If user has some other status, return an error
         return {
           success: false,
-          error: 'You are already a participant in this split',
+          error: `You cannot join this split with your current status: ${existingParticipant.status}`,
         };
       }
 

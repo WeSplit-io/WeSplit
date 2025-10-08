@@ -350,6 +350,10 @@ interface AppContextType {
   
   // Group invitation handling
   acceptGroupInvitation: (notificationId: string, groupId: string) => Promise<void>;
+  
+  // Split invitation handling
+  acceptSplitInvitation: (notificationId: string, splitId: string) => Promise<any>;
+  
   removeNotification: (notificationId: string) => Promise<void>;
   
   // Real-time listener management
@@ -1113,6 +1117,55 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [state.currentUser, state.notifications]);
 
+  // Split invitation handling
+  const acceptSplitInvitation = useCallback(async (notificationId: string, splitId: string) => {
+    if (!state.currentUser?.id) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      console.log('🔄 AppContext: Starting acceptSplitInvitation...');
+      console.log('🔄 AppContext: Notification ID:', notificationId);
+      console.log('🔄 AppContext: Split ID:', splitId);
+      console.log('🔄 AppContext: User ID:', state.currentUser.id);
+
+      // Find the notification
+      const notification = state.notifications?.find(n => n.id === notificationId);
+      if (!notification || !notification.data?.splitId) {
+        throw new Error('Invalid notification or missing split data');
+      }
+
+      // Import SplitInvitationService
+      const { SplitInvitationService } = await import('../services/splitInvitationService');
+      
+      // Create invitation data from notification
+      const invitationData = {
+        type: 'split_invitation' as const,
+        splitId: notification.data.splitId,
+        billName: notification.data.billName || 'Unknown Bill',
+        totalAmount: notification.data.totalAmount || 0,
+        currency: notification.data.currency || 'USDC',
+        creatorId: notification.data.inviterId || '',
+        timestamp: new Date().toISOString(),
+      };
+
+      // Join the split
+      const result = await SplitInvitationService.joinSplit(invitationData, state.currentUser.id.toString());
+      console.log('🔄 AppContext: Split invitation accepted successfully:', result);
+
+      if (result.success) {
+        // Remove the notification
+        await removeNotification(notificationId);
+        console.log('🔄 AppContext: Notification removed from state');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('🔄 AppContext: Error accepting split invitation:', error);
+      throw error;
+    }
+  }, [state.currentUser, state.notifications, removeNotification]);
+
   // Group invitation handling
   const acceptGroupInvitation = useCallback(async (notificationId: string, groupId: string) => {
     if (!state.currentUser?.id) {
@@ -1193,6 +1246,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     loadNotifications,
     refreshNotifications,
     acceptGroupInvitation,
+    acceptSplitInvitation,
     removeNotification,
     startGroupListener,
     stopGroupListener,

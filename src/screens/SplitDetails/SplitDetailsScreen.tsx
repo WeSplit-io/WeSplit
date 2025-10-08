@@ -75,36 +75,24 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const { currentUser } = state;
   
   // Debug: Log the current user data and route params
-  console.log('🔍 SplitDetailsScreen: Current user from context:', {
-    currentUser: currentUser ? {
-      id: currentUser.id,
-      name: currentUser.name,
-      email: currentUser.email,
-      wallet_address: currentUser.wallet_address,
-      wallet_public_key: currentUser.wallet_public_key
-    } : null,
-    isAuthenticated: state.isAuthenticated,
-    authMethod: state.authMethod
-  });
-  
-  // Debug: Log route params to understand what data we're receiving
-  console.log('🔍 SplitDetailsScreen: Route params received:', {
-    hasSplitData: !!splitData,
-    splitDataId: splitData?.id,
-    splitDataTitle: splitData?.title,
-    splitDataObject: splitData,
-    splitDataType: typeof splitData,
-    splitDataKeys: splitData ? Object.keys(splitData) : 'null',
-    hasSplitId: !!splitId,
-    splitId: splitId,
-    hasProcessedBillData: !!processedBillData,
-    hasBillData: !!billData,
-    isNewBill: isNewBill,
-    isFromNotification: isFromNotification,
-    isEditing: isEditing,
-    allRouteParams: Object.keys(route?.params || {}),
-    routeParamsObject: route?.params
-  });
+  if (__DEV__) {
+    console.log('🔍 SplitDetailsScreen: Current user from context:', {
+      currentUser: currentUser ? {
+        id: currentUser.id,
+        name: currentUser.name
+      } : null,
+      isAuthenticated: state.isAuthenticated
+    });
+    
+    console.log('🔍 SplitDetailsScreen: Route params received:', {
+      hasSplitData: !!splitData,
+      splitDataId: splitData?.id,
+      hasSplitId: !!splitId,
+      hasProcessedBillData: !!processedBillData,
+      hasBillData: !!billData,
+      isNewBill: isNewBill
+    });
+  }
   
   const [billName, setBillName] = useState(() => {
     // Use data from existing split if available, otherwise use mockup data for new splits
@@ -210,6 +198,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const [isInvitingUsers, setIsInvitingUsers] = useState(false);
   const [createdSplitId, setCreatedSplitId] = useState<string | null>(null);
   const [isJoiningSplit, setIsJoiningSplit] = useState(false);
+  const [hasJustJoinedSplit, setHasJustJoinedSplit] = useState(false);
   
   // Helper function to check if current user is the creator
   const isCurrentUserCreator = () => {
@@ -571,27 +560,32 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       // Check if user is already a participant
       const existingParticipant = split.participants.find(p => p.userId === currentUser.id.toString());
       if (existingParticipant) {
-        console.log('🔍 SplitDetailsScreen: User is already a participant, loading split data');
-        // Load the split data and navigate to it
-        setCurrentSplitData(split);
-        setBillName(split.title);
-        setTotalAmount(split.totalAmount.toString());
-        setSelectedSplitType(split.splitType);
-        
-        // Transform participants to unified format
-        const transformedParticipants = split.participants.map((p: any) => ({
-          id: p.userId,
-          name: p.name,
-          walletAddress: p.walletAddress,
-          status: p.status,
-          amountOwed: p.amountOwed,
-          amountPaid: p.amountPaid || 0,
-          userId: p.userId,
-          email: p.email || '',
-          items: [],
-        }));
-        setParticipants(transformedParticipants);
-        return;
+        if (existingParticipant.status === 'accepted') {
+          console.log('🔍 SplitDetailsScreen: User is already accepted in this split, loading split data');
+          // Load the split data and navigate to it
+          setCurrentSplitData(split);
+          setBillName(split.title);
+          setTotalAmount(split.totalAmount.toString());
+          setSelectedSplitType(split.splitType);
+          
+          // Transform participants to unified format
+          const transformedParticipants = split.participants.map((p: any) => ({
+            id: p.userId,
+            name: p.name,
+            walletAddress: p.walletAddress,
+            status: p.status,
+            amountOwed: p.amountOwed,
+            amountPaid: p.amountPaid || 0,
+            userId: p.userId,
+            email: p.email || '',
+            items: [],
+          }));
+          setParticipants(transformedParticipants);
+          return;
+        } else {
+          console.log('🔍 SplitDetailsScreen: User is invited but not accepted, will update status to accepted');
+          // User is invited but not accepted, we'll update their status below
+        }
       }
 
       // User is not a participant, so we need to join the split
@@ -663,9 +657,26 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           email: p.email || '',
           items: [],
         }));
+        
+        console.log('🔍 SplitDetailsScreen: Setting participants after join:', {
+          participantsCount: transformedParticipants.length,
+          participants: transformedParticipants,
+          currentUserId: currentUser.id.toString(),
+          currentUserParticipant: transformedParticipants.find(p => p.userId === currentUser.id.toString()),
+          hasJustJoinedSplit: true
+        });
+        
         setParticipants(transformedParticipants);
 
         Alert.alert('Success!', `You have successfully joined "${updatedSplit.title}" split!`);
+        
+        // Set flag to prevent checkExistingSplit from overwriting participant data
+        setHasJustJoinedSplit(true);
+        
+        // Reset the flag after 5 seconds to allow normal operation
+        setTimeout(() => {
+          setHasJustJoinedSplit(false);
+        }, 5000);
         
         // Stay on the split details screen - don't navigate away
         
@@ -673,9 +684,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         if (notificationId) {
           try {
             const { NotificationCompletionService } = await import('../../services/notificationCompletionService');
-            await NotificationCompletionService.completeNotificationProcess(
+            await NotificationCompletionService.completeSplitInvitationNotification(
               notificationId,
-              'group_invite', // Use the correct notification type
               currentUser.id.toString(),
               { splitId: splitId, splitTitle: updatedSplit.title }
             );
@@ -829,8 +839,36 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       // Only create a new split if we don't have existing splitData AND we haven't already created one
       // Also check if we have a splitId from navigation (which indicates an existing split)
       // Check both the destructured variables AND the route params directly
-      // But only consider it an existing split if we have actual splitData, not just a splitId
-      const hasExistingSplit = splitData || createdSplitId || route?.params?.splitData;
+      // Check if we have an existing split (either splitData, currentSplitData, or createdSplitId)
+      // Note: splitId from route params doesn't guarantee the split exists in database
+      const hasExistingSplit = splitData || currentSplitData || createdSplitId || route?.params?.splitData;
+      
+      // Also check if we have a splitWallet (indicates a split was created with wallet)
+      const hasSplitWithWallet = !!splitWallet;
+      
+      // If we have a splitId but no splitData, check if it exists in the database
+      let splitExistsInDatabase = false;
+      if ((splitId || route?.params?.splitId) && !hasExistingSplit) {
+        try {
+          const splitIdToCheck = splitId || route?.params?.splitId;
+          if (splitIdToCheck) {
+            console.log('🔍 SplitDetailsScreen: Checking if split exists in database:', splitIdToCheck);
+            const splitResult = await SplitStorageService.getSplit(splitIdToCheck);
+            splitExistsInDatabase = splitResult.success && !!splitResult.split;
+            if (splitExistsInDatabase && splitResult.split) {
+              console.log('🔍 SplitDetailsScreen: Split exists in database, using existing split');
+              setCurrentSplitData(splitResult.split);
+            } else {
+              console.log('🔍 SplitDetailsScreen: Split does not exist in database, will create new split');
+            }
+          }
+        } catch (error) {
+          console.log('🔍 SplitDetailsScreen: Error checking split existence:', error);
+          splitExistsInDatabase = false;
+        }
+      }
+      
+      const finalHasExistingSplit = hasExistingSplit || splitExistsInDatabase || hasSplitWithWallet;
       
       console.log('🔍 SplitDetailsScreen: Split existence check:', {
         hasSplitData: !!splitData,
@@ -838,17 +876,21 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         hasCreatedSplitId: !!createdSplitId,
         hasRouteSplitData: !!route?.params?.splitData,
         hasRouteSplitId: !!route?.params?.splitId,
+        hasSplitWithWallet: hasSplitWithWallet,
         hasExistingSplit: hasExistingSplit,
-        shouldCreateNewSplit: !hasExistingSplit && currentUser,
+        splitExistsInDatabase: splitExistsInDatabase,
+        finalHasExistingSplit: finalHasExistingSplit,
+        shouldCreateNewSplit: !finalHasExistingSplit && currentUser,
         // Detailed breakdown
         splitDataCheck: !!splitData,
         splitIdCheck: !!splitId,
         createdSplitIdCheck: !!createdSplitId,
         routeSplitDataCheck: !!route?.params?.splitData,
-        routeSplitIdCheck: !!route?.params?.splitId
+        routeSplitIdCheck: !!route?.params?.splitId,
+        splitWalletCheck: hasSplitWithWallet
       });
       
-      if (!hasExistingSplit && currentUser) {
+      if (!finalHasExistingSplit && currentUser) {
         console.log('🔍 SplitDetailsScreen: Creating split in database before inviting users...');
         
         // Validate required fields before creating split
@@ -888,7 +930,9 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             Alert.alert('Error', 'All participants must have a valid name.');
             return;
           }
-          if (!participant.walletAddress || participant.walletAddress.trim() === '') {
+          // Only require wallet address for participants with 'accepted' status
+          // Invited participants can be added without wallet addresses initially
+          if (participant.status === 'accepted' && (!participant.walletAddress || participant.walletAddress.trim() === '')) {
             Alert.alert('Error', `Participant ${participant.name} must have a valid wallet address.`);
             return;
           }
@@ -968,20 +1012,41 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       } else {
         // We have existing split data, use the existing split
         console.log('🔍 SplitDetailsScreen: Using existing split for invitation:', {
-          splitId: splitData?.id || splitId || route?.params?.splitData?.id || route?.params?.splitId,
+          splitId: splitData?.id || currentSplitData?.id || splitId || route?.params?.splitData?.id || route?.params?.splitId,
           hasCreatedSplitId: !!createdSplitId,
           createdSplitId: createdSplitId,
           hasSplitData: !!splitData,
+          hasCurrentSplitData: !!currentSplitData,
           hasSplitId: !!splitId,
           hasRouteSplitData: !!route?.params?.splitData,
-          hasRouteSplitId: !!route?.params?.splitId
+          hasRouteSplitId: !!route?.params?.splitId,
+          splitExistsInDatabase: splitExistsInDatabase
         });
         
         // If we have splitData but no createdSplitId, set it to prevent creating new splits
-        const existingSplitId = splitData?.id || splitId || route?.params?.splitData?.id || route?.params?.splitId;
+        const existingSplitId = splitData?.id || currentSplitData?.id || splitId || route?.params?.splitData?.id || route?.params?.splitId;
         if (existingSplitId && !createdSplitId) {
           console.log('🔍 SplitDetailsScreen: Setting createdSplitId to existing split ID:', existingSplitId);
           setCreatedSplitId(existingSplitId);
+        }
+        
+        // If we have a splitWallet but no createdSplitId, try to get the split ID from the wallet
+        if (splitWallet && !createdSplitId && !existingSplitId) {
+          console.log('🔍 SplitDetailsScreen: Split has wallet but no ID, trying to find split by wallet ID:', splitWallet.id);
+          try {
+            // Try to find the split by wallet ID
+            const splitsResult = await SplitStorageService.getUserSplits(currentUser.id.toString());
+            if (splitsResult.success && splitsResult.splits) {
+              const splitWithWallet = splitsResult.splits.find(s => s.walletId === splitWallet.id);
+              if (splitWithWallet) {
+                console.log('🔍 SplitDetailsScreen: Found split with wallet, setting createdSplitId:', splitWithWallet.id);
+                setCreatedSplitId(splitWithWallet.id);
+                setCurrentSplitData(splitWithWallet);
+              }
+            }
+          } catch (error) {
+            console.log('🔍 SplitDetailsScreen: Error finding split by wallet ID:', error);
+          }
         }
       }
       
@@ -1054,7 +1119,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         walletAddress: recipientWalletAddress, // Use the actual wallet address from user profile
         status: 'pending',
         invitedAt: new Date().toISOString(),
-        splitId: createResult?.split?.id || createdSplitId || splitData?.id || splitId || route?.params?.splitId || currentSplitId, // Use actual split ID from database
+        splitId: createResult?.split?.id || createdSplitId || splitData?.id || currentSplitData?.id || splitId || route?.params?.splitId || currentSplitId, // Use actual split ID from database
       };
 
       // Debug: Log the invited user object to verify wallet address
@@ -1072,7 +1137,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       setInvitedUsers(prev => [...prev, invitedUser]);
 
       // Add the invited user to the split in the database
-      const splitIdToUpdate = createResult?.split?.id || createdSplitId || splitData?.id || splitId || route?.params?.splitId || currentSplitId;
+      const splitIdToUpdate = createResult?.split?.id || createdSplitId || splitData?.id || currentSplitData?.id || splitId || route?.params?.splitId || currentSplitId;
       if (splitIdToUpdate) {
         try {
           const addParticipantResult = await SplitStorageService.addParticipant(splitIdToUpdate, {
@@ -1102,13 +1167,39 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       // Send notification to the contact
       try {
         // Use the actual split ID from database if we just created it or have a created split ID
-        const notificationSplitId = createResult?.split?.id || createdSplitId || splitData?.id || splitId || route?.params?.splitId || currentSplitId;
+        const notificationSplitId = createResult?.split?.id || createdSplitId || splitData?.id || currentSplitData?.id || splitId || route?.params?.splitId || currentSplitId;
+        
+        // Validate required data before sending notification
+        if (!recipientUserId) {
+          throw new Error('Recipient user ID is required');
+        }
+        
+        if (!notificationSplitId) {
+          throw new Error('Split ID is required for notification');
+        }
+        
+        if (!billName || !totalAmount) {
+          throw new Error('Bill name and total amount are required for notification');
+        }
+        
+        if (!currentUser?.name || !currentUser?.id) {
+          throw new Error('Current user information is incomplete');
+        }
+        
+        console.log('🔍 SplitDetailsScreen: Sending notification with validated data:', {
+          recipientUserId,
+          notificationSplitId,
+          billName,
+          totalAmount,
+          inviterName: currentUser.name,
+          inviterId: currentUser.id.toString()
+        });
         
         await sendNotification(
           recipientUserId, // Use the found user ID
           `You're invited to split "${billName}"`,
           `${currentUser.name} invited you to split a bill for ${totalAmount} USDC. Tap to join!`,
-          'group_invite',
+          'split_invite',
           {
             splitId: notificationSplitId,
             billName: billName,
@@ -1126,7 +1217,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         );
       } catch (notificationError) {
         console.error(`Failed to send notification to ${contact.name}:`, notificationError);
-        Alert.alert('Error', `Failed to send notification to ${contact.name}. Please try again.`);
+        const errorMessage = notificationError instanceof Error ? notificationError.message : 'Unknown error occurred';
+        Alert.alert('Error', `Failed to send notification to ${contact.name}: ${errorMessage}`);
       }
 
     } catch (error) {
@@ -1609,7 +1701,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // Check for existing split and load wallet if it exists
   useEffect(() => {
     const checkExistingSplit = async () => {
-      if (currentUser && !splitWallet && !isCreatingWallet && !isProcessingNewBill) {
+      if (currentUser && !splitWallet && !isCreatingWallet && !isProcessingNewBill && !hasJustJoinedSplit) {
         setIsCreatingWallet(true);
         console.log('🔍 SplitDetailsScreen: Checking for existing split...');
         
@@ -1643,26 +1735,24 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             const splitResult = await SplitStorageService.getSplit(splitId);
             if (splitResult.success && splitResult.split) {
               existingSplit = splitResult.split;
+              // Set the current split data so invitation logic knows we have an existing split
+              setCurrentSplitData(existingSplit);
               // Update the state with the loaded split data
               setBillName(existingSplit.title);
               setTotalAmount(existingSplit.totalAmount.toString());
               setSelectedSplitType(existingSplit.splitType);
-              // Transform participants to unified format, excluding invited users
-              const transformedParticipants = existingSplit.participants
-                .filter((participant: any) => 
-                  participant.status !== 'invited' && participant.status !== 'pending'
-                )
-                .map((participant: any) => ({
-                  id: participant.userId,
-                  name: participant.name,
-                  walletAddress: participant.walletAddress,
-                  status: participant.status,
-                  amountOwed: participant.amountOwed,
-                  amountPaid: participant.amountPaid || 0,
-                  userId: participant.userId,
-                  email: participant.email || '',
-                  items: [],
-                }));
+              // Transform participants to unified format, including all participants (not filtering out invited/pending)
+              const transformedParticipants = existingSplit.participants.map((participant: any) => ({
+                id: participant.userId,
+                name: participant.name,
+                walletAddress: participant.walletAddress,
+                status: participant.status,
+                amountOwed: participant.amountOwed,
+                amountPaid: participant.amountPaid || 0,
+                userId: participant.userId,
+                email: participant.email || '',
+                items: [],
+              }));
               setParticipants(transformedParticipants);
             }
           } else if (processedBillData) {
@@ -1705,16 +1795,17 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     };
 
     checkExistingSplit();
-  }, [currentUser?.id, splitData?.walletId, processedBillData?.id, splitId, isProcessingNewBill]); // Added splitId and isProcessingNewBill to dependencies
+  }, [currentUser?.id, splitData?.walletId, processedBillData?.id, splitId, isProcessingNewBill, hasJustJoinedSplit]); // Added splitId, isProcessingNewBill, and hasJustJoinedSplit to dependencies
 
   // Debug: Monitor splitWallet state changes
   useEffect(() => {
-    console.log('🔍 SplitDetailsScreen: splitWallet state changed:', {
-      hasWallet: !!splitWallet,
-      walletId: splitWallet?.id,
-      walletAddress: splitWallet?.walletAddress,
-      isCreator: isCurrentUserCreator()
-    });
+    if (__DEV__) {
+      console.log('🔍 SplitDetailsScreen: splitWallet state changed:', {
+        hasWallet: !!splitWallet,
+        walletId: splitWallet?.id,
+        isCreator: isCurrentUserCreator()
+      });
+    }
   }, [splitWallet]);
 
   // Set authoritative price in price management service when component loads
@@ -1743,11 +1834,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             'USDC'
           );
           
-          console.log('💰 SplitDetailsScreen: Set authoritative price with actual data:', {
-            billId: processedBillData.id,
-            totalAmount: actualAmount,
-            currency: 'USDC'
-          });
+          if (__DEV__) {
+            console.log('💰 SplitDetailsScreen: Set authoritative price:', {
+              billId: processedBillData.id,
+              totalAmount: actualAmount
+            });
+          }
         }
       }
     };
@@ -1757,17 +1849,21 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // Debug effect to track selectedSplitType changes
   useEffect(() => {
-    console.log('selectedSplitType state changed to:', selectedSplitType);
+    if (__DEV__) {
+      console.log('selectedSplitType state changed to:', selectedSplitType);
+    }
   }, [selectedSplitType]);
 
   // Debug effect to track modal visibility
   useEffect(() => {
-    console.log('Modal visibility changed to:', showSplitModal);
+    if (__DEV__) {
+      console.log('Modal visibility changed to:', showSplitModal);
+    }
   }, [showSplitModal]);
 
   // Restore invited users from split data when component loads
   useEffect(() => {
-    if (splitData?.participants) {
+    if (splitData?.participants && !hasJustJoinedSplit) {
       console.log('🔍 SplitDetailsScreen: Restoring invited users from split data:', {
         splitId: splitData.id,
         participantsCount: splitData.participants.length,
@@ -1794,7 +1890,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         console.log('🔍 SplitDetailsScreen: Restored invited users:', restoredInvitedUsers);
       }
     }
-  }, [splitData]);
+  }, [splitData, hasJustJoinedSplit]);
 
   // Initialize createdSplitId when component loads with existing split data
   useEffect(() => {
@@ -1816,6 +1912,23 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       timestamp: new Date().toISOString()
     });
   }, [splitData]);
+
+  // Monitor participants state changes
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('🔍 SplitDetailsScreen: participants state changed:', {
+        participantsCount: participants.length,
+        participants: participants.map(p => ({
+          id: p.id,
+          name: p.name,
+          status: p.status,
+          userId: p.userId
+        })),
+        hasJustJoinedSplit,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [participants, hasJustJoinedSplit]);
 
   // Monitor route parameters changes
   useEffect(() => {
@@ -1851,7 +1964,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton} 
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.navigate('SplitsList')}
         >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
@@ -1964,6 +2077,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   <Text style={styles.statusAccepted}>✓</Text>
                 ) : (
                   <Text style={styles.statusPending}>Pending</Text>
+                )}
+                {__DEV__ && (
+                  <Text style={{ fontSize: 10, color: '#666' }}>
+                    {participant.status}
+                  </Text>
                 )}
               </View>
             </View>
