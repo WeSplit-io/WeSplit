@@ -22,6 +22,7 @@ import { userWalletService } from '../../services/userWalletService';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { colors } from '../../theme';
 import { consolidatedWalletService } from '../../services/consolidatedWalletService';
+import { UserImageService } from '../../services/userImageService';
 import * as ImagePicker from 'expo-image-picker';
 
 const CreateProfileScreen: React.FC = () => {
@@ -207,12 +208,30 @@ const CreateProfileScreen: React.FC = () => {
 
         console.log('User created/retrieved successfully:', result.user);
 
+        // Upload avatar if provided
+        let finalAvatarUrl = result.user.avatar;
+        if (avatar && avatar.startsWith('file://')) {
+          console.log('📸 CreateProfile: Uploading avatar...');
+          const uploadResult = await UserImageService.uploadUserAvatar(
+            result.user.id.toString(), 
+            avatar
+          );
+          
+          if (uploadResult.success && uploadResult.imageUrl) {
+            finalAvatarUrl = uploadResult.imageUrl;
+            console.log('📸 CreateProfile: Avatar uploaded successfully');
+          } else {
+            console.warn('📸 CreateProfile: Failed to upload avatar:', uploadResult.error);
+            // Continue with profile creation even if avatar upload fails
+          }
+        }
+
         // Build user object for local state
         const user = {
           id: result.user.id.toString(),
           name: result.user.name,
           email: result.user.email,
-          avatar: avatar || 'https://randomuser.me/api/portraits/men/32.jpg',
+          avatar: finalAvatarUrl || 'https://randomuser.me/api/portraits/men/32.jpg',
           walletAddress: result.user.wallet_address,
           wallet_address: result.user.wallet_address,
           wallet_public_key: result.user.wallet_public_key,

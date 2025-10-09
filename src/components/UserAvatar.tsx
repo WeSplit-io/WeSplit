@@ -27,6 +27,8 @@ interface UserAvatarProps {
   borderColor?: string;
   // If user data is already available, pass it to avoid extra API calls
   userImageInfo?: UserImageInfo;
+  // Direct avatar URL if available
+  avatarUrl?: string;
 }
 
 const UserAvatar: React.FC<UserAvatarProps> = ({
@@ -38,16 +40,40 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   showBorder = false,
   borderColor = colors.green,
   userImageInfo,
+  avatarUrl,
 }) => {
   const [imageInfo, setImageInfo] = useState<UserImageInfo | null>(userImageInfo || null);
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
-    if (!userImageInfo) {
+    console.log('🔍 UserAvatar: Props received:', {
+      userId,
+      userName,
+      userImageInfo: !!userImageInfo,
+      avatarUrl,
+      hasAvatarUrl: !!avatarUrl
+    });
+
+    if (userImageInfo) {
+      // Use provided userImageInfo
+      console.log('🔍 UserAvatar: Using provided userImageInfo');
+      setImageInfo(userImageInfo);
+    } else if (avatarUrl) {
+      // Use provided avatarUrl directly
+      console.log('🔍 UserAvatar: Using provided avatarUrl:', avatarUrl);
+      setImageInfo({
+        userId,
+        imageUrl: avatarUrl,
+        hasImage: true,
+        fallbackInitials: UserImageService.generateInitials(userName || 'User'),
+      });
+    } else {
       // Fetch image info if not provided
+      console.log('🔍 UserAvatar: Fetching image info from service');
       const fetchImageInfo = async () => {
         try {
           const info = await UserImageService.getUserImageInfo(userId, userName);
+          console.log('🔍 UserAvatar: Fetched image info:', info);
           setImageInfo(info);
         } catch (error) {
           console.error('UserAvatar: Error fetching image info:', error);
@@ -62,10 +88,8 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
       };
 
       fetchImageInfo();
-    } else {
-      setImageInfo(userImageInfo);
     }
-  }, [userId, userName, userImageInfo]);
+  }, [userId, userName, userImageInfo, avatarUrl]);
 
   const handleImageError = () => {
     console.log('UserAvatar: Image failed to load, using fallback');

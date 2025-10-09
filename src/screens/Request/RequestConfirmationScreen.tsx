@@ -9,6 +9,7 @@ import { useWallet } from '../../context/WalletContext';
 import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import UserAvatar from '../../components/UserAvatar';
 
 const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, amount, description, groupId } = route.params || {};
@@ -96,11 +97,14 @@ const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
 
         {/* Contact Info */}
         <View style={styles.contactRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {contact?.name?.charAt(0).toUpperCase() || 'U'}
-            </Text>
-          </View>
+          <UserAvatar
+            userId={contact?.id?.toString() || ''}
+            userName={contact?.name}
+            size={48}
+            avatarUrl={contact?.avatar}
+            style={styles.avatar}
+            backgroundColor={colors.primaryGreen}
+          />
           <View style={styles.contactInfo}>
             <Text style={styles.contactName}>{contact?.name || 'Unknown'}</Text>
             <Text style={styles.contactEmail}>{contact?.email || ''}</Text>

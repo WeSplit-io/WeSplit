@@ -10,6 +10,7 @@ import { parseWeSplitDeepLink, handleJoinGroupDeepLink, handleAddContactFromProf
 import { UserContact, User } from '../types';
 import { colors } from '../theme';
 import { styles } from './ContactsList.styles';
+import UserAvatar from './UserAvatar';
 
 interface ContactsListProps {
   groupId?: string;
@@ -488,25 +489,30 @@ const ContactsList: React.FC<ContactsListProps> = ({
     });
   };
 
-  const renderContact = (item: UserContact, section: 'friends' | 'others' | 'all' | 'favorite') => (
-    <TouchableOpacity
-      key={`${section}-${item.id}`}
-      style={styles.contactRow}
-      onPress={() => onContactSelect(item)}
-    >
-      <View style={styles.avatar}>
-        {item.avatar && item.avatar.trim() !== '' ? (
-          <Image
-            source={{ uri: item.avatar }}
-            style={{ width: '100%', height: '100%', borderRadius: 999 }}
-            resizeMode="cover"
-          />
-        ) : (
-          <Text style={styles.avatarText}>
-            {item.name ? item.name.charAt(0).toUpperCase() : formatWalletAddress(item.wallet_address).charAt(0).toUpperCase()}
-          </Text>
-        )}
-      </View>
+  const renderContact = (item: UserContact, section: 'friends' | 'others' | 'all' | 'favorite') => {
+    // Debug logging for contact avatar data
+    console.log('🔍 ContactsList: Rendering contact:', {
+      id: item.id,
+      name: item.name,
+      avatar: item.avatar,
+      hasAvatar: !!item.avatar,
+      section
+    });
+
+    return (
+      <TouchableOpacity
+        key={`${section}-${item.id}`}
+        style={styles.contactRow}
+        onPress={() => onContactSelect(item)}
+      >
+        <UserAvatar
+          userId={item.id.toString()}
+          userName={item.name}
+          size={40}
+          avatarUrl={item.avatar}
+          style={styles.avatar}
+          backgroundColor={colors.surface}
+        />
       <View style={styles.contactInfo}>
         <Text style={styles.contactName}>
           {item.name || formatWalletAddress(item.wallet_address)}
@@ -534,7 +540,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
         />
       </TouchableOpacity>
     </TouchableOpacity>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -688,28 +695,41 @@ const ContactsList: React.FC<ContactsListProps> = ({
                 {!isSearching && searchResults.length > 0 && (
                   <View style={styles.sectionContainer}>
                     <Text style={styles.sectionTitle}>Search Results</Text>
-                    {searchResults.map((user) => (
-                      <View key={`search-${user.id}`} style={styles.contactRow}>
-                        <TouchableOpacity
-                          style={styles.searchContactRow}
-                          onPress={() => onContactSelect({
-                            id: user.id,
-                            name: user.name,
-                            email: user.email,
-                            wallet_address: user.wallet_address,
-                            wallet_public_key: user.wallet_public_key,
-                            created_at: user.created_at,
-                            joined_at: user.created_at,
-                            first_met_at: user.created_at,
-                            mutual_groups_count: 0,
-                            isFavorite: false
-                          })}
-                        >
-                          <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>
-                              {user.name ? user.name.charAt(0).toUpperCase() : formatWalletAddress(user.wallet_address).charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
+                    {searchResults.map((user) => {
+                      // Debug logging for search result user data
+                      console.log('🔍 ContactsList: Search result user:', {
+                        id: user.id,
+                        name: user.name,
+                        avatar: user.avatar,
+                        hasAvatar: !!user.avatar
+                      });
+
+                      return (
+                        <View key={`search-${user.id}`} style={styles.contactRow}>
+                          <TouchableOpacity
+                            style={styles.searchContactRow}
+                            onPress={() => onContactSelect({
+                              id: user.id,
+                              name: user.name,
+                              email: user.email,
+                              wallet_address: user.wallet_address,
+                              wallet_public_key: user.wallet_public_key,
+                              created_at: user.created_at,
+                              joined_at: user.created_at,
+                              first_met_at: user.created_at,
+                              avatar: user.avatar,
+                              mutual_groups_count: 0,
+                              isFavorite: false
+                            })}
+                          >
+                          <UserAvatar
+                            userId={user.id.toString()}
+                            userName={user.name}
+                            size={40}
+                            avatarUrl={user.avatar}
+                            style={styles.avatar}
+                            backgroundColor={colors.surface}
+                          />
                           <View style={styles.contactInfo}>
                             <Text style={styles.contactName}>
                               {user.name || formatWalletAddress(user.wallet_address)}
@@ -748,7 +768,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
                           )
                         )}
                       </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 )}
                 {!isSearching && searchQuery.trim() && searchResults.length === 0 && (

@@ -21,6 +21,7 @@ import { useApp } from '../../context/AppContext';
 import { colors, spacing } from '../../theme';
 import * as ImagePicker from 'expo-image-picker';
 import AccountDeletionService, { DeletionProgress } from '../../services/accountDeletionService';
+import { UserImageService } from '../../services/userImageService';
 import styles from './styles';
 
 
@@ -40,6 +41,9 @@ const AccountSettingsScreen = ({ navigation }: any) => {
   // Account deletion states
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deletionProgress, setDeletionProgress] = useState<DeletionProgress | null>(null);
+  
+  // Avatar upload states
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   // Update form values when currentUser changes
   useEffect(() => {
@@ -163,20 +167,66 @@ const AccountSettingsScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     if (!pseudo.trim()) {
       Alert.alert('Error', 'Pseudo cannot be empty');
       return;
     }
     
-    // Update user profile
-    updateUser({ 
-      ...currentUser, 
-      name: pseudo.trim(),
-      avatar: avatar || undefined
-    });
-    Alert.alert('Success', 'Profile updated successfully');
-    nav.goBack();
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User information not available');
+      return;
+    }
+    
+    try {
+      setIsUploadingAvatar(true);
+      
+      let finalAvatarUrl = currentUser.avatar;
+      
+      // If avatar has changed and is a local URI, upload it
+      if (avatar && avatar !== currentUser.avatar && avatar.startsWith('file://')) {
+        console.log('📸 AccountSettings: Uploading new avatar...');
+        const uploadResult = await UserImageService.uploadUserAvatar(
+          currentUser.id.toString(), 
+          avatar
+        );
+        
+        if (uploadResult.success && uploadResult.imageUrl) {
+          finalAvatarUrl = uploadResult.imageUrl;
+          console.log('📸 AccountSettings: Avatar uploaded successfully');
+        } else {
+          Alert.alert('Error', uploadResult.error || 'Failed to upload avatar');
+          return;
+        }
+      } else if (avatar === null && currentUser.avatar) {
+        // Avatar was removed
+        console.log('🗑️ AccountSettings: Removing avatar...');
+        const deleteResult = await UserImageService.deleteUserAvatar(currentUser.id.toString());
+        
+        if (deleteResult.success) {
+          finalAvatarUrl = '';
+          console.log('🗑️ AccountSettings: Avatar removed successfully');
+        } else {
+          console.warn('🗑️ AccountSettings: Failed to remove avatar:', deleteResult.error);
+          // Continue with profile update even if avatar deletion fails
+        }
+      }
+      
+      // Update user profile
+      await updateUser({ 
+        ...currentUser, 
+        name: pseudo.trim(),
+        avatar: finalAvatarUrl
+      });
+      
+      Alert.alert('Success', 'Profile updated successfully');
+      nav.goBack();
+    } catch (error) {
+      console.error('❌ AccountSettings: Error updating profile:', error);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -479,18 +529,22 @@ const AccountSettingsScreen = ({ navigation }: any) => {
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity 
           onPress={handleSaveProfile}
-          disabled={!hasChanges}
+          disabled={!hasChanges || isUploadingAvatar}
         >
           <LinearGradient
-            colors={!hasChanges ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
+            colors={(!hasChanges || isUploadingAvatar) ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.gradientButton}
           >
-            <Text style={[
-              styles.saveButtonText,
-              !hasChanges && styles.saveButtonTextDisabled
-            ]}>Save</Text>
+            {isUploadingAvatar ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text style={[
+                styles.saveButtonText,
+                (!hasChanges || isUploadingAvatar) && styles.saveButtonTextDisabled
+              ]}>Save</Text>
+            )}
           </LinearGradient>
         </TouchableOpacity>
       </View>

@@ -7,6 +7,7 @@ import { firebaseDataService } from '../../services/firebaseDataService';
 import { UserContact, User, GroupMember } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import UserAvatar from '../../components/UserAvatar';
 
 // Utility function to generate dynamic avatar colors
 const getAvatarColor = (name: string): string => {
@@ -57,23 +58,16 @@ const getAvatarText = (contact: UserContact | User): string => {
 const renderAvatar = (contact: UserContact | User) => {
   const displayName = getDisplayName(contact);
   const avatarColor = getAvatarColor(displayName);
-  const avatarText = getAvatarText(contact);
-
-  if (contact.avatar && contact.avatar.trim()) {
-    return (
-      <Image 
-        source={{ uri: contact.avatar }} 
-        style={[styles.contactAvatar, { borderColor: avatarColor }]}
-      />
-    );
-  }
 
   return (
-    <View style={[styles.contactAvatar, { backgroundColor: avatarColor }]}>
-      <Text style={styles.avatarText}>
-        {avatarText}
-      </Text>
-    </View>
+    <UserAvatar
+      userId={contact.id.toString()}
+      userName={displayName}
+      size={40}
+      avatarUrl={contact.avatar}
+      style={[styles.contactAvatar, { borderColor: avatarColor }]}
+      backgroundColor={avatarColor}
+    />
   );
 };
 

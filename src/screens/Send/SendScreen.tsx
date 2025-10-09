@@ -87,7 +87,9 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
       email: contact.email,
       wallet: contact.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet',
       fullWallet: contact.wallet_address,
-      id: contact.id
+      id: contact.id,
+      avatar: contact.avatar,
+      hasAvatar: !!contact.avatar
     });
     
     navigation.navigate('SendAmount', {

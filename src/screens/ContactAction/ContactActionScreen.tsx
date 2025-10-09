@@ -4,6 +4,7 @@ import { View, Text, TouchableOpacity, Image, TextInput, ScrollView, KeyboardAvo
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
+import UserAvatar from '../../components/UserAvatar';
 import { UserContact } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
@@ -19,6 +20,18 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
   const { selectedContact } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
+
+  // Debug logging for contact data
+  useEffect(() => {
+    console.log('🔍 ContactAction: Selected contact data:', {
+      id: selectedContact?.id,
+      name: selectedContact?.name,
+      avatar: selectedContact?.avatar,
+      hasAvatar: !!selectedContact?.avatar,
+      email: selectedContact?.email,
+      wallet_address: selectedContact?.wallet_address
+    });
+  }, [selectedContact]);
   const [activeAction, setActiveAction] = useState<'send' | 'request'>('send');
   const [amount, setAmount] = useState('0');
   const [showAddNote, setShowAddNote] = useState(false);
@@ -70,6 +83,7 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
     if (activeAction === 'send') {
       // Navigate directly to SendConfirmation screen
       navigation.navigate('SendConfirmation', {
+        destinationType: 'friend',
         contact: selectedContact,
         amount: numAmount,
         description: note.trim(),
@@ -191,17 +205,13 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
       {/* Contact Info - Using SendAmountScreen design */}
       <View style={styles.recipientAvatarContainer}>
         <View style={styles.recipientAvatar}>
-          {selectedContact?.avatar || selectedContact?.photoURL ? (
-            <Image
-              source={{ uri: selectedContact.avatar || selectedContact.photoURL }}
-              style={{ width: '100%', height: '100%', borderRadius: 999 }}
-              resizeMode="cover"
-            />
-          ) : (
-            <Text style={styles.recipientAvatarText}>
-              {selectedContact?.name ? selectedContact.name.charAt(0).toUpperCase() : formatWalletAddress(selectedContact?.wallet_address || '').charAt(0).toUpperCase()}
-            </Text>
-          )}
+          <UserAvatar
+            userId={selectedContact?.id?.toString() || ''}
+            userName={selectedContact?.name}
+            size={70}
+            avatarUrl={selectedContact?.avatar}
+            style={{ width: '100%', height: '100%', borderRadius: 999 }}
+          />
         </View>
         <Text style={styles.recipientName}>
           {selectedContact?.name || formatWalletAddress(selectedContact?.wallet_address || '')}

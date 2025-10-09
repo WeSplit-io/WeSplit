@@ -9,6 +9,7 @@ import { consolidatedTransactionService } from '../../services/consolidatedTrans
 import { GroupMember } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import UserAvatar from '../../components/UserAvatar';
 
 // --- AppleSlider adapted from WalletManagementScreen ---
 interface AppleSliderProps {
@@ -157,13 +158,26 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       fullAddress: recipientAddress,
       id: recipient?.id
     });
+    console.log('💰 SendConfirmation: Contact data:', {
+      contactId: contact?.id,
+      contactName: contact?.name,
+      contactAvatar: contact?.avatar,
+      hasAvatar: !!contact?.avatar
+    });
     console.log('💰 SendConfirmation: Transaction details:', {
       amount,
       description,
       groupId,
       isSettlement
     });
-  }, [destinationType, recipientName, recipientAddress, amount, description, groupId, isSettlement]);
+    console.log('💰 SendConfirmation: Avatar display logic:', {
+      destinationType,
+      hasContact: !!contact,
+      willShowUserAvatar: (destinationType === 'friend' || (contact && !destinationType)) && contact,
+      contactAvatar: contact?.avatar,
+      contactId: contact?.id
+    });
+  }, [destinationType, recipientName, recipientAddress, amount, description, groupId, isSettlement, contact]);
   const [sending, setSending] = useState(false);
 
   const handleConfirmSend = async () => {
@@ -447,11 +461,13 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         {/* Recipient Card */}
         <View style={styles.mockupRecipientCard}>
           <View style={styles.mockupRecipientAvatar}>
-            {destinationType === 'friend' && contact?.avatar ? (
-              <Image
-                source={{ uri: contact.avatar }}
+            {(destinationType === 'friend' || (contact && !destinationType)) && contact ? (
+              <UserAvatar
+                userId={contact.id?.toString() || ''}
+                userName={contact.name}
+                size={60}
+                avatarUrl={contact.avatar}
                 style={{ width: '100%', height: '100%', borderRadius: 999 }}
-                resizeMode="cover"
               />
             ) : destinationType === 'external' && (wallet as any)?.type === 'kast' ? (
               <Image

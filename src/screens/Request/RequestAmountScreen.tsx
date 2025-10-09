@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import UserAvatar from '../../components/UserAvatar';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
@@ -139,19 +140,14 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
       {/* Recipient Info */}
       <View style={styles.requestRecipientAvatarContainer}>
-        <View style={styles.requestRecipientAvatar}>
-          {contact?.avatar || contact?.photoURL ? (
-            <Image
-              source={{ uri: contact.avatar || contact.photoURL }}
-              style={{ width: '100%', height: '100%', borderRadius: 999 }}
-              resizeMode="cover"
-            />
-          ) : (
-            <Text style={[styles.requestRecipientAvatarText, { fontSize: 18 }]}>
-              {contact?.name ? contact.name.charAt(0).toUpperCase() : formatWalletAddress(contact?.wallet_address || '').charAt(0).toUpperCase()}
-            </Text>
-          )}
-        </View>
+        <UserAvatar
+          userId={contact?.id?.toString() || ''}
+          userName={contact?.name}
+          size={60}
+          avatarUrl={contact?.avatar || contact?.photoURL}
+          style={styles.requestRecipientAvatar}
+          backgroundColor={colors.surface}
+        />
         <Text style={styles.requestRecipientName}>
           {contact?.name || formatWalletAddress(contact?.wallet_address || '')}
         </Text>

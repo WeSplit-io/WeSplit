@@ -30,6 +30,7 @@ import {
   getDocs,
   deleteDoc
 } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { initializeFirebaseAuth } from './firebasePersistence';
@@ -96,6 +97,9 @@ export const auth = initializeFirebaseAuth(app);
 
 // Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app);
+
+// Initialize Firebase Storage and get a reference to the service
+export const storage = getStorage(app);
 
 // Firebase Authentication functions for email-only flow
 export const firebaseAuth = {

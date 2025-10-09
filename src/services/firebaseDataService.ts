@@ -492,7 +492,7 @@ export const firebaseUserService = {
       );
       const contactsDocs = await getDocs(contactsQuery);
       
-      return contactsDocs.docs.map(doc => {
+      const contacts = contactsDocs.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
@@ -508,6 +508,18 @@ export const firebaseUserService = {
           isFavorite: data.isFavorite || false
         } as UserContact;
       });
+
+      // Debug logging for avatar data
+      console.log('🔍 firebaseUserService.getUserContacts: Loaded user contacts with avatar data:', 
+        contacts.map(c => ({
+          id: c.id,
+          name: c.name,
+          avatar: c.avatar,
+          hasAvatar: !!c.avatar
+        }))
+      );
+
+      return contacts;
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error getting user contacts:', error); }
       return [];
@@ -1355,18 +1367,19 @@ export const firebaseGroupService = {
         const memberData = doc.data();
         const contactId = memberData.user_id;
         
-                 if (!contactsMap.has(contactId)) {
-           contactsMap.set(contactId, {
-             id: contactId,
-             name: memberData.name || '',
-              email: memberData.email || '',
-              wallet_address: memberData.wallet_address || '',
-              wallet_public_key: memberData.wallet_public_key || '',
-             created_at: firebaseDataTransformers.timestampToISO(memberData.created_at),
-             joined_at: firebaseDataTransformers.timestampToISO(memberData.joined_at),
-             first_met_at: firebaseDataTransformers.timestampToISO(memberData.joined_at),
-             mutual_groups_count: 1
-           });
+        if (!contactsMap.has(contactId)) {
+          contactsMap.set(contactId, {
+            id: contactId,
+            name: memberData.name || '',
+            email: memberData.email || '',
+            wallet_address: memberData.wallet_address || '',
+            wallet_public_key: memberData.wallet_public_key || '',
+            created_at: firebaseDataTransformers.timestampToISO(memberData.created_at),
+            joined_at: firebaseDataTransformers.timestampToISO(memberData.joined_at),
+            first_met_at: firebaseDataTransformers.timestampToISO(memberData.joined_at),
+            avatar: memberData.avatar || '',
+            mutual_groups_count: 1
+          });
          } else {
            // Increment mutual groups count
            const existing = contactsMap.get(contactId)!;
@@ -1374,7 +1387,19 @@ export const firebaseGroupService = {
          }
       });
       
-      return Array.from(contactsMap.values());
+      const contacts = Array.from(contactsMap.values());
+      
+      // Debug logging for avatar data
+      console.log('🔍 firebaseGroupService.getUserContacts: Loaded contacts with avatar data:', 
+        contacts.map(c => ({
+          id: c.id,
+          name: c.name,
+          avatar: c.avatar,
+          hasAvatar: !!c.avatar
+        }))
+      );
+      
+      return contacts;
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error getting user contacts:', error); }
       return [];

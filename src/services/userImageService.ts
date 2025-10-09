@@ -5,6 +5,7 @@
 
 import { firebaseUserService } from './firebaseDataService';
 import { logger } from './loggingService';
+import { AvatarUploadService } from './avatarUploadService';
 
 export interface UserImageResult {
   success: boolean;
@@ -30,20 +31,41 @@ export class UserImageService {
       const user = await firebaseUserService.getCurrentUser(userId);
       
       if (user) {
-        
+        // First check if user has avatar URL in Firestore
         if (user.avatar && user.avatar.trim() !== '') {
-          console.log('🔍 UserImageService: Found user avatar:', user.avatar);
+          console.log('🔍 UserImageService: Found user avatar in Firestore:', user.avatar);
           return {
             success: true,
             imageUrl: user.avatar,
           };
-        } else {
-          console.log('🔍 UserImageService: No avatar found for user');
+        }
+        
+        // If no avatar in Firestore, check Firebase Storage
+        console.log('🔍 UserImageService: No avatar in Firestore, checking Firebase Storage');
+        const storageAvatarUrl = await AvatarUploadService.getAvatarUrl(userId);
+        
+        if (storageAvatarUrl) {
+          console.log('🔍 UserImageService: Found avatar in Firebase Storage:', storageAvatarUrl);
+          
+          // Update Firestore with the storage URL for future use
+          try {
+            await firebaseUserService.updateUser(userId, { avatar: storageAvatarUrl });
+            console.log('🔍 UserImageService: Updated Firestore with storage URL');
+          } catch (updateError) {
+            console.warn('🔍 UserImageService: Failed to update Firestore with storage URL:', updateError);
+          }
+          
           return {
             success: true,
-            imageUrl: undefined,
+            imageUrl: storageAvatarUrl,
           };
         }
+        
+        console.log('🔍 UserImageService: No avatar found anywhere');
+        return {
+          success: true,
+          imageUrl: undefined,
+        };
       } else {
         console.log('🔍 UserImageService: User not found');
         return {
@@ -172,5 +194,83 @@ export class UserImageService {
       hasImage: !!(user.avatar && user.avatar.trim() !== ''),
       fallbackInitials,
     };
+  }
+
+  /**
+   * Upload user avatar
+   */
+  static async uploadUserAvatar(
+    userId: string, 
+    imageUri: string, 
+    onProgress?: (progress: number) => void
+  ): Promise<UserImageResult> {
+    try {
+      console.log('📸 UserImageService: Starting avatar upload for user:', userId);
+      
+      // Upload to Firebase Storage
+      const uploadResult = await AvatarUploadService.uploadAvatar(userId, imageUri, onProgress);
+      
+      if (!uploadResult.success || !uploadResult.avatarUrl) {
+        return {
+          success: false,
+          error: uploadResult.error || 'Failed to upload avatar',
+        };
+      }
+      
+      // Update user document in Firestore with the new avatar URL
+      await firebaseUserService.updateUser(userId, { avatar: uploadResult.avatarUrl });
+      
+      console.log('📸 UserImageService: Avatar uploaded and user updated successfully');
+      
+      return {
+        success: true,
+        imageUrl: uploadResult.avatarUrl,
+      };
+    } catch (error) {
+      console.error('📸 UserImageService: Error uploading user avatar:', error);
+      logger.error('Failed to upload user avatar', error, 'UserImageService');
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Delete user avatar
+   */
+  static async deleteUserAvatar(userId: string): Promise<UserImageResult> {
+    try {
+      console.log('🗑️ UserImageService: Starting avatar deletion for user:', userId);
+      
+      // Delete from Firebase Storage
+      const deleteResult = await AvatarUploadService.deleteAvatar(userId);
+      
+      if (!deleteResult.success) {
+        return {
+          success: false,
+          error: deleteResult.error || 'Failed to delete avatar',
+        };
+      }
+      
+      // Update user document in Firestore to remove avatar URL
+      await firebaseUserService.updateUser(userId, { avatar: '' });
+      
+      console.log('🗑️ UserImageService: Avatar deleted and user updated successfully');
+      
+      return {
+        success: true,
+        imageUrl: undefined,
+      };
+    } catch (error) {
+      console.error('🗑️ UserImageService: Error deleting user avatar:', error);
+      logger.error('Failed to delete user avatar', error, 'UserImageService');
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
   }
 }

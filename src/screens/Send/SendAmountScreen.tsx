@@ -9,6 +9,7 @@ import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import UserAvatar from '../../components/UserAvatar';
 
 const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const {
@@ -43,7 +44,9 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
         email: contact.email,
         wallet: contact.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet',
         fullWallet: contact.wallet_address,
-        id: contact.id
+        id: contact.id,
+        avatar: contact.avatar,
+        hasAvatar: !!contact.avatar
       } : null,
       wallet: wallet ? {
         name: wallet.name,
@@ -187,11 +190,13 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
       {recipientInfo && (
         <View style={styles.recipientAvatarContainer}>
           <View style={styles.recipientAvatar}>
-            {destinationType === 'friend' && recipientInfo.avatar ? (
-              <Image
-                source={{ uri: recipientInfo.avatar }}
+            {destinationType === 'friend' && contact ? (
+              <UserAvatar
+                userId={contact.id?.toString() || ''}
+                userName={contact.name}
+                size={70}
+                avatarUrl={contact.avatar}
                 style={{ width: '100%', height: '100%', borderRadius: 999 }}
-                resizeMode="cover"
               />
             ) : destinationType === 'external' && (wallet as any)?.type === 'kast' ? (
               <Image

@@ -15,6 +15,7 @@ import SettleUpModal from '../SettleUp/SettleUpModal';
 import TransactionModal from '../../components/TransactionModal';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import UserAvatar from '../../components/UserAvatar';
 
 const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   // Validate and extract groupId from route params
@@ -643,30 +644,18 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Function to render dynamic balance avatar based on balance status
   const renderBalanceAvatar = useCallback((balance: Balance, isCurrentUser: boolean = false) => {
-    // Get user avatar if available
     const user = realMembers.find(member => String(member.id) === String(balance.userId));
-    const avatar = user?.avatar;
     const userName = user?.name || balance.userName || 'User';
 
-    if (avatar && avatar.trim() !== '') {
-      return (
-        <View style={styles.memberBalanceAvatar}>
-          <Image
-            source={{ uri: avatar }}
-            style={styles.memberBalanceAvatarImage}
-            defaultSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
-          />
-        </View>
-      );
-    }
-
-    // Fallback to initial with neutral color
     return (
-      <View style={styles.memberBalanceAvatar}>
-        <Text style={styles.memberBalanceAvatarText}>
-          {userName.charAt(0).toUpperCase()}
-        </Text>
-      </View>
+      <UserAvatar
+        userId={balance.userId}
+        userName={userName}
+        size={40}
+        avatarUrl={user?.avatar}
+        style={styles.memberBalanceAvatar}
+        backgroundColor={colors.surface}
+      />
     );
   }, [realMembers]);
 
