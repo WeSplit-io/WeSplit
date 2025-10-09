@@ -482,6 +482,10 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: spacing.md,
   },
+  addContactsButtonDisabled: {
+    backgroundColor: colors.gray,
+    opacity: 0.6,
+  },
   addContactsButtonText: {
     color: colors.white,
     fontSize: typography.fontSize.md,

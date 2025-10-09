@@ -1135,6 +1135,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error('Invalid notification or missing split data');
       }
 
+      console.log('🔄 AppContext: Notification data structure:', {
+        notificationId,
+        notificationData: notification.data,
+        hasInviterId: !!notification.data.inviterId,
+        hasCreatorId: !!notification.data.creatorId,
+        inviterId: notification.data.inviterId,
+        creatorId: notification.data.creatorId
+      });
+
       // Import SplitInvitationService
       const { SplitInvitationService } = await import('../services/splitInvitationService');
       
@@ -1145,9 +1154,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         billName: notification.data.billName || 'Unknown Bill',
         totalAmount: notification.data.totalAmount || 0,
         currency: notification.data.currency || 'USDC',
-        creatorId: notification.data.inviterId || '',
+        creatorId: notification.data.inviterId || notification.data.creatorId || '',
         timestamp: new Date().toISOString(),
       };
+
+      console.log('🔄 AppContext: Created invitation data:', invitationData);
 
       // Join the split
       const result = await SplitInvitationService.joinSplit(invitationData, state.currentUser.id.toString());

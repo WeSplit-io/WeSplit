@@ -301,13 +301,84 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
 
 
-  const handleSplitPress = useCallback((split: Split) => {
+  const handleSplitPress = useCallback(async (split: Split) => {
     try {
       console.log('🔍 SplitsListScreen: Opening split:', {
         id: split.id,
         title: split.title,
-        status: split.status
+        status: split.status,
+        splitType: split.splitType
       });
+
+      // Check if this is a completed degen split that should go to result screen
+      if (split.splitType === 'degen' && split.walletId) {
+        try {
+          console.log('🔍 SplitsListScreen: Checking degen split wallet status:', split.walletId);
+          
+          // Import SplitWalletService dynamically to avoid circular dependencies
+          const { SplitWalletService } = await import('../../services/splitWalletService');
+          const walletResult = await SplitWalletService.getSplitWallet(split.walletId);
+          
+          if (walletResult.success && walletResult.wallet) {
+            const wallet = walletResult.wallet;
+            console.log('🔍 SplitsListScreen: Wallet status check:', {
+              walletId: wallet.id,
+              walletStatus: wallet.status,
+              hasDegenWinner: !!wallet.degenWinner,
+              degenWinner: wallet.degenWinner,
+              currentUserId: currentUser?.id?.toString()
+            });
+            
+            // If the degen split is completed and has a winner, navigate to result screen
+            if ((wallet.status === 'completed' || wallet.status === 'spinning_completed') && wallet.degenWinner) {
+              console.log('🔍 SplitsListScreen: Navigating to DegenResult for completed split');
+              
+              // Find the winner participant
+              const winnerParticipant = split.participants.find(p => p.userId === wallet.degenWinner?.userId);
+              
+              if (winnerParticipant) {
+                // Convert participants to unified format
+                const unifiedParticipants = split.participants.map((p: any) => ({
+                  id: p.userId,
+                  name: p.name,
+                  walletAddress: p.walletAddress,
+                  status: p.status,
+                  amountOwed: p.amountOwed,
+                  amountPaid: p.amountPaid || 0,
+                  userId: p.userId,
+                  email: p.email || '',
+                  items: [],
+                }));
+                
+                // Create unified bill data
+                const unifiedBillData = {
+                  id: split.billId || split.id,
+                  title: split.title,
+                  totalAmount: split.totalAmount,
+                  currency: split.currency || 'USDC',
+                  date: split.date,
+                  merchant: split.merchant?.name || 'Unknown Merchant',
+                  location: split.merchant?.address || 'Unknown Location',
+                  participants: unifiedParticipants,
+                };
+                
+                navigation.navigate('DegenResult', {
+                  billData: unifiedBillData,
+                  participants: unifiedParticipants,
+                  totalAmount: split.totalAmount,
+                  selectedParticipant: winnerParticipant,
+                  splitWallet: wallet,
+                  splitData: split,
+                });
+                return;
+              }
+            }
+          }
+        } catch (walletError) {
+          console.error('🔍 SplitsListScreen: Error checking wallet status:', walletError);
+          // Continue with normal navigation if wallet check fails
+        }
+      }
 
       // Debug: Log the split data being passed to navigation
       console.log('🔍 SplitsListScreen: Navigating to SplitDetails with split data:', {
@@ -358,7 +429,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
       console.error('❌ SplitsListScreen: Error navigating to split details:', err);
       Alert.alert('Navigation Error', 'Failed to open split details');
     }
-  }, [navigation]);
+  }, [navigation, currentUser]);
 
 
 

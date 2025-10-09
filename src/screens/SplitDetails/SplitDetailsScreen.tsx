@@ -65,6 +65,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     analysisResult, 
     splitId, 
     splitData, 
+    splitWalletId,
     isEditing,
     imageUri,
     isNewBill,
@@ -505,6 +506,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               const createResult = await SplitStorageService.createSplit(splitData);
               if (createResult.success && createResult.split) {
                 setCurrentSplitData(createResult.split);
+                setCreatedSplitId(createResult.split.id); // Fix: Set createdSplitId to prevent duplicate creation
                 console.log('🔍 SplitDetailsScreen: Split created successfully in database:', {
                   splitId: createResult.split.id,
                   walletAddress: createResult.split.walletAddress,
@@ -544,7 +546,16 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // Handle joining a split when opened from a notification
   useEffect(() => {
+    console.log('🔍 SplitDetailsScreen: useEffect for notification handling:', {
+      isFromNotification,
+      splitId,
+      hasCurrentUser: !!currentUser,
+      hasSplitData: !!splitData,
+      shouldHandleNotification: isFromNotification && splitId && currentUser && !splitData
+    });
+    
     if (isFromNotification && splitId && currentUser && !splitData) {
+      console.log('🔍 SplitDetailsScreen: Calling handleJoinSplitFromNotification');
       handleJoinSplitFromNotification();
     }
   }, [isFromNotification, splitId, currentUser, splitData]);
@@ -562,7 +573,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
     setIsJoiningSplit(true);
     try {
-      console.log('🔍 SplitDetailsScreen: Joining split from notification:', splitId);
+      console.log('🔍 SplitDetailsScreen: Loading split from notification:', splitId);
       
       // First, get the split data
       const splitResult = await SplitStorageService.getSplit(splitId);
@@ -573,96 +584,18 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
       const split = splitResult.split;
 
-      // Check if user is already a participant
+      // FIXED: Check if user is already a participant (they should be after acceptSplitInvitation)
       const existingParticipant = split.participants.find(p => p.userId === currentUser.id.toString());
-      if (existingParticipant) {
-        if (existingParticipant.status === 'accepted') {
-          console.log('🔍 SplitDetailsScreen: User is already accepted in this split, loading split data');
-          // Load the split data and navigate to it
-          setCurrentSplitData(split);
-          setBillName(split.title);
-          setTotalAmount(split.totalAmount.toString());
-          setSelectedSplitType(split.splitType);
-          
-          // Transform participants to unified format
-          const transformedParticipants = split.participants.map((p: any) => ({
-            id: p.userId,
-            name: p.name,
-            walletAddress: p.walletAddress,
-            status: p.status,
-            amountOwed: p.amountOwed,
-            amountPaid: p.amountPaid || 0,
-            userId: p.userId,
-            email: p.email || '',
-            items: [],
-          }));
-          setParticipants(transformedParticipants);
-          return;
-        } else {
-          console.log('🔍 SplitDetailsScreen: User is invited but not accepted, will update status to accepted');
-          // User is invited but not accepted, we'll update their status below
-        }
-      }
-
-      // User is not a participant, so we need to join the split
-      const userData = await firebaseDataService.user.getCurrentUser(currentUser.id.toString());
-      if (!userData) {
-        Alert.alert('Error', 'User data not found');
-        return;
-      }
-
-      // Add the user as a participant
-      const newParticipant = {
-        userId: currentUser.id.toString(),
-        name: userData.name || 'Unknown User',
-        email: userData.email || '',
-        walletAddress: userData.wallet_address || userData.wallet_public_key || '',
-        amountOwed: split.totalAmount / (split.participants.length + 1), // Equal split
-        amountPaid: 0,
-        status: 'accepted' as const,
-      };
-
-      console.log('🔍 SplitDetailsScreen: Adding participant to split:', newParticipant);
-      const addResult = await SplitStorageService.addParticipant(splitId, newParticipant);
-      console.log('🔍 SplitDetailsScreen: Add participant result:', addResult);
-      
-      if (!addResult.success) {
-        console.error('🔍 SplitDetailsScreen: Failed to add participant:', addResult.error);
-        Alert.alert('Error', addResult.error || 'Failed to join split');
-        return;
-      }
-      
-      console.log('🔍 SplitDetailsScreen: Successfully added participant to split');
-
-      // Send confirmation notification to the creator
-      await sendNotification(
-        split.creatorId,
-        'User Joined Your Split',
-        `${userData.name} has joined your split "${split.title}". The split is ready to begin!`,
-        'group_added',
-        {
-          splitId: splitId,
-          billName: split.title,
-          totalAmount: split.totalAmount,
-          currency: split.currency,
-          inviterName: split.creatorName,
-          inviterId: split.creatorId,
-          joinedUserId: currentUser.id.toString(),
-          joinedUserName: userData.name,
-        }
-      );
-
-        // Load the updated split data
-        const updatedSplitResult = await SplitStorageService.getSplit(splitId);
-        if (updatedSplitResult.success && updatedSplitResult.split) {
-          const updatedSplit = updatedSplitResult.split;
-          setCurrentSplitData(updatedSplit);
-        setBillName(updatedSplit.title);
-        setTotalAmount(updatedSplit.totalAmount.toString());
-        setSelectedSplitType(updatedSplit.splitType);
+      if (existingParticipant && existingParticipant.status === 'accepted') {
+        console.log('🔍 SplitDetailsScreen: User is already accepted in this split, loading split data');
+        // Load the split data and navigate to it
+        setCurrentSplitData(split);
+        setBillName(split.title);
+        setTotalAmount(split.totalAmount.toString());
+        setSelectedSplitType(split.splitType);
         
         // Transform participants to unified format
-        const transformedParticipants = updatedSplit.participants.map((p: any) => ({
+        const transformedParticipants = split.participants.map((p: any) => ({
           id: p.userId,
           name: p.name,
           walletAddress: p.walletAddress,
@@ -673,45 +606,21 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           email: p.email || '',
           items: [],
         }));
-        
-        console.log('🔍 SplitDetailsScreen: Setting participants after join:', {
-          participantsCount: transformedParticipants.length,
-          participants: transformedParticipants,
-          currentUserId: currentUser.id.toString(),
-          currentUserParticipant: transformedParticipants.find(p => p.userId === currentUser.id.toString()),
-          hasJustJoinedSplit: true
-        });
-        
         setParticipants(transformedParticipants);
-
-        Alert.alert('Success!', `You have successfully joined "${updatedSplit.title}" split!`);
         
-        // Set flag to prevent checkExistingSplit from overwriting participant data
-        setHasJustJoinedSplit(true);
-        
-        // Reset the flag after 5 seconds to allow normal operation
-        setTimeout(() => {
-          setHasJustJoinedSplit(false);
-        }, 5000);
-        
-        // Stay on the split details screen - don't navigate away
-        
-        // Delete the notification after successful join
-        if (notificationId) {
-          try {
-            const { NotificationCompletionService } = await import('../../services/notificationCompletionService');
-            await NotificationCompletionService.completeSplitInvitationNotification(
-              notificationId,
-              currentUser.id.toString(),
-              { splitId: splitId, splitTitle: updatedSplit.title }
-            );
-            console.log('🔍 SplitDetailsScreen: Notification deleted after successful join:', notificationId);
-          } catch (notificationError) {
-            console.error('🔍 SplitDetailsScreen: Error deleting notification:', notificationError);
-            // Don't show error to user as this is not critical
-          }
-        }
+        console.log('🔍 SplitDetailsScreen: Split data loaded successfully from notification');
+        return;
       }
+
+      // FIXED: If user is not a participant, this means acceptSplitInvitation failed
+      // We should not try to add them again here, just show an error
+      console.error('🔍 SplitDetailsScreen: User is not a participant in this split. acceptSplitInvitation may have failed.');
+      Alert.alert(
+        'Error', 
+        'You are not a participant in this split. The invitation may have expired or been revoked.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+      return;
 
     } catch (error) {
       console.error('🔍 SplitDetailsScreen: Error joining split from notification:', error);
@@ -775,9 +684,102 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     setShowAddFriendsModal(false);
   };
 
-  const handleAddContacts = () => {
+  // FIXED: Function to ensure split with wallet exists before allowing invitations
+  const ensureSplitWithWalletExists = async () => {
+    if (!currentUser || !billName || !totalAmount) {
+      throw new Error('Missing required data for split creation');
+    }
+
+    console.log('🔍 SplitDetailsScreen: Creating split with wallet synchronously...');
+
+    // Create wallet first
+    const walletResult = await SplitWalletService.createSplitWallet(
+      processedBillData?.id || billData?.id || `split_${Date.now()}`,
+      currentUser.id.toString(),
+      parseFloat(totalAmount),
+      processedBillData?.currency || billData?.currency || 'USDC',
+      participants.map((p: any) => ({
+        userId: p.id,
+        name: p.name,
+        walletAddress: p.walletAddress,
+        amountOwed: p.amountOwed || 0,
+      }))
+    );
+
+    if (!walletResult.success || !walletResult.wallet) {
+      throw new Error(walletResult.error || 'Failed to create split wallet');
+    }
+
+    setSplitWallet(walletResult.wallet);
+
+    // Create split in database with wallet info
+    const splitData = {
+      billId: processedBillData?.id || billData?.id || `split_${Date.now()}`,
+      title: billName,
+      description: `Split for ${billName}`,
+      totalAmount: parseFloat(totalAmount),
+      currency: processedBillData?.currency || billData?.currency || 'USDC',
+      splitType: selectedSplitType || 'fair',
+      status: 'draft' as const,
+      creatorId: currentUser.id.toString(),
+      creatorName: currentUser.name,
+      participants: participants.map((p: any) => ({
+        userId: p.id,
+        name: p.name,
+        email: p.email || '',
+        walletAddress: p.walletAddress,
+        amountOwed: p.amountOwed || 0,
+        amountPaid: p.amountPaid || 0,
+        status: p.status || 'accepted',
+      })),
+      merchant: {
+        name: processedBillData?.merchant || billData?.merchant || 'Unknown',
+        address: processedBillData?.location || billData?.location || '',
+      },
+      date: processedBillData?.date || billData?.date || new Date().toISOString(),
+      // Always include wallet information
+      walletId: walletResult.wallet.id,
+      walletAddress: walletResult.wallet.walletAddress,
+    };
+
+    const createResult = await SplitStorageService.createSplit(splitData);
+    if (!createResult.success || !createResult.split) {
+      throw new Error(createResult.error || 'Failed to create split in database');
+    }
+
+    setCurrentSplitData(createResult.split);
+    setCreatedSplitId(createResult.split.id);
+
+    console.log('🔍 SplitDetailsScreen: Split with wallet created successfully:', {
+      splitId: createResult.split.id,
+      walletId: walletResult.wallet.id,
+      walletAddress: walletResult.wallet.walletAddress
+    });
+
+    return createResult.split;
+  };
+
+  const handleAddContacts = async () => {
+    // FIXED: For new bills, ensure split with wallet is created before allowing invitations
+    if (isNewBill && (!splitWallet || !createdSplitId)) {
+      console.log('🔍 SplitDetailsScreen: Creating split with wallet before allowing invitations...');
+      
+      try {
+        // Create the split with wallet synchronously
+        await ensureSplitWithWalletExists();
+      } catch (error) {
+        console.error('🔍 SplitDetailsScreen: Failed to create split with wallet:', error);
+        Alert.alert(
+          'Error',
+          'Failed to create split. Please try again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    }
+
     // Generate a consistent splitId for new bills
-    const currentSplitId = splitId || processedBillData?.id || billData?.id || `split_${Date.now()}`;
+    const currentSplitId = splitId || processedBillData?.id || billData?.id || createdSplitId || `split_${Date.now()}`;
     
     // Navigate to the existing ContactsScreen with split selection action
     // Store the callback in a ref or use a different approach to avoid serialization warning
@@ -793,6 +795,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   // Handle contact selection from ContactsScreen
+  // FIXED: This function now properly detects existing splits with wallets to prevent duplicate creation
   const handleContactSelection = async (contact: any) => {
     if (!currentUser?.id) {
       Alert.alert('Error', 'User not authenticated');
@@ -885,6 +888,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         }
       }
       
+      // Simplified logic: If we have ANY indication of an existing split, don't create a new one
       const finalHasExistingSplit = hasExistingSplit || splitExistsInDatabase || hasSplitWithWallet;
       
       console.log('🔍 SplitDetailsScreen: Split existence check:', {
@@ -909,6 +913,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       
       if (!finalHasExistingSplit && currentUser) {
         console.log('🔍 SplitDetailsScreen: Creating split in database before inviting users...');
+        console.log('🔍 SplitDetailsScreen: This should only happen for new splits without existing data');
+        
+        // Warning: If we have a splitWallet but are creating a new split, this might be a bug
+        if (splitWallet) {
+          console.warn('🔍 SplitDetailsScreen: WARNING - Creating new split but splitWallet exists! This might create a duplicate.');
+          console.warn('🔍 SplitDetailsScreen: splitWallet ID:', splitWallet.id);
+        }
         
         // Validate required fields before creating split
         if (!billName || !totalAmount || isNaN(parseFloat(totalAmount))) {
@@ -1014,12 +1025,23 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             address: processedBillData?.location || billData?.location || '',
           },
           date: processedBillData?.date || billData?.date || new Date().toISOString(),
+          // Include wallet information if available to prevent wallet-less splits
+          ...(splitWallet && {
+            walletId: splitWallet.id,
+            walletAddress: splitWallet.walletAddress,
+          }),
         };
 
         createResult = await SplitStorageService.createSplit(splitDataToCreate);
         if (createResult.success && createResult.split) {
           console.log('🔍 SplitDetailsScreen: Split created successfully in database:', createResult.split.id);
           console.log('🔍 SplitDetailsScreen: Split is now available for invitations');
+          console.log('🔍 SplitDetailsScreen: Split wallet info:', {
+            hasWalletId: !!createResult.split.walletId,
+            walletId: createResult.split.walletId,
+            hasWalletAddress: !!createResult.split.walletAddress,
+            walletAddress: createResult.split.walletAddress
+          });
           setCreatedSplitId(createResult.split.id);
         } else {
           console.error('🔍 SplitDetailsScreen: Failed to create split in database:', createResult.error);
@@ -1653,7 +1675,9 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           
           console.log('🔍 SplitDetailsScreen: Found winner participant:', {
             winnerParticipant,
-            degenWinnerUserId: splitWallet.degenWinner?.userId
+            degenWinnerUserId: splitWallet.degenWinner?.userId,
+            currentUserId,
+            isCurrentUserWinner: (winnerParticipant?.userId || winnerParticipant?.id) === currentUserId
           });
           
           if (winnerParticipant) {
@@ -1662,7 +1686,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               billData: unifiedBillData,
               participants: unifiedParticipants,
               totalAmount: parseFloat(totalAmount),
-              selectedParticipant: winnerParticipant,
+              selectedParticipant: winnerParticipant, // This will determine if user is winner or loser
               splitWallet: splitWallet,
               processedBillData,
               splitData: currentSplitData,
@@ -1837,8 +1861,15 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             // Get the existing wallet
             const walletResult = await SplitWalletService.getSplitWallet(existingSplit.walletId);
             if (walletResult.success && walletResult.wallet) {
-              console.log('🔍 SplitDetailsScreen: Using existing wallet:', walletResult.wallet.id);
+              console.log('🔍 SplitDetailsScreen: Using existing wallet:', {
+                walletId: walletResult.wallet.id,
+                walletStatus: walletResult.wallet.status,
+                hasDegenWinner: !!walletResult.wallet.degenWinner,
+                degenWinner: walletResult.wallet.degenWinner
+              });
               setSplitWallet(walletResult.wallet);
+            } else {
+              console.log('🔍 SplitDetailsScreen: Failed to load wallet:', walletResult.error);
             }
           } else {
             console.log('🔍 SplitDetailsScreen: No existing split found, wallet will be created when split type is selected');
@@ -1860,10 +1891,97 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       console.log('🔍 SplitDetailsScreen: splitWallet state changed:', {
         hasWallet: !!splitWallet,
         walletId: splitWallet?.id,
+        walletStatus: splitWallet?.status,
+        hasDegenWinner: !!splitWallet?.degenWinner,
+        degenWinner: splitWallet?.degenWinner,
         isCreator: isCurrentUserCreator()
       });
     }
   }, [splitWallet]);
+
+  // Check for degen split completion when wallet is loaded
+  useEffect(() => {
+    console.log('🔍 SplitDetailsScreen: Navigation check useEffect triggered:', {
+      hasSplitWallet: !!splitWallet,
+      hasCurrentUser: !!currentUser,
+      selectedSplitType,
+      walletStatus: splitWallet?.status,
+      hasDegenWinner: !!splitWallet?.degenWinner,
+      degenWinner: splitWallet?.degenWinner,
+      currentUserId: currentUser?.id?.toString(),
+      isCompleted: splitWallet?.status === 'completed' || splitWallet?.status === 'spinning_completed'
+    });
+
+    if (splitWallet && currentUser && selectedSplitType === 'degen') {
+      console.log('🔍 SplitDetailsScreen: Checking degen split completion on wallet load:', {
+        walletStatus: splitWallet.status,
+        hasDegenWinner: !!splitWallet.degenWinner,
+        degenWinner: splitWallet.degenWinner,
+        currentUserId: currentUser.id?.toString(),
+        isCompleted: splitWallet.status === 'completed' || splitWallet.status === 'spinning_completed'
+      });
+
+      if (splitWallet.status === 'completed' || splitWallet.status === 'spinning_completed') {
+        if (splitWallet.degenWinner) {
+          const currentUserId = currentUser.id?.toString();
+          const winnerParticipant = participants.find((p: any) => 
+            (p.userId || p.id) === splitWallet.degenWinner?.userId
+          );
+          
+          console.log('🔍 SplitDetailsScreen: Auto-navigating to DegenResult:', {
+            currentUserId,
+            winnerUserId: splitWallet.degenWinner?.userId,
+            isCurrentUserWinner: (winnerParticipant?.userId || winnerParticipant?.id) === currentUserId,
+            winnerParticipant
+          });
+          
+          if (winnerParticipant) {
+            navigation.navigate('DegenResult', {
+              billData: billData,
+              participants: participants,
+              totalAmount: parseFloat(totalAmount),
+              selectedParticipant: winnerParticipant,
+              splitWallet: splitWallet,
+              processedBillData,
+              splitData: currentSplitData,
+            });
+          }
+        }
+      }
+    } else if (splitWallet && currentUser && splitWallet.status === 'spinning_completed' && splitWallet.degenWinner) {
+      // Fallback: Check for completed degen split even if selectedSplitType is not set
+      console.log('🔍 SplitDetailsScreen: Fallback navigation check for completed degen split:', {
+        walletStatus: splitWallet.status,
+        hasDegenWinner: !!splitWallet.degenWinner,
+        degenWinner: splitWallet.degenWinner,
+        currentUserId: currentUser.id?.toString()
+      });
+
+      const currentUserId = currentUser.id?.toString();
+      const winnerParticipant = participants.find((p: any) => 
+        (p.userId || p.id) === splitWallet.degenWinner?.userId
+      );
+      
+      console.log('🔍 SplitDetailsScreen: Fallback auto-navigating to DegenResult:', {
+        currentUserId,
+        winnerUserId: splitWallet.degenWinner?.userId,
+        isCurrentUserWinner: (winnerParticipant?.userId || winnerParticipant?.id) === currentUserId,
+        winnerParticipant
+      });
+      
+      if (winnerParticipant) {
+        navigation.navigate('DegenResult', {
+          billData: billData,
+          participants: participants,
+          totalAmount: parseFloat(totalAmount),
+          selectedParticipant: winnerParticipant,
+          splitWallet: splitWallet,
+          processedBillData,
+          splitData: currentSplitData,
+        });
+      }
+    }
+  }, [splitWallet, currentUser, selectedSplitType, participants, billData, totalAmount, currentSplitData]);
 
   // Handle split invitation from deep links (QR code, NFC, shareable links)
   useEffect(() => {

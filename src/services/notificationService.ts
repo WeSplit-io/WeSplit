@@ -35,21 +35,34 @@ export class NotificationService {
    */
   static async initializePushNotifications(): Promise<boolean> {
     try {
+      console.log('🔍 NotificationService: Initializing push notifications...');
+      
       if (!Device.isDevice) {
-        console.log('Must use physical device for Push Notifications');
+        console.log('🔍 NotificationService: Must use physical device for Push Notifications');
         return false;
       }
 
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      console.log('🔍 NotificationService: Current notification permissions:', existingStatus);
+      
       let finalStatus = existingStatus;
 
       if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
+        console.log('🔍 NotificationService: Requesting notification permissions...');
+        const { status } = await Notifications.requestPermissionsAsync({
+          ios: {
+            allowAlert: true,
+            allowBadge: true,
+            allowSound: true,
+            allowAnnouncements: true,
+          },
+        });
         finalStatus = status;
+        console.log('🔍 NotificationService: Permission request result:', finalStatus);
       }
 
       if (finalStatus !== 'granted') {
-        console.log('Failed to get push token for push notification!');
+        console.log('🔍 NotificationService: Failed to get notification permissions! Status:', finalStatus);
         return false;
       }
 
@@ -62,9 +75,11 @@ export class NotificationService {
         }),
       });
 
+      console.log('🔍 NotificationService: Push notifications initialized successfully');
       logger.info('Push notifications initialized successfully', {}, 'NotificationService');
       return true;
     } catch (error) {
+      console.error('🔍 NotificationService: Failed to initialize push notifications:', error);
       logger.error('Failed to initialize push notifications', error, 'NotificationService');
       return false;
     }
@@ -92,7 +107,19 @@ export class NotificationService {
     data?: any
   ): Promise<boolean> {
     try {
-      await Notifications.scheduleNotificationAsync({
+      // Check if we're on a physical device
+      if (!Device.isDevice) {
+        return false;
+      }
+
+      // Check permissions
+      const { status } = await Notifications.getPermissionsAsync();
+      
+      if (status !== 'granted') {
+        return false;
+      }
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
           title,
           body,
@@ -214,7 +241,7 @@ export class NotificationService {
       });
 
       // Send push notification
-      await this.sendPushNotification(
+      const pushResult = await this.sendPushNotification(
         notification.title,
         notification.message,
         {
@@ -270,7 +297,7 @@ export class NotificationService {
       });
 
       // Send push notification
-      await this.sendPushNotification(
+      const pushResult = await this.sendPushNotification(
         notification.title,
         notification.message,
         {
@@ -328,7 +355,7 @@ export class NotificationService {
       });
 
       // Send push notification
-      await this.sendPushNotification(
+      const pushResult = await this.sendPushNotification(
         notification.title,
         notification.message,
         {
@@ -415,11 +442,6 @@ export class NotificationService {
     notificationType: NotificationData['type'],
     data: Partial<NotificationData>
   ): Promise<{ success: boolean; sent: number; failed: number; errors: string[] }> {
-    console.log('🔍 NotificationService: sendBulkNotifications called with:', {
-      userIds,
-      notificationType,
-      data
-    });
     
     const results = await Promise.allSettled(
       userIds.map(userId => {

@@ -81,7 +81,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             // Send completion notifications
             const completionRecipients = [
               winnerId, 
-              ...losers.map(l => l.userId || l.id).filter(id => id)
+              ...losers.map(l => l.userId).filter(id => id)
             ].filter(id => id); // Filter out undefined values
             
             
@@ -92,7 +92,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
                 {
                   splitWalletId: splitWallet.id,
                   billName: splitData?.title || billData?.title || MockupDataService.getBillName(),
-                  winnerName: selectedParticipant.name,
+                  amount: totalAmount,
                 }
               );
             }
@@ -189,7 +189,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     setIsProcessing(true);
     try {
       // Get the loser's in-app wallet address
-      const loserParticipant = participants.find(p => 
+      const loserParticipant = participants.find((p: any) => 
         (p.userId || p.id) === currentUser!.id.toString()
       );
       
@@ -259,12 +259,6 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     }
   };
 
-  // Handle payment option selection
-  const handlePaymentOption = (method: 'personal-wallet' | 'kast-card') => {
-    setSelectedPaymentMethod(method);
-    setShowSignatureStep(true);
-  };
-
   // Handle winner fund claiming
   const handleClaimFunds = async () => {
     setShowClaimModal(false);
@@ -274,12 +268,6 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       // Winners get back the full amount they locked
       const winnerAmount = totalAmount;
       
-      console.log('🔍 DegenResultScreen: Claiming funds for winner:', {
-        winnerAmount,
-        totalAmount,
-        splitWalletId: splitWallet.id,
-        userId: currentUser!.id.toString()
-      });
       
       // Transfer funds from split wallet to winner's in-app wallet
       const { SplitWalletService } = await import('../../services/splitWalletService');

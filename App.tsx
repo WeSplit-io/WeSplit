@@ -104,6 +104,15 @@ export default function App() {
       try {
         // Firebase is automatically initialized when the config file is imported
         
+        // Initialize push notifications
+        const { NotificationService } = await import('./src/services/notificationService');
+        const notificationInitialized = await NotificationService.initializePushNotifications();
+        if (notificationInitialized) {
+          logger.info('Push notifications initialized successfully', null, 'App');
+        } else {
+          logger.warn('Push notifications initialization failed - permissions may be denied', null, 'App');
+        }
+        
         // Initialize Solana wallet system
         logger.info('App initialized successfully', null, 'App');
         setIsInitialized(true);

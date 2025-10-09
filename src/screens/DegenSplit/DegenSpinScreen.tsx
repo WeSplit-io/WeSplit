@@ -156,47 +156,40 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
         console.error('Failed to save winner information:', error);
       }
 
-      // Send notifications to all participants about the roulette result
-      try {
-        const { NotificationService } = await import('../../services/notificationService');
-        const billName = splitData?.title || billData?.title || MockupDataService.getBillName();
-        const winnerId = baseParticipantCards[finalIndex].userId;
-        const winnerName = baseParticipantCards[finalIndex].name;
-        
-        // Send winner notification
-        await NotificationService.sendWinnerNotification(
-          winnerId,
-          splitWallet.id,
-          billName
-        );
-        
-        // Send loser notifications to all other participants
-        const loserIds = participants
-          .filter(p => (p.userId || p.id) !== winnerId)
-          .map(p => p.userId || p.id)
-          .filter(id => id);
-        
-        if (loserIds.length > 0) {
-          await NotificationService.sendBulkNotifications(
-            loserIds,
-            'split_loser',
-            {
-              splitWalletId: splitWallet.id,
-              billName,
-              amount: totalAmount,
-            }
+        // Send notifications to all participants about the roulette result
+        try {
+          const { NotificationService } = await import('../../services/notificationService');
+          const billName = splitData?.title || billData?.title || MockupDataService.getBillName();
+          const winnerId = baseParticipantCards[finalIndex].userId;
+          const winnerName = baseParticipantCards[finalIndex].name;
+          
+          // Send winner notification
+          await NotificationService.sendWinnerNotification(
+            winnerId,
+            splitWallet.id,
+            billName
           );
+          
+          // Send loser notifications to all other participants
+          const loserIds = participants
+            .filter(p => (p.userId || p.id) !== winnerId)
+            .map(p => p.userId || p.id)
+            .filter(id => id);
+          
+          if (loserIds.length > 0) {
+            await NotificationService.sendBulkNotifications(
+              loserIds,
+              'split_loser',
+              {
+                splitWalletId: splitWallet.id,
+                billName,
+                amount: totalAmount,
+              }
+            );
+          }
+        } catch (error) {
+          console.error('Failed to send roulette result notifications:', error);
         }
-        
-        console.log('🔍 DegenSpinScreen: Roulette result notifications sent:', {
-          winnerId,
-          winnerName,
-          loserIds,
-          billName
-        });
-      } catch (error) {
-        console.error('Failed to send roulette result notifications:', error);
-      }
 
       // Navigate to result screen after delay
       setTimeout(() => {

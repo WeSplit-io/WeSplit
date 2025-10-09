@@ -87,6 +87,19 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const handleNotificationPress = async (notification: NotificationData) => {
+    console.log('🔍 NotificationsScreen: handleNotificationPress called with:', {
+      notificationId: notification.id,
+      notificationType: notification.type,
+      notificationData: notification.data,
+      isRead: notification.is_read,
+      fullNotification: notification
+    });
+    
+    console.log('🔍 NotificationsScreen: handleNotificationPress - notification type check:', {
+      type: notification.type,
+      isSplitInvite: notification.type === 'split_invite'
+    });
+    
     // Mark as read if not already read
     if (!notification.is_read) {
       try {
@@ -104,15 +117,54 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         navigation.navigate('GroupDetails', { groupId });
       }
     } else if (notification.type === 'split_invite') {
-      // Handle split invitation - navigate to SplitDetailsScreen
+      // Handle split invitation by accepting it first, then navigating to split details
+      console.log('🔍 NotificationsScreen: ENTERED split_invite handler in handleNotificationPress');
       const splitId = notification.data?.splitId;
+      console.log('🔍 NotificationsScreen: Split invite notification data:', {
+        notificationId: notification.id,
+        splitId: splitId,
+        notificationData: notification.data,
+        fullNotification: notification
+      });
+      
       if (splitId) {
-        console.log('🔍 NotificationsScreen: Navigating to SplitDetailsScreen for split invitation:', splitId);
-        navigation.navigate('SplitDetails', { 
-          splitId: splitId,
-          isFromNotification: true,
-          notificationId: notification.id
-        });
+        console.log('🔍 NotificationsScreen: Handling split invitation tap - accepting invitation first:', splitId);
+        
+        // Accept the invitation first, then navigate
+        try {
+          const result = await acceptSplitInvitation(notification.id, splitId);
+          console.log('🔍 NotificationsScreen: Split invitation accepted from tap:', result);
+          
+          if (result.success) {
+            // Navigate to SplitDetails after successful acceptance
+            console.log('🔍 NotificationsScreen: About to navigate to SplitDetails with params:', {
+              splitId: splitId,
+              isFromNotification: true,
+              notificationId: notification.id,
+              resultSplitId: result.splitId,
+              navigationObject: !!navigation,
+              navigationNavigate: !!navigation.navigate,
+              currentRoute: navigation.getState?.()?.routes?.[navigation.getState?.()?.index]?.name
+            });
+            
+            try {
+              navigation.navigate('SplitDetails', { 
+                splitId: splitId,
+                isFromNotification: true,
+                notificationId: notification.id
+              });
+              console.log('🔍 NotificationsScreen: Navigation call completed successfully');
+            } catch (navError) {
+              console.error('🔍 NotificationsScreen: Navigation error in handleNotificationPress:', navError);
+              Alert.alert('Navigation Error', 'Failed to navigate to split details. Please try again.');
+            }
+          } else {
+            Alert.alert('Error', result.error || 'Failed to accept invitation');
+          }
+        } catch (error) {
+          console.error('🔍 NotificationsScreen: Error accepting split invitation from tap:', error);
+          Alert.alert('Error', 'Failed to accept invitation. Please try again.');
+        }
       }
     }
   };
@@ -250,6 +302,12 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   const notificationActionHandler = async (notification: NotificationData) => {
     const notificationId = notification.id;
     
+    console.log('🔍 NotificationsScreen: notificationActionHandler called with:', {
+      notificationId: notification.id,
+      notificationType: notification.type,
+      notificationData: notification.data
+    });
+    
     // Wrap the entire handler in a try-catch to prevent any stopTracking errors from escaping
     try {
       // Initialize animation if not exists
@@ -270,8 +328,15 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
         // Add debugging to identify where the error is coming from
         console.log('🔍 DEBUG: Starting notification action for type:', notification.type);
+        console.log('🔍 DEBUG: Notification type check:', {
+          type: notification.type,
+          isSplitInvite: notification.type === 'split_invite',
+          isPaymentRequest: notification.type === 'payment_request',
+          isPaymentReminder: notification.type === 'payment_reminder'
+        });
 
         if (notification.type === 'payment_request' || notification.type === 'payment_reminder') {
+          console.log('🔍 DEBUG: Handling payment request/reminder');
           // Handle payment request
           if (notification.status === 'paid') {
             showToast('Payment already completed');
@@ -413,7 +478,16 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
         } else if (notification.type === 'split_invite') {
           // Handle split invitation
+          console.log('🔍 NotificationsScreen: ENTERED split_invite handler in notificationActionHandler');
+          console.log('🔍 DEBUG: Processing split_invite notification');
           const splitId = notification.data?.splitId;
+          
+          console.log('🔍 NotificationsScreen: Action button - split invite notification data:', {
+            notificationId: notification.id,
+            splitId: splitId,
+            notificationData: notification.data,
+            fullNotification: notification
+          });
           
           if (!splitId) {
             throw new Error('Missing split data in notification');
@@ -422,7 +496,15 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           // Accept the split invitation using AppContext method
           console.log('🔍 NotificationsScreen: Accepting split invitation:', splitId);
           try {
+            console.log('🔍 NotificationsScreen: Calling acceptSplitInvitation with:', {
+              notificationId,
+              splitId,
+              notificationData: notification.data
+            });
+            
             const result = await acceptSplitInvitation(notificationId, splitId);
+            
+            console.log('🔍 NotificationsScreen: acceptSplitInvitation result:', result);
             
             if (result.success) {
               // Update action state
@@ -431,32 +513,51 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                 [notificationId]: 'completed'
               }));
 
-              // Fade animation
+              // Navigate to SplitDetailsScreen immediately after successful acceptance
+              console.log('🔍 NotificationsScreen: About to navigate to SplitDetails with params (action button):', {
+                splitId: splitId,
+                isFromNotification: true,
+                resultSplitId: result.splitId,
+                navigationState: navigation.getState ? navigation.getState() : 'No state available'
+              });
+              
+              try {
+                const currentRoute = navigation.getState()?.routes[navigation.getState()?.index]?.name;
+                console.log('🔍 NotificationsScreen: About to navigate with params (action button):', {
+                  splitId: splitId,
+                  isFromNotification: true,
+                  currentRoute: currentRoute,
+                  navigationState: navigation.getState(),
+                  canNavigate: navigation.canGoBack !== undefined,
+                  resultSplitId: result.splitId
+                });
+                
+                // Check if we're already on SplitDetails screen
+                if (currentRoute === 'SplitDetails') {
+                  console.log('🔍 NotificationsScreen: Already on SplitDetails, using replace instead of navigate');
+                  navigation.replace('SplitDetails', { 
+                    splitId: splitId,
+                    isFromNotification: true
+                  });
+                } else {
+                  console.log('🔍 NotificationsScreen: Navigating to SplitDetails from:', currentRoute);
+                  navigation.navigate('SplitDetails', { 
+                    splitId: splitId,
+                    isFromNotification: true
+                  });
+                }
+                console.log('✅ NotificationsScreen: Successfully called navigation (action button)');
+              } catch (navError) {
+                console.error('❌ NotificationsScreen: Navigation error (action button):', navError);
+                Alert.alert('Navigation Error', 'Failed to navigate to split details. Please try again.');
+              }
+
+              // Fade animation after navigation
               Animated.timing(fadeAnimations[notificationId], {
                 toValue: 0.6,
                 duration: 300,
                 useNativeDriver: true,
-              }).start(() => {
-                // Navigate to SplitDetailsScreen after animation
-                console.log('🔍 NotificationsScreen: About to navigate to SplitDetails with params:', {
-                  splitId: splitId,
-                  isFromNotification: true,
-                  navigationState: navigation.getState ? navigation.getState() : 'No state available'
-                });
-                
-                // Add a small delay to ensure the join operation is fully complete
-                setTimeout(() => {
-                  try {
-                    navigation.navigate('SplitDetails', { 
-                      splitId: splitId,
-                      isFromNotification: true
-                    });
-                    console.log('✅ NotificationsScreen: Successfully called navigation.navigate');
-                  } catch (navError) {
-                    console.error('❌ NotificationsScreen: Navigation error:', navError);
-                  }
-                }, 200); // Small delay to ensure state is updated
-              });
+              }).start();
               
               showToast('Successfully joined the split!');
             } else {
@@ -466,11 +567,22 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             // Check if this is a stopTracking error (non-critical)
             if (error instanceof Error && error.message.includes('stopTracking')) {
               console.log('🔍 NotificationsScreen: Non-critical stopTracking error in split invitation:', error.message);
-              // Don't treat this as an error, just log it
+              // Don't treat this as an error, just log it and continue with navigation
               setActionStates(prev => ({
                 ...prev,
                 [notificationId]: 'completed'
               }));
+              
+              // Still try to navigate even if there's a stopTracking error
+              try {
+                navigation.navigate('SplitDetails', { 
+                  splitId: splitId,
+                  isFromNotification: true
+                });
+                console.log('🔍 NotificationsScreen: Navigation completed despite stopTracking error');
+              } catch (navError) {
+                console.error('🔍 NotificationsScreen: Navigation error after stopTracking error:', navError);
+              }
               return; // Exit early, don't re-throw
             }
             
@@ -1109,14 +1221,14 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           const billName = notification.data?.billName;
           
           if (splitWalletId) {
-            // Navigate to degen spin screen
-            navigation.navigate('DegenSpin', {
+            // Navigate to SplitDetails first, which will handle the correct navigation
+            navigation.navigate('SplitDetails', {
               splitWalletId,
               billName,
               isFromNotification: true,
               notificationId: notificationId,
             });
-            showToast('Opening spin screen...');
+            showToast('Opening split details...');
           }
           
           // Mark as read and delete
@@ -1152,14 +1264,14 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           const billName = notification.data?.billName;
           
           if (splitWalletId) {
-            // Navigate to degen result screen
-            navigation.navigate('DegenResult', {
+            // Navigate to SplitDetails first, which will handle the correct navigation
+            navigation.navigate('SplitDetails', {
               splitWalletId,
               billName,
               isFromNotification: true,
               notificationId: notificationId,
             });
-            showToast('Opening result screen...');
+            showToast('Opening split details...');
           }
           
           // Mark as read and delete
@@ -1196,15 +1308,15 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           const amount = notification.data?.amount;
           
           if (splitWalletId) {
-            // Navigate to degen result screen
-            navigation.navigate('DegenResult', {
+            // Navigate to SplitDetails first, which will handle the correct navigation
+            navigation.navigate('SplitDetails', {
               splitWalletId,
               billName,
               amount,
               isFromNotification: true,
               notificationId: notificationId,
             });
-            showToast('Opening result screen...');
+            showToast('Opening split details...');
           }
           
           // Mark as read and delete

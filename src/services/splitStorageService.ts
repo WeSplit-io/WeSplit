@@ -229,18 +229,22 @@ export class SplitStorageService {
         }
       });
 
-      // Add participant splits (avoid duplicates)
+      // Add participant splits (avoid duplicates) - only show accepted invitations
       allSplitsSnapshot.docs.forEach(doc => {
         const splitData = doc.data() as Split;
         splitData.firebaseDocId = doc.id;
         
-        // Check if user is a participant in this split
-        const isParticipant = splitData.participants.some(participant => 
+        // Check if user is a participant in this split with accepted status
+        const userParticipant = splitData.participants.find(participant => 
           participant.userId === userId
         );
         
-        if (isParticipant && !seenIds.has(splitData.id)) {
-          // Found participant split - Removed log to prevent infinite logging
+        // Only include splits where user has accepted the invitation
+        const isAcceptedParticipant = userParticipant && 
+          (userParticipant.status === 'accepted' || userParticipant.status === 'paid' || userParticipant.status === 'locked');
+        
+        if (isAcceptedParticipant && !seenIds.has(splitData.id)) {
+          // Found accepted participant split - Removed log to prevent infinite logging
           splits.push(splitData);
           seenIds.add(splitData.id);
         }
