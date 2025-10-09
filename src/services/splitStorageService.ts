@@ -28,6 +28,7 @@ export interface Split {
   description?: string;
   totalAmount: number;
   currency: string;
+  category?: string; // Category for the split (trip, food, home, event, rocket)
   splitType: 'fair' | 'degen';
   splitMethod?: 'equal' | 'manual'; // Locked split method after confirmation
   status: 'draft' | 'active' | 'locked' | 'completed' | 'cancelled';

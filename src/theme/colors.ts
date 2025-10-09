@@ -18,6 +18,7 @@ export const colors = {
     // Green colors
     green: '#A5EA15',
     greenBlue: '#53EF97',
+    greenBlue20: 'rgba(83, 239, 119, 0.20)',
 
 
     // Gradient colors

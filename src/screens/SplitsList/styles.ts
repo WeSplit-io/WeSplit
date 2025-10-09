@@ -15,7 +15,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
   },
@@ -46,7 +46,7 @@ export const styles = StyleSheet.create({
   filtersContainer: {
     flexDirection: 'row',
     padding: spacing.sm,
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
     marginBottom: spacing.lg,
     gap: spacing.sm,
     borderRadius: 16,
@@ -73,7 +73,7 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   splitsContainer: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   sectionTitle: {
     fontSize: typography.fontSize.lg,
@@ -175,10 +175,20 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: spacing.md,
+    width: '100%',
+  },
+  splitHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: spacing.sm,
+    marginRight: spacing.sm,
+  },
+  categoryIcon: {
+    flexShrink: 0,
   },
   splitTitleContainer: {
     flex: 1,
-    marginRight: spacing.sm,
   },
   splitTitle: {
     fontSize: typography.fontSize.lg,
@@ -194,6 +204,14 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  splitCardDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   statusText: {
     fontSize: typography.fontSize.xs,
@@ -238,6 +256,16 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  roleIcon: {
+    width: 12,
+    height: 12,
+    tintColor: colors.textSecondary,
   },
   createdBy: {
     fontSize: typography.fontSize.sm,

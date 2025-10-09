@@ -24,6 +24,8 @@ import { styles } from './styles';
 import { colors } from '../../theme/colors';
 import NavBar from '../../components/NavBar';
 import UserAvatar from '../../components/UserAvatar';
+import GroupIcon from '../../components/GroupIcon';
+import Icon from '../../components/Icon';
 import { BillSplitSummary } from '../../types/billSplitting';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
 import { MockupDataService } from '../../data/mockupData';
@@ -314,11 +316,11 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
       if (split.splitType === 'degen' && split.walletId) {
         try {
           console.log('🔍 SplitsListScreen: Checking degen split wallet status:', split.walletId);
-          
+
           // Import SplitWalletService dynamically to avoid circular dependencies
           const { SplitWalletService } = await import('../../services/splitWalletService');
           const walletResult = await SplitWalletService.getSplitWallet(split.walletId);
-          
+
           if (walletResult.success && walletResult.wallet) {
             const wallet = walletResult.wallet;
             console.log('🔍 SplitsListScreen: Wallet status check:', {
@@ -328,14 +330,14 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
               degenWinner: wallet.degenWinner,
               currentUserId: currentUser?.id?.toString()
             });
-            
+
             // If the degen split is completed and has a winner, navigate to result screen
             if ((wallet.status === 'completed' || wallet.status === 'spinning_completed') && wallet.degenWinner) {
               console.log('🔍 SplitsListScreen: Navigating to DegenResult for completed split');
-              
+
               // Find the winner participant
               const winnerParticipant = split.participants.find(p => p.userId === wallet.degenWinner?.userId);
-              
+
               if (winnerParticipant) {
                 // Convert participants to unified format
                 const unifiedParticipants = split.participants.map((p: any) => ({
@@ -349,7 +351,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
                   email: p.email || '',
                   items: [],
                 }));
-                
+
                 // Create unified bill data
                 const unifiedBillData = {
                   id: split.billId || split.id,
@@ -361,7 +363,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
                   location: split.merchant?.address || 'Unknown Location',
                   participants: unifiedParticipants,
                 };
-                
+
                 navigation.navigate('DegenResult', {
                   billData: unifiedBillData,
                   participants: unifiedParticipants,
@@ -437,7 +439,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     // Use actual split data
     const splitAmount = split.totalAmount;
     const splitTitle = split.title;
-    
+
     return (
       <TouchableOpacity
         key={split.id}
@@ -446,23 +448,41 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         activeOpacity={0.7}
       >
         <View style={styles.splitHeader}>
-          <View style={styles.splitTitleContainer}>
-            <Text style={styles.splitTitle} numberOfLines={1}>
-              {splitTitle}
-            </Text>
-            <Text style={styles.splitDate}>
-              {split.date}
-            </Text>
+          <View style={styles.splitHeaderLeft}>
+            {/* Category Icon */}
+            <GroupIcon
+              category={split.category || 'trip'}
+              size={48}
+              style={styles.categoryIcon}
+            />
+            <View style={styles.splitTitleContainer}>
+              <Text style={styles.splitTitle} numberOfLines={1}>
+                {splitTitle}
+              </Text>
+              <View style={styles.roleContainer}>
+                <Image 
+                  source={split.creatorId === currentUser?.id 
+                    ? require('../../../assets/award-icon.png') 
+                    : require('../../../assets/user-icon.png')
+                  }
+                  style={styles.roleIcon}
+                />
+                <Text style={styles.createdBy}>
+                  {split.creatorId === currentUser?.id ? 'Owner' : 'Member'}
+                </Text>
+              </View>
+            </View>
           </View>
-          
+
           <View style={[styles.statusBadge, getStatusBadgeStyle(split.status)]}>
+            <View style={[styles.splitCardDot, getStatusDotStyle(split.status)]} />
             <Text style={[styles.statusText, getStatusTextStyle(split.status)]}>
               {split.status}
             </Text>
           </View>
         </View>
-        
-          <View style={styles.splitDetails}>
+
+        {/*<View style={styles.splitDetails}>
             <View style={styles.amountContainer}>
               <Text style={styles.amountLabel}>Total</Text>
               <Text style={styles.amountValue}>
@@ -482,7 +502,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
             </Text>
           </View>
 
-        </View>
+        </View> */}
 
         <View style={styles.splitCardBottom}>
 
@@ -509,30 +529,33 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
               )}
             </View>
           </View>
+
+          <Image 
+            source={require('../../../assets/chevron-right.png')} 
+            style={styles.splitCardArrow} 
+          />
         </View>
-      
-        <View style={styles.splitFooter}>
-          <Text style={styles.createdBy}>
-            {split.creatorId === currentUser?.id ? 'Created by you' : `Created by ${split.creatorName}`}
-          </Text>
+
+        {/*<View style={styles.splitFooter}>
+
           <Text style={styles.createdAt}>
             {(() => {
               // Always use mockup data for consistency
               const { MockupDataService } = require('../../data/mockupData');
               return MockupDataService.getBillDate();
             })()}
-          </Text>
-        </View>
-        
+          </Text>  
+        </View>*/}
+
         {/* Wallet Information - Only show for creators */}
-        {split.creatorId === currentUser?.id && split.walletAddress && (
+        {/*{split.creatorId === currentUser?.id && split.walletAddress && (
           <View style={styles.walletInfo}>
             <Text style={styles.walletLabel}>Split Wallet:</Text>
             <Text style={styles.walletAddress} numberOfLines={1} ellipsizeMode="middle">
               {split.walletAddress}
             </Text>
           </View>
-        )}
+        )}*/}
       </TouchableOpacity>
     );
   };
@@ -564,6 +587,21 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         return { color: colors.textSecondary };
       default:
         return { color: colors.text };
+    }
+  };
+
+  const getStatusDotStyle = (status: string) => {
+    switch (status) {
+      case 'active':
+        return { backgroundColor: colors.green };
+      case 'completed':
+        return { backgroundColor: colors.success };
+      case 'pending':
+        return { backgroundColor: colors.warning };
+      case 'draft':
+        return { backgroundColor: colors.textSecondary };
+      default:
+        return { backgroundColor: colors.text };
     }
   };
 
