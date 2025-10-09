@@ -7,6 +7,8 @@ import Icon from '../../components/Icon';
 import { UserContact } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import { useApp } from '../../context/AppContext';
+import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
 
 interface ContactActionScreenProps {
   navigation: any;
@@ -15,12 +17,15 @@ interface ContactActionScreenProps {
 
 const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, route }) => {
   const { selectedContact } = route.params || {};
+  const { state } = useApp();
+  const { currentUser } = state;
   const [activeAction, setActiveAction] = useState<'send' | 'request'>('send');
   const [amount, setAmount] = useState('0');
   const [showAddNote, setShowAddNote] = useState(false);
   const [note, setNote] = useState('');
   const [noteInputWidth, setNoteInputWidth] = useState(60);
   const [maxNoteInputWidth, setMaxNoteInputWidth] = useState(0);
+  const [processing, setProcessing] = useState(false);
   const noteTextRef = useRef<RNText>(null);
 
   useEffect(() => {
@@ -50,25 +55,79 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
     setAmount(cleaned || '0');
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     const numAmount = parseFloat(amount);
     if (!numAmount || numAmount <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
       return;
     }
 
+    if (!selectedContact) {
+      Alert.alert('Error', 'Contact information is missing');
+      return;
+    }
+
     if (activeAction === 'send') {
-      navigation.navigate('SendAmount', {
-        destinationType: 'friend',
+      // Navigate directly to SendConfirmation screen
+      navigation.navigate('SendConfirmation', {
         contact: selectedContact,
-        prefilledAmount: numAmount,
-        prefilledNote: note.trim(),
+        amount: numAmount,
+        description: note.trim(),
+        isSettlement: false,
       });
     } else {
-      navigation.navigate('RequestAmount', {
-        contact: selectedContact,
-        prefilledAmount: numAmount,
-      });
+      // Handle request directly here
+      if (!currentUser?.id) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+
+      setProcessing(true);
+      try {
+        console.log('💰 ContactAction: Creating payment request...', {
+          senderId: currentUser.id,
+          recipientId: selectedContact.id,
+          amount: numAmount,
+          description: note.trim(),
+        });
+
+        // Create the payment request using Firebase service
+        const paymentRequest = await createPaymentRequest(
+          currentUser.id,
+          selectedContact.id,
+          numAmount,
+          'USDC',
+          note.trim()
+        );
+
+        console.log('✅ ContactAction: Payment request created successfully:', paymentRequest);
+
+        // Navigate to success screen with the actual request data
+        navigation.navigate('RequestSuccess', {
+          contact: selectedContact,
+          amount: numAmount,
+          description: note.trim(),
+          requestId: paymentRequest.id,
+          paymentRequest,
+        });
+      } catch (error) {
+        console.error('❌ ContactAction: Error creating payment request:', error);
+        
+        // More detailed error logging
+        if (error instanceof Error) {
+          console.error('❌ ContactAction: Error details:', {
+            message: error.message,
+            stack: error.stack
+          });
+        }
+        
+        Alert.alert(
+          'Error', 
+          `Failed to create payment request: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      } finally {
+        setProcessing(false);
+      }
     }
   };
 
@@ -248,19 +307,23 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
 
         {/* Continue Button fixed at bottom */}
         <View style={styles.amountCardContinueButtonWrapper}>
-          <TouchableOpacity onPress={handleContinue} disabled={!isAmountValid} activeOpacity={0.8} style={{ width: '100%' }}>
-            {isAmountValid ? (
+          <TouchableOpacity onPress={handleContinue} disabled={!isAmountValid || processing} activeOpacity={0.8} style={{ width: '100%' }}>
+            {isAmountValid && !processing ? (
               <LinearGradient
                 colors={[colors.gradientStart, colors.gradientEnd]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.mockupContinueButton}
               >
-                <Text style={styles.mockupContinueButtonTextActive}>Continue</Text>
+                <Text style={styles.mockupContinueButtonTextActive}>
+                  {activeAction === 'send' ? 'Send' : 'Request'}
+                </Text>
               </LinearGradient>
             ) : (
               <View style={styles.mockupContinueButton}>
-                <Text style={styles.mockupContinueButtonText}>Continue</Text>
+                <Text style={styles.mockupContinueButtonText}>
+                  {processing ? 'Processing...' : (activeAction === 'send' ? 'Send' : 'Request')}
+                </Text>
               </View>
             )}
           </TouchableOpacity>

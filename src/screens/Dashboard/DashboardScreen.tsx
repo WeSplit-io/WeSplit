@@ -36,6 +36,8 @@ import { firebaseTransactionService, firebaseDataService } from '../../services/
 import { generateProfileLink } from '../../services/deepLinkHandler';
 import { SplitStorageService } from '../../services/splitStorageService';
 import { MockupDataService } from '../../data/mockupData';
+import { db } from '../../config/firebase';
+import { getDoc, doc } from 'firebase/firestore';
 
 // Avatar component with loading state and error handling
 const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
@@ -117,6 +119,34 @@ const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, disp
 const DashboardScreen: React.FC<any> = ({ navigation }) => {
   const { state, notifications, loadNotifications, refreshNotifications, updateUser } = useApp();
   const { currentUser, isAuthenticated } = state;
+
+  // Function to fetch user data from Firebase
+  const fetchUserData = async (userId: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        return {
+          id: userId,
+          name: userData.name || userData.email || 'Unknown User',
+          email: userData.email || '',
+          wallet_address: userData.wallet_address || userData.wallet_public_key || '',
+          avatar: userData.avatar || userData.photoURL || ''
+        };
+      }
+    } catch (error) {
+      console.log('🔍 Dashboard: Error fetching user data:', error);
+    }
+    
+    // Return fallback data if user not found
+    return {
+      id: userId,
+      name: 'Unknown User',
+      email: '',
+      wallet_address: '',
+      avatar: ''
+    };
+  };
   const {
     // App wallet state and actions
     appWalletAddress,
@@ -1729,9 +1759,63 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                       </View>
                       <TouchableOpacity
                         style={styles.requestSendButtonNew}
-                        onPress={() => {
-                          // Handle send payment logic here
-                          Alert.alert('Send Payment', `Send ${amount.toFixed(2)} ${currency} to ${senderName}?`);
+                        onPress={async () => {
+                          try {
+                            console.log('🔍 Dashboard: Send button pressed for request:', {
+                              requestId: request.id,
+                              requestData: request.data,
+                              amount,
+                              currency,
+                              senderName
+                            });
+
+                            // Get the sender ID from the request data
+                            const senderId = request.data?.senderId || request.data?.requester || request.data?.sender;
+                            if (!senderId) {
+                              console.error('🔍 Dashboard: No sender ID found in request data:', request.data);
+                              Alert.alert('Error', 'Unable to find sender information');
+                              return;
+                            }
+
+                            console.log('🔍 Dashboard: Fetching user data for sender ID:', senderId);
+                            
+                            // Fetch user data to get wallet address and other details
+                            const contact = await fetchUserData(senderId);
+                            
+                            console.log('🔍 Dashboard: Fetched contact data:', {
+                              id: contact.id,
+                              name: contact.name,
+                              email: contact.email,
+                              wallet: contact.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet'
+                            });
+
+                            // Validate that we have the necessary contact information
+                            if (!contact.wallet_address) {
+                              Alert.alert('Error', 'Recipient wallet address not found. Please ask them to set up their wallet.');
+                              return;
+                            }
+                            
+                            // Navigate to SendAmount screen with pre-filled data
+                            console.log('🔍 Dashboard: Navigating to SendAmount with data:', {
+                              contact: contact.name,
+                              amount,
+                              currency,
+                              groupId: request.data?.groupId
+                            });
+
+                            navigation.navigate('SendAmount', {
+                              destinationType: 'friend',
+                              contact: contact,
+                              groupId: request.data?.groupId,
+                              prefilledAmount: amount,
+                              prefilledNote: `Payment request from ${contact.name}`,
+                              fromNotification: false,
+                              requestId: request.data?.requestId || request.id
+                            });
+                          } catch (error) {
+                            console.error('🔍 Dashboard: Error handling send payment:', error);
+                            Alert.alert('Error', 'Failed to process payment request. Please try again.');
+                          }
                         }}
                       >
                         <LinearGradient

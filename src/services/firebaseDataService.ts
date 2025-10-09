@@ -2184,14 +2184,26 @@ export const firebaseTransactionService = {
       // Removed excessive logging for cleaner console
       
       const allTransactions = [
+        // Outgoing transactions (user is sender)
         ...fromDocs.docs.map(doc => {
           const transaction = firebaseDataTransformers.firestoreToTransaction(doc);
-          // Removed excessive logging for cleaner console
+          // Ensure transaction type is set correctly for outgoing transactions
+          if (transaction.from_user === userId) {
+            transaction.type = transaction.type === 'deposit' || transaction.type === 'withdraw' 
+              ? transaction.type 
+              : 'send';
+          }
           return transaction;
         }),
+        // Incoming transactions (user is receiver)
         ...toDocs.docs.map(doc => {
           const transaction = firebaseDataTransformers.firestoreToTransaction(doc);
-          // Removed excessive logging for cleaner console
+          // Ensure transaction type is set correctly for incoming transactions
+          if (transaction.to_user === userId) {
+            transaction.type = transaction.type === 'deposit' || transaction.type === 'withdraw' 
+              ? transaction.type 
+              : 'receive';
+          }
           return transaction;
         })
       ];

@@ -845,18 +845,30 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
         } else if (notification.type === 'group_payment_request') {
           // Handle group payment request notification
-          const sender = notification.data?.sender;
+          const requesterId = notification.data?.sender || notification.data?.requester;
           const amount = notification.data?.amount;
           const currency = notification.data?.currency;
           const groupId = notification.data?.groupId;
           
-          if (sender && amount && currency) {
-            // Navigate to send payment screen
-            navigation.navigate('Send', { 
-              recipient: sender,
-              amount: amount,
-              currency: currency,
+          if (requesterId && amount && currency) {
+            // Fetch the user data to get wallet address and other details
+            console.log('🔍 DEBUG: Fetching user data for group payment request ID:', requesterId);
+            const contact = await fetchUserData(requesterId);
+            
+            console.log('🔍 DEBUG: Fetched contact data for group payment request:', {
+              id: contact.id,
+              name: contact.name,
+              email: contact.email,
+              wallet: contact.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet'
+            });
+
+            // Navigate to SendAmount screen with pre-filled data
+            navigation.navigate('SendAmount', { 
+              destinationType: 'friend',
+              contact: contact,
               groupId: groupId,
+              prefilledAmount: amount,
+              prefilledNote: `Payment request from ${contact.name}`,
               fromNotification: true,
               notificationId: notificationId
             });

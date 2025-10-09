@@ -215,12 +215,22 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
     }
   };
 
-  const getTransactionTitle = (transaction: Transaction) => {
+  const getTransactionTitle = async (transaction: Transaction) => {
     switch (transaction.type) {
       case 'send':
-        return `Send to ${transaction.to_user}`;
+        try {
+          const recipient = await firebaseDataService.user.getCurrentUser(transaction.to_user);
+          return `Send to ${recipient.name || 'Unknown'}`;
+        } catch (error) {
+          return `Send to ${transaction.to_user}`;
+        }
       case 'receive':
-        return `Received from ${transaction.from_user}`;
+        try {
+          const sender = await firebaseDataService.user.getCurrentUser(transaction.from_user);
+          return `Received from ${sender.name || 'Unknown'}`;
+        } catch (error) {
+          return `Received from ${transaction.from_user}`;
+        }
       case 'deposit':
         return 'Deposit';
       case 'withdraw':
@@ -271,13 +281,13 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
     }> = [];
 
     // Add real transactions from Firebase
-    transactions.forEach(transaction => {
-      unifiedTransactions.push({
+    const realTransactions = await Promise.all(
+      transactions.map(async (transaction) => ({
         id: transaction.id,
         type: transaction.type,
         amount: transaction.amount,
         currency: transaction.currency,
-        title: getTransactionTitle(transaction),
+        title: await getTransactionTitle(transaction),
         source: getTransactionSource(transaction),
         time: new Date(transaction.created_at).toLocaleTimeString('en-US', {
           hour: '2-digit',
@@ -286,8 +296,9 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
         }),
         isRealTransaction: true,
         originalTransaction: transaction
-      });
-    });
+      }))
+    );
+    unifiedTransactions.push(...realTransactions);
 
     // Add ALL individual expenses from ALL groups
     for (const group of groups) {
