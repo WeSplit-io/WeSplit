@@ -298,6 +298,18 @@ export const styles = StyleSheet.create({
     minWidth: 80,
     textAlign: 'center',
   },
+  lockedIndicator: {
+    marginLeft: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    backgroundColor: colors.green,
+    borderRadius: 4,
+  },
+  lockedIndicatorText: {
+    color: colors.black,
+    fontSize: typography.fontSize.xs,
+    fontWeight: '600',
+  },
   // Modal styles
   modalOverlay: {
     position: 'absolute',

@@ -23,6 +23,7 @@ interface AddDestinationSheetProps {
   visible: boolean;
   onClose: () => void;
   onSaved: (destination: any) => void;
+  isLoading?: boolean;
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -30,7 +31,8 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   visible,
   onClose,
-  onSaved
+  onSaved,
+  isLoading = false
 }) => {
   const [destinationType, setDestinationType] = useState<'wallet' | 'kast'>('wallet');
   const [address, setAddress] = useState('');
@@ -87,9 +89,12 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     }
   };
 
-  // Animate in when modal becomes visible
+  // Animate in when modal becomes visible and reset form
   useEffect(() => {
     if (visible) {
+      // Reset form when modal becomes visible
+      resetForm();
+      
       Animated.parallel([
         Animated.timing(translateY, {
           toValue: 0,
@@ -111,7 +116,21 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     setChain('solana');
     setIdentifier('');
     setErrors({});
+    setDestinationType('wallet'); // Reset to default type
   };
+
+  // Clear form fields when switching between wallet and KAST card types
+  useEffect(() => {
+    // Clear the fields that are not relevant to the current type
+    if (destinationType === 'wallet') {
+      setIdentifier('');
+    } else {
+      setAddress('');
+      setChain('solana');
+    }
+    // Clear any existing errors
+    setErrors({});
+  }, [destinationType]);
 
   const handleClose = () => {
     resetForm();
@@ -146,6 +165,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   };
 
   const isFormValid = () => {
+    if (isLoading) return false;
     if (!name.trim()) return false;
     
     if (destinationType === 'wallet') {
@@ -156,7 +176,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   };
 
   const handleSave = () => {
-    if (!validateForm()) {
+    if (isLoading || !validateForm()) {
       return;
     }
 
@@ -170,7 +190,8 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     };
 
     onSaved(destination);
-    handleClose();
+    // Reset form after successful save
+    resetForm();
   };
 
   const renderWalletForm = () => (
@@ -331,7 +352,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
                     </View>
                   ) : (
                     <View>
-                      <Text style={styles.inputLabel}>Card Adress</Text>
+                      <Text style={styles.inputLabel}>Card Address</Text>
                       <TextInput
                         style={styles.inputField}
                         value={identifier}
@@ -372,7 +393,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
                       styles.saveButtonText,
                       !isFormValid() && styles.saveButtonTextDisabled
                     ]}>
-                      Save
+                      {isLoading ? 'Saving...' : 'Save'}
                     </Text>
                   </TouchableOpacity>
                 </View>

@@ -438,10 +438,24 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                 useNativeDriver: true,
               }).start(() => {
                 // Navigate to SplitDetailsScreen after animation
-                navigation.navigate('SplitDetails', { 
+                console.log('🔍 NotificationsScreen: About to navigate to SplitDetails with params:', {
                   splitId: splitId,
-                  isFromNotification: true
+                  isFromNotification: true,
+                  navigationState: navigation.getState ? navigation.getState() : 'No state available'
                 });
+                
+                // Add a small delay to ensure the join operation is fully complete
+                setTimeout(() => {
+                  try {
+                    navigation.navigate('SplitDetails', { 
+                      splitId: splitId,
+                      isFromNotification: true
+                    });
+                    console.log('✅ NotificationsScreen: Successfully called navigation.navigate');
+                  } catch (navError) {
+                    console.error('❌ NotificationsScreen: Navigation error:', navError);
+                  }
+                }, 200); // Small delay to ensure state is updated
               });
               
               showToast('Successfully joined the split!');

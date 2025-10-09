@@ -5,22 +5,10 @@ import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { formatKastIdentifier } from '../../utils/sendUtils';
 import AddDestinationSheet from '../../components/AddDestinationSheet';
+import { linkedWalletsService, ExternalWallet, KastCard } from '../../services/linkedWalletsService';
 import { styles } from './styles';
 
-interface ExternalWallet {
-  id: string;
-  label: string;
-  address: string;
-  chain: string;
-}
-
-interface KastCard {
-  id: string;
-  label: string;
-  identifierMasked: string;
-  last4: string;
-  address: string;
-}
+// Interfaces are now imported from the service
 
 const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   const { state } = useApp();
@@ -32,58 +20,88 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
 
-  // Load data on mount
+  // Load data on mount and when user changes
   useEffect(() => {
-    loadLinkedDestinations();
-  }, []);
+    if (currentUser?.id) {
+      loadLinkedDestinations();
+    }
+  }, [currentUser?.id]);
 
   const loadLinkedDestinations = async () => {
+    if (!currentUser?.id) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // Load external wallets from availableWallets
-      const wallets: ExternalWallet[] = availableWallets.map(wallet => ({
-        id: wallet.id,
-        label: wallet.name,
-        address: wallet.address,
-        chain: 'solana' // Default to Solana for now
-      }));
+      console.log('🔄 Loading linked destinations for user:', currentUser.id);
+      
+      // Load from the linked wallets service
+      const linkedData = await linkedWalletsService.getLinkedDestinations(currentUser.id.toString());
+      
+      console.log('📊 Loaded linked destinations:', {
+        wallets: linkedData.externalWallets.length,
+        cards: linkedData.kastCards.length
+      });
 
-      // TODO: Load KAST cards from API
-      const cards: KastCard[] = [];
-
-      setExternalWallets(wallets);
-      setKastCards(cards);
+      setExternalWallets(linkedData.externalWallets);
+      setKastCards(linkedData.kastCards);
     } catch (error) {
-      console.error('Error loading linked destinations:', error);
+      console.error('❌ Error loading linked destinations:', error);
       Alert.alert('Error', 'Failed to load linked destinations');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleAddDestination = (destination: any) => {
-    if (destination.type === 'wallet') {
-      const newWallet: ExternalWallet = {
-        id: Date.now().toString(),
-        label: destination.name,
-        address: destination.address,
-        chain: destination.chain || 'solana'
-      };
-      setExternalWallets(prev => [...prev, newWallet]);
-    } else if (destination.type === 'kast') {
-      const newCard: KastCard = {
-        id: Date.now().toString(),
-        label: destination.name,
-        identifierMasked: formatKastIdentifier(destination.identifier),
-        last4: destination.identifier.slice(-4),
-        address: destination.identifier
-      };
-      setKastCards(prev => [...prev, newCard]);
+  const handleAddDestination = async (destination: any) => {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User not found');
+      return;
     }
-    
-    setShowAddModal(false);
-    Alert.alert('Success', 'Saved to Linked Cards');
+
+    setIsAdding(true);
+    try {
+      console.log('💾 Adding new destination:', destination);
+      
+      if (destination.type === 'wallet') {
+        const newWallet = await linkedWalletsService.addExternalWallet(
+          currentUser.id.toString(),
+          {
+            label: destination.name,
+            address: destination.address,
+            chain: destination.chain || 'solana'
+          }
+        );
+        
+        setExternalWallets(prev => [...prev, newWallet]);
+        console.log('✅ External wallet added successfully');
+        Alert.alert('Success', `Wallet "${newWallet.label}" has been linked successfully!`);
+      } else if (destination.type === 'kast') {
+        const newCard = await linkedWalletsService.addKastCard(
+          currentUser.id.toString(),
+          {
+            label: destination.name,
+            identifier: destination.identifier
+          }
+        );
+        
+        setKastCards(prev => [...prev, newCard]);
+        console.log('✅ KAST card added successfully');
+        Alert.alert('Success', `KAST card "${newCard.label}" has been linked successfully!`);
+      }
+      
+      setShowAddModal(false);
+    } catch (error) {
+      console.error('❌ Error adding destination:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save destination';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   const formatWalletAddress = (address: string) => {
@@ -93,6 +111,11 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const handleUnlinkWallet = (walletId: string) => {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User not found');
+      return;
+    }
+
     Alert.alert(
       'Unlink Wallet',
       'Are you sure you want to unlink this wallet?',
@@ -101,9 +124,17 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
         { 
           text: 'Unlink', 
           style: 'destructive',
-          onPress: () => {
-            setExternalWallets(prev => prev.filter(wallet => wallet.id !== walletId));
-            setExpandedItemId(null);
+          onPress: async () => {
+            try {
+              await linkedWalletsService.removeExternalWallet(currentUser.id.toString(), walletId);
+              setExternalWallets(prev => prev.filter(wallet => wallet.id !== walletId));
+              setExpandedItemId(null);
+              console.log('✅ External wallet unlinked successfully');
+            } catch (error) {
+              console.error('❌ Error unlinking wallet:', error);
+              const errorMessage = error instanceof Error ? error.message : 'Failed to unlink wallet';
+              Alert.alert('Error', errorMessage);
+            }
           }
         }
       ]
@@ -111,6 +142,11 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const handleUnlinkKastCard = (cardId: string) => {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User not found');
+      return;
+    }
+
     Alert.alert(
       'Unlink KAST Card',
       'Are you sure you want to unlink this KAST card?',
@@ -119,9 +155,17 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
         { 
           text: 'Unlink', 
           style: 'destructive',
-          onPress: () => {
-            setKastCards(prev => prev.filter(card => card.id !== cardId));
-            setExpandedItemId(null);
+          onPress: async () => {
+            try {
+              await linkedWalletsService.removeKastCard(currentUser.id.toString(), cardId);
+              setKastCards(prev => prev.filter(card => card.id !== cardId));
+              setExpandedItemId(null);
+              console.log('✅ KAST card unlinked successfully');
+            } catch (error) {
+              console.error('❌ Error unlinking KAST card:', error);
+              const errorMessage = error instanceof Error ? error.message : 'Failed to unlink KAST card';
+              Alert.alert('Error', errorMessage);
+            }
           }
         }
       ]
@@ -267,8 +311,9 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Linked Wallets</Text>
             <TouchableOpacity 
-              style={styles.addButton}
+              style={[styles.addButton, isAdding && { opacity: 0.6 }]}
               onPress={() => setShowAddModal(true)}
+              disabled={isAdding}
             >
               <Image
                 source={require('../../../assets/plus-icon-green.png')}
@@ -315,8 +360,12 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           {/* Add Destination Modal */}
           <AddDestinationSheet
             visible={showAddModal}
-            onClose={() => setShowAddModal(false)}
+            onClose={() => {
+              setShowAddModal(false);
+              setIsAdding(false); // Reset loading state when closing
+            }}
             onSaved={handleAddDestination}
+            isLoading={isAdding}
           />
         </View>
       </TouchableWithoutFeedback>

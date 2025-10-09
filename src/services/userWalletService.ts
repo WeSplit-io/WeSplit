@@ -50,9 +50,48 @@ export class UserWalletService {
   
   // Prevent multiple wallet creation calls for the same user
   private walletCreationPromises: { [userId: string]: Promise<WalletCreationResult> } = {};
+  
+  // Cache restored wallets to avoid repeated restoration
+  private restoredWallets: { [userId: string]: { wallet: any; timestamp: number } } = {};
+  private readonly WALLET_CACHE_DURATION_MS = 30000; // 30 seconds
 
   constructor() {
     this.connection = new Connection(RPC_ENDPOINT, 'confirmed');
+  }
+
+  /**
+   * Get cached wallet if available and not expired
+   */
+  private getCachedWallet(userId: string): any | null {
+    const cached = this.restoredWallets[userId];
+    if (cached && (Date.now() - cached.timestamp) < this.WALLET_CACHE_DURATION_MS) {
+      logger.info('UserWalletService: Using cached wallet', { userId }, 'UserWalletService');
+      return cached.wallet;
+    }
+    return null;
+  }
+
+  /**
+   * Cache a restored wallet
+   */
+  private cacheWallet(userId: string, wallet: any): void {
+    this.restoredWallets[userId] = {
+      wallet,
+      timestamp: Date.now()
+    };
+  }
+
+  /**
+   * Clear wallet cache for a specific user or all users
+   */
+  public clearWalletCache(userId?: string): void {
+    if (userId) {
+      delete this.restoredWallets[userId];
+      logger.info('UserWalletService: Cleared wallet cache for user', { userId }, 'UserWalletService');
+    } else {
+      this.restoredWallets = {};
+      logger.info('UserWalletService: Cleared all wallet cache', {}, 'UserWalletService');
+    }
   }
 
   /**
@@ -224,10 +263,23 @@ export class UserWalletService {
   /**
    * Restore existing wallet for a user
    * This method tries to restore the wallet from stored seed phrase or private key
-   * IMPROVED: More robust restoration with multiple fallback strategies
+   * IMPROVED: More robust restoration with multiple fallback strategies and caching
    */
   private async restoreExistingWallet(userId: string, walletAddress: string): Promise<WalletCreationResult> {
     try {
+      // Check if we have a cached wallet first
+      const cachedWallet = this.getCachedWallet(userId);
+      if (cachedWallet) {
+        return {
+          success: true,
+          wallet: {
+            address: cachedWallet.address,
+            publicKey: cachedWallet.publicKey,
+            secretKey: cachedWallet.secretKey
+          }
+        };
+      }
+
       logger.info('UserWalletService: Attempting to restore existing wallet', { 
         userId, 
         walletAddress 
@@ -236,18 +288,21 @@ export class UserWalletService {
       // Strategy 1: Try to restore from stored private key
       const privateKeyResult = await this.tryRestoreFromPrivateKey(userId, walletAddress);
       if (privateKeyResult.success) {
+        this.cacheWallet(userId, privateKeyResult.wallet);
         return privateKeyResult;
       }
 
       // Strategy 2: Try to restore from stored seed phrase
       const seedPhraseResult = await this.tryRestoreFromSeedPhrase(userId, walletAddress);
       if (seedPhraseResult.success) {
+        this.cacheWallet(userId, seedPhraseResult.wallet);
         return seedPhraseResult;
       }
 
       // Strategy 3: Try alternative derivation paths from seed phrase
       const alternativeResult = await this.tryAlternativeDerivationPaths(userId, walletAddress);
       if (alternativeResult.success) {
+        this.cacheWallet(userId, alternativeResult.wallet);
         return alternativeResult;
       }
 
@@ -255,6 +310,7 @@ export class UserWalletService {
       // This handles cases where the user's wallet was created with different derivation
       const fallbackResult = await this.tryFallbackRestoration(userId, walletAddress);
       if (fallbackResult.success) {
+        this.cacheWallet(userId, fallbackResult.wallet);
         return fallbackResult;
       }
 
@@ -264,7 +320,11 @@ export class UserWalletService {
         walletAddress 
       }, 'UserWalletService');
 
-      return await this.fixWalletMismatch(userId);
+      const fixResult = await this.fixWalletMismatch(userId);
+      if (fixResult.success) {
+        this.cacheWallet(userId, fixResult.wallet);
+      }
+      return fixResult;
 
     } catch (error) {
       logger.error('UserWalletService: Error restoring existing wallet', error, 'UserWalletService');

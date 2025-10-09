@@ -287,7 +287,7 @@ export const styles = StyleSheet.create({
     gap: spacing.md,
   },
   payButton: {
-    backgroundColor: colors.orange,
+    backgroundColor: colors.green,
     borderRadius: 12,
     paddingVertical: spacing.lg,
     alignItems: 'center',
@@ -570,6 +570,106 @@ export const styles = StyleSheet.create({
   },
   transferButtonText: {
     color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '600',
+  },
+  // Dev button styles
+  buttonContainer: {
+    gap: spacing.sm,
+  },
+  devButton: {
+    backgroundColor: colors.green,
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.green,
+    borderStyle: 'dashed',
+  },
+  devButtonText: {
+    color: colors.black,
+    fontSize: typography.fontSize.sm,
+    fontWeight: '700',
+  },
+  // Wallet selection styles
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  loadingText: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    marginTop: spacing.md,
+  },
+  noWalletsContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  noWalletsText: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    textAlign: 'center',
+  },
+  selectedWalletInfo: {
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    padding: spacing.md,
+    marginVertical: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  selectedWalletLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.xs,
+  },
+  selectedWalletAddress: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    fontFamily: 'monospace',
+  },
+  // Add wallet button styles
+  addWalletButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 2,
+    borderColor: colors.green,
+    borderStyle: 'dashed',
+  },
+  addWalletIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.green,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  addWalletIconText: {
+    color: colors.black,
+    fontSize: typography.fontSize.xl,
+    fontWeight: '700',
+  },
+  addWalletContent: {
+    flex: 1,
+  },
+  addWalletTitle: {
+    color: colors.green,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+  },
+  addWalletDescription: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+  },
+  addWalletArrow: {
+    color: colors.green,
     fontSize: typography.fontSize.lg,
     fontWeight: '600',
   },

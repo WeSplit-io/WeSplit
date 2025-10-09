@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import NavBar from '../../components/NavBar';
 import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
+import { linkedWalletsService, ExternalWallet, KastCard } from '../../services/linkedWalletsService';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
@@ -26,6 +28,35 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState<'friends' | 'external'>(initialTab || 'friends');
   const [searchQuery, setSearchQuery] = useState('');
   const [contactsTab, setContactsTab] = useState<'All' | 'Favorite' | 'Search'>('All');
+  const [linkedWallets, setLinkedWallets] = useState<ExternalWallet[]>([]);
+  const [linkedKastCards, setLinkedKastCards] = useState<KastCard[]>([]);
+  const [loadingLinkedDestinations, setLoadingLinkedDestinations] = useState(false);
+
+  // Load linked destinations
+  const loadLinkedDestinations = async () => {
+    if (!currentUser?.id) return;
+    
+    setLoadingLinkedDestinations(true);
+    try {
+      console.log('🔄 SendScreen: Loading linked destinations for user:', currentUser.id);
+      
+      const linkedData = await linkedWalletsService.getLinkedDestinations(currentUser.id.toString());
+      
+      console.log('📊 SendScreen: Loaded linked destinations:', {
+        wallets: linkedData.externalWallets.length,
+        cards: linkedData.kastCards.length
+      });
+
+      setLinkedWallets(linkedData.externalWallets);
+      setLinkedKastCards(linkedData.kastCards);
+    } catch (error) {
+      console.error('❌ SendScreen: Error loading linked destinations:', error);
+      setLinkedWallets([]);
+      setLinkedKastCards([]);
+    } finally {
+      setLoadingLinkedDestinations(false);
+    }
+  };
 
   // Ensure app wallet is connected on mount
   useEffect(() => {
@@ -33,6 +64,22 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
       ensureAppWallet(currentUser.id.toString());
     }
   }, [currentUser?.id, appWalletConnected]);
+
+  // Load linked destinations when component mounts or when external tab is selected
+  useEffect(() => {
+    if (currentUser?.id && activeTab === 'external') {
+      loadLinkedDestinations();
+    }
+  }, [currentUser?.id, activeTab]);
+
+  // Refresh linked destinations when screen comes into focus (e.g., returning from LinkedCards)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (currentUser?.id && activeTab === 'external') {
+        loadLinkedDestinations();
+      }
+    }, [currentUser?.id, activeTab])
+  );
 
   const handleSelectContact = (contact: UserContact) => {
     console.log('📱 SendScreen: Selected contact for sending:', {
@@ -50,16 +97,17 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     });
   };
 
-  const handleSelectWallet = (wallet: any) => {
-    console.log('📱 SendScreen: Selected external wallet for sending:', {
-      name: wallet.name,
-      address: wallet.address,
-      id: wallet.id
+  const handleSelectWallet = (destination: ExternalWallet | KastCard) => {
+    console.log('📱 SendScreen: Selected external destination for sending:', {
+      name: destination.label,
+      address: destination.address,
+      id: destination.id,
+      type: 'address' in destination ? 'wallet' : 'kast'
     });
     
     navigation.navigate('SendAmount', {
       destinationType: 'external',
-      wallet: wallet,
+      destination: destination,
       groupId,
     });
   };
@@ -96,6 +144,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
       onSuccess: () => {
         // Refresh the screen to show newly connected wallet
         console.log('External wallet connected successfully');
+        loadLinkedDestinations(); // Reload linked destinations
       }
     });
   };
@@ -129,15 +178,16 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   );
 
   const renderExternalWalletTab = () => {
-    // Add test KAST card to the list
-    const testKastCard = {
-      id: 'kast-test-card',
-      name: 'KAST Card Test',
-      address: 'kast_1234567890abcdef',
-      type: 'kast'
-    };
+    // Combine linked wallets and KAST cards
+    const allDestinations = [...linkedWallets, ...linkedKastCards];
 
-    const allDestinations = [...availableWallets, testKastCard];
+    if (loadingLinkedDestinations) {
+      return (
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateTitle}>Loading linked destinations...</Text>
+        </View>
+      );
+    }
 
     if (allDestinations.length === 0) {
       return (
@@ -150,7 +200,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
           </View>
           <Text style={styles.emptyStateTitle}>No cards or wallets connected</Text>
           <Text style={styles.emptyStateSubtitle}>
-          Link a card or wallet to start sending funds easily.
+            Link a card or wallet to start sending funds easily.
           </Text>
           <TouchableOpacity 
             style={styles.connectWalletButton}
@@ -164,34 +214,40 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
 
     return (
       <ScrollView style={styles.walletsList} showsVerticalScrollIndicator={false}>
-        {allDestinations.map((destination) => (
-          <TouchableOpacity
-            key={destination.id}
-            style={styles.walletRow}
-            onPress={() => handleSelectWallet(destination)}
-          >
-            {(destination as any).type === 'kast' ? (
-              <Image
-                source={require('../../../assets/kast-logo.png')}
-                style={[styles.kastIcon]}
-              />
-            ) : (
-              <View style={styles.walletIcon}>
+        {allDestinations.map((destination) => {
+          const isKastCard = 'identifier' in destination;
+          
+          return (
+            <TouchableOpacity
+              key={destination.id}
+              style={styles.walletRow}
+              onPress={() => handleSelectWallet(destination)}
+            >
+              {isKastCard ? (
                 <Image
-                  source={require('../../../assets/wallet-icon-white.png')}
-                  style={styles.walletIconImage}
+                  source={require('../../../assets/kast-logo.png')}
+                  style={[styles.kastIcon]}
                 />
+              ) : (
+                <View style={styles.walletIcon}>
+                  <Image
+                    source={require('../../../assets/wallet-icon-white.png')}
+                    style={styles.walletIconImage}
+                  />
+                </View>
+              )}
+              <View style={styles.walletInfo}>
+                <Text style={styles.walletName}>{destination.label}</Text>
+                <Text style={styles.walletAddress}>
+                  {formatWalletAddress(destination.address)}
+                </Text>
+                {isKastCard && (
+                  <Text style={styles.walletType}>KAST Card</Text>
+                )}
               </View>
-            )}
-            <View style={styles.walletInfo}>
-              <Text style={styles.walletName}>{destination.name}</Text>
-              <Text style={styles.walletAddress}>
-                {formatWalletAddress(destination.address)}
-              </Text>
-            </View>
-            
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          );
+        })}
         
         <TouchableOpacity 
           style={styles.addWalletButton}

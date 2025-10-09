@@ -113,6 +113,7 @@ const SplitPaymentScreen: React.FC = () => {
       // Get split wallet details
       const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
       if (!walletResult.success || !walletResult.wallet) {
+        console.error('🔍 SplitPaymentScreen: Failed to load split wallet:', walletResult.error);
         setError(walletResult.error || 'Split wallet not found');
         setIsLoading(false);
         return;
@@ -456,7 +457,7 @@ const SplitPaymentScreen: React.FC = () => {
               <Text style={styles.statusLabel}>Status:</Text>
               <Text style={[
                 styles.statusValue,
-                { color: isFullyPaid ? colors.green : colors.orange }
+                { color: isFullyPaid ? colors.green : colors.warning }
               ]}>
                 {isFullyPaid ? 'Paid' : 'Pending'}
               </Text>

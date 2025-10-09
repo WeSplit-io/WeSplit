@@ -114,8 +114,8 @@ export const WALLET_CONFIG = {
   connectionTimeout: 10000,
   // Auto-connect on app start
   autoConnect: true,
-  // Balance call debounce
-  balanceCallDebounce: 2000,
+  // Balance call debounce - increased to prevent excessive calls
+  balanceCallDebounce: 10000, // 10 seconds
 };
 
 // Logging configuration

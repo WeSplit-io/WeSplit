@@ -470,22 +470,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     setConsecutiveFailures(0); // Reset failure counter when user changes
   }, [currentUser?.id]);
 
-  // Auto-refresh balance periodically to keep it up-to-date
-  useEffect(() => {
-    if (!currentUser?.id || !isAuthenticated) {
-      return;
-    }
-
-    // Set up periodic balance refresh every 30 seconds
-    const interval = setInterval(() => {
-      if (!loadingUserWallet && balanceLoaded) {
-        console.log('🔄 Dashboard: Periodic balance refresh');
-        loadUserCreatedWalletBalance();
-      }
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(interval);
-  }, [currentUser?.id, isAuthenticated, loadingUserWallet, balanceLoaded, loadUserCreatedWalletBalance]);
+  // Note: Periodic balance refresh is now handled by WalletProvider to avoid duplicate calls
 
   // Consolidated effect to load user wallet balance - only run when necessary
   useEffect(() => {

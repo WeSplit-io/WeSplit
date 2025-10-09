@@ -213,6 +213,17 @@ export class NotificationService {
         createdAt: serverTimestamp(),
       });
 
+      // Send push notification
+      await this.sendPushNotification(
+        notification.title,
+        notification.message,
+        {
+          type: notification.type,
+          splitWalletId: notification.splitWalletId,
+          billName: notification.billName
+        }
+      );
+
       logger.info('Spin available notification sent', {
         userId,
         splitWalletId,
@@ -257,6 +268,17 @@ export class NotificationService {
         ...notification,
         createdAt: serverTimestamp(),
       });
+
+      // Send push notification
+      await this.sendPushNotification(
+        notification.title,
+        notification.message,
+        {
+          type: notification.type,
+          splitWalletId: notification.splitWalletId,
+          billName: notification.billName
+        }
+      );
 
       logger.info('Winner notification sent', {
         userId,
@@ -304,6 +326,18 @@ export class NotificationService {
         ...notification,
         createdAt: serverTimestamp(),
       });
+
+      // Send push notification
+      await this.sendPushNotification(
+        notification.title,
+        notification.message,
+        {
+          type: notification.type,
+          splitWalletId: notification.splitWalletId,
+          billName: notification.billName,
+          amount: notification.amount
+        }
+      );
 
       logger.info('Loser notification sent', {
         userId,

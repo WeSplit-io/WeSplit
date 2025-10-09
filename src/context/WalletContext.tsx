@@ -646,6 +646,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     
     const interval = setInterval(async () => {
       try {
+        // Only refresh if we haven't checked recently (within last 30 seconds)
+        const now = Date.now();
+        const lastCheck = lastBalanceCheck?.getTime() || 0;
+        if (now - lastCheck < 30000) {
+          console.log('🔄 WalletProvider: Skipping balance check - too recent');
+          return;
+        }
+
         // Refresh app wallet balance
         if (appWalletConnected) {
           const { userWalletService } = await import('../services/userWalletService');
@@ -671,10 +679,10 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           console.error('❌ WalletProvider: Error during auto-refresh:', error);
         }
       }
-    }, 60000); // Check every 60 seconds to reduce rate limiting
+    }, 120000); // Check every 2 minutes to reduce rate limiting and excessive calls
 
     setBalancePollingInterval(interval);
-  }, [autoRefreshEnabled, appWalletConnected, isConnected, address, appWalletBalance, appWalletAddress]);
+  }, [autoRefreshEnabled, appWalletConnected, isConnected, address, appWalletBalance, appWalletAddress, lastBalanceCheck]);
 
   const stopBalancePolling = useCallback(() => {
     if (balancePollingInterval) {

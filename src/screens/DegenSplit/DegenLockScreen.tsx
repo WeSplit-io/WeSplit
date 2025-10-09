@@ -3,12 +3,11 @@
  * Users must lock the full bill amount before the degen split can begin
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   SafeAreaView,
   StatusBar,
   Animated,
@@ -18,7 +17,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
 import { styles } from './DegenLockStyles';
 import { SplitWalletService } from '../../services/splitWalletService';
 import { NotificationService } from '../../services/notificationService';
@@ -37,8 +35,8 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   // Extract participants from splitData if not provided directly
   const participants = routeParticipants || splitData?.participants || [];
   
-  // Always use unified mockup data for consistency - ignore route params
-  const totalAmount = MockupDataService.getBillAmount();
+  // Use route params if available, otherwise fallback to mockup data
+  const totalAmount = routeTotalAmount || MockupDataService.getBillAmount();
   const { state } = useApp();
   const { currentUser } = state;
   const insets = useSafeAreaInsets();
@@ -52,35 +50,25 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   const [isCheckingLocks, setIsCheckingLocks] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   
-  const slideAnimation = useRef(new Animated.Value(0)).current;
   const lockProgress = useRef(new Animated.Value(0)).current;
 
-  // Debug: Log the received data
-  console.log('🔍 DegenLockScreen: Received route params:', {
-    billData: billData ? { title: billData.title, totalAmount: billData.totalAmount } : null,
-    routeParticipants: routeParticipants ? routeParticipants.length : 'undefined',
-    extractedParticipants: participants ? participants.length : 'undefined',
-    routeTotalAmount,
-    unifiedTotalAmount: totalAmount,
-    processedBillData: processedBillData ? { title: processedBillData.title, totalAmount: processedBillData.totalAmount } : null,
-    splitData: splitData ? { 
-      id: splitData.id, 
-      title: splitData.title,
-      participants: splitData.participants?.length || 0,
-      splitType: splitData.splitType
-    } : null,
-    existingSplitWallet: existingSplitWallet ? {
-      id: existingSplitWallet.id,
-      walletAddress: existingSplitWallet.walletAddress,
-      participants: existingSplitWallet.participants?.length || 0
-    } : 'No existing wallet',
-  });
+  // Memoize the bill date to prevent excessive FallbackDataService calls
+  const billDate = useMemo(() => {
+    try {
+      return FallbackDataService.generateBillDate(processedBillData, billData, true);
+    } catch (error) {
+      return new Date().toLocaleDateString('en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+    }
+  }, [processedBillData, billData]);
+
   
-  console.log('🔍 DegenLockScreen: Route params keys:', Object.keys(route.params || {}));
 
   // Validate required data
   if (!participants || !Array.isArray(participants) || participants.length === 0) {
-    console.error('🔍 DegenLockScreen: Invalid participants data:', participants);
     Alert.alert('Error', 'Invalid participants data. Please try again.');
     navigation.goBack();
     return null;
@@ -117,38 +105,21 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     setShowLockModal(false);
     
     try {
-      console.log('🔍 DegenLockScreen: Starting degen split wallet creation...');
-      console.log('🔍 DegenLockScreen: Participants data:', participants);
-      
       // Use existing split wallet - wallet should already be created during bill processing
       let walletToUse = splitWallet;
       
       if (!walletToUse) {
-        console.error('🔍 DegenLockScreen: No existing wallet found! Wallet should have been created during bill processing.');
         Alert.alert('Error', 'No split wallet found. Please go back and create the split again.');
         setIsLocking(false);
         return;
-      } else {
-        console.log('🔍 DegenLockScreen: Using existing split wallet:', walletToUse.id);
       }
 
-      // Sync participants between split data and split wallet
+      // Sync participants between split data and split wallet if needed
       const splitParticipantIds = participants.map((p: any) => p.userId || p.id);
       const walletParticipantIds = walletToUse.participants.map((p: any) => p.userId);
       
-      console.log('🔍 DegenLockScreen: Participant sync check:', {
-        splitParticipantIds,
-        walletParticipantIds,
-        needsSync: splitParticipantIds.length !== walletParticipantIds.length || 
-                   !splitParticipantIds.every(id => walletParticipantIds.includes(id))
-      });
-      
-      // If participants don't match, sync them
       if (splitParticipantIds.length !== walletParticipantIds.length || 
           !splitParticipantIds.every(id => walletParticipantIds.includes(id))) {
-        console.log('🔍 DegenLockScreen: Syncing participants to split wallet...');
-        
-        const { SplitWalletService } = await import('../../services/splitWalletService');
         const participantsForUpdate = participants.map(p => ({
           userId: p.userId || p.id,
           name: p.name,
@@ -162,7 +133,6 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         );
         
         if (!syncResult.success) {
-          console.error('🔍 DegenLockScreen: Failed to sync participants:', syncResult.error);
           Alert.alert('Error', 'Failed to sync participants. Please try again.');
           setIsLocking(false);
           return;
@@ -173,14 +143,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         if (reloadResult.success && reloadResult.wallet) {
           walletToUse = reloadResult.wallet;
           setSplitWallet(walletToUse);
-          console.log('🔍 DegenLockScreen: Wallet participants synced successfully');
         }
-      }
-
-      if (!walletToUse) {
-        Alert.alert('Error', 'No split wallet available');
-        setIsLocking(false);
-        return;
       }
 
       // Lock the current user's amount in the split wallet
@@ -191,7 +154,6 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       );
 
       if (!lockResult.success) {
-        console.error('🔍 DegenLockScreen: Lock failed:', lockResult.error);
         Alert.alert(
           'Lock Failed', 
           lockResult.error || 'Failed to lock amount. This might be due to insufficient funds or network issues.',
@@ -209,39 +171,19 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         .filter(p => (p.userId || p.id) !== currentUser!.id.toString())
         .map(p => p.userId || p.id);
       
-      const billName = MockupDataService.getBillName(); // Use unified mockup data
+      const billName = splitData?.title || billData?.title || MockupDataService.getBillName();
 
       if (otherParticipantIds.length > 0) {
-        console.log('🔍 DegenLockScreen: Sending notifications with data:', {
-          otherParticipantIds,
-          splitWalletId: walletToUse.id,
-          billName,
-          amount: totalAmount,
-          amountType: typeof totalAmount
-        });
-        
-        const notificationResult = await NotificationService.sendBulkNotifications(
+        await NotificationService.sendBulkNotifications(
           otherParticipantIds,
           'split_lock_required',
           {
             splitWalletId: walletToUse.id,
             billName,
-            amount: totalAmount, // Each participant needs to lock the full amount
+            amount: totalAmount,
           }
         );
-        
-        console.log('🔍 DegenLockScreen: Notification result:', notificationResult);
-        
-        if (!notificationResult.success || notificationResult.failed > 0) {
-          console.error('🔍 DegenLockScreen: Some notifications failed:', {
-            sent: notificationResult.sent,
-            failed: notificationResult.failed,
-            errors: notificationResult.errors
-          });
-        }
       }
-
-      console.log('🔍 DegenLockScreen: Successfully locked amount for degen split');
 
       // Lock the split method in the split data
       if (splitData && splitData.id) {
@@ -249,11 +191,10 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           const { SplitStorageService } = await import('../../services/splitStorageService');
           await SplitStorageService.updateSplit(splitData.id, {
             splitType: 'degen',
-            status: 'active', // Mark as active when creator locks their share
+            status: 'active',
           });
-          console.log('🔍 DegenLockScreen: Split method locked as degen');
         } catch (error) {
-          console.error('🔍 DegenLockScreen: Error locking split method:', error);
+          // Non-critical error, continue
         }
       }
 
@@ -262,16 +203,21 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         toValue: 1,
         duration: 2000,
         useNativeDriver: false,
-      }).start(() => {
+      }).start(async () => {
         setIsLocked(true);
         setIsLocking(false);
+        
+        // Reload wallet to get updated participant status
+        const updatedWalletResult = await SplitWalletService.getSplitWallet(walletToUse.id);
+        if (updatedWalletResult.success && updatedWalletResult.wallet) {
+          setSplitWallet(updatedWalletResult.wallet);
+        }
         
         // Check if all participants have locked their funds
         checkAllParticipantsLocked();
       });
 
     } catch (error) {
-      console.error('🔍 DegenLockScreen: Error in degen split:', error);
       Alert.alert('Error', 'Failed to lock amount. Please try again.');
       setIsLocking(false);
     }
@@ -282,15 +228,13 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   };
 
   // Function to check if all participants have locked their funds
-  const checkAllParticipantsLocked = async () => {
+  const checkAllParticipantsLocked = useCallback(async () => {
     if (!splitWallet || !currentUser?.id) {
       return;
     }
 
     setIsCheckingLocks(true);
     try {
-      console.log('🔍 DegenLockScreen: Checking if all participants have locked funds...');
-      
       // Get the current wallet status to check locked participants
       const walletResult = await SplitWalletService.getSplitWallet(splitWallet.id);
       
@@ -298,27 +242,14 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         const wallet = walletResult.wallet;
         const totalParticipants = participants.length;
         
-        console.log('🔍 DegenLockScreen: Wallet participants data:', {
-          participants: wallet.participants.map(p => ({
-            userId: p.userId,
-            amountPaid: p.amountPaid,
-            amountOwed: p.amountOwed
-          }))
-        });
-        
-        const lockedCount = wallet.participants.filter(p => p.amountPaid > 0).length;
-        
-        console.log('🔍 DegenLockScreen: Lock status check:', {
-          totalParticipants,
-          lockedCount,
-          allLocked: lockedCount === totalParticipants,
-          walletParticipants: wallet.participants.length
-        });
+        const lockedCount = wallet.participants.filter((p: any) => 
+          p.amountPaid > 0 || (__DEV__ && p.status === 'locked')
+        ).length;
         
         // Update locked participants list for UI
         const lockedParticipantIds = wallet.participants
-          .filter(p => p.amountPaid > 0)
-          .map(p => p.userId);
+          .filter((p: any) => p.amountPaid > 0 || (__DEV__ && p.status === 'locked'))
+          .map((p: any) => p.userId);
         
         // Only update state if there's a change to avoid unnecessary re-renders
         setLockedParticipants(prev => {
@@ -334,38 +265,26 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         const allLocked = lockedCount === totalParticipants;
         setAllParticipantsLocked(prev => {
           if (prev !== allLocked) {
-            console.log('🔍 DegenLockScreen: All participants locked status changed:', allLocked);
             return allLocked;
           }
           return prev;
         });
+
+        // Update the splitWallet state with fresh data
+        setSplitWallet(wallet);
       }
     } catch (error) {
-      console.error('🔍 DegenLockScreen: Error checking participant locks:', error);
+      // Silent error handling
     } finally {
       setIsCheckingLocks(false);
     }
-  };
+  }, [splitWallet, currentUser?.id, participants.length]);
 
   // Function to handle roulette button press
   const handleRollRoulette = () => {
     if (!allParticipantsLocked || !splitWallet) {
-      console.log('🔍 DegenLockScreen: Cannot start roulette - conditions not met:', {
-        allParticipantsLocked,
-        hasSplitWallet: !!splitWallet
-      });
       return;
     }
-
-    console.log('🔍 DegenLockScreen: Rolling roulette - all participants locked!');
-    console.log('🔍 DegenLockScreen: Navigation data:', {
-      hasBillData: !!billData,
-      hasParticipants: !!participants,
-      totalAmount,
-      hasSplitWallet: !!splitWallet,
-      hasProcessedBillData: !!processedBillData,
-      hasSplitData: !!splitData,
-    });
     
     try {
       // Navigate to Degen Spin screen
@@ -378,7 +297,6 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         splitData,
       });
     } catch (error) {
-      console.error('🔍 DegenLockScreen: Error navigating to DegenSpin:', error);
       Alert.alert('Error', 'Failed to start the roulette. Please try again.');
     }
   };
@@ -397,7 +315,6 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           const walletResult = await SplitWalletService.getSplitWallet(splitData.walletId);
           if (walletResult.success && walletResult.wallet) {
             setSplitWallet(walletResult.wallet);
-            console.log('🔍 DegenLockScreen: Loaded split wallet:', walletResult.wallet.id);
             
             // Check if current user has already locked their funds
             if (currentUser?.id) {
@@ -405,12 +322,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
                 p => p.userId === currentUser.id.toString()
               );
               
-              if (userParticipant && userParticipant.amountPaid > 0) {
-                console.log('🔍 DegenLockScreen: User has already locked funds:', {
-                  userId: currentUser.id.toString(),
-                  amountPaid: userParticipant.amountPaid,
-                  status: userParticipant.status
-                });
+              if (userParticipant && (userParticipant.amountPaid > 0 || (__DEV__ && userParticipant.status === 'locked'))) {
                 setIsLocked(true);
                 setLockedParticipants(prev => [...prev, currentUser.id.toString()]);
               }
@@ -418,11 +330,9 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
             
             // Immediately check all participants' lock status to avoid flicker
             await checkAllParticipantsLocked();
-          } else {
-            console.error('🔍 DegenLockScreen: Failed to load split wallet:', walletResult.error);
           }
         } catch (error) {
-          console.error('🔍 DegenLockScreen: Error loading split wallet:', error);
+          // Silent error handling
         } finally {
           setIsLoadingWallet(false);
         }
@@ -430,7 +340,19 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     };
 
     loadSplitWallet();
-  }, [splitData?.walletId, currentUser?.id]);
+  }, [splitData?.walletId, checkAllParticipantsLocked]);
+
+  // Update allParticipantsLocked when splitWallet changes
+  useEffect(() => {
+    if (splitWallet?.participants) {
+      // In dev mode, also check for 'locked' status in addition to amountPaid
+      const lockedCount = splitWallet.participants.filter((p: any) => 
+        p.amountPaid > 0 || (__DEV__ && p.status === 'locked')
+      ).length;
+      const allLocked = lockedCount === participants.length;
+      setAllParticipantsLocked(allLocked);
+    }
+  }, [splitWallet, participants.length]);
 
   // Periodic check for participant locks when user has locked their funds
   useEffect(() => {
@@ -467,23 +389,10 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         <View style={styles.billCard}>
           <View style={styles.billCardHeader}>
             <Text style={styles.billIcon}>🍽️</Text>
-            <Text style={styles.billTitle}>{MockupDataService.getBillName()}</Text>
+            <Text style={styles.billTitle}>{splitData?.title || billData?.title || MockupDataService.getBillName()}</Text>
           </View>
           <Text style={styles.billDate}>
-            {(() => {
-              try {
-                const date = FallbackDataService.generateBillDate(processedBillData, billData, true);
-                console.log('🔍 DegenLockScreen: Generated date:', date);
-                return date;
-              } catch (error) {
-                console.error('🔍 DegenLockScreen: Error generating date:', error);
-                return new Date().toLocaleDateString('en-US', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric'
-                });
-              }
-            })()}
+            {billDate}
           </Text>
           <View style={styles.totalBillRow}>
             <Text style={styles.totalBillLabel}>Total Bill</Text>
@@ -509,7 +418,16 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
             />
             <View style={styles.progressInner}>
               <Text style={styles.progressPercentage}>
-                {lockedParticipants.length}/{participants.length}
+                {(() => {
+                  // Use wallet data for accurate count if available
+                  if (splitWallet?.participants) {
+                    const lockedCount = splitWallet.participants.filter((p: any) => 
+                      p.amountPaid > 0 || (__DEV__ && p.status === 'locked')
+                    ).length;
+                    return `${lockedCount}/${participants.length}`;
+                  }
+                  return `${lockedParticipants.length}/${participants.length}`;
+                })()}
               </Text>
               <Text style={styles.progressAmount}>
                 Locked
@@ -521,7 +439,12 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         {/* Participants List */}
         <View style={styles.participantsContainer}>
           {participants.map((participant, index) => {
-            const isParticipantLocked = lockedParticipants.includes(participant.userId || participant.id);
+            // Use wallet participant data if available for accurate lock status
+            const walletParticipant = splitWallet?.participants?.find((p: any) => p.userId === (participant.userId || participant.id));
+            const isParticipantLocked = walletParticipant ? 
+              (walletParticipant.amountPaid > 0 || (__DEV__ && walletParticipant.status === 'locked')) : 
+              lockedParticipants.includes(participant.userId || participant.id);
+            
             return (
               <View key={participant.userId || participant.id || `participant_${index}`} style={styles.participantCard}>
                 <View style={styles.participantAvatar}>
@@ -540,6 +463,11 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
                 </View>
                 <View style={styles.participantAmountContainer}>
                   <Text style={styles.participantAmount}>{totalAmount} USDC</Text>
+                  {isParticipantLocked && (
+                    <View style={styles.lockedIndicator}>
+                      <Text style={styles.lockedIndicatorText}>🔒</Text>
+                    </View>
+                  )}
                 </View>
               </View>
             );
@@ -596,34 +524,81 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         {/* Roll Roulette Button - Show for all participants who have locked their funds */}
         {isLocked && (
           <View style={[styles.rouletteContainer, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <TouchableOpacity
-              style={[
-                styles.rouletteButton,
-                (!allParticipantsLocked || isCheckingLocks) && styles.rouletteButtonDisabled
-              ]}
-              onPress={handleRollRoulette}
-              disabled={!allParticipantsLocked || isCheckingLocks}
-            >
-              <View style={styles.rouletteButtonContent}>
-                <Text style={styles.rouletteButtonIcon}>🎲</Text>
-                <Text style={[
-                  styles.rouletteButtonText,
-                  (!allParticipantsLocked || isCheckingLocks) && styles.rouletteButtonTextDisabled
-                ]}>
-                  {isCheckingLocks 
-                    ? 'Checking...' 
-                    : allParticipantsLocked 
-                      ? 'Roll Roulette!' 
-                      : `Waiting for ${participants.length - lockedParticipants.length} more participant${participants.length - lockedParticipants.length !== 1 ? 's' : ''}`
-                  }
-                </Text>
+            {/* Creator can roll roulette */}
+            {currentUser?.id === splitData?.creatorId ? (
+              <TouchableOpacity
+                style={[
+                  styles.rouletteButton,
+                  (!allParticipantsLocked || isCheckingLocks) && styles.rouletteButtonDisabled
+                ]}
+                onPress={handleRollRoulette}
+                disabled={!allParticipantsLocked || isCheckingLocks}
+              >
+                <View style={styles.rouletteButtonContent}>
+                  <Text style={styles.rouletteButtonIcon}>🎲</Text>
+                  <Text style={[
+                    styles.rouletteButtonText,
+                    (!allParticipantsLocked || isCheckingLocks) && styles.rouletteButtonTextDisabled
+                  ]}>
+                    {isCheckingLocks 
+                      ? 'Checking...' 
+                      : allParticipantsLocked 
+                        ? 'Roll Roulette!' 
+                        : (() => {
+                            // Use wallet data for accurate count
+                            if (splitWallet?.participants) {
+                              const lockedCount = splitWallet.participants.filter((p: any) => 
+                                p.amountPaid > 0 || (__DEV__ && p.status === 'locked')
+                              ).length;
+                              const remaining = participants.length - lockedCount;
+                              return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''}`;
+                            }
+                            const remaining = participants.length - lockedParticipants.length;
+                            return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''}`;
+                          })()
+                    }
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              /* Non-creators see waiting message */
+              <View style={[styles.rouletteButton, styles.rouletteButtonDisabled]}>
+                <View style={styles.rouletteButtonContent}>
+                  <Text style={styles.rouletteButtonIcon}>⏳</Text>
+                  <Text style={[styles.rouletteButtonText, styles.rouletteButtonTextDisabled]}>
+                    {allParticipantsLocked 
+                      ? 'Waiting for the creator to roll!' 
+                      : (() => {
+                          // Use wallet data for accurate count
+                          if (splitWallet?.participants) {
+                            const lockedCount = splitWallet.participants.filter((p: any) => 
+                              p.amountPaid > 0 || (__DEV__ && p.status === 'locked')
+                            ).length;
+                            const remaining = participants.length - lockedCount;
+                            return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''}`;
+                          }
+                          const remaining = participants.length - lockedParticipants.length;
+                          return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''}`;
+                        })()
+                    }
+                  </Text>
+                </View>
               </View>
-            </TouchableOpacity>
+            )}
             
             {/* Status indicator */}
             <View style={styles.rouletteStatusContainer}>
               <Text style={styles.rouletteStatusText}>
-                {lockedParticipants.length} of {participants.length} participants locked
+                {(() => {
+                  // Use wallet data for accurate count, same as lock icons
+                  if (splitWallet?.participants) {
+                    const lockedCount = splitWallet.participants.filter((p: any) => 
+                      p.amountPaid > 0 || (__DEV__ && p.status === 'locked')
+                    ).length;
+                    return `${lockedCount} of ${participants.length} participants locked`;
+                  }
+                  return `${lockedParticipants.length} of ${participants.length} participants locked`;
+                })()}
               </Text>
             </View>
           </View>

@@ -8,7 +8,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   SafeAreaView,
   StatusBar,
   Animated,
@@ -16,10 +15,9 @@ import {
 } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
 import { styles } from './DegenSpinStyles';
+import { useApp } from '../../context/AppContext';
 import { NotificationService } from '../../services/notificationService';
-import { FallbackDataService } from '../../utils/fallbackDataService';
 import { MockupDataService } from '../../data/mockupData';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -40,9 +38,12 @@ interface Participant {
 const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) => {
   const { billData, participants, totalAmount, splitWallet, processedBillData, splitData } = route.params;
   
-  // Get current user from context (you'll need to import this)
-  // For now, we'll assume the first participant is the creator
-  const isCreator = true; // TODO: Get from actual user context
+  // Get current user from context
+  const { state } = useApp();
+  const { currentUser } = state;
+  
+  // Check if current user is the creator
+  const isCreator = currentUser && splitData && currentUser.id.toString() === splitData.creatorId;
   
   // Animation state
   const [isSpinning, setIsSpinning] = useState(false);
@@ -57,13 +58,13 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
   useEffect(() => {
     const sendSpinNotifications = async () => {
       const participantIds = participants.map(p => p.userId || p.id).filter(id => id);
-      const billName = MockupDataService.getBillName();
+      const billName = splitData?.title || billData?.title || MockupDataService.getBillName();
 
       if (participantIds.length === 0) {
         return;
       }
 
-      await NotificationService.sendBulkNotifications(
+      const notificationResult = await NotificationService.sendBulkNotifications(
         participantIds,
         'split_spin_available',
         {
@@ -71,10 +72,12 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
           billName,
         }
       );
+      
+      console.log('🔍 DegenSpinScreen: Spin available notification result:', notificationResult);
     };
 
     sendSpinNotifications();
-  }, []);
+  }, [participants, splitData?.title, billData?.title, splitWallet.id]);
 
   // Data processing
   const MIN_CARDS_FOR_CAROUSEL = 20; // Increased for better infinite effect
@@ -108,16 +111,6 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
     // Select random participant from original participants (not duplicates)
     const finalIndex = Math.floor(Math.random() * baseParticipantCards.length);
     
-    console.log('🎰 Starting infinite roulette:', {
-      baseParticipants: BASE_PARTICIPANTS,
-      totalCards: TOTAL_CARDS,
-      finalIndex,
-      selectedParticipant: baseParticipantCards[finalIndex]?.name,
-      cardWidth: CARD_WIDTH,
-      rotations: ROTATIONS,
-      totalRotationDistance: TOTAL_ROTATION_DISTANCE,
-      animationRange: [0, -TOTAL_ROTATION_DISTANCE]
-    });
     
     // Reset animation values
     spinAnimation.setValue(0);
@@ -143,11 +136,68 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
         duration: 200,
         useNativeDriver: true,
       }),
-    ]).start(() => {
+    ]).start(async () => {
       setSelectedIndex(finalIndex);
       setIsSpinning(false);
       setHasSpun(true);
       
+      // Save the winner information to the split wallet
+      try {
+        const { SplitWalletService } = await import('../../services/splitWalletService');
+        await SplitWalletService.updateSplitWallet(splitWallet.id, {
+          degenWinner: {
+            userId: baseParticipantCards[finalIndex].userId,
+            name: baseParticipantCards[finalIndex].name,
+            selectedAt: new Date().toISOString()
+          },
+          status: 'spinning_completed'
+        });
+      } catch (error) {
+        console.error('Failed to save winner information:', error);
+      }
+
+      // Send notifications to all participants about the roulette result
+      try {
+        const { NotificationService } = await import('../../services/notificationService');
+        const billName = splitData?.title || billData?.title || MockupDataService.getBillName();
+        const winnerId = baseParticipantCards[finalIndex].userId;
+        const winnerName = baseParticipantCards[finalIndex].name;
+        
+        // Send winner notification
+        await NotificationService.sendWinnerNotification(
+          winnerId,
+          splitWallet.id,
+          billName
+        );
+        
+        // Send loser notifications to all other participants
+        const loserIds = participants
+          .filter(p => (p.userId || p.id) !== winnerId)
+          .map(p => p.userId || p.id)
+          .filter(id => id);
+        
+        if (loserIds.length > 0) {
+          await NotificationService.sendBulkNotifications(
+            loserIds,
+            'split_loser',
+            {
+              splitWalletId: splitWallet.id,
+              billName,
+              amount: totalAmount,
+            }
+          );
+        }
+        
+        console.log('🔍 DegenSpinScreen: Roulette result notifications sent:', {
+          winnerId,
+          winnerName,
+          loserIds,
+          billName
+        });
+      } catch (error) {
+        console.error('Failed to send roulette result notifications:', error);
+      }
+
       // Navigate to result screen after delay
       setTimeout(() => {
         navigation.navigate('DegenResult', {

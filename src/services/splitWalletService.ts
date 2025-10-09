@@ -19,12 +19,17 @@ export interface SplitWallet {
   secretKey: string; // Encrypted and stored securely
   totalAmount: number;
   currency: string;
-  status: 'active' | 'locked' | 'completed' | 'cancelled';
+  status: 'active' | 'locked' | 'completed' | 'cancelled' | 'spinning_completed';
   participants: SplitWalletParticipant[];
   createdAt: string;
   updatedAt: string;
   completedAt?: string; // When the split was completed
   firebaseDocId?: string; // Firebase document ID for direct access
+  degenWinner?: { // For degen splits - stores the winner information
+    userId: string;
+    name: string;
+    selectedAt: string;
+  };
 }
 
 export interface SplitWalletParticipant {
@@ -186,11 +191,18 @@ export class SplitWalletService {
       // Validate participant data to prevent corruption
       const totalParticipantAmounts = splitWallet.participants.reduce((sum, p) => sum + p.amountOwed, 0);
       if (Math.abs(totalParticipantAmounts - splitWallet.totalAmount) > 0.01) {
-        console.warn('🔍 SplitWalletService: Participant amounts do not match total amount:', {
+        console.warn('🔍 SplitWalletService: Participant amounts do not match total amount, correcting...', {
           totalParticipantAmounts,
           totalAmount: splitWallet.totalAmount,
           difference: Math.abs(totalParticipantAmounts - splitWallet.totalAmount)
         });
+        
+        // Fix the participant amounts to match the total
+        const correctedAmountPerPerson = splitWallet.totalAmount / splitWallet.participants.length;
+        splitWallet.participants = splitWallet.participants.map(p => ({
+          ...p,
+          amountOwed: correctedAmountPerPerson
+        }));
       }
 
       // Ensure all participants have amountPaid = 0 initially
@@ -427,6 +439,51 @@ export class SplitWalletService {
   }
 
   /**
+   * Update split wallet with any fields
+   * This is a general method for updating split wallet data
+   */
+  static async updateSplitWallet(splitWalletId: string, updates: Partial<SplitWallet>): Promise<SplitWalletResult> {
+    try {
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = result.wallet;
+      const docId = wallet.firebaseDocId || splitWalletId;
+
+      // Update the wallet with the provided fields
+      await updateDoc(doc(db, 'splitWallets', docId), {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      });
+
+      logger.info('Split wallet updated successfully', {
+        splitWalletId,
+        updates: Object.keys(updates)
+      }, 'SplitWalletService');
+
+      return {
+        success: true,
+        wallet: {
+          ...wallet,
+          ...updates,
+        },
+      };
+
+    } catch (error) {
+      logger.error('Failed to update split wallet', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
    * Update split wallet participants without recreating the wallet
    * This allows adding/removing participants while maintaining the same wallet
    */
@@ -538,15 +595,11 @@ export class SplitWalletService {
    */
   static async getSplitWallet(splitWalletId: string): Promise<SplitWalletResult> {
     try {
-      // Getting split wallet with ID - Removed log to prevent infinite logging
-      
       // First, try to get by Firebase document ID (if it looks like a Firebase doc ID)
       if (splitWalletId.length > 20 && !splitWalletId.startsWith('split_wallet_')) {
-        // Trying to get by Firebase document ID - Removed log to prevent infinite logging
         const walletDoc = await getDoc(doc(db, 'splitWallets', splitWalletId));
         
         if (walletDoc.exists()) {
-          // Found wallet by Firebase document ID - Removed log to prevent infinite logging
           return {
             success: true,
             wallet: walletDoc.data() as SplitWallet,
@@ -555,13 +608,11 @@ export class SplitWalletService {
       }
       
       // If not found by document ID, try to find by internal ID
-      // Trying to get by internal ID - Removed log to prevent infinite logging
       const walletsRef = collection(db, 'splitWallets');
       const q = query(walletsRef, where('id', '==', splitWalletId));
       const querySnapshot = await getDocs(q);
       
       if (!querySnapshot.empty) {
-        // Found wallet by internal ID - Removed log to prevent infinite logging
         const walletData = querySnapshot.docs[0].data() as SplitWallet;
         // Add the Firebase document ID to the wallet data
         walletData.firebaseDocId = querySnapshot.docs[0].id;
@@ -571,7 +622,6 @@ export class SplitWalletService {
         };
       }
       
-      console.log('🔍 SplitWalletService: Split wallet not found');
       return {
         success: false,
         error: 'Split wallet not found',
@@ -962,6 +1012,108 @@ export class SplitWalletService {
   }
 
   /**
+   * Transfer funds from split wallet to a user's wallet (for degen split winners)
+   */
+  static async transferToUserWallet(
+    splitWalletId: string,
+    userId: string,
+    amount: number
+  ): Promise<PaymentResult> {
+    try {
+      console.log('🔍 SplitWalletService: Transferring to user wallet:', {
+        splitWalletId,
+        userId,
+        amount
+      });
+
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = result.wallet;
+
+      // Find the participant
+      const participant = wallet.participants.find(p => p.userId === userId);
+      if (!participant) {
+        return {
+          success: false,
+          error: 'Participant not found in split wallet',
+        };
+      }
+
+      // Check if participant has locked funds
+      if (participant.status !== 'locked' && participant.status !== 'paid') {
+        return {
+          success: false,
+          error: 'Participant has not locked their funds',
+        };
+      }
+
+      // Transfer funds FROM split wallet TO participant's wallet
+      // Use the new method that can send from a specific wallet
+      console.log('🔍 SplitWalletService: About to transfer USDC:', {
+        fromWallet: wallet.walletAddress,
+        toWallet: participant.walletAddress,
+        amount,
+        participantUserId: userId
+      });
+      
+      const transactionResult = await consolidatedTransactionService.sendUsdcFromSpecificWallet(
+        wallet.walletAddress, // Split wallet address (source)
+        wallet.secretKey, // Split wallet's secret key
+        participant.walletAddress, // Participant wallet address (destination)
+        amount,
+        `Degen Split refund for ${wallet.billId}`,
+        'medium'
+      );
+
+      if (!transactionResult.success) {
+        return {
+          success: false,
+          error: transactionResult.error || 'Failed to transfer funds',
+        };
+      }
+
+      // Update participant status to 'refunded'
+      const updatedParticipants = wallet.participants.map(p => 
+        p.userId === userId 
+          ? { ...p, status: 'refunded' as const, amountPaid: 0 }
+          : p
+      );
+
+      // Update the wallet
+      await updateDoc(doc(db, 'splitWallets', wallet.firebaseDocId || splitWalletId), {
+        participants: updatedParticipants,
+        updatedAt: new Date().toISOString(),
+      });
+
+      logger.info('Funds transferred to user wallet successfully', {
+        splitWalletId,
+        userId,
+        amount,
+        transactionSignature: transactionResult.signature,
+      }, 'SplitWalletService');
+
+      return {
+        success: true,
+        transactionSignature: transactionResult.signature,
+        amount: amount,
+      };
+
+    } catch (error) {
+      logger.error('Failed to transfer funds to user wallet', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
    * Send funds from split wallet to an address for Degen Split payments
    * This version accepts 'locked' status for participants (used in Degen Split)
    */
@@ -1002,13 +1154,13 @@ export class SplitWalletService {
       }
 
       // Send payment from split wallet to recipient address
-      // The creator has custody of the split wallet, so they initiate the transaction
-      const transactionResult = await consolidatedTransactionService.sendUsdcTransaction(
-        recipientAddress,
+      // Use the new method that can send from a specific wallet
+      const transactionResult = await consolidatedTransactionService.sendUsdcFromSpecificWallet(
+        wallet.walletAddress, // Split wallet address (source)
+        wallet.secretKey, // Split wallet's secret key
+        recipientAddress, // Recipient address (destination)
         wallet.totalAmount,
-        wallet.creatorId, // Creator has custody and initiates the transaction
         description || `Degen Split payment for ${wallet.billId}`,
-        undefined,
         'high' // High priority for final payment
       );
 
@@ -1023,12 +1175,12 @@ export class SplitWalletService {
         splitWalletId,
         recipientAddress,
         amount: wallet.totalAmount,
-        transactionSignature: transactionResult.transactionSignature
+        transactionSignature: transactionResult.signature
       }, 'SplitWalletService');
 
       return {
         success: true,
-        transactionSignature: transactionResult.transactionSignature,
+        transactionSignature: transactionResult.signature,
         amount: wallet.totalAmount,
       };
 
@@ -1265,6 +1417,70 @@ export class SplitWalletService {
   }
 
   /**
+   * Validate and fix participant data consistency
+   * This ensures all participant data is consistent with the wallet total
+   */
+  static async validateParticipantData(splitWalletId: string): Promise<{
+    success: boolean;
+    isValid: boolean;
+    issues: string[];
+    error?: string;
+  }> {
+    try {
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          isValid: false,
+          issues: [],
+          error: result.error || 'Split wallet not found'
+        };
+      }
+
+      const wallet = result.wallet;
+      const issues: string[] = [];
+
+      // Check total amount consistency
+      const totalParticipantAmounts = wallet.participants.reduce((sum, p) => sum + p.amountOwed, 0);
+      if (Math.abs(totalParticipantAmounts - wallet.totalAmount) > 0.01) {
+        issues.push(`Participant amounts (${totalParticipantAmounts}) don't match wallet total (${wallet.totalAmount})`);
+      }
+
+      // Check for negative amounts
+      const negativeAmounts = wallet.participants.filter(p => p.amountOwed < 0 || p.amountPaid < 0);
+      if (negativeAmounts.length > 0) {
+        issues.push(`Found ${negativeAmounts.length} participants with negative amounts`);
+      }
+
+      // Check for zero amountOwed with positive amountPaid
+      const corruptedParticipants = wallet.participants.filter(p => p.amountOwed === 0 && p.amountPaid > 0);
+      if (corruptedParticipants.length > 0) {
+        issues.push(`Found ${corruptedParticipants.length} participants with corrupted data (amountOwed=0, amountPaid>0)`);
+      }
+
+      // Check for amountPaid exceeding amountOwed
+      const overpaidParticipants = wallet.participants.filter(p => p.amountPaid > p.amountOwed);
+      if (overpaidParticipants.length > 0) {
+        issues.push(`Found ${overpaidParticipants.length} participants who have paid more than they owe`);
+      }
+
+      return {
+        success: true,
+        isValid: issues.length === 0,
+        issues
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        isValid: false,
+        issues: [],
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
    * Repair corrupted split wallet data
    * This fixes cases where amountOwed and amountPaid are swapped or incorrect
    */
@@ -1286,6 +1502,21 @@ export class SplitWalletService {
 
       const wallet = result.wallet;
       let needsRepair = false;
+      
+      // Check if all participants have amountOwed = 0 (common issue)
+      const allParticipantsHaveZeroAmount = wallet.participants.every(p => p.amountOwed === 0);
+      const totalParticipantAmounts = wallet.participants.reduce((sum, p) => sum + p.amountOwed, 0);
+      
+      if (allParticipantsHaveZeroAmount || Math.abs(totalParticipantAmounts - wallet.totalAmount) > 0.01) {
+        console.log('🔧 SplitWalletService: Found participants with incorrect amounts:', {
+          allParticipantsHaveZeroAmount,
+          totalParticipantAmounts,
+          walletTotalAmount: wallet.totalAmount,
+          participantsCount: wallet.participants.length
+        });
+        needsRepair = true;
+      }
+      
       const updatedParticipants = wallet.participants.map(participant => {
         // Check for data corruption: amountOwed = 0 but amountPaid > 0
         if (participant.amountOwed === 0 && participant.amountPaid > 0) {
@@ -1308,6 +1539,50 @@ export class SplitWalletService {
             ...participant,
             amountOwed: correctAmountOwed,
             // Keep amountPaid as is to preserve payment history
+            status: participant.amountPaid >= correctAmountOwed ? 'paid' as const : 'locked' as const,
+          };
+        }
+        
+        // Check for participants with amountOwed = 0 (needs repair)
+        if (participant.amountOwed === 0 && wallet.totalAmount > 0) {
+          console.log('🔧 SplitWalletService: Found participant with zero amountOwed:', {
+            userId: participant.userId,
+            name: participant.name,
+            amountOwed: participant.amountOwed,
+            amountPaid: participant.amountPaid,
+            status: participant.status
+          });
+
+          needsRepair = true;
+          
+          // Calculate correct amountOwed based on total amount and number of participants
+          const correctAmountOwed = wallet.totalAmount / wallet.participants.length;
+          
+          return {
+            ...participant,
+            amountOwed: correctAmountOwed,
+            // Keep amountPaid as is to preserve payment history
+            status: participant.amountPaid >= correctAmountOwed ? 'paid' as const : 'locked' as const,
+          };
+        }
+        
+        // Also check for other corruption patterns
+        if (participant.amountOwed < 0 || participant.amountPaid < 0) {
+          console.log('🔧 SplitWalletService: Found negative amounts for participant:', {
+            userId: participant.userId,
+            name: participant.name,
+            amountOwed: participant.amountOwed,
+            amountPaid: participant.amountPaid
+          });
+
+          needsRepair = true;
+          
+          const correctAmountOwed = wallet.totalAmount / wallet.participants.length;
+          
+          return {
+            ...participant,
+            amountOwed: Math.max(0, participant.amountOwed || correctAmountOwed),
+            amountPaid: Math.max(0, participant.amountPaid || 0),
             status: participant.amountPaid >= correctAmountOwed ? 'paid' as const : 'locked' as const,
           };
         }
@@ -1616,11 +1891,11 @@ export class SplitWalletService {
       await sendNotificationsToUsers(
         participantIds,
         '🎉 Split Completed!',
-        `The "${wallet.billName}" split has been completed successfully! All payments have been processed.`,
+        `The "${wallet.billId}" split has been completed successfully! All payments have been processed.`,
         'general',
         {
           splitWalletId: wallet.id,
-          billName: wallet.billName,
+          billName: wallet.billId,
           totalAmount: wallet.totalAmount,
           currency: wallet.currency,
           completedAt: new Date().toISOString(),
@@ -1630,7 +1905,7 @@ export class SplitWalletService {
 
       logger.info('Split completion notifications sent successfully', {
         splitWalletId: wallet.id,
-        billName: wallet.billName,
+        billName: wallet.billId,
         participantCount: participantIds.length
       }, 'SplitWalletService');
 
@@ -1654,11 +1929,11 @@ export class SplitWalletService {
       await sendNotificationsToUsers(
         participantIds,
         '🔒 All Funds Locked!',
-        `All participants have locked their funds for "${wallet.billName}". The creator can now roll the roulette!`,
+        `All participants have locked their funds for "${wallet.billId}". The creator can now roll the roulette!`,
         'general',
         {
           splitWalletId: wallet.id,
-          billName: wallet.billName,
+          billName: wallet.billId,
           totalAmount: wallet.totalAmount,
           currency: wallet.currency,
           lockedAt: new Date().toISOString(),
@@ -1671,11 +1946,11 @@ export class SplitWalletService {
       await sendNotification(
         wallet.creatorId,
         '🎲 Ready to Roll!',
-        `All participants have locked their funds for "${wallet.billName}". You can now roll the roulette to determine the loser!`,
+        `All participants have locked their funds for "${wallet.billId}". You can now roll the roulette to determine the loser!`,
         'general',
         {
           splitWalletId: wallet.id,
-          billName: wallet.billName,
+          billName: wallet.billId,
           totalAmount: wallet.totalAmount,
           currency: wallet.currency,
           lockedAt: new Date().toISOString(),
@@ -1685,7 +1960,7 @@ export class SplitWalletService {
 
       logger.info('Degen lock completion notifications sent successfully', {
         splitWalletId: wallet.id,
-        billName: wallet.billName,
+        billName: wallet.billId,
         participantCount: participantIds.length,
         creatorId: wallet.creatorId
       }, 'SplitWalletService');
@@ -1744,11 +2019,11 @@ export class SplitWalletService {
       await sendNotificationsToUsers(
         participantIds,
         '🎲 Roulette Result!',
-        `The roulette has been rolled for "${wallet.billName}". ${loserName} is the unlucky one who will pay the full amount!`,
+        `The roulette has been rolled for "${wallet.billId}". ${loserName} is the unlucky one who will pay the full amount!`,
         'general',
         {
           splitWalletId: wallet.id,
-          billName: wallet.billName,
+          billName: wallet.billId,
           totalAmount: wallet.totalAmount,
           currency: wallet.currency,
           loserId,
@@ -1760,7 +2035,7 @@ export class SplitWalletService {
 
       logger.info('Roulette result notifications sent successfully', {
         splitWalletId: wallet.id,
-        billName: wallet.billName,
+        billName: wallet.billId,
         loserId,
         loserName,
         participantCount: participantIds.length

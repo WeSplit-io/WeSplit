@@ -94,8 +94,20 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       hasSplitId: !!splitId,
       hasProcessedBillData: !!processedBillData,
       hasBillData: !!billData,
-      isNewBill: isNewBill
+      isNewBill: isNewBill,
+      isFromNotification: isFromNotification,
+      routeParams: route?.params,
+      fullRoute: route
     });
+    
+    // Additional logging for notification navigation
+    if (isFromNotification) {
+      console.log('🔍 SplitDetailsScreen: Navigation from notification detected:', {
+        splitId: splitId,
+        isFromNotification: isFromNotification,
+        notificationId: route?.params?.notificationId
+      });
+    }
   }
   
   const [billName, setBillName] = useState(() => {
@@ -1620,6 +1632,46 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         splitData: currentSplitData, // Pass the split data
       });
     } else {
+      // Check if degen split has already been completed or spinning completed
+      // If so, redirect to result screen based on user's win/loss state
+      console.log('🔍 SplitDetailsScreen: Checking degen split completion status:', {
+        hasSplitWallet: !!splitWallet,
+        walletStatus: splitWallet?.status,
+        hasDegenWinner: !!splitWallet?.degenWinner,
+        degenWinner: splitWallet?.degenWinner,
+        currentUserId: currentUser?.id?.toString()
+      });
+      
+      if (splitWallet && (splitWallet.status === 'completed' || splitWallet.status === 'spinning_completed')) {
+        // Check if this is a degen split and if the user is winner or loser
+        const currentUserId = currentUser?.id?.toString();
+        if (currentUserId && splitWallet.degenWinner) {
+          // Find the winner participant from the participants list
+          const winnerParticipant = unifiedParticipants.find(p => 
+            (p.userId || p.id) === splitWallet.degenWinner?.userId
+          );
+          
+          console.log('🔍 SplitDetailsScreen: Found winner participant:', {
+            winnerParticipant,
+            degenWinnerUserId: splitWallet.degenWinner?.userId
+          });
+          
+          if (winnerParticipant) {
+            console.log('🔍 SplitDetailsScreen: Navigating to DegenResult for completed split');
+            navigation.navigate('DegenResult', {
+              billData: unifiedBillData,
+              participants: unifiedParticipants,
+              totalAmount: parseFloat(totalAmount),
+              selectedParticipant: winnerParticipant,
+              splitWallet: splitWallet,
+              processedBillData,
+              splitData: currentSplitData,
+            });
+            return;
+          }
+        }
+      }
+      
       console.log('🔍 SplitDetailsScreen: Navigating to DegenLock with wallet:', splitWallet ? {
         id: splitWallet.id,
         walletAddress: splitWallet.walletAddress,

@@ -49,6 +49,22 @@ class PriceManagementService {
    * Default amount is 75.00 USDC (from unified mockup data)
    */
   setBillPrice(billId: string, amount: number, currency: string = 'USDC'): void {
+    // Validate input parameters
+    if (!billId || billId.trim() === '') {
+      console.error('💰 PriceManagementService: Invalid billId provided');
+      return;
+    }
+    
+    if (amount < 0 || !isFinite(amount)) {
+      console.error('💰 PriceManagementService: Invalid amount provided:', amount);
+      return;
+    }
+    
+    if (!currency || currency.trim() === '') {
+      console.error('💰 PriceManagementService: Invalid currency provided');
+      return;
+    }
+
     const priceData: PriceData = {
       amount,
       currency,

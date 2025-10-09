@@ -16,7 +16,6 @@ import {
   sendAndConfirmTransaction,
   ComputeBudgetProgram
 } from '@solana/web3.js';
-import { COMPANY_WALLET_CONFIG } from '../config/chain';
 import { 
   getAssociatedTokenAddress, 
   createAssociatedTokenAccountInstruction,
@@ -1080,6 +1079,86 @@ class ConsolidatedTransactionService {
     } catch (error) {
       console.error('🔗 ConsolidatedTransactionService: Failed to get wallet address:', error);
       return null;
+    }
+  }
+
+  /**
+   * Send USDC from a specific wallet (like a split wallet) to a recipient
+   * This method allows sending from any wallet using its secret key
+   */
+  async sendUsdcFromSpecificWallet(
+    fromWalletAddress: string,
+    fromWalletSecretKey: string,
+    toAddress: string,
+    amount: number,
+    memo?: string,
+    priority: 'low' | 'medium' | 'high' = 'medium'
+  ): Promise<{
+    success: boolean;
+    transactionId?: string;
+    signature?: string;
+    error?: string;
+  }> {
+    console.log('🔗 ConsolidatedTransactionService: Sending USDC from specific wallet:', {
+      fromWalletAddress,
+      toAddress,
+      amount
+    });
+
+    try {
+      // Create keypair from the wallet's secret key
+      const secretKeyBuffer = Buffer.from(fromWalletSecretKey, 'base64');
+      const walletKeypair = Keypair.fromSecretKey(secretKeyBuffer);
+      
+      // Verify the keypair matches the expected address
+      if (walletKeypair.publicKey.toBase58() !== fromWalletAddress) {
+        return {
+          success: false,
+          error: 'Wallet secret key does not match the provided address'
+        };
+      }
+
+      // Create a direct Solana transaction
+      const connection = new Connection(process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com');
+      
+      // Get the wallet's USDC token account
+      const usdcMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // USDC mint address
+      const walletUsdcAccount = await getAssociatedTokenAddress(usdcMint, walletKeypair.publicKey);
+      const recipientUsdcAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(toAddress));
+
+      // Create the transfer instruction
+      const usdcAmount = amount * 1000000; // Convert to smallest USDC unit (6 decimals)
+      console.log('🔗 ConsolidatedTransactionService: Creating USDC transfer:', {
+        fromAccount: walletUsdcAccount.toBase58(),
+        toAccount: recipientUsdcAccount.toBase58(),
+        amount,
+        usdcAmount,
+        amountInSmallestUnit: usdcAmount
+      });
+      
+      const transferInstruction = createTransferInstruction(
+        walletUsdcAccount,
+        recipientUsdcAccount,
+        walletKeypair.publicKey,
+        usdcAmount
+      );
+
+      // Create and send the transaction
+      const transaction = new Transaction().add(transferInstruction);
+      const signature = await sendAndConfirmTransaction(connection, transaction, [walletKeypair]);
+
+      return {
+        success: true,
+        signature,
+        transactionId: signature
+      };
+
+    } catch (error) {
+      console.error('🔗 ConsolidatedTransactionService: Error sending from specific wallet:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
     }
   }
 
