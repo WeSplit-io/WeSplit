@@ -51,9 +51,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
       userName,
       userImageInfo: !!userImageInfo,
       avatarUrl,
-      hasAvatarUrl: !!avatarUrl,
-      userIdType: typeof userId,
-      userNameType: typeof userName
+      hasAvatarUrl: !!avatarUrl
     });
 
     if (userImageInfo) {
@@ -74,17 +72,6 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
       console.log('🔍 UserAvatar: Fetching image info from service');
       const fetchImageInfo = async () => {
         try {
-          if (!userId || userId.trim() === '') {
-            console.log('🔍 UserAvatar: Invalid userId, using fallback');
-            setImageInfo({
-              userId: userId || 'unknown',
-              imageUrl: undefined,
-              hasImage: false,
-              fallbackInitials: UserImageService.generateInitials(userName || 'User'),
-            });
-            return;
-          }
-          
           const info = await UserImageService.getUserImageInfo(userId, userName);
           console.log('🔍 UserAvatar: Fetched image info:', info);
           setImageInfo(info);
@@ -92,7 +79,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
           console.error('UserAvatar: Error fetching image info:', error);
           // Set fallback
           setImageInfo({
-            userId: userId || 'unknown',
+            userId,
             imageUrl: undefined,
             hasImage: false,
             fallbackInitials: UserImageService.generateInitials(userName || 'User'),

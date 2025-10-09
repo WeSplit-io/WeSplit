@@ -323,6 +323,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
             processedBillData: currentProcessedData,
             analysisResult: processingResult,
             splitData: updateResult.split, // Pass the updated split data
+            splitId: existingSplitId, // FIXED: Pass the splitId to prevent duplicate creation
           });
         } else {
           console.log('🔍 BillProcessingScreen: Failed to update split:', updateResult.error);

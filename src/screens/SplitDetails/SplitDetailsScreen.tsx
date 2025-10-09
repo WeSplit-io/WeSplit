@@ -101,7 +101,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   if (__DEV__) {
     console.log('🔍 SplitDetailsScreen: Current user from context:', {
       currentUser: currentUser ? {
-        id: currentUser.id,        name: currentUser.name
+        id: currentUser.id,
+        name: currentUser.name
       } : null,
       isAuthenticated: state.isAuthenticated
     });
@@ -580,10 +581,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // Process new bill on component mount if needed
   useEffect(() => {
-    if (isNewBill && imageUri && currentUser && !isProcessingNewBill && !createdSplitId) {
+    if (isNewBill && imageUri && currentUser && !isProcessingNewBill && !createdSplitId && !isEditing) {
       processNewBillImage();
     }
-  }, [isNewBill, imageUri, currentUser, isProcessingNewBill, createdSplitId]);
+  }, [isNewBill, imageUri, currentUser, isProcessingNewBill, createdSplitId, isEditing]);
 
   // Handle joining a split when opened from a notification
   useEffect(() => {
@@ -1935,7 +1936,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // Check for existing split and load wallet if it exists
   useEffect(() => {
     const checkExistingSplit = async () => {
-      if (currentUser && !splitWallet && !isCreatingWallet && !isProcessingNewBill && !hasJustJoinedSplit && !createdSplitId) {
+      if (currentUser && !splitWallet && !isCreatingWallet && !isProcessingNewBill && !hasJustJoinedSplit && !createdSplitId && !isEditing) {
         setIsCreatingWallet(true);
         console.log('🔍 SplitDetailsScreen: Checking for existing split...');
 
@@ -1984,13 +1985,17 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               split.title === processedBillData.title
             );
           } else if (splitId && splitData) {
-            // We have both splitId and splitData (normal case when navigating from splits list)
+            // We have both splitId and splitData (normal case when navigating from splits list or after edit)
             console.log('🔍 SplitDetailsScreen: Using splitData from navigation (both splitId and splitData present):', {
               splitId: splitId,
               splitDataId: splitData.id,
               splitDataTitle: splitData.title
             });
             existingSplit = splitData;
+            // FIXED: Set createdSplitId to prevent duplicate creation after edit
+            if (!createdSplitId) {
+              setCreatedSplitId(splitData.id);
+            }
           } else {
             console.log('🔍 SplitDetailsScreen: No existing split conditions met, will create new split when needed');
           }
@@ -2023,7 +2028,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     };
 
     checkExistingSplit();
-  }, [currentUser?.id, splitData?.id, processedBillData?.id, splitId, isProcessingNewBill, hasJustJoinedSplit, createdSplitId]); // FIXED: Use splitData?.id instead of splitData?.walletId and add createdSplitId
+  }, [currentUser?.id, splitData?.id, processedBillData?.id, splitId, isProcessingNewBill, hasJustJoinedSplit, createdSplitId, isEditing]); // FIXED: Use splitData?.id instead of splitData?.walletId and add createdSplitId and isEditing
 
   // Debug: Monitor splitWallet state changes
   useEffect(() => {
@@ -2459,14 +2464,6 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                     const avatarStyle = index > 0
                       ? [styles.avatar, styles.avatarOverlap] as any
                       : styles.avatar;
-
-                    // Debug participant data
-                    console.log('🔍 SplitDetailsScreen: Rendering avatar for participant:', {
-                      participantId: participant.id,
-                      participantName: participant.name,
-                      participantUserId: participant.userId,
-                      participantKeys: Object.keys(participant)
-                    });
 
                     return (
                       <UserAvatar
