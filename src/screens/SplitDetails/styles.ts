@@ -12,7 +12,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     backgroundColor: colors.black,
   },
@@ -23,6 +23,11 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.xl,
     fontWeight: '600',
+  },
+  backButtonIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.white,
   },
   headerTitle: {
     color: colors.white,
@@ -36,61 +41,113 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.md,
   },
+  editButtonIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.white,
+  },
+
+  /* === Bill Card Styles === */
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   billCard: {
     backgroundColor: colors.green,
     borderRadius: 20,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    position: 'relative',
   },
+  splitCardDotLeft: {
+    width: 30,
+    height: 30,
+    borderRadius: 20,
+    marginRight: spacing.xs,
+    position: 'absolute',
+    bottom: '45%',
+    left: -15,
+    backgroundColor: colors.black,
+    zIndex: 1,
+  },
+  splitCardDotRight: {
+    width: 30,
+    height: 30,
+    borderRadius: 20,
+    marginLeft: spacing.xs,
+    position: 'absolute',
+    bottom: '45%',
+    right: -15,
+    backgroundColor: colors.black,
+    zIndex: 1,
+  },
+  billCardTop: {
+   
+  },
+
   billHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  billHeaderContent: {
+    flex: 1,
   },
   billTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-  },
-  billIcon: {
-    fontSize: typography.fontSize.lg,
+ },
+  billIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: colors.black,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: spacing.sm,
   },
+  billIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.white,
+  },
   billTitle: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.xl,
     fontWeight: '700',
+    flex: 1,
+
   },
   billDate: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.sm,
     opacity: 0.9,
   },
   billAmountContainer: {
     marginBottom: spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   billAmountLabel: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.md,
-    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
   },
   billAmountRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
   },
   billAmountUSDC: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.xxl,
     fontWeight: '700',
-    marginRight: spacing.sm,
   },
   billAmountEUR: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.md,
     opacity: 0.9,
   },
@@ -100,16 +157,19 @@ export const styles = StyleSheet.create({
     opacity: 0.8,
     marginTop: spacing.xs,
   },
+  billCardBottom: {
+  },
+
   splitInfoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
   },
   splitInfoLeft: {
     flex: 1,
   },
   splitInfoLabel: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.md,
     marginBottom: spacing.sm,
   },
@@ -146,26 +206,28 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.black,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    borderRadius: 8,
+    borderRadius: 20,
   },
   addButtonText: {
     color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
   },
+
+
+  /*** ==== Participants Section ==== ***/
   participantsSection: {
-    marginBottom: spacing.xl,
   },
   participantsTitle: {
     color: colors.white,
     fontSize: typography.fontSize.lg,
     fontWeight: '600',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   participantCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white5,
     borderRadius: 12,
-    padding: spacing.lg,
+    padding: spacing.md,
     marginBottom: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -174,7 +236,7 @@ export const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.green,
+    backgroundColor: colors.white10,
     marginRight: spacing.md,
   },
   participantInfo: {
@@ -198,23 +260,31 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.lg,
     fontWeight: '600',
   },
+  statusAcceptedIcon: {
+    width: 20,
+    height: 20,
+    objectFit: 'contain',
+    marginRight: spacing.xs,
+  },
   statusPending: {
     color: colors.textSecondary,
     fontSize: typography.fontSize.sm,
   },
   bottomContainer: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.sm,
     backgroundColor: colors.black,
   },
   splitButton: {
-    backgroundColor: colors.green,
-    paddingVertical: spacing.lg,
     borderRadius: 12,
+    overflow: 'hidden',
+  },
+  splitButtonGradient: {
+    paddingVertical: spacing.md,
     alignItems: 'center',
   },
   splitButtonText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.lg,
     fontWeight: '700',
   },
@@ -359,7 +429,7 @@ export const styles = StyleSheet.create({
   },
   // Add Friends Modal Styles
   addFriendsModalContainer: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.blackWhite5,
     borderTopLeftRadius: spacing.xl,
     borderTopRightRadius: spacing.xl,
     paddingTop: spacing.lg,
@@ -375,7 +445,7 @@ export const styles = StyleSheet.create({
   dragHandle: {
     width: 50,
     height: 5,
-    backgroundColor: colors.border,
+    backgroundColor: colors.white70,
     borderRadius: 3,
     alignSelf: 'center',
     marginBottom: spacing.xl,
@@ -395,14 +465,12 @@ export const styles = StyleSheet.create({
   },
   qrCodeContainer: {
     marginBottom: spacing.xl,
+    backgroundColor: colors.white,
+    padding: spacing.md,
+    borderRadius: spacing.md,
     shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 12,
+    width: '100%',
+
   },
   qrCodePlaceholder: {
     width: 220,
@@ -446,18 +514,18 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 'auto',
     paddingTop: spacing.xl,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   shareLinkButton: {
     flex: 1,
-    backgroundColor: colors.border,
+    backgroundColor: colors.white10,
     borderRadius: spacing.md,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     alignItems: 'center',
     borderWidth: 0,
   },
   shareLinkButtonText: {
-    color: colors.black,
+    color: colors.white80,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
   },
@@ -465,7 +533,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.green,
     borderRadius: spacing.md,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     alignItems: 'center',
   },
   doneButtonText: {
@@ -475,27 +543,28 @@ export const styles = StyleSheet.create({
   },
   addContactsButton: {
     flex: 1,
-    backgroundColor: colors.green,
     borderRadius: 12,
-    paddingVertical: spacing.lg,
+    marginLeft: spacing.md,
+    overflow: 'hidden',
+  },
+  addContactsButtonGradient: {
+    paddingVertical: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: spacing.md,
   },
   addContactsButtonDisabled: {
-    backgroundColor: colors.gray,
+    backgroundColor: colors.GRAY,
     opacity: 0.6,
   },
   addContactsButtonText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
   },
   
   // Split Wallet Section Styles
   splitWalletSection: {
-    marginTop: spacing.lg,
-    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
   },
   splitWalletTitle: {
     color: colors.white,
@@ -504,7 +573,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   splitWalletCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white5,
     borderRadius: 12,
     padding: spacing.lg,
     flexDirection: 'row',
@@ -520,16 +589,35 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     marginBottom: spacing.xs,
   },
+  walletAddressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   splitWalletAddress: {
     color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: '500',
   },
+  copyIcon: {
+    width: 14,
+    height: 14,
+    tintColor: colors.white80,
+  },
   privateKeyButton: {
-    backgroundColor: colors.green,
+    backgroundColor: colors.white10,
     borderRadius: 8,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  privateKeyButtonIcon: {
+    width: 20,
+    height: 20,
+    objectFit: 'contain',
+    marginRight: spacing.xs,
   },
   privateKeyButtonText: {
     color: colors.white,
@@ -611,8 +699,10 @@ export const styles = StyleSheet.create({
   },
   copyButton: {
     flex: 1,
-    backgroundColor: colors.green,
     borderRadius: 12,
+    overflow: 'hidden',
+  },
+  copyButtonGradient: {
     paddingVertical: spacing.lg,
     alignItems: 'center',
   },

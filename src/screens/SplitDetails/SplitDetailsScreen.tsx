@@ -3,7 +3,7 @@
  * Screen for editing bill split details, managing participants, and configuring split methods
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,15 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  SafeAreaView,
   StatusBar,
   Modal,
   ActivityIndicator,
+  Image,
+  Animated,
+  Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
@@ -37,12 +41,21 @@ import { QRCodeService } from '../../services/qrCodeService';
 import { sendNotification } from '../../services/firebaseNotificationService';
 import UserAvatar from '../../components/UserAvatar';
 import QRCode from 'react-native-qrcode-svg';
-import { 
-  SplitDetailsNavigationParams, 
-  SplitDataConverter, 
-  UnifiedBillData, 
-  UnifiedParticipant 
+import {
+  SplitDetailsNavigationParams,
+  SplitDataConverter,
+  UnifiedBillData,
+  UnifiedParticipant
 } from '../../types/splitNavigation';
+
+// Image mapping for category icons
+const CATEGORY_IMAGES: { [key: string]: any } = {
+  trip: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ftrip-icon-black.png?alt=media&token=3afeb768-566f-4fd7-a550-a19c5c4f5caf' },
+  food: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ffood-icon-black.png?alt=media&token=ef382697-bf78-49e6-b3b3-f669378ebd36' },
+  home: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fhouse-icon-black.png?alt=media&token=03406723-1c5b-45fd-a20b-dda8c49a2f83' },
+  event: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fevent-icon-black.png?alt=media&token=b11d12c2-c4d9-4029-be12-0ddde31ad0d1' },
+  rocket: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Frocket-icon-black.png?alt=media&token=90fabb5a-8110-4fd9-9753-9c785fa953a4' },
+};
 
 interface SplitDetailsScreenProps {
   navigation: any;
@@ -59,12 +72,12 @@ interface SplitDetailsScreenProps {
 
 const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, route }) => {
   // Get data from route params - support both new splits and existing splits
-  const { 
-    billData, 
-    processedBillData, 
-    analysisResult, 
-    splitId, 
-    splitData, 
+  const {
+    billData,
+    processedBillData,
+    analysisResult,
+    splitId,
+    splitData,
     splitWalletId,
     isEditing,
     imageUri,
@@ -75,10 +88,16 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     shareableLink,
     splitInvitationData
   } = route?.params || {};
-  
+
+  // Utility function to format wallet address
+  const formatWalletAddress = (address: string) => {
+    if (!address || address.length < 8) return address;
+    return `${address.slice(0, 4)}...${address.slice(-4)}`;
+  };
+
   const { state } = useApp();
   const { currentUser } = state;
-  
+
   // Debug: Log the current user data and route params
   if (__DEV__) {
     console.log('🔍 SplitDetailsScreen: Current user from context:', {
@@ -88,7 +107,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       } : null,
       isAuthenticated: state.isAuthenticated
     });
-    
+
     console.log('🔍 SplitDetailsScreen: Route params received:', {
       hasSplitData: !!splitData,
       splitDataId: splitData?.id,
@@ -100,7 +119,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       routeParams: route?.params,
       fullRoute: route
     });
-    
+
     // Additional logging for notification navigation
     if (isFromNotification) {
       console.log('🔍 SplitDetailsScreen: Navigation from notification detected:', {
@@ -110,7 +129,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       });
     }
   }
-  
+
   const [billName, setBillName] = useState(() => {
     // Use data from existing split if available, otherwise use mockup data for new splits
     if (splitData?.title) {
@@ -128,7 +147,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     console.log('🔍 SplitDetailsScreen: Using mockup bill name for new split');
     return MockupDataService.getBillName();
   });
-  
+
   const [totalAmount, setTotalAmount] = useState(() => {
     // Use data from existing split if available, otherwise use mockup data for new splits
     if (splitData?.totalAmount) {
@@ -158,6 +177,15 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const [showPrivateKeyModal, setShowPrivateKeyModal] = useState(false);
   const [splitWalletPrivateKey, setSplitWalletPrivateKey] = useState<string | null>(null);
   const [showAddFriendsModal, setShowAddFriendsModal] = useState(false);
+
+  // Animation refs for modals
+  const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+  const splitModalTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const splitModalOpacity = useRef(new Animated.Value(0)).current;
+  const addFriendsModalTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const addFriendsModalOpacity = useRef(new Animated.Value(0)).current;
+  const privateKeyModalTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const privateKeyModalOpacity = useRef(new Animated.Value(0)).current;
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [currentSplitData, setCurrentSplitData] = useState<Split | null>(splitData || null);
   const [splitWallet, setSplitWallet] = useState<any>(null);
@@ -216,11 +244,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const [createdSplitId, setCreatedSplitId] = useState<string | null>(null);
   const [isJoiningSplit, setIsJoiningSplit] = useState(false);
   const [hasJustJoinedSplit, setHasJustJoinedSplit] = useState(false);
-  
+
   // Helper function to check if current user is the creator
   const isCurrentUserCreator = () => {
     if (!currentUser) return false;
-    
+
     // Check currentSplitData first (for joined splits)
     if (currentSplitData?.creatorId) {
       const isCreator = currentSplitData.creatorId === currentUser.id.toString();
@@ -231,7 +259,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       });
       return isCreator;
     }
-    
+
     // Check splitData (for existing splits)
     if (splitData?.creatorId) {
       const isCreator = splitData.creatorId === currentUser.id.toString();
@@ -242,7 +270,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       });
       return isCreator;
     }
-    
+
     // For new splits, the current user is always the creator
     console.log('🔍 SplitDetailsScreen: isCurrentUserCreator check (new split):', {
       currentUserId: currentUser.id.toString(),
@@ -250,7 +278,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     });
     return true;
   };
-  
+
   // Helper function to check if all invited users have accepted
   const areAllInvitedUsersAccepted = () => {
     console.log('🔍 SplitDetailsScreen: Checking if all invited users accepted:', {
@@ -258,20 +286,20 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       invitedUsersLength: invitedUsers.length,
       currentUserId: currentUser?.id.toString()
     });
-    
+
     // If there are no participants and no invited users, only creator can proceed
     if (participants.length === 0 && invitedUsers.length === 0) {
       console.log('🔍 SplitDetailsScreen: No participants or invited users, allowing proceed');
       return true;
     }
-    
+
     // FIRST: Check if there are any pending invited users - if yes, split button should be disabled
     const pendingInvitedUsers = invitedUsers.filter((user: any) => user.status === 'pending');
     if (pendingInvitedUsers.length > 0) {
       console.log('🔍 SplitDetailsScreen: There are pending invited users:', pendingInvitedUsers.length);
       return false; // Disable split button until all invited users accept
     }
-    
+
     // SECOND: Check if there are any invited users with other statuses (declined, etc.)
     const nonPendingInvitedUsers = invitedUsers.filter((user: any) => user.status !== 'pending');
     if (nonPendingInvitedUsers.length > 0) {
@@ -283,11 +311,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         return false;
       }
     }
-    
+
     // THIRD: Check if all participants (excluding creator) have accepted
     const nonCreatorParticipants = participants.filter((p: any) => p.id !== currentUser?.id.toString());
     console.log('🔍 SplitDetailsScreen: Non-creator participants:', nonCreatorParticipants.length);
-    
+
     if (nonCreatorParticipants.length === 0) {
       // If there are no other participants, check if there are any invited users
       if (invitedUsers.length > 0) {
@@ -297,7 +325,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       console.log('🔍 SplitDetailsScreen: Only creator participants, allowing proceed');
       return true; // Only creator, can proceed
     }
-    
+
     const allParticipantsAccepted = nonCreatorParticipants.every((p: any) => p.status === 'accepted');
     console.log('🔍 SplitDetailsScreen: All participants accepted:', allParticipantsAccepted);
     return allParticipantsAccepted;
@@ -313,13 +341,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         wallet_address: currentUser.wallet_address
       } : null
     });
-    
+
     // Use participants from existing split data if available
     if (splitData?.participants && splitData.participants.length > 0) {
       console.log('🔍 SplitDetailsScreen: Using participants from splitData');
       // Transform SplitParticipant to UnifiedParticipant format, but exclude invited users
       return splitData.participants
-        .filter((participant: any) => 
+        .filter((participant: any) =>
           participant.status !== 'invited' && participant.status !== 'pending'
         )
         .map((participant: any) => ({
@@ -334,7 +362,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           items: [],
         }));
     }
-    
+
     // Use participants from processed bill data or bill data if available
     if (processedBillData?.participants && processedBillData.participants.length > 0) {
       console.log('🔍 SplitDetailsScreen: Using participants from processedBillData');
@@ -351,7 +379,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         items: participant.items || [],
       }));
     }
-    
+
     if (billData?.participants && billData.participants.length > 0) {
       console.log('🔍 SplitDetailsScreen: Using participants from billData');
       // Transform BillParticipant to UnifiedParticipant format
@@ -367,7 +395,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         items: participant.items || [],
       }));
     }
-    
+
     // If no participants provided, start with just the current user as creator
     if (currentUser) {
       const currentUserParticipant = {
@@ -384,7 +412,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       console.log('🔍 SplitDetailsScreen: Created current user participant:', currentUserParticipant);
       return [currentUserParticipant];
     }
-    
+
     // Fallback if no current user
     console.log('🔍 SplitDetailsScreen: No current user, returning empty participants');
     return [];
@@ -393,20 +421,20 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // Process new bill image if coming from camera
   const processNewBillImage = async () => {
     if (!imageUri || !isNewBill || !currentUser) return;
-    
+
     setIsProcessingNewBill(true);
-    
+
     try {
       console.log('🔍 SplitDetailsScreen: Processing new bill image...');
-      
+
       // Use mock service to simulate your Python OCR service
       const analysisResult = await MockBillAnalysisService.analyzeBillImage(imageUri);
       setNewBillProcessingResult(analysisResult);
-      
+
       if (analysisResult.success && analysisResult.data) {
         // Process the structured data with current user information
         const processedData = BillAnalysisService.processBillData(analysisResult.data, currentUser);
-        
+
         // Set the authoritative price in the price management service immediately
         const { priceManagementService } = await import('../../services/priceManagementService');
         priceManagementService.setBillPrice(
@@ -414,13 +442,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           processedData.totalAmount,
           processedData.currency || 'USDC'
         );
-        
+
         console.log('💰 SplitDetailsScreen: Set authoritative price for new bill:', {
           billId: processedData.id,
           totalAmount: processedData.totalAmount,
           currency: processedData.currency || 'USDC'
         });
-        
+
         // Update the bill name and total amount with processed data
         console.log('🔍 SplitDetailsScreen: Updating state with processed data:', {
           title: processedData.title,
@@ -429,7 +457,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         });
         setBillName(processedData.title);
         setTotalAmount(processedData.totalAmount.toString());
-        
+
         // Update participants with processed data (transform to unified format)
         const transformedParticipants = processedData.participants.map((participant: any) => ({
           id: participant.id,
@@ -443,10 +471,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           items: participant.items || [],
         }));
         setParticipants(transformedParticipants);
-        
+
         // Store the processed data for later use
         setCurrentProcessedBillData(processedData);
-        
+
         // Create a wallet immediately for new bills so user can see wallet address
         console.log('🔍 SplitDetailsScreen: Creating wallet for new bill...');
         try {
@@ -462,7 +490,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               amountOwed: p.amountOwed,
             }))
           );
-          
+
           if (walletResult.success && walletResult.wallet) {
             setSplitWallet(walletResult.wallet);
             console.log('🔍 SplitDetailsScreen: Wallet created successfully for new bill:', {
@@ -471,7 +499,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               isCreator: isCurrentUserCreator(),
               walletObject: walletResult.wallet
             });
-            
+
             // Create the split in the database immediately so it appears in the list
             console.log('🔍 SplitDetailsScreen: Creating split in database...');
             try {
@@ -502,7 +530,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 walletId: walletResult.wallet.id,
                 walletAddress: walletResult.wallet.walletAddress,
               };
-              
+
               const createResult = await SplitStorageService.createSplit(splitData);
               if (createResult.success && createResult.split) {
                 setCurrentSplitData(createResult.split);
@@ -528,7 +556,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       } else {
         Alert.alert('Processing Failed', analysisResult.error || 'Failed to process bill image');
       }
-      
+
     } catch (error) {
       console.error('Error processing new bill:', error);
       Alert.alert('Error', 'Failed to process bill image. Please try again.');
@@ -553,7 +581,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       hasSplitData: !!splitData,
       shouldHandleNotification: isFromNotification && splitId && currentUser && !splitData
     });
-    
+
     if (isFromNotification && splitId && currentUser && !splitData) {
       console.log('🔍 SplitDetailsScreen: Calling handleJoinSplitFromNotification');
       handleJoinSplitFromNotification();
@@ -574,7 +602,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     setIsJoiningSplit(true);
     try {
       console.log('🔍 SplitDetailsScreen: Loading split from notification:', splitId);
-      
+
       // First, get the split data
       const splitResult = await SplitStorageService.getSplit(splitId);
       if (!splitResult.success || !splitResult.split) {
@@ -593,7 +621,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         setBillName(split.title);
         setTotalAmount(split.totalAmount.toString());
         setSelectedSplitType(split.splitType);
-        
+
         // Transform participants to unified format
         const transformedParticipants = split.participants.map((p: any) => ({
           id: p.userId,
@@ -607,7 +635,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           items: [],
         }));
         setParticipants(transformedParticipants);
-        
+
         console.log('🔍 SplitDetailsScreen: Split data loaded successfully from notification');
         return;
       }
@@ -616,7 +644,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       // We should not try to add them again here, just show an error
       console.error('🔍 SplitDetailsScreen: User is not a participant in this split. acceptSplitInvitation may have failed.');
       Alert.alert(
-        'Error', 
+        'Error',
         'You are not a participant in this split. The invitation may have expired or been revoked.',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
@@ -641,7 +669,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   useEffect(() => {
     if (currentUser && participants.length > 0) {
       const creatorExists = participants.some((p: any) => p.id === currentUser.id.toString());
-      
+
       if (!creatorExists) {
         console.log('🔍 SplitDetailsScreen: Creator not found in participants, adding...');
         const currentUserParticipant = {
@@ -664,7 +692,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     // Generate QR code data when opening the modal
     const splitId = processedBillData?.id || billData?.id || `split_${Date.now()}`;
     const walletAddress = splitWallet?.walletAddress || 'wallet_address_placeholder';
-    
+
     const qrData = QRCodeService.generateSplitInvitationQR(
       splitId,
       billName,
@@ -681,7 +709,22 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   const handleCloseAddFriendsModal = () => {
-    setShowAddFriendsModal(false);
+    Animated.parallel([
+      Animated.timing(addFriendsModalTranslateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(addFriendsModalOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowAddFriendsModal(false);
+      addFriendsModalTranslateY.setValue(SCREEN_HEIGHT);
+      addFriendsModalOpacity.setValue(0);
+    });
   };
 
   // FIXED: Function to ensure split with wallet exists before allowing invitations
@@ -763,7 +806,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     // FIXED: For new bills, ensure split with wallet is created before allowing invitations
     if (isNewBill && (!splitWallet || !createdSplitId)) {
       console.log('🔍 SplitDetailsScreen: Creating split with wallet before allowing invitations...');
-      
+
       try {
         // Create the split with wallet synchronously
         await ensureSplitWithWalletExists();
@@ -780,7 +823,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
     // Generate a consistent splitId for new bills
     const currentSplitId = splitId || processedBillData?.id || billData?.id || createdSplitId || `split_${Date.now()}`;
-    
+
     // Navigate to the existing ContactsScreen with split selection action
     // Store the callback in a ref or use a different approach to avoid serialization warning
     navigation.navigate('Contacts', {
@@ -789,7 +832,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       splitName: billName,
       returnRoute: 'SplitDetails', // Add return route info
     });
-    
+
     // Close the modal
     setShowAddFriendsModal(false);
   };
@@ -803,20 +846,20 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     }
 
     // Check if contact is already a participant
-    const isAlreadyParticipant = participants.some((p: any) => 
+    const isAlreadyParticipant = participants.some((p: any) =>
       p.id === contact.id || p.email === contact.email || p.walletAddress === contact.wallet_address
     );
-    
+
     if (isAlreadyParticipant) {
       Alert.alert('Already Added', `${contact.name} is already a participant in this split.`);
       return;
     }
 
     // Check if contact is already invited
-    const isAlreadyInvited = invitedUsers.some((user: any) => 
+    const isAlreadyInvited = invitedUsers.some((user: any) =>
       user.id === contact.id || user.email === contact.email
     );
-    
+
     if (isAlreadyInvited) {
       Alert.alert('Already Invited', `${contact.name} has already been invited to this split.`);
       return;
@@ -827,10 +870,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     try {
       // Generate a consistent splitId for new bills
       const currentSplitId = splitId || processedBillData?.id || billData?.id || `split_${Date.now()}`;
-      
+
       // Variable to store the created split result
       let createResult: any = null;
-      
+
       // Debug: Log the current state to understand why a new split might be created
       console.log('🔍 SplitDetailsScreen: handleContactSelection - Current state:', {
         hasSplitData: !!splitData,
@@ -862,10 +905,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       // Check if we have an existing split (either splitData, currentSplitData, or createdSplitId)
       // Note: splitId from route params doesn't guarantee the split exists in database
       const hasExistingSplit = splitData || currentSplitData || createdSplitId || route?.params?.splitData;
-      
+
       // Also check if we have a splitWallet (indicates a split was created with wallet)
       const hasSplitWithWallet = !!splitWallet;
-      
+
       // If we have a splitId but no splitData, check if it exists in the database
       let splitExistsInDatabase = false;
       if ((splitId || route?.params?.splitId) && !hasExistingSplit) {
@@ -887,10 +930,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           splitExistsInDatabase = false;
         }
       }
-      
+
       // Simplified logic: If we have ANY indication of an existing split, don't create a new one
       const finalHasExistingSplit = hasExistingSplit || splitExistsInDatabase || hasSplitWithWallet;
-      
+
       console.log('🔍 SplitDetailsScreen: Split existence check:', {
         hasSplitData: !!splitData,
         hasSplitId: !!splitId,
@@ -910,32 +953,32 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         routeSplitIdCheck: !!route?.params?.splitId,
         splitWalletCheck: hasSplitWithWallet
       });
-      
+
       if (!finalHasExistingSplit && currentUser) {
         console.log('🔍 SplitDetailsScreen: Creating split in database before inviting users...');
         console.log('🔍 SplitDetailsScreen: This should only happen for new splits without existing data');
-        
+
         // Warning: If we have a splitWallet but are creating a new split, this might be a bug
         if (splitWallet) {
           console.warn('🔍 SplitDetailsScreen: WARNING - Creating new split but splitWallet exists! This might create a duplicate.');
           console.warn('🔍 SplitDetailsScreen: splitWallet ID:', splitWallet.id);
         }
-        
+
         // Validate required fields before creating split
         if (!billName || !totalAmount || isNaN(parseFloat(totalAmount))) {
           Alert.alert('Error', 'Please ensure the bill name and total amount are valid before inviting users.');
           return;
         }
-        
+
         const parsedAmount = parseFloat(totalAmount);
         if (parsedAmount <= 0) {
           Alert.alert('Error', 'The total amount must be greater than 0.');
           return;
         }
-        
+
         // Allow splits with any number of participants (including just the creator)
         console.log('🔍 SplitDetailsScreen: Participants count:', participants.length);
-        
+
         // Validate currency
         const currency = processedBillData?.currency || billData?.currency || 'USDC';
         const validCurrencies = ['USDC', 'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
@@ -943,7 +986,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           Alert.alert('Error', `Invalid currency: ${currency}. Please use a supported currency.`);
           return;
         }
-        
+
         // Validate split type
         const splitType = selectedSplitType || 'fair';
         const validSplitTypes = ['fair', 'degen'];
@@ -951,7 +994,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           Alert.alert('Error', `Invalid split type: ${splitType}. Please use a supported split type.`);
           return;
         }
-        
+
         // Validate participants
         for (const participant of participants) {
           if (!participant.name || participant.name.trim() === '') {
@@ -965,7 +1008,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             return;
           }
         }
-        
+
         // Validate merchant data
         const merchantName = processedBillData?.merchant || billData?.merchant || 'Unknown';
         const merchantAddress = processedBillData?.location || billData?.location || '';
@@ -973,34 +1016,34 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           Alert.alert('Error', 'Merchant name is required.');
           return;
         }
-        
+
         // Validate date data
         const date = processedBillData?.date || billData?.date || new Date().toISOString();
         if (!date || isNaN(new Date(date).getTime())) {
           Alert.alert('Error', 'Invalid date provided.');
           return;
         }
-        
+
         // Validate bill ID
         const billId = processedBillData?.id || billData?.id || currentSplitId;
         if (!billId || billId.trim() === '') {
           Alert.alert('Error', 'Bill ID is required.');
           return;
         }
-        
+
         // Validate creator data
         if (!currentUser.id || !currentUser.name) {
           Alert.alert('Error', 'Creator information is incomplete. Please ensure you are properly logged in.');
           return;
         }
-        
+
         // Validate description data
         const description = `Split for ${billName}`;
         if (!description || description.trim() === '') {
           Alert.alert('Error', 'Description is required.');
           return;
         }
-        
+
         const splitDataToCreate = {
           billId: processedBillData?.id || billData?.id || currentSplitId,
           title: billName,
@@ -1061,14 +1104,14 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           hasRouteSplitId: !!route?.params?.splitId,
           splitExistsInDatabase: splitExistsInDatabase
         });
-        
+
         // If we have splitData but no createdSplitId, set it to prevent creating new splits
         const existingSplitId = splitData?.id || currentSplitData?.id || splitId || route?.params?.splitData?.id || route?.params?.splitId;
         if (existingSplitId && !createdSplitId) {
           console.log('🔍 SplitDetailsScreen: Setting createdSplitId to existing split ID:', existingSplitId);
           setCreatedSplitId(existingSplitId);
         }
-        
+
         // If we have a splitWallet but no createdSplitId, try to get the split ID from the wallet
         if (splitWallet && !createdSplitId && !existingSplitId) {
           console.log('🔍 SplitDetailsScreen: Split has wallet but no ID, trying to find split by wallet ID:', splitWallet.id);
@@ -1088,56 +1131,56 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           }
         }
       }
-      
+
       // Find the correct user ID and get their actual wallet address
       let recipientUserId = contact.id;
       let recipientWalletAddress = contact.wallet_address || '';
       let recipientUserData = null;
-      
+
       // If the contact has an email, try to find the actual user by email
       if (contact.email) {
         try {
           console.log('🔍 SplitDetailsScreen: Looking up user by email:', contact.email);
           const { unifiedUserService } = await import('../../services/unifiedUserService');
           const userByEmail = await unifiedUserService.getUserByEmail(contact.email);
-            if (userByEmail) {
-              recipientUserId = userByEmail.id;
-              recipientUserData = userByEmail;
-              console.log('🔍 Found user by email:', { 
-                email: contact.email, 
-                userId: recipientUserId, 
-                walletAddress: userByEmail.wallet_address,
-                userData: userByEmail
-              });
-            } else {
-              console.log('🔍 No user found by email:', contact.email);
-            }
+          if (userByEmail) {
+            recipientUserId = userByEmail.id;
+            recipientUserData = userByEmail;
+            console.log('🔍 Found user by email:', {
+              email: contact.email,
+              userId: recipientUserId,
+              walletAddress: userByEmail.wallet_address,
+              userData: userByEmail
+            });
+          } else {
+            console.log('🔍 No user found by email:', contact.email);
+          }
         } catch (error) {
           console.log('🔍 Could not find user by email, using contact ID:', contact.id, error);
         }
       }
-      
+
       // If the contact has a wallet address, try to find the actual user by wallet
       if (contact.wallet_address && recipientUserId === contact.id) {
         try {
           console.log('🔍 SplitDetailsScreen: Looking up user by wallet address:', contact.wallet_address);
           const userByWallet = await firebaseDataService.user.getUserByWalletAddress(contact.wallet_address);
-            if (userByWallet) {
-              recipientUserId = userByWallet.id;
-              recipientUserData = userByWallet;
-              console.log('🔍 Found user by wallet:', { 
-                wallet: contact.wallet_address, 
-                userId: recipientUserId,
-                userData: userByWallet
-              });
-            } else {
-              console.log('🔍 No user found by wallet address:', contact.wallet_address);
-            }
+          if (userByWallet) {
+            recipientUserId = userByWallet.id;
+            recipientUserData = userByWallet;
+            console.log('🔍 Found user by wallet:', {
+              wallet: contact.wallet_address,
+              userId: recipientUserId,
+              userData: userByWallet
+            });
+          } else {
+            console.log('🔍 No user found by wallet address:', contact.wallet_address);
+          }
         } catch (error) {
           console.log('🔍 Could not find user by wallet, using contact ID:', contact.id, error);
         }
       }
-      
+
       // If we found the user data, use their actual wallet address
       if (recipientUserData && recipientUserData.wallet_address) {
         recipientWalletAddress = recipientUserData.wallet_address;
@@ -1148,7 +1191,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       } else {
         console.log('🔍 No wallet address found for user:', recipientUserId);
       }
-      
+
       // Create invited user object
       const invitedUser = {
         id: recipientUserId, // Use the found user ID
@@ -1188,7 +1231,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             amountPaid: 0,
             status: 'invited', // Mark as invited in database
           });
-          
+
           if (addParticipantResult.success) {
             console.log('🔍 SplitDetailsScreen: Successfully added invited user to database:', {
               splitId: splitIdToUpdate,
@@ -1207,24 +1250,24 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       try {
         // Use the actual split ID from database if we just created it or have a created split ID
         const notificationSplitId = createResult?.split?.id || createdSplitId || splitData?.id || currentSplitData?.id || splitId || route?.params?.splitId || currentSplitId;
-        
+
         // Validate required data before sending notification
         if (!recipientUserId) {
           throw new Error('Recipient user ID is required');
         }
-        
+
         if (!notificationSplitId) {
           throw new Error('Split ID is required for notification');
         }
-        
+
         if (!billName || !totalAmount) {
           throw new Error('Bill name and total amount are required for notification');
         }
-        
+
         if (!currentUser?.name || !currentUser?.id) {
           throw new Error('Current user information is incomplete');
         }
-        
+
         console.log('🔍 SplitDetailsScreen: Sending notification with validated data:', {
           recipientUserId,
           notificationSplitId,
@@ -1233,7 +1276,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           inviterName: currentUser.name,
           inviterId: currentUser.id.toString()
         });
-        
+
         await sendNotification(
           recipientUserId, // Use the found user ID
           `You're invited to split "${billName}"`,
@@ -1272,44 +1315,44 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const handleNotificationResponse = async (userId: string, response: 'accepted' | 'declined') => {
     try {
       // Update the invited user's status
-      setInvitedUsers(prev => 
-        prev.map(user => 
-          user.id === userId 
+      setInvitedUsers(prev =>
+        prev.map(user =>
+          user.id === userId
             ? { ...user, status: response, respondedAt: new Date().toISOString() }
             : user
         )
       );
 
       // If accepted, add to participants and remove from invited users
-        if (response === 'accepted') {
-          console.log('🔍 SplitDetailsScreen: User accepted invitation:', {
-            userId: userId,
-            invitedUsersCount: invitedUsers.length,
-            invitedUserIds: invitedUsers.map(u => u.id)
+      if (response === 'accepted') {
+        console.log('🔍 SplitDetailsScreen: User accepted invitation:', {
+          userId: userId,
+          invitedUsersCount: invitedUsers.length,
+          invitedUserIds: invitedUsers.map(u => u.id)
+        });
+
+        const invitedUser = invitedUsers.find(user => user.id === userId);
+        if (invitedUser) {
+          console.log('🔍 SplitDetailsScreen: Found invited user to accept:', {
+            userId: invitedUser.id,
+            name: invitedUser.name,
+            walletAddress: invitedUser.walletAddress,
+            email: invitedUser.email
           });
-          
-          const invitedUser = invitedUsers.find(user => user.id === userId);
-          if (invitedUser) {
-            console.log('🔍 SplitDetailsScreen: Found invited user to accept:', {
-              userId: invitedUser.id,
-              name: invitedUser.name,
-              walletAddress: invitedUser.walletAddress,
-              email: invitedUser.email
-            });
-            const newParticipant = {
-              id: invitedUser.id,
-              name: invitedUser.name,
-              walletAddress: invitedUser.walletAddress || invitedUser.email || 'No wallet address', // Use actual wallet address if available
-              status: 'accepted' as const,
-              amountOwed: parseFloat(totalAmount) / (participants.length + 1), // Equal split
-              amountPaid: 0,
-              userId: invitedUser.id,
-              email: invitedUser.email || '',
-              items: [],
-            };
+          const newParticipant = {
+            id: invitedUser.id,
+            name: invitedUser.name,
+            walletAddress: invitedUser.walletAddress || invitedUser.email || 'No wallet address', // Use actual wallet address if available
+            status: 'accepted' as const,
+            amountOwed: parseFloat(totalAmount) / (participants.length + 1), // Equal split
+            amountPaid: 0,
+            userId: invitedUser.id,
+            email: invitedUser.email || '',
+            items: [],
+          };
 
           setParticipants(prev => [...prev, newParticipant]);
-          
+
           // Remove the user from invited users since they're now a participant
           setInvitedUsers(prev => {
             const filtered = prev.filter(user => user.id !== userId);
@@ -1326,7 +1369,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           const splitIdToUpdate = createdSplitId || splitData?.id;
           if (splitIdToUpdate && currentUser) {
             console.log('🔍 SplitDetailsScreen: Adding participant to split in database:', splitIdToUpdate);
-            
+
             // Update the existing participant's status in the database instead of adding a new one
             const updateResult = await SplitStorageService.updateParticipantStatus(splitIdToUpdate, newParticipant.id, 'accepted');
             if (updateResult.success) {
@@ -1424,16 +1467,16 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
       // Generate NFC payload
       const nfcPayload = SplitInvitationService.generateNFCPayload(invitationData);
-      
+
       // Use NFC service to write the payload
       const result = await NFCSplitService.writeSplitInvitation(nfcPayload);
-      
+
       if (result.success) {
         Alert.alert('NFC Share', 'Split invitation has been written to the NFC tag successfully!');
       } else {
         Alert.alert('NFC Error', result.error || 'Failed to share via NFC. Please try again.');
       }
-      
+
     } catch (error) {
       console.error('NFC sharing error:', error);
       Alert.alert('NFC Error', 'Failed to share via NFC. Please try again.');
@@ -1458,7 +1501,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
       // Generate shareable link
       const shareableLink = SplitInvitationService.generateShareableLink(invitationData);
-      
+
       // Use React Native's Share API
       const { Share } = require('react-native');
       await Share.share({
@@ -1475,7 +1518,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const handleContactSelect = async (contact: any) => {
     try {
       // Check if contact is already a participant
-      const isAlreadyParticipant = participants.some((p: any) => 
+      const isAlreadyParticipant = participants.some((p: any) =>
         p.walletAddress === contact.wallet_address || p.id === contact.id
       );
 
@@ -1508,7 +1551,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       if (splitWallet && currentUser) {
         try {
           console.log('🔍 SplitDetailsScreen: Updating split wallet with new participant...');
-          
+
           // Update the wallet participants without recreating the wallet
           const updatedParticipants = [...participants, newParticipant].map((p: any) => ({
             userId: p.id,
@@ -1516,12 +1559,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             walletAddress: p.walletAddress,
             amountOwed: p.amountOwed || 0,
           }));
-          
+
           const updateResult = await SplitWalletService.updateSplitWalletParticipants(
             splitWallet.id,
             updatedParticipants
           );
-          
+
           if (updateResult.success) {
             console.log('🔍 SplitDetailsScreen: Split wallet participants updated successfully');
             // Update local wallet state with new participants
@@ -1556,45 +1599,45 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     if (currentUser && processedBillData) {
       try {
         console.log('🔍 SplitDetailsScreen: Saving/updating split in database...');
-        
+
         // Update the existing split with the selected split type
         if (currentSplitData) {
           console.log('🔍 SplitDetailsScreen: Updating existing split with split type:', type);
-          
+
           const updateResult = await SplitStorageService.updateSplit(currentSplitData.id, {
-          splitType: type,
+            splitType: type,
             status: 'active' as const, // Change status to active when split type is selected
           });
-          
+
           if (updateResult.success && updateResult.split) {
             console.log('🔍 SplitDetailsScreen: Split updated successfully with split type');
             setCurrentSplitData(updateResult.split);
-          
-          // Convert data to unified format
-          const unifiedBillData = processedBillData ? 
-            SplitDataConverter.processBillDataToUnified(processedBillData) : 
-            undefined;
-          const unifiedParticipants = SplitDataConverter.participantsToUnified(participants);
 
-          // Navigate to the appropriate split screen with the unified data
-          if (type === 'fair') {
-            navigation.navigate('FairSplit', {
-              billData: unifiedBillData,
-              processedBillData: processedBillData,
+            // Convert data to unified format
+            const unifiedBillData = processedBillData ?
+              SplitDataConverter.processBillDataToUnified(processedBillData) :
+              undefined;
+            const unifiedParticipants = SplitDataConverter.participantsToUnified(participants);
+
+            // Navigate to the appropriate split screen with the unified data
+            if (type === 'fair') {
+              navigation.navigate('FairSplit', {
+                billData: unifiedBillData,
+                processedBillData: processedBillData,
                 splitData: updateResult.split,
                 splitWallet: splitWallet,
-            });
+              });
+            } else {
+              navigation.navigate('DegenLock', {
+                billData: unifiedBillData,
+                processedBillData: processedBillData,
+                splitData: updateResult.split,
+                splitWallet: splitWallet,
+                participants: unifiedParticipants,
+                totalAmount: processedBillData.totalAmount,
+              });
+            }
           } else {
-            navigation.navigate('DegenLock', {
-              billData: unifiedBillData,
-              processedBillData: processedBillData,
-                splitData: updateResult.split,
-                splitWallet: splitWallet,
-              participants: unifiedParticipants,
-              totalAmount: processedBillData.totalAmount,
-            });
-          }
-        } else {
             console.log('🔍 SplitDetailsScreen: Failed to update split:', updateResult.error);
             Alert.alert('Error', updateResult.error || 'Failed to update split');
           }
@@ -1617,14 +1660,14 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       walletAddress: splitWallet.walletAddress,
       participants: splitWallet.participants?.length || 0
     } : 'No wallet');
-    
+
     if (!selectedSplitType) {
       Alert.alert('Please select a split type', 'Choose either Fair Split or Degen Split to continue');
       return;
     }
 
     setShowSplitModal(false);
-    
+
     // Convert data to unified format
     const unifiedBillData: UnifiedBillData = {
       id: processedBillData?.id || billData?.id || `split_${Date.now()}`,
@@ -1636,7 +1679,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       location: currentSplitData?.merchant?.address || processedBillData?.location || billData?.location || 'Unknown Location',
       participants: participants,
     };
-    
+
     const unifiedParticipants = SplitDataConverter.participantsToUnified(participants);
 
     if (selectedSplitType === 'fair') {
@@ -1645,8 +1688,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         walletAddress: splitWallet.walletAddress,
         participants: splitWallet.participants?.length || 0
       } : 'No wallet');
-      
-      navigation.navigate('FairSplit', { 
+
+      navigation.navigate('FairSplit', {
         billData: unifiedBillData,
         processedBillData,
         analysisResult,
@@ -1663,23 +1706,23 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         degenWinner: splitWallet?.degenWinner,
         currentUserId: currentUser?.id?.toString()
       });
-      
+
       if (splitWallet && (splitWallet.status === 'completed' || splitWallet.status === 'spinning_completed')) {
         // Check if this is a degen split and if the user is winner or loser
         const currentUserId = currentUser?.id?.toString();
         if (currentUserId && splitWallet.degenWinner) {
           // Find the winner participant from the participants list
-          const winnerParticipant = unifiedParticipants.find(p => 
+          const winnerParticipant = unifiedParticipants.find(p =>
             (p.userId || p.id) === splitWallet.degenWinner?.userId
           );
-          
+
           console.log('🔍 SplitDetailsScreen: Found winner participant:', {
             winnerParticipant,
             degenWinnerUserId: splitWallet.degenWinner?.userId,
             currentUserId,
             isCurrentUserWinner: (winnerParticipant?.userId || winnerParticipant?.id) === currentUserId
           });
-          
+
           if (winnerParticipant) {
             console.log('🔍 SplitDetailsScreen: Navigating to DegenResult for completed split');
             navigation.navigate('DegenResult', {
@@ -1695,13 +1738,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           }
         }
       }
-      
+
       console.log('🔍 SplitDetailsScreen: Navigating to DegenLock with wallet:', splitWallet ? {
         id: splitWallet.id,
         walletAddress: splitWallet.walletAddress,
         participants: splitWallet.participants?.length || 0
       } : 'No wallet');
-      
+
       navigation.navigate('DegenLock', {
         billData: unifiedBillData,
         participants: unifiedParticipants,
@@ -1715,8 +1758,23 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   const handleCloseModal = () => {
-    setShowSplitModal(false);
-    setSelectedSplitType(null);
+    Animated.parallel([
+      Animated.timing(splitModalTranslateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(splitModalOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowSplitModal(false);
+      setSelectedSplitType(null);
+      splitModalTranslateY.setValue(SCREEN_HEIGHT);
+      splitModalOpacity.setValue(0);
+    });
   };
 
   const handleShowPrivateKey = async () => {
@@ -1727,9 +1785,9 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
     try {
       console.log('🔍 SplitDetailsScreen: Requesting private key for wallet:', splitWallet.id);
-      
+
       const result = await SplitWalletService.getSplitWalletPrivateKey(
-        splitWallet.id, 
+        splitWallet.id,
         currentUser.id.toString()
       );
 
@@ -1746,9 +1804,210 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   const handleClosePrivateKeyModal = () => {
-    setShowPrivateKeyModal(false);
-    setSplitWalletPrivateKey(null);
+    Animated.parallel([
+      Animated.timing(privateKeyModalTranslateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(privateKeyModalOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowPrivateKeyModal(false);
+      setSplitWalletPrivateKey(null);
+      privateKeyModalTranslateY.setValue(SCREEN_HEIGHT);
+      privateKeyModalOpacity.setValue(0);
+    });
   };
+
+  // Animation handlers for Split Modal
+  const handleSplitModalGestureEvent = Animated.event(
+    [{ nativeEvent: { translationY: splitModalTranslateY } }],
+    { useNativeDriver: true }
+  );
+
+  const handleSplitModalStateChange = (event: any) => {
+    const { translationY, state } = event.nativeEvent;
+    if (state === 2) {
+      splitModalOpacity.setValue(1);
+    } else if (state === 4 || state === 5) {
+      if (translationY > 100) {
+        Animated.parallel([
+          Animated.timing(splitModalTranslateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(splitModalOpacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setShowSplitModal(false);
+          setSelectedSplitType(null);
+          splitModalTranslateY.setValue(SCREEN_HEIGHT);
+          splitModalOpacity.setValue(0);
+        });
+      } else {
+        Animated.parallel([
+          Animated.spring(splitModalTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }),
+          Animated.timing(splitModalOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }
+  };
+
+  // Animation handlers for Add Friends Modal
+  const handleAddFriendsModalGestureEvent = Animated.event(
+    [{ nativeEvent: { translationY: addFriendsModalTranslateY } }],
+    { useNativeDriver: true }
+  );
+
+  const handleAddFriendsModalStateChange = (event: any) => {
+    const { translationY, state } = event.nativeEvent;
+    if (state === 2) {
+      addFriendsModalOpacity.setValue(1);
+    } else if (state === 4 || state === 5) {
+      if (translationY > 100) {
+        Animated.parallel([
+          Animated.timing(addFriendsModalTranslateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(addFriendsModalOpacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setShowAddFriendsModal(false);
+          addFriendsModalTranslateY.setValue(SCREEN_HEIGHT);
+          addFriendsModalOpacity.setValue(0);
+        });
+      } else {
+        Animated.parallel([
+          Animated.spring(addFriendsModalTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }),
+          Animated.timing(addFriendsModalOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }
+  };
+
+  // Animation handlers for Private Key Modal
+  const handlePrivateKeyModalGestureEvent = Animated.event(
+    [{ nativeEvent: { translationY: privateKeyModalTranslateY } }],
+    { useNativeDriver: true }
+  );
+
+  const handlePrivateKeyModalStateChange = (event: any) => {
+    const { translationY, state } = event.nativeEvent;
+    if (state === 2) {
+      privateKeyModalOpacity.setValue(1);
+    } else if (state === 4 || state === 5) {
+      if (translationY > 100) {
+        Animated.parallel([
+          Animated.timing(privateKeyModalTranslateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(privateKeyModalOpacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setShowPrivateKeyModal(false);
+          setSplitWalletPrivateKey(null);
+          privateKeyModalTranslateY.setValue(SCREEN_HEIGHT);
+          privateKeyModalOpacity.setValue(0);
+        });
+      } else {
+        Animated.parallel([
+          Animated.spring(privateKeyModalTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }),
+          Animated.timing(privateKeyModalOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }
+  };
+
+  // Animate in when modals become visible
+  useEffect(() => {
+    if (showSplitModal) {
+      Animated.parallel([
+        Animated.timing(splitModalTranslateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(splitModalOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showSplitModal]);
+
+  useEffect(() => {
+    if (showAddFriendsModal) {
+      Animated.parallel([
+        Animated.timing(addFriendsModalTranslateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(addFriendsModalOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showAddFriendsModal]);
+
+  useEffect(() => {
+    if (showPrivateKeyModal) {
+      Animated.parallel([
+        Animated.timing(privateKeyModalTranslateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(privateKeyModalOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showPrivateKeyModal]);
 
   const handleEditBill = () => {
     // Navigate back to BillProcessingScreen with current data for editing
@@ -1785,10 +2044,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       if (currentUser && !splitWallet && !isCreatingWallet && !isProcessingNewBill && !hasJustJoinedSplit) {
         setIsCreatingWallet(true);
         console.log('🔍 SplitDetailsScreen: Checking for existing split...');
-        
+
         try {
           let existingSplit = null;
-          
+
           // Debug: Log the condition evaluation
           console.log('🔍 SplitDetailsScreen: checkExistingSplit - Evaluating conditions:', {
             hasSplitData: !!splitData,
@@ -1801,7 +2060,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             condition2: splitData && !splitData.walletId,
             condition3: splitId && !splitData
           });
-          
+
           // If we have splitData from navigation, use it
           if (splitData && splitData.walletId) {
             console.log('🔍 SplitDetailsScreen: Using splitData from navigation:', splitData.walletId);
@@ -1839,8 +2098,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           } else if (processedBillData) {
             // Check if a split already exists for this bill
             const existingSplits = await SplitStorageService.getUserSplits(currentUser.id.toString());
-            existingSplit = existingSplits.splits?.find(split => 
-              split.billId === processedBillData.id || 
+            existingSplit = existingSplits.splits?.find(split =>
+              split.billId === processedBillData.id ||
               split.title === processedBillData.title
             );
           } else if (splitId && splitData) {
@@ -1854,10 +2113,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           } else {
             console.log('🔍 SplitDetailsScreen: No existing split conditions met, will create new split when needed');
           }
-          
+
           if (existingSplit && existingSplit.walletId) {
             console.log('🔍 SplitDetailsScreen: Found existing split with wallet:', existingSplit.walletId);
-            
+
             // Get the existing wallet
             const walletResult = await SplitWalletService.getSplitWallet(existingSplit.walletId);
             if (walletResult.success && walletResult.wallet) {
@@ -1924,17 +2183,17 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       if (splitWallet.status === 'completed' || splitWallet.status === 'spinning_completed') {
         if (splitWallet.degenWinner) {
           const currentUserId = currentUser.id?.toString();
-          const winnerParticipant = participants.find((p: any) => 
+          const winnerParticipant = participants.find((p: any) =>
             (p.userId || p.id) === splitWallet.degenWinner?.userId
           );
-          
+
           console.log('🔍 SplitDetailsScreen: Auto-navigating to DegenResult:', {
             currentUserId,
             winnerUserId: splitWallet.degenWinner?.userId,
             isCurrentUserWinner: (winnerParticipant?.userId || winnerParticipant?.id) === currentUserId,
             winnerParticipant
           });
-          
+
           if (winnerParticipant) {
             navigation.navigate('DegenResult', {
               billData: billData,
@@ -1958,17 +2217,17 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       });
 
       const currentUserId = currentUser.id?.toString();
-      const winnerParticipant = participants.find((p: any) => 
+      const winnerParticipant = participants.find((p: any) =>
         (p.userId || p.id) === splitWallet.degenWinner?.userId
       );
-      
+
       console.log('🔍 SplitDetailsScreen: Fallback auto-navigating to DegenResult:', {
         currentUserId,
         winnerUserId: splitWallet.degenWinner?.userId,
         isCurrentUserWinner: (winnerParticipant?.userId || winnerParticipant?.id) === currentUserId,
         winnerParticipant
       });
-      
+
       if (winnerParticipant) {
         navigation.navigate('DegenResult', {
           billData: billData,
@@ -2024,7 +2283,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         const joinResult = await SplitInvitationService.joinSplit(invitationData, currentUser.id);
         if (joinResult.success) {
           console.log('🔍 SplitDetailsScreen: Successfully joined split via deep link:', joinResult.splitId);
-          
+
           // Load the split data to display it
           const splitResult = await SplitStorageService.getSplit(invitationData.splitId);
           if (splitResult.success && splitResult.split) {
@@ -2032,7 +2291,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             setBillName(splitResult.split.title);
             setTotalAmount(splitResult.split.totalAmount.toString());
             setSelectedSplitType(splitResult.split.splitType);
-            
+
             // Transform participants to unified format
             const transformedParticipants = splitResult.split.participants.map((p: any) => ({
               id: p.userId,
@@ -2046,7 +2305,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               items: [],
             }));
             setParticipants(transformedParticipants);
-            
+
             Alert.alert('Success!', `You have successfully joined "${splitResult.split.title}" split!`);
           }
         } else {
@@ -2068,26 +2327,26 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       if (processedBillData?.id) {
         const { priceManagementService } = await import('../../services/priceManagementService');
         const { PriceDebugger } = await import('../../utils/priceDebugger');
-        
+
         // Use actual amount from state for consistency
         const actualAmount = parseFloat(totalAmount);
-        
+
         // Debug current state
         PriceDebugger.debugBillAmounts(processedBillData.id, {
           processedBillData,
           billData,
           routeParams: { totalAmount: actualAmount }
         });
-        
+
         const existingPrice = priceManagementService.getBillPrice(processedBillData.id);
-        
+
         if (!existingPrice) {
           priceManagementService.setBillPrice(
             processedBillData.id,
             actualAmount, // Use actual amount from state
             'USDC'
           );
-          
+
           if (__DEV__) {
             console.log('💰 SplitDetailsScreen: Set authoritative price:', {
               billId: processedBillData.id,
@@ -2097,7 +2356,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         }
       }
     };
-    
+
     setAuthoritativePrice();
   }, [processedBillData?.id]);
 
@@ -2123,12 +2382,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         participantsCount: splitData.participants.length,
         participants: splitData.participants
       });
-      
+
       // Find participants with 'invited' or 'pending' status and restore them to invitedUsers
-      const invitedParticipants = splitData.participants.filter((participant: any) => 
+      const invitedParticipants = splitData.participants.filter((participant: any) =>
         participant.status === 'invited' || participant.status === 'pending'
       );
-      
+
       if (invitedParticipants.length > 0) {
         console.log('🔍 SplitDetailsScreen: Found invited participants to restore:', invitedParticipants.length);
         const restoredInvitedUsers = invitedParticipants.map((participant: any) => ({
@@ -2139,7 +2398,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           status: participant.status,
           invitedAt: participant.joinedAt || new Date().toISOString(),
         }));
-        
+
         setInvitedUsers(restoredInvitedUsers);
         console.log('🔍 SplitDetailsScreen: Restored invited users:', restoredInvitedUsers);
       }
@@ -2200,7 +2459,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={colors.black} />
-        
+
         <View style={styles.processingContainer}>
           <ActivityIndicator size="large" color={colors.green} />
           <Text style={styles.processingSubtitle}>
@@ -2214,106 +2473,200 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
-      
+
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
+        <TouchableOpacity
+          style={styles.backButton}
           onPress={() => navigation.navigate('SplitsList')}
         >
-          <Text style={styles.backButtonText}>←</Text>
+          <Image
+            source={require('../../../assets/chevron-left.png')}
+            style={styles.backButtonIcon}
+          />
         </TouchableOpacity>
-        
+
         <Text style={styles.headerTitle}>Split the Bill</Text>
-        
+
         <TouchableOpacity style={styles.editButton} onPress={handleEditBill}>
-          <Text style={styles.editButtonText}>✏️</Text>
+          <Image
+            source={require('../../../assets/edit-icon.png')}
+            style={styles.editButtonIcon}
+          />
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Bill Details Card */}
-        <View style={styles.billCard}>
-          <View style={styles.billHeader}>
-            <View style={styles.billTitleContainer}>
-              <Text style={styles.billIcon}>🍽️</Text>
-              <Text style={styles.billTitle}>{billName}</Text>
+        <LinearGradient
+          colors={[colors.green, colors.greenLight]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.billCard}
+        >
+          {/*=== Bill Card Top ===*/}
+          <View style={styles.billCardTop}>
+            <View style={styles.billHeader}>
+              <View style={styles.billTitleContainer}>
+                <View style={styles.billIconContainer}>
+                  <Image
+                    source={CATEGORY_IMAGES[splitData?.category || currentSplitData?.category || 'food']}
+                    style={styles.billIcon}
+                  />
+                </View>
+                <View style={styles.billHeaderContent}>
+                  <Text
+                    style={styles.billTitle}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
+                    {billName}
+                  </Text>
+
+                  <Text style={styles.billDate}>
+                    {(() => {
+                      // Use data from existing split if available, otherwise use mockup data
+                      if (splitData?.date) {
+                        return splitData.date;
+                      }
+                      if (processedBillData?.date) {
+                        return processedBillData.date;
+                      }
+                      if (billData?.date) {
+                        return billData.date;
+                      }
+                      const { MockupDataService } = require('../../data/mockupData');
+                      return MockupDataService.getBillDate();
+                    })()}
+                  </Text>
+                </View>
+
+              </View>
+
             </View>
-            <Text style={styles.billDate}>
-              {(() => {
-                // Use data from existing split if available, otherwise use mockup data
-                if (splitData?.date) {
-                  return splitData.date;
-                }
-                if (processedBillData?.date) {
-                  return processedBillData.date;
-                }
-                if (billData?.date) {
-                  return billData.date;
-                }
-                const { MockupDataService } = require('../../data/mockupData');
-                return MockupDataService.getBillDate();
-              })()}
-            </Text>
-          </View>
-          
-          <View style={styles.billAmountContainer}>
-            <Text style={styles.billAmountLabel}>Total Bill</Text>
-            <View style={styles.billAmountRow}>
-              <Text style={styles.billAmountUSDC}>{totalAmount} USDC</Text>
-              <Text style={styles.billAmountEUR}>
-                {(() => {
-                  const currency = splitData?.currency || processedBillData?.currency || billData?.currency || 'USD';
-                  if (currency === 'USD') {
-                    return `$${parseFloat(totalAmount).toFixed(2)}`;
-                  } else {
-                    return `${(parseFloat(totalAmount) * 0.95).toFixed(2)}€`;
-                  }
-                })()}
-              </Text>
+
+            <View style={styles.billAmountContainer}>
+              <Text style={styles.billAmountLabel}>Total Bill</Text>
+              <View style={styles.billAmountRow}>
+                <Text style={styles.billAmountUSDC}>{totalAmount} USDC</Text>
+                <Text style={styles.billAmountEUR}>
+                  {(() => {
+                    const currency = splitData?.currency || processedBillData?.currency || billData?.currency || 'USD';
+                    if (currency === 'USD') {
+                      return `$${parseFloat(totalAmount).toFixed(2)}`;
+                    } else {
+                      return `${(parseFloat(totalAmount) * 0.95).toFixed(2)}€`;
+                    }
+                  })()}
+                </Text>
+              </View>
+              {/*{(splitData?.merchant?.address || processedBillData?.location || billData?.location) && (
+                <Text style={[styles.billAmountEUR, { marginTop: spacing.xs }]}>
+                  {splitData?.merchant?.address || processedBillData?.location || billData?.location}
+                </Text>
+              )}*/}
             </View>
-            {(splitData?.merchant?.address || processedBillData?.location || billData?.location) && (
-              <Text style={[styles.billAmountEUR, { marginTop: spacing.xs }]}>
-                {splitData?.merchant?.address || processedBillData?.location || billData?.location}
-              </Text>
-            )}
           </View>
-          
-          <View style={styles.splitInfoContainer}>
-            <View style={styles.splitInfoLeft}>
-              <Text style={styles.splitInfoLabel}>Split between:</Text>
-              <View style={styles.avatarContainer}>
-                {participants.slice(0, 4).map((participant: any, index: number) => {
-                  const avatarStyle = index > 0 
-                    ? [styles.avatar, styles.avatarOverlap] as any
-                    : styles.avatar;
-                  
-                  return (
-                    <UserAvatar
-                      key={participant.id}
-                      userId={participant.id}
-                      userName={participant.name}
-                      size={32}
-                      style={avatarStyle}
+
+
+          {/*=== Bill Card Bottom ===*/}
+          <View style={styles.billCardBottom}>
+            <View style={styles.splitInfoContainer}>
+              <View style={styles.splitInfoLeft}>
+                <Text style={styles.splitInfoLabel}>Split between:</Text>
+                <View style={styles.avatarContainer}>
+                  {participants.slice(0, 4).map((participant: any, index: number) => {
+                    const avatarStyle = index > 0
+                      ? [styles.avatar, styles.avatarOverlap] as any
+                      : styles.avatar;
+
+                    return (
+                      <UserAvatar
+                        key={participant.id}
+                        userId={participant.id}
+                        userName={participant.name}
+                        size={32}
+                        style={avatarStyle}
+                      />
+                    );
+                  })}
+                  {participants.length > 4 && (
+                    <View style={[styles.avatar, styles.avatarOverlay]}>
+                      <Text style={styles.avatarOverlayText}>+{participants.length - 4}</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              <TouchableOpacity style={styles.addButton} onPress={handleAddParticipant}>
+                <Text style={styles.addButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.splitCardDotLeft}/>
+            <View style={styles.splitCardDotRight}/>
+
+
+        </LinearGradient>
+
+
+        {/* Split Wallet Info Section - Only visible to creators */}
+        {(() => {
+          const shouldShowWallet = (splitWallet || currentSplitData?.walletAddress) && isCurrentUserCreator();
+          console.log('🔍 SplitDetailsScreen: Wallet display check:', {
+            hasSplitWallet: !!splitWallet,
+            hasCurrentSplitDataWallet: !!currentSplitData?.walletAddress,
+            isCreator: isCurrentUserCreator(),
+            shouldShowWallet,
+            walletAddress: splitWallet?.walletAddress || currentSplitData?.walletAddress,
+            splitWalletObject: splitWallet,
+            currentSplitDataObject: currentSplitData,
+            currentUser: currentUser?.id
+          });
+          return shouldShowWallet;
+        })() && (
+            <View style={styles.splitWalletSection}>
+              <Text style={styles.splitWalletTitle}>Split Wallet</Text>
+              <View style={styles.splitWalletCard}>
+                <TouchableOpacity 
+                  style={styles.splitWalletInfo}
+                  onPress={() => {
+                    const address = splitWallet?.walletAddress || currentSplitData?.walletAddress;
+                    if (address) {
+                      Clipboard.setStringAsync(address);
+                      Alert.alert('Copied!', 'Wallet address copied to clipboard');
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.splitWalletLabel}>Wallet Address:</Text>
+                  <View style={styles.walletAddressContainer}>
+                    <Text style={styles.splitWalletAddress}>
+                      {formatWalletAddress(splitWallet?.walletAddress || currentSplitData?.walletAddress || '')}
+                    </Text>
+                    <Image
+                      source={require('../../../assets/copy-icon.png')}
+                      style={styles.copyIcon}
                     />
-                  );
-                })}
-                {participants.length > 4 && (
-                  <View style={[styles.avatar, styles.avatarOverlay]}>
-                    <Text style={styles.avatarOverlayText}>+{participants.length - 4}</Text>
                   </View>
-                )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.privateKeyButton}
+                  onPress={handleShowPrivateKey}
+                >
+                  <Image
+                    source={require('../../../assets/eye-icon.png')}
+                    style={styles.privateKeyButtonIcon}
+                  />
+                  <Text style={styles.privateKeyButtonText}>View Private Key</Text>
+                </TouchableOpacity>
               </View>
             </View>
-            <TouchableOpacity style={styles.addButton} onPress={handleAddParticipant}>
-              <Text style={styles.addButtonText}>Add</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+          )}
 
         {/* Participants Section */}
         <View style={styles.participantsSection}>
           <Text style={styles.participantsTitle}>In the pool:</Text>
-          
+
           {participants.map((participant: any) => (
             <View key={participant.id} style={styles.participantCard}>
               <UserAvatar
@@ -2324,19 +2677,22 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               />
               <View style={styles.participantInfo}>
                 <Text style={styles.participantName}>{participant.name}</Text>
-                <Text style={styles.participantWallet}>{participant.walletAddress}</Text>
+                <Text style={styles.participantWallet}>{formatWalletAddress(participant.walletAddress)}</Text>
               </View>
               <View style={styles.participantStatus}>
                 {participant.status === 'accepted' ? (
-                  <Text style={styles.statusAccepted}>✓</Text>
+                  <Image
+                    source={require('../../../assets/check-circle-icon.png')}
+                    style={styles.statusAcceptedIcon}
+                  />
                 ) : (
                   <Text style={styles.statusPending}>Pending</Text>
                 )}
-                {__DEV__ && (
+                {/*{__DEV__ && (
                   <Text style={{ fontSize: 10, color: '#666' }}>
                     {participant.status}
                   </Text>
-                )}
+                )}*/}
               </View>
             </View>
           ))}
@@ -2354,7 +2710,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   walletAddress: invitedUser.walletAddress,
                   displayText: invitedUser.walletAddress || invitedUser.email || 'No wallet address'
                 });
-                
+
                 return (
                   <View key={invitedUser.id} style={styles.participantCard}>
                     <UserAvatar
@@ -2377,39 +2733,6 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           )}
         </View>
 
-        {/* Split Wallet Info Section - Only visible to creators */}
-        {(() => {
-          const shouldShowWallet = (splitWallet || currentSplitData?.walletAddress) && isCurrentUserCreator();
-          console.log('🔍 SplitDetailsScreen: Wallet display check:', {
-            hasSplitWallet: !!splitWallet,
-            hasCurrentSplitDataWallet: !!currentSplitData?.walletAddress,
-            isCreator: isCurrentUserCreator(),
-            shouldShowWallet,
-            walletAddress: splitWallet?.walletAddress || currentSplitData?.walletAddress,
-            splitWalletObject: splitWallet,
-            currentSplitDataObject: currentSplitData,
-            currentUser: currentUser?.id
-          });
-          return shouldShowWallet;
-        })() && (
-          <View style={styles.splitWalletSection}>
-            <Text style={styles.splitWalletTitle}>Split Wallet</Text>
-            <View style={styles.splitWalletCard}>
-              <View style={styles.splitWalletInfo}>
-                <Text style={styles.splitWalletLabel}>Wallet Address:</Text>
-                <Text style={styles.splitWalletAddress} numberOfLines={1} ellipsizeMode="middle">
-                  {splitWallet?.walletAddress || currentSplitData?.walletAddress}
-                </Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.privateKeyButton} 
-                onPress={handleShowPrivateKey}
-              >
-                <Text style={styles.privateKeyButtonText}>🔑 View Private Key</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
 
         {/* Loading indicator when creating wallet */}
         {isCreatingWallet && (
@@ -2424,29 +2747,32 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
       {/* Bottom Action Button - Only visible to creators */}
       {isCurrentUserCreator() && (
-      <View style={styles.bottomContainer}>
-          <TouchableOpacity 
-            style={[
-              styles.splitButton,
-              !areAllInvitedUsersAccepted() && styles.splitButtonDisabled
-            ]} 
+        <View style={styles.bottomContainer}>
+          <TouchableOpacity
+            style={styles.splitButton}
             onPress={handleSplitBill}
             disabled={!areAllInvitedUsersAccepted()}
           >
-            <Text style={[
-              styles.splitButtonText,
-              !areAllInvitedUsersAccepted() && styles.splitButtonTextDisabled
-            ]}>
+            <LinearGradient
+              colors={areAllInvitedUsersAccepted() ? [colors.green, colors.greenLight] : [colors.surface, colors.surface]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.splitButtonGradient}
+            >
+              <Text style={[
+                styles.splitButtonText,
+                !areAllInvitedUsersAccepted() && styles.splitButtonTextDisabled
+              ]}>
                 {(() => {
                   const allAccepted = areAllInvitedUsersAccepted();
                   const pendingInvitedUsers = invitedUsers.filter((user: any) => user.status === 'pending');
                   const nonPendingInvitedUsers = invitedUsers.filter((user: any) => user.status !== 'pending');
                   const acceptedInvitedUsers = nonPendingInvitedUsers.filter((user: any) => user.status === 'accepted');
                   const declinedInvitedUsers = nonPendingInvitedUsers.filter((user: any) => user.status === 'declined');
-                  
+
                   // Count users who need to accept (pending + non-accepted non-pending)
                   const usersNeedingAcceptance = pendingInvitedUsers.length + (nonPendingInvitedUsers.length - acceptedInvitedUsers.length);
-                  
+
                   console.log('🔍 SplitDetailsScreen: Split button state:', {
                     allAccepted,
                     pendingInvitedUsers: pendingInvitedUsers.length,
@@ -2457,7 +2783,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                     invitedUsersCount: invitedUsers.length,
                     participantsCount: participants.length
                   });
-                  
+
                   if (allAccepted) {
                     return 'Split';
                   } else if (usersNeedingAcceptance > 0) {
@@ -2466,38 +2792,50 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                     return 'Split';
                   }
                 })()}
-            </Text>
-        </TouchableOpacity>
-      </View>
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Split Type Selection Modal */}
       <Modal
         visible={showSplitModal}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         onRequestClose={handleCloseModal}
+        statusBarTranslucent={true}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={handleCloseModal}
-        >
-          <TouchableOpacity 
-            style={styles.modalContainer}
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-          >
-            {/* Modal Handle */}
-            <View style={styles.modalHandle} />
+        <Animated.View style={[styles.modalOverlay, { opacity: splitModalOpacity }]}>
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              activeOpacity={1}
+              onPress={handleCloseModal}
+            />
             
+            <PanGestureHandler
+              onGestureEvent={handleSplitModalGestureEvent}
+              onHandlerStateChange={handleSplitModalStateChange}
+            >
+              <Animated.View
+                style={[
+                  styles.modalContainer,
+                  {
+                    transform: [{ translateY: splitModalTranslateY }],
+                  },
+                ]}
+              >
+                {/* Modal Handle */}
+                <View style={styles.modalHandle} />
+
             {/* Modal Content */}
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Choose your splitting style</Text>
               <Text style={styles.modalSubtitle}>
                 Pick how you want to settle the bill with friends.
               </Text>
-              
+
               {/* Split Type Options */}
               <View style={styles.splitOptionsContainer}>
                 {/* Fair Split Option */}
@@ -2516,7 +2854,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                     Everyone pays their fair share
                   </Text>
                 </TouchableOpacity>
-                
+
                 {/* Degen Split Option */}
                 <TouchableOpacity
                   style={[
@@ -2538,61 +2876,74 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   </Text>
                 </TouchableOpacity>
               </View>
-              
-               {/* Continue Button */}
-               <TouchableOpacity
-                 style={[
-                   styles.continueButton,
-                   !selectedSplitType && styles.continueButtonDisabled
-                 ]}
-                 onPress={() => {
-                   console.log('Continue button touched!');
-                   handleContinue();
-                 }}
-                 disabled={!selectedSplitType}
-               >
-                 <LinearGradient
-                   colors={selectedSplitType ? [colors.green, colors.greenLight] : [colors.surface, colors.surface]}
-                   start={{ x: 0, y: 0 }}
-                   end={{ x: 1, y: 0 }}
-                   style={styles.continueButtonGradient}
-                 >
-                   <Text style={[
-                     styles.continueButtonText,
-                     !selectedSplitType && styles.continueButtonTextDisabled
-                   ]}>
-                     Continue
-                   </Text>
-                 </LinearGradient>
-               </TouchableOpacity>
+
+              {/* Continue Button */}
+              <TouchableOpacity
+                style={[
+                  styles.continueButton,
+                  !selectedSplitType && styles.continueButtonDisabled
+                ]}
+                onPress={() => {
+                  console.log('Continue button touched!');
+                  handleContinue();
+                }}
+                disabled={!selectedSplitType}
+              >
+                <LinearGradient
+                  colors={selectedSplitType ? [colors.green, colors.greenLight] : [colors.surface, colors.surface]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.continueButtonGradient}
+                >
+                  <Text style={[
+                    styles.continueButtonText,
+                    !selectedSplitType && styles.continueButtonTextDisabled
+                  ]}>
+                    Continue
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+              </Animated.View>
+            </PanGestureHandler>
+          </View>
+        </Animated.View>
       </Modal>
 
       {/* Add Friends Modal */}
       <Modal
         visible={showAddFriendsModal}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={handleCloseAddFriendsModal}
+        statusBarTranslucent={true}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={handleCloseAddFriendsModal}
-        >
-          <TouchableOpacity 
-            style={styles.addFriendsModalContainer}
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-          >
-            {/* Drag Handle */}
-            <View style={styles.dragHandle} />
+        <Animated.View style={[styles.modalOverlay, { opacity: addFriendsModalOpacity }]}>
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              activeOpacity={1}
+              onPress={handleCloseAddFriendsModal}
+            />
             
+            <PanGestureHandler
+              onGestureEvent={handleAddFriendsModalGestureEvent}
+              onHandlerStateChange={handleAddFriendsModalStateChange}
+            >
+              <Animated.View
+                style={[
+                  styles.addFriendsModalContainer,
+                  {
+                    transform: [{ translateY: addFriendsModalTranslateY }],
+                  },
+                ]}
+              >
+                {/* Drag Handle */}
+                <View style={styles.dragHandle} />
+
             {/* Title */}
             <Text style={styles.addFriendsModalTitle}>Show QR Code</Text>
-            
+
             {/* QR Code Section */}
             <View style={styles.qrCodeSection}>
               <View style={styles.qrCodeContainer}>
@@ -2614,66 +2965,86 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   </View>
                 )}
               </View>
-              
+
               {/* Split Context */}
               <View style={styles.splitContext}>
                 <Text style={styles.splitContextIcon}>🍴</Text>
                 <Text style={styles.splitContextText}>{billName}</Text>
               </View>
             </View>
-            
+
             {/* Action Buttons */}
             <View style={styles.addFriendsModalButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.shareLinkButton}
                 onPress={handleLinkShare}
               >
                 <Text style={styles.shareLinkButtonText}>Share link</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.addContactsButton}
                 onPress={handleAddContacts}
                 disabled={isInvitingUsers}
               >
-                {isInvitingUsers ? (
-                  <ActivityIndicator size="small" color={colors.white} />
-                ) : (
-                  <Text style={styles.addContactsButtonText}>Add Contacts</Text>
-                )}
+                <LinearGradient
+                  colors={[colors.green, colors.greenLight]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.addContactsButtonGradient}
+                >
+                  {isInvitingUsers ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={styles.addContactsButtonText}>Add Contacts</Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+              </Animated.View>
+            </PanGestureHandler>
+          </View>
+        </Animated.View>
       </Modal>
 
       {/* Private Key Modal */}
       <Modal
         visible={showPrivateKeyModal}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         onRequestClose={handleClosePrivateKeyModal}
+        statusBarTranslucent={true}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={handleClosePrivateKeyModal}
-        >
-          <TouchableOpacity 
-            style={styles.privateKeyModalContainer}
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-          >
-            {/* Modal Handle */}
-            <View style={styles.modalHandle} />
+        <Animated.View style={[styles.modalOverlay, { opacity: privateKeyModalOpacity }]}>
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              activeOpacity={1}
+              onPress={handleClosePrivateKeyModal}
+            />
             
+            <PanGestureHandler
+              onGestureEvent={handlePrivateKeyModalGestureEvent}
+              onHandlerStateChange={handlePrivateKeyModalStateChange}
+            >
+              <Animated.View
+                style={[
+                  styles.privateKeyModalContainer,
+                  {
+                    transform: [{ translateY: privateKeyModalTranslateY }],
+                  },
+                ]}
+              >
+                {/* Modal Handle */}
+                <View style={styles.modalHandle} />
+
             {/* Modal Content */}
             <View style={styles.privateKeyModalContent}>
               <Text style={styles.privateKeyModalTitle}>🔑 Split Wallet Private Key</Text>
               <Text style={styles.privateKeyModalSubtitle}>
                 Keep this private key secure. Only you can access it.
               </Text>
-              
+
               {/* Private Key Display */}
               <View style={styles.privateKeyDisplayContainer}>
                 <Text style={styles.privateKeyLabel}>Private Key:</Text>
@@ -2683,7 +3054,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   </Text>
                 </View>
               </View>
-              
+
               {/* Warning */}
               <View style={styles.privateKeyWarning}>
                 <Text style={styles.privateKeyWarningIcon}>⚠️</Text>
@@ -2691,10 +3062,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   Never share this private key with anyone. It gives full access to your split wallet.
                 </Text>
               </View>
-              
+
               {/* Action Buttons */}
               <View style={styles.privateKeyButtonContainer}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.copyButton}
                   onPress={async () => {
                     if (splitWalletPrivateKey) {
@@ -2703,10 +3074,17 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                     }
                   }}
                 >
-                  <Text style={styles.copyButtonText}>📋 Copy</Text>
+                  <LinearGradient
+                    colors={[colors.green, colors.greenLight]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.copyButtonGradient}
+                  >
+                    <Text style={styles.copyButtonText}>📋 Copy</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={styles.closePrivateKeyButton}
                   onPress={handleClosePrivateKeyModal}
                 >
@@ -2714,8 +3092,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 </TouchableOpacity>
               </View>
             </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+              </Animated.View>
+            </PanGestureHandler>
+          </View>
+        </Animated.View>
       </Modal>
 
     </SafeAreaView>

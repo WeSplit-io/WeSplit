@@ -8,6 +8,7 @@ export const colors = {
     white10: 'rgba(255, 255, 255, 0.10)',
     white50: 'rgba(255, 255, 255, 0.50)',
     white70: 'rgba(255, 255, 255, 0.70)',
+    white80: 'rgba(255, 255, 255, 0.80)',
 
     // Black colors
     blackOverlay: 'rgba(0, 0, 0, 0.65)',
