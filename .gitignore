@@ -160,3 +160,14 @@ temp/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+.rece
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+receipt_extract/
+
+.DS_Store
+.DS_Store?

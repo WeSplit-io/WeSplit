@@ -32,7 +32,7 @@ export const styles = StyleSheet.create({
   headerTitle: {
     color: colors.white,
     fontSize: typography.fontSize.lg,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   editButton: {
     padding: spacing.sm,

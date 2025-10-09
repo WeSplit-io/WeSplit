@@ -26,11 +26,30 @@ export class UserImageService {
    */
   static async getUserImage(userId: string): Promise<UserImageResult> {
     try {
-      console.log('🔍 UserImageService: Fetching user image for:', userId);
+      console.log('🔍 UserImageService: Fetching user image for:', {
+        userId,
+        userIdType: typeof userId,
+        userIdLength: userId?.length
+      });
+      
+      if (!userId || userId.trim() === '') {
+        console.log('🔍 UserImageService: Invalid userId provided');
+        return {
+          success: false,
+          error: 'Invalid user ID provided',
+        };
+      }
       
       const user = await firebaseUserService.getCurrentUser(userId);
       
       if (user) {
+        console.log('🔍 UserImageService: User found:', {
+          userId: user.id,
+          userName: user.name,
+          hasAvatar: !!user.avatar,
+          avatarValue: user.avatar
+        });
+        
         // First check if user has avatar URL in Firestore
         if (user.avatar && user.avatar.trim() !== '') {
           console.log('🔍 UserImageService: Found user avatar in Firestore:', user.avatar);
