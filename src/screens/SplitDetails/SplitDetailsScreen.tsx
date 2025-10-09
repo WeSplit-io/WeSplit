@@ -57,6 +57,15 @@ const CATEGORY_IMAGES: { [key: string]: any } = {
   rocket: { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Frocket-icon-black.png?alt=media&token=90fabb5a-8110-4fd9-9753-9c785fa953a4' },
 };
 
+// Local image mapping for category icons (for tintColor support)
+const CATEGORY_IMAGES_LOCAL: { [key: string]: any } = {
+  trip: require('../../../assets/trip-icon-black.png'),
+  food: require('../../../assets/food-icon-black.png'),
+  home: require('../../../assets/house-icon-black.png'),
+  event: require('../../../assets/event-icon-black.png'),
+  rocket: require('../../../assets/rocket-icon-black.png'),
+};
+
 interface SplitDetailsScreenProps {
   navigation: any;
   route?: {
@@ -64,6 +73,7 @@ interface SplitDetailsScreenProps {
       imageUri?: string;
       isNewBill?: boolean;
       selectedContact?: any;
+      selectedContacts?: any[];
       shareableLink?: string;
       splitInvitationData?: string;
     };
@@ -1904,6 +1914,32 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     }
   }, [showPrivateKeyModal]);
 
+  // Handle multiple contacts selection from ContactsScreen
+  useEffect(() => {
+    const selectedContacts = route?.params?.selectedContacts;
+    if (selectedContacts && Array.isArray(selectedContacts) && selectedContacts.length > 0) {
+      // Process all selected contacts
+      const inviteMultipleContacts = async () => {
+        console.log('🔍 SplitDetailsScreen: Processing multiple contacts:', selectedContacts.length);
+        
+        for (const contact of selectedContacts) {
+          try {
+            await handleContactSelection(contact);
+          } catch (error) {
+            console.error('🔍 SplitDetailsScreen: Error inviting contact:', contact.name, error);
+          }
+        }
+        
+        // Clear the selectedContacts from navigation params after processing
+        navigation.setParams({ selectedContacts: undefined });
+        
+        Alert.alert('Success', `${selectedContacts.length} ${selectedContacts.length === 1 ? 'contact has' : 'contacts have'} been invited to the split!`);
+      };
+      
+      inviteMultipleContacts();
+    }
+  }, [route?.params?.selectedContacts]);
+
   const handleEditBill = () => {
     // Navigate back to BillProcessingScreen with current data for editing
     navigation.navigate('BillProcessing', {
@@ -2836,7 +2872,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 {qrCodeData ? (
                   <QRCode
                     value={qrCodeData}
-                    size={220}
+                    size={300}
                     color={colors.black}
                     backgroundColor={colors.white}
                     logoSize={30}
@@ -2854,7 +2890,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
               {/* Split Context */}
               <View style={styles.splitContext}>
-                <Text style={styles.splitContextIcon}>🍴</Text>
+                <Image 
+                  source={CATEGORY_IMAGES_LOCAL[splitData?.category || currentSplitData?.category || 'food']}
+                  style={styles.splitContextIconImage}
+                  tintColor={colors.white}
+                />
                 <Text style={styles.splitContextText}>{billName}</Text>
               </View>
             </View>

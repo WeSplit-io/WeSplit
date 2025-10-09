@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import NavBar from '../../components/NavBar';
 import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { UserContact, User } from '../../types';
+import { colors } from '../../theme/colors';
 import { styles } from './styles';
 
 interface ContactsScreenProps {
@@ -21,25 +23,41 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
   
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'All' | 'Favorite' | 'Search'>('All');
+  const [selectedContacts, setSelectedContacts] = useState<UserContact[]>([]);
+  const [isInviting, setIsInviting] = useState(false);
 
   const handleSelectContact = (contact: UserContact) => {
     if (action === 'send' && onContactSelect) {
       // If we're in send mode, call the callback
       onContactSelect(contact);
     } else if (action === 'split') {
-      // If we're in split mode, navigate back with the selected contact
-      if (returnRoute) {
-        navigation.navigate(returnRoute, {
-          selectedContact: contact,
-          splitId: splitId,
-          splitName: splitName,
-        });
-      } else {
-        navigation.goBack();
-      }
+      // If we're in split mode, toggle contact selection for multiple selection
+      setSelectedContacts(prev => {
+        const isAlreadySelected = prev.some(c => c.id === contact.id);
+        if (isAlreadySelected) {
+          return prev.filter(c => c.id !== contact.id);
+        } else {
+          return [...prev, contact];
+        }
+      });
     } else {
       // Navigate to the new ContactAction screen with toggle
       navigation.navigate('ContactAction', { selectedContact: contact });
+    }
+  };
+
+  const handleInviteContacts = () => {
+    if (selectedContacts.length === 0) return;
+
+    // Navigate back with all selected contacts
+    if (returnRoute) {
+      navigation.navigate(returnRoute, {
+        selectedContacts: selectedContacts,
+        splitId: splitId,
+        splitName: splitName,
+      });
+    } else {
+      navigation.goBack();
     }
   };
 
@@ -80,32 +98,70 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
     return 'Contacts';
   };
 
+  const isSplitMode = action === 'split';
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.placeholder} />
+        {isSplitMode ? (
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Image
+              source={require('../../../assets/chevron-left.png')}
+              style={styles.backIcon}
+            />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.placeholder} />
+        )}
         <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
         <View style={styles.placeholder} />
       </View>
 
-      <View style={styles.content}>
+      <View style={[styles.content, isSplitMode && styles.contentWithButton]}>
         <ContactsList
           onContactSelect={handleSelectContact}
           onAddContact={handleAddContact}
-          showAddButton={true}
+          showAddButton={isSplitMode}
           showSearch={true}
-          showTabs={true}
+          showTabs={!isSplitMode}
           activeTab={activeTab}
           onTabChange={handleTabChange}
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
           placeholder="Search contacts"
           hideToggleBar={true}
+          selectedContacts={isSplitMode ? selectedContacts : undefined}
+          multiSelect={isSplitMode}
         />
       </View>
+
+      {isSplitMode && selectedContacts.length > 0 && (
+        <View style={styles.inviteButtonContainer}>
+          <TouchableOpacity
+            style={styles.inviteButton}
+            onPress={handleInviteContacts}
+            disabled={isInviting}
+          >
+            <LinearGradient
+              colors={[colors.green, colors.greenLight]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.inviteButtonGradient}
+            >
+              {isInviting ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Text style={styles.inviteButtonText}>
+                  Invite {selectedContacts.length} {selectedContacts.length === 1 ? 'Contact' : 'Contacts'}
+                </Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      )}
       
-      <NavBar currentRoute="Contacts" navigation={navigation} />
+      {!isSplitMode && <NavBar currentRoute="Contacts" navigation={navigation} />}
     </SafeAreaView>
   );
 };

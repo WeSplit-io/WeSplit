@@ -176,6 +176,7 @@ export const styles = StyleSheet.create({
   avatarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: -10,
   },
   avatar: {
     width: 32,
@@ -186,7 +187,7 @@ export const styles = StyleSheet.create({
     borderColor: colors.green,
   },
   avatarOverlap: {
-    marginLeft: -8,
+    marginLeft: -10,
   },
   avatarOverlay: {
     width: 32,
@@ -195,7 +196,6 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.black,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: spacing.xs,
   },
   avatarOverlayText: {
     color: colors.white,
@@ -276,7 +276,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.black,
   },
   splitButton: {
-    borderRadius: 12,
+    borderRadius: spacing.md,
     overflow: 'hidden',
   },
   splitButtonGradient: {
@@ -435,7 +435,7 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,
-    minHeight: '70%',
+    minHeight: '60%',
     maxHeight: '85%',
     position: 'absolute',
     bottom: 0,
@@ -452,10 +452,10 @@ export const styles = StyleSheet.create({
   },
   addFriendsModalTitle: {
     color: colors.white,
-    fontSize: typography.fontSize.xxl,
-    fontWeight: '700',
+    fontSize: typography.fontSize.xl,
+    fontWeight: '600',
     textAlign: 'center',
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xl,
   },
   qrCodeSection: {
     alignItems: 'center',
@@ -466,10 +466,11 @@ export const styles = StyleSheet.create({
   qrCodeContainer: {
     marginBottom: spacing.xl,
     backgroundColor: colors.white,
-    padding: spacing.md,
+    padding: spacing.lg,
     borderRadius: spacing.md,
     shadowColor: colors.black,
-    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
 
   },
   qrCodePlaceholder: {
@@ -504,6 +505,14 @@ export const styles = StyleSheet.create({
     marginRight: spacing.md,
     opacity: 0.8,
   },
+  splitContextIconImage: {
+    width: 36,
+    height: 36,
+    marginRight: spacing.md,
+    backgroundColor: colors.white10,
+    borderRadius: spacing.sm,
+    padding: spacing.sm,
+  },
   splitContextText: {
     color: colors.white,
     fontSize: typography.fontSize.lg,
@@ -513,8 +522,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 'auto',
-    paddingTop: spacing.xl,
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   shareLinkButton: {
     flex: 1,
@@ -543,7 +551,7 @@ export const styles = StyleSheet.create({
   },
   addContactsButton: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: spacing.md,
     marginLeft: spacing.md,
     overflow: 'hidden',
   },
@@ -699,7 +707,7 @@ export const styles = StyleSheet.create({
   },
   copyButton: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: spacing.md,
     overflow: 'hidden',
   },
   copyButtonGradient: {

@@ -93,6 +93,10 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
   },
+  contactRowSelected: {
+    backgroundColor: colors.white5,
+    borderRadius: 12,
+  },
   avatar: {
     width: spacing.xxl + spacing.sm,
     height: spacing.xxl + spacing.sm,
@@ -127,6 +131,30 @@ export const styles = StyleSheet.create({
   },
   favoriteButton: {
     padding: spacing.sm,
+  },
+  selectIndicator: {
+    marginLeft: spacing.sm,
+  },
+  checkmark: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.white10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.white30,
+  },
+  addButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
   },
   loadingContainer: {
     flex: 1,

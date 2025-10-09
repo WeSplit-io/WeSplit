@@ -24,9 +24,11 @@ interface ContactsListProps {
   searchQuery?: string;
   onSearchQueryChange?: (query: string) => void;
   placeholder?: string;
-  hideToggleBar?: boolean; // NEW PROP
+  hideToggleBar?: boolean;
   onNavigateToSend?: (recipientWalletAddress: string, userName?: string) => void;
   onNavigateToTransfer?: (recipientWalletAddress: string, userName?: string) => void;
+  selectedContacts?: UserContact[];
+  multiSelect?: boolean;
 }
 
 const ContactsList: React.FC<ContactsListProps> = ({
@@ -41,9 +43,11 @@ const ContactsList: React.FC<ContactsListProps> = ({
   searchQuery = '',
   onSearchQueryChange,
   placeholder = "Search contacts",
-  hideToggleBar = false, // NEW PROP
+  hideToggleBar = false,
   onNavigateToSend,
   onNavigateToTransfer,
+  selectedContacts = [],
+  multiSelect = false,
 }) => {
   const { state } = useApp();
   const { currentUser } = state;
@@ -499,10 +503,12 @@ const ContactsList: React.FC<ContactsListProps> = ({
       section
     });
 
+    const isSelected = multiSelect && selectedContacts.some(c => c.id === item.id);
+
     return (
       <TouchableOpacity
         key={`${section}-${item.id}`}
-        style={styles.contactRow}
+        style={[styles.contactRow, isSelected && styles.contactRowSelected]}
         onPress={() => onContactSelect(item)}
       >
         <UserAvatar
@@ -529,16 +535,34 @@ const ContactsList: React.FC<ContactsListProps> = ({
           </Text>
         )}
       </View>
-      <TouchableOpacity
-        style={styles.favoriteButton}
-        onPress={() => toggleFavorite(item.id)}
-      >
-        <Icon
-          name="star"
-          size={16}
-          color={item.isFavorite ? colors.brandGreen : colors.textSecondary}
-        />
-      </TouchableOpacity>
+      {multiSelect ? (
+        <View style={styles.selectIndicator}>
+          {isSelected ? (
+            <View style={styles.checkmark}>
+              <Icon
+                name="check"
+                size={16}
+                color={colors.white}
+              />
+            </View>
+          ) : (
+            <View style={styles.addButton}>
+              <Text style={styles.addButtonText}>Add</Text>
+            </View>
+          )}
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.favoriteButton}
+          onPress={() => toggleFavorite(item.id)}
+        >
+          <Icon
+            name="star"
+            size={16}
+            color={item.isFavorite ? colors.brandGreen : colors.textSecondary}
+          />
+        </TouchableOpacity>
+      )}
     </TouchableOpacity>
     );
   };

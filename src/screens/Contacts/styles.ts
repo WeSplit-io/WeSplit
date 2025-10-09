@@ -18,6 +18,11 @@ export const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
+  backIcon: {
+    width: 24,
+    height: 24,
+    tintColor: colors.white,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: typography.fontWeight.semibold,
@@ -29,6 +34,9 @@ export const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: spacing.md,
+  },
+  contentWithButton: {
+    paddingBottom: 80, // Make room for the invite button
   },
   searchContainer: {
     flexDirection: 'row',
@@ -151,5 +159,31 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  inviteButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.black,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  inviteButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  inviteButtonGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semibold,
   },
 }); 
