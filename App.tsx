@@ -74,6 +74,7 @@ import ContactActionScreen from './src/screens/ContactAction/ContactActionScreen
 import TransactionHistoryScreen from './src/screens/TransactionHistory/TransactionHistoryScreen';
 import ExternalWalletConnectionScreen from './src/screens/ExternalWalletConnection';
 import ManualSignatureInputScreen from './src/screens/ExternalWalletConnection/ManualSignatureInputScreen';
+import ManualBillCreationScreen from './src/screens/ManualBillCreation/ManualBillCreationScreen';
 
 
 const Stack = createStackNavigator();
@@ -272,6 +273,7 @@ export default function App() {
                 <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
                 <Stack.Screen name="ExternalWalletConnection" component={ExternalWalletConnectionScreen} />
                 <Stack.Screen name="ManualSignatureInput" component={ManualSignatureInputScreen} />
+                <Stack.Screen name="ManualBillCreation" component={ManualBillCreationScreen} />
                 <Stack.Screen name="SettleUpModal" component={SettleUpModal} />
               </Stack.Navigator>
               </NavigationWrapper>

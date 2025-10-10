@@ -271,9 +271,9 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
           style={styles.bottomLeftButton} 
           onPress={() => {
             try {
-              navigation.navigate('BillEdit');
+              navigation.navigate('ManualBillCreation');
             } catch (error) {
-              console.error('Error navigating to BillEdit:', error);
+              console.error('Error navigating to ManualBillCreation:', error);
               navigation.goBack();
             }
           }}

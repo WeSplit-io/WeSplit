@@ -74,6 +74,7 @@ interface SplitDetailsScreenProps {
     params?: SplitDetailsNavigationParams & {
       imageUri?: string;
       isNewBill?: boolean;
+      isManualCreation?: boolean;
       selectedContact?: any;
       selectedContacts?: any[];
       shareableLink?: string;
@@ -93,6 +94,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     isEditing,
     imageUri,
     isNewBill,
+    isManualCreation,
     selectedContact,
     isFromNotification,
     notificationId,
@@ -126,6 +128,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       hasProcessedBillData: !!processedBillData,
       hasBillData: !!billData,
       isNewBill: isNewBill,
+      isManualCreation: isManualCreation,
       isFromNotification: isFromNotification,
       routeParams: route?.params,
       fullRoute: route
@@ -472,6 +475,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       description: `Split for ${billInfo.title}`,
       totalAmount: billInfo.totalAmount,
       currency: billInfo.currency || 'USDC',
+      category: billInfo.category || 'Other', // Include category from bill info
       splitType: selectedSplitType || 'fair',
       status: 'draft' as const,
       creatorId: currentUser.id.toString(),
@@ -779,6 +783,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       merchant: processedBillData?.merchant || billData?.merchant || 'Unknown',
       location: processedBillData?.location || billData?.location || '',
       date: processedBillData?.date || billData?.date || new Date().toISOString(),
+      category: processedBillData?.originalAnalysis?.category || 'Other', // Extract category from original analysis
     };
 
     return await createSplitWithWallet(billInfo, participants);
@@ -1009,6 +1014,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           merchant: processedBillData?.merchant || billData?.merchant || 'Unknown',
           location: processedBillData?.location || billData?.location || '',
           date: processedBillData?.date || billData?.date || new Date().toISOString(),
+          category: processedBillData?.originalAnalysis?.category || 'Other', // Extract category from original analysis
         };
 
         try {
