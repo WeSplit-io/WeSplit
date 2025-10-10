@@ -48,11 +48,11 @@ export interface AIAnalysisResponse {
 }
 
 export class AIBillAnalysisService {
-  // Configuration - Use your local IP for React Native/Expo
-  private static readonly BASE_URL = __DEV__ ? 'http://192.168.1.75:4000' : 'https://your-production-server.com';
-  private static readonly API_ENDPOINT = `${this.BASE_URL}/analyze-bill`;
-  private static readonly TEST_ENDPOINT = `${this.BASE_URL}/test`;
-  private static readonly HEALTH_ENDPOINT = `${this.BASE_URL}/health`;
+  // Configuration - Always use Firebase Functions (both dev and production)
+  private static readonly BASE_URL = 'https://us-central1-wesplit-35186.cloudfunctions.net';
+  private static readonly API_ENDPOINT = `${this.BASE_URL}/analyzeBill`;
+  private static readonly TEST_ENDPOINT = `${this.BASE_URL}/testAI`;
+  private static readonly HEALTH_ENDPOINT = `${this.BASE_URL}/aiHealthCheck`;
   
   // Timeout settings
   private static readonly REQUEST_TIMEOUT = 60000; // 60 seconds for large images

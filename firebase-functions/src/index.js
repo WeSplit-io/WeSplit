@@ -283,3 +283,9 @@ exports.createMoonPayURL = moonpayFunctions.createMoonPayURL;
 exports.moonpayWebhook = moonpayFunctions.moonpayWebhook;
 exports.getMoonPayTransactionStatus = moonpayFunctions.getMoonPayTransactionStatus;
 exports.getUserMoonPayTransactions = moonpayFunctions.getUserMoonPayTransactions;
+
+// Export AI functions
+const aiService = require('./aiService');
+exports.aiHealthCheck = aiService.aiHealthCheck;
+exports.analyzeBill = aiService.analyzeBill;
+exports.testAI = aiService.testAI;
