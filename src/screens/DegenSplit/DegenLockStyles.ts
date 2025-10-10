@@ -36,16 +36,32 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: 0, // Remove horizontal padding to match design
     paddingBottom: spacing.xxl, // Add bottom padding for phone UI
     justifyContent: 'space-between',
     flexGrow: 1,
   },
   billCard: {
+    // Ticket-style card with semi-circular notches
     backgroundColor: colors.green,
     borderRadius: 16,
     padding: spacing.lg,
     marginTop: spacing.xl,
+    marginHorizontal: spacing.md,
+    // Create ticket effect with pseudo-elements using border radius
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    // Add gradient effect
+    shadowColor: colors.green,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   billCardHeader: {
     flexDirection: 'row',
@@ -90,10 +106,12 @@ export const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface, // Dark gray background
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    borderWidth: 8,
+    borderColor: colors.white70, // Light gray border for the filled portion
   },
   progressFill: {
     position: 'absolute',
@@ -101,15 +119,18 @@ export const styles = StyleSheet.create({
     height: 200,
     borderRadius: 100,
     borderWidth: 8,
-    borderColor: colors.green,
+    borderColor: colors.white70, // Light gray for progress
     borderTopColor: 'transparent',
     borderRightColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: colors.white70,
+    transform: [{ rotate: '-90deg' }], // Start from top
   },
   progressInner: {
     alignItems: 'center',
   },
   progressPercentage: {
-    color: colors.green,
+    color: colors.white,
     fontSize: typography.fontSize.xxl,
     fontWeight: '700',
     marginBottom: spacing.xs,
@@ -117,36 +138,10 @@ export const styles = StyleSheet.create({
   progressAmount: {
     color: colors.white,
     fontSize: typography.fontSize.md,
-    fontWeight: '600',
+    fontWeight: '400',
     textAlign: 'center',
   },
-  instructionsContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    padding: spacing.xl,
-    marginBottom: spacing.lg,
-    alignItems: 'center',
-    marginHorizontal: spacing.sm,
-  },
-  lockIconContainer: {
-    marginBottom: spacing.md,
-  },
-  lockIcon: {
-    fontSize: 32,
-  },
-  instructionsTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  instructionsSubtitle: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.md,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  // Removed instructions container as it's not in the design
   slideContainer: {
     marginBottom: spacing.xxl,
     paddingBottom: spacing.lg, // Extra padding for phone UI elements
@@ -158,7 +153,16 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',
-    marginHorizontal: spacing.sm,
+    marginHorizontal: spacing.md,
+    // Add gradient effect shadow
+    shadowColor: colors.green,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   slideButtonDisabled: {
     backgroundColor: colors.surface,
@@ -248,6 +252,7 @@ export const styles = StyleSheet.create({
   // Participants list styles
   participantsContainer: {
     marginVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   participantCard: {
     flexDirection: 'row',
@@ -291,12 +296,8 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 12,
-    minWidth: 80,
-    textAlign: 'center',
+    // Remove background to match design
+    textAlign: 'right',
   },
   lockedIndicator: {
     marginLeft: spacing.sm,

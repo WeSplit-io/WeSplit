@@ -94,10 +94,13 @@ export const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   billIconImage: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     marginRight: spacing.sm,
     tintColor: colors.white,
+    padding: spacing.sm,
+    borderRadius: 8,
+    backgroundColor: colors.black,
 
   },
   billTitle: {
@@ -335,13 +338,17 @@ export const styles = StyleSheet.create({
     gap: spacing.md,
   },
   payButton: {
-    backgroundColor: colors.green,
     borderRadius: 12,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     alignItems: 'center',
   },
+  payButtonTouchable: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   payButtonText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
   },

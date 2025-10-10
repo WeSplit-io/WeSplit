@@ -1675,21 +1675,28 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   // Users can send their payments when not fully covered
                   return (
                     <View style={styles.buttonContainer}>
-                      <TouchableOpacity 
+                      <LinearGradient
+                        colors={[colors.green, colors.greenBlue]}
                         style={[
                           styles.payButton,
                           isSendingPayment && styles.payButtonDisabled
-                        ]} 
-                        onPress={handleSendMyShares}
-                        disabled={isSendingPayment}
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
                       >
-                        <Text style={[
-                          styles.payButtonText,
-                          isSendingPayment && styles.payButtonTextDisabled
-                        ]}>
-                          {isSendingPayment ? 'Sending...' : 'Send My Shares'}
-                        </Text>
-                      </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.payButtonTouchable}
+                          onPress={handleSendMyShares}
+                          disabled={isSendingPayment}
+                        >
+                          <Text style={[
+                            styles.payButtonText,
+                            isSendingPayment && styles.payButtonTextDisabled
+                          ]}>
+                            {isSendingPayment ? 'Sending...' : 'Send My Shares'}
+                          </Text>
+                        </TouchableOpacity>
+                      </LinearGradient>
                       
                       {/* DEV BUTTON - Only show in development and to creators */}
                       {__DEV__ && isCurrentUserCreator() && (

@@ -14,6 +14,7 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -386,10 +387,15 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Bill Info Card */}
-        <View style={styles.billCard}>
+        {/* Bill Info Card with Gradient */}
+        <LinearGradient
+          colors={[colors.green, colors.greenBlue]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.billCard}
+        >
           <View style={styles.billCardHeader}>
-            <Text style={styles.billIcon}>🍽️</Text>
+            <Text style={styles.billIcon}>💳</Text>
             <Text style={styles.billTitle}>{splitData?.title || billData?.title || MockupDataService.getBillName()}</Text>
           </View>
           <Text style={styles.billDate}>
@@ -399,7 +405,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
             <Text style={styles.totalBillLabel}>Total Bill</Text>
             <Text style={styles.totalBillAmount}>{totalAmount} USDC</Text>
           </View>
-        </View>
+        </LinearGradient>
 
         {/* Lock Progress Circle */}
         <View style={styles.progressContainer}>
@@ -475,51 +481,61 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           })}
         </View>
 
-        {/* Lock Instructions - Bottom Sheet Style */}
-        <View style={styles.instructionsContainer}>
-          <View style={styles.lockIconContainer}>
-            <Text style={styles.lockIcon}>🔒</Text>
-          </View>
-          <Text style={styles.instructionsTitle}>
-            Lock {totalAmount} USDC for Degen Split
-          </Text>
-          <Text style={styles.instructionsSubtitle}>
-            Everyone locks the full amount. Winner pays nothing, losers pay their share!
-          </Text>
-        </View>
+        {/* Removed instructions section to match design */}
 
         {/* Slide to Lock Button */}
         <View style={[styles.slideContainer, { paddingBottom: isLocked ? spacing.md : Math.max(insets.bottom, spacing.lg) }]}>
-          <TouchableOpacity
-            style={[
-              styles.slideButton,
-              (isLocked || isLocking || isLoadingWallet) && styles.slideButtonDisabled
-            ]}
-            onPress={handleLockMyShare}
-            disabled={isLocked || isLocking || isLoadingWallet}
-          >
-            <View style={styles.slideButtonContent}>
-              <Text style={[
-                styles.slideButtonText,
-                (isLocked || isLocking || isLoadingWallet) && styles.slideButtonTextDisabled
-              ]}>
-                {isLocked ? 'Locked ✓' : isLocking ? 'Locking...' : isLoadingWallet ? 'Loading...' : 'Lock my share'}
-              </Text>
-              {!isLocked && !isLocking && !isLoadingWallet && (
-                <Text style={styles.slideButtonArrow}>→</Text>
+          {(isLocked || isLocking || isLoadingWallet) ? (
+            <TouchableOpacity
+              style={[
+                styles.slideButton,
+                styles.slideButtonDisabled
+              ]}
+              onPress={handleLockMyShare}
+              disabled={isLocked || isLocking || isLoadingWallet}
+            >
+              <View style={styles.slideButtonContent}>
+                <Text style={[
+                  styles.slideButtonText,
+                  styles.slideButtonTextDisabled
+                ]}>
+                  {isLocked ? 'Locked ✓' : isLocking ? 'Locking...' : isLoadingWallet ? 'Loading...' : 'Lock my share'}
+                </Text>
+                {!isLocked && !isLocking && !isLoadingWallet && (
+                  <Text style={styles.slideButtonArrow}>→</Text>
+                )}
+              </View>
+              
+              {/* Progress bar inside button */}
+              {isLocking && (
+                <Animated.View 
+                  style={[
+                    styles.slideProgress,
+                    { width: progressPercentage }
+                  ]} 
+                />
               )}
-            </View>
-            
-            {/* Progress bar inside button */}
-            {isLocking && (
-              <Animated.View 
-                style={[
-                  styles.slideProgress,
-                  { width: progressPercentage }
-                ]} 
-              />
-            )}
-          </TouchableOpacity>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={handleLockMyShare}
+              disabled={isLocked || isLocking || isLoadingWallet}
+            >
+              <LinearGradient
+                colors={[colors.green, colors.greenBlue]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.slideButton}
+              >
+                <View style={styles.slideButtonContent}>
+                  <Text style={styles.slideButtonText}>
+                    Lock my share
+                  </Text>
+                  <Text style={styles.slideButtonArrow}>→</Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Roll Roulette Button - Show for all participants who have locked their funds */}
