@@ -28,7 +28,6 @@ import { typography } from '../../theme/typography';
 import { styles } from './styles';
 import { ProcessedBillData, BillAnalysisResult } from '../../types/billAnalysis';
 import { BillAnalysisService } from '../../services/billAnalysisService';
-import { MockBillAnalysisService } from '../../services/mockBillAnalysisService';
 import { AIBillAnalysisService } from '../../services/aiBillAnalysisService';
 import { SplitInvitationService } from '../../services/splitInvitationService';
 import { convertFiatToUSDC, formatCurrencyAmount } from '../../services/fiatCurrencyService';
@@ -206,6 +205,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const [isCreatingWallet, setIsCreatingWallet] = useState(false);
   const [isProcessingNewBill, setIsProcessingNewBill] = useState(false);
   const [newBillProcessingResult, setNewBillProcessingResult] = useState<BillAnalysisResult | null>(null);
+  const [hasAttemptedProcessing, setHasAttemptedProcessing] = useState(false); // Prevent infinite retry loops
   const [currentProcessedBillData, setCurrentProcessedBillData] = useState<ProcessedBillData | null>(() => {
     // Use processedBillData if available, otherwise create from splitData
     if (processedBillData) {
@@ -282,7 +282,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       console.log('🔍 SplitDetailsScreen: isCurrentUserCreator check (splitData):', {
         currentUserId: currentUser.id.toString(),
         creatorId: splitData.creatorId,
-        isCreator
+        isCreator,
+        splitDataParticipants: splitData.participants?.map(p => ({
+          userId: p.userId,
+          name: p.name,
+          status: p.status
+        }))
       });
       return isCreator;
     }
@@ -360,11 +365,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
     // Use participants from existing split data if available
     if (splitData?.participants && splitData.participants.length > 0) {
-      console.log('🔍 SplitDetailsScreen: Using participants from splitData');
-      // Transform SplitParticipant to UnifiedParticipant format, but exclude invited users
+      console.log('🔍 SplitDetailsScreen: Using participants from splitData:', splitData.participants);
+      // Transform SplitParticipant to UnifiedParticipant format, but exclude only invited users
+      // Include pending users (they might be the creator)
       return splitData.participants
         .filter((participant: any) =>
-          participant.status !== 'invited' && participant.status !== 'pending'
+          participant.status !== 'invited'
         )
         .map((participant: any) => ({
           id: participant.userId, // Map userId to id for compatibility
@@ -435,18 +441,26 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   });
 
   // Helper function to create split with wallet
-  const createSplitWithWallet = async (billInfo: any, participants: any[] = []) => {
+  const createSplitWithWallet = async (billInfo: any, participants: any[] = [], forceCreate: boolean = false) => {
     if (!currentUser || !billInfo) {
       throw new Error('Missing required data for split creation');
     }
 
-    // Prevent duplicate creation
-    if (createdSplitId) {
+    // Prevent duplicate creation unless forced (for manual creation)
+    if (createdSplitId && !forceCreate) {
       console.log('🔍 SplitDetailsScreen: Split already exists, skipping creation:', createdSplitId);
       return currentSplitData;
     }
 
-    console.log('🔍 SplitDetailsScreen: Creating split with wallet...');
+    console.log('🔍 SplitDetailsScreen: Creating split with wallet...', {
+      billInfo,
+      participants: participants.map((p: any) => ({
+        userId: p.id,
+        name: p.name,
+        walletAddress: p.walletAddress,
+        amountOwed: p.amountOwed,
+      }))
+    });
 
     // Create wallet first
     const walletResult = await SplitWalletService.createSplitWallet(
@@ -476,8 +490,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       totalAmount: billInfo.totalAmount,
       currency: billInfo.currency || 'USDC',
       category: billInfo.category || 'Other', // Include category from bill info
-      splitType: selectedSplitType || 'fair',
-      status: 'draft' as const,
+      splitType: billInfo.splitType || selectedSplitType || 'fair',
+      status: 'active' as const, // Create split as active immediately
       creatorId: currentUser.id.toString(),
       creatorName: currentUser.name,
       participants: participants.map((p: any) => ({
@@ -515,103 +529,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     return createResult.split;
   };
 
-  // Process new bill image if coming from camera
-  const processNewBillImage = async () => {
-    if (!imageUri || !isNewBill || !currentUser) return;
-
-    // FIXED: Prevent duplicate processing if already processed
-    if (createdSplitId || currentSplitData) {
-      console.log('🔍 SplitDetailsScreen: Bill already processed, skipping:', { createdSplitId, hasCurrentSplitData: !!currentSplitData });
-      return;
-    }
-
-    setIsProcessingNewBill(true);
-
-    try {
-      console.log('🔍 SplitDetailsScreen: Processing new bill image with AI...');
-
-      // Try AI service first
-      let analysisResult = await AIBillAnalysisService.analyzeBillImage(imageUri);
-      
-      // Fallback to mock service if AI fails
-      if (!analysisResult.success) {
-        console.warn('⚠️ AI analysis failed, falling back to mock data:', analysisResult.error);
-        analysisResult = await MockBillAnalysisService.analyzeBillImage(imageUri);
-      } else {
-        console.log('✅ AI analysis successful!');
-      }
-      
-      setNewBillProcessingResult(analysisResult);
-
-      if (analysisResult.success && analysisResult.data) {
-        // Process the structured data with current user information
-        const processedData = BillAnalysisService.processBillData(analysisResult.data, currentUser);
-
-        // Set the authoritative price in the price management service immediately
-        const { priceManagementService } = await import('../../services/priceManagementService');
-        priceManagementService.setBillPrice(
-          processedData.id,
-          processedData.totalAmount,
-          processedData.currency || 'USD'
-        );
-
-        console.log('💰 SplitDetailsScreen: Set authoritative price for new bill:', {
-          billId: processedData.id,
-          totalAmount: processedData.totalAmount,
-          currency: processedData.currency || 'USD'
-        });
-
-        // Update the bill name and total amount with processed data
-        console.log('🔍 SplitDetailsScreen: Updating state with processed data:', {
-          title: processedData.title,
-          totalAmount: processedData.totalAmount,
-          currency: processedData.currency
-        });
-        setBillName(processedData.title);
-        setTotalAmount(processedData.totalAmount.toString());
-
-        // Update participants with processed data (transform to unified format)
-        const transformedParticipants = processedData.participants.map((participant: any) => ({
-          id: participant.id,
-          name: participant.name,
-          walletAddress: participant.walletAddress,
-          status: participant.status,
-          amountOwed: participant.amountOwed,
-          amountPaid: participant.amountPaid || 0,
-          userId: participant.id, // Map id to userId for compatibility
-          email: '',
-          items: participant.items || [],
-        }));
-        setParticipants(transformedParticipants);
-
-        // Store the processed data for later use
-        setCurrentProcessedBillData(processedData);
-
-        // Create split with wallet using helper function
-        try {
-          await createSplitWithWallet(processedData, transformedParticipants);
-        } catch (error) {
-          console.error('🔍 SplitDetailsScreen: Error creating split with wallet:', error);
-          Alert.alert('Error', 'Failed to create split. Please try again.');
-        }
-      } else {
-        Alert.alert('Processing Failed', analysisResult.error || 'Failed to process bill image');
-      }
-
-    } catch (error) {
-      console.error('Error processing new bill:', error);
-      Alert.alert('Error', 'Failed to process bill image. Please try again.');
-    } finally {
-      setIsProcessingNewBill(false);
-    }
-  };
-
-  // Process new bill on component mount if needed
-  useEffect(() => {
-    if (isNewBill && imageUri && currentUser && !isProcessingNewBill && !createdSplitId && !isEditing) {
-      processNewBillImage();
-    }
-  }, [isNewBill, imageUri, currentUser, isProcessingNewBill, createdSplitId, isEditing]);
+  // Note: OCR AI processing is now handled in BillProcessingScreen
+  // This screen only handles existing splits or manual creation
 
   // Handle joining a split when opened from a notification
   useEffect(() => {
@@ -661,7 +580,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         setCurrentSplitData(split);
         setBillName(split.title);
         setTotalAmount(split.totalAmount.toString());
-        setSelectedSplitType(split.splitType);
+        setSelectedSplitType(split.splitType || null);
 
         // Transform participants to unified format
         const transformedParticipants = split.participants.map((p: any) => ({
@@ -1530,7 +1449,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
           const updateResult = await SplitStorageService.updateSplit(currentSplitData.id, {
             splitType: type,
-            status: 'active' as const, // Change status to active when split type is selected
+            // Status is already 'active' from creation, no need to change it
           });
 
           if (updateResult.success && updateResult.split) {
@@ -1991,9 +1910,36 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // Check for existing split and load wallet if it exists
   useEffect(() => {
     const checkExistingSplit = async () => {
-      if (currentUser && !splitWallet && !isCreatingWallet && !isProcessingNewBill && !hasJustJoinedSplit && !createdSplitId && !isEditing) {
+      // Debug: Log all the conditions for split checking
+      console.log('🔍 SplitDetailsScreen: checkExistingSplit conditions:', {
+        hasCurrentUser: !!currentUser,
+        hasSplitWallet: !!splitWallet,
+        isCreatingWallet,
+        isProcessingNewBill,
+        hasJustJoinedSplit,
+        hasCreatedSplitId: !!createdSplitId,
+        isEditing,
+        isNewBill,
+        hasProcessedBillData: !!processedBillData,
+        processedBillDataId: (processedBillData as any)?.id,
+        processedBillDataTitle: (processedBillData as any)?.title,
+        shouldCheckForSplit: currentUser && !splitWallet && !isCreatingWallet && !hasJustJoinedSplit && !createdSplitId && !isEditing
+      });
+
+      // Check if we need to create a split for new bills (OCR processing)
+      const shouldCheckForSplit = currentUser && !splitWallet && !isCreatingWallet && !hasJustJoinedSplit && !createdSplitId && !isEditing;
+      
+      if (shouldCheckForSplit) {
         setIsCreatingWallet(true);
-        console.log('🔍 SplitDetailsScreen: Checking for existing split...');
+        console.log('🔍 SplitDetailsScreen: Checking for existing split...', {
+          shouldCheckForSplit,
+          currentUser: !!currentUser,
+          splitWallet: !!splitWallet,
+          isCreatingWallet,
+          hasJustJoinedSplit,
+          createdSplitId,
+          isEditing
+        });
 
         try {
           let existingSplit = null;
@@ -2017,7 +1963,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               // Update the state with the loaded split data
               setBillName(existingSplit.title);
               setTotalAmount(existingSplit.totalAmount.toString());
-              setSelectedSplitType(existingSplit.splitType);
+              setSelectedSplitType(existingSplit.splitType || null);
               // Transform participants to unified format, including all participants (not filtering out invited/pending)
               const transformedParticipants = existingSplit.participants.map((participant: any) => ({
                 id: participant.userId,
@@ -2034,7 +1980,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             }
           } else if (processedBillData) {
             // Check if a split already exists for this bill
-            const existingSplits = await SplitStorageService.getUserSplits(currentUser.id.toString());
+            const existingSplits = await SplitStorageService.getUserSplits(currentUser?.id.toString() || '');
             existingSplit = existingSplits.splits?.find(split =>
               split.billId === processedBillData.id ||
               split.title === processedBillData.title
@@ -2083,7 +2029,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     };
 
     checkExistingSplit();
-  }, [currentUser?.id, splitData?.id, processedBillData?.id, splitId, isProcessingNewBill, hasJustJoinedSplit, createdSplitId, isEditing]); // FIXED: Use splitData?.id instead of splitData?.walletId and add createdSplitId and isEditing
+  }, [currentUser?.id, splitData?.id, processedBillData?.id, splitId, isProcessingNewBill, hasJustJoinedSplit, createdSplitId, isEditing, isNewBill, processedBillData]); // Dependencies for split checking
+
+  // Manual creation is now handled in ManualBillCreationScreen.tsx
+  // This useEffect is no longer needed
 
   // Debug: Monitor splitWallet state changes
   useEffect(() => {
@@ -2231,7 +2180,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             setCurrentSplitData(splitResult.split);
             setBillName(splitResult.split.title);
             setTotalAmount(splitResult.split.totalAmount.toString());
-            setSelectedSplitType(splitResult.split.splitType);
+            setSelectedSplitType(splitResult.split.splitType || null);
 
             // Transform participants to unified format
             const transformedParticipants = splitResult.split.participants.map((p: any) => ({

@@ -30,6 +30,7 @@ import { AIBillAnalysisService } from '../../services/aiBillAnalysisService';
 import { billOCRService } from '../../services/billOCRService';
 import { useApp } from '../../context/AppContext';
 import { SplitStorageService } from '../../services/splitStorageService';
+import { SplitWalletService } from '../../services/splitWalletService';
 
 interface RouteParams {
   imageUri: string;
@@ -109,6 +110,19 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
     }
   }, [isEditing]);
 
+  // Auto-proceed to split creation when OCR AI processing is complete
+  useEffect(() => {
+    if (currentProcessedBillData && !isEditing && processingResult?.success) {
+      console.log('🔍 BillProcessingScreen: OCR AI processing complete, auto-proceeding to split creation...');
+      // Keep processing state active and proceed immediately
+      proceedToSplitDetails();
+    }
+  }, [currentProcessedBillData, isEditing, processingResult]);
+
+  /**
+   * OCR AI Split Creation Logic
+   * Handles the complete flow of processing bill images and creating splits
+   */
   const processBillImage = async () => {
     setIsProcessing(true);
     setIsAIProcessing(true);
@@ -117,12 +131,43 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
     try {
       console.log('🤖 BillProcessingScreen: Starting AI-powered bill analysis...');
       
-      // Try AI service first
-      let analysisResult = await AIBillAnalysisService.analyzeBillImage(imageUri);
+      // Try AI service first with improved error handling
+      let analysisResult = await AIBillAnalysisService.analyzeBillImage(imageUri, currentUser?.id);
       
-      // Fallback to mock service if AI fails
+      // Handle AI analysis result with better error messages
       if (!analysisResult.success) {
-        console.warn('⚠️ AI analysis failed, falling back to mock data:', analysisResult.error);
+        console.warn('⚠️ AI analysis failed:', analysisResult.error);
+        
+        // Check if it's a rate limiting error
+        const isRateLimitError = analysisResult.error?.includes('overloaded') || 
+                                analysisResult.error?.includes('429') || 
+                                analysisResult.error?.includes('rate limit');
+        
+        if (isRateLimitError) {
+          Alert.alert(
+            'AI Service Busy',
+            'The AI service is currently busy. Please wait a moment and try again, or use manual entry.',
+            [
+              { 
+                text: 'Try Again', 
+                onPress: () => {
+                  setIsProcessing(false);
+                  setIsAIProcessing(false);
+                  setTimeout(() => processBillImage(), 2000); // Retry after 2 seconds
+                }
+              },
+              { 
+                text: 'Manual Entry', 
+                onPress: () => navigation.navigate('ManualBillCreation')
+              },
+              { text: 'Cancel', style: 'cancel' }
+            ]
+          );
+          return;
+        }
+        
+        // For other errors, fallback to mock service
+        console.warn('⚠️ Falling back to mock data due to AI failure');
         setProcessingMethod('mock');
         analysisResult = await MockBillAnalysisService.analyzeBillImage(imageUri);
       } else {
@@ -151,20 +196,11 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
           currency: processedData.currency || 'USDC'
         });
       
-        // Update legacy state for backward compatibility
-        setExtractedItems(processedData.items.map(item => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          category: item.category,
-          participants: item.participants,
-        })));
-        setTotalAmount(processedData.totalAmount);
-        setMerchant(processedData.merchant);
-        setDate(processedData.date);
+        // Update form fields with processed data
+        updateFormWithProcessedData(processedData);
       } else {
         Alert.alert('Processing Failed', analysisResult.error || 'Failed to process bill image');
+        setIsProcessing(false); // Set to false when processing fails
       }
       
     } catch (error) {
@@ -176,11 +212,42 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         confidence: 0,
       };
       setProcessingResult(errorResult);
+      setIsProcessing(false); // Only set to false on error
       Alert.alert('Error', 'Failed to process bill image. Please try again.');
     } finally {
-      setIsProcessing(false);
       setIsAIProcessing(false);
+      // Don't set isProcessing to false here for successful cases - let the auto-proceed handle it
     }
+  };
+
+  /**
+   * Update form fields with processed bill data
+   */
+  const updateFormWithProcessedData = (processedData: ProcessedBillData) => {
+    // Update legacy state for backward compatibility
+    setExtractedItems(processedData.items.map(item => ({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      category: item.category,
+      participants: item.participants,
+    })));
+    
+    // Update form fields
+    setTotalAmount(processedData.totalAmount);
+    setMerchant(processedData.merchant);
+    setDate(processedData.date);
+    setBillName(processedData.title);
+    setAmount(processedData.totalAmount.toString());
+    setConvertedAmount(processedData.totalAmount.toString());
+    
+    console.log('📝 BillProcessingScreen: Form updated with processed data:', {
+      title: processedData.title,
+      totalAmount: processedData.totalAmount,
+      merchant: processedData.merchant,
+      itemsCount: processedData.items.length
+    });
   };
 
 
@@ -223,71 +290,249 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
     setTotalAmount(newTotal);
   };
 
+  /**
+   * OCR AI Split Creation - Create Split with Wallet and Navigate to Split Details
+   * Handles the complete creation flow for OCR-generated splits including wallet creation
+   */
   const proceedToSplitDetails = async () => {
-    // If in edit mode, use existing processed data or create new one
-    let currentProcessedData = currentProcessedBillData;
-    
-    if (!currentProcessedData) {
-      // Create processed data from current state
-      const billId = existingSplitData?.billId || `split_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    try {
+      console.log('🔍 BillProcessingScreen: Creating OCR AI split with wallet...');
       
-       currentProcessedData = {
-         id: billId,
-         title: billName,
-         merchant: merchant || 'Restaurant',
-         location: '',
-         date: date,
-         time: new Date().toLocaleTimeString(),
-         currency: 'USDC',
-         totalAmount: parseFloat(convertedAmount),
-         subtotal: parseFloat(convertedAmount) * 0.9, // Estimate
-         tax: parseFloat(convertedAmount) * 0.1, // Estimate
-        items: extractedItems.map(item => ({
+      if (!currentUser) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+      
+      // If in edit mode, use existing processed data or create new one
+      let currentProcessedData = currentProcessedBillData;
+      
+      if (!currentProcessedData) {
+        // Create processed data from current state
+        const billId = existingSplitData?.billId || `split_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        
+         currentProcessedData = {
+           id: billId,
+           title: billName,
+           merchant: merchant || 'Restaurant',
+           location: '',
+           date: date,
+           time: new Date().toLocaleTimeString(),
+           currency: 'USDC',
+           totalAmount: parseFloat(convertedAmount),
+           subtotal: parseFloat(convertedAmount) * 0.9, // Estimate
+           tax: parseFloat(convertedAmount) * 0.1, // Estimate
+          items: extractedItems.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity || 1,
+            category: item.category || 'Other',
+            participants: item.participants,
+            isSelected: true,
+          })),
+          participants: [],
+          settings: {
+            allowPartialPayments: true,
+            requireAllAccept: false,
+            autoCalculate: true,
+            splitMethod: 'equal' as const,
+            taxIncluded: true,
+          },
+          originalAnalysis: {} as BillAnalysisData,
+        };
+      }
+
+      // Validate the processed data
+      if (currentProcessedData) {
+        const validation = BillAnalysisService.validateBillData(currentProcessedData);
+        if (!validation.isValid) {
+          Alert.alert('Validation Error', validation.errors.join('\n'));
+          return;
+        }
+      }
+
+      console.log('✅ BillProcessingScreen: Data validated, creating split with wallet...');
+
+      // If editing an existing split, update it in the database
+      if (isEditing && existingSplitId && currentUser && currentProcessedData) {
+        try {
+          console.log('🔍 BillProcessingScreen: Updating existing split:', existingSplitId);
+          
+          const updatedSplitData = {
+            billId: currentProcessedData.id,
+            title: currentProcessedData.title,
+            description: `Split for ${currentProcessedData.title}`,
+            totalAmount: currentProcessedData.totalAmount,
+            currency: currentProcessedData.currency,
+            splitType: existingSplitData?.splitType || 'fair',
+            status: existingSplitData?.status || 'draft',
+            creatorId: currentUser.id.toString(),
+            creatorName: currentUser.name,
+            participants: existingSplitData?.participants || [], // Keep existing participants
+            items: currentProcessedData.items.map(item => ({
+              id: item.id,
+              name: item.name,
+              price: item.price,
+              quantity: item.quantity,
+              category: item.category,
+              participants: item.participants,
+            })),
+            merchant: {
+              name: currentProcessedData.merchant,
+              address: currentProcessedData.location,
+              phone: '(415) 555-0123',
+            },
+            date: currentProcessedData.date,
+            updatedAt: new Date().toISOString(),
+          };
+
+          const updateResult = await SplitStorageService.updateSplit(existingSplitId, updatedSplitData);
+          
+          if (updateResult.success) {
+            console.log('🔍 BillProcessingScreen: Split updated successfully');
+            
+            // Navigate back to SplitDetails with updated data
+            navigation.navigate('SplitDetails', { 
+              billData: {
+                title: currentProcessedData.title,
+                totalAmount: currentProcessedData.totalAmount,
+                currency: currentProcessedData.currency,
+                date: currentProcessedData.date,
+                merchant: currentProcessedData.merchant,
+                billImageUrl: imageUri,
+                items: currentProcessedData.items.map(item => ({
+                  id: item.id,
+                  name: item.name,
+                  price: item.price,
+                  quantity: item.quantity,
+                  category: item.category,
+                  participants: item.participants,
+                })),
+                participants: currentProcessedData.participants.map(p => ({
+                  id: p.id,
+                  name: p.name,
+                  walletAddress: p.walletAddress,
+                  status: p.status,
+                  amountOwed: p.amountOwed,
+                  items: p.items,
+                })),
+                settings: currentProcessedData.settings,
+              },
+              processedBillData: currentProcessedData,
+              analysisResult: processingResult,
+              splitData: updateResult.split, // Pass the updated split data
+              splitId: existingSplitId, // FIXED: Pass the splitId to prevent duplicate creation
+            });
+          } else {
+            console.log('🔍 BillProcessingScreen: Failed to update split:', updateResult.error);
+            Alert.alert('Error', updateResult.error || 'Failed to update split');
+          }
+        } catch (error) {
+          console.error('🔍 BillProcessingScreen: Error updating split:', error);
+          Alert.alert('Error', 'Failed to update split');
+        }
+        return;
+      }
+
+      // Create new OCR AI split with wallet
+      console.log('🔍 BillProcessingScreen: Creating new OCR AI split with wallet...');
+      
+      // Create wallet first
+      const walletResult = await SplitWalletService.createSplitWallet(
+        currentProcessedData.id,
+        currentUser.id.toString(),
+        currentProcessedData.totalAmount,
+        currentProcessedData.currency || 'USDC',
+        currentProcessedData.participants.map(p => ({
+          userId: p.id,
+          name: p.name,
+          walletAddress: p.walletAddress,
+          amountOwed: p.amountOwed,
+        }))
+      );
+
+      if (!walletResult.success || !walletResult.wallet) {
+        throw new Error(walletResult.error || 'Failed to create split wallet');
+      }
+
+      console.log('✅ BillProcessingScreen: Wallet created successfully:', {
+        walletId: walletResult.wallet.id,
+        walletAddress: walletResult.wallet.walletAddress
+      });
+
+      // Ensure the creator is included as a participant
+      const allParticipants = [...currentProcessedData.participants];
+      
+      // Check if creator is already in participants, if not add them
+      const creatorExists = allParticipants.some(p => p.id === currentUser.id.toString());
+      if (!creatorExists) {
+        allParticipants.push({
+          id: currentUser.id.toString(),
+          name: currentUser.name,
+          walletAddress: currentUser.wallet_address || '',
+          amountOwed: 0, // Will be calculated
+          status: 'accepted', // Creator should be accepted, not pending
+          items: []
+        });
+      }
+
+      // Create split in database with wallet information
+      const splitData = {
+        billId: currentProcessedData.id,
+        title: currentProcessedData.title,
+        description: `OCR Split for ${currentProcessedData.title}`,
+        totalAmount: currentProcessedData.totalAmount,
+        currency: currentProcessedData.currency,
+        splitType: 'fair' as const,
+        status: 'active' as const,
+        creatorId: currentUser.id.toString(),
+        creatorName: currentUser.name,
+        participants: allParticipants.map(p => ({
+          userId: p.id,
+          name: p.name,
+          email: '',
+          walletAddress: p.walletAddress,
+          amountOwed: p.amountOwed,
+          amountPaid: 0,
+          status: p.id === currentUser.id.toString() ? 'accepted' as const : 'pending' as const,
+        })),
+        items: currentProcessedData.items.map(item => ({
           id: item.id,
           name: item.name,
           price: item.price,
-          quantity: item.quantity || 1,
-          category: item.category || 'Other',
           participants: item.participants,
-          isSelected: true,
         })),
-        participants: [],
-        settings: {
-          allowPartialPayments: true,
-          requireAllAccept: false,
-          autoCalculate: true,
-          splitMethod: 'equal' as const,
-          taxIncluded: true,
+        merchant: {
+          name: currentProcessedData.merchant,
+          address: currentProcessedData.location,
+          phone: '',
         },
-        originalAnalysis: {} as BillAnalysisData,
+        date: currentProcessedData.date,
+        walletId: walletResult.wallet.id,
+        walletAddress: walletResult.wallet.walletAddress,
       };
-    }
 
-    // Validate the processed data
-    if (currentProcessedData) {
-      const validation = BillAnalysisService.validateBillData(currentProcessedData);
-      if (!validation.isValid) {
-        Alert.alert('Validation Error', validation.errors.join('\n'));
-        return;
+      // Create split in database
+      const createResult = await SplitStorageService.createSplit(splitData);
+      if (!createResult.success || !createResult.split) {
+        throw new Error(createResult.error || 'Failed to create split in database');
       }
-    }
 
-    // If editing an existing split, update it in the database
-    if (isEditing && existingSplitId && currentUser && currentProcessedData) {
-      try {
-        console.log('🔍 BillProcessingScreen: Updating existing split:', existingSplitId);
-        
-        const updatedSplitData = {
-          billId: currentProcessedData.id,
+      console.log('✅ BillProcessingScreen: OCR AI split created successfully:', {
+        splitId: createResult.split.id,
+        walletId: walletResult.wallet.id,
+        walletAddress: walletResult.wallet.walletAddress
+      });
+
+      // Navigate to SplitDetails with the created split
+      navigation.navigate('SplitDetails', { 
+        billData: {
           title: currentProcessedData.title,
-          description: `Split for ${currentProcessedData.title}`,
           totalAmount: currentProcessedData.totalAmount,
           currency: currentProcessedData.currency,
-          splitType: existingSplitData?.splitType || 'fair',
-          status: existingSplitData?.status || 'draft',
-          creatorId: currentUser.id.toString(),
-          creatorName: currentUser.name,
-          participants: existingSplitData?.participants || [], // Keep existing participants
+          date: currentProcessedData.date,
+          merchant: currentProcessedData.merchant,
+          billImageUrl: imageUri,
           items: currentProcessedData.items.map(item => ({
             id: item.id,
             name: item.name,
@@ -296,99 +541,26 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
             category: item.category,
             participants: item.participants,
           })),
-          merchant: {
-            name: currentProcessedData.merchant,
-            address: currentProcessedData.location,
-            phone: '(415) 555-0123',
-          },
-          date: currentProcessedData.date,
-          updatedAt: new Date().toISOString(),
-        };
-
-        const updateResult = await SplitStorageService.updateSplit(existingSplitId, updatedSplitData);
-        
-        if (updateResult.success) {
-          console.log('🔍 BillProcessingScreen: Split updated successfully');
-          
-          // Navigate back to SplitDetails with updated data
-          navigation.navigate('SplitDetails', { 
-            billData: {
-              title: currentProcessedData.title,
-              totalAmount: currentProcessedData.totalAmount,
-              currency: currentProcessedData.currency,
-              date: currentProcessedData.date,
-              merchant: currentProcessedData.merchant,
-              billImageUrl: imageUri,
-              items: currentProcessedData.items.map(item => ({
-                id: item.id,
-                name: item.name,
-                price: item.price,
-                quantity: item.quantity,
-                category: item.category,
-                participants: item.participants,
-              })),
-              participants: currentProcessedData.participants.map(p => ({
-                id: p.id,
-                name: p.name,
-                walletAddress: p.walletAddress,
-                status: p.status,
-                amountOwed: p.amountOwed,
-                items: p.items,
-              })),
-              settings: currentProcessedData.settings,
-            },
-            processedBillData: currentProcessedData,
-            analysisResult: processingResult,
-            splitData: updateResult.split, // Pass the updated split data
-            splitId: existingSplitId, // FIXED: Pass the splitId to prevent duplicate creation
-          });
-        } else {
-          console.log('🔍 BillProcessingScreen: Failed to update split:', updateResult.error);
-          Alert.alert('Error', updateResult.error || 'Failed to update split');
-        }
-      } catch (error) {
-        console.error('🔍 BillProcessingScreen: Error updating split:', error);
-        Alert.alert('Error', 'Failed to update split');
-      }
-      return;
-    }
-
-    // Convert to legacy format for backward compatibility
-    if (currentProcessedData) {
-      const billData: BillSplitCreationData = {
-        title: currentProcessedData.title,
-        totalAmount: currentProcessedData.totalAmount,
-        currency: currentProcessedData.currency,
-        date: currentProcessedData.date,
-        merchant: currentProcessedData.merchant,
-        billImageUrl: imageUri,
-        items: currentProcessedData.items.map(item => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          category: item.category,
-          participants: item.participants,
-        })),
-        participants: currentProcessedData.participants.map(p => ({
-          name: p.name,
-          walletAddress: p.walletAddress,
-          userId: p.id,
-          email: '', // Add empty email field
-        })),
-        settings: {
-          allowPartialPayments: currentProcessedData.settings.allowPartialPayments,
-          requireAllAccept: currentProcessedData.settings.requireAllAccept,
-          autoCalculate: currentProcessedData.settings.autoCalculate,
-          splitMethod: currentProcessedData.settings.splitMethod === 'manual' ? 'custom' : currentProcessedData.settings.splitMethod,
+          participants: currentProcessedData.participants.map(p => ({
+            id: p.id,
+            name: p.name,
+            walletAddress: p.walletAddress,
+            status: p.status,
+            amountOwed: p.amountOwed,
+            items: p.items,
+          })),
+          settings: currentProcessedData.settings,
         },
-      };
-
-      navigation.navigate('SplitDetails', { 
-        billData,
         processedBillData: currentProcessedData,
         analysisResult: processingResult,
+        splitData: createResult.split,
+        splitId: createResult.split.id,
+        splitWallet: walletResult.wallet,
       });
+      
+    } catch (error) {
+      console.error('❌ BillProcessingScreen: Error creating OCR AI split:', error);
+      Alert.alert('Error', 'Failed to create split. Please try again.');
     }
   };
 
@@ -404,11 +576,17 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         <View style={styles.processingContainer}>
           <ActivityIndicator size="large" color={colors.green} />
           <Text style={styles.processingSubtitle}>
-            {isAIProcessing ? '🤖 AI is analyzing your receipt...' : 'Analyzing your image...'}
+            {isAIProcessing ? '🤖 AI is analyzing your receipt...' : 
+             currentProcessedBillData ? '✅ Creating your split with wallet...' : 'Analyzing your image...'}
           </Text>
           {processingMethod && (
             <Text style={styles.processingMethod}>
-              {processingMethod === 'ai' ? '✅ Using AI analysis' : '📝 Using sample data'}
+              {processingMethod === 'ai' ? '✅ AI analysis complete' : '📝 Using sample data'}
+            </Text>
+          )}
+          {currentProcessedBillData && !isAIProcessing && (
+            <Text style={styles.processingMethod}>
+              🚀 Auto-creating split and redirecting...
             </Text>
           )}
         </View>

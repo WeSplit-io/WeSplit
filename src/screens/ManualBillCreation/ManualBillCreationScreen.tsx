@@ -25,16 +25,17 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { useApp } from '../../context/AppContext';
 import { ManualBillDataProcessor, ManualBillInput } from '../../services/manualBillDataProcessor';
+import { ManualSplitCreationService } from '../../services/manualSplitCreationService';
 import { BillAnalysisData } from '../../types/billAnalysis';
 import { convertFiatToUSDC } from '../../services/fiatCurrencyService';
 
 // Category options with text labels
 const CATEGORIES = [
-  { id: 'trip', name: 'Trip', color: '#A5EA15' },
-  { id: 'food', name: 'Food', color: '#FFB800' },
-  { id: 'home', name: 'Home', color: '#00BFA5' },
-  { id: 'event', name: 'Event', color: '#FF6B35' },
-  { id: 'rocket', name: 'Rocket', color: '#9C27B0' },
+  { id: 'trip', name: 'Travel & Transport', color: '#A5EA15' },
+  { id: 'food', name: 'Food & Drinks', color: '#FFB800' },
+  { id: 'home', name: 'Housing & Utilities', color: '#00BFA5' },
+  { id: 'event', name: 'Events & Entertainment', color: '#FF6B35' },
+  { id: 'rocket', name: 'Shopping & Essentials', color: '#9C27B0' },
 ];
 
 // Currency options
@@ -112,6 +113,14 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       errors.amount = 'Please enter a valid amount';
     }
 
+    if (isConverting) {
+      errors.amount = 'Amount conversion in progress, please wait';
+    }
+
+    if (!convertedAmount || convertedAmount <= 0) {
+      errors.amount = 'Unable to convert amount to USDC';
+    }
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -153,23 +162,47 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       return;
     }
 
+    // Check if amount conversion is still in progress
+    if (isConverting) {
+      Alert.alert('Please wait', 'Amount conversion is still in progress. Please wait a moment and try again.');
+      return;
+    }
+
+    // Check if we have a converted amount
+    if (!convertedAmount || convertedAmount <= 0) {
+      Alert.alert('Conversion Error', 'Unable to convert amount to USDC. Please check your amount and try again.');
+      return;
+    }
+
     setIsCreating(true);
 
     try {
+      console.log('🔄 ManualBillCreationScreen: Starting bill creation process:', {
+        billName: billName.trim(),
+        originalAmount: parseFloat(amount),
+        originalCurrency: selectedCurrency.code,
+        convertedAmount: convertedAmount,
+        category: selectedCategory,
+        selectedDate: selectedDate.toISOString()
+      });
+
       // Create manual bill input data
       const manualBillInput: ManualBillInput = {
         category: CATEGORIES.find(c => c.id === selectedCategory)?.name || 'Other',
         name: billName.trim(),
-        amount: parseFloat(amount),
-        currency: selectedCurrency.code,
+        amount: convertedAmount, // Use the converted USDC amount
+        currency: 'USDC', // Always use USDC for the final amount
         date: selectedDate,
         location: '', // Could be enhanced with location input
-        description: `Manual bill created on ${selectedDate.toLocaleDateString()}`,
+        description: `Manual bill created on ${selectedDate.toLocaleDateString()} (${amount} ${selectedCurrency.code} converted to ${convertedAmount.toFixed(4)} USDC)`,
       };
+
+      console.log('🔄 ManualBillCreationScreen: Manual bill input created:', manualBillInput);
 
       // Validate the manual input
       const validation = ManualBillDataProcessor.validateManualInput(manualBillInput);
       if (!validation.isValid) {
+        console.error('❌ ManualBillCreationScreen: Validation failed:', validation.errors);
         Alert.alert('Validation Error', validation.errors.join('\n'));
         return;
       }
@@ -180,20 +213,51 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
         currentUser
       );
 
+      console.log('🔄 ManualBillCreationScreen: Bill analysis data created:', {
+        storeName: manualBillData.store.name,
+        totalAmount: manualBillData.transaction.order_total,
+        currency: manualBillData.currency,
+        category: manualBillData.category
+      });
+
       // Process the manual bill data using the same processor as OCR
       const processedBillData = ManualBillDataProcessor.processManualBillData(
         manualBillData,
         currentUser
       );
 
-      console.log('✅ ManualBillCreationScreen: Bill created successfully:', {
+      console.log('✅ ManualBillCreationScreen: Bill processed successfully:', {
         title: processedBillData.title,
         totalAmount: processedBillData.totalAmount,
         currency: processedBillData.currency,
+        participantsCount: processedBillData.participants.length,
+        itemsCount: processedBillData.items.length
       });
 
-      // Navigate to split details with the processed data
+      // Create the split and wallet directly
+      const splitCreationResult = await ManualSplitCreationService.createManualSplit({
+        processedBillData,
+        currentUser,
+        billName: processedBillData.title,
+        totalAmount: processedBillData.totalAmount.toString(),
+        participants: processedBillData.participants,
+        selectedSplitType: undefined // Let user choose in SplitDetails
+      });
+
+      if (!splitCreationResult.success) {
+        throw new Error(splitCreationResult.error || 'Failed to create split');
+      }
+
+      console.log('✅ ManualBillCreationScreen: Split created successfully:', {
+        splitId: splitCreationResult.split?.id,
+        title: splitCreationResult.split?.title
+      });
+
+      // Navigate to split details with the created split data
       navigation.navigate('SplitDetails', {
+        splitData: splitCreationResult.split,
+        splitId: splitCreationResult.split?.id,
+        splitWallet: splitCreationResult.splitWallet, // Pass the wallet information
         billData: {
           title: processedBillData.title,
           totalAmount: processedBillData.totalAmount,
@@ -207,15 +271,15 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
           data: manualBillData,
           processingTime: 0,
           confidence: 1.0,
-          rawText: `Manual bill: ${billName} - ${amount} ${selectedCurrency.code}`,
+          rawText: `Manual bill: ${billName} - ${amount} ${selectedCurrency.code} (${convertedAmount.toFixed(4)} USDC)`,
         },
-        isNewBill: true,
-        isManualCreation: true,
+        isNewBill: false, // Not a new bill since we already created the split
+        isManualCreation: false, // Not manual creation since we already processed it
       });
 
     } catch (error) {
       console.error('❌ ManualBillCreationScreen: Error creating bill:', error);
-      Alert.alert('Error', 'Failed to create bill. Please try again.');
+      Alert.alert('Error', `Failed to create bill: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
     } finally {
       setIsCreating(false);
     }
@@ -361,16 +425,27 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       {/* Continue Button */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={[styles.continueButton, isCreating && styles.buttonDisabled]}
+          style={[
+            styles.continueButton, 
+            (isCreating || isConverting || !convertedAmount || convertedAmount <= 0) && styles.buttonDisabled
+          ]}
           onPress={handleCreateBill}
-          disabled={isCreating}
+          disabled={isCreating || isConverting || !convertedAmount || convertedAmount <= 0}
         >
           <LinearGradient
-            colors={[colors.green, colors.greenBlue]}
+            colors={
+              (isCreating || isConverting || !convertedAmount || convertedAmount <= 0) 
+                ? [colors.surface, colors.surface] 
+                : [colors.green, colors.greenBlue]
+            }
             style={styles.buttonGradient}
           >
             {isCreating ? (
               <ActivityIndicator color={colors.black} />
+            ) : isConverting ? (
+              <Text style={[styles.buttonText, { color: colors.textSecondary }]}>Converting...</Text>
+            ) : !convertedAmount || convertedAmount <= 0 ? (
+              <Text style={[styles.buttonText, { color: colors.textSecondary }]}>Enter Amount</Text>
             ) : (
               <Text style={styles.buttonText}>Continue</Text>
             )}

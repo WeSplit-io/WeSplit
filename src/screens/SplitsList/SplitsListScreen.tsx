@@ -113,7 +113,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     useCallback(() => {
       if (currentUser?.id) {
         if (__DEV__) {
-          console.log('🔍 SplitsListScreen: Screen focused, refreshing splits');
+          console.log('🔍 SplitsListScreen: Screen focused, refreshing splits for user:', currentUser.id);
         }
         loadSplits();
       }
@@ -146,6 +146,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
             id: s.id,
             title: s.title,
             status: s.status,
+            splitType: s.splitType,
             totalAmount: s.totalAmount,
             date: s.date,
             createdAt: s.createdAt,
@@ -333,35 +334,13 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         splitIdValue: split.id
       });
 
-      // Navigate to the correct screen based on split type and method
-      if (split.status === 'active' && split.splitType) {
-        // Split method is locked, navigate directly to the appropriate screen
-        if (split.splitType === 'fair') {
-          navigation.navigate('FairSplit', {
-            splitData: split,
-            isEditing: false
-          });
-        } else if (split.splitType === 'degen') {
-          navigation.navigate('DegenLock', {
-            splitData: split,
-            isEditing: false
-          });
-        } else {
-          // Fallback to SplitDetails for unknown types
-          navigation.navigate('SplitDetails', {
-            splitId: split.id,
-            splitData: split,
-            isEditing: false
-          });
-        }
-      } else {
-        // Split method not locked yet, go to SplitDetails to configure
-        navigation.navigate('SplitDetails', {
-          splitId: split.id,
-          splitData: split,
-          isEditing: false
-        });
-      }
+      // Always navigate to SplitDetails first for consistent behavior
+      // This ensures all splits (OCR and manual) follow the same flow
+      navigation.navigate('SplitDetails', {
+        splitId: split.id,
+        splitData: split,
+        isEditing: false
+      });
     } catch (err) {
       console.error('❌ SplitsListScreen: Error navigating to split details:', err);
       Alert.alert('Navigation Error', 'Failed to open split details');

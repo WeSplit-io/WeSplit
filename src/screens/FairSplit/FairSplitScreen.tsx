@@ -102,7 +102,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               }
               
               // Transform participants to local format and ensure correct amounts
-              const totalAmount = MockupDataService.getBillAmount();
+              const totalAmount = fullSplitData.totalAmount; // Use actual split amount
               const amountPerPerson = totalAmount / fullSplitData.participants.length;
               
               const transformedParticipants = fullSplitData.participants.map((p: any) => ({
@@ -136,7 +136,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                       }
                       
                       // Create updated wallet participants from split data with correct amounts
-                      const totalAmount = MockupDataService.getBillAmount();
+                      const totalAmount = fullSplitData.totalAmount; // Use actual split amount
                       const amountPerPerson = totalAmount / fullSplitData.participants.length;
                       
                       const updatedWalletParticipants = fullSplitData.participants.map(p => {
@@ -251,7 +251,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         const participantId = p.userId || p.id || `participant_${index}`;
         
         // Calculate amount per person for equal split
-        const totalAmount = MockupDataService.getBillAmount();
+        const totalAmount = splitData?.totalAmount || MockupDataService.getBillAmount(); // Use split data if available
         const amountPerPerson = totalAmount / sourceParticipants.length;
         
         // If this participant is the current user, use real data
@@ -285,7 +285,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     
     // If no participants provided, start with just the current user as creator
     if (currentUser) {
-      const totalAmount = MockupDataService.getBillAmount();
+      const totalAmount = splitData?.totalAmount || MockupDataService.getBillAmount(); // Use split data if available
       const currentUserParticipant = {
         id: currentUser.id.toString(),
         name: currentUser.name,
@@ -309,13 +309,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const authoritativePrice = priceManagementService.getBillPrice(billId);
   
   
-  // Always use unified mockup data for consistency - ignore route params
-  const totalAmount = MockupDataService.getBillAmount();
+  // Use split data if available, otherwise fall back to mockup data
+  const totalAmount = splitData?.totalAmount || MockupDataService.getBillAmount();
   
   // Set authoritative price when component loads
   useEffect(() => {
     const setAuthoritativePrice = () => {
-      const unifiedAmount = MockupDataService.getBillAmount();
+      const unifiedAmount = splitData?.totalAmount || MockupDataService.getBillAmount();
       
       // Force set the authoritative price for this bill (overrides any existing)
       priceManagementService.forceSetBillPrice(
@@ -492,7 +492,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             'split_payment_required', // Use existing notification type
             {
               splitWalletId: splitWallet.id,
-              billName: MockupDataService.getBillName(), // Use unified mockup data
+              billName: splitData?.title || MockupDataService.getBillName(), // Use unified mockup data
             }
           );
 
@@ -578,7 +578,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         setSplitWallet(result.wallet);
         
         // Update participants with the repaired data
-        const totalAmount = MockupDataService.getBillAmount();
+        const totalAmount = splitData?.totalAmount || MockupDataService.getBillAmount();
         const amountPerPerson = totalAmount / result.wallet.participants.length;
         
         const updatedParticipants = result.wallet.participants.map(p => ({
@@ -726,7 +726,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         // Set the authoritative price in the price management service
         if (wallet) {
           const walletBillId = wallet.billId;
-          const unifiedAmount = MockupDataService.getBillAmount();
+          const unifiedAmount = splitData?.totalAmount || MockupDataService.getBillAmount();
           
           if (__DEV__) {
             console.log('💰 FairSplitScreen: Setting authoritative price:', {
@@ -765,7 +765,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
   const sendPaymentNotifications = async (wallet: SplitWallet) => {
     const participantIds = wallet.participants.map(p => p.userId);
-    const billName = MockupDataService.getBillName(); // Use unified mockup data
+    const billName = splitData?.title || MockupDataService.getBillName(); // Use unified mockup data
 
     await NotificationService.sendBulkNotifications(
       participantIds,
@@ -824,7 +824,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 // Navigate to payment screen anyway
                 navigation.navigate('SplitPayment', {
                   splitWalletId: splitWallet.id,
-                  billName: MockupDataService.getBillName(), // Use unified mockup data
+                  billName: splitData?.title || MockupDataService.getBillName(), // Use unified mockup data
                   totalAmount: totalAmount,
                 });
               }
@@ -903,7 +903,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
     console.log('🚀 DEV: Bypassing all checks and triggering split behavior directly:', {
       splitWalletId: splitWallet.id,
-      billName: MockupDataService.getBillName(),
+      billName: splitData?.title || MockupDataService.getBillName(),
       totalAmount: totalAmount,
       participants: participants,
       splitWallet: splitWallet,

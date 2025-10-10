@@ -54,14 +54,14 @@ export class AIBillAnalysisService {
   private static readonly TEST_ENDPOINT = `${this.BASE_URL}/testAI`;
   private static readonly HEALTH_ENDPOINT = `${this.BASE_URL}/aiHealthCheck`;
   
-  // Timeout settings
-  private static readonly REQUEST_TIMEOUT = 60000; // 60 seconds for large images
-  private static readonly MAX_RETRIES = 2;
+  // Timeout settings - updated for the new model
+  private static readonly REQUEST_TIMEOUT = 45000; // 45 seconds for faster model
+  private static readonly MAX_RETRIES = 1; // Server has retry logic, minimal client retries
   
   /**
    * Analyze bill image using AI agent
    */
-  static async analyzeBillImage(imageUri: string): Promise<BillAnalysisResult> {
+  static async analyzeBillImage(imageUri: string, userId?: string): Promise<BillAnalysisResult> {
     console.log('🤖 AIBillAnalysisService: Starting AI analysis for:', imageUri);
     
     try {
@@ -75,7 +75,7 @@ export class AIBillAnalysisService {
       const imageData = await this.convertImageToBase64(imageUri);
       
       // Call AI service with base64 data (with retry logic)
-      const aiResponse = await this.callAIServiceWithRetry(imageData);
+      const aiResponse = await this.callAIServiceWithRetry(imageData, userId);
       
       if (!aiResponse.success) {
         throw new Error(aiResponse.error || 'AI analysis failed');
@@ -174,13 +174,13 @@ export class AIBillAnalysisService {
   /**
    * Call AI service with retry logic
    */
-  private static async callAIServiceWithRetry(imageData: string): Promise<AIAnalysisResponse> {
+  private static async callAIServiceWithRetry(imageData: string, userId?: string): Promise<AIAnalysisResponse> {
     let lastError: Error | null = null;
     
     for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
       try {
         console.log(`🔄 AI service attempt ${attempt}/${this.MAX_RETRIES}`);
-        const response = await this.callAIService(imageData);
+        const response = await this.callAIService(imageData, userId);
         
         if (response.success) {
           console.log(`✅ AI service succeeded on attempt ${attempt}`);
@@ -209,22 +209,31 @@ export class AIBillAnalysisService {
   /**
    * Call AI service with image data
    */
-  private static async callAIService(imageData: string): Promise<AIAnalysisResponse> {
+  private static async callAIService(imageData: string, userId?: string): Promise<AIAnalysisResponse> {
     const requestBody = {
       imageData: imageData
     };
     
+    // Prepare headers with user ID for rate limiting
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add user ID header if available for rate limiting
+    if (userId) {
+      headers['x-user-id'] = userId;
+    }
+    
     console.log('📤 Sending request to AI service:', {
       endpoint: this.API_ENDPOINT,
       dataSize: imageData.length,
-      dataType: imageData.startsWith('data:') ? 'base64' : 'unknown'
+      dataType: imageData.startsWith('data:') ? 'base64' : 'unknown',
+      hasUserId: !!userId
     });
     
     const response = await fetch(this.API_ENDPOINT, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(requestBody),
       timeout: this.REQUEST_TIMEOUT
     });
@@ -232,7 +241,26 @@ export class AIBillAnalysisService {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ AI service error response:', errorText);
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
+      
+      // Try to parse the error response
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText };
+      }
+      
+      // Handle specific error types based on our backend implementation
+      if (response.status === 429 || errorData.errorType === 'rate_limit') {
+        const retryAfter = errorData.retryAfter || 60;
+        throw new Error(`AI service is currently busy. Please try again in ${retryAfter} seconds.`);
+      } else if (response.status === 503) {
+        throw new Error('AI service temporarily unavailable. Please try again.');
+      } else if (response.status === 400) {
+        throw new Error('Invalid image format. Please try a different image.');
+      } else {
+        throw new Error(errorData.error || `HTTP ${response.status}: ${errorText}`);
+      }
     }
     
     return await response.json();
