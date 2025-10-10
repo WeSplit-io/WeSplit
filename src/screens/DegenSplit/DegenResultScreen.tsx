@@ -207,10 +207,12 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
 
       // In degen splits, the loser withdraws their locked funds from the split wallet
       // to their own wallet so they can pay the bill using their preferred method
-      const result = await SplitWalletService.transferToUserWallet(
+      const result = await SplitWalletService.extractDegenSplitFunds(
         splitWallet.id,
         currentUser!.id.toString(),
-        totalAmount
+        currentUser!.wallet_address || '', // Use user's wallet address
+        totalAmount,
+        'Degen Split loser fund extraction'
       );
       
       if (result.success) {
@@ -239,10 +241,12 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     try {
       // In degen splits, the loser withdraws their locked funds from the split wallet
       // to their KAST card wallet so they can pay the bill using their KAST card
-      const result = await SplitWalletService.transferToUserWallet(
+      const result = await SplitWalletService.extractDegenSplitFunds(
         splitWallet.id,
         currentUser!.id.toString(),
-        totalAmount
+        currentUser!.wallet_address || '', // Use user's wallet address
+        totalAmount,
+        'Degen Split loser fund extraction to KAST card'
       );
       
       if (result.success) {
@@ -278,10 +282,12 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       
       // Transfer funds from split wallet to winner's in-app wallet
       const { SplitWalletService } = await import('../../services/splitWalletService');
-      const result = await SplitWalletService.transferToUserWallet(
+      const result = await SplitWalletService.extractDegenSplitFunds(
         splitWallet.id,
         currentUser!.id.toString(),
-        winnerAmount
+        currentUser!.wallet_address || '', // Use user's wallet address
+        winnerAmount,
+        'Degen Split winner fund extraction'
       );
       
       if (result.success) {

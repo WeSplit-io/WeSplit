@@ -10,6 +10,7 @@ import {
   BillParticipant,
   BillSplitSettings 
 } from '../types/billAnalysis';
+import { calculateEqualSplit } from '../utils/currencyUtils';
 
 export class BillAnalysisService {
   /**
@@ -139,7 +140,7 @@ export class BillAnalysisService {
    * Calculate equal split amounts
    */
   static calculateEqualSplit(totalAmount: number, participantCount: number): number {
-    return totalAmount / participantCount;
+    return calculateEqualSplit(totalAmount, participantCount);
   }
 
   /**

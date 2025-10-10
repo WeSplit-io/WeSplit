@@ -4,7 +4,7 @@
  */
 
 // Import centralized configuration
-import { CURRENT_NETWORK } from '../../config/solanaConfig';
+import { CURRENT_NETWORK } from '../../config/chain';
 
 // RPC Configuration
 export const RPC_CONFIG = {

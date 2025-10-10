@@ -31,7 +31,7 @@ export interface Split {
   category?: string; // Category for the split (trip, food, home, event, rocket)
   splitType?: 'fair' | 'degen';
   splitMethod?: 'equal' | 'manual'; // Locked split method after confirmation
-  status: 'draft' | 'active' | 'locked' | 'completed' | 'cancelled';
+  status: 'draft' | 'pending' | 'active' | 'locked' | 'completed' | 'cancelled';
   creatorId: string;
   creatorName: string;
   participants: SplitParticipant[];

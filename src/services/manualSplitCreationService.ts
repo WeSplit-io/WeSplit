@@ -96,7 +96,7 @@ export class ManualSplitCreationService {
         totalAmount: data.processedBillData.totalAmount,
         currency: data.processedBillData.currency,
         splitType: 'fair' as const,
-        status: 'active' as const,
+        status: 'pending' as const, // Split starts as pending until user confirms repartition
         creatorId: data.currentUser.id.toString(),
         creatorName: data.currentUser.name,
         participants: allParticipants.map(p => ({

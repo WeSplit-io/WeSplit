@@ -8,48 +8,28 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
   Alert,
   SafeAreaView,
   StatusBar,
   TextInput,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import UserAvatar from '../../components/UserAvatar';
-import { typography } from '../../theme/typography';
 import { styles } from './styles';
 import { SplitWalletService, SplitWallet } from '../../services/splitWalletService';
 import { NotificationService } from '../../services/notificationService';
 import { priceManagementService } from '../../services/priceManagementService';
-import { FallbackDataService } from '../../utils/fallbackDataService';
-import { MockupDataService } from '../../data/mockupData';
 import { useApp } from '../../context/AppContext';
-import { SplitWalletMigrationService } from '../../services/splitWalletMigrationService';
-import { PriceManagerDebugger } from '../../utils/priceManagerDebugger';
+import { AmountCalculationService, Participant } from '../../services/amountCalculationService';
+import { DataSourceService } from '../../services/dataSourceService';
+import FairSplitHeader from './components/FairSplitHeader';
+import FairSplitProgress from './components/FairSplitProgress';
+import FairSplitParticipants from './components/FairSplitParticipants';
 
-// Local image mapping for category icons
-const CATEGORY_IMAGES_LOCAL: { [key: string]: any } = {
-  trip: require('../../../assets/trip-icon-black.png'),
-  food: require('../../../assets/food-icon-black.png'),
-  home: require('../../../assets/house-icon-black.png'),
-  event: require('../../../assets/event-icon-black.png'),
-  rocket: require('../../../assets/rocket-icon-black.png'),
-};
-
-interface Participant {
-  id: string;
-  name: string;
-  walletAddress: string;
-  amountOwed: number;
-  amountPaid: number;
-  amountLocked: number;
-  status: 'pending' | 'locked' | 'confirmed' | 'accepted' | 'declined';
-}
+// Remove local image mapping - now handled in FairSplitHeader component
 
 interface FairSplitScreenProps {
   navigation: any;
@@ -89,6 +69,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     return splitData.creatorId === currentUser.id.toString();
   };
 
+  // Helper functions for common calculations
+  const calculateTotalLocked = () => participants.reduce((sum, p) => sum + p.amountLocked, 0);
+  const calculateTotalAssigned = () => participants.reduce((sum, p) => sum + (p.amountOwed || 0), 0);
+  const calculateTotalPaid = (walletParticipants: any[]) => walletParticipants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+  const hasInvalidAmounts = () => participants.some(p => !p.amountOwed || p.amountOwed <= 0);
+  const hasZeroAmounts = () => participants.some(p => p.amountOwed === 0);
+
   // Initialize split confirmation status and method
   useEffect(() => {
     const initializeSplitData = async () => {
@@ -113,8 +100,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               }
               
               // Transform participants to local format and ensure correct amounts
-              const totalAmount = fullSplitData.totalAmount; // Use actual split amount
+              // CRITICAL: Always use split data amount as the source of truth, not split wallet amount
+              const totalAmount = fullSplitData.totalAmount; // Use split data amount as source of truth
               const amountPerPerson = totalAmount / fullSplitData.participants.length;
+              
+              // Using split data amount as source of truth for calculations
               
               const transformedParticipants = fullSplitData.participants.map((p: any) => ({
                 id: p.userId,
@@ -147,8 +137,17 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                       }
                       
                       // Create updated wallet participants from split data with correct amounts
-                      const totalAmount = fullSplitData.totalAmount; // Use actual split amount
+                      // CRITICAL: Use split data amount as source of truth, not split wallet amount
+                      const totalAmount = fullSplitData.totalAmount; // Use split data amount as source of truth
                       const amountPerPerson = totalAmount / fullSplitData.participants.length;
+                      
+                      console.log('🔧 FairSplitScreen: Syncing participants with split data amount:', {
+                        splitDataAmount: fullSplitData.totalAmount,
+                        splitWalletAmount: wallet.totalAmount,
+                        usingAmount: totalAmount,
+                        amountPerPerson,
+                        reason: 'Split data is the authoritative source for bill amounts'
+                      });
                       
                       const updatedWalletParticipants = fullSplitData.participants.map(p => {
                         const existingWalletParticipant = wallet.participants.find(wp => wp.userId === p.userId);
@@ -262,7 +261,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         const participantId = p.userId || p.id || `participant_${index}`;
         
         // Calculate amount per person for equal split
-        const totalAmount = splitData?.totalAmount || MockupDataService.getBillAmount(); // Use split data if available
+        const totalAmount = splitData?.totalAmount || 0; // Use split data if available
         const amountPerPerson = totalAmount / sourceParticipants.length;
         
         // If this participant is the current user, use real data
@@ -296,7 +295,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     
     // If no participants provided, start with just the current user as creator
     if (currentUser) {
-      const totalAmount = splitData?.totalAmount || MockupDataService.getBillAmount(); // Use split data if available
+      const totalAmount = splitData?.totalAmount || 0; // Use split data if available
       const currentUserParticipant = {
         id: currentUser.id.toString(),
         name: currentUser.name,
@@ -319,65 +318,28 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const billId = processedBillData?.id || splitData?.billId || `split_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const authoritativePrice = priceManagementService.getBillPrice(billId);
   
-  
-  // Use split data if available, otherwise fall back to mockup data
-  const totalAmount = splitData?.totalAmount || MockupDataService.getBillAmount();
+  // Use DataSourceService for consistent data access
+  const billInfo = DataSourceService.getBillInfo(splitData, processedBillData, billData);
+  const totalAmount = billInfo.amount.data;
   
   // Set authoritative price when component loads
   useEffect(() => {
     const setAuthoritativePrice = () => {
-      const unifiedAmount = splitData?.totalAmount || MockupDataService.getBillAmount();
-      
       // Force set the authoritative price for this bill (overrides any existing)
       priceManagementService.forceSetBillPrice(
         billId,
-        unifiedAmount,
-        'USDC'
+        totalAmount,
+        billInfo.currency.data
       );
       
-      // Debug price management after setting (only in development)
+      // Log data source usage for debugging
       if (__DEV__) {
-        PriceManagerDebugger.debugPriceManagement(billId);
-      }
-      
-      // Check if existing split wallet needs migration
-      if (existingSplitWallet && SplitWalletMigrationService.needsMigration(existingSplitWallet)) {
-        const migrationRecommendations = SplitWalletMigrationService.getMigrationRecommendations(existingSplitWallet);
-        
-        if (__DEV__) {
-          console.warn('⚠️ FairSplitScreen: Split wallet needs migration:', {
-          walletAmount: existingSplitWallet.totalAmount,
-          expectedAmount: unifiedAmount,
-            walletId: existingSplitWallet.id
-        });
-        }
-        
-        // Attempt to migrate the wallet
-        SplitWalletMigrationService.migrateSplitWallet(existingSplitWallet)
-          .then(result => {
-            if (result.success && result.migrated) {
-              if (__DEV__) {
-                console.log('✅ FairSplitScreen: Split wallet migrated successfully');
-              }
-              
-              // Reload the split wallet data to get the updated amount
-              loadSplitWalletData();
-            } else if (result.success && !result.migrated) {
-              if (__DEV__) {
-                console.log('ℹ️ FairSplitScreen: Split wallet migration not needed');
-              }
-            } else {
-              console.error('❌ FairSplitScreen: Split wallet migration failed:', result.error);
-            }
-          })
-          .catch(error => {
-            console.error('❌ FairSplitScreen: Error during split wallet migration:', error);
-          });
+        DataSourceService.logDataSourceUsage(splitData, processedBillData, billData, 'FairSplitScreen');
       }
     };
     
     setAuthoritativePrice();
-  }, [billId, existingSplitWallet]);
+  }, [billId, totalAmount, billInfo.currency.data]);
   
   // Debug bill amount consistency - Removed to prevent infinite logs
   
@@ -402,7 +364,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   }
   
   // Total amount calculation
-  const totalLocked = participants.reduce((sum, p) => sum + p.amountLocked, 0);
+  const totalLocked = calculateTotalLocked();
   const progressPercentage = Math.round((totalLocked / totalAmount) * 100);
   
   // State for completion tracking
@@ -420,27 +382,31 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   useEffect(() => {
     if (splitMethod === 'equal' && participants.length > 0) {
       // Check if participants have zero amounts and trigger repair if needed
-      const hasZeroAmounts = participants.some(p => p.amountOwed === 0);
-      if (hasZeroAmounts && splitWallet?.id) {
+      if (hasZeroAmounts() && splitWallet?.id) {
         console.log('🔧 FairSplitScreen: Detected participants with zero amounts, triggering repair...');
         checkAndRepairData();
         return; // Let the repair handle the update
       }
       
-      // Use centralized price management for consistent calculations
-      const splitData = priceManagementService.calculateSplitAmounts(billId, participants.length, 'equal');
-      const amountPerPerson = splitData?.amountPerParticipant || (totalAmount / participants.length);
+      // Use AmountCalculationService for consistent calculations
+      const updatedParticipants = AmountCalculationService.calculateParticipantAmounts(
+        totalAmount,
+        participants,
+        'equal'
+      );
       
       // Only update if the amount actually changed to prevent infinite loops
       setParticipants(prev => {
-        const needsUpdate = prev.some(p => Math.abs(p.amountOwed - amountPerPerson) > 0.01);
+        const needsUpdate = prev.some((p, index) => 
+          Math.abs(p.amountOwed - updatedParticipants[index]?.amountOwed || 0) > 0.01
+        );
         
         if (!needsUpdate) return prev;
         
-        return prev.map(p => ({ ...p, amountOwed: amountPerPerson }));
+        return updatedParticipants;
       });
     }
-  }, [splitMethod, totalAmount, billId, participants.length, splitWallet?.id]); // Added splitWallet?.id to trigger repair
+  }, [splitMethod, totalAmount, participants.length, splitWallet?.id]);
 
 
   // Load completion data when split wallet is available
@@ -450,11 +416,25 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       checkAndRepairData();
       checkPaymentCompletion();
       
-      // Set up periodic payment completion check
-      const interval = setInterval(checkPaymentCompletion, 10000); // Check every 10 seconds
-      return () => clearInterval(interval);
+      // Set up periodic progress updates (only if not completed to avoid infinite loops)
+      const progressInterval = setInterval(() => {
+        if (splitWallet?.status !== 'completed') {
+          loadCompletionData();
+        }
+      }, 5000); // Update progress every 5 seconds
+      
+      const completionInterval = setInterval(() => {
+        if (splitWallet?.status !== 'completed') {
+          checkPaymentCompletion();
+        }
+      }, 10000); // Check completion every 10 seconds
+      
+      return () => {
+        clearInterval(progressInterval);
+        clearInterval(completionInterval);
+      };
     }
-  }, [splitWallet?.id]);
+  }, [splitWallet?.id, splitWallet?.status]);
 
   // Load user wallets when component mounts
   useEffect(() => {
@@ -485,7 +465,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       const wallet = result.wallet;
       const allParticipantsPaid = wallet.participants.every(p => p.status === 'paid');
 
-      if (allParticipantsPaid && wallet.participants.length > 0) {
+      // Only proceed if all participants have paid AND the wallet is not already completed
+      if (allParticipantsPaid && wallet.participants.length > 0 && wallet.status !== 'completed') {
+        console.log('🎉 All participants have paid, completing split wallet...');
+        
         // Get merchant address if available
         const merchantAddress = processedBillData?.merchant?.address || billData?.merchant?.address;
         
@@ -496,18 +479,29 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         );
 
         if (completionResult.success) {
-          // Send completion notifications
-          const { NotificationService } = await import('../../services/notificationService');
-          await NotificationService.sendBulkNotifications(
-            wallet.participants.map(p => p.userId),
-            'split_payment_required', // Use existing notification type
-            {
-              splitWalletId: splitWallet.id,
-              billName: splitData?.title || MockupDataService.getBillName(), // Use unified mockup data
-            }
-          );
+          console.log('✅ Split wallet completed successfully');
+          
+          // Update local state to reflect completion
+          setSplitWallet(prev => prev ? { ...prev, status: 'completed' as const } : null);
+          
+          // Send completion notifications (only if not already sent)
+          try {
+            const { NotificationService } = await import('../../services/notificationService');
+            await NotificationService.sendBulkNotifications(
+              wallet.participants.map(p => p.userId),
+              'split_payment_required', // Use existing notification type
+              {
+                splitWalletId: splitWallet.id,
+                billName: billInfo.name.data,
+                amount: wallet.totalAmount // Use amount field for total amount
+              }
+            );
+          } catch (notificationError) {
+            console.warn('⚠️ Failed to send completion notifications:', notificationError);
+            // Don't fail the entire process for notification errors
+          }
 
-          // Show completion alert
+          // Show completion alert (but don't redirect automatically)
           Alert.alert(
             'Split Complete! 🎉',
             merchantAddress 
@@ -515,27 +509,38 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               : 'All participants have paid their shares. The split is now complete!',
             [
               {
-                text: 'OK',
+                text: 'Stay Here',
+                style: 'default',
+                onPress: () => {
+                  // Just reload the completion data to show updated status
+                  loadCompletionData();
+                }
+              },
+              {
+                text: 'View Splits',
+                style: 'default',
                 onPress: () => navigation.navigate('SplitsList'),
               },
             ]
           );
         } else {
-          console.error('Failed to complete split:', completionResult.error);
+          console.error('❌ Failed to complete split:', completionResult.error);
           Alert.alert(
             'Split Complete (Partial)',
             'All participants have paid their shares, but there was an issue sending funds to the merchant. Please contact support.',
             [
               {
                 text: 'OK',
-                onPress: () => navigation.navigate('SplitsList'),
+                onPress: () => {
+                  // Don't redirect automatically, let user decide
+                }
               },
             ]
           );
         }
       }
     } catch (error) {
-      console.error('Error checking payment completion:', error);
+      console.error('❌ Error checking payment completion:', error);
     }
   };
 
@@ -589,7 +594,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         setSplitWallet(result.wallet);
         
         // Update participants with the repaired data
-        const totalAmount = splitData?.totalAmount || MockupDataService.getBillAmount();
+        const totalAmount = splitData?.totalAmount || 0;
         const amountPerPerson = totalAmount / result.wallet.participants.length;
         
         const updatedParticipants = result.wallet.participants.map(p => ({
@@ -627,8 +632,15 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           totalParticipants: result.totalParticipants || 0,
         };
         setCompletionData(newCompletionData);
+        
+        // Only log in development and when there are significant changes
+        if (__DEV__ && (newCompletionData.completionPercentage === 100 || newCompletionData.completionPercentage === 0)) {
+          console.log('🔍 FairSplitScreen: Completion data updated:', newCompletionData);
+        }
       } else {
-        console.error('❌ FairSplitScreen: Failed to load completion data:', result.error);
+        if (__DEV__) {
+          console.error('❌ FairSplitScreen: Failed to load completion data:', result.error);
+        }
         // Set default completion data on error
         setCompletionData({
           completionPercentage: 0,
@@ -640,7 +652,9 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         });
       }
     } catch (error) {
-      console.error('❌ FairSplitScreen: Error loading completion data:', error);
+      if (__DEV__) {
+        console.error('❌ FairSplitScreen: Error loading completion data:', error);
+      }
       // Set default completion data on error
       setCompletionData({
         completionPercentage: 0,
@@ -737,7 +751,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         // Set the authoritative price in the price management service
         if (wallet) {
           const walletBillId = wallet.billId;
-          const unifiedAmount = splitData?.totalAmount || MockupDataService.getBillAmount();
+          const unifiedAmount = totalAmount;
           
           if (__DEV__) {
             console.log('💰 FairSplitScreen: Setting authoritative price:', {
@@ -767,8 +781,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       );
 
     } catch (error) {
-      console.error('Error creating split wallet:', error);
-      Alert.alert('Error', 'Failed to create split wallet. Please try again.');
+      handleError(error, 'create split wallet');
     } finally {
       setIsCreatingWallet(false);
     }
@@ -776,7 +789,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
   const sendPaymentNotifications = async (wallet: SplitWallet) => {
     const participantIds = wallet.participants.map(p => p.userId);
-    const billName = splitData?.title || MockupDataService.getBillName(); // Use unified mockup data
+    const billName = billInfo.name.data; // Use DataSourceService
 
     await NotificationService.sendBulkNotifications(
       participantIds,
@@ -835,7 +848,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 // Navigate to payment screen anyway
                 navigation.navigate('SplitPayment', {
                   splitWalletId: splitWallet.id,
-                  billName: splitData?.title || MockupDataService.getBillName(), // Use unified mockup data
+                  billName: billInfo.name.data, // Use DataSourceService
                   totalAmount: totalAmount,
                 });
               }
@@ -899,55 +912,86 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     }
   };
 
-  // DEV FUNCTION: Bypass all checks and trigger split behavior directly
-  const handleDevBypass = () => {
+  // Helper function to reload wallets (used in multiple places)
+  const reloadWallets = async () => {
+    await loadUserWallets();
+  };
+
+  // Helper function for common error handling
+  const handleError = (error: any, context: string, showAlert: boolean = true) => {
+    console.error(`❌ FairSplitScreen: ${context}:`, error);
+    if (showAlert) {
+      Alert.alert('Error', `Failed to ${context.toLowerCase()}. Please try again.`);
+    }
+  };
+
+  // Helper function to validate creator permissions
+  const validateCreatorPermission = (action: string): boolean => {
+    if (!isCurrentUserCreator()) {
+      Alert.alert('Error', `Only the split creator can ${action}`);
+      return false;
+    }
+    return true;
+  };
+
+  // DEV FUNCTION: Independent fund withdrawal for testing
+  const handleDevWithdraw = () => {
     if (!splitWallet) {
       Alert.alert('Error', 'Split wallet not created yet');
       return;
     }
 
-    // Ensure only the creator can use the dev bypass
-    if (!isCurrentUserCreator()) {
-      Alert.alert('Error', 'Only the split creator can withdraw funds');
+    // Ensure only the creator can use the dev withdrawal
+    if (!validateCreatorPermission('withdraw funds')) {
       return;
     }
 
-    console.log('🚀 DEV: Bypassing all checks and triggering split behavior directly:', {
+    console.log('🚀 DEV: Independent fund withdrawal triggered:', {
       splitWalletId: splitWallet.id,
-      billName: splitData?.title || MockupDataService.getBillName(),
+      billName: billInfo.name.data,
       totalAmount: totalAmount,
+      collectedAmount: completionData?.collectedAmount || 0,
+      completionPercentage: completionData?.completionPercentage || 0,
       participants: participants,
       splitWallet: splitWallet,
-      billId: billId,
-      splitData: splitData,
-      processedBillData: processedBillData,
       isCreator: isCurrentUserCreator(),
-      isFullyCovered: completionData?.completionPercentage === 100,
       currentUserId: currentUser?.id,
       creatorId: splitWallet.creatorId
     });
 
-    // Load wallets first, then trigger the split funds modal
-    loadUserWallets();
-    setShowSplitModal(true);
+    // Show confirmation dialog
+    Alert.alert(
+      '🚀 DEV: Independent Fund Withdrawal',
+      `This will withdraw ${completionData?.collectedAmount || 0} USDC from the split wallet.\n\nCurrent Progress: ${completionData?.completionPercentage || 0}%\nCollected: ${completionData?.collectedAmount || 0} USDC\nTotal: ${totalAmount} USDC\n\nThis is a development feature for testing purposes.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Withdraw Funds', 
+          style: 'destructive',
+          onPress: () => {
+            // Load wallets first, then trigger the split funds modal
+            reloadWallets();
+            setShowSplitModal(true);
+          }
+        }
+      ]
+    );
   };
 
   // Phase 1: Creator confirms the split repartition
   const handleConfirmSplit = async () => {
-    if (!isCurrentUserCreator()) {
-      Alert.alert('Error', 'Only the split creator can confirm the repartition');
+    if (!validateCreatorPermission('confirm the repartition')) {
       return;
     }
 
     // Validate that all participants have amounts assigned
-    const hasInvalidAmounts = participants.some(p => !p.amountOwed || p.amountOwed <= 0);
-    if (hasInvalidAmounts) {
+    if (hasInvalidAmounts()) {
       Alert.alert('Error', 'All participants must have valid amounts assigned');
       return;
     }
 
     // Validate that total amounts match the bill total
-    const totalAssigned = participants.reduce((sum, p) => sum + (p.amountOwed || 0), 0);
+    const totalAssigned = calculateTotalAssigned();
     if (Math.abs(totalAssigned - totalAmount) > 0.01) { // Allow small rounding differences
       Alert.alert('Error', `Total assigned amounts (${totalAssigned.toFixed(2)}) must equal bill total (${totalAmount.toFixed(2)})`);
       return;
@@ -1028,6 +1072,51 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   participantAmount: participant.amountOwed,
                   creatorName: currentUser?.name || 'Unknown',
                   creatorId: currentUser?.id.toString() || '',
+                  // Navigation data to redirect to FairSplitScreen
+                  navigation: {
+                    screen: 'FairSplit',
+                    params: {
+                      billData: processedBillData ? {
+                        id: processedBillData.id,
+                        title: processedBillData.title,
+                        totalAmount: processedBillData.totalAmount,
+                        currency: processedBillData.currency,
+                        date: processedBillData.date,
+                        merchant: processedBillData.merchant,
+                        location: processedBillData.location,
+                        participants: processedBillData.participants.map((p: any) => ({
+                          id: p.id,
+                          name: p.name,
+                          walletAddress: p.walletAddress,
+                          amountOwed: p.amountOwed,
+                          amountPaid: p.amountPaid || 0,
+                          status: p.status,
+                          items: p.items || []
+                        }))
+                      } : undefined,
+                      processedBillData: processedBillData,
+                      splitWallet: {
+                        id: finalSplitWallet.id,
+                        walletAddress: finalSplitWallet.walletAddress,
+                        totalAmount: finalSplitWallet.totalAmount,
+                        currency: finalSplitWallet.currency,
+                        participants: finalSplitWallet.participants
+                      },
+                      splitData: {
+                        id: splitData!.id,
+                        title: splitData!.title,
+                        totalAmount: splitData!.totalAmount,
+                        currency: splitData!.currency,
+                        splitType: splitData!.splitType,
+                        status: splitData!.status,
+                        creatorId: splitData!.creatorId,
+                        creatorName: splitData!.creatorName,
+                        participants: splitData!.participants,
+                        walletId: finalSplitWallet.id,
+                        walletAddress: finalSplitWallet.walletAddress
+                      }
+                    }
+                  }
                 }
               );
               console.log(`🔔 Notification sent to participant: ${participant.name}`);
@@ -1048,8 +1137,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         Alert.alert('Error', updateResult.error || 'Failed to confirm split');
       }
     } catch (error) {
-      console.error('Error confirming split:', error);
-      Alert.alert('Error', 'Failed to confirm split');
+      handleError(error, 'confirm split');
     } finally {
       setIsCreatingWallet(false);
     }
@@ -1198,7 +1286,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       }
       
       // Check if participants have actually paid their shares
-      const totalPaid = splitWallet.participants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+      const totalPaid = calculateTotalPaid(splitWallet.participants);
       console.log('🔍 FairSplitScreen: Fund collection check:', {
         totalAmount: splitWallet.totalAmount,
         totalPaid,
@@ -1239,10 +1327,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         billId: splitWallet.billId
       });
       
-      // Use sendDegenSplitPayment for both external and in-app transfers
-      const transferResult = await SplitWalletService.sendDegenSplitPayment(
+      // Use extractFairSplitFunds for Fair Split transfers
+      const transferResult = await SplitWalletService.extractFairSplitFunds(
         splitWallet.id,
         selectedWallet.address,
+        currentUser.id.toString(),
         description
       );
       
@@ -1286,8 +1375,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       }
       
     } catch (error) {
-      console.error('❌ FairSplitScreen: Error during transfer process:', error);
-      Alert.alert('Error', 'Failed to complete transfer. Please try again.');
+      handleError(error, 'complete transfer');
     } finally {
       setIsSigning(false);
     }
@@ -1336,21 +1424,37 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       );
       
       if (result.success) {
+        console.log('✅ FairSplitScreen: Payment successful:', {
+          amount: amount,
+          transactionSignature: result.transactionSignature
+        });
+        
+        // Update local participant status immediately
+        setParticipants(prev => prev.map(p => 
+          p.id === currentUser.id.toString() 
+            ? { ...p, amountPaid: p.amountPaid + amount, status: 'confirmed' as const }
+            : p
+        ));
+        
+        // Reload split wallet to get latest data
+        const walletResult = await SplitWalletService.getSplitWallet(splitWallet.id);
+        if (walletResult.success && walletResult.wallet) {
+          setSplitWallet(walletResult.wallet);
+        }
+        
+        // Update completion data immediately
+        await loadCompletionData();
+        
         Alert.alert(
           'Payment Successful!',
           `You have successfully paid ${amount.toFixed(2)} USDC to the split wallet.`,
           [{ text: 'OK' }]
         );
-        
-        // Reload participants to show updated payment status
-        // This would typically trigger a refresh of the participants data
-        console.log('🔍 FairSplitScreen: Payment successful, should refresh participant data');
       } else {
         Alert.alert('Payment Failed', result.error || 'Failed to process payment');
       }
     } catch (error) {
-      console.error('Error processing payment:', error);
-      Alert.alert('Error', 'Failed to process payment. Please try again.');
+      handleError(error, 'process payment');
     } finally {
       setIsSendingPayment(false);
       setPaymentAmount('');
@@ -1394,72 +1498,22 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => navigation.goBack()}
-        >
-          <Image 
-            source={require('../../../assets/chevron-left.png')} 
-            style={styles.backButtonIcon}
-          />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>Fair Split</Text>
-        
-        <View style={{ width: 40 }} />
-      </View>
-
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Bill Summary Card */}
-        <LinearGradient
-          colors={[colors.green, colors.greenBlue]}
-          style={styles.billCard}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        >
-          <View style={styles.billHeader}>
-            <Image
-              source={CATEGORY_IMAGES_LOCAL[splitData?.category || processedBillData?.category || billData?.category || 'food']}
-              style={styles.billIconImage}
-              resizeMode="contain"
-            />
-            <View style={styles.billTitleContainer}>
-              <Text style={styles.billTitle}>
-                {billData?.title || processedBillData?.title || 'Restaurant Bill'}
-              </Text>
-              <Text style={styles.billDate}>
-                {billData?.date || processedBillData?.date || new Date().toLocaleDateString()}
-              </Text>
-            </View>
-          </View>
-          
-          <View style={styles.billAmountContainer}>
-            <Text style={styles.billAmountLabel}>Total Bill</Text>
-            <Text style={styles.billAmountUSDC}>
-              {totalAmount.toFixed(1)} USDC
-            </Text>
-          </View>
-          <View style={styles.billCardDotLeft}/>
-          <View style={styles.billCardDotRight}/>
-        </LinearGradient>
+        {/* Header with Bill Information */}
+        <FairSplitHeader
+          billName={billInfo.name.data}
+          billDate={billInfo.date.data}
+          totalAmount={totalAmount}
+          category={splitData?.category || processedBillData?.category || billData?.category}
+          onBackPress={() => navigation.goBack()}
+        />
 
         {/* Progress Indicator */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressCircle}>
-            <View style={styles.progressInner}>
-              <Text style={styles.progressPercentage}>
-                ({completionData?.completionPercentage || 0}%)
-              </Text>
-              <Text style={styles.progressAmount}>
-                {completionData?.collectedAmount?.toFixed(1) || 0} USDC
-              </Text>
-              <Text style={styles.progressLabel}>
-                Locked
-              </Text>
-            </View>
-          </View>
-        </View>
+        <FairSplitProgress
+          completionData={completionData}
+          totalAmount={totalAmount}
+          isLoading={isLoadingCompletionData}
+        />
 
         {/* Split Method Selection - Only for creator before confirmation */}
         {!isSplitConfirmed && isCurrentUserCreator() && (
@@ -1549,49 +1603,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         )}
 
         {/* Participants List */}
-        <View style={styles.participantsContainer}>
-          {participants.map((participant) => (
-            <View key={participant.id} style={styles.participantCard}>
-            <UserAvatar
-              displayName={participant.name}
-              size={40}
-              style={styles.participantAvatar}
-            />
-            <View style={styles.participantInfo}>
-                <Text style={styles.participantName}>{participant.name}</Text>
-                <Text style={styles.participantWallet}>
-                  {participant.walletAddress.length > 10 
-                    ? `${participant.walletAddress.slice(0, 4)}...${participant.walletAddress.slice(-4)}`
-                    : participant.walletAddress
-                  }
-                </Text>
-            </View>
-            <View style={styles.participantAmountContainer}>
-                {!isSplitConfirmed && isCurrentUserCreator() && splitMethod === 'manual' ? (
-                  // Creator can edit amounts in manual mode
-                  <TouchableOpacity 
-                    style={styles.editableAmountButton}
-                    onPress={() => handleEditParticipantAmount(participant)}
-                  >
-                    <Text style={styles.editableAmountText}>
-                      ${participant.amountOwed.toFixed(3)}
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  // Read-only amount display
-                  <View style={styles.readOnlyAmountContainer}>
-                    <Text style={styles.readOnlyAmountText}>
-                      ${participant.amountOwed.toFixed(3)}
-                    </Text>
-                    {isSplitConfirmed && (
-                      <Text style={styles.lockedIndicator}>🔒</Text>
-                    )}
-            </View>
-                )}
-          </View>
-            </View>
-          ))}
-        </View>
+        <FairSplitParticipants
+          participants={participants}
+          isSplitConfirmed={isSplitConfirmed}
+          isCurrentUserCreator={isCurrentUserCreator()}
+          splitMethod={splitMethod}
+          onEditParticipantAmount={handleEditParticipantAmount}
+        />
       </ScrollView>
 
       {/* Action Buttons */}
@@ -1702,10 +1720,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                       {__DEV__ && isCurrentUserCreator() && (
                         <TouchableOpacity 
                           style={styles.devButton} 
-                          onPress={handleDevBypass}
+                          onPress={handleDevWithdraw}
                         >
                           <Text style={styles.devButtonText}>
-                            🚀 DEV: Split Funds
+                            🚀 DEV: Withdraw Funds
                           </Text>
                         </TouchableOpacity>
                       )}

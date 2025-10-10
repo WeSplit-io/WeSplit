@@ -134,6 +134,29 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
+  progressDetails: {
+    marginTop: spacing.lg,
+    width: '100%',
+    backgroundColor: colors.gray800,
+    borderRadius: 12,
+    padding: spacing.lg,
+  },
+  progressDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  progressDetailLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    fontWeight: '500',
+  },
+  progressDetailValue: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: '600',
+  },
   progressCircle: {
     width: 200,
     height: 200,
@@ -729,6 +752,30 @@ export const styles = StyleSheet.create({
   addWalletArrow: {
     color: colors.green,
     fontSize: typography.fontSize.lg,
+    fontWeight: '600',
+  },
+  // Progress details styles
+  progressDetails: {
+    marginTop: spacing.lg,
+    width: '100%',
+    backgroundColor: colors.gray800,
+    borderRadius: 12,
+    padding: spacing.lg,
+  },
+  progressDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  progressDetailLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    fontWeight: '500',
+  },
+  progressDetailValue: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
     fontWeight: '600',
   },
 });

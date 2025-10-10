@@ -8,6 +8,8 @@ import Constants from 'expo-constants';
 export interface ChainConfig {
   name: string;
   rpcUrl: string;
+  wsUrl?: string;
+  rpcEndpoints: string[]; // Multiple RPC endpoints for failover
   usdcMintAddress: string;
   commitment: 'processed' | 'confirmed' | 'finalized';
   isProduction: boolean;
@@ -40,10 +42,26 @@ export const CHAIN_NETWORKS: Record<string, ChainConfig> = {
     rpcUrl: HELIUS_API_KEY 
       ? `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`
       : 'https://api.mainnet-beta.solana.com',
+    wsUrl: HELIUS_API_KEY 
+      ? `wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`
+      : 'wss://api.mainnet-beta.solana.com',
+    rpcEndpoints: HELIUS_API_KEY 
+      ? [
+          `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`,
+          'https://api.mainnet-beta.solana.com',
+          'https://solana-api.projectserum.com',
+          'https://rpc.ankr.com/solana'
+        ]
+      : [
+          'https://api.mainnet-beta.solana.com',
+          'https://solana-api.projectserum.com',
+          'https://rpc.ankr.com/solana',
+          'https://mainnet.helius-rpc.com'
+        ],
     usdcMintAddress: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
     commitment: 'confirmed',
     isProduction: IS_PRODUCTION,
-    timeout: 30000,
+    timeout: 15000, // Reduced from 30s to 15s for better UX
     retries: 3,
   },
   // Development networks (only available in development)
@@ -51,19 +69,29 @@ export const CHAIN_NETWORKS: Record<string, ChainConfig> = {
     devnet: {
       name: 'devnet',
       rpcUrl: 'https://api.devnet.solana.com',
+      wsUrl: 'wss://api.devnet.solana.com',
+      rpcEndpoints: [
+        'https://api.devnet.solana.com',
+        'https://devnet.helius-rpc.com'
+      ],
       usdcMintAddress: 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
       commitment: 'confirmed',
       isProduction: false,
-      timeout: 30000,
+      timeout: 15000,
       retries: 3,
     },
     testnet: {
       name: 'testnet',
       rpcUrl: 'https://api.testnet.solana.com',
+      wsUrl: 'wss://api.testnet.solana.com',
+      rpcEndpoints: [
+        'https://api.testnet.solana.com',
+        'https://testnet.helius-rpc.com'
+      ],
       usdcMintAddress: 'CpMah17kQEL2wqyMKt3mZBdTnZbkbfx4nqmQMFDP5vwp',
       commitment: 'confirmed',
       isProduction: false,
-      timeout: 30000,
+      timeout: 15000,
       retries: 3,
     },
   }),
@@ -97,11 +125,11 @@ export const TRANSACTION_CONFIG = {
     tokenTransfer: 300000,
     multiSigTransfer: 500000,
   },
-  // Priority fees (in micro-lamports)
+  // Priority fees (in micro-lamports) - Increased for faster processing
   priorityFees: {
-    low: 1000,
-    medium: 5000,
-    high: 10000,
+    low: 5000,    // Increased from 1000
+    medium: 15000, // Increased from 5000
+    high: 50000,   // Increased from 10000
   },
   // Retry configuration
   retry: {
@@ -109,11 +137,11 @@ export const TRANSACTION_CONFIG = {
     retryDelay: 1000,
     exponentialBackoff: true,
   },
-  // Timeout configuration
+  // Timeout configuration - Optimized for speed
   timeout: {
-    connection: 10000,
-    transaction: 30000,
-    confirmation: 60000,
+    connection: 5000,    // Reduced from 10s
+    transaction: 15000,  // Reduced from 30s
+    confirmation: 30000, // Reduced from 60s
   },
   // Commitment levels
   commitment: {

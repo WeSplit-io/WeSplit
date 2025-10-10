@@ -5,6 +5,7 @@
  */
 
 import { logger } from './loggingService';
+import { calculateEqualSplit } from '../utils/currencyUtils';
 
 export interface PriceData {
   amount: number;
@@ -146,7 +147,7 @@ class PriceManagementService {
     }
 
     const amountPerParticipant = splitMethod === 'equal' 
-      ? priceData.amount / participantCount 
+      ? calculateEqualSplit(priceData.amount, participantCount) // Use consistent rounding
       : priceData.amount; // For manual, each participant sets their own amount
 
     const splitData: SplitPriceData = {

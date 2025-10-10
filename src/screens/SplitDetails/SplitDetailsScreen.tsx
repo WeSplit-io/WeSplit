@@ -491,7 +491,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       currency: billInfo.currency || 'USDC',
       category: billInfo.category || 'Other', // Include category from bill info
       splitType: billInfo.splitType || selectedSplitType || 'fair',
-      status: 'active' as const, // Create split as active immediately
+      status: 'pending' as const, // Split starts as pending until user confirms repartition
       creatorId: currentUser.id.toString(),
       creatorName: currentUser.name,
       participants: participants.map((p: any) => ({
@@ -2323,7 +2323,39 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       splitDataKeys: splitData ? Object.keys(splitData) : 'null',
       timestamp: new Date().toISOString()
     });
-  }, [splitData]);
+
+    // Check if split is active/locked and redirect participants to FairSplitScreen
+    if (splitData && currentUser && splitData.status === 'active' && splitData.splitType === 'fair') {
+      console.log('🔍 SplitDetailsScreen: Split is active and locked, checking if user should be redirected to FairSplitScreen:', {
+        splitId: splitData.id,
+        splitStatus: splitData.status,
+        splitType: splitData.splitType,
+        currentUserId: currentUser.id.toString(),
+        isCreator: splitData.creatorId === currentUser.id.toString()
+      });
+
+      // Check if current user is a participant in this split
+      const isParticipant = splitData.participants.some(p => p.userId === currentUser.id.toString());
+      
+      if (isParticipant) {
+        console.log('🔍 SplitDetailsScreen: User is a participant in locked split, redirecting to FairSplitScreen');
+        
+        // Convert data to unified format for FairSplitScreen
+        const unifiedBillData = processedBillData ?
+          SplitDataConverter.processBillDataToUnified(processedBillData) :
+          undefined;
+
+        // Redirect to FairSplitScreen with all necessary data
+        navigation.navigate('FairSplit', {
+          billData: unifiedBillData,
+          processedBillData: processedBillData,
+          analysisResult: analysisResult,
+          splitWallet: splitWallet,
+          splitData: splitData,
+        });
+      }
+    }
+  }, [splitData, currentUser, navigation, processedBillData, analysisResult, splitWallet]);
 
   // Monitor participants state changes
   useEffect(() => {

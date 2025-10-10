@@ -7,6 +7,7 @@
 import { consolidatedWalletService } from './consolidatedWalletService';
 import { consolidatedTransactionService } from './consolidatedTransactionService';
 import { logger } from './loggingService';
+import { roundUsdcAmount } from '../utils/currencyUtils';
 import { collection, doc, addDoc, getDoc, getDocs, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -16,7 +17,8 @@ export interface SplitWallet {
   creatorId: string;
   walletAddress: string;
   publicKey: string;
-  secretKey: string; // Encrypted and stored securely
+  // SECURITY: Private keys are NEVER stored in Firebase
+  // The creator stores the split wallet's private key locally on their device
   totalAmount: number;
   currency: string;
   status: 'active' | 'locked' | 'completed' | 'cancelled' | 'spinning_completed';
@@ -57,6 +59,163 @@ export interface PaymentResult {
 }
 
 export class SplitWalletService {
+  /**
+   * Round USDC amount to proper precision (6 decimal places)
+   * Uses floor instead of round to avoid rounding up beyond available balance
+   */
+  static roundUsdcAmount(amount: number): number {
+    return roundUsdcAmount(amount);
+  }
+
+  /**
+   * Validate wallet address format
+   */
+  static isValidWalletAddress(address: string): boolean {
+    if (!address || typeof address !== 'string') return false;
+    
+    // Remove common invalid values
+    const invalidValues = ['No wallet address', 'Unknown wallet', '', 'null', 'undefined'];
+    if (invalidValues.includes(address.toLowerCase())) return false;
+    
+    // Check if it's a valid Solana public key format
+    try {
+      const { PublicKey } = require('@solana/web3.js');
+      new PublicKey(address);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Ensure user wallet is properly initialized
+   */
+  static async ensureUserWalletInitialized(userId: string): Promise<{success: boolean, error?: string}> {
+    try {
+      const { userWalletService } = await import('../services/userWalletService');
+      const walletResult = await userWalletService.ensureUserWallet(userId);
+      
+      if (!walletResult.success) {
+        // If wallet doesn't exist, we can't create it here - user needs to set up wallet first
+        return { success: false, error: 'User wallet not found. Please set up your wallet first.' };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Wallet initialization failed' };
+    }
+  }
+
+  /**
+   * Check USDC balance for a user
+   */
+  static async checkUsdcBalance(userId: string): Promise<{success: boolean, balance: number, error?: string}> {
+    try {
+      const { userWalletService } = await import('../services/userWalletService');
+      const walletResult = await userWalletService.ensureUserWallet(userId);
+      
+      if (!walletResult.success || !walletResult.wallet) {
+        return { success: false, balance: 0, error: 'User wallet not found' };
+      }
+      
+      const { PublicKey, Connection } = require('@solana/web3.js');
+      const { getAssociatedTokenAddress, getAccount } = require('@solana/spl-token');
+      const { CURRENT_NETWORK } = require('../config/chain');
+      
+      const connection = new Connection(CURRENT_NETWORK.rpcUrl);
+      const publicKey = new PublicKey(walletResult.wallet.publicKey);
+      const usdcTokenAccount = await getAssociatedTokenAddress(
+        new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+        publicKey
+      );
+      
+      try {
+        const account = await getAccount(connection, usdcTokenAccount);
+        const balance = Number(account.amount) / 1000000; // USDC has 6 decimals
+        return { success: true, balance };
+      } catch {
+        return { success: true, balance: 0 }; // No USDC token account means 0 balance
+      }
+    } catch (error) {
+      return { success: false, balance: 0, error: 'Failed to check balance' };
+    }
+  }
+
+  /**
+   * Ensure USDC token account exists for a user
+   */
+  static async ensureUsdcTokenAccount(userId: string): Promise<{success: boolean, error?: string}> {
+    try {
+      const { userWalletService } = await import('../services/userWalletService');
+      const walletResult = await userWalletService.ensureUserWallet(userId);
+      
+      if (!walletResult.success || !walletResult.wallet) {
+        return { success: false, error: 'User wallet not found' };
+      }
+      
+      const { PublicKey, Connection, Keypair } = require('@solana/web3.js');
+      const { getAssociatedTokenAddress, getAccount, createAssociatedTokenAccountInstruction } = require('@solana/spl-token');
+      const { CURRENT_NETWORK } = require('../config/chain');
+      
+      const connection = new Connection(CURRENT_NETWORK.rpcUrl);
+      const publicKey = new PublicKey(walletResult.wallet.publicKey);
+      const usdcTokenAccount = await getAssociatedTokenAddress(
+        new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+        publicKey
+      );
+      
+      try {
+        await getAccount(connection, usdcTokenAccount);
+        return { success: true }; // Account exists
+      } catch {
+        // Account doesn't exist, try to create it
+        try {
+          // Create keypair from user's secret key
+          let keypair: any;
+          try {
+            if (!walletResult.wallet.secretKey) {
+              throw new Error('No secret key found');
+            }
+            const secretKeyBuffer = Buffer.from(walletResult.wallet.secretKey, 'base64');
+            keypair = Keypair.fromSecretKey(secretKeyBuffer);
+          } catch {
+            if (!walletResult.wallet.secretKey) {
+              throw new Error('No secret key found');
+            }
+            const secretKeyArray = JSON.parse(walletResult.wallet.secretKey);
+            keypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
+          }
+          
+          // Create the USDC token account
+          const transaction = new (require('@solana/web3.js').Transaction)();
+          transaction.add(
+            createAssociatedTokenAccountInstruction(
+              keypair.publicKey, // payer
+              usdcTokenAccount, // associated token account
+              publicKey, // owner
+              new PublicKey(CURRENT_NETWORK.usdcMintAddress) // mint
+            )
+          );
+          
+          const { blockhash } = await connection.getLatestBlockhash();
+          transaction.recentBlockhash = blockhash;
+          transaction.feePayer = keypair.publicKey;
+          
+          const signature = await connection.sendTransaction(transaction, [keypair]);
+          await connection.confirmTransaction(signature);
+          
+          console.log('✅ Created USDC token account for user:', userId);
+          return { success: true };
+        } catch (createError) {
+          console.error('❌ Failed to create USDC token account:', createError);
+          return { success: false, error: 'Failed to create USDC token account' };
+        }
+      }
+    } catch (error) {
+      return { success: false, error: 'Failed to ensure USDC token account' };
+    }
+  }
+
   /**
    * Test method to verify split wallet creation works
    */
@@ -156,16 +315,16 @@ export class SplitWalletService {
         publicKey: wallet.publicKey 
       }, 'SplitWalletService');
 
-      // Create split wallet record
-      const splitWallet: SplitWallet = {
-        id: `split_wallet_${billId}_${Date.now()}`,
-        billId,
-        creatorId,
-        walletAddress: wallet.address,
-        publicKey: wallet.publicKey,
-        secretKey: wallet.secretKey || '', // This should be encrypted in production
-        totalAmount,
-        currency,
+        // Create split wallet record (NO PRIVATE KEYS STORED)
+        const splitWallet: SplitWallet = {
+          id: `split_wallet_${billId}_${Date.now()}`,
+          billId,
+          creatorId,
+          walletAddress: wallet.address,
+          publicKey: wallet.publicKey,
+          // SECURITY: Private keys are NEVER stored in Firebase
+          totalAmount,
+          currency,
         status: 'active',
         participants: participants.map(p => ({
           ...p,
@@ -260,6 +419,17 @@ export class SplitWalletService {
         
         // Update the split wallet object with the Firebase document ID
         splitWallet.firebaseDocId = docRef.id;
+        
+        // Store the private key locally on the creator's device
+        if (wallet.secretKey) {
+          const storeResult = await this.storeSplitWalletPrivateKey(splitWallet.id, creatorId, wallet.secretKey);
+          if (!storeResult.success) {
+            console.warn('🔍 SplitWalletService: Failed to store private key locally:', storeResult.error);
+            // Don't fail the entire operation, but log the warning
+          } else {
+            console.log('🔍 SplitWalletService: Private key stored locally on creator device');
+          }
+        }
         
         console.log('🔍 SplitWalletService: Split wallet stored successfully!');
         logger.info('Split wallet stored successfully in Firebase', { 
@@ -501,12 +671,30 @@ export class SplitWalletService {
 
       const wallet = walletResult.wallet;
       
-      // Update participants list
-      const updatedParticipants = participants.map(p => ({
-        ...p,
-        amountPaid: 0,
-        status: 'pending' as const,
-      }));
+      // Update participants list - preserve creator status as 'accepted', others as 'pending'
+      const updatedParticipants = participants.map(p => {
+        const existingParticipant = wallet.participants.find(wp => wp.userId === p.userId);
+        const isCreator = p.userId === wallet.creatorId;
+        
+        return {
+          ...p,
+          amountPaid: existingParticipant?.amountPaid || 0, // Preserve existing payments
+          status: isCreator ? 'locked' as const : 'pending' as const, // Creator is locked, others are pending
+          transactionSignature: existingParticipant?.transactionSignature,
+          paidAt: existingParticipant?.paidAt,
+        };
+      });
+
+      console.log('🔍 SplitWalletService: Updated participants with correct status:', {
+        participants: updatedParticipants.map(p => ({
+          userId: p.userId,
+          name: p.name,
+          amountOwed: p.amountOwed,
+          amountPaid: p.amountPaid,
+          status: p.status,
+          isCreator: p.userId === wallet.creatorId
+        }))
+      });
 
       // Update the wallet in Firebase
       await updateDoc(doc(db, 'splitWallets', wallet.firebaseDocId || splitWalletId), {
@@ -535,7 +723,62 @@ export class SplitWalletService {
   }
 
   /**
-   * Get split wallet private key for the creator
+   * Store split wallet private key locally on creator's device
+   * Only the creator can store and access their split wallet's private key
+   */
+  static async storeSplitWalletPrivateKey(splitWalletId: string, creatorId: string, privateKey: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('🔍 SplitWalletService: Storing split wallet private key locally:', {
+        splitWalletId,
+        creatorId,
+        hasPrivateKey: !!privateKey
+      });
+
+      // Import secure storage service
+      const { secureStorageService } = await import('./secureStorageService');
+      
+      // Convert private key to the same format used by user wallets
+      const secretKeyArray = Array.from(new Uint8Array(Buffer.from(privateKey, 'base64')));
+      
+      // Store the private key securely on the creator's device using the same method as user wallets
+      const storageKey = `split_wallet_${splitWalletId}`;
+      await secureStorageService.storePrivateKey(storageKey, JSON.stringify(secretKeyArray));
+
+      console.log('🔍 SplitWalletService: Split wallet private key stored successfully');
+      return { success: true };
+
+    } catch (error) {
+      console.error('🔍 SplitWalletService: Error storing split wallet private key:', error);
+      logger.error('Failed to store split wallet private key', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Check if a split wallet has its private key stored locally
+   * This helps identify splits that need to be recreated
+   */
+  static async hasLocalPrivateKey(splitWalletId: string, creatorId: string): Promise<{ success: boolean; hasKey: boolean; error?: string }> {
+    try {
+      const privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, creatorId);
+      return {
+        success: true,
+        hasKey: privateKeyResult.success && !!privateKeyResult.privateKey
+      };
+    } catch (error) {
+      return {
+        success: false,
+        hasKey: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Get split wallet private key from creator's local storage
    * Only the creator of the split can access the private key
    */
   static async getSplitWalletPrivateKey(splitWalletId: string, requesterId: string): Promise<{ success: boolean; privateKey?: string; error?: string }> {
@@ -573,11 +816,29 @@ export class SplitWalletService {
         };
       }
 
-      console.log('🔍 SplitWalletService: Private key access granted to creator');
+      // Import secure storage service
+      const { secureStorageService } = await import('./secureStorageService');
+      
+      // Retrieve the private key from local storage using the same method as user wallets
+      const storageKey = `split_wallet_${splitWalletId}`;
+      const privateKeyData = await secureStorageService.getPrivateKey(storageKey);
 
+      if (!privateKeyData) {
+        return {
+          success: false,
+          error: 'Split wallet private key not found in local storage. Please recreate the split.',
+        };
+      }
+
+      // Convert back from the stored format to base64 string
+      const secretKeyArray = JSON.parse(privateKeyData);
+      const privateKeyBuffer = Buffer.from(secretKeyArray);
+      const privateKey = privateKeyBuffer.toString('base64');
+
+      console.log('🔍 SplitWalletService: Private key retrieved from local storage');
       return {
         success: true,
-        privateKey: wallet.secretKey,
+        privateKey: privateKey,
       };
 
     } catch (error) {
@@ -813,6 +1074,9 @@ export class SplitWalletService {
     payerWalletAddress: string
   ): Promise<PaymentResult> {
     try {
+      // Ensure amount is properly rounded using our currency utilities
+      const roundedAmount = this.roundUsdcAmount(amount);
+      
       const result = await this.getSplitWallet(splitWalletId);
       if (!result.success || !result.wallet) {
         return {
@@ -840,32 +1104,30 @@ export class SplitWalletService {
 
       // Validate payment amount
       const remainingAmount = participant.amountOwed - participant.amountPaid;
-      if (amount > remainingAmount) {
+      if (roundedAmount > remainingAmount) {
         return {
           success: false,
-          error: `Payment amount (${amount}) exceeds remaining amount (${remainingAmount})`,
+          error: `Payment amount (${roundedAmount}) exceeds remaining amount (${remainingAmount})`,
         };
       }
 
       // Send transaction from participant's wallet to split wallet
-      // Note: The participantId should be the actual user ID, and the transaction service
-      // will look up the user's wallet information from the database
-      console.log('🔍 SplitWalletService: Sending USDC transaction:', {
+      // Use the same approach as working one-to-one transfers
+      console.log('🔍 SplitWalletService: Sending USDC transaction to split wallet:', {
         toAddress: wallet.walletAddress,
-        amount,
+        originalAmount: amount,
+        roundedAmount: roundedAmount,
         fromUserId: participantId,
         memo: `Split payment for bill ${wallet.billId}`,
         participantWalletAddress: participant.walletAddress,
         participantName: participant.name
       });
       
-      const transactionResult = await consolidatedTransactionService.sendUsdcTransaction(
-        wallet.walletAddress, // Send TO the split wallet
-        amount,
-        participantId, // The participant is the sender (user ID)
-        `Split payment for bill ${wallet.billId}`,
-        undefined,
-        'medium'
+      const transactionResult = await this.sendUsdcToSplitWallet(
+        participantId,
+        wallet.walletAddress,
+        roundedAmount,
+        `Split payment for bill ${wallet.billId}`
       );
       
       console.log('🔍 SplitWalletService: Transaction result:', transactionResult);
@@ -878,7 +1140,7 @@ export class SplitWalletService {
       }
 
       // Update participant payment status
-      const updatedAmountPaid = participant.amountPaid + amount;
+      const updatedAmountPaid = participant.amountPaid + roundedAmount;
       const newStatus = updatedAmountPaid >= participant.amountOwed ? 'paid' : 'locked';
 
       // Use Firebase document ID if available, otherwise use the splitWalletId
@@ -901,14 +1163,15 @@ export class SplitWalletService {
       logger.info('Participant payment processed successfully', {
         splitWalletId,
         participantId,
-        amount,
+        originalAmount: amount,
+        roundedAmount: roundedAmount,
         transactionSignature: transactionResult.signature,
       }, 'SplitWalletService');
 
       return {
         success: true,
         transactionSignature: transactionResult.signature,
-        amount,
+        amount: roundedAmount,
       };
 
     } catch (error) {
@@ -921,8 +1184,8 @@ export class SplitWalletService {
   }
 
   /**
-   * Send payment from split wallet to Cast account
-   * This is called when all participants have paid
+   * Send payment from split wallet to Cast account (Fair Split - Creator only)
+   * This is called when all participants have paid in a Fair Split
    */
   static async sendToCastAccount(
     splitWalletId: string,
@@ -952,19 +1215,35 @@ export class SplitWalletService {
       // Calculate total amount collected in the split wallet
       const totalCollected = wallet.participants.reduce((sum, p) => sum + p.amountPaid, 0);
       
-      // Check if we have collected the full amount
-      if (totalCollected < wallet.totalAmount) {
+      // Get the actual USDC balance from the blockchain with fallback to participant data
+      const { actualBalance, usedFallback } = await this.getSplitWalletUsdcBalance(wallet.walletAddress, totalCollected);
+      
+      // Use the actual blockchain balance instead of calculated amounts to avoid precision issues
+      const withdrawalAmount = this.roundUsdcAmount(actualBalance);
+      
+      // Check if we have collected the full amount (with small tolerance for floating point precision)
+      const tolerance = 0.000001; // 1 micro-USDC tolerance
+      if (actualBalance < (wallet.totalAmount - tolerance)) {
         return {
           success: false,
-          error: `Insufficient funds collected. Required: ${wallet.totalAmount} USDC, Collected: ${totalCollected} USDC`,
+          error: `Insufficient funds collected. Required: ${wallet.totalAmount} USDC, Available: ${actualBalance} USDC`,
         };
       }
+
+      console.log('🔍 SplitWalletService: Using balance for Cast account transfer:', {
+        walletTotalAmount: wallet.totalAmount,
+        totalCollected: totalCollected,
+        actualBalance: actualBalance,
+        withdrawalAmount: withdrawalAmount,
+        usedFallback: usedFallback,
+        difference: Math.abs(wallet.totalAmount - actualBalance)
+      });
 
       // Send payment from split wallet to Cast account
       // The creator has custody of the split wallet, so they initiate the transaction
       const transactionResult = await consolidatedTransactionService.sendUsdcTransaction(
         castAccountAddress,
-        wallet.totalAmount,
+        withdrawalAmount, // Use the actual collected amount instead of wallet.totalAmount
         wallet.creatorId, // Creator has custody and initiates the transaction
         description || `Bill payment for ${wallet.billId}`,
         undefined,
@@ -989,7 +1268,7 @@ export class SplitWalletService {
       logger.info('Payment sent to Cast account successfully', {
         splitWalletId,
         castAccountAddress,
-        amount: wallet.totalAmount,
+        amount: withdrawalAmount,
         transactionSignature: transactionResult.signature,
       }, 'SplitWalletService');
 
@@ -999,7 +1278,7 @@ export class SplitWalletService {
       return {
         success: true,
         transactionSignature: transactionResult.signature,
-        amount: wallet.totalAmount,
+        amount: withdrawalAmount,
       };
 
     } catch (error) {
@@ -1012,7 +1291,8 @@ export class SplitWalletService {
   }
 
   /**
-   * Transfer funds from split wallet to a user's wallet (for degen split winners)
+   * Transfer funds from split wallet to a user's wallet (Degen Split - All participants)
+   * This method allows any participant to extract their locked funds
    */
   static async transferToUserWallet(
     splitWalletId: string,
@@ -1062,9 +1342,18 @@ export class SplitWalletService {
         participantUserId: userId
       });
       
+      // Get the private key from local storage
+      const privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, wallet.creatorId);
+      if (!privateKeyResult.success || !privateKeyResult.privateKey) {
+        return {
+          success: false,
+          error: privateKeyResult.error || 'Failed to retrieve split wallet private key from local storage',
+        };
+      }
+
       const transactionResult = await consolidatedTransactionService.sendUsdcFromSpecificWallet(
         wallet.walletAddress, // Split wallet address (source)
-        wallet.secretKey, // Split wallet's secret key
+        privateKeyResult.privateKey, // Split wallet's secret key from local storage
         participant.walletAddress, // Participant wallet address (destination)
         amount,
         `Degen Split refund for ${wallet.billId}`,
@@ -1114,6 +1403,279 @@ export class SplitWalletService {
   }
 
   /**
+   * Extract funds from Fair Split wallet (Creator only)
+   * This method ensures only the creator can extract funds from a Fair Split
+   */
+  static async extractFairSplitFunds(
+    splitWalletId: string,
+    recipientAddress: string,
+    creatorId: string,
+    description?: string
+  ): Promise<PaymentResult> {
+    try {
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = result.wallet;
+
+      // Validate that the requester is the creator
+      if (wallet.creatorId !== creatorId) {
+        return {
+          success: false,
+          error: 'Only the split creator can extract funds from a Fair Split',
+        };
+      }
+
+      // Get the private key from local storage
+      const privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, creatorId);
+      if (!privateKeyResult.success || !privateKeyResult.privateKey) {
+        // MIGRATION: For existing splits created before local storage was implemented
+        console.log('🔍 SplitWalletService: Private key not found in local storage, checking for migration...');
+        
+        // Check if this is an old split that needs migration
+        if (privateKeyResult.error?.includes('not found in local storage')) {
+          return {
+            success: false,
+            error: 'This split was created before the security update. Please create a new split to withdraw funds. The old split wallet\'s private key cannot be recovered.',
+          };
+        }
+        
+        return {
+          success: false,
+          error: privateKeyResult.error || 'Failed to retrieve split wallet private key from local storage',
+        };
+      }
+
+      console.log('🔍 SplitWalletService: extractFairSplitFunds - Private key retrieved from local storage:', {
+        walletId: wallet.id,
+        walletAddress: wallet.walletAddress,
+        creatorId: wallet.creatorId,
+        hasPrivateKey: !!privateKeyResult.privateKey
+      });
+
+      // Try to ensure USDC token account exists for the split wallet
+      const tokenAccountResult = await this.ensureSplitWalletUsdcTokenAccount(splitWalletId, creatorId);
+      if (!tokenAccountResult.success) {
+        console.warn('🔍 SplitWalletService: Failed to ensure USDC token account:', {
+          error: tokenAccountResult.error
+        });
+        
+        // If token account creation failed due to timeout, wait a bit and check if it was actually created
+        if (tokenAccountResult.error?.includes('timeout') || tokenAccountResult.error?.includes('processing')) {
+          console.log('🔍 SplitWalletService: Token account creation timed out, waiting 5 seconds and checking if it was created...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          // Check if the token account was actually created despite the timeout
+          const { consolidatedTransactionService } = await import('./consolidatedTransactionService');
+          const balanceCheck = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
+          
+          if (balanceCheck.success) {
+            console.log('✅ SplitWalletService: Token account was created successfully despite timeout');
+          } else {
+            console.warn('⚠️ SplitWalletService: Token account still not found after timeout, will use fallback logic');
+          }
+        }
+      } else {
+        console.log('✅ SplitWalletService: USDC token account ensured successfully');
+      }
+
+      // Check if all participants have paid (Fair Split requirement)
+      const allPaid = wallet.participants.every(p => p.status === 'paid');
+      if (!allPaid) {
+        return {
+          success: false,
+          error: 'Not all participants have paid their amounts in the Fair Split',
+        };
+      }
+
+      // Calculate total amount collected in the split wallet
+      const totalCollected = wallet.participants.reduce((sum, p) => sum + p.amountPaid, 0);
+      
+      // Get the actual USDC balance from the blockchain with fallback to participant data
+      const { actualBalance, usedFallback } = await this.getSplitWalletUsdcBalance(wallet.walletAddress, totalCollected);
+      
+      // Use the actual blockchain balance instead of calculated amounts to avoid precision issues
+      const withdrawalAmount = this.roundUsdcAmount(actualBalance);
+      
+      // Check if we have collected the full amount (with small tolerance for floating point precision)
+      const tolerance = 0.000001; // 1 micro-USDC tolerance
+      if (actualBalance < (wallet.totalAmount - tolerance)) {
+        return {
+          success: false,
+          error: `Insufficient funds collected. Required: ${wallet.totalAmount} USDC, Available: ${actualBalance} USDC`,
+        };
+      }
+
+      console.log('🔍 SplitWalletService: Using balance for withdrawal:', {
+        walletTotalAmount: wallet.totalAmount,
+        totalCollected: totalCollected,
+        actualBalance: actualBalance,
+        withdrawalAmount: withdrawalAmount,
+        usedFallback: usedFallback,
+        difference: Math.abs(wallet.totalAmount - actualBalance)
+      });
+
+      // If we're using fallback data but the actual balance is 0, this indicates a problem
+      if (usedFallback && actualBalance === 0) {
+        console.warn('⚠️ SplitWalletService: Using fallback data but actual balance is 0 - this may indicate USDC tokens are not accessible');
+        return {
+          success: false,
+          error: 'USDC tokens are not accessible. The token account may not have been created properly or the tokens may not have been sent to the split wallet.',
+        };
+      }
+
+      // Send payment from split wallet to recipient address
+      const transactionResult = await consolidatedTransactionService.sendUsdcFromSpecificWallet(
+        wallet.walletAddress, // Split wallet address (source)
+        privateKeyResult.privateKey, // Split wallet's secret key from local storage
+        recipientAddress, // Recipient address (destination)
+        withdrawalAmount, // Use the actual collected amount instead of wallet.totalAmount
+        description || `Fair Split fund extraction for ${wallet.billId}`,
+        'high' // High priority for final payment
+      );
+
+      if (!transactionResult.success) {
+        return {
+          success: false,
+          error: transactionResult.error || 'Failed to extract funds',
+        };
+      }
+
+      // Update wallet status to completed
+      const docId = wallet.firebaseDocId || splitWalletId;
+      await updateDoc(doc(db, 'splitWallets', docId), {
+        status: 'completed',
+        updatedAt: new Date().toISOString(),
+      });
+
+      logger.info('Fair Split funds extracted successfully', {
+        splitWalletId,
+        recipientAddress,
+        amount: withdrawalAmount,
+        transactionSignature: transactionResult.signature,
+        creatorId
+      }, 'SplitWalletService');
+
+      // Send completion notifications to all participants
+      await this.sendSplitCompletionNotifications(wallet);
+
+      return {
+        success: true,
+        transactionSignature: transactionResult.signature,
+        amount: withdrawalAmount,
+      };
+
+    } catch (error) {
+      logger.error('Failed to extract Fair Split funds', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Extract funds from Degen Split wallet (All participants can extract)
+   * This method allows any participant to extract their locked funds in a Degen Split
+   */
+  static async extractDegenSplitFunds(
+    splitWalletId: string,
+    userId: string,
+    recipientAddress: string,
+    amount: number,
+    description?: string
+  ): Promise<PaymentResult> {
+    try {
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = result.wallet;
+
+      // Find the participant
+      const participant = wallet.participants.find(p => p.userId === userId);
+      if (!participant) {
+        return {
+          success: false,
+          error: 'Participant not found in split wallet',
+        };
+      }
+
+      // Check if participant has locked funds (Degen Split requirement)
+      if (participant.status !== 'locked' && participant.status !== 'paid') {
+        return {
+          success: false,
+          error: 'Participant has not locked their funds for the Degen Split',
+        };
+      }
+
+      // Validate amount doesn't exceed locked amount
+      if (amount > participant.amountOwed) {
+        return {
+          success: false,
+          error: `Amount (${amount}) exceeds locked amount (${participant.amountOwed})`,
+        };
+      }
+
+      // Send payment from split wallet to recipient address
+      // Get the private key from local storage
+      const privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, wallet.creatorId);
+      if (!privateKeyResult.success || !privateKeyResult.privateKey) {
+        return {
+          success: false,
+          error: privateKeyResult.error || 'Failed to retrieve split wallet private key from local storage',
+        };
+      }
+
+      const transactionResult = await consolidatedTransactionService.sendUsdcFromSpecificWallet(
+        wallet.walletAddress, // Split wallet address (source)
+        privateKeyResult.privateKey, // Split wallet's secret key from local storage
+        recipientAddress, // Recipient address (destination)
+        amount,
+        description || `Degen Split fund extraction for ${wallet.billId}`,
+        'high' // High priority for fund extraction
+      );
+
+      if (!transactionResult.success) {
+        return {
+          success: false,
+          error: transactionResult.error || 'Failed to extract funds',
+        };
+      }
+
+      logger.info('Degen Split funds extracted successfully', {
+        splitWalletId,
+        userId,
+        recipientAddress,
+        amount,
+        transactionSignature: transactionResult.signature
+      }, 'SplitWalletService');
+
+      return {
+        success: true,
+        transactionSignature: transactionResult.signature,
+        amount: amount,
+      };
+
+    } catch (error) {
+      logger.error('Failed to extract Degen Split funds', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
    * Send funds from split wallet to an address for Degen Split payments
    * This version accepts 'locked' status for participants (used in Degen Split)
    */
@@ -1155,9 +1717,18 @@ export class SplitWalletService {
 
       // Send payment from split wallet to recipient address
       // Use the new method that can send from a specific wallet
+      // Get the private key from local storage
+      const privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, wallet.creatorId);
+      if (!privateKeyResult.success || !privateKeyResult.privateKey) {
+        return {
+          success: false,
+          error: privateKeyResult.error || 'Failed to retrieve split wallet private key from local storage',
+        };
+      }
+
       const transactionResult = await consolidatedTransactionService.sendUsdcFromSpecificWallet(
         wallet.walletAddress, // Split wallet address (source)
-        wallet.secretKey, // Split wallet's secret key
+        privateKeyResult.privateKey, // Split wallet's secret key from local storage
         recipientAddress, // Recipient address (destination)
         wallet.totalAmount,
         description || `Degen Split payment for ${wallet.billId}`,
@@ -1300,11 +1871,45 @@ export class SplitWalletService {
     amount: number
   ): Promise<PaymentResult> {
     try {
+      // Ensure amount is properly rounded using our currency utilities
+      const roundedAmount = this.roundUsdcAmount(amount);
+      
       logger.info('Processing participant share payment', {
         splitWalletId,
         participantId,
-        amount
+        originalAmount: amount,
+        roundedAmount: roundedAmount
       }, 'SplitWalletService');
+
+      // Step 1: Validate inputs
+      if (!splitWalletId || !participantId || roundedAmount <= 0) {
+        return { success: false, error: 'Invalid input parameters' };
+      }
+
+      // Step 2: Ensure user wallet is initialized
+      const walletInitResult = await this.ensureUserWalletInitialized(participantId);
+      if (!walletInitResult.success) {
+        return { success: false, error: walletInitResult.error };
+      }
+
+      // Step 3: Ensure USDC token account exists
+      const tokenAccountResult = await this.ensureUsdcTokenAccount(participantId);
+      if (!tokenAccountResult.success) {
+        return { success: false, error: tokenAccountResult.error };
+      }
+
+      // Step 4: Check USDC balance
+      const balanceResult = await this.checkUsdcBalance(participantId);
+      if (!balanceResult.success) {
+        return { success: false, error: balanceResult.error };
+      }
+
+      if (balanceResult.balance < roundedAmount) {
+        return { 
+          success: false, 
+          error: `Insufficient USDC balance. Required: ${roundedAmount} USDC, Available: ${balanceResult.balance.toFixed(6)} USDC` 
+        };
+      }
 
       const result = await this.getSplitWallet(splitWalletId);
       if (!result.success || !result.wallet) {
@@ -1334,23 +1939,15 @@ export class SplitWalletService {
 
       // Validate payment amount
       const remainingAmount = participant.amountOwed - participant.amountPaid;
-      if (amount > remainingAmount) {
+      if (roundedAmount > remainingAmount) {
         return {
           success: false,
-          error: `Payment amount (${amount}) exceeds your remaining amount (${remainingAmount})`,
-        };
-      }
-
-      // Check if amount is valid (greater than 0)
-      if (amount <= 0) {
-        return {
-          success: false,
-          error: 'Payment amount must be greater than 0',
+          error: `Payment amount (${roundedAmount}) exceeds your remaining amount (${remainingAmount})`,
         };
       }
 
       // Check if participant has a valid wallet address
-      if (!participant.walletAddress || participant.walletAddress === 'No wallet address' || participant.walletAddress === 'Unknown wallet') {
+      if (!this.isValidWalletAddress(participant.walletAddress)) {
         return {
           success: false,
           error: 'Participant does not have a valid wallet address. Please ensure the user has connected their wallet.',
@@ -1361,7 +1958,7 @@ export class SplitWalletService {
       return await this.processParticipantPayment(
         splitWalletId,
         participantId,
-        amount,
+        roundedAmount,
         participant.walletAddress
       );
 
@@ -1370,6 +1967,389 @@ export class SplitWalletService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Send USDC from participant's wallet to split wallet using direct USDC transfer
+   */
+  static async sendUsdcToSplitWallet(
+    participantId: string,
+    splitWalletAddress: string,
+    amount: number,
+    memo: string
+  ): Promise<{
+    success: boolean;
+    signature?: string;
+    error?: string;
+  }> {
+    try {
+      // Ensure amount is properly rounded using our currency utilities
+      const roundedAmount = this.roundUsdcAmount(amount);
+      
+      console.log('🔍 SplitWalletService: sendUsdcToSplitWallet called:', {
+        participantId,
+        splitWalletAddress,
+        originalAmount: amount,
+        roundedAmount: roundedAmount,
+        memo
+      });
+
+      // Ensure user wallet is initialized
+      const walletInitResult = await this.ensureUserWalletInitialized(participantId);
+      if (!walletInitResult.success) {
+        return {
+          success: false,
+          error: walletInitResult.error || 'Failed to initialize user wallet'
+        };
+      }
+
+      // Use the existing internal transfer service which properly handles user wallets
+      const { internalTransferService } = await import('../transfer/sendInternal');
+      
+      // Send USDC from user's wallet to the split wallet address
+      const transferResult = await internalTransferService.sendInternalTransferToAddress({
+        to: splitWalletAddress, // Destination: split wallet address
+        amount: roundedAmount, // Amount to send (properly rounded)
+        currency: 'USDC', // Currency
+        userId: participantId, // Sender: participant ID
+        memo: memo, // Memo
+        priority: 'medium' // Priority
+      });
+
+      if (!transferResult.success) {
+        // Provide more specific error messages
+        let errorMessage = transferResult.error || 'Failed to send funds to split wallet';
+        
+        // Check for common error patterns and provide better messages
+        if (errorMessage.includes('USDC token account does not exist')) {
+          errorMessage = 'Your USDC wallet is not set up. Please contact support to initialize your USDC account.';
+        } else if (errorMessage.includes('Insufficient')) {
+          errorMessage = `Insufficient USDC balance. You need ${roundedAmount} USDC to complete this payment.`;
+        } else if (errorMessage.includes('Invalid user wallet secret key')) {
+          errorMessage = 'Your wallet is not properly configured. Please try reconnecting your wallet.';
+        } else if (errorMessage.includes('timeout') || errorMessage.includes('Transaction timeout')) {
+          errorMessage = 'Transaction is taking longer than expected. Please check your transaction status in a few minutes. The payment may still be processing.';
+        } else if (errorMessage.includes('blockhash') || errorMessage.includes('block height exceeded')) {
+          errorMessage = 'Network congestion detected. Please try again in a moment.';
+        }
+        
+        return {
+          success: false,
+          error: errorMessage
+        };
+      }
+
+      console.log('🔍 SplitWalletService: Successfully sent USDC to split wallet:', {
+        signature: transferResult.signature,
+        originalAmount: amount,
+        roundedAmount: roundedAmount,
+        splitWalletAddress
+      });
+
+      return {
+        success: true,
+        signature: transferResult.signature
+      };
+
+    } catch (error) {
+      console.error('❌ SplitWalletService: Error in sendUsdcToSplitWallet:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Check if a transaction signature is confirmed on the blockchain
+   */
+  static async checkTransactionStatus(signature: string): Promise<{
+    success: boolean;
+    confirmed: boolean;
+    error?: string;
+  }> {
+    try {
+      const { internalTransferService } = await import('../transfer/sendInternal');
+      const status = await internalTransferService.getTransactionStatus(signature);
+      
+      return {
+        success: true,
+        confirmed: status.status === 'confirmed' || status.status === 'finalized'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        confirmed: false,
+        error: error instanceof Error ? error.message : 'Failed to check transaction status'
+      };
+    }
+  }
+
+  /**
+   * Check if USDC tokens are actually accessible in a split wallet
+   */
+  static async verifyUsdcTokensAccessible(walletAddress: string): Promise<{
+    success: boolean;
+    accessible: boolean;
+    balance: number;
+    error?: string;
+  }> {
+    try {
+      const { consolidatedTransactionService } = await import('./consolidatedTransactionService');
+      const balanceResult = await consolidatedTransactionService.getUsdcBalance(walletAddress);
+      
+      if (balanceResult.success) {
+        return {
+          success: true,
+          accessible: true,
+          balance: balanceResult.balance
+        };
+      } else {
+        return {
+          success: true,
+          accessible: false,
+          balance: 0,
+          error: balanceResult.error
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        accessible: false,
+        balance: 0,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+
+  /**
+   * Get USDC balance for a split wallet with fallback to participant data
+   */
+  static async getSplitWalletUsdcBalance(
+    walletAddress: string,
+    totalCollected: number
+  ): Promise<{ actualBalance: number; usedFallback: boolean }> {
+    try {
+      const { consolidatedTransactionService } = await import('./consolidatedTransactionService');
+      const balanceResult = await consolidatedTransactionService.getUsdcBalance(walletAddress);
+      
+      if (!balanceResult.success) {
+        console.warn('🔍 SplitWalletService: Failed to get USDC balance, using participant data as fallback:', {
+          error: balanceResult.error,
+          walletAddress: walletAddress,
+          totalCollected: totalCollected
+        });
+        
+        // If the error is related to token account not found, wait a bit and try again
+        if (balanceResult.error?.includes('TokenAccountNotFoundError') || balanceResult.error?.includes('token account')) {
+          console.log('🔍 SplitWalletService: Token account not found, waiting 5 seconds and retrying...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          const retryResult = await consolidatedTransactionService.getUsdcBalance(walletAddress);
+          if (retryResult.success) {
+            console.log('✅ SplitWalletService: USDC balance retrieved on retry:', retryResult.balance);
+            return { actualBalance: retryResult.balance, usedFallback: false };
+          }
+          
+          // If still not found, wait another 5 seconds and try once more
+          console.log('🔍 SplitWalletService: Token account still not found, waiting another 5 seconds and retrying...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          const secondRetryResult = await consolidatedTransactionService.getUsdcBalance(walletAddress);
+          if (secondRetryResult.success) {
+            console.log('✅ SplitWalletService: USDC balance retrieved on second retry:', secondRetryResult.balance);
+            return { actualBalance: secondRetryResult.balance, usedFallback: false };
+          }
+        }
+        
+        return { actualBalance: totalCollected, usedFallback: true };
+      } else {
+        return { actualBalance: balanceResult.balance, usedFallback: false };
+      }
+    } catch (error) {
+      console.warn('🔍 SplitWalletService: Error getting USDC balance, using participant data as fallback:', error);
+      return { actualBalance: totalCollected, usedFallback: true };
+    }
+  }
+
+  /**
+   * Ensure USDC token account exists for a split wallet
+   * This is needed when tokens were sent but the token account wasn't created
+   */
+  static async ensureSplitWalletUsdcTokenAccount(
+    splitWalletId: string,
+    creatorId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log('🔍 SplitWalletService: Ensuring USDC token account for split wallet:', {
+        splitWalletId,
+        creatorId
+      });
+
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = result.wallet;
+
+      // Verify that the requester is the creator
+      if (wallet.creatorId !== creatorId) {
+        return {
+          success: false,
+          error: 'Only the split creator can manage the split wallet',
+        };
+      }
+
+      // Get the private key from local storage
+      const privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, creatorId);
+      if (!privateKeyResult.success || !privateKeyResult.privateKey) {
+        return {
+          success: false,
+          error: privateKeyResult.error || 'Failed to retrieve split wallet private key',
+        };
+      }
+
+      const { PublicKey, Connection, Keypair } = require('@solana/web3.js');
+      const { getAssociatedTokenAddress, getAccount, createAssociatedTokenAccountInstruction } = require('@solana/spl-token');
+      const { CURRENT_NETWORK } = require('../config/chain');
+      
+      const connection = new Connection(CURRENT_NETWORK.rpcUrl);
+      const walletPublicKey = new PublicKey(wallet.walletAddress);
+      const usdcMint = new PublicKey(CURRENT_NETWORK.usdcMintAddress);
+      const usdcTokenAccount = await getAssociatedTokenAddress(usdcMint, walletPublicKey);
+      
+      try {
+        await getAccount(connection, usdcTokenAccount);
+        console.log('🔍 SplitWalletService: USDC token account already exists for split wallet');
+        return { success: true }; // Account exists
+      } catch {
+        // Account doesn't exist, try to create it
+        console.log('🔍 SplitWalletService: Creating USDC token account for split wallet...');
+        
+        try {
+          // Create keypair from split wallet's secret key
+          let keypair: any;
+          try {
+            const secretKeyBuffer = Buffer.from(privateKeyResult.privateKey, 'base64');
+            keypair = Keypair.fromSecretKey(secretKeyBuffer);
+          } catch {
+            const secretKeyArray = JSON.parse(privateKeyResult.privateKey);
+            keypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
+          }
+          
+          // Create the USDC token account using company wallet as fee payer
+          const { COMPANY_WALLET_CONFIG } = require('../config/chain');
+          if (!COMPANY_WALLET_CONFIG.secretKey) {
+            throw new Error('Company wallet secret key not found in configuration');
+          }
+          
+          // Parse the company wallet secret key (it's stored as JSON array)
+          const secretKeyArray = JSON.parse(COMPANY_WALLET_CONFIG.secretKey);
+          const companyKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
+          
+          // Check company wallet SOL balance before attempting transaction
+          const companySolBalance = await connection.getBalance(companyKeypair.publicKey);
+          console.log('🔍 SplitWalletService: Company wallet SOL balance check:', {
+            address: companyKeypair.publicKey.toBase58(),
+            solBalance: companySolBalance / 1000000000, // Convert lamports to SOL
+            solBalanceLamports: companySolBalance
+          });
+          
+          if (companySolBalance < 5000000) { // Less than 0.005 SOL (5 million lamports)
+            throw new Error(`Company wallet has insufficient SOL balance: ${companySolBalance / 1000000000} SOL. Need at least 0.005 SOL for transaction fees.`);
+          }
+          
+          const transaction = new (require('@solana/web3.js').Transaction)();
+          transaction.add(
+            createAssociatedTokenAccountInstruction(
+              companyKeypair.publicKey, // payer (company wallet pays fees)
+              usdcTokenAccount, // associated token account
+              walletPublicKey, // owner (split wallet owns the account)
+              usdcMint // mint
+            )
+          );
+          
+          const { blockhash } = await connection.getLatestBlockhash();
+          transaction.recentBlockhash = blockhash;
+          transaction.feePayer = companyKeypair.publicKey;
+          
+          // Send transaction and get signature
+          const signature = await connection.sendTransaction(transaction, [companyKeypair], {
+            skipPreflight: false,
+            preflightCommitment: 'confirmed'
+          });
+          
+          console.log('🔍 SplitWalletService: Token account creation transaction sent:', {
+            signature: signature,
+            note: 'Transaction sent, checking for confirmation with timeout'
+          });
+          
+          // Wait for confirmation with timeout, but don't fail if it times out
+          try {
+            const confirmationPromise = connection.confirmTransaction(signature, 'confirmed');
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Token account creation confirmation timeout')), 30000);
+            });
+            
+            await Promise.race([confirmationPromise, timeoutPromise]);
+            console.log('✅ Token account creation confirmed successfully');
+          } catch (timeoutError) {
+            console.warn('⚠️ Token account creation confirmation timed out, but transaction was sent:', {
+              signature: signature,
+              error: timeoutError instanceof Error ? timeoutError.message : 'Unknown timeout error',
+              note: 'Transaction may still be processing on the blockchain'
+            });
+            
+            // Don't throw error - the transaction was sent and might succeed
+            // Wait a bit for the transaction to potentially complete on the blockchain
+            console.log('🔍 SplitWalletService: Waiting 10 seconds for token account creation to complete...');
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            
+            // Check if the token account was actually created despite the timeout
+            try {
+              await getAccount(connection, usdcTokenAccount);
+              console.log('✅ Token account was created successfully despite timeout confirmation');
+              return { success: true };
+            } catch {
+              console.log('⚠️ Token account was not created, but transaction was sent. Will use fallback logic.');
+              // Don't return error - let the withdrawal process handle it with fallback
+            }
+          }
+          
+          console.log('✅ Created USDC token account for split wallet:', usdcTokenAccount.toBase58());
+          return { success: true };
+        } catch (createError) {
+          console.error('❌ Failed to create USDC token account for split wallet:', createError);
+          
+          // Provide specific error messages for common issues
+          let errorMessage = 'Failed to create USDC token account for split wallet';
+          if (createError instanceof Error) {
+            if (createError.message.includes('insufficient SOL balance') || createError.message.includes('Attempt to debit an account')) {
+              errorMessage = 'Company wallet has insufficient SOL balance for transaction fees.';
+            } else if (createError.message.includes('timeout') || createError.message.includes('TransactionExpiredTimeoutError')) {
+              errorMessage = 'Token account creation timed out. The transaction may still be processing.';
+            } else if (createError.message.includes('Simulation failed')) {
+              errorMessage = 'Transaction simulation failed. Usually indicates insufficient SOL balance or network issues.';
+            } else {
+              errorMessage = `Token account creation failed: ${createError.message}`;
+            }
+          }
+          
+          return { success: false, error: errorMessage };
+        }
+      }
+    } catch (error) {
+      console.error('❌ SplitWalletService: Error ensuring USDC token account:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }

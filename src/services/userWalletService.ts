@@ -180,7 +180,8 @@ export class UserWalletService {
             success: true,
             wallet: {
               address: restoreResult.wallet?.address || existingWalletAddress,
-              publicKey: restoreResult.wallet?.publicKey || user?.wallet_public_key || existingWalletAddress
+              publicKey: restoreResult.wallet?.publicKey || user?.wallet_public_key || existingWalletAddress,
+              secretKey: restoreResult.wallet?.secretKey // Include the secret key
             }
           };
         } else {
@@ -401,7 +402,8 @@ export class UserWalletService {
                 success: true,
                 wallet: {
                   address: result.address,
-                  publicKey: result.publicKey || result.address
+                  publicKey: result.publicKey || result.address,
+                  secretKey: result.secretKey // Include the secret key
                 }
               };
             }
@@ -425,7 +427,8 @@ export class UserWalletService {
               success: true,
               wallet: {
                 address: keypair.publicKey.toBase58(),
-                publicKey: keypair.publicKey.toBase58()
+                publicKey: keypair.publicKey.toBase58(),
+                secretKey: Buffer.from(keypair.secretKey).toString('base64') // Include the secret key
               }
             };
           } catch (error) {
@@ -480,7 +483,8 @@ export class UserWalletService {
               success: true,
               wallet: {
                 address: user.wallet_address,
-                publicKey: user.wallet_public_key || user.wallet_address
+                publicKey: user.wallet_public_key || user.wallet_address,
+                secretKey: restoreResult.wallet?.secretKey // Include the secret key from restore result
               }
             };
           }
@@ -848,7 +852,8 @@ export class UserWalletService {
           success: true,
           wallet: {
             address: user.wallet_address,
-            publicKey: user.wallet_public_key || user.wallet_address
+            publicKey: user.wallet_public_key || user.wallet_address,
+            secretKey: restoreResult.wallet?.secretKey // Include the secret key from restore result
           }
         };
       }

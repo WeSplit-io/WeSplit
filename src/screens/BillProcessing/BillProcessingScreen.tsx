@@ -484,7 +484,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         totalAmount: currentProcessedData.totalAmount,
         currency: currentProcessedData.currency,
         splitType: 'fair' as const,
-        status: 'active' as const,
+        status: 'pending' as const, // Split starts as pending until user confirms repartition
         creatorId: currentUser.id.toString(),
         creatorName: currentUser.name,
         participants: allParticipants.map(p => ({
