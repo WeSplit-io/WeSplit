@@ -9,33 +9,32 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
   Alert,
   StatusBar,
   TextInput,
   Modal,
   ActivityIndicator,
-  SafeAreaView,
+  Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
 import { useApp } from '../../context/AppContext';
 import { ManualBillDataProcessor, ManualBillInput } from '../../services/manualBillDataProcessor';
 import { ManualSplitCreationService } from '../../services/manualSplitCreationService';
 import { BillAnalysisData } from '../../types/billAnalysis';
 import { convertFiatToUSDC } from '../../services/fiatCurrencyService';
+import { styles } from './styles';
 
-// Category options with text labels
+// Category options with images
 const CATEGORIES = [
-  { id: 'trip', name: 'Travel & Transport', color: '#A5EA15' },
-  { id: 'food', name: 'Food & Drinks', color: '#FFB800' },
-  { id: 'home', name: 'Housing & Utilities', color: '#00BFA5' },
-  { id: 'event', name: 'Events & Entertainment', color: '#FF6B35' },
-  { id: 'rocket', name: 'Shopping & Essentials', color: '#9C27B0' },
+  { id: 'trip', name: 'Trip', color: '#A5EA15', image: require('../../../assets/trip-icon-black.png') },
+  { id: 'food', name: 'Food', color: '#FFB800', image: require('../../../assets/food-icon-black.png') },
+  { id: 'home', name: 'Home', color: '#00BFA5', image: require('../../../assets/house-icon-black.png') },
+  { id: 'event', name: 'Event', color: '#FF6B35', image: require('../../../assets/event-icon-black.png') },
+  { id: 'rocket', name: 'Rocket', color: '#9C27B0', image: require('../../../assets/rocket-icon-black.png') },
 ];
 
 // Currency options
@@ -51,6 +50,11 @@ interface ManualBillCreationScreenProps {
   route?: {
     params?: {
       onBillCreated?: (billData: any) => void;
+      // Edit mode parameters
+      isEditing?: boolean;
+      existingBillData?: any;
+      existingSplitId?: string;
+      onBillUpdated?: (billData: any) => void;
     };
   };
 }
@@ -59,12 +63,38 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
   const { state } = useApp();
   const { currentUser } = state;
 
-  // Form state
-  const [selectedCategory, setSelectedCategory] = useState('trip');
-  const [billName, setBillName] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [amount, setAmount] = useState('');
-  const [selectedCurrency, setSelectedCurrency] = useState(CURRENCIES[0]);
+  // Extract edit mode parameters
+  const { 
+    isEditing = false, 
+    existingBillData, 
+    existingSplitId, 
+    onBillUpdated 
+  } = route?.params || {};
+
+  // Form state - initialize with existing data if editing
+  const [selectedCategory, setSelectedCategory] = useState(
+    isEditing && existingBillData?.category 
+      ? existingBillData.category.toLowerCase()
+      : 'trip'
+  );
+  const [billName, setBillName] = useState(
+    isEditing && existingBillData?.title ? existingBillData.title : ''
+  );
+  const [selectedDate, setSelectedDate] = useState(
+    isEditing && existingBillData?.date 
+      ? new Date(existingBillData.date)
+      : new Date()
+  );
+  const [amount, setAmount] = useState(
+    isEditing && existingBillData?.totalAmount 
+      ? existingBillData.totalAmount.toString()
+      : ''
+  );
+  const [selectedCurrency, setSelectedCurrency] = useState(
+    isEditing && existingBillData?.currency
+      ? CURRENCIES.find(c => c.code === existingBillData.currency) || CURRENCIES[0]
+      : CURRENCIES[0]
+  );
   const [convertedAmount, setConvertedAmount] = useState<number | null>(null);
   const [isConverting, setIsConverting] = useState(false);
 
@@ -132,10 +162,14 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
 
   // Handle date change
   const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
     if (selectedDate) {
       setSelectedDate(selectedDate);
     }
+  };
+
+  // Handle date picker close
+  const handleDatePickerClose = () => {
+    setShowDatePicker(false);
   };
 
   // Handle currency selection
@@ -151,7 +185,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
     clearValidationErrors();
   };
 
-  // Handle bill creation
+  // Handle bill creation/update
   const handleCreateBill = async () => {
     if (!validateForm()) {
       return;
@@ -194,7 +228,9 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
         currency: 'USDC', // Always use USDC for the final amount
         date: selectedDate,
         location: '', // Could be enhanced with location input
-        description: `Manual bill created on ${selectedDate.toLocaleDateString()} (${amount} ${selectedCurrency.code} converted to ${convertedAmount.toFixed(4)} USDC)`,
+        description: isEditing 
+          ? `Manual bill updated on ${selectedDate.toLocaleDateString()}`
+          : `Manual bill created on ${selectedDate.toLocaleDateString()} (${amount} ${selectedCurrency.code} converted to ${convertedAmount.toFixed(4)} USDC)`,
       };
 
       console.log('🔄 ManualBillCreationScreen: Manual bill input created:', manualBillInput);
@@ -226,60 +262,80 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
         currentUser
       );
 
-      console.log('✅ ManualBillCreationScreen: Bill processed successfully:', {
-        title: processedBillData.title,
-        totalAmount: processedBillData.totalAmount,
-        currency: processedBillData.currency,
-        participantsCount: processedBillData.participants.length,
-        itemsCount: processedBillData.items.length
-      });
-
-      // Create the split and wallet directly
-      const splitCreationResult = await ManualSplitCreationService.createManualSplit({
-        processedBillData,
-        currentUser,
-        billName: processedBillData.title,
-        totalAmount: processedBillData.totalAmount.toString(),
-        participants: processedBillData.participants,
-        selectedSplitType: undefined // Let user choose in SplitDetails
-      });
-
-      if (!splitCreationResult.success) {
-        throw new Error(splitCreationResult.error || 'Failed to create split');
-      }
-
-      console.log('✅ ManualBillCreationScreen: Split created successfully:', {
-        splitId: splitCreationResult.split?.id,
-        title: splitCreationResult.split?.title
-      });
-
-      // Navigate to split details with the created split data
-      navigation.navigate('SplitDetails', {
-        splitData: splitCreationResult.split,
-        splitId: splitCreationResult.split?.id,
-        splitWallet: splitCreationResult.splitWallet, // Pass the wallet information
-        billData: {
+      if (isEditing) {
+        console.log('✅ ManualBillCreationScreen: Bill updated successfully:', {
           title: processedBillData.title,
           totalAmount: processedBillData.totalAmount,
           currency: processedBillData.currency,
-          merchant: processedBillData.merchant,
-          date: processedBillData.date,
-        },
-        processedBillData: processedBillData,
-        analysisResult: {
-          success: true,
-          data: manualBillData,
-          processingTime: 0,
-          confidence: 1.0,
-          rawText: `Manual bill: ${billName} - ${amount} ${selectedCurrency.code} (${convertedAmount.toFixed(4)} USDC)`,
-        },
-        isNewBill: false, // Not a new bill since we already created the split
-        isManualCreation: false, // Not manual creation since we already processed it
-      });
+        });
+
+        // Call the update callback if provided
+        if (onBillUpdated) {
+          onBillUpdated({
+            ...processedBillData,
+            existingSplitId,
+            isUpdated: true,
+          });
+        }
+
+        // Navigate back or to appropriate screen
+        navigation.goBack();
+      } else {
+        console.log('✅ ManualBillCreationScreen: Bill processed successfully:', {
+          title: processedBillData.title,
+          totalAmount: processedBillData.totalAmount,
+          currency: processedBillData.currency,
+          participantsCount: processedBillData.participants.length,
+          itemsCount: processedBillData.items.length
+        });
+
+        // Create the split and wallet directly
+        const splitCreationResult = await ManualSplitCreationService.createManualSplit({
+          processedBillData,
+          currentUser,
+          billName: processedBillData.title,
+          totalAmount: processedBillData.totalAmount.toString(),
+          participants: processedBillData.participants,
+          selectedSplitType: undefined // Let user choose in SplitDetails
+        });
+
+        if (!splitCreationResult.success) {
+          throw new Error(splitCreationResult.error || 'Failed to create split');
+        }
+
+        console.log('✅ ManualBillCreationScreen: Split created successfully:', {
+          splitId: splitCreationResult.split?.id,
+          title: splitCreationResult.split?.title
+        });
+
+        // Navigate to split details with the created split data
+        navigation.navigate('SplitDetails', {
+          splitData: splitCreationResult.split,
+          splitId: splitCreationResult.split?.id,
+          splitWallet: splitCreationResult.splitWallet, // Pass the wallet information
+          billData: {
+            title: processedBillData.title,
+            totalAmount: processedBillData.totalAmount,
+            currency: processedBillData.currency,
+            merchant: processedBillData.merchant,
+            date: processedBillData.date,
+          },
+          processedBillData: processedBillData,
+          analysisResult: {
+            success: true,
+            data: manualBillData,
+            processingTime: 0,
+            confidence: 1.0,
+            rawText: `Manual bill: ${billName} - ${amount} ${selectedCurrency.code} (${convertedAmount.toFixed(4)} USDC)`,
+          },
+          isNewBill: false, // Not a new bill since we already created the split
+          isManualCreation: false, // Not manual creation since we already processed it
+        });
+      }
 
     } catch (error) {
-      console.error('❌ ManualBillCreationScreen: Error creating bill:', error);
-      Alert.alert('Error', `Failed to create bill: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
+      console.error('❌ ManualBillCreationScreen: Error processing bill:', error);
+      Alert.alert('Error', `Failed to ${isEditing ? 'update' : 'create'} bill: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
     } finally {
       setIsCreating(false);
     }
@@ -304,10 +360,14 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <Image
+            source={require('../../../assets/chevron-left.png')}
+            style={styles.backIcon}
+            resizeMode="contain"
+          />
         </TouchableOpacity>
         
-        <Text style={styles.title}>Create Bill</Text>
+        <Text style={styles.title}>{isEditing ? 'Edit Bill' : 'Create Bill'}</Text>
         
         <View style={styles.headerSpacer} />
       </View>
@@ -320,20 +380,29 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
             {CATEGORIES.map((category) => (
               <TouchableOpacity
                 key={category.id}
-                style={[
-                  styles.categoryButton,
-                  selectedCategory === category.id && {
-                    backgroundColor: category.color,
-                  },
-                ]}
+                style={styles.categoryButton}
                 onPress={() => handleCategorySelect(category.id)}
               >
-                <Text style={[
-                  styles.categoryText,
-                  selectedCategory === category.id && styles.categoryTextSelected
-                ]}>
-                  {category.name}
-                </Text>
+                {selectedCategory === category.id ? (
+                  <LinearGradient
+                    colors={[colors.green, colors.greenBlue]}
+                    style={styles.categoryGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Image
+                      source={category.image}
+                      style={styles.categoryIconSelected}
+                      resizeMode="contain"
+                    />
+                  </LinearGradient>
+                ) : (
+                  <Image
+                    source={category.image}
+                    style={styles.categoryIcon}
+                    resizeMode="contain"
+                  />
+                )}
               </TouchableOpacity>
             ))}
           </View>
@@ -353,7 +422,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
               clearValidationErrors();
             }}
             placeholder="Expense Name"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.white70}
           />
           {validationErrors.name && (
             <Text style={styles.errorText}>{validationErrors.name}</Text>
@@ -368,7 +437,11 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
             onPress={() => setShowDatePicker(true)}
           >
             <Text style={styles.dateText}>{formatDate(selectedDate)}</Text>
-            <Text style={styles.calendarIcon}>📅</Text>
+            <Image
+              source={require('../../../assets/calendar-icon.png')}
+              style={styles.calendarIcon}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         </View>
 
@@ -387,7 +460,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
                 clearValidationErrors();
               }}
               placeholder="0.00"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.white70}
               keyboardType="numeric"
             />
             <TouchableOpacity
@@ -439,6 +512,8 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
                 : [colors.green, colors.greenBlue]
             }
             style={styles.buttonGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
             {isCreating ? (
               <ActivityIndicator color={colors.black} />
@@ -447,21 +522,42 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
             ) : !convertedAmount || convertedAmount <= 0 ? (
               <Text style={[styles.buttonText, { color: colors.textSecondary }]}>Enter Amount</Text>
             ) : (
-              <Text style={styles.buttonText}>Continue</Text>
+              <Text style={styles.buttonText}>{isEditing ? 'Update Bill' : 'Continue'}</Text>
             )}
           </LinearGradient>
         </TouchableOpacity>
       </View>
 
       {/* Date Picker Modal */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-        />
-      )}
+      <Modal
+        visible={showDatePicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleDatePickerClose}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.datePickerModalContent}>
+            <View style={styles.datePickerHeader}>
+              <Text style={styles.modalTitle}>Select Date</Text>
+              <TouchableOpacity
+                onPress={handleDatePickerClose}
+                style={styles.datePickerCloseButton}
+              >
+                <Text style={styles.datePickerCloseText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+            <DateTimePicker
+              value={selectedDate}
+              mode="date"
+              display="spinner"
+              onChange={handleDateChange}
+              style={styles.datePicker}
+              textColor={colors.white}
+              themeVariant="dark"
+            />
+          </View>
+        </View>
+      </Modal>
 
       {/* Currency Picker Modal */}
       <Modal
@@ -499,233 +595,5 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.black,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backIcon: {
-    fontSize: 24,
-    color: colors.white,
-  },
-  title: {
-    ...typography.textStyles.navTitle,
-    color: colors.white,
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.md,
-  },
-  section: {
-    marginVertical: spacing.md,
-  },
-  sectionLabel: {
-    ...typography.textStyles.label,
-    color: colors.white,
-    marginBottom: spacing.sm,
-  },
-  categoryContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  categoryButton: {
-    flex: 1,
-    height: spacing.buttonHeight,
-    borderRadius: spacing.radiusMd,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-    marginHorizontal: spacing.xs,
-  },
-  categoryText: {
-    ...typography.textStyles.buttonSmall,
-    color: colors.textLightSecondary,
-    textAlign: 'center',
-  },
-  categoryTextSelected: {
-    color: colors.white,
-  },
-  textInput: {
-    backgroundColor: colors.surface,
-    borderRadius: spacing.radiusMd,
-    paddingHorizontal: spacing.inputPaddingHorizontal,
-    paddingVertical: spacing.inputPaddingVertical,
-    color: colors.white,
-    ...typography.textStyles.body,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-    height: spacing.inputHeight,
-  },
-  inputError: {
-    borderColor: colors.error,
-  },
-  errorText: {
-    color: colors.error,
-    ...typography.textStyles.caption,
-    marginTop: spacing.xs,
-  },
-  dateInput: {
-    backgroundColor: colors.surface,
-    borderRadius: spacing.radiusMd,
-    paddingHorizontal: spacing.inputPaddingHorizontal,
-    paddingVertical: spacing.inputPaddingVertical,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-    height: spacing.inputHeight,
-  },
-  dateText: {
-    color: colors.white,
-    ...typography.textStyles.body,
-  },
-  calendarIcon: {
-    fontSize: spacing.iconSizeSmall,
-    color: colors.textLightSecondary,
-  },
-  amountContainer: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  amountInput: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: spacing.radiusMd,
-    paddingHorizontal: spacing.inputPaddingHorizontal,
-    paddingVertical: spacing.inputPaddingVertical,
-    color: colors.white,
-    ...typography.textStyles.body,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-    height: spacing.inputHeight,
-  },
-  currencyButton: {
-    backgroundColor: colors.surface,
-    borderRadius: spacing.radiusMd,
-    paddingHorizontal: spacing.inputPaddingHorizontal,
-    paddingVertical: spacing.inputPaddingVertical,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-    minWidth: 100,
-    height: spacing.inputHeight,
-  },
-  currencyText: {
-    color: colors.white,
-    ...typography.textStyles.body,
-    marginRight: spacing.xs,
-  },
-  dropdownIcon: {
-    color: colors.textLightSecondary,
-    fontSize: spacing.iconSizeSmall,
-  },
-  totalContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: spacing.borderWidthThin,
-    borderTopColor: colors.border,
-  },
-  totalLabel: {
-    ...typography.textStyles.label,
-    color: colors.white,
-  },
-  totalValueContainer: {
-    alignItems: 'flex-end',
-  },
-  totalValue: {
-    ...typography.textStyles.amountMedium,
-    color: colors.green,
-  },
-  totalValuePlaceholder: {
-    ...typography.textStyles.body,
-    color: colors.textLightSecondary,
-  },
-  buttonContainer: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  continueButton: {
-    borderRadius: spacing.radiusMd,
-    overflow: 'hidden',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonGradient: {
-    paddingVertical: spacing.buttonPaddingVertical,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: spacing.buttonHeight,
-  },
-  buttonText: {
-    ...typography.textStyles.button,
-    color: colors.black,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: colors.blackOverlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderRadius: spacing.radiusLg,
-    padding: spacing.lg,
-    width: '80%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    ...typography.textStyles.h6,
-    color: colors.white,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  currencyOption: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderRadius: spacing.radiusSm,
-    marginBottom: spacing.sm,
-  },
-  currencyOptionSelected: {
-    backgroundColor: colors.green + '20',
-  },
-  currencyOptionText: {
-    ...typography.textStyles.body,
-    color: colors.white,
-  },
-  modalCloseButton: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-  },
-  modalCloseText: {
-    ...typography.textStyles.body,
-    color: colors.textLightSecondary,
-  },
-});
 
 export default ManualBillCreationScreen;
