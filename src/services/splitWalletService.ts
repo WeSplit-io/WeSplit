@@ -1139,6 +1139,34 @@ export class SplitWalletService {
         };
       }
 
+      // Verify the transaction actually succeeded by checking the split wallet balance
+      console.log('🔍 SplitWalletService: Verifying transaction by checking split wallet balance...');
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for blockchain propagation
+      
+      const { consolidatedTransactionService } = await import('./consolidatedTransactionService');
+      const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
+      
+      if (!balanceResult.success) {
+        console.warn('🔍 SplitWalletService: Could not verify balance, but transaction was confirmed. Proceeding with caution.');
+      } else {
+        console.log('🔍 SplitWalletService: Split wallet balance after payment:', {
+          balance: balanceResult.balance,
+          expectedIncrease: roundedAmount,
+          walletAddress: wallet.walletAddress
+        });
+        
+        // If balance is still effectively 0 after confirmed transaction, there might be an issue
+        const minimumThreshold = 0.001; // 0.001 USDC minimum threshold
+        if (balanceResult.balance < minimumThreshold) {
+          console.error('🔍 SplitWalletService: WARNING - Split wallet balance is below threshold after confirmed transaction. This may indicate a problem with the USDC transfer.', {
+            balance: balanceResult.balance,
+            threshold: minimumThreshold,
+            expectedIncrease: roundedAmount
+          });
+          // Don't fail the transaction, but log the issue for investigation
+        }
+      }
+
       // Update participant payment status
       const updatedAmountPaid = participant.amountPaid + roundedAmount;
       const newStatus = updatedAmountPaid >= participant.amountOwed ? 'paid' : 'locked';
@@ -1504,7 +1532,34 @@ export class SplitWalletService {
       
       // Check if we have collected the full amount (with small tolerance for floating point precision)
       const tolerance = 0.000001; // 1 micro-USDC tolerance
+      const minimumThreshold = 0.001; // 0.001 USDC minimum threshold for "no funds"
+      
       if (actualBalance < (wallet.totalAmount - tolerance)) {
+        // If balance is effectively 0 (below minimum threshold) but participants are marked as paid, this indicates a synchronization issue
+        if (actualBalance < minimumThreshold && totalCollected > 0) {
+          console.error('🔍 SplitWalletService: CRITICAL ISSUE - Participants marked as paid but split wallet balance is 0. This indicates a transaction synchronization problem.');
+          
+          // Try to wait a bit longer and check again (blockchain propagation delay)
+          console.log('🔍 SplitWalletService: Waiting 10 seconds for blockchain propagation and retrying balance check...');
+          await new Promise(resolve => setTimeout(resolve, 10000));
+          
+          const retryBalanceResult = await this.getSplitWalletUsdcBalance(wallet.walletAddress, totalCollected);
+          if (retryBalanceResult.actualBalance >= minimumThreshold) {
+            console.log('🔍 SplitWalletService: Balance found on retry:', retryBalanceResult.actualBalance);
+            // Use the retry balance
+            const retryWithdrawalAmount = this.roundUsdcAmount(retryBalanceResult.actualBalance);
+            if (retryBalanceResult.actualBalance >= (wallet.totalAmount - tolerance)) {
+              // Proceed with withdrawal using retry balance
+              return await this.performWithdrawal(wallet, retryWithdrawalAmount, recipientAddress, description);
+            }
+          }
+          
+          return {
+            success: false,
+            error: `Transaction synchronization issue detected. Participants are marked as paid (${totalCollected} USDC) but split wallet balance is below ${minimumThreshold} USDC (actual: ${actualBalance} USDC). This may be due to pending transactions or blockchain delays. Please wait a few minutes and try again, or contact support if the issue persists.`,
+          };
+        }
+        
         return {
           success: false,
           error: `Insufficient funds collected. Required: ${wallet.totalAmount} USDC, Available: ${actualBalance} USDC`,
@@ -1530,6 +1585,293 @@ export class SplitWalletService {
       }
 
       // Send payment from split wallet to recipient address
+      return await this.performWithdrawal(wallet, withdrawalAmount, recipientAddress, description);
+
+    } catch (error) {
+      logger.error('Failed to extract Fair Split funds', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Debug method to manually check USDC balance with multiple approaches
+   * This helps identify if there are issues with token account derivation or balance queries
+   */
+  static async debugUsdcBalance(walletAddress: string): Promise<{
+    success: boolean;
+    results: any;
+    error?: string;
+  }> {
+    try {
+      console.log('🔍 SplitWalletService: Starting USDC balance debug for wallet:', walletAddress);
+      
+      const { Connection, PublicKey } = await import('@solana/web3.js');
+      const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token');
+      const { CURRENT_NETWORK } = await import('../config/chain');
+      
+      const connection = new Connection(CURRENT_NETWORK.rpcUrl);
+      const walletPublicKey = new PublicKey(walletAddress);
+      const usdcMint = new PublicKey(CURRENT_NETWORK.usdcMintAddress);
+      
+      const results: any = {
+        walletAddress,
+        usdcMint: usdcMint.toBase58(),
+        timestamp: new Date().toISOString()
+      };
+      
+      // Method 1: Standard token account derivation
+      try {
+        const usdcTokenAccount = await getAssociatedTokenAddress(usdcMint, walletPublicKey);
+        results.method1 = {
+          tokenAccount: usdcTokenAccount.toBase58(),
+          approach: 'getAssociatedTokenAddress'
+        };
+        
+        try {
+          const accountInfo = await getAccount(connection, usdcTokenAccount);
+          results.method1.balance = Number(accountInfo.amount) / 1000000;
+          results.method1.rawAmount = accountInfo.amount.toString();
+          results.method1.success = true;
+        } catch (error) {
+          results.method1.error = error instanceof Error ? error.message : String(error);
+          results.method1.success = false;
+        }
+      } catch (error) {
+        results.method1 = {
+          error: error instanceof Error ? error.message : String(error),
+          success: false
+        };
+      }
+      
+      // Method 2: Direct account info query
+      try {
+        const usdcTokenAccount = await getAssociatedTokenAddress(usdcMint, walletPublicKey);
+        const accountInfo = await connection.getAccountInfo(usdcTokenAccount);
+        
+        results.method2 = {
+          tokenAccount: usdcTokenAccount.toBase58(),
+          approach: 'getAccountInfo',
+          exists: !!accountInfo,
+          owner: accountInfo?.owner.toBase58(),
+          lamports: accountInfo?.lamports,
+          dataLength: accountInfo?.data.length
+        };
+        
+        if (accountInfo && accountInfo.data.length > 0) {
+          // Try to parse the token account data manually
+          try {
+            const data = accountInfo.data;
+            // Token account data structure: mint (32) + owner (32) + amount (8) + ...
+            if (data.length >= 72) {
+              const amountBuffer = data.slice(64, 72);
+              const amount = amountBuffer.readBigUInt64LE(0);
+              results.method2.manualBalance = Number(amount) / 1000000;
+              results.method2.manualRawAmount = amount.toString();
+            }
+          } catch (parseError) {
+            results.method2.parseError = parseError instanceof Error ? parseError.message : String(parseError);
+          }
+        }
+        
+        results.method2.success = true;
+      } catch (error) {
+        results.method2 = {
+          error: error instanceof Error ? error.message : String(error),
+          success: false
+        };
+      }
+      
+      // Method 3: Check all token accounts for this wallet
+      try {
+        const tokenAccounts = await connection.getTokenAccountsByOwner(walletPublicKey, {
+          programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
+        });
+        
+        results.method3 = {
+          approach: 'getTokenAccountsByOwner',
+          totalAccounts: tokenAccounts.value.length,
+          accounts: tokenAccounts.value.map(account => ({
+            pubkey: account.pubkey.toBase58(),
+            account: {
+              owner: account.account.owner.toBase58(),
+              lamports: account.account.lamports,
+              dataLength: account.account.data.length
+            }
+          }))
+        };
+        
+        // Check if any of these accounts have USDC
+        for (const tokenAccount of tokenAccounts.value) {
+          try {
+            const accountInfo = await getAccount(connection, tokenAccount.pubkey);
+            if (accountInfo.mint.equals(usdcMint)) {
+              results.method3.usdcAccount = {
+                pubkey: tokenAccount.pubkey.toBase58(),
+                balance: Number(accountInfo.amount) / 1000000,
+                rawAmount: accountInfo.amount.toString(),
+                owner: accountInfo.owner.toBase58()
+              };
+              break;
+            }
+          } catch (error) {
+            // Skip invalid accounts
+          }
+        }
+        
+        results.method3.success = true;
+      } catch (error) {
+        results.method3 = {
+          error: error instanceof Error ? error.message : String(error),
+          success: false
+        };
+      }
+      
+      console.log('🔍 SplitWalletService: USDC balance debug completed:', results);
+      
+      return {
+        success: true,
+        results
+      };
+    } catch (error) {
+      console.error('🔍 SplitWalletService: USDC balance debug failed:', error);
+      return {
+        success: false,
+        results: {},
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Repair split wallet data when synchronization issues are detected
+   * This method can fix cases where participants are marked as paid but funds aren't actually in the wallet
+   */
+  static async repairSplitWalletSynchronization(
+    splitWalletId: string,
+    creatorId: string
+  ): Promise<{ success: boolean; repaired: boolean; error?: string }> {
+    try {
+      console.log('🔧 SplitWalletService: Starting split wallet synchronization repair...', {
+        splitWalletId,
+        creatorId
+      });
+
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          repaired: false,
+          error: result.error || 'Split wallet not found'
+        };
+      }
+
+      const wallet = result.wallet;
+
+      // Verify that the requester is the creator
+      if (wallet.creatorId !== creatorId) {
+        return {
+          success: false,
+          repaired: false,
+          error: 'Only the split creator can repair split wallet data'
+        };
+      }
+
+      // Get the actual on-chain balance
+      const { actualBalance, usedFallback } = await this.getSplitWalletUsdcBalance(wallet.walletAddress, 0);
+      const totalCollected = wallet.participants.reduce((sum, p) => sum + p.amountPaid, 0);
+
+      console.log('🔧 SplitWalletService: Synchronization analysis:', {
+        actualBalance,
+        totalCollected,
+        usedFallback,
+        participants: wallet.participants.map(p => ({
+          userId: p.userId,
+          name: p.name,
+          amountOwed: p.amountOwed,
+          amountPaid: p.amountPaid,
+          status: p.status
+        }))
+      });
+
+      // Check if there's a synchronization issue
+      const minimumThreshold = 0.001;
+      if (actualBalance < minimumThreshold && totalCollected > 0) {
+        console.log('🔧 SplitWalletService: Synchronization issue detected, attempting repair...');
+
+        // Option 1: Reset all participants to unpaid status
+        // This allows them to retry their payments
+        const repairedParticipants = wallet.participants.map(p => ({
+          ...p,
+          amountPaid: 0,
+          status: 'locked' as const,
+          transactionSignature: undefined,
+          paidAt: undefined
+        }));
+
+        // Update the wallet with repaired participant data
+        const docId = wallet.firebaseDocId || splitWalletId;
+        await updateDoc(doc(db, 'splitWallets', docId), {
+          participants: repairedParticipants,
+          updatedAt: new Date().toISOString(),
+        });
+
+        console.log('🔧 SplitWalletService: Split wallet data repaired successfully', {
+          participantsReset: repairedParticipants.length,
+          totalAmount: wallet.totalAmount
+        });
+
+        return {
+          success: true,
+          repaired: true
+        };
+      } else if (actualBalance >= minimumThreshold) {
+        console.log('🔧 SplitWalletService: No synchronization issue detected, balance is sufficient');
+        return {
+          success: true,
+          repaired: false
+        };
+      } else {
+        console.log('🔧 SplitWalletService: No participants have paid, no repair needed');
+        return {
+          success: true,
+          repaired: false
+        };
+      }
+    } catch (error) {
+      console.error('🔧 SplitWalletService: Error repairing split wallet synchronization:', error);
+      return {
+        success: false,
+        repaired: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Perform the actual withdrawal transaction
+   */
+  private static async performWithdrawal(
+    wallet: SplitWallet,
+    withdrawalAmount: number,
+    recipientAddress: string,
+    description?: string
+  ): Promise<PaymentResult> {
+    try {
+      const { consolidatedTransactionService } = await import('./consolidatedTransactionService');
+      
+      // Get the private key from local storage
+      const privateKeyResult = await this.getSplitWalletPrivateKey(wallet.id, wallet.creatorId);
+      if (!privateKeyResult.success || !privateKeyResult.privateKey) {
+        return {
+          success: false,
+          error: privateKeyResult.error || 'Failed to retrieve split wallet private key',
+        };
+      }
+
+      // Send payment from split wallet to recipient address
       const transactionResult = await consolidatedTransactionService.sendUsdcFromSpecificWallet(
         wallet.walletAddress, // Split wallet address (source)
         privateKeyResult.privateKey, // Split wallet's secret key from local storage
@@ -1547,18 +1889,18 @@ export class SplitWalletService {
       }
 
       // Update wallet status to completed
-      const docId = wallet.firebaseDocId || splitWalletId;
+      const docId = wallet.firebaseDocId || wallet.id;
       await updateDoc(doc(db, 'splitWallets', docId), {
         status: 'completed',
         updatedAt: new Date().toISOString(),
       });
 
       logger.info('Fair Split funds extracted successfully', {
-        splitWalletId,
+        splitWalletId: wallet.id,
         recipientAddress,
         amount: withdrawalAmount,
         transactionSignature: transactionResult.signature,
-        creatorId
+        creatorId: wallet.creatorId
       }, 'SplitWalletService');
 
       // Send completion notifications to all participants
@@ -1569,9 +1911,8 @@ export class SplitWalletService {
         transactionSignature: transactionResult.signature,
         amount: withdrawalAmount,
       };
-
     } catch (error) {
-      logger.error('Failed to extract Fair Split funds', error, 'SplitWalletService');
+      logger.error('Failed to perform withdrawal', error, 'SplitWalletService');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',

@@ -473,9 +473,9 @@ class ConsolidatedTransactionService {
       const toPublicKey = new PublicKey(params.to);
       
       // Recipient gets the full amount
-      const recipientAmountInSmallestUnit = Math.round(recipientAmount * 1_000_000); // USDC has 6 decimals
+      const recipientAmountInSmallestUnit = Math.floor(recipientAmount * 1_000_000 + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
       // Company fee amount
-      const companyFeeAmount = Math.round(companyFee * 1_000_000); // USDC has 6 decimals
+      const companyFeeAmount = Math.floor(companyFee * 1_000_000 + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
 
       // Use company wallet for fees if configured, otherwise use user wallet
       const feePayerPublicKey = COMPANY_WALLET_CONFIG.useUserWalletForFees 
@@ -1028,8 +1028,24 @@ class ConsolidatedTransactionService {
       console.log('🔗 ConsolidatedTransactionService: Token account derivation:', {
         walletAddress,
         usdcMint: usdcMint.toBase58(),
+        usdcMintSource: 'USDC_CONFIG.mintAddress',
+        networkName: CURRENT_NETWORK.name,
         usdcTokenAccount: usdcTokenAccount.toBase58()
       });
+      
+      // Additional debugging: Check if the token account exists and get more details
+      try {
+        const accountInfo = await connection.getAccountInfo(usdcTokenAccount);
+        console.log('🔗 ConsolidatedTransactionService: Token account info:', {
+          exists: !!accountInfo,
+          owner: accountInfo?.owner.toBase58(),
+          executable: accountInfo?.executable,
+          lamports: accountInfo?.lamports,
+          dataLength: accountInfo?.data.length
+        });
+      } catch (infoError) {
+        console.log('🔗 ConsolidatedTransactionService: Could not get account info:', infoError);
+      }
       
       try {
         const accountInfo = await getAccount(connection, usdcTokenAccount);
@@ -1294,21 +1310,19 @@ class ConsolidatedTransactionService {
       }
 
       // Create a direct Solana transaction with multiple RPC endpoints for better reliability
-      const rpcEndpoints = [
-        process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
-        'https://solana-api.projectserum.com',
-        'https://rpc.ankr.com/solana'
-      ];
+      const rpcEndpoints = CURRENT_NETWORK.rpcEndpoints || [CURRENT_NETWORK.rpcUrl];
       
-      let connection = new Connection(rpcEndpoints[0], 'confirmed');
+      let connection = new Connection(rpcEndpoints[0], CURRENT_NETWORK.commitment);
       
-      // Get the wallet's USDC token account - use the same mint that was used when tokens were sent
-      const usdcMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // Mainnet USDC mint
+      // Get the wallet's USDC token account - use the configured mint address
+      const usdcMint = new PublicKey(USDC_CONFIG.mintAddress); // Use configured USDC mint
       const walletUsdcAccount = await getAssociatedTokenAddress(usdcMint, walletKeypair.publicKey);
       const recipientUsdcAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(toAddress));
       
       console.log('🔗 ConsolidatedTransactionService: Token account derivation:', {
         usdcMint: usdcMint.toBase58(),
+        usdcMintSource: 'USDC_CONFIG.mintAddress',
+        networkName: CURRENT_NETWORK.name,
         walletPublicKey: walletKeypair.publicKey.toBase58(),
         walletUsdcAccount: walletUsdcAccount.toBase58(),
         recipientPublicKey: toAddress,
@@ -1364,6 +1378,15 @@ class ConsolidatedTransactionService {
         const requiredAmount = amount * 1000000;
         const availableAmount = Number(walletAccount.amount);
         const bufferAmount = 1; // 1 unit buffer (0.000001 USDC)
+        const minimumThreshold = 1000; // 0.001 USDC minimum threshold (1000 units)
+        
+        // Check if wallet has any meaningful balance
+        if (availableAmount < minimumThreshold) {
+          return {
+            success: false,
+            error: `Split wallet has insufficient USDC balance. Required: ${amount} USDC, Available: ${(availableAmount / 1000000).toFixed(6)} USDC (below ${(minimumThreshold / 1000000).toFixed(3)} USDC threshold)`
+          };
+        }
         
         if (availableAmount < requiredAmount) {
           return {

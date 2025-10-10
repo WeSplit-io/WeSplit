@@ -4,11 +4,12 @@
 
 /**
  * Round USDC amount to proper precision (6 decimal places)
- * Uses floor instead of round to avoid rounding up beyond available balance
+ * Uses proper rounding to avoid floating point precision issues
  * This ensures consistency across all services
  */
 export function roundUsdcAmount(amount: number): number {
-  return Math.floor(amount * 1000000) / 1000000;
+  // Use proper rounding to avoid floating point precision issues
+  return Math.round(amount * 1000000) / 1000000;
 }
 
 /**
@@ -62,7 +63,7 @@ export function validateAmountSum(amounts: number[], expectedTotal: number, tole
  * @returns Amount in smallest USDC unit (6 decimals)
  */
 export function usdcToSmallestUnit(usdcAmount: number): number {
-  return Math.floor(usdcAmount * 1000000);
+  return Math.floor(usdcAmount * 1000000 + 0.5);
 }
 
 /**

@@ -624,7 +624,7 @@ class InternalTransferService {
       }
 
       // Add USDC transfer instruction for recipient (full amount)
-      const transferAmount = Math.floor(recipientAmount * Math.pow(10, 6)); // USDC has 6 decimals
+      const transferAmount = Math.floor(recipientAmount * Math.pow(10, 6) + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
       logger.info('Adding USDC transfer instruction for recipient', { 
         transferAmount, 
         recipientAmount,
@@ -647,7 +647,7 @@ class InternalTransferService {
 
       // Add company fee transfer instruction to admin wallet
       if (companyFee > 0) {
-        const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6)); // USDC has 6 decimals
+        const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6) + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
         
         // Get company wallet's USDC token account
         const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(COMPANY_WALLET_CONFIG.address));
@@ -1404,7 +1404,16 @@ class InternalTransferService {
         }
 
         // Add USDC transfer instruction (full amount to recipient)
-        const transferAmount = Math.floor(recipientAmount * 1000000); // USDC has 6 decimals
+        // Use precise conversion to avoid floating point issues
+        const transferAmount = Math.floor(recipientAmount * 1000000 + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
+        
+        console.log('🔍 USDC Transfer Amount Conversion:', {
+          recipientAmount,
+          rawCalculation: recipientAmount * 1000000,
+          transferAmount,
+          expectedRaw: 0.0116 * 1000000,
+          difference: Math.abs(transferAmount - (0.0116 * 1000000))
+        });
         transaction.add(
           createTransferInstruction(
             fromTokenAccount,
@@ -1423,7 +1432,7 @@ class InternalTransferService {
             new PublicKey(COMPANY_WALLET_CONFIG.address)
           );
 
-          const companyFeeAmount = Math.floor(companyFee * 1000000); // USDC has 6 decimals
+          const companyFeeAmount = Math.floor(companyFee * 1000000 + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
           transaction.add(
             createTransferInstruction(
               fromTokenAccount,
@@ -1604,16 +1613,9 @@ class InternalTransferService {
             } catch (confirmError) {
               console.warn(`⚠️ Transaction confirmation failed:`, (confirmError as Error).message);
               
-              // If confirmation fails, the transaction might still succeed
-              // Check if we have a signature from the send step
-              if (signature) {
-                console.log(`📤 Transaction was sent with signature: ${signature}, but confirmation failed`);
-                // Transaction was sent successfully, just confirmation timed out
-                // This is acceptable for split wallet funding
-              } else {
-                // No signature means the send itself failed
-                throw confirmError;
-              }
+              // For split wallet payments, we need strict confirmation
+              // Don't accept transactions that haven't been confirmed
+              throw new Error(`Transaction confirmation failed: ${(confirmError as Error).message}. Transaction may have failed or is still pending.`);
             }
             
             console.log(`✅ Transaction successful on attempt ${attempt} with signature: ${signature}`);

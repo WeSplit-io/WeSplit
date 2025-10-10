@@ -3,7 +3,7 @@
  * Allows users to configure and manage fair bill splitting with equal or manual options
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,10 +14,6 @@ import {
   StatusBar,
   TextInput,
   ActivityIndicator,
-  Animated,
-  PanResponder,
-  StyleSheet,
-  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
@@ -34,116 +30,6 @@ import FairSplitProgress from './components/FairSplitProgress';
 import FairSplitParticipants from './components/FairSplitParticipants';
 
 // Remove local image mapping - now handled in FairSplitHeader component
-
-interface AppleSliderProps {
-  onSlideComplete?: () => void;
-  disabled: boolean;
-  loading: boolean;
-  text?: string;
-}
-
-const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, loading, text = 'Slide to Transfer' }) => {
-  const maxSlideDistance = 300;
-  const sliderValue = useRef(new Animated.Value(0)).current;
-  const [isSliderActive, setIsSliderActive] = useState(false);
-
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => !disabled && !loading,
-    onMoveShouldSetPanResponder: () => !disabled && !loading,
-    onPanResponderGrant: () => {
-      setIsSliderActive(true);
-    },
-    onPanResponderMove: (_, gestureState) => {
-      const newValue = Math.max(0, Math.min(gestureState.dx, maxSlideDistance));
-      sliderValue.setValue(newValue);
-    },
-    onPanResponderRelease: (_, gestureState) => {
-      if (gestureState.dx > maxSlideDistance * 0.6) {
-        Animated.timing(sliderValue, {
-          toValue: maxSlideDistance,
-          duration: 200,
-          useNativeDriver: false,
-        }).start(() => {
-          if (onSlideComplete) onSlideComplete();
-          setTimeout(() => {
-            sliderValue.setValue(0);
-            setIsSliderActive(false);
-          }, 1000);
-        });
-      } else {
-        Animated.timing(sliderValue, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }).start(() => {
-          setIsSliderActive(false);
-        });
-      }
-    },
-  });
-
-  return (
-    <LinearGradient
-      colors={[colors.green, colors.greenBlue]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
-      style={styles.appleSliderGradientBorder}
-    >
-      <View style={[styles.appleSliderContainer, disabled && { opacity: 0.5 }]} {...panResponder.panHandlers}>
-        <Animated.View style={styles.appleSliderTrack}>
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              opacity: sliderValue.interpolate({ inputRange: [0, maxSlideDistance], outputRange: [0, 1] }) as any,
-              borderRadius: 999,
-            }}
-          >
-            <LinearGradient
-              colors={[colors.green, colors.greenBlue]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{
-                ...StyleSheet.absoluteFillObject,
-                borderRadius: 999,
-              }}
-            />
-          </Animated.View>
-          <Animated.Text
-            style={[
-              styles.appleSliderText,
-              { color: colors.white }
-            ]}
-          >
-            {loading ? 'Transferring...' : text}
-          </Animated.Text>
-        </Animated.View>
-        <Animated.View
-          style={[
-            styles.appleSliderThumb,
-            {
-              transform: [{ translateX: sliderValue }],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={[colors.green, colors.greenBlue]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              borderRadius: 30,
-            }}
-          />
-          <Image 
-            source={require('../../../assets/chevron-right.png')} 
-            style={styles.appleSliderThumbIcon}
-          />
-        </Animated.View>
-      </View>
-    </LinearGradient>
-  );
-};
 
 interface FairSplitScreenProps {
   navigation: any;
@@ -1039,6 +925,129 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     }
   };
 
+  // Debug USDC balance to identify balance query issues
+  const debugUsdcBalance = async () => {
+    if (!splitWallet) {
+      Alert.alert('Error', 'No split wallet available');
+      return;
+    }
+
+    try {
+      console.log('🔍 FairSplitScreen: Starting USDC balance debug...', {
+        splitWalletAddress: splitWallet.walletAddress
+      });
+
+      const { SplitWalletService } = await import('../../services/splitWalletService');
+      const debugResult = await SplitWalletService.debugUsdcBalance(splitWallet.walletAddress);
+
+      if (debugResult.success) {
+        console.log('🔍 FairSplitScreen: USDC balance debug results:', debugResult.results);
+        
+        // Show results in a detailed alert
+        const results = debugResult.results;
+        let message = `USDC Balance Debug Results:\n\n`;
+        message += `Wallet: ${results.walletAddress}\n`;
+        message += `USDC Mint: ${results.usdcMint}\n\n`;
+        
+        if (results.method1) {
+          message += `Method 1 (getAssociatedTokenAddress):\n`;
+          message += `Token Account: ${results.method1.tokenAccount}\n`;
+          message += `Balance: ${results.method1.balance || 0} USDC\n`;
+          message += `Raw Amount: ${results.method1.rawAmount || 'N/A'}\n`;
+          message += `Success: ${results.method1.success}\n\n`;
+        }
+        
+        if (results.method2) {
+          message += `Method 2 (getAccountInfo):\n`;
+          message += `Exists: ${results.method2.exists}\n`;
+          message += `Owner: ${results.method2.owner || 'N/A'}\n`;
+          message += `Manual Balance: ${results.method2.manualBalance || 0} USDC\n`;
+          message += `Manual Raw: ${results.method2.manualRawAmount || 'N/A'}\n\n`;
+        }
+        
+        if (results.method3) {
+          message += `Method 3 (getTokenAccountsByOwner):\n`;
+          message += `Total Accounts: ${results.method3.totalAccounts}\n`;
+          if (results.method3.usdcAccount) {
+            message += `USDC Account Found: ${results.method3.usdcAccount.pubkey}\n`;
+            message += `USDC Balance: ${results.method3.usdcAccount.balance} USDC\n`;
+            message += `USDC Raw: ${results.method3.usdcAccount.rawAmount}\n`;
+          } else {
+            message += `No USDC account found\n`;
+          }
+        }
+        
+        Alert.alert('USDC Balance Debug Results', message, [
+          { text: 'OK' }
+        ]);
+      } else {
+        Alert.alert('Debug Failed', debugResult.error || 'Failed to debug USDC balance');
+      }
+    } catch (error) {
+      console.error('❌ FairSplitScreen: Error debugging USDC balance:', error);
+      Alert.alert('Error', 'Failed to debug USDC balance');
+    }
+  };
+
+  // Repair split wallet when synchronization issues are detected
+  const repairSplitWallet = async () => {
+    if (!splitWallet || !currentUser) {
+      Alert.alert('Error', 'Unable to repair split wallet');
+      return;
+    }
+
+    try {
+      console.log('🔧 FairSplitScreen: Starting split wallet repair...', {
+        splitWalletId: splitWallet.id,
+        creatorId: currentUser.id.toString()
+      });
+
+      const { SplitWalletService } = await import('../../services/splitWalletService');
+      const repairResult = await SplitWalletService.repairSplitWalletSynchronization(
+        splitWallet.id,
+        currentUser.id.toString()
+      );
+
+      if (repairResult.success && repairResult.repaired) {
+        console.log('✅ FairSplitScreen: Split wallet repaired successfully');
+        
+        Alert.alert(
+          'Split Wallet Repaired!',
+          'The split wallet data has been repaired. Participant payment status has been reset, and they can now retry their payments.\n\nYou can now try to withdraw funds again once participants have paid.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Reload the split wallet data to reflect the repair
+                loadSplitWalletData();
+                // Close any open modals
+                setShowSignatureStep(false);
+                setShowSplitModal(false);
+                setSelectedTransferMethod(null);
+                setSelectedWallet(null);
+              }
+            }
+          ]
+        );
+      } else if (repairResult.success && !repairResult.repaired) {
+        Alert.alert(
+          'No Repair Needed',
+          'The split wallet data appears to be correct. The issue might be temporary. Please try the withdrawal again.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Repair Failed',
+          repairResult.error || 'Failed to repair split wallet. Please contact support.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('❌ FairSplitScreen: Error repairing split wallet:', error);
+      Alert.alert('Error', 'Failed to repair split wallet. Please contact support.');
+    }
+  };
+
   // Helper function to validate creator permissions
   const validateCreatorPermission = (action: string): boolean => {
     if (!isCurrentUserCreator()) {
@@ -1401,9 +1410,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       
       // Check if participants have actually paid their shares
       const totalPaid = calculateTotalPaid(splitWallet.participants);
+      const tolerance = 0.001; // 0.001 USDC tolerance for rounding differences
+      
       console.log('🔍 FairSplitScreen: Fund collection check:', {
         totalAmount: splitWallet.totalAmount,
         totalPaid,
+        tolerance,
+        difference: Math.abs(totalPaid - splitWallet.totalAmount),
         participants: splitWallet.participants.map(p => ({
           name: p.name,
           amountOwed: p.amountOwed,
@@ -1412,11 +1425,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         }))
       });
       
-      if (totalPaid < splitWallet.totalAmount) {
+      if (totalPaid < (splitWallet.totalAmount - tolerance)) {
         console.error('❌ FairSplitScreen: Insufficient funds collected:', {
           required: splitWallet.totalAmount,
           collected: totalPaid,
-          missing: splitWallet.totalAmount - totalPaid
+          missing: splitWallet.totalAmount - totalPaid,
+          tolerance
         });
         Alert.alert(
           'Insufficient Funds', 
@@ -1425,6 +1439,40 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         return;
       }
       
+      // Double-check the actual on-chain balance before attempting withdrawal
+      console.log('🔍 FairSplitScreen: Verifying on-chain balance before withdrawal...');
+      try {
+        const { consolidatedTransactionService } = await import('../../services/consolidatedTransactionService');
+        const balanceResult = await consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress);
+        
+        if (balanceResult.success) {
+          console.log('🔍 FairSplitScreen: On-chain balance check:', {
+            onChainBalance: balanceResult.balance,
+            expectedBalance: splitWallet.totalAmount,
+            difference: Math.abs(balanceResult.balance - splitWallet.totalAmount),
+            tolerance
+          });
+          
+          // Check if on-chain balance is sufficient (with tolerance)
+          if (balanceResult.balance < (splitWallet.totalAmount - tolerance)) {
+            console.warn('⚠️ FairSplitScreen: On-chain balance is lower than expected:', {
+              onChainBalance: balanceResult.balance,
+              expectedBalance: splitWallet.totalAmount,
+              difference: splitWallet.totalAmount - balanceResult.balance
+            });
+            
+            // Still proceed but log the discrepancy
+            console.log('🔍 FairSplitScreen: Proceeding with withdrawal despite balance discrepancy - this may be due to rounding or timing issues');
+          }
+        } else {
+          console.warn('⚠️ FairSplitScreen: Could not verify on-chain balance:', balanceResult.error);
+          // Proceed anyway as the balance check might fail due to network issues
+        }
+      } catch (error) {
+        console.warn('⚠️ FairSplitScreen: Error checking on-chain balance:', error);
+        // Proceed anyway as the balance check might fail due to network issues
+      }
+
       // Process the transfer - both external and in-app use the same method
       const description = `Split funds transfer to ${selectedWallet.name || (selectedWallet.type === 'external' ? 'external wallet' : 'in-app wallet')}`;
       
@@ -1485,7 +1533,24 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         );
       } else {
         console.error('❌ FairSplitScreen: Transfer failed:', transferResult.error);
-        Alert.alert('Transfer Failed', transferResult.error || 'Failed to transfer funds. Please try again.');
+        
+        // Check if this is a synchronization issue that can be repaired
+        if (transferResult.error?.includes('Transaction synchronization issue detected')) {
+          Alert.alert(
+            'Synchronization Issue Detected',
+            'We detected that participants are marked as paid but the funds aren\'t actually in the split wallet. This can happen due to transaction delays or failures.\n\nWould you like to repair the split wallet data? This will reset participant payment status so they can retry their payments.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Repair Split Wallet', 
+                style: 'default',
+                onPress: () => repairSplitWallet()
+              }
+            ]
+          );
+        } else {
+          Alert.alert('Transfer Failed', transferResult.error || 'Failed to transfer funds. Please try again.');
+        }
       }
       
     } catch (error) {
@@ -1830,16 +1895,36 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                         </TouchableOpacity>
                       </LinearGradient>
                       
-                      {/* DEV BUTTON - Only show in development and to creators */}
+                      {/* DEV BUTTONS - Only show in development and to creators */}
                       {__DEV__ && isCurrentUserCreator() && (
-                        <TouchableOpacity 
-                          style={styles.devButton} 
-                          onPress={handleDevWithdraw}
-                        >
-                          <Text style={styles.devButtonText}>
-                            🚀 DEV: Withdraw Funds
-                          </Text>
-                        </TouchableOpacity>
+                        <View style={styles.buttonContainer}>
+                          <TouchableOpacity 
+                            style={styles.devButton} 
+                            onPress={handleDevWithdraw}
+                          >
+                            <Text style={styles.devButtonText}>
+                              🚀 DEV: Withdraw Funds
+                            </Text>
+                          </TouchableOpacity>
+                          
+                          <TouchableOpacity 
+                            style={[styles.devButton, { backgroundColor: colors.warning }]} 
+                            onPress={repairSplitWallet}
+                          >
+                            <Text style={styles.devButtonText}>
+                              🔧 DEV: Repair Split Wallet
+                            </Text>
+                          </TouchableOpacity>
+                          
+                          <TouchableOpacity 
+                            style={[styles.devButton, { backgroundColor: colors.info }]} 
+                            onPress={debugUsdcBalance}
+                          >
+                            <Text style={styles.devButtonText}>
+                              🔍 DEV: Debug USDC Balance
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
                       )}
                     </View>
                   );
@@ -2083,43 +2168,44 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 {/* Transfer Visualization */}
                 <View style={styles.transferVisualization}>
                   <View style={styles.transferIcon}>
-                    <Image 
-                      source={require('../../../assets/wesplit-logo-card.png')} 
-                      style={styles.transferIconImage}
-                      resizeMode="contain"
-                    />
-                  </View>
+                    <Text style={styles.transferIconText}>💳</Text>
+                </View>
                   <View style={styles.transferArrows}>
                     <Text style={styles.transferArrowText}>{'>>>>'}</Text>
                   </View>
                   <View style={styles.transferIcon}>
-                    <Image 
-                      source={require('../../../assets/kast-logo.png')} 
-                      style={styles.transferIconImage}
-                      resizeMode="contain"
-                    />
+                    <Text style={styles.transferIconText}>
+                      {selectedTransferMethod === 'external-wallet' ? '🏦' : '💳'}
+                    </Text>
                   </View>
                 </View>
 
-                <AppleSlider
-                  onSlideComplete={handleSignatureStep}
+              <TouchableOpacity 
+                style={[
+                    styles.transferButton,
+                    isSigning && styles.transferButtonDisabled
+                  ]}
+                  onPress={handleSignatureStep}
                   disabled={isSigning}
-                  loading={isSigning}
-                  text="Slide to Transfer"
-                />
+                >
+                  <View style={styles.transferButtonContent}>
+                    <View style={styles.transferButtonIcon}>
+                      <Text style={styles.transferButtonIconText}>→</Text>
+                    </View>
+                    <Text style={styles.transferButtonText}>
+                      {isSigning ? 'Transferring...' : 'Transfer Funds'}
+                </Text>
+                  </View>
+              </TouchableOpacity>
 
                 <TouchableOpacity 
-                  style={styles.modalBackButton}
+                  style={styles.modalCancelButton}
                   onPress={() => {
                     setShowSignatureStep(false);
                     setSelectedTransferMethod(null);
                   }}
                 >
-                  <Image 
-                    source={require('../../../assets/chevron-left.png')} 
-                    style={styles.modalBackButtonIcon}
-                  />
-                  <Text style={styles.modalBackButtonText}>Back</Text>
+                  <Text style={styles.modalCancelButtonText}>Back</Text>
                 </TouchableOpacity>
               </>
             )}
