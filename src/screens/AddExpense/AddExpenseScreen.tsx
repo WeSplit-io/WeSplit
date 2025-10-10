@@ -14,6 +14,7 @@ import { convertToUSDC } from '../../services/priceService';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { styles } from './styles';
 import { colors } from '../../theme/colors';
+import { DEFAULT_AVATAR_URL } from '../../config/constants';
 
 // Updated categories with more vibrant colors matching the screenshots
 const categories = [
@@ -714,12 +715,14 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
                 <Image
                   source={{ uri: groupMembers.find(m => m.id === paidBy)?.avatar }}
                   style={styles.paidByAvatarImage}
-                  defaultSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+                  defaultSource={{ uri: DEFAULT_AVATAR_URL }}
                 />
               ) : (
-                <Text style={styles.paidByAvatarText}>
-                  {groupMembers.find(m => m.id === paidBy)?.name?.charAt(0).toUpperCase() || '?'}
-                </Text>
+                <Image
+                  source={{ uri: DEFAULT_AVATAR_URL }}
+                  style={styles.paidByAvatar}
+                  resizeMode="cover"
+                />
               )}
             </View>
             <View style={styles.paidByDetails}>
@@ -788,9 +791,11 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
               </View>
               
               <View style={styles.memberAvatar}>
-                <Text style={styles.avatarText}>
-                  {member.name.charAt(0).toUpperCase()}
-                </Text>
+                <Image
+                  source={{ uri: member.avatar || DEFAULT_AVATAR_URL }}
+                  style={styles.memberAvatarImage}
+                  resizeMode="cover"
+                />
               </View>
               
               <View style={styles.memberInfo}>
@@ -950,12 +955,14 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
                           <Image
                             source={{ uri: member.avatar }}
                             style={styles.paidByOptionAvatarImage}
-                            defaultSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+                            defaultSource={{ uri: DEFAULT_AVATAR_URL }}
                           />
                         ) : (
-                          <Text style={styles.paidByOptionAvatarText}>
-                            {member.name.charAt(0).toUpperCase()}
-                          </Text>
+                          <Image
+                            source={{ uri: DEFAULT_AVATAR_URL }}
+                            style={styles.paidByOptionAvatarImage}
+                            resizeMode="cover"
+                          />
                         )}
                       </View>
                       <View style={styles.paidByOptionDetails}>

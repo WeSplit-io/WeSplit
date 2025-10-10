@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { colors, spacing, typography } from '../theme';
+import { DEFAULT_AVATAR_URL } from '../config/constants';
 
 interface ExpenseItemProps {
   payer: string;
@@ -22,7 +23,7 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
   youOwe = false,
 }) => (
   <View style={styles.container}>
-    <Image source={{ uri: payerAvatar }} style={styles.avatar} />
+    <Image source={{ uri: payerAvatar || DEFAULT_AVATAR_URL }} style={styles.avatar} />
     <View style={styles.info}>
       <Text style={styles.desc}>{payer} paid {amount}</Text>
       <Text style={styles.sub}>{description} • {date}</Text>

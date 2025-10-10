@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import UserAvatar from '../../components/UserAvatar';
 import { typography } from '../../theme/typography';
 import { styles } from './styles';
 import { SplitWalletService, SplitWallet } from '../../services/splitWalletService';
@@ -1492,11 +1493,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           <Text style={styles.participantsTitle}>Split between:</Text>
           {participants.map((participant) => (
             <View key={participant.id} style={styles.participantCard}>
-            <View style={styles.participantAvatar}>
-                <Text style={styles.participantAvatarText}>
-                  {participant.name.charAt(0).toUpperCase()}
-                </Text>
-            </View>
+            <UserAvatar
+              displayName={participant.name}
+              size={40}
+              style={styles.participantAvatar}
+            />
             <View style={styles.participantInfo}>
                 <Text style={styles.participantName}>{participant.name}</Text>
                 <Text style={styles.participantWallet}>

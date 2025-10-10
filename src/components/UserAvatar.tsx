@@ -16,9 +16,10 @@ import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { UserImageService, UserImageInfo } from '../services/userImageService';
+import { DEFAULT_AVATAR_URL } from '../config/constants';
 
 interface UserAvatarProps {
-  userId: string;
+  userId?: string;
   userName?: string;
   size?: number;
   style?: ViewStyle;
@@ -29,6 +30,10 @@ interface UserAvatarProps {
   userImageInfo?: UserImageInfo;
   // Direct avatar URL if available
   avatarUrl?: string;
+  // For simple avatar display without user lookup
+  displayName?: string;
+  // Loading timeout in milliseconds (default: 5000)
+  loadingTimeout?: number;
 }
 
 const UserAvatar: React.FC<UserAvatarProps> = ({
@@ -41,14 +46,18 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   borderColor = colors.green,
   userImageInfo,
   avatarUrl,
+  displayName,
+  loadingTimeout = 5000,
 }) => {
   const [imageInfo, setImageInfo] = useState<UserImageInfo | null>(userImageInfo || null);
   const [imageError, setImageError] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     console.log('🔍 UserAvatar: Props received:', {
       userId,
       userName,
+      displayName,
       userImageInfo: !!userImageInfo,
       avatarUrl,
       hasAvatarUrl: !!avatarUrl
@@ -62,17 +71,17 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
       // Use provided avatarUrl directly
       console.log('🔍 UserAvatar: Using provided avatarUrl:', avatarUrl);
       setImageInfo({
-        userId,
+        userId: userId || 'unknown',
         imageUrl: avatarUrl,
         hasImage: true,
-        fallbackInitials: UserImageService.generateInitials(userName || 'User'),
+        fallbackInitials: UserImageService.generateInitials(userName || displayName || 'User'),
       });
-    } else {
-      // Fetch image info if not provided
+    } else if (userId) {
+      // Fetch image info if userId is provided
       console.log('🔍 UserAvatar: Fetching image info from service');
       const fetchImageInfo = async () => {
         try {
-          const info = await UserImageService.getUserImageInfo(userId, userName);
+          const info = await UserImageService.getUserImageInfo(userId, userName || displayName);
           console.log('🔍 UserAvatar: Fetched image info:', info);
           setImageInfo(info);
         } catch (error) {
@@ -82,18 +91,49 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
             userId,
             imageUrl: undefined,
             hasImage: false,
-            fallbackInitials: UserImageService.generateInitials(userName || 'User'),
+            fallbackInitials: UserImageService.generateInitials(userName || displayName || 'User'),
           });
         }
       };
 
       fetchImageInfo();
+    } else {
+      // No userId provided, use displayName for initials
+      console.log('🔍 UserAvatar: No userId, using displayName for fallback');
+      setImageInfo({
+        userId: 'unknown',
+        imageUrl: undefined,
+        hasImage: false,
+        fallbackInitials: UserImageService.generateInitials(displayName || userName || 'User'),
+      });
     }
-  }, [userId, userName, userImageInfo, avatarUrl]);
+  }, [userId, userName, displayName, userImageInfo, avatarUrl]);
+
+  // Add loading timeout
+  useEffect(() => {
+    if (isLoading) {
+      const timeout = setTimeout(() => {
+        console.log('⏰ UserAvatar: Loading timeout, falling back to placeholder');
+        setIsLoading(false);
+        setImageError(true);
+      }, loadingTimeout);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoading, loadingTimeout]);
 
   const handleImageError = () => {
     console.log('UserAvatar: Image failed to load, using fallback');
     setImageError(true);
+    setIsLoading(false);
+  };
+
+  const handleImageLoadStart = () => {
+    setIsLoading(true);
+  };
+
+  const handleImageLoad = () => {
+    setIsLoading(false);
   };
 
   const avatarStyle: ViewStyle = {
@@ -126,24 +166,32 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     );
   }
 
-  // Show image if available and no error
-  if (imageInfo.hasImage && imageInfo.imageUrl && !imageError) {
-    return (
+  // Show image if available and no error, otherwise show placeholder image
+  const imageUri = (imageInfo.hasImage && imageInfo.imageUrl && !imageError) 
+    ? imageInfo.imageUrl 
+    : DEFAULT_AVATAR_URL;
+
+  return (
+    <View style={[avatarStyle, { overflow: 'hidden', position: 'relative' }]}>
+      {isLoading && (
+        <View style={[avatarStyle, { 
+          position: 'absolute', 
+          backgroundColor: colors.surface,
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1
+        }]}>
+          <Text style={initialsStyle}>...</Text>
+        </View>
+      )}
       <Image
-        source={{ uri: imageInfo.imageUrl }}
-        style={avatarStyle}
+        source={{ uri: imageUri }}
+        style={[avatarStyle, { opacity: isLoading ? 0 : 1 }]}
+        onLoadStart={handleImageLoadStart}
+        onLoad={handleImageLoad}
         onError={handleImageError}
         resizeMode="cover"
       />
-    );
-  }
-
-  // Show initials fallback
-  return (
-    <View style={avatarStyle}>
-      <Text style={initialsStyle}>
-        {imageInfo.fallbackInitials}
-      </Text>
     </View>
   );
 };

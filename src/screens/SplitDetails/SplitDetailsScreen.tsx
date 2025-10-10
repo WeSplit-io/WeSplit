@@ -2515,7 +2515,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                       <UserAvatar
                         key={participant.id}
                         userId={participant.id}
-                        userName={participant.name}
+                        displayName={participant.name}
                         size={32}
                         style={avatarStyle}
                       />
@@ -2603,7 +2603,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             <View key={participant.id} style={styles.participantCard}>
               <UserAvatar
                 userId={participant.id}
-                userName={participant.name}
+                displayName={participant.name}
                 size={40}
                 style={styles.participantAvatar}
               />
@@ -2647,7 +2647,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   <View key={invitedUser.id} style={styles.participantCard}>
                     <UserAvatar
                       userId={invitedUser.id}
-                      userName={invitedUser.name}
+                      displayName={invitedUser.name}
                       size={40}
                       style={styles.participantAvatar}
                     />

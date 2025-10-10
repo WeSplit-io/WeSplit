@@ -13,6 +13,7 @@ import { firebaseDataService } from '../../services/firebaseDataService';
 import { GroupWithDetails, Expense } from '../../types';
 import { styles } from './styles';
 import { colors } from '../../theme';
+import UserAvatar from '../../components/UserAvatar';
 
 type FilterType = 'all' | 'active' | 'closed';
 
@@ -353,9 +354,11 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
                     style={styles.groupMemberAvatarImage}
                   />
                 ) : (
-                  <Text style={styles.groupMemberAvatarText}>
-                    {((member.name || member.email || 'U') as string).charAt(0).toUpperCase()}
-                  </Text>
+                  <UserAvatar
+                    displayName={member.name || member.email || 'U'}
+                    size={24}
+                    style={styles.groupMemberAvatar}
+                  />
                 )}
               </View>
             ))}
@@ -554,9 +557,11 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
                             style={styles.prominentMemberAvatarImage}
                           />
                         ) : (
-                          <Text style={styles.prominentMemberAvatarText}>
-                            {((member.name || member.email || 'U') as string).charAt(0).toUpperCase()}
-                          </Text>
+                          <UserAvatar
+                            displayName={member.name || member.email || 'U'}
+                            size={32}
+                            style={styles.prominentMemberAvatar}
+                          />
                         )}
                       </View>
                     ))}

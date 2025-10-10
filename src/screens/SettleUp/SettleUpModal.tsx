@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Modal, Alert, ActivityIndicat
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import { Animated } from 'react-native';
 import Icon from '../../components/Icon';
+import UserAvatar from '../../components/UserAvatar';
 import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
 import { convertToUSDC } from '../../services/priceService';
@@ -1094,9 +1095,11 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
                                         style={styles.settlementCardAvatarImage}
                                       />
                                     ) : (
-                                      <Text style={styles.settlementCardAvatarText}>
-                                        {item.name.charAt(0).toUpperCase()}
-                                      </Text>
+                                      <UserAvatar
+                                        displayName={item.name}
+                                        size={40}
+                                        style={styles.settlementCardAvatar}
+                                      />
                                     )}
                                   </View>
 

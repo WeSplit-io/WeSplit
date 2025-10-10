@@ -7,6 +7,8 @@ import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { secureSeedPhraseService } from '../../services/secureSeedPhraseService';
 import { styles } from './styles';
+import { DEFAULT_AVATAR_URL } from '../../config/constants';
+import UserAvatar from '../../components/UserAvatar';
 
 // Helper function to safely load images with fallback
 const SafeImage = ({ source, style, fallbackSource }: any) => {
@@ -21,46 +23,14 @@ const SafeImage = ({ source, style, fallbackSource }: any) => {
   );
 };
 
-// Avatar component with loading state and error handling
+// Avatar component wrapper for backward compatibility
 const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasError, setHasError] = useState(false);
-
-  useEffect(() => {
-    if (avatar && avatar.trim() !== '') {
-      setIsLoading(true);
-      setHasError(false);
-    }
-  }, [avatar]);
-
-  if (!avatar || avatar.trim() === '' || hasError) {
-    return (
-      <View style={[style, styles.avatarFallback]}>
-        <Text style={styles.avatarFallbackText}>
-          {displayName.charAt(0).toUpperCase()}
-        </Text>
-      </View>
-    );
-  }
-
   return (
-    <View style={style}>
-      {isLoading && (
-        <View style={[style, styles.avatarLoadingContainer]}>
-          <ActivityIndicator size="small" color="#A5EA15" />
-        </View>
-      )}
-      <Image
-        source={{ uri: avatar }}
-        style={[style, { opacity: isLoading ? 0 : 1 }]}
-        onLoadStart={() => setIsLoading(true)}
-        onLoad={() => setIsLoading(false)}
-        onError={() => {
-          setIsLoading(false);
-          setHasError(true);
-        }}
-      />
-    </View>
+    <UserAvatar
+      avatarUrl={avatar}
+      displayName={displayName}
+      style={style}
+    />
   );
 };
 
@@ -253,7 +223,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwallet-icon-default.png?alt=media&token=ec0f1589-4bc6-41a9-80d9-6ce68ab36448' }}
               style={styles.menuIcon}
-              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+              fallbackSource={{ uri: DEFAULT_AVATAR_URL }}
             />
             <Text style={styles.menuItemText}>Wallet</Text>
             <SafeImage
@@ -266,7 +236,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-account-icon.png?alt=media&token=29c78193-1d31-4c25-9cd6-ba301a241554' }}
               style={styles.menuIcon}
-              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+              fallbackSource={{ uri: DEFAULT_AVATAR_URL }}
             />
             <Text style={styles.menuItemText}>Account info</Text>
             <SafeImage
@@ -280,7 +250,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
             <SafeImage
               source={require('../../../assets/eye-icon.png')}
               style={styles.menuIcon}
-              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+              fallbackSource={{ uri: DEFAULT_AVATAR_URL }}
             />
             <Text style={styles.menuItemText}>Seed phrase</Text>
             <SafeImage
@@ -294,7 +264,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-history-icon.png?alt=media&token=95a8fbb7-1574-4f6b-8dc8-5bd02d0608e9' }}
               style={styles.menuIcon}
-              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+              fallbackSource={{ uri: DEFAULT_AVATAR_URL }}
             />
             <Text style={styles.menuItemText}>Transaction History</Text>
             <SafeImage
@@ -308,7 +278,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-verify-icon.png?alt=media&token=abda6454-007c-495b-a64d-5169da43316e' }}
               style={styles.menuIcon}
-              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+              fallbackSource={{ uri: DEFAULT_AVATAR_URL }}
             />
             <Text style={styles.menuItemText}>Verify account</Text>
             <SafeImage
@@ -322,7 +292,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-referal-icon.png?alt=media&token=d8f12c3f-11ef-46bd-8f8f-013da5274a80' }}
               style={styles.menuIcon}
-              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+              fallbackSource={{ uri: DEFAULT_AVATAR_URL }}
             />
             <Text style={styles.menuItemText}>Referral Friend</Text>
             <SafeImage
@@ -344,7 +314,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-help-icon.png?alt=media&token=b8848597-c8ee-415d-b689-22bd31397ad2' }}
               style={styles.menuIcon}
-              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+              fallbackSource={{ uri: DEFAULT_AVATAR_URL }}
             />
             <Text style={styles.menuItemText}>Help Center</Text>
             <SafeImage
@@ -358,7 +328,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-faq-icon.png?alt=media&token=afb4392e-da9e-4c53-bf59-2475eef7c40c' }}
               style={styles.menuIcon}
-              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+              fallbackSource={{ uri: DEFAULT_AVATAR_URL }}
             />
             <Text style={styles.menuItemText}>FAQ</Text>
             <SafeImage
@@ -372,7 +342,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-logout-icon.png?alt=media&token=5282a042-4105-445a-8ea2-1136245a59c6' }}
               style={styles.menuIcon}
-              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+              fallbackSource={{ uri: DEFAULT_AVATAR_URL }}
             />
             <Text style={[styles.menuItemText, styles.logoutText]}>Log Out</Text>
             <SafeImage

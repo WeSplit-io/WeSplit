@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenLockStyles';
+import UserAvatar from '../../components/UserAvatar';
 import { SplitWalletService } from '../../services/splitWalletService';
 import { NotificationService } from '../../services/notificationService';
 import { FallbackDataService } from '../../utils/fallbackDataService';
@@ -447,11 +448,11 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
             
             return (
               <View key={participant.userId || participant.id || `participant_${index}`} style={styles.participantCard}>
-                <View style={styles.participantAvatar}>
-                  <Text style={styles.participantAvatarText}>
-                    {participant.name ? participant.name.charAt(0).toUpperCase() : '?'}
-                  </Text>
-                </View>
+                <UserAvatar
+                  displayName={participant.name || `Participant ${index + 1}`}
+                  size={40}
+                  style={styles.participantAvatar}
+                />
                 <View style={styles.participantInfo}>
                   <Text style={styles.participantName}>{participant.name || `Participant ${index + 1}`}</Text>
                   <Text style={styles.participantWallet}>

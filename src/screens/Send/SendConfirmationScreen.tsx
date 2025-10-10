@@ -10,6 +10,7 @@ import { GroupMember } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
+import { DEFAULT_AVATAR_URL } from '../../config/constants';
 
 // --- AppleSlider adapted from WalletManagementScreen ---
 interface AppleSliderProps {
@@ -482,14 +483,11 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
                 />
               </View>
             ) : (
-              <View style={styles.mockupRecipientAvatarTextWrapper}>
-              <Text style={styles.mockupRecipientAvatarText}>
-                {destinationType === 'external' 
-                  ? (wallet?.name ? wallet.name.charAt(0).toUpperCase() : (wallet?.address ? wallet.address.substring(0, 1).toUpperCase() : 'W'))
-                  : (contact?.name ? contact.name.charAt(0).toUpperCase() : (contact?.wallet_address ? contact.wallet_address.substring(0, 1).toUpperCase() : 'U'))
-                }
-              </Text>
-              </View>
+              <Image
+                source={{ uri: DEFAULT_AVATAR_URL }}
+                style={{ width: '100%', height: '100%', borderRadius: 999 }}
+                resizeMode="cover"
+              />
             )}
           </View>
           <View style={styles.mockupRecipientInfo}>

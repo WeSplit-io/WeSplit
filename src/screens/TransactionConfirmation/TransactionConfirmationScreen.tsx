@@ -9,6 +9,7 @@ import {
   TextInput,
 } from 'react-native';
 import Icon from '../../components/Icon';
+import UserAvatar from '../../components/UserAvatar';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { formatCryptoAmount } from '../../utils/cryptoUtils';
@@ -104,11 +105,11 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
       <View style={styles.content}>
         {/* Recipient Info */}
         <View style={styles.recipientCard}>
-          <View style={styles.recipientAvatar}>
-            <Text style={styles.recipientAvatarText}>
-              {params.recipient.name.charAt(0).toUpperCase()}
-            </Text>
-          </View>
+          <UserAvatar
+            displayName={params.recipient.name}
+            size={50}
+            style={styles.recipientAvatar}
+          />
           <View style={styles.recipientInfo}>
             <Text style={styles.recipientName}>{params.recipient.name}</Text>
             <Text style={styles.recipientEmail}>{params.recipient.email}</Text>

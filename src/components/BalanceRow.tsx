@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { colors, spacing, typography } from '../theme';
+import { DEFAULT_AVATAR_URL } from '../config/constants';
 
 interface BalanceRowProps {
   avatar: string;
@@ -12,7 +13,7 @@ interface BalanceRowProps {
 
 const BalanceRow: React.FC<BalanceRowProps> = ({ avatar, name, amount, status, positive = false }) => (
   <View style={styles.row}>
-    <Image source={{ uri: avatar }} style={styles.avatar} />
+    <Image source={{ uri: avatar || DEFAULT_AVATAR_URL }} style={styles.avatar} />
     <Text style={styles.name}>{name}</Text>
     <Text style={[styles.amount, { color: positive ? colors.green : colors.red }]}>
       {amount}

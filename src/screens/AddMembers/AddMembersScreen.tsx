@@ -48,11 +48,11 @@ const getDisplayName = (contact: UserContact | User): string => {
   return 'Unknown';
 };
 
-// Utility function to get avatar text
-const getAvatarText = (contact: UserContact | User): string => {
-  const displayName = getDisplayName(contact);
-  return displayName.charAt(0).toUpperCase();
-};
+// Utility function to get avatar text (unused - kept for potential future use)
+// const getAvatarText = (contact: UserContact | User): string => {
+//   const displayName = getDisplayName(contact);
+//   return displayName.charAt(0).toUpperCase();
+// };
 
 // Utility function to render avatar
 const renderAvatar = (contact: UserContact | User) => {

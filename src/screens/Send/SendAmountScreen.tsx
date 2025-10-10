@@ -10,6 +10,7 @@ import { useWallet } from '../../context/WalletContext';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
+import { DEFAULT_AVATAR_URL } from '../../config/constants';
 
 const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const {
@@ -211,11 +212,11 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
                 />
               </View>
             ) : (
-              <View style={styles.recipientAvatarTextWrapper}>
-              <Text style={[styles.recipientAvatarText, { fontSize: 18 }]}>
-                  {recipientInfo.name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
+              <Image
+                source={{ uri: DEFAULT_AVATAR_URL }}
+                style={{ width: '100%', height: '100%', borderRadius: 999 }}
+                resizeMode="cover"
+              />
      
      
             )}

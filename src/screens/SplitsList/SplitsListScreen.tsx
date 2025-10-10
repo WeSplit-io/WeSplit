@@ -38,79 +38,14 @@ interface SplitsListScreenProps {
   navigation: any;
 }
 
-// Avatar component with loading state and error handling (from DashboardScreen)
+// Avatar component wrapper for backward compatibility
 const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasError, setHasError] = useState(false);
-
-  // Reset error state when avatar changes
-  useEffect(() => {
-    if (avatar && avatar.trim() !== '') {
-      setHasError(false);
-    }
-  }, [avatar]);
-
-  // Add timeout to prevent infinite loading
-  useEffect(() => {
-    if (isLoading) {
-      const timeout = setTimeout(() => {
-        console.log('⏰ Avatar loading timeout, falling back to initial');
-        setIsLoading(false);
-        setHasError(true);
-      }, 5000); // 5 second timeout
-
-      return () => clearTimeout(timeout);
-    }
-  }, [isLoading]);
-
-  // Check if avatar is valid
-  const hasValidAvatar = avatar && avatar.trim() !== '' && !hasError;
-
-  // Fallback to initial if no valid avatar
-  if (!hasValidAvatar) {
-    return (
-      <View style={[style, { backgroundColor: colors.brandGreen, alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ fontSize: 14, fontWeight: 'medium', color: colors.white }}>
-          {displayName.charAt(0).toUpperCase()}
-        </Text>
-      </View>
-    );
-  }
-
   return (
-    <View style={[style, { overflow: 'hidden', position: 'relative' }]}>
-      {isLoading && (
-        <View style={[
-          StyleSheet.absoluteFill,
-          {
-            backgroundColor: colors.darkBorder,
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 10
-          }
-        ]}>
-          <ActivityIndicator size="small" color={colors.primaryGreen} />
-        </View>
-      )}
-      <Image
-        source={{ uri: avatar }}
-        style={{ width: '100%', height: '100%' }}
-        resizeMode="cover"
-        onLoadStart={() => {
-          console.log('🔄 Avatar loading started:', avatar);
-          setIsLoading(true);
-        }}
-        onLoad={() => {
-          console.log('✅ Avatar loaded successfully:', avatar);
-          setIsLoading(false);
-        }}
-        onError={(e) => {
-          console.log('❌ Avatar loading error:', e.nativeEvent.error, 'for URL:', avatar);
-          setIsLoading(false);
-          setHasError(true);
-        }}
-      />
-    </View>
+    <UserAvatar
+      avatarUrl={avatar}
+      displayName={displayName}
+      style={style}
+    />
   );
 };
 

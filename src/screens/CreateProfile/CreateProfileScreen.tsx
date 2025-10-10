@@ -23,6 +23,7 @@ import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { colors } from '../../theme';
 import { consolidatedWalletService } from '../../services/consolidatedWalletService';
 import { UserImageService } from '../../services/userImageService';
+import { DEFAULT_AVATAR_URL } from '../../config/constants';
 import * as ImagePicker from 'expo-image-picker';
 
 const CreateProfileScreen: React.FC = () => {
@@ -169,7 +170,7 @@ const CreateProfileScreen: React.FC = () => {
             id: existingUser.id.toString(),
             name: existingUser.name,
             email: existingUser.email,
-            avatar: existingUser.avatar || 'https://randomuser.me/api/portraits/men/32.jpg',
+            avatar: existingUser.avatar || DEFAULT_AVATAR_URL,
             walletAddress: existingUser.wallet_address,
             wallet_address: existingUser.wallet_address,
             wallet_public_key: existingUser.wallet_public_key,
@@ -231,7 +232,7 @@ const CreateProfileScreen: React.FC = () => {
           id: user.id.toString(),
           name: user.name,
           email: user.email,
-          avatar: finalAvatarUrl || 'https://randomuser.me/api/portraits/men/32.jpg',
+          avatar: finalAvatarUrl || DEFAULT_AVATAR_URL,
           walletAddress: user.wallet_address,
           wallet_address: user.wallet_address,
           wallet_public_key: user.wallet_public_key,

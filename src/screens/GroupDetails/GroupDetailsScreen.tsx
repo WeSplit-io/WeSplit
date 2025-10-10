@@ -16,6 +16,7 @@ import TransactionModal from '../../components/TransactionModal';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
+import { DEFAULT_AVATAR_URL } from '../../config/constants';
 
 const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   // Validate and extract groupId from route params
@@ -397,18 +398,18 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
         <Image
           source={{ uri: avatar }}
           style={styles.expenseAvatarImage}
-                      defaultSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fuser.png?alt=media&token=2f63fec7-5324-4c87-8e31-4c7c6f789d6f' }}
+                      defaultSource={{ uri: DEFAULT_AVATAR_URL }}
         />
       );
     }
 
-    // Fallback to icon with user initial
+    // Fallback to placeholder image
     return (
-      <View style={styles.expenseAvatar}>
-        <Text style={styles.expenseAvatarText}>
-          {userName.charAt(0).toUpperCase()}
-        </Text>
-      </View>
+      <Image
+        source={{ uri: DEFAULT_AVATAR_URL }}
+        style={styles.expenseAvatarImage}
+        resizeMode="cover"
+      />
     );
   }, [getUserAvatarForExpense, getUserNameForExpense]);
 
