@@ -29,6 +29,7 @@ import { styles } from './styles';
 import { ProcessedBillData, BillAnalysisResult } from '../../types/billAnalysis';
 import { BillAnalysisService } from '../../services/billAnalysisService';
 import { MockBillAnalysisService } from '../../services/mockBillAnalysisService';
+import { AIBillAnalysisService } from '../../services/aiBillAnalysisService';
 import { SplitInvitationService } from '../../services/splitInvitationService';
 import { NFCSplitService } from '../../services/nfcService';
 import { useApp } from '../../context/AppContext';
@@ -520,10 +521,19 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     setIsProcessingNewBill(true);
 
     try {
-      console.log('🔍 SplitDetailsScreen: Processing new bill image...');
+      console.log('🔍 SplitDetailsScreen: Processing new bill image with AI...');
 
-      // Use mock service to simulate your Python OCR service
-      const analysisResult = await MockBillAnalysisService.analyzeBillImage(imageUri);
+      // Try AI service first
+      let analysisResult = await AIBillAnalysisService.analyzeBillImage(imageUri);
+      
+      // Fallback to mock service if AI fails
+      if (!analysisResult.success) {
+        console.warn('⚠️ AI analysis failed, falling back to mock data:', analysisResult.error);
+        analysisResult = await MockBillAnalysisService.analyzeBillImage(imageUri);
+      } else {
+        console.log('✅ AI analysis successful!');
+      }
+      
       setNewBillProcessingResult(analysisResult);
 
       if (analysisResult.success && analysisResult.data) {

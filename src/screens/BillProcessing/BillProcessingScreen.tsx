@@ -26,6 +26,7 @@ import { BillItem, OCRProcessingResult, BillSplitCreationData } from '../../type
 import { BillAnalysisData, BillAnalysisResult, ProcessedBillData } from '../../types/billAnalysis';
 import { BillAnalysisService } from '../../services/billAnalysisService';
 import { MockBillAnalysisService } from '../../services/mockBillAnalysisService';
+import { AIBillAnalysisService } from '../../services/aiBillAnalysisService';
 import { billOCRService } from '../../services/billOCRService';
 import { useApp } from '../../context/AppContext';
 import { SplitStorageService } from '../../services/splitStorageService';
@@ -52,6 +53,8 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
   
   const [isProcessing, setIsProcessing] = useState(!isEditing);
   const [processingResult, setProcessingResult] = useState<BillAnalysisResult | null>(analysisResult || null);
+  const [isAIProcessing, setIsAIProcessing] = useState(false);
+  const [processingMethod, setProcessingMethod] = useState<'ai' | 'mock' | null>(null);
   const [currentProcessedBillData, setCurrentProcessedBillData] = useState<ProcessedBillData | null>(processedBillData || null);
   const [extractedItems, setExtractedItems] = useState<BillItem[]>(
     isEditing && processedBillData ? 
@@ -108,11 +111,24 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
 
   const processBillImage = async () => {
     setIsProcessing(true);
+    setIsAIProcessing(true);
+    setProcessingMethod(null);
     
     try {
-      // Use mock service to simulate your Python OCR service
-      // Replace this with actual API call to your Python service
-      const analysisResult = await MockBillAnalysisService.analyzeBillImage(imageUri);
+      console.log('🤖 BillProcessingScreen: Starting AI-powered bill analysis...');
+      
+      // Try AI service first
+      let analysisResult = await AIBillAnalysisService.analyzeBillImage(imageUri);
+      
+      // Fallback to mock service if AI fails
+      if (!analysisResult.success) {
+        console.warn('⚠️ AI analysis failed, falling back to mock data:', analysisResult.error);
+        setProcessingMethod('mock');
+        analysisResult = await MockBillAnalysisService.analyzeBillImage(imageUri);
+      } else {
+        console.log('✅ AI analysis successful!');
+        setProcessingMethod('ai');
+      }
       
       setProcessingResult(analysisResult);
       
@@ -163,6 +179,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
       Alert.alert('Error', 'Failed to process bill image. Please try again.');
     } finally {
       setIsProcessing(false);
+      setIsAIProcessing(false);
     }
   };
 
@@ -387,8 +404,13 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         <View style={styles.processingContainer}>
           <ActivityIndicator size="large" color={colors.green} />
           <Text style={styles.processingSubtitle}>
-            Analyzing your image...
+            {isAIProcessing ? '🤖 AI is analyzing your receipt...' : 'Analyzing your image...'}
           </Text>
+          {processingMethod && (
+            <Text style={styles.processingMethod}>
+              {processingMethod === 'ai' ? '✅ Using AI analysis' : '📝 Using sample data'}
+            </Text>
+          )}
         </View>
       </SafeAreaView>
     );

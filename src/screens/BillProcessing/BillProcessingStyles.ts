@@ -28,6 +28,12 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
+  processingMethod: {
+    fontSize: typography.fontSize.sm,
+    color: colors.green,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
   processingSteps: {
     alignItems: 'flex-start',
   },
