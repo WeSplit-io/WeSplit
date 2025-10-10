@@ -15,7 +15,9 @@ import {
   StatusBar,
   TextInput,
   ActivityIndicator,
+  Image,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import UserAvatar from '../../components/UserAvatar';
@@ -29,6 +31,15 @@ import { MockupDataService } from '../../data/mockupData';
 import { useApp } from '../../context/AppContext';
 import { SplitWalletMigrationService } from '../../services/splitWalletMigrationService';
 import { PriceManagerDebugger } from '../../utils/priceManagerDebugger';
+
+// Local image mapping for category icons
+const CATEGORY_IMAGES_LOCAL: { [key: string]: any } = {
+  trip: require('../../../assets/trip-icon-black.png'),
+  food: require('../../../assets/food-icon-black.png'),
+  home: require('../../../assets/house-icon-black.png'),
+  event: require('../../../assets/event-icon-black.png'),
+  rocket: require('../../../assets/rocket-icon-black.png'),
+};
 
 interface Participant {
   id: string;
@@ -1388,7 +1399,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           style={styles.backButton} 
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>←</Text>
+          <Image 
+            source={require('../../../assets/chevron-left.png')} 
+            style={styles.backButtonIcon}
+          />
         </TouchableOpacity>
         
         <Text style={styles.headerTitle}>Fair Split</Text>
@@ -1398,17 +1412,26 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Bill Summary Card */}
-        <View style={styles.billCard}>
+        <LinearGradient
+          colors={[colors.green, colors.greenBlue]}
+          style={styles.billCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
           <View style={styles.billHeader}>
+            <Image
+              source={CATEGORY_IMAGES_LOCAL[splitData?.category || processedBillData?.category || billData?.category || 'food']}
+              style={styles.billIconImage}
+              resizeMode="contain"
+            />
             <View style={styles.billTitleContainer}>
-              <Text style={styles.billIcon}>🍽️</Text>
               <Text style={styles.billTitle}>
                 {billData?.title || processedBillData?.title || 'Restaurant Bill'}
               </Text>
+              <Text style={styles.billDate}>
+                {billData?.date || processedBillData?.date || new Date().toLocaleDateString()}
+              </Text>
             </View>
-            <Text style={styles.billDate}>
-              {billData?.date || processedBillData?.date || new Date().toLocaleDateString()}
-            </Text>
           </View>
           
           <View style={styles.billAmountContainer}>
@@ -1417,7 +1440,9 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               {totalAmount.toFixed(1)} USDC
             </Text>
           </View>
-        </View>
+          <View style={styles.billCardDotLeft}/>
+          <View style={styles.billCardDotRight}/>
+        </LinearGradient>
 
         {/* Progress Indicator */}
         <View style={styles.progressContainer}>
@@ -1441,35 +1466,65 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           <View style={styles.splitMethodContainer}>
             <Text style={styles.splitMethodLabel}>Split between:</Text>
             <View style={styles.splitMethodOptions}>
-              <TouchableOpacity
-                style={[
-                  styles.splitMethodOption,
-                  splitMethod === 'equal' && styles.splitMethodOptionActive
-                ]}
-                onPress={() => handleSplitMethodChange('equal')}
-              >
-                <Text style={[
-                  styles.splitMethodOptionText,
-                  splitMethod === 'equal' && styles.splitMethodOptionTextActive
-                ]}>
-                  Equal
-                </Text>
-              </TouchableOpacity>
+              {splitMethod === 'equal' ? (
+                <LinearGradient
+                  colors={[colors.green, colors.greenBlue]}
+                  style={[styles.splitMethodOption, styles.splitMethodOptionActive]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <TouchableOpacity
+                    style={styles.splitMethodOptionTouchable}
+                    onPress={() => handleSplitMethodChange('equal')}
+                  >
+                    <Text style={[
+                      styles.splitMethodOptionText,
+                      styles.splitMethodOptionTextActive
+                    ]}>
+                      Equal
+                    </Text>
+                  </TouchableOpacity>
+                </LinearGradient>
+              ) : (
+                <TouchableOpacity
+                  style={styles.splitMethodOption}
+                  onPress={() => handleSplitMethodChange('equal')}
+                >
+                  <Text style={styles.splitMethodOptionText}>
+                    Equal
+                  </Text>
+                </TouchableOpacity>
+              )}
               
-              <TouchableOpacity
-                style={[
-                  styles.splitMethodOption,
-                  splitMethod === 'manual' && styles.splitMethodOptionActive
-                ]}
-                onPress={() => handleSplitMethodChange('manual')}
-              >
-                <Text style={[
-                  styles.splitMethodOptionText,
-                  splitMethod === 'manual' && styles.splitMethodOptionTextActive
-                ]}>
-                  Manual
-                </Text>
-              </TouchableOpacity>
+              {splitMethod === 'manual' ? (
+                <LinearGradient
+                  colors={[colors.green, colors.greenBlue]}
+                  style={[styles.splitMethodOption, styles.splitMethodOptionActive]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <TouchableOpacity
+                    style={styles.splitMethodOptionTouchable}
+                    onPress={() => handleSplitMethodChange('manual')}
+                  >
+                    <Text style={[
+                      styles.splitMethodOptionText,
+                      styles.splitMethodOptionTextActive
+                    ]}>
+                      Manual
+                    </Text>
+                  </TouchableOpacity>
+                </LinearGradient>
+              ) : (
+                <TouchableOpacity
+                  style={styles.splitMethodOption}
+                  onPress={() => handleSplitMethodChange('manual')}
+                >
+                  <Text style={styles.splitMethodOptionText}>
+                    Manual
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}
@@ -1479,18 +1534,22 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           <View style={styles.splitMethodContainer}>
             <Text style={styles.splitMethodLabel}>Split method:</Text>
             <View style={styles.splitMethodOptions}>
-              <View style={[styles.splitMethodOption, styles.splitMethodOptionActive]}>
+              <LinearGradient
+                colors={[colors.green, colors.greenBlue]}
+                style={[styles.splitMethodOption, styles.splitMethodOptionActive]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
                 <Text style={[styles.splitMethodOptionText, styles.splitMethodOptionTextActive]}>
                   {splitMethod === 'equal' ? 'Equal' : 'Manual'} (Locked)
                 </Text>
-              </View>
+              </LinearGradient>
             </View>
           </View>
         )}
 
         {/* Participants List */}
         <View style={styles.participantsContainer}>
-          <Text style={styles.participantsTitle}>Split between:</Text>
           {participants.map((participant) => (
             <View key={participant.id} style={styles.participantCard}>
             <UserAvatar
@@ -1556,21 +1615,28 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             {!isSplitConfirmed ? (
               // Phase 1: Creator can confirm split repartition
               isCurrentUserCreator() ? (
-            <TouchableOpacity 
-                  style={[
-                    styles.confirmButton,
-                    isCreatingWallet && styles.confirmButtonDisabled
-                  ]} 
-                  onPress={handleConfirmSplit}
-                  disabled={isCreatingWallet}
-                >
-                  <Text style={[
-                    styles.confirmButtonText,
-                    isCreatingWallet && styles.confirmButtonTextDisabled
-                  ]}>
-                    {isCreatingWallet ? 'Confirming...' : 'Confirm Split'}
-              </Text>
-            </TouchableOpacity>
+            <LinearGradient
+              colors={[colors.green, colors.greenBlue]}
+              style={[
+                styles.confirmButton,
+                isCreatingWallet && styles.confirmButtonDisabled
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <TouchableOpacity 
+                style={styles.confirmButtonTouchable}
+                onPress={handleConfirmSplit}
+                disabled={isCreatingWallet}
+              >
+                <Text style={[
+                  styles.confirmButtonText,
+                  isCreatingWallet && styles.confirmButtonTextDisabled
+                ]}>
+                  {isCreatingWallet ? 'Confirming...' : 'Confirm Split'}
+                </Text>
+              </TouchableOpacity>
+            </LinearGradient>
               ) : (
                 <View style={styles.waitingContainer}>
                   <Text style={styles.waitingText}>
@@ -1671,12 +1737,19 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 <Text style={styles.modalCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <LinearGradient
+                colors={[colors.green, colors.greenBlue]}
                 style={styles.modalSaveButton}
-                onPress={handleSaveEditedAmount}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
               >
-                <Text style={styles.modalSaveButtonText}>Save</Text>
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.modalSaveButtonTouchable}
+                  onPress={handleSaveEditedAmount}
+                >
+                  <Text style={styles.modalSaveButtonText}>Save</Text>
+                </TouchableOpacity>
+              </LinearGradient>
             </View>
           </View>
         </View>
@@ -1711,20 +1784,27 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 <Text style={styles.modalCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <LinearGradient
+                colors={[colors.green, colors.greenBlue]}
                 style={[
                   styles.modalSaveButton,
                   isSendingPayment && styles.modalSaveButtonDisabled
                 ]}
-                onPress={handlePaymentModalConfirm}
-                disabled={isSendingPayment}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
               >
-                {isSendingPayment ? (
-                  <ActivityIndicator color={colors.white} size="small" />
-                ) : (
-                  <Text style={styles.modalSaveButtonText}>Pay Now</Text>
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.modalSaveButtonTouchable}
+                  onPress={handlePaymentModalConfirm}
+                  disabled={isSendingPayment}
+                >
+                  {isSendingPayment ? (
+                    <ActivityIndicator color={colors.white} size="small" />
+                  ) : (
+                    <Text style={styles.modalSaveButtonText}>Pay Now</Text>
+                  )}
+                </TouchableOpacity>
+              </LinearGradient>
             </View>
           </View>
         </View>

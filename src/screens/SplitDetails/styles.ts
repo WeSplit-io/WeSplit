@@ -237,10 +237,10 @@ export const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: colors.white10,
-    marginRight: spacing.md,
   },
   participantInfo: {
     flex: 1,
+    marginLeft: spacing.md,
   },
   participantName: {
     color: colors.white,

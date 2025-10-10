@@ -1879,30 +1879,39 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   }, [route?.params?.selectedContacts]);
 
   const handleEditBill = () => {
-    // Navigate back to BillProcessingScreen with current data for editing
-    navigation.navigate('BillProcessing', {
-      imageUri: billData?.billImageUrl || 'existing_bill', // Use existing image or placeholder
-      billData: {
+    // Navigate to ManualBillCreationScreen with current data for editing
+    navigation.navigate('ManualBillCreation', {
+      isEditing: true,
+      existingBillData: {
         title: billName,
         totalAmount: parseFloat(totalAmount),
         currency: splitData?.currency || processedBillData?.currency || billData?.currency || 'USD',
         date: splitData?.date || processedBillData?.date || billData?.date || new Date().toISOString().split('T')[0],
         merchant: splitData?.merchant?.name || processedBillData?.merchant || billData?.merchant || 'Unknown Merchant',
-        billImageUrl: (billData as any)?.billImageUrl,
-        items: processedBillData?.items || billData?.items || [],
-        participants: participants,
-        settings: processedBillData?.settings || (billData as any)?.settings || {
-          allowPartialPayments: true,
-          requireAllAccept: false,
-          autoCalculate: true,
-          splitMethod: 'equal',
-        },
+        category: 'trip', // Default category - could be enhanced to detect from data
       },
-      processedBillData,
-      analysisResult,
-      isEditing: true, // Flag to indicate this is an edit operation
-      existingSplitId: splitData?.firebaseDocId || splitData?.id, // Pass existing split ID
-      existingSplitData: splitData, // Pass existing split data for updating
+      existingSplitId: splitData?.firebaseDocId || splitData?.id,
+      onBillUpdated: (updatedData: any) => {
+        // Handle the updated bill data
+        console.log('✅ Bill updated from ManualBillCreation:', updatedData);
+        
+        // Update local state with the new data
+        if (updatedData.title) {
+          setBillName(updatedData.title);
+        }
+        if (updatedData.totalAmount) {
+          setTotalAmount(updatedData.totalAmount.toString());
+        }
+        if (updatedData.currency) {
+          // Update currency if needed
+        }
+        if (updatedData.date) {
+          // Update date if needed
+        }
+        
+        // You could also trigger a refresh of the split data here
+        // or update the split in the database
+      }
     });
   };
 
