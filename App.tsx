@@ -6,6 +6,7 @@ import { WalletProvider } from './src/context/WalletContext';
 import { AppProvider } from './src/context/AppContext';
 import { WalletLinkingProvider } from './src/context/WalletLinkingContext';
 import { Text, View, Image } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { styles } from './App.styles';
 import NavigationWrapper from './src/components/NavigationWrapper';
 import ErrorBoundary from './src/components/ErrorBoundary';
@@ -159,11 +160,12 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <WalletProvider>
-        <AppProvider>
-            <WalletLinkingProvider>
-              <NavigationWrapper>
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <WalletProvider>
+            <AppProvider>
+                <WalletLinkingProvider>
+                  <NavigationWrapper>
               <Stack.Navigator 
                 initialRouteName="Splash"
                 screenOptions={{
@@ -276,12 +278,13 @@ export default function App() {
                 <Stack.Screen name="ManualBillCreation" component={ManualBillCreationScreen} />
                 <Stack.Screen name="SettleUpModal" component={SettleUpModal} />
               </Stack.Navigator>
-              </NavigationWrapper>
-            </WalletLinkingProvider>
-          </AppProvider>
-        </WalletProvider>
-    </QueryClientProvider>
-    </ErrorBoundary>
+                  </NavigationWrapper>
+                </WalletLinkingProvider>
+              </AppProvider>
+            </WalletProvider>
+          </QueryClientProvider>
+        </SafeAreaProvider>
+      </ErrorBoundary>
   );
 }
 

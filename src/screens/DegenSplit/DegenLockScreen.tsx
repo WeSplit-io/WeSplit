@@ -13,6 +13,9 @@ import {
   Animated,
   Alert,
   ScrollView,
+  Image,
+  PanResponder,
+  StyleSheet,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +28,129 @@ import { NotificationService } from '../../services/notificationService';
 import { FallbackDataService } from '../../utils/fallbackDataService';
 import { MockupDataService } from '../../data/mockupData';
 import { useApp } from '../../context/AppContext';
+
+// AppleSlider component adapted from SendConfirmationScreen
+interface AppleSliderProps {
+  onSlideComplete: () => void;
+  disabled: boolean;
+  loading: boolean;
+  text?: string;
+}
+
+const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, loading, text = 'Slide to Lock' }) => {
+  const maxSlideDistance = 300;
+  const sliderValue = useRef(new Animated.Value(0)).current;
+  const [isSliderActive, setIsSliderActive] = useState(false);
+
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => !disabled && !loading,
+    onMoveShouldSetPanResponder: () => !disabled && !loading,
+    onPanResponderGrant: () => {
+      setIsSliderActive(true);
+    },
+    onPanResponderMove: (_, gestureState) => {
+      const newValue = Math.max(0, Math.min(gestureState.dx, maxSlideDistance));
+      sliderValue.setValue(newValue);
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (gestureState.dx > maxSlideDistance * 0.6) {
+        Animated.timing(sliderValue, {
+          toValue: maxSlideDistance,
+          duration: 200,
+          useNativeDriver: false,
+        }).start(() => {
+          if (onSlideComplete) onSlideComplete();
+          setTimeout(() => {
+            sliderValue.setValue(0);
+            setIsSliderActive(false);
+          }, 1000);
+        });
+      } else {
+        Animated.timing(sliderValue, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }).start(() => {
+          setIsSliderActive(false);
+        });
+      }
+    },
+  });
+
+  return (
+    <LinearGradient
+      colors={[colors.green, colors.greenBlue]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.appleSliderGradientBorder}
+    >
+      <View style={[styles.appleSliderContainer, disabled && { opacity: 0.5 }]} {...panResponder.panHandlers}>
+        <Animated.View style={styles.appleSliderTrack}>
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              opacity: sliderValue.interpolate({ inputRange: [0, maxSlideDistance], outputRange: [0, 1] }) as any,
+              borderRadius: 999,
+            }}
+          >
+            <LinearGradient
+              colors={[colors.green, colors.greenBlue]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                ...StyleSheet.absoluteFillObject,
+                borderRadius: 999,
+              }}
+            />
+          </Animated.View>
+          <Animated.Text
+            style={[
+              styles.appleSliderText,
+              { color: colors.white }
+            ]}
+          >
+            {loading ? 'Locking...' : text}
+          </Animated.Text>
+        </Animated.View>
+        <Animated.View
+          style={[
+            styles.appleSliderThumb,
+            {
+              transform: [{ translateX: sliderValue }],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[colors.green, colors.greenBlue]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              borderRadius: 30,
+            }}
+          />
+          <Image 
+            source={require('../../../assets/chevron-right.png')} 
+            style={styles.appleSliderThumbIcon}
+          />
+        </Animated.View>
+      </View>
+    </LinearGradient>
+  );
+};
+
+// Category image mapping
+const CATEGORY_IMAGES: { [key: string]: any } = {
+  trip: require('../../../assets/trip-icon-black.png'),
+  food: require('../../../assets/food-icon-black.png'),
+  house: require('../../../assets/house-icon-black.png'),
+  event: require('../../../assets/event-icon-black.png'),
+  rocket: require('../../../assets/rocket-icon-black.png'),
+  lamp: require('../../../assets/lamp-icon-black.png'),
+  award: require('../../../assets/award-icon-black.png'),
+  user: require('../../../assets/user-icon-black.png'),
+};
 
 interface DegenLockScreenProps {
   navigation: any;
@@ -53,6 +179,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   const [showLockModal, setShowLockModal] = useState(false);
   
   const lockProgress = useRef(new Animated.Value(0)).current;
+  const circleProgress = useRef(new Animated.Value(0)).current;
 
   // Memoize the bill date to prevent excessive FallbackDataService calls
   const billDate = useMemo(() => {
@@ -66,6 +193,40 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       });
     }
   }, [processedBillData, billData]);
+
+  // Get category image based on data
+  const getCategoryImage = () => {
+    // Try to get category from different sources
+    const category = splitData?.category || 
+                    billData?.category || 
+                    processedBillData?.category || 
+                    'food'; // Default to food
+    
+    return CATEGORY_IMAGES[category] || CATEGORY_IMAGES['food'];
+  };
+
+  // Calculate progress percentage and update animation
+  const updateCircleProgress = useCallback(() => {
+    let lockedCount = 0;
+    
+    if (splitWallet?.participants) {
+      lockedCount = splitWallet.participants.filter((p: any) => 
+        p.amountPaid > 0 || (__DEV__ && p.status === 'locked')
+      ).length;
+    } else {
+      lockedCount = lockedParticipants.length;
+    }
+    
+    const totalCount = participants.length;
+    const progressPercentage = totalCount > 0 ? lockedCount / totalCount : 0;
+    
+    // Animate to the new progress value
+    Animated.timing(circleProgress, {
+      toValue: progressPercentage,
+      duration: 500,
+      useNativeDriver: false,
+    }).start();
+  }, [splitWallet?.participants, lockedParticipants.length, participants.length, circleProgress]);
 
   
 
@@ -168,6 +329,9 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       // Update locked participants list
       setLockedParticipants((prev: string[]) => [...prev, currentUser!.id.toString()]);
 
+      // Update circle progress animation
+      updateCircleProgress();
+
       // Send lock required notifications to all other participants
       const otherParticipantIds = participants
         .filter(p => (p.userId || p.id) !== currentUser!.id.toString())
@@ -200,24 +364,18 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         }
       }
 
-      // Animate the lock progress
-      Animated.timing(lockProgress, {
-        toValue: 1,
-        duration: 2000,
-        useNativeDriver: false,
-      }).start(async () => {
-        setIsLocked(true);
-        setIsLocking(false);
-        
-        // Reload wallet to get updated participant status
-        const updatedWalletResult = await SplitWalletService.getSplitWallet(walletToUse.id);
-        if (updatedWalletResult.success && updatedWalletResult.wallet) {
-          setSplitWallet(updatedWalletResult.wallet);
-        }
-        
-        // Check if all participants have locked their funds
-        checkAllParticipantsLocked();
-      });
+      // Set locked state immediately (no animation)
+      setIsLocked(true);
+      setIsLocking(false);
+      
+      // Reload wallet to get updated participant status
+      const updatedWalletResult = await SplitWalletService.getSplitWallet(walletToUse.id);
+      if (updatedWalletResult.success && updatedWalletResult.wallet) {
+        setSplitWallet(updatedWalletResult.wallet);
+      }
+      
+      // Check if all participants have locked their funds
+      checkAllParticipantsLocked();
 
     } catch (error) {
       Alert.alert('Error', 'Failed to lock amount. Please try again.');
@@ -274,13 +432,16 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
 
         // Update the splitWallet state with fresh data
         setSplitWallet(wallet);
+        
+        // Update circle progress animation
+        updateCircleProgress();
       }
     } catch (error) {
       // Silent error handling
     } finally {
       setIsCheckingLocks(false);
     }
-  }, [splitWallet, currentUser?.id, participants.length]);
+  }, [splitWallet, currentUser?.id, participants.length, updateCircleProgress]);
 
   // Function to handle roulette button press
   const handleRollRoulette = () => {
@@ -332,6 +493,9 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
             
             // Immediately check all participants' lock status to avoid flicker
             await checkAllParticipantsLocked();
+            
+            // Update circle progress animation
+            updateCircleProgress();
           }
         } catch (error) {
           // Silent error handling
@@ -342,7 +506,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     };
 
     loadSplitWallet();
-  }, [splitData?.walletId, checkAllParticipantsLocked]);
+  }, [splitData?.walletId, checkAllParticipantsLocked, updateCircleProgress]);
 
   // Update allParticipantsLocked when splitWallet changes
   useEffect(() => {
@@ -353,8 +517,11 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       ).length;
       const allLocked = lockedCount === participants.length;
       setAllParticipantsLocked(allLocked);
+      
+      // Update circle progress animation
+      updateCircleProgress();
     }
-  }, [splitWallet, participants.length]);
+  }, [splitWallet, participants.length, updateCircleProgress]);
 
   // Periodic check for participant locks when user has locked their funds
   useEffect(() => {
@@ -376,7 +543,10 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Text style={styles.backButtonText}>←</Text>
+          <Image 
+            source={require('../../../assets/chevron-left.png')} 
+            style={styles.backButtonIcon}
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Degen Split</Text>
         <View style={styles.headerSpacer} />
@@ -395,16 +565,27 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           style={styles.billCard}
         >
           <View style={styles.billCardHeader}>
-            <Text style={styles.billIcon}>💳</Text>
-            <Text style={styles.billTitle}>{splitData?.title || billData?.title || MockupDataService.getBillName()}</Text>
+            <View style={styles.billIconContainer}>
+              <Image 
+                source={getCategoryImage()} 
+                style={styles.billIcon}
+                tintColor={colors.white}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.billTitleContainer}>
+              <Text style={styles.billTitle}>{splitData?.title || billData?.title || MockupDataService.getBillName()}</Text>
+              <Text style={styles.billDate}>
+                {billDate}
+              </Text>
+            </View>
           </View>
-          <Text style={styles.billDate}>
-            {billDate}
-          </Text>
           <View style={styles.totalBillRow}>
             <Text style={styles.totalBillLabel}>Total Bill</Text>
             <Text style={styles.totalBillAmount}>{totalAmount} USDC</Text>
           </View>
+          <View style={styles.billCardDotLeft}/>
+          <View style={styles.billCardDotRight}/>
         </LinearGradient>
 
         {/* Lock Progress Circle */}
@@ -415,7 +596,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
                 styles.progressFill,
                 {
                   transform: [{
-                    rotate: lockProgress.interpolate({
+                    rotate: circleProgress.interpolate({
                       inputRange: [0, 1],
                       outputRange: ['0deg', '360deg'],
                     })
@@ -472,7 +653,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
                   <Text style={styles.participantAmount}>{totalAmount} USDC</Text>
                   {isParticipantLocked && (
                     <View style={styles.lockedIndicator}>
-                      <Text style={styles.lockedIndicatorText}>🔒</Text>
+                      <Text style={styles.lockedIndicatorText}>🔒 Locked</Text>
                     </View>
                   )}
                 </View>
@@ -483,143 +664,89 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
 
         {/* Removed instructions section to match design */}
 
-        {/* Slide to Lock Button */}
-        <View style={[styles.slideContainer, { paddingBottom: isLocked ? spacing.md : Math.max(insets.bottom, spacing.lg) }]}>
-          {(isLocked || isLocking || isLoadingWallet) ? (
-            <TouchableOpacity
-              style={[
-                styles.slideButton,
-                styles.slideButtonDisabled
-              ]}
-              onPress={handleLockMyShare}
-              disabled={isLocked || isLocking || isLoadingWallet}
-            >
-              <View style={styles.slideButtonContent}>
-                <Text style={[
-                  styles.slideButtonText,
-                  styles.slideButtonTextDisabled
-                ]}>
-                  {isLocked ? 'Locked ✓' : isLocking ? 'Locking...' : isLoadingWallet ? 'Loading...' : 'Lock my share'}
-                </Text>
-                {!isLocked && !isLocking && !isLoadingWallet && (
-                  <Text style={styles.slideButtonArrow}>→</Text>
-                )}
-              </View>
-              
-              {/* Progress bar inside button */}
-              {isLocking && (
-                <Animated.View 
-                  style={[
-                    styles.slideProgress,
-                    { width: progressPercentage }
-                  ]} 
-                />
-              )}
-            </TouchableOpacity>
-          ) : (
+        {/* Lock Button - Pushed to bottom */}
+        <View style={[styles.lockButtonContainer]}>
+          {!isLocked ? (
+            // Not locked yet - show lock button
             <TouchableOpacity
               onPress={handleLockMyShare}
-              disabled={isLocked || isLocking || isLoadingWallet}
+              disabled={isLocking || isLoadingWallet}
             >
               <LinearGradient
                 colors={[colors.green, colors.greenBlue]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.slideButton}
+                style={styles.lockButton}
               >
-                <View style={styles.slideButtonContent}>
-                  <Text style={styles.slideButtonText}>
-                    Lock my share
-                  </Text>
-                  <Text style={styles.slideButtonArrow}>→</Text>
-                </View>
+                <Text style={styles.lockButtonText}>
+                  {isLocking ? 'Locking...' : isLoadingWallet ? 'Loading...' : 'Lock my share'}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
+          ) : currentUser?.id === splitData?.creatorId ? (
+            // Creator and locked - show waiting or start spinning
+            allParticipantsLocked ? (
+              // All locked - show start spinning button
+              <TouchableOpacity
+                style={styles.lockButton}
+                onPress={handleRollRoulette}
+                disabled={isCheckingLocks}
+              >
+                <LinearGradient
+                  colors={[colors.green, colors.greenBlue]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.lockButton}
+                >
+                  <Text style={styles.lockButtonText}>
+                    {isCheckingLocks ? 'Checking...' : 'Start Spinning'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            ) : (
+              // Not all locked - show waiting message
+              <View style={[styles.lockButton, styles.lockButtonDisabled]}>
+                <Text style={[styles.lockButtonText, styles.lockButtonTextDisabled]}>
+                  {(() => {
+                    // Use wallet data for accurate count
+                    if (splitWallet?.participants) {
+                      const lockedCount = splitWallet.participants.filter((p: any) => 
+                        p.amountPaid > 0 || (__DEV__ && p.status === 'locked')
+                      ).length;
+                      const remaining = participants.length - lockedCount;
+                      return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
+                    }
+                    const remaining = participants.length - lockedParticipants.length;
+                    return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
+                  })()}
+                </Text>
+              </View>
+            )
+          ) : (
+            // Not creator but locked - show waiting message
+            <View style={[styles.lockButton, styles.lockButtonDisabled]}>
+              <Text style={[styles.lockButtonText, styles.lockButtonTextDisabled]}>
+                {allParticipantsLocked 
+                  ? 'Waiting for the creator to spin!' 
+                  : (() => {
+                      // Use wallet data for accurate count
+                      if (splitWallet?.participants) {
+                        const lockedCount = splitWallet.participants.filter((p: any) => 
+                          p.amountPaid > 0 || (__DEV__ && p.status === 'locked')
+                        ).length;
+                        const remaining = participants.length - lockedCount;
+                        return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
+                      }
+                      const remaining = participants.length - lockedParticipants.length;
+                      return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
+                    })()
+                }
+              </Text>
+            </View>
           )}
         </View>
 
-        {/* Roll Roulette Button - Show for all participants who have locked their funds */}
-        {isLocked && (
-          <View style={[styles.rouletteContainer, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            {/* Creator can roll roulette */}
-            {currentUser?.id === splitData?.creatorId ? (
-              <TouchableOpacity
-                style={[
-                  styles.rouletteButton,
-                  (!allParticipantsLocked || isCheckingLocks) && styles.rouletteButtonDisabled
-                ]}
-                onPress={handleRollRoulette}
-                disabled={!allParticipantsLocked || isCheckingLocks}
-              >
-                <View style={styles.rouletteButtonContent}>
-                  <Text style={styles.rouletteButtonIcon}>🎲</Text>
-                  <Text style={[
-                    styles.rouletteButtonText,
-                    (!allParticipantsLocked || isCheckingLocks) && styles.rouletteButtonTextDisabled
-                  ]}>
-                    {isCheckingLocks 
-                      ? 'Checking...' 
-                      : allParticipantsLocked 
-                        ? 'Roll Roulette!' 
-                        : (() => {
-                            // Use wallet data for accurate count
-                            if (splitWallet?.participants) {
-                              const lockedCount = splitWallet.participants.filter((p: any) => 
-                                p.amountPaid > 0 || (__DEV__ && p.status === 'locked')
-                              ).length;
-                              const remaining = participants.length - lockedCount;
-                              return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''}`;
-                            }
-                            const remaining = participants.length - lockedParticipants.length;
-                            return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''}`;
-                          })()
-                    }
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ) : (
-              /* Non-creators see waiting message */
-              <View style={[styles.rouletteButton, styles.rouletteButtonDisabled]}>
-                <View style={styles.rouletteButtonContent}>
-                  <Text style={styles.rouletteButtonIcon}>⏳</Text>
-                  <Text style={[styles.rouletteButtonText, styles.rouletteButtonTextDisabled]}>
-                    {allParticipantsLocked 
-                      ? 'Waiting for the creator to roll!' 
-                      : (() => {
-                          // Use wallet data for accurate count
-                          if (splitWallet?.participants) {
-                            const lockedCount = splitWallet.participants.filter((p: any) => 
-                              p.amountPaid > 0 || (__DEV__ && p.status === 'locked')
-                            ).length;
-                            const remaining = participants.length - lockedCount;
-                            return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''}`;
-                          }
-                          const remaining = participants.length - lockedParticipants.length;
-                          return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''}`;
-                        })()
-                    }
-                  </Text>
-                </View>
-              </View>
-            )}
-            
-            {/* Status indicator */}
-            <View style={styles.rouletteStatusContainer}>
-              <Text style={styles.rouletteStatusText}>
-                {(() => {
-                  // Use wallet data for accurate count, same as lock icons
-                  if (splitWallet?.participants) {
-                    const lockedCount = splitWallet.participants.filter((p: any) => 
-                      p.amountPaid > 0 || (__DEV__ && p.status === 'locked')
-                    ).length;
-                    return `${lockedCount} of ${participants.length} participants locked`;
-                  }
-                  return `${lockedParticipants.length} of ${participants.length} participants locked`;
-                })()}
-              </Text>
-            </View>
-          </View>
-        )}
+        {/* Roulette section removed - integrated into main button */}
       </ScrollView>
 
       {/* Lock Confirmation Modal */}
@@ -629,7 +756,10 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
             <View style={styles.modalHandle} />
             <View style={styles.modalContent}>
               <View style={styles.modalIconContainer}>
-                <Text style={styles.modalLockIcon}>🔒</Text>
+                <Image 
+                  source={require('../../../assets/lock-check-icon.png')} 
+                  style={styles.modalLockIcon}
+                />
               </View>
               <Text style={styles.modalTitle}>
                 Lock {totalAmount} USDC to split the Bill
@@ -638,18 +768,12 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
                 Your share is unlocked after the split is done!
               </Text>
               
-              <TouchableOpacity
-                style={styles.modalSlideButton}
-                onPress={handleConfirmLock}
+              <AppleSlider
+                onSlideComplete={handleConfirmLock}
                 disabled={isLocking}
-              >
-                <View style={styles.modalSlideButtonContent}>
-                  <Text style={styles.modalSlideButtonIcon}>→</Text>
-                  <Text style={styles.modalSlideButtonText}>
-                    {isLocking ? 'Locking...' : 'Slide to Lock'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
+                loading={isLocking}
+                text="Slide to Lock"
+              />
             </View>
           </View>
         </View>

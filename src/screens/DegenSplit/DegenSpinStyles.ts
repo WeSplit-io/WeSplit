@@ -24,6 +24,11 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.xl,
     fontWeight: '600',
   },
+  backButtonIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.white,
+  },
   headerTitle: {
     color: colors.white,
     fontSize: typography.fontSize.lg,
@@ -34,8 +39,8 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl, // Add bottom padding for phone UI
+    paddingHorizontal: 0, // No horizontal padding for full screen
+    paddingBottom: spacing.sm, // Reduced bottom padding since button is now fixed
   },
   // Main participant card styles (matching the design)
   mainParticipantCard: {
@@ -78,12 +83,14 @@ export const styles = StyleSheet.create({
   },
   // Bill summary styles
   billSummaryContainer: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.white10,
     borderRadius: 20,
     padding: spacing.lg,
-    marginHorizontal: spacing.sm,
-    marginTop: spacing.lg,
+    marginHorizontal: spacing.lg, // Add margin for bill summary
+    marginTop: spacing.md, // Reduced top margin since it's now below roulette
     marginBottom: spacing.xl,
+    gap: spacing.md,
+    position: 'relative',
   },
   billSummaryRow: {
     flexDirection: 'row',
@@ -93,10 +100,22 @@ export const styles = StyleSheet.create({
   },
   billSummaryIcon: {
     fontSize: typography.fontSize.md,
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    padding: spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 28,
+    height: 28,
+  },
+  billSummaryIconImage: {
+    width: 16,
+    height: 16,
+    tintColor: colors.black,
   },
   billSummaryTitle: {
     color: colors.white,
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.lg,
     fontWeight: '600',
     flex: 1,
     marginLeft: spacing.sm,
@@ -121,7 +140,7 @@ export const styles = StyleSheet.create({
   },
   // Roulette container styles
   rouletteContainer: {
-    height: 280,
+    height: 400, // Fixed height for roulette area
     marginTop: spacing.xl,
     marginBottom: spacing.lg,
     overflow: 'hidden', // Hide cards that go out of bounds for cleaner look
@@ -133,67 +152,108 @@ export const styles = StyleSheet.create({
   rouletteCards: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 180, // Match card height
-    justifyContent: 'flex-start', // Start from left for infinite effect
-    width: '200%', // Wider to accommodate more cards
-    paddingHorizontal: spacing.lg,
-    backgroundColor: 'rgba(0, 255, 0, 0.1)', // Temporary green background for debugging
+    height: 400, // Match container height
+    justifyContent: 'center', // Center the cards
+    width: '100%', // Full width
+    paddingHorizontal: 0, // No horizontal padding
+    backgroundColor: 'transparent',
   },
   rouletteCard: {
-    width: 140,
-    height: 180,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    marginHorizontal: spacing.xs,
+    width: 400, // Adjusted width for better fit
+    height: 300, // Adjusted height
+    backgroundColor: 'transparent',
+    borderRadius: 20,
+    marginHorizontal: -30, // Negative margin to bring cards closer
     position: 'relative',
     overflow: 'hidden',
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 8,
     },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 12,
+    elevation: 12,
     flexShrink: 0, // Prevent cards from shrinking
     alignSelf: 'center', // Center each card vertically
-    borderWidth: 2, // Temporary border for debugging
-    borderColor: 'yellow', // Temporary border color for debugging
+    transform: [{ rotate: '90deg' }], // Rotate cards 90 degrees
+    borderWidth: 12,
+    borderColor: colors.white10,
+  },
+  rouletteCardContent: {
+    flex: 1,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'column',
+    height: '100%',
+    width: '100%',
+  },
+  rouletteCardHeader: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+    height: '100%',
+  },
+  rouletteCardBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
   },
   selectedCard: {
     transform: [{ scale: 1.1 }],
     shadowOpacity: 0.5,
     elevation: 12,
   },
-  // Roulette card content styles
-  rouletteCardContent: {
-    position: 'absolute',
-    left: spacing.lg,
-    top: spacing.lg,
-    bottom: spacing.lg,
-    justifyContent: 'center',
+  // Roulette card content styles - removed duplicate
+  rouletteCardLogo: {
+    width: 24,
+    height: 24,
+    marginBottom: spacing.md,
+    alignSelf: 'flex-start',
   },
   rouletteCardName: {
     color: colors.white,
     fontSize: typography.fontSize.lg,
     fontWeight: '600',
-    transform: [{ rotate: '-90deg' }],
-    marginBottom: spacing.md,
+    textAlign: 'left',
+    marginBottom: spacing.xs,
+    alignSelf: 'flex-start',
   },
-  rouletteCardId: {
-    color: colors.textSecondary,
+  rouletteCardHash: {
+    color: colors.white80,
     fontSize: typography.fontSize.sm,
-    transform: [{ rotate: '-90deg' }],
+    fontWeight: '400',
+    textAlign: 'left',
+    opacity: 0.8,
+    alignSelf: 'flex-start',
   },
-  rouletteCardIcon: {
+  tiltedCard: {
+    opacity: 0.6,
+  },
+  selectionIndicator: {
     position: 'absolute',
-    top: spacing.lg,
-    right: spacing.lg,
+    top: 10,
+    right: 10,
+    backgroundColor: colors.green,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: 12,
+    zIndex: 10,
   },
-  rouletteCardIconText: {
-    fontSize: typography.fontSize.lg,
-    color: colors.white,
+  selectionText: {
+    color: colors.black,
+    fontSize: typography.fontSize.xs,
+    fontWeight: '700',
   },
+
   // Green gradient for roulette cards
   rouletteCardGradient: {
     position: 'absolute',
@@ -230,22 +290,56 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xxl,
     paddingBottom: spacing.lg, // Extra padding for phone UI elements
   },
-  spinButton: {
-    backgroundColor: colors.green,
-    borderRadius: 12,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
+  bottomButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: spacing.md,
+    paddingBottom: 50,
+    paddingTop: spacing.md,
+    backgroundColor: colors.black,
+  },
+  spinButtonGradient: {
+    borderRadius: 16,
     marginHorizontal: spacing.sm,
   },
+  spinButton: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
   spinButtonDisabled: {
-    backgroundColor: colors.surface,
+    opacity: 0.5,
   },
   spinButtonText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.lg,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   spinButtonTextDisabled: {
-    color: colors.textSecondary,
+    color: colors.white50,
+  },
+  billCardDotLeft: {
+    width: 28,
+    height: 28,
+    borderRadius: 20,
+    marginRight: spacing.xs,
+    position: 'absolute',
+    bottom: '55%',
+    left: -16,
+    backgroundColor: colors.black,
+    zIndex: 1,
+  },
+  billCardDotRight: {
+    width: 28,
+    height: 28,
+    borderRadius: 20,
+    marginLeft: spacing.xs,
+    position: 'absolute',
+    bottom: '55%',
+    right: -16,
+    backgroundColor: colors.black,
+    zIndex: 1,
   },
 });

@@ -8,11 +8,13 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Alert,
-  Share,
+  Image,
+  Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenResultStyles';
@@ -136,14 +138,19 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
 
   const handleShareOnX = async () => {
     try {
-      const message = `Just got selected to pay the entire bill of ${totalAmount} USDC in our Degen Split! 😅 Better luck next time! 🍀 #DegenSplit #WeSplit`;
+      const resultText = isWinner ? 'Win' : 'Lost';
+      const message = `${resultText} ${totalAmount} $USDC on @wesplit_io Degen Split 😂\nWho's brave enough to try their luck next? 🎲`;
+      const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(message)}`;
       
-      await Share.share({
-        message,
-        title: 'Degen Split Result',
-      });
+      const canOpen = await Linking.canOpenURL(twitterUrl);
+      if (canOpen) {
+        await Linking.openURL(twitterUrl);
+      } else {
+        Alert.alert('Error', 'Unable to open Twitter');
+      }
     } catch (error) {
       console.error('Error sharing:', error);
+      Alert.alert('Error', 'Unable to open Twitter');
     }
   };
 
@@ -298,7 +305,10 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackToSplits}>
-          <Text style={styles.backButtonText}>←</Text>
+          <Image 
+            source={require('../../../assets/chevron-left.png')} 
+            style={styles.backButtonIcon}
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Degen Split Result</Text>
         <View style={styles.headerSpacer} />
@@ -341,31 +351,12 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
 
         {/* Share Button */}
         <TouchableOpacity style={styles.shareButton} onPress={handleShareOnX}>
-          <Text style={styles.shareButtonText}>Share on X</Text>
+          <Text style={styles.shareButtonText}>Share on </Text>
+          <Image 
+            source={require('../../../assets/twitter-x.png')} 
+            style={styles.twitterIcon}
+          />
         </TouchableOpacity>
-
-        {/* Action Buttons */}
-        {isLoser && (
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.settleButton,
-                isProcessing && styles.actionButtonDisabled
-              ]}
-              onPress={() => setShowPaymentOptionsModal(true)}
-              disabled={isProcessing}
-            >
-              <Text style={[
-                styles.actionButtonText,
-                styles.settleButtonText,
-                isProcessing && styles.actionButtonTextDisabled
-              ]}>
-                {isProcessing ? 'Processing...' : 'Transfer to Use'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
         {/* Claim Button - Only show for winners */}
         {isWinner && (
@@ -391,6 +382,35 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         )}
 
       </View>
+
+      {/* Action Buttons - Fixed at bottom */}
+      {isLoser && (
+        <View style={styles.bottomButtonContainer}>
+          <TouchableOpacity
+            onPress={() => setShowPaymentOptionsModal(true)}
+            disabled={isProcessing}
+            style={styles.actionButton}
+          >
+            <LinearGradient
+              colors={[colors.green, colors.greenBlue]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[
+                styles.settleButton,
+                isProcessing && styles.actionButtonDisabled
+              ]}
+            >
+              <Text style={[
+                styles.actionButtonText,
+                styles.settleButtonText,
+                isProcessing && styles.actionButtonTextDisabled
+              ]}>
+                {isProcessing ? 'Processing...' : 'Transfer to Use'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      )}
 
 
       {/* Claim Confirmation Modal */}

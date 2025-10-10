@@ -24,6 +24,11 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.xl,
     fontWeight: '600',
   },
+  backButtonIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.white,
+  },
   headerTitle: {
     color: colors.white,
     fontSize: typography.fontSize.lg,
@@ -34,9 +39,8 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl,
-    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: 50,
     alignItems: 'center',
   },
   avatarContainer: {
@@ -46,7 +50,7 @@ export const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
@@ -71,20 +75,22 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   amountContainer: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.white10,
     borderRadius: 12,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.lg,
     marginBottom: spacing.xl,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.red,
-    minWidth: 200,
+    width: '80%',
   },
   winnerAmountContainer: {
     borderColor: colors.green,
+    backgroundColor: colors.greenBlue20,
   },
   loserAmountContainer: {
     borderColor: colors.red,
+    backgroundColor: colors.red20,
   },
   amountText: {
     color: colors.white,
@@ -116,11 +122,19 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderRadius: 12,
     marginBottom: spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   shareButtonText: {
     color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
+  },
+  twitterIcon: {
+    width: 16,
+    height: 16,
+    tintColor: colors.white,
   },
   paymentOptionsContainer: {
     width: '100%',
@@ -169,19 +183,24 @@ export const styles = StyleSheet.create({
   // Action buttons container
   actionButtonsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     marginTop: spacing.xl,
     gap: spacing.md,
     width: '100%',
   },
+  // Bottom button container - Fixed at bottom
+  bottomButtonContainer: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.lg,
+    width: '100%',
+  },
   actionButton: {
-    flex: 1,
+    width: '100%',
     borderRadius: 12,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
+    overflow: 'hidden',
   },
   actionButtonDisabled: {
-    backgroundColor: colors.textSecondary,
+    opacity: 0.5,
   },
   actionButtonText: {
     fontSize: typography.fontSize.md,
@@ -192,10 +211,14 @@ export const styles = StyleSheet.create({
   },
   // Settle button styles
   settleButton: {
-    backgroundColor: colors.surface,
+    width: '100%',
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   settleButtonText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
   },

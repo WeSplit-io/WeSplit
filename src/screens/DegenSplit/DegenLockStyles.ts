@@ -12,17 +12,17 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     backgroundColor: colors.black,
   },
   backButton: {
     padding: spacing.sm,
   },
-  backButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.xl,
-    fontWeight: '600',
+  backButtonIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.white,
   },
   headerTitle: {
     color: colors.white,
@@ -37,8 +37,6 @@ export const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: 0, // Remove horizontal padding to match design
-    paddingBottom: spacing.xxl, // Add bottom padding for phone UI
-    justifyContent: 'space-between',
     flexGrow: 1,
   },
   billCard: {
@@ -46,13 +44,14 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.green,
     borderRadius: 16,
     padding: spacing.lg,
-    marginTop: spacing.xl,
+    marginTop: spacing.md,
     marginHorizontal: spacing.md,
     // Create ticket effect with pseudo-elements using border radius
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
+    gap: spacing.md,
     // Add gradient effect
     shadowColor: colors.green,
     shadowOffset: {
@@ -68,19 +67,54 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
-  billIcon: {
-    fontSize: 16,
+  billCardDotLeft: {
+    width: 30,
+    height: 30,
+    borderRadius: 20,
+    marginRight: spacing.xs,
+    position: 'absolute',
+    bottom: '50%',
+    left: -15,
+    backgroundColor: colors.black,
+    zIndex: 1,
+  },  
+  billCardDotRight: {
+    width: 30,
+    height: 30,
+    borderRadius: 20,
+    marginLeft: spacing.xs,
+    position: 'absolute',
+    bottom: '50%',
+    right: -15,
+    backgroundColor: colors.black,
+    zIndex: 1,
+  },
+  billIconContainer: {
+    width: 32,
+    height: 32,
+    backgroundColor: colors.black,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: spacing.sm,
   },
+  billIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.white,
+  },
+  billTitleContainer: {
+    flex: 1,
+  },
   billTitle: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.xl,
     fontWeight: '700',
+    marginBottom: spacing.xs,
   },
   billDate: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.md,
-    marginBottom: spacing.md,
     opacity: 0.9,
   },
   totalBillRow: {
@@ -89,12 +123,12 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   totalBillLabel: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.md,
     opacity: 0.9,
   },
   totalBillAmount: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.xxl,
     fontWeight: '700',
   },
@@ -106,24 +140,19 @@ export const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: colors.surface, // Dark gray background
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    borderWidth: 8,
-    borderColor: colors.white70, // Light gray border for the filled portion
+    borderWidth: 15,
+    borderColor: colors.white10, // Light gray border for the filled portion
   },
   progressFill: {
     position: 'absolute',
     width: 200,
     height: 200,
     borderRadius: 100,
-    borderWidth: 8,
-    borderColor: colors.white70, // Light gray for progress
-    borderTopColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderLeftColor: colors.white70,
+    borderWidth: 15,
+    borderColor: colors.green, // Light gray for progress
     transform: [{ rotate: '-90deg' }], // Start from top
   },
   progressInner: {
@@ -141,19 +170,19 @@ export const styles = StyleSheet.create({
     fontWeight: '400',
     textAlign: 'center',
   },
-  // Removed instructions container as it's not in the design
-  slideContainer: {
-    marginBottom: spacing.xxl,
-    paddingBottom: spacing.lg, // Extra padding for phone UI elements
+  // Lock button at bottom of screen
+  lockButtonContainer: {
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.black,
+    marginTop: 'auto', // Push to bottom
   },
-  slideButton: {
-    backgroundColor: colors.green,
+  lockButton: {
     borderRadius: 12,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
     position: 'relative',
     overflow: 'hidden',
-    marginHorizontal: spacing.md,
     // Add gradient effect shadow
     shadowColor: colors.green,
     shadowOffset: {
@@ -163,28 +192,20 @@ export const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
+    width: '100%',
   },
-  slideButtonDisabled: {
+  lockButtonDisabled: {
     backgroundColor: colors.surface,
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  slideButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  slideButtonText: {
-    color: colors.white,
+  lockButtonText: {
+    color: colors.black,
     fontSize: typography.fontSize.lg,
-    fontWeight: '700',
-    marginRight: spacing.sm,
+    fontWeight: '600',
   },
-  slideButtonTextDisabled: {
+  lockButtonTextDisabled: {
     color: colors.textSecondary,
-  },
-  slideButtonArrow: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '700',
   },
   slideProgress: {
     position: 'absolute',
@@ -257,17 +278,16 @@ export const styles = StyleSheet.create({
   participantCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white5,
     borderRadius: 16,
-    padding: spacing.lg,
+    padding: spacing.md,
     marginBottom: spacing.md,
   },
   participantAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.green,
-    marginRight: spacing.md,
+    backgroundColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -278,6 +298,7 @@ export const styles = StyleSheet.create({
   },
   participantInfo: {
     flex: 1,
+    marginLeft: spacing.md,
   },
   participantName: {
     color: colors.white,
@@ -303,11 +324,10 @@ export const styles = StyleSheet.create({
     marginLeft: spacing.sm,
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
-    backgroundColor: colors.green,
     borderRadius: 4,
   },
   lockedIndicatorText: {
-    color: colors.black,
+    color: colors.white,
     fontSize: typography.fontSize.xs,
     fontWeight: '600',
   },
@@ -323,11 +343,11 @@ export const styles = StyleSheet.create({
     zIndex: 1000,
   },
   modalContainer: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.blackWhite5,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: spacing.md,
-    paddingBottom: Math.max(spacing.xl, 34), // Account for safe area
+    paddingBottom: spacing.xxl, // Account for safe area
   },
   modalHandle: {
     width: 40,
@@ -343,9 +363,16 @@ export const styles = StyleSheet.create({
   },
   modalIconContainer: {
     marginBottom: spacing.lg,
+    backgroundColor: colors.white10,
+    borderRadius: 16,
+    padding: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalLockIcon: {
-    fontSize: 48,
+    width: 28,
+    height: 28,
+    tintColor: colors.white,
   },
   modalTitle: {
     color: colors.white,
@@ -384,5 +411,47 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.lg,
     fontWeight: '700',
+  },
+  
+  // AppleSlider styles
+  appleSliderGradientBorder: {
+    borderRadius: 999,
+    padding: 3,
+    width: '100%',
+  },
+  appleSliderContainer: {
+    borderRadius: 999,
+    backgroundColor: colors.blackWhite5,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  appleSliderTrack: {
+    height: 60,
+    borderRadius: 999,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  appleSliderText: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: '500',
+    textAlign: 'center',
+    zIndex: 1,
+  },
+  appleSliderThumb: {
+    position: 'absolute',
+    left: 5,
+    top: 5,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  appleSliderThumbIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.black,
   },
 });
