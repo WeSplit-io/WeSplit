@@ -124,8 +124,6 @@ export default {
       EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE: process.env.EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE,
       EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE: process.env.EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE,
       
-      // Privy Configuration
-      EXPO_PUBLIC_PRIVY_APP_ID: process.env.EXPO_PUBLIC_PRIVY_APP_ID
     }
   }
 }; 

@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
-import { unifiedUserService } from '../../services/unifiedUserService';
+import { firebaseDataService } from '../../services/firebaseDataService';
 import { userWalletService } from '../../services/userWalletService';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { colors } from '../../theme';
@@ -159,7 +159,7 @@ const CreateProfileScreen: React.FC = () => {
 
       // Check if user already exists and has a username
       try {
-        const existingUser = await unifiedUserService.getUserByEmail(email);
+        const existingUser = await firebaseDataService.user.getUserByEmail(email);
         
         if (existingUser && existingUser.name && existingUser.name.trim() !== '') {
           console.log('✅ User already has username, skipping profile creation:', existingUser.name);
@@ -199,21 +199,21 @@ const CreateProfileScreen: React.FC = () => {
           avatar: avatar || undefined,
         };
 
-        console.log('Creating/getting user with unified service:', { email, name: pseudo });
-        const result = await unifiedUserService.createOrGetUser(userData);
+        console.log('Creating/getting user with firebase service:', { email, name: pseudo });
+        const user = await firebaseDataService.user.createUserIfNotExists(userData);
         
-        if (!result.success || !result.user) {
-          throw new Error(result.error || 'Failed to create user');
+        if (!user) {
+          throw new Error('Failed to create user');
         }
 
-        console.log('User created/retrieved successfully:', result.user);
+        console.log('User created/retrieved successfully:', user);
 
         // Upload avatar if provided
-        let finalAvatarUrl = result.user.avatar;
+        let finalAvatarUrl = user.avatar;
         if (avatar && avatar.startsWith('file://')) {
           console.log('📸 CreateProfile: Uploading avatar...');
           const uploadResult = await UserImageService.uploadUserAvatar(
-            result.user.id.toString(), 
+            user.id.toString(), 
             avatar
           );
           
@@ -227,19 +227,19 @@ const CreateProfileScreen: React.FC = () => {
         }
 
         // Build user object for local state
-        const user = {
-          id: result.user.id.toString(),
-          name: result.user.name,
-          email: result.user.email,
+        const appUser = {
+          id: user.id.toString(),
+          name: user.name,
+          email: user.email,
           avatar: finalAvatarUrl || 'https://randomuser.me/api/portraits/men/32.jpg',
-          walletAddress: result.user.wallet_address,
-          wallet_address: result.user.wallet_address,
-          wallet_public_key: result.user.wallet_public_key,
-          created_at: result.user.created_at,
+          walletAddress: user.wallet_address,
+          wallet_address: user.wallet_address,
+          wallet_public_key: user.wallet_public_key,
+          created_at: user.created_at,
           hasCompletedOnboarding: true // User has completed profile creation
         };
 
-        authenticateUser(user, 'email');
+        authenticateUser(appUser, 'email');
         
         try {
           (navigation as any).replace('Dashboard');

@@ -1056,8 +1056,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       if (contact.email) {
         try {
           console.log('🔍 SplitDetailsScreen: Looking up user by email:', contact.email);
-          const { unifiedUserService } = await import('../../services/unifiedUserService');
-          const userByEmail = await unifiedUserService.getUserByEmail(contact.email);
+          const { firebaseDataService } = await import('../../services/firebaseDataService');
+          const userByEmail = await firebaseDataService.user.getUserByEmail(contact.email);
           if (userByEmail) {
             recipientUserId = userByEmail.id;
             recipientUserData = userByEmail;

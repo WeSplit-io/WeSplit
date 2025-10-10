@@ -450,6 +450,24 @@ export const firebaseUserService = {
     }
   },
 
+  getUserByEmail: async (email: string): Promise<User | null> => {
+    try {
+      const usersRef = collection(db, 'users');
+      const userQuery = query(usersRef, where('email', '==', email));
+      const userDocs = await getDocs(userQuery);
+      
+      if (!userDocs.empty) {
+        const userDoc = userDocs.docs[0];
+        return firebaseDataTransformers.firestoreToUser(userDoc);
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting user by email:', error);
+      return null;
+    }
+  },
+
   updateUser: async (userId: string, updates: Partial<User>): Promise<User> => {
     const userRef = doc(db, 'users', userId);
     const updateData: any = {};

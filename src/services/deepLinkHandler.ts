@@ -372,6 +372,17 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
         console.log('🔥 OAuth callback received:', linkData);
         // Handle OAuth callback - this will be processed by the OAuth services
         // The OAuth services will handle the code exchange and user authentication
+        if (linkData.oauthError) {
+          console.error('🔥 OAuth callback error:', linkData.oauthError);
+          Alert.alert(
+            'Authentication Error',
+            `OAuth authentication failed: ${linkData.oauthError}`
+          );
+        } else if (linkData.oauthCode) {
+          console.log('🔥 OAuth callback success, code received');
+          // The OAuth service should handle this automatically
+          // This is just for logging and debugging
+        }
         break;
       
       case 'join-split':

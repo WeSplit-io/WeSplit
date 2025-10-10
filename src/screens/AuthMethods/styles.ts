@@ -83,19 +83,6 @@ export const styles = StyleSheet.create({
     opacity: 0.6,
   },
   // Social authentication section styles
-  privySection: {
-    marginBottom: spacing.xl,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.darkBorder,
-  },
-  privySectionTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
   socialOptions: {
     gap: spacing.md,
   },

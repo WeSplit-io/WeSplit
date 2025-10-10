@@ -23,12 +23,11 @@ import { firebaseAuth, firestoreService, auth } from '../../config/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { consolidatedWalletService } from '../../services/consolidatedWalletService';
-import { consolidatedAuthService } from '../../services/consolidatedAuthService';
-import { userWalletService } from '../../services/userWalletService';
-import { unifiedUserService } from '../../services/unifiedUserService';
-import { userDataService } from '../../services/userDataService';
+import { unifiedSSOService } from '../../services/unifiedSSOService';
 import { sendVerificationCode } from '../../services/firebaseFunctionsService';
-// import { usePrivyAuth } from '../../hooks/usePrivyAuth';
+import { logOAuthConfiguration } from '../../utils/oauthTest';
+import { testEnvironmentVariables } from '../../utils/envTest';
+import { logOAuthDebugInfo } from '../../utils/oauthDebugger';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
@@ -48,12 +47,11 @@ const AuthMethodsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { authenticateUser, updateUser } = useApp();
   const { connectWallet } = useWallet();
-  // const { login: privyLogin, authenticated: privyAuthenticated, user: privyUser } = usePrivyAuth();
 
   // State management
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<'google' | 'twitter' | 'apple' | 'privy' | null>(null);
+  const [socialLoading, setSocialLoading] = useState<'google' | 'twitter' | 'apple' | null>(null);
   const [hasCheckedMonthlyVerification, setHasCheckedMonthlyVerification] = useState(false);
   const [hasHandledAuthState, setHasHandledAuthState] = useState(false);
 
@@ -456,55 +454,30 @@ const AuthMethodsScreen: React.FC = () => {
       }
   };
 
-  // Handle social authentication (replaces Privy authentication)
-  const handleSocialAuthWithProvider = async (provider: 'google' | 'twitter' | 'apple') => {
-    setSocialLoading(provider);
-    
-    try {
-      console.log('🚀 Starting social authentication with provider:', provider);
-      
-      // Use consolidated auth service for social login
-      await handleSocialAuth(provider);
-      
-      console.log('✅ Social authentication initiated successfully');
-      
-    } catch (error) {
-      console.error('❌ Social authentication failed:', error);
-      Alert.alert(
-        'Authentication Failed',
-        error instanceof Error ? error.message : `Failed to authenticate with ${provider}. Please try again.`
-      );
-    } finally {
-      setSocialLoading(null);
-    }
-  };
 
   // Handle social authentication with improved error handling and user data management
   const handleSocialAuth = async (provider: 'google' | 'twitter' | 'apple') => {
     setSocialLoading(provider);
     
     try {
-      let authResult;
+      // Log OAuth configuration for debugging
+      console.log(`🔧 Testing OAuth configuration for ${provider}...`);
+      testEnvironmentVariables();
+      logOAuthConfiguration();
+      logOAuthDebugInfo();
       
-      switch (provider) {
-        case 'google':
-          authResult = await consolidatedAuthService.signInWithGoogle();
-          break;
-        case 'twitter':
-          authResult = await consolidatedAuthService.signInWithTwitter();
-          break;
-        case 'apple':
-          authResult = await consolidatedAuthService.signInWithApple();
-          break;
-        default:
-          throw new Error('Unsupported provider');
-      }
+      // Use unified SSO service for authentication
+      const ssoResult = await unifiedSSOService.authenticateWithSSO(provider);
 
-      if (authResult.success && authResult.user) {
+      if (ssoResult.success && ssoResult.user) {
+        console.log(`✅ ${provider} authentication successful, saving user data...`);
+        
         // Save user data to Firestore using the new user data service
         const userDataResult = await userDataService.saveUserDataAfterSSO(authResult.user, provider);
 
         if (userDataResult.success && userDataResult.userData) {
+          console.log(`✅ User data saved successfully for ${provider} user`);
+          
           // Transform to app user format
           const appUser = {
             id: userDataResult.userData.id,
@@ -517,6 +490,15 @@ const AuthMethodsScreen: React.FC = () => {
             hasCompletedOnboarding: userDataResult.userData.hasCompletedOnboarding
           };
 
+          console.log('🔍 SSO User data:', {
+            id: appUser.id,
+            email: appUser.email,
+            name: appUser.name,
+            hasWallet: !!appUser.wallet_address,
+            walletAddress: appUser.wallet_address,
+            hasCompletedOnboarding: appUser.hasCompletedOnboarding
+          });
+
           // Authenticate user with social provider
           authenticateUser(appUser, 'social');
 
@@ -524,40 +506,118 @@ const AuthMethodsScreen: React.FC = () => {
           const needsProfile = !appUser.name || appUser.name.trim() === '';
 
           if (needsProfile) {
+            console.log('🔄 User needs profile creation, navigating to CreateProfile');
             navigation.reset({
               index: 0,
               routes: [{ name: 'CreateProfile', params: { email: appUser.email } }],
             });
           } else if (appUser.hasCompletedOnboarding) {
+            console.log('✅ User has completed onboarding, navigating to Dashboard');
             navigation.reset({
               index: 0,
               routes: [{ name: 'Dashboard' }],
             });
           } else {
+            console.log('🔄 User needs onboarding, navigating to Onboarding');
             navigation.reset({
               index: 0,
               routes: [{ name: 'Onboarding' }],
             });
           }
         } else {
-          console.error(`Failed to save user data for ${provider}:`, userDataResult.error);
+          console.error(`❌ Failed to save user data for ${provider}:`, userDataResult.error);
+          
+          // Provide more specific error messages
+          let errorMessage = 'Failed to save user data. Please try again.';
+          if (userDataResult.error) {
+            if (userDataResult.error.includes('wallet')) {
+              errorMessage = 'Account created successfully, but wallet setup failed. You can add a wallet later.';
+            } else if (userDataResult.error.includes('network') || userDataResult.error.includes('timeout')) {
+              errorMessage = 'Network error occurred. Please check your connection and try again.';
+            } else {
+              errorMessage = userDataResult.error;
+            }
+          }
+          
           Alert.alert(
-            'Authentication Failed',
-            userDataResult.error || 'Failed to save user data. Please try again.'
+            'Authentication Issue',
+            errorMessage,
+            [
+              {
+                text: 'Try Again',
+                onPress: () => handleSocialAuth(provider)
+              },
+              {
+                text: 'Cancel',
+                style: 'cancel'
+              }
+            ]
           );
         }
       } else {
-        console.error(`${provider} authentication failed:`, authResult.error);
+        console.error(`❌ ${provider} authentication failed:`, authResult.error);
+        
+        // Provide more specific error messages for common OAuth issues
+        let errorMessage = 'Failed to authenticate with social provider. Please try again.';
+        if (authResult.error) {
+          if (authResult.error.includes('cancelled')) {
+            errorMessage = 'Sign-in was cancelled. Please try again if you want to continue.';
+          } else if (authResult.error.includes('not configured') || authResult.error.includes('Client ID')) {
+            errorMessage = `${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-in is not properly configured. Please contact support.`;
+          } else if (authResult.error.includes('network') || authResult.error.includes('timeout')) {
+            errorMessage = 'Network error occurred. Please check your connection and try again.';
+          } else if (authResult.error.includes('already exists')) {
+            errorMessage = 'An account with this email already exists. Please try signing in with a different method.';
+          } else {
+            errorMessage = authResult.error;
+          }
+        }
+        
         Alert.alert(
           'Authentication Failed',
-          authResult.error || 'Failed to authenticate with social provider. Please try again.'
+          errorMessage,
+          [
+            {
+              text: 'Try Again',
+              onPress: () => handleSocialAuth(provider)
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel'
+            }
+          ]
         );
       }
     } catch (error) {
       console.error(`${provider} authentication error:`, error);
+      
+      // Provide more specific error messages for common OAuth issues
+      let errorMessage = 'Failed to authenticate. Please try again.';
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Authentication timed out. Please try again.';
+        } else if (error.message.includes('network')) {
+          errorMessage = 'Network error occurred. Please check your connection and try again.';
+        } else if (error.message.includes('cancelled')) {
+          errorMessage = 'Sign-in was cancelled. Please try again if you want to continue.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       Alert.alert(
         'Authentication Error',
-        error instanceof Error ? error.message : 'Failed to authenticate. Please try again.'
+        errorMessage,
+        [
+          {
+            text: 'Try Again',
+            onPress: () => handleSocialAuth(provider)
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          }
+        ]
       );
     } finally {
       setSocialLoading(null);
@@ -565,7 +625,7 @@ const AuthMethodsScreen: React.FC = () => {
   };
 
   // Get loading text for social buttons
-  const getSocialLoadingText = (provider: 'google' | 'twitter' | 'apple' | 'privy') => {
+  const getSocialLoadingText = (provider: 'google' | 'twitter' | 'apple') => {
     switch (provider) {
       case 'google':
         return 'Signing in with Google...';
@@ -573,8 +633,6 @@ const AuthMethodsScreen: React.FC = () => {
         return 'Signing in with Twitter...';
       case 'apple':
         return 'Signing in with Apple...';
-      case 'privy':
-        return 'Signing in with Privy...';
       default:
         return 'Signing in...';
     }
@@ -645,61 +703,6 @@ const AuthMethodsScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Privy Authentication Section */}
-          <View style={styles.privySection}>
-            <Text style={styles.privySectionTitle}>Social Login Options</Text>
-            
-            {/* Social Authentication Options */}
-            <View style={styles.socialOptions}>
-              <TouchableOpacity
-                style={[
-                  styles.socialButton,
-                  (loading || socialLoading === 'google') && styles.socialButtonDisabled
-                ]}
-                onPress={() => handleSocialAuthWithProvider('google')}
-                disabled={loading || socialLoading !== null}
-              >
-                <View style={styles.socialIconContainer}>
-                  <Text style={styles.socialEmoji}>🔍</Text>
-                </View>
-                <Text style={styles.socialButtonText}>
-                  {socialLoading === 'google' ? 'Signing in...' : 'Sign in with Google'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.socialButton,
-                  (loading || socialLoading === 'twitter') && styles.socialButtonDisabled
-                ]}
-                onPress={() => handleSocialAuthWithProvider('twitter')}
-                disabled={loading || socialLoading !== null}
-              >
-                <View style={styles.socialIconContainer}>
-                  <Text style={styles.socialEmoji}>🐦</Text>
-                </View>
-                <Text style={styles.socialButtonText}>
-                  {socialLoading === 'twitter' ? 'Signing in...' : 'Sign in with Twitter'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.socialButton,
-                  (loading || socialLoading === 'apple') && styles.socialButtonDisabled
-                ]}
-                onPress={() => handleSocialAuthWithProvider('apple')}
-                disabled={loading || socialLoading !== null}
-              >
-                <View style={styles.socialIconContainer}>
-                  <Text style={styles.socialEmoji}>🍎</Text>
-                </View>
-                <Text style={styles.socialButtonText}>
-                  {socialLoading === 'apple' ? 'Signing in...' : 'Sign in with Apple'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
 
           {/* Separator */}
           <View style={styles.separator}>
