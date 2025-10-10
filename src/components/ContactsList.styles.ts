@@ -145,16 +145,19 @@ export const styles = StyleSheet.create({
   },
   addButton: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.sm,
     backgroundColor: colors.white10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.white30,
+    borderRadius: 16,
   },
   addButtonText: {
     color: colors.white,
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
+  },
+  addButtonIcon: {
+    width: 16,
+    height: 16,
+    resizeMode: 'contain',
   },
   loadingContainer: {
     flex: 1,

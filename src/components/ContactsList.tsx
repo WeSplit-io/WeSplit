@@ -538,12 +538,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
       {multiSelect ? (
         <View style={styles.selectIndicator}>
           {isSelected ? (
-            <View style={styles.checkmark}>
-              <Icon
-                name="check"
-                size={16}
-                color={colors.white}
-              />
+            <View style={styles.addButton}>
+              <Image source={require('../../assets/check-lg-linear.png')} style={styles.addButtonIcon} />
             </View>
           ) : (
             <View style={styles.addButton}>
@@ -728,24 +724,29 @@ const ContactsList: React.FC<ContactsListProps> = ({
                         hasAvatar: !!user.avatar
                       });
 
+                      const userAsContact: UserContact = {
+                        id: user.id,
+                        name: user.name,
+                        email: user.email,
+                        wallet_address: user.wallet_address,
+                        wallet_public_key: user.wallet_public_key,
+                        created_at: user.created_at,
+                        joined_at: user.created_at,
+                        first_met_at: user.created_at,
+                        avatar: user.avatar,
+                        mutual_groups_count: 0,
+                        isFavorite: false
+                      };
+
+                      const isSelected = multiSelect && selectedContacts.some(c => c.id === user.id);
+                      const isAlreadyContact = isUserAlreadyContact(user);
+
                       return (
-                        <View key={`search-${user.id}`} style={styles.contactRow}>
-                          <TouchableOpacity
-                            style={styles.searchContactRow}
-                            onPress={() => onContactSelect({
-                              id: user.id,
-                              name: user.name,
-                              email: user.email,
-                              wallet_address: user.wallet_address,
-                              wallet_public_key: user.wallet_public_key,
-                              created_at: user.created_at,
-                              joined_at: user.created_at,
-                              first_met_at: user.created_at,
-                              avatar: user.avatar,
-                              mutual_groups_count: 0,
-                              isFavorite: false
-                            })}
-                          >
+                        <TouchableOpacity
+                          key={`search-${user.id}`}
+                          style={[styles.contactRow, isSelected && styles.contactRowSelected]}
+                          onPress={() => onContactSelect(userAsContact)}
+                        >
                           <UserAvatar
                             userId={user.id.toString()}
                             userName={user.name}
@@ -767,31 +768,45 @@ const ContactsList: React.FC<ContactsListProps> = ({
                               {user.wallet_address ? formatWalletAddress(user.wallet_address) : user.email}
                             </Text>
                           </View>
-                        </TouchableOpacity>
-                        {showAddButton && (
-                          !isUserAlreadyContact(user) ? (
-                            <TouchableOpacity
-                              style={styles.favoriteButton}
-                              onPress={() => handleAddContact(user)}
-                              disabled={isAddingContact === Number(user.id)}
-                            >
-                              <Icon
-                                name={isAddingContact === Number(user.id) ? "check" : "user-plus"}
-                                size={16}
-                                color={isAddingContact === Number(user.id) ? colors.brandGreen : colors.brandGreen}
-                              />
-                            </TouchableOpacity>
-                          ) : (
-                            <View style={styles.favoriteButton}>
-                              <Icon
-                                name="check"
-                                size={16}
-                                color={colors.brandGreen}
-                              />
+                          {multiSelect ? (
+                            <View style={styles.selectIndicator}>
+                              {isSelected ? (
+                                <View style={styles.addButton}>
+                                  
+                                  <Image source={require('../../assets/check-lg-linear.png')} style={styles.addButtonIcon} />
+                                </View>
+                              ) : (
+                                <View style={styles.addButton}>
+                                  <Text style={styles.addButtonText}>Add</Text>
+                                </View>
+                              )}
                             </View>
-                          )
-                        )}
-                      </View>
+                          ) : (
+                            showAddButton && (
+                              !isAlreadyContact ? (
+                                <TouchableOpacity
+                                  style={styles.favoriteButton}
+                                  onPress={() => handleAddContact(user)}
+                                  disabled={isAddingContact === Number(user.id)}
+                                >
+                                  <Icon
+                                    name={isAddingContact === Number(user.id) ? "check" : "user-plus"}
+                                    size={16}
+                                    color={isAddingContact === Number(user.id) ? colors.brandGreen : colors.brandGreen}
+                                  />
+                                </TouchableOpacity>
+                              ) : (
+                                <View style={styles.favoriteButton}>
+                                  <Icon
+                                    name="check"
+                                    size={16}
+                                    color={colors.brandGreen}
+                                  />
+                                </View>
+                              )
+                            )
+                          )}
+                        </TouchableOpacity>
                       );
                     })}
                   </View>

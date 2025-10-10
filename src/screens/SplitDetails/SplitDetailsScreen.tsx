@@ -2976,37 +2976,47 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
             {/* Modal Content */}
             <View style={styles.privateKeyModalContent}>
-              <Text style={styles.privateKeyModalTitle}>🔑 Split Wallet Private Key</Text>
-              <Text style={styles.privateKeyModalSubtitle}>
-                Keep this private key secure. Only you can access it.
-              </Text>
+              {/* Main Content */}
+              <View style={styles.privateKeyMainContent}>
+                <Text style={styles.privateKeyModalTitle}>Split Wallet Private Key</Text>
+                <Text style={styles.privateKeyModalSubtitle}>
+                  Keep this secure. Only you can access your split wallet with this key.
+                </Text>
 
-              {/* Private Key Display */}
-              <View style={styles.privateKeyDisplayContainer}>
-                <Text style={styles.privateKeyLabel}>Private Key:</Text>
-                <View style={styles.privateKeyTextContainer}>
-                  <Text style={styles.privateKeyText} selectable={true}>
-                    {splitWalletPrivateKey}
+                {/* Private Key Display */}
+                <View style={styles.privateKeyDisplayContainer}>
+                  <Text style={styles.privateKeyLabel}>Private Key:</Text>
+                  <View style={styles.privateKeyTextContainer}>
+                    <Text style={styles.privateKeyText} selectable={true}>
+                      {splitWalletPrivateKey}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Warning */}
+                <View style={styles.privateKeyWarning}>
+                  <Text style={styles.privateKeyWarningIcon}>⚠️</Text>
+                  <Text style={styles.privateKeyWarningText}>
+                    Never share this private key with anyone. It gives full access to your split wallet.
                   </Text>
                 </View>
               </View>
 
-              {/* Warning */}
-              <View style={styles.privateKeyWarning}>
-                <Text style={styles.privateKeyWarningIcon}>⚠️</Text>
-                <Text style={styles.privateKeyWarningText}>
-                  Never share this private key with anyone. It gives full access to your split wallet.
-                </Text>
-              </View>
-
-              {/* Action Buttons */}
+              {/* Action Buttons - Fixed at bottom */}
               <View style={styles.privateKeyButtonContainer}>
+                <TouchableOpacity
+                  style={styles.closePrivateKeyButton}
+                  onPress={handleClosePrivateKeyModal}
+                >
+                  <Text style={styles.closePrivateKeyButtonText}>Close</Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity
                   style={styles.copyButton}
                   onPress={async () => {
                     if (splitWalletPrivateKey) {
                       await Clipboard.setStringAsync(splitWalletPrivateKey);
-                      Alert.alert('Copied', 'Private key copied to clipboard');
+                      Alert.alert('✅ Copied', 'Private key copied to clipboard');
                     }
                   }}
                 >
@@ -3016,15 +3026,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                     end={{ x: 1, y: 0 }}
                     style={styles.copyButtonGradient}
                   >
-                    <Text style={styles.copyButtonText}>📋 Copy</Text>
+                    <Text style={styles.copyButtonText}>Copy to Clipboard</Text>
                   </LinearGradient>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.closePrivateKeyButton}
-                  onPress={handleClosePrivateKeyModal}
-                >
-                  <Text style={styles.closePrivateKeyButtonText}>Close</Text>
                 </TouchableOpacity>
               </View>
             </View>

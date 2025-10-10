@@ -168,12 +168,14 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     backgroundColor: colors.black,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    marginBottom: spacing.md,
   },
   inviteButton: {
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  inviteButtonDisabled: {
+    opacity: 0.6,
   },
   inviteButtonGradient: {
     paddingVertical: 16,
@@ -182,8 +184,10 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   inviteButtonText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: 16,
     fontWeight: typography.fontWeight.semibold,
+  },
+  inviteButtonTextDisabled: {
   },
 }); 

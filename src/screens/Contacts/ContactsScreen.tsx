@@ -124,7 +124,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
           onAddContact={handleAddContact}
           showAddButton={isSplitMode}
           showSearch={true}
-          showTabs={!isSplitMode}
+          showTabs={true}
           activeTab={activeTab}
           onTabChange={handleTabChange}
           searchQuery={searchQuery}
@@ -136,15 +136,21 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
         />
       </View>
 
-      {isSplitMode && selectedContacts.length > 0 && (
+      {isSplitMode && (
         <View style={styles.inviteButtonContainer}>
           <TouchableOpacity
-            style={styles.inviteButton}
+            style={[
+              styles.inviteButton,
+              selectedContacts.length === 0 && styles.inviteButtonDisabled
+            ]}
             onPress={handleInviteContacts}
-            disabled={isInviting}
+            disabled={isInviting || selectedContacts.length === 0}
           >
             <LinearGradient
-              colors={[colors.green, colors.greenLight]}
+              colors={selectedContacts.length === 0 
+                ? [colors.darkGray, colors.darkGray] 
+                : [colors.green, colors.greenLight]
+              }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.inviteButtonGradient}
@@ -152,8 +158,14 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
               {isInviting ? (
                 <ActivityIndicator size="small" color={colors.white} />
               ) : (
-                <Text style={styles.inviteButtonText}>
-                  Invite {selectedContacts.length} {selectedContacts.length === 1 ? 'Contact' : 'Contacts'}
+                <Text style={[
+                  styles.inviteButtonText,
+                  selectedContacts.length === 0 && styles.inviteButtonTextDisabled
+                ]}>
+                  {selectedContacts.length === 0 
+                    ? 'Invite' 
+                    : `Invite ${selectedContacts.length} ${selectedContacts.length === 1 ? 'Contact' : 'Contacts'}`
+                  }
                 </Text>
               )}
             </LinearGradient>
