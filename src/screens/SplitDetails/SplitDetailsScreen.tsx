@@ -2822,9 +2822,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   ]}
                   onPress={() => handleSplitTypeSelection('fair')}
                 >
-                  <View style={styles.splitOptionIcon}>
-                    <Text style={styles.splitOptionIconText}>⚖️</Text>
-                  </View>
+                
+                    
+                    <Image
+                      source={require('../../../assets/fair-split-icon.png')}
+                      style={styles.splitOptionIconImage}
+                    />
+                 
                   <Text style={styles.splitOptionTitle}>Fair Split</Text>
                   <Text style={styles.splitOptionDescription}>
                     Everyone pays their fair share
@@ -2839,13 +2843,21 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   ]}
                   onPress={() => handleSplitTypeSelection('degen')}
                 >
-                  <View style={styles.riskyModeLabel}>
+                  <LinearGradient
+                    colors={[colors.green, colors.greenLight]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.riskyModeLabel}
+                  >
                     <Text style={styles.riskyModeIcon}>🔥</Text>
                     <Text style={styles.riskyModeText}>Risky mode</Text>
-                  </View>
-                  <View style={styles.splitOptionIcon}>
-                    <Text style={styles.splitOptionIconText}>🎲</Text>
-                  </View>
+                  </LinearGradient>
+                  
+                    <Image
+                      source={require('../../../assets/degen-split-icon.png')}
+                      style={styles.splitOptionIconImage}
+                    />
+              
                   <Text style={styles.splitOptionTitle}>Degen Split</Text>
                   <Text style={styles.splitOptionDescription}>
                     One pays it all, luck decides who

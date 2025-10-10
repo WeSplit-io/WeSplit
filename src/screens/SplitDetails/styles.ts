@@ -303,19 +303,19 @@ export const styles = StyleSheet.create({
     zIndex: 1000,
   },
   modalContainer: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.blackWhite5,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: spacing.md,
     paddingBottom: spacing.xl,
     paddingHorizontal: spacing.lg,
-    height: '65%',
+    height: '55%',
     minHeight: 400,
   },
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: colors.textSecondary,
+    backgroundColor: colors.white50,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: spacing.xl,
@@ -327,13 +327,12 @@ export const styles = StyleSheet.create({
   },
   modalTitle: {
     color: colors.white,
-    fontSize: typography.fontSize.xxl,
+    fontSize: typography.fontSize.xl,
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: spacing.sm,
   },
   modalSubtitle: {
-    color: colors.textSecondary,
+    color: colors.white80,
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     marginBottom: spacing.xl,
@@ -347,9 +346,9 @@ export const styles = StyleSheet.create({
   },
   splitOption: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white5,
     borderRadius: 16,
-    padding: spacing.lg,
+    padding: spacing.md,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
@@ -360,14 +359,13 @@ export const styles = StyleSheet.create({
   splitOptionSelected: {
     borderColor: colors.green,
   },
-  splitOptionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.surface,
+
+  splitOptionIconImage: {
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   splitOptionIconText: {
     fontSize: 28,
@@ -375,12 +373,12 @@ export const styles = StyleSheet.create({
   splitOptionTitle: {
     color: colors.white,
     fontSize: typography.fontSize.lg,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
   splitOptionDescription: {
-    color: colors.textSecondary,
+    color: colors.white80,
     fontSize: typography.fontSize.sm,
     textAlign: 'center',
     lineHeight: 18,
@@ -390,7 +388,6 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     top: -6,
     left: -6,
-    backgroundColor: colors.green,
     borderRadius: 12,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
@@ -403,24 +400,23 @@ export const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   riskyModeText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.xs,
     fontWeight: '600',
   },
   continueButton: {
     borderRadius: 12,
-    marginTop: spacing.lg,
     overflow: 'hidden',
   },
   continueButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   continueButtonGradient: {
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     alignItems: 'center',
   },
   continueButtonText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.lg,
     fontWeight: '700',
   },
