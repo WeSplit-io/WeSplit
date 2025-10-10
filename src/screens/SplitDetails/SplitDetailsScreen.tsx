@@ -31,6 +31,7 @@ import { BillAnalysisService } from '../../services/billAnalysisService';
 import { MockBillAnalysisService } from '../../services/mockBillAnalysisService';
 import { AIBillAnalysisService } from '../../services/aiBillAnalysisService';
 import { SplitInvitationService } from '../../services/splitInvitationService';
+import { convertFiatToUSDC, formatCurrencyAmount } from '../../services/fiatCurrencyService';
 import { NFCSplitService } from '../../services/nfcService';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
@@ -254,6 +255,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const [createdSplitId, setCreatedSplitId] = useState<string | null>(null);
   const [isJoiningSplit, setIsJoiningSplit] = useState(false);
   const [hasJustJoinedSplit, setHasJustJoinedSplit] = useState(false);
+  const [usdcEquivalent, setUsdcEquivalent] = useState<number | null>(null);
+  const [isConvertingCurrency, setIsConvertingCurrency] = useState(false);
 
   // Helper function to check if current user is the creator
   const isCurrentUserCreator = () => {
@@ -545,13 +548,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         priceManagementService.setBillPrice(
           processedData.id,
           processedData.totalAmount,
-          processedData.currency || 'USDC'
+          processedData.currency || 'USD'
         );
 
         console.log('💰 SplitDetailsScreen: Set authoritative price for new bill:', {
           billId: processedData.id,
           totalAmount: processedData.totalAmount,
-          currency: processedData.currency || 'USDC'
+          currency: processedData.currency || 'USD'
         });
 
         // Update the bill name and total amount with processed data
@@ -1195,7 +1198,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         await sendNotification(
           recipientUserId, // Use the found user ID
           `You're invited to split "${billName}"`,
-          `${currentUser.name} invited you to split a bill for ${totalAmount} USDC. Tap to join!`,
+          `${currentUser.name} invited you to split a bill for ${formatCurrencyAmount(parseFloat(totalAmount), processedBillData?.currency || billData?.currency || 'USD')}. Tap to join!`,
           'split_invite',
           {
             splitId: notificationSplitId,
@@ -1420,7 +1423,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       // Use React Native's Share API
       const { Share } = require('react-native');
       await Share.share({
-        message: `Join my bill split "${billName}" for ${totalAmount} ${processedBillData?.currency || 'USD'}. Click to join: ${shareableLink}`,
+        message: `Join my bill split "${billName}" for ${formatCurrencyAmount(parseFloat(totalAmount), processedBillData?.currency || 'USD')}. Click to join: ${shareableLink}`,
         url: shareableLink,
         title: `Join ${billName} Split`,
       });
@@ -2276,7 +2279,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           priceManagementService.setBillPrice(
             processedBillData.id,
             actualAmount, // Use actual amount from state
-            'USDC'
+            processedBillData.currency || 'USD'
           );
 
           if (__DEV__) {
@@ -2386,6 +2389,36 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     });
   }, [route?.params]);
 
+  // Convert currency to USDC when amount or currency changes
+  useEffect(() => {
+    const convertCurrency = async () => {
+      const currency = splitData?.currency || processedBillData?.currency || billData?.currency || 'USD';
+      const amount = parseFloat(totalAmount);
+      
+      if (!amount || isNaN(amount)) return;
+      
+      // Skip conversion for USD/USDC
+      if (currency === 'USD' || currency === 'USDC') {
+        setUsdcEquivalent(amount);
+        return;
+      }
+      
+      setIsConvertingCurrency(true);
+      try {
+        const convertedAmount = await convertFiatToUSDC(amount, currency);
+        setUsdcEquivalent(convertedAmount);
+      } catch (error) {
+        console.error('Error converting currency:', error);
+        // Fallback to original amount
+        setUsdcEquivalent(amount);
+      } finally {
+        setIsConvertingCurrency(false);
+      }
+    };
+
+    convertCurrency();
+  }, [totalAmount, splitData?.currency, processedBillData?.currency, billData?.currency]);
+
   // Show loading state when processing new bill
   if (isProcessingNewBill) {
     return (
@@ -2479,17 +2512,28 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             <View style={styles.billAmountContainer}>
               <Text style={styles.billAmountLabel}>Total Bill</Text>
               <View style={styles.billAmountRow}>
-                <Text style={styles.billAmountUSDC}>{totalAmount} USDC</Text>
-                <Text style={styles.billAmountEUR}>
-                  {(() => {
-                    const currency = splitData?.currency || processedBillData?.currency || billData?.currency || 'USD';
-                    if (currency === 'USD') {
-                      return `$${parseFloat(totalAmount).toFixed(2)}`;
-                    } else {
-                      return `${(parseFloat(totalAmount) * 0.95).toFixed(2)}€`;
-                    }
-                  })()}
-                </Text>
+                {(() => {
+                  const currency = splitData?.currency || processedBillData?.currency || billData?.currency || 'USD';
+                  const amount = parseFloat(totalAmount);
+                  
+                  // Show original currency first, then USDC equivalent
+                  return (
+                    <>
+                      <Text style={styles.billAmountUSDC}>
+                        {formatCurrencyAmount(amount, currency)}
+                      </Text>
+                      <Text style={styles.billAmountEUR}>
+                        {isConvertingCurrency ? (
+                          'Converting...'
+                        ) : usdcEquivalent !== null ? (
+                          `${usdcEquivalent.toFixed(2)} USDC`
+                        ) : (
+                          'Loading...'
+                        )}
+                      </Text>
+                    </>
+                  );
+                })()}
               </View>
               {/*{(splitData?.merchant?.address || processedBillData?.location || billData?.location) && (
                 <Text style={[styles.billAmountEUR, { marginTop: spacing.xs }]}>
