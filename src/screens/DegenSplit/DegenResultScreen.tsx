@@ -3,7 +3,7 @@
  * Shows the "loser" who has to pay the entire bill
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,9 @@ import {
   Alert,
   Image,
   Linking,
+  Animated,
+  PanResponder,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -34,6 +37,117 @@ interface SelectedParticipant {
   userId: string;
   avatar?: string;
 }
+
+// AppleSlider component adapted from DegenLockScreen
+interface AppleSliderProps {
+  onSlideComplete: () => void;
+  disabled: boolean;
+  loading: boolean;
+  text?: string;
+}
+
+const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, loading, text = 'Slide to Transfer' }) => {
+  const maxSlideDistance = 300;
+  const sliderValue = useRef(new Animated.Value(0)).current;
+  const [isSliderActive, setIsSliderActive] = useState(false);
+
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => !disabled && !loading,
+    onMoveShouldSetPanResponder: () => !disabled && !loading,
+    onPanResponderGrant: () => {
+      setIsSliderActive(true);
+    },
+    onPanResponderMove: (_, gestureState) => {
+      const newValue = Math.max(0, Math.min(gestureState.dx, maxSlideDistance));
+      sliderValue.setValue(newValue);
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (gestureState.dx > maxSlideDistance * 0.6) {
+        Animated.timing(sliderValue, {
+          toValue: maxSlideDistance,
+          duration: 200,
+          useNativeDriver: false,
+        }).start(() => {
+          if (onSlideComplete) onSlideComplete();
+          setTimeout(() => {
+            sliderValue.setValue(0);
+            setIsSliderActive(false);
+          }, 1000);
+        });
+      } else {
+        Animated.timing(sliderValue, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }).start(() => {
+          setIsSliderActive(false);
+        });
+      }
+    },
+  });
+
+  return (
+    <LinearGradient
+      colors={[colors.green, colors.greenBlue]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.appleSliderGradientBorder}
+    >
+      <View style={[styles.appleSliderContainer, disabled && { opacity: 0.5 }]} {...panResponder.panHandlers}>
+        <Animated.View style={styles.appleSliderTrack}>
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              opacity: sliderValue.interpolate({ inputRange: [0, maxSlideDistance], outputRange: [0, 1] }) as any,
+              borderRadius: 999,
+            }}
+          >
+            <LinearGradient
+              colors={[colors.green, colors.greenBlue]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                ...StyleSheet.absoluteFillObject,
+                borderRadius: 999,
+              }}
+            />
+          </Animated.View>
+          <Animated.Text
+            style={[
+              styles.appleSliderText,
+              { color: colors.white }
+            ]}
+          >
+            {loading ? 'Transferring...' : text}
+          </Animated.Text>
+        </Animated.View>
+        <Animated.View
+          style={[
+            styles.appleSliderThumb,
+            {
+              transform: [{ translateX: sliderValue }],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[colors.green, colors.greenBlue]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              borderRadius: 30,
+            }}
+          />
+          <Image 
+            source={require('../../../assets/chevron-right.png')} 
+            style={styles.appleSliderThumbIcon}
+          />
+        </Animated.View>
+      </View>
+    </LinearGradient>
+  );
+};
 
 const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route }) => {
   const { billData, participants, totalAmount, selectedParticipant, splitWallet, processedBillData, splitData } = route.params;
@@ -520,44 +634,43 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
                 {/* Transfer Visualization */}
                 <View style={styles.transferVisualization}>
                   <View style={styles.transferIcon}>
-                    <Text style={styles.transferIconText}>💳</Text>
+                    <Image 
+                      source={require('../../../assets/wesplit-logo-card.png')} 
+                      style={styles.transferIconImage}
+                      resizeMode="contain"
+                    />
                   </View>
                   <View style={styles.transferArrows}>
                     <Text style={styles.transferArrowText}>{'>>>>'}</Text>
                   </View>
                   <View style={styles.transferIcon}>
-                    <Text style={styles.transferIconText}>
-                      {selectedPaymentMethod === 'personal-wallet' ? '💳' : '🏦'}
-                    </Text>
+                    <Image 
+                      source={require('../../../assets/kast-logo.png')} 
+                      style={styles.transferIconImage}
+                      resizeMode="contain"
+                    />
                   </View>
                 </View>
 
-                <TouchableOpacity 
-                  style={[
-                    styles.transferButton,
-                    isSigning && styles.transferButtonDisabled
-                  ]}
-                  onPress={handleSignatureStep}
+                <AppleSlider
+                  onSlideComplete={handleSignatureStep}
                   disabled={isSigning}
-                >
-                  <View style={styles.transferButtonContent}>
-                    <View style={styles.transferButtonIcon}>
-                      <Text style={styles.transferButtonIconText}>→</Text>
-                    </View>
-                    <Text style={styles.transferButtonText}>
-                      {isSigning ? 'Signing...' : 'Transfer money'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                  loading={isSigning}
+                  text="Slide to Transfer"
+                />
 
                 <TouchableOpacity 
-                  style={styles.modalCancelButton}
+                  style={styles.modalBackButton}
                   onPress={() => {
                     setShowSignatureStep(false);
                     setSelectedPaymentMethod(null);
                   }}
                 >
-                  <Text style={styles.modalCancelButtonText}>Back</Text>
+                  <Image 
+                    source={require('../../../assets/chevron-left.png')} 
+                    style={styles.modalBackButtonIcon}
+                  />
+                  <Text style={styles.modalBackButtonText}>Back</Text>
                 </TouchableOpacity>
               </>
             )}

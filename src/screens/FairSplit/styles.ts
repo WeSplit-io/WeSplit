@@ -137,7 +137,7 @@ export const styles = StyleSheet.create({
   progressDetails: {
     marginTop: spacing.lg,
     width: '100%',
-    backgroundColor: colors.gray800,
+    backgroundColor: colors.blackWhite5,
     borderRadius: 12,
     padding: spacing.lg,
   },
@@ -483,14 +483,14 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: spacing.md,
+    height: 40,
   },
   modalCancelButton: {
-    flex: 1,
     backgroundColor: colors.white10,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 30,
+    paddingVertical: spacing.md,
   },
   modalCancelButtonText: {
     color: colors.white80,
@@ -551,18 +551,16 @@ export const styles = StyleSheet.create({
   splitOptionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.white5,
     borderRadius: 12,
     padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   splitOptionIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white5,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
@@ -597,10 +595,10 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
   },
   transferIcon: {
-    width: 60,
-    height: 60,
+    width: 70,
+    height: 70,
     borderRadius: 12,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -692,7 +690,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   selectedWalletInfo: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.white5,
     borderRadius: 8,
     padding: spacing.md,
     marginVertical: spacing.md,
@@ -700,7 +698,7 @@ export const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   selectedWalletLabel: {
-    color: colors.textSecondary,
+    color: colors.white70,
     fontSize: typography.fontSize.sm,
     marginBottom: spacing.xs,
   },
@@ -714,13 +712,10 @@ export const styles = StyleSheet.create({
   addWalletButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.white5,
     borderRadius: 12,
     padding: spacing.lg,
     marginBottom: spacing.md,
-    borderWidth: 2,
-    borderColor: colors.green,
-    borderStyle: 'dashed',
   },
   addWalletIcon: {
     width: 48,
@@ -740,7 +735,7 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   addWalletTitle: {
-    color: colors.green,
+    color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
     marginBottom: spacing.xs,
@@ -754,28 +749,70 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.lg,
     fontWeight: '600',
   },
-  // Progress details styles
-  progressDetails: {
-    marginTop: spacing.lg,
-    width: '100%',
-    backgroundColor: colors.gray800,
-    borderRadius: 12,
-    padding: spacing.lg,
+  // Transfer icon image styles
+  transferIconImage: {
+    width: 50,
+    height: 50,
   },
-  progressDetailRow: {
+  // Modal back button styles
+  modalBackButton: {
+    padding: spacing.sm,
+    zIndex: 1001,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
   },
-  progressDetailLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    fontWeight: '500',
+  modalBackButtonIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.white,
   },
-  progressDetailValue: {
+  modalBackButtonText: {
     color: colors.white,
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.md,
     fontWeight: '600',
+  },
+  // Apple slider styles
+  appleSliderGradientBorder: {
+    borderRadius: 999,
+    padding: 2,
+    marginBottom: spacing.lg,
+  },
+  appleSliderContainer: {
+    backgroundColor: colors.blackWhite5,
+    borderRadius: 999,
+    height: 60,
+    overflow: 'hidden',
+  },
+  appleSliderTrack: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  appleSliderText: {
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  appleSliderThumb: {
+    position: 'absolute',
+    left: 2,
+    top: 2,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  appleSliderThumbIcon: {
+    width: 16,
+    height: 16,
+    tintColor: colors.white,
   },
 });
