@@ -19,7 +19,8 @@ import {
   getAccount,
   TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
-import { CURRENT_NETWORK, TRANSACTION_CONFIG, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG } from '../config/chain';
+import { CURRENT_NETWORK, TRANSACTION_CONFIG } from '../config/chain';
+import { FeeService, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG, TransactionType } from '../config/feeConfig';
 import { solanaWalletService } from '../wallet/solanaWallet';
 import { logger } from '../services/loggingService';
 
@@ -30,6 +31,7 @@ export interface ExternalTransferParams {
   memo?: string;
   userId: string;
   priority?: 'low' | 'medium' | 'high';
+  transactionType?: TransactionType; // Add transaction type for fee calculation
 }
 
 export interface ExternalTransferResult {
@@ -100,8 +102,9 @@ class ExternalTransferService {
         };
       }
 
-      // Calculate company fee - NEW APPROACH
-      const { fee: companyFee, totalAmount, recipientAmount } = this.calculateCompanyFee(params.amount);
+      // Calculate company fee using centralized service with transaction type
+      const transactionType = params.transactionType || 'withdraw';
+      const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
 
       // Load wallet
       const walletLoaded = await solanaWalletService.loadWallet();
@@ -203,7 +206,7 @@ class ExternalTransferService {
       const currentBalance = currency === 'SOL' ? balance.sol : balance.usdc;
       
       // Calculate total required amount (including company fee)
-      const { fee: companyFee } = this.calculateCompanyFee(amount);
+      const { fee: companyFee } = FeeService.calculateCompanyFee(amount);
       const requiredAmount = amount + companyFee;
 
       return {
@@ -238,10 +241,13 @@ class ExternalTransferService {
       // Get recent blockhash
       const { blockhash } = await this.connection.getLatestBlockhash();
 
-      // Create transaction
+      // Use centralized fee payer logic - Company pays SOL gas fees
+      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
+
+      // Create transaction with proper fee payer
       const transaction = new Transaction({
         recentBlockhash: blockhash,
-        feePayer: fromPublicKey
+        feePayer: feePayerPublicKey // Company pays SOL gas fees, user pays company fees
       });
 
       // Add priority fee
@@ -315,8 +321,8 @@ class ExternalTransferService {
       const toPublicKey = new PublicKey(params.to);
       const usdcMint = new PublicKey(CURRENT_NETWORK.usdcMintAddress);
 
-      // CRITICAL FIX: Company pays fees, not user
-      const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
+      // Use centralized fee payer logic - Company pays SOL gas fees
+      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
 
       // Get token accounts
       const fromTokenAccount = await getAssociatedTokenAddress(usdcMint, fromPublicKey);
@@ -334,10 +340,10 @@ class ExternalTransferService {
       // Get recent blockhash
       const { blockhash } = await this.connection.getLatestBlockhash();
 
-      // Create transaction
+      // Create transaction with proper fee payer
       const transaction = new Transaction({
         recentBlockhash: blockhash,
-        feePayer: companyPublicKey // Company pays all fees
+        feePayer: feePayerPublicKey // Company pays SOL gas fees, user pays company fees
       });
 
       // Add priority fee
@@ -463,32 +469,7 @@ class ExternalTransferService {
     }
   }
 
-  /**
-   * Calculate company fee - NEW APPROACH: Recipient gets full amount, sender pays amount + fees
-   */
-  private calculateCompanyFee(amount: number): { fee: number; totalAmount: number; recipientAmount: number } {
-    const feePercentage = COMPANY_FEE_CONFIG.percentage / 100;
-    let fee = amount * feePercentage;
-    
-    // Apply only max fee limit (no minimum)
-    fee = Math.min(fee, COMPANY_FEE_CONFIG.maxFee);
-    
-    // Recipient gets the full amount they expect
-    const recipientAmount = amount;
-    
-    // Sender pays the amount + fees
-    const totalAmount = amount + fee;
-    
-    console.log('💰 NEW External Fee calculation:', {
-      requestedAmount: amount,
-      fee,
-      recipientAmount,
-      totalAmount,
-      feePercentage: COMPANY_FEE_CONFIG.percentage,
-    });
-    
-    return { fee, totalAmount, recipientAmount };
-  }
+  // Fee calculation now handled by centralized FeeService
 
   /**
    * Get priority fee

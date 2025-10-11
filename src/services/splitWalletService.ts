@@ -7,6 +7,7 @@
 import { consolidatedWalletService } from './consolidatedWalletService';
 import { consolidatedTransactionService } from './consolidatedTransactionService';
 import { logger } from './loggingService';
+import { FeeService } from '../config/feeConfig';
 import { roundUsdcAmount } from '../utils/currencyUtils';
 import { collection, doc, addDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -200,7 +201,7 @@ export class SplitWalletService {
           
           const { blockhash } = await connection.getLatestBlockhash();
           transaction.recentBlockhash = blockhash;
-          transaction.feePayer = keypair.publicKey;
+          transaction.feePayer = FeeService.getFeePayerPublicKey(keypair.publicKey);
           
           const signature = await connection.sendTransaction(transaction, [keypair]);
           await connection.confirmTransaction(signature);
@@ -1880,9 +1881,8 @@ export class SplitWalletService {
       const { blockhash } = await connection.getLatestBlockhash('confirmed');
       transaction.recentBlockhash = blockhash;
 
-      // Set fee payer (company wallet)
-      const companyWallet = new PublicKey(COMPANY_WALLET_CONFIG.address);
-      transaction.feePayer = companyWallet;
+      // Set fee payer using centralized logic
+      transaction.feePayer = FeeService.getFeePayerPublicKey(walletKeypair.publicKey);
 
       // Sign transaction
       transaction.sign(walletKeypair);
@@ -3450,7 +3450,7 @@ export class SplitWalletService {
           
           const { blockhash } = await connection.getLatestBlockhash();
           transaction.recentBlockhash = blockhash;
-          transaction.feePayer = companyKeypair.publicKey;
+          transaction.feePayer = FeeService.getFeePayerPublicKey(walletPublicKey);
           
           // Send transaction and get signature
           const signature = await connection.sendTransaction(transaction, [companyKeypair], {

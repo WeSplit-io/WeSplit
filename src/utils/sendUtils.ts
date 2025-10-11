@@ -149,7 +149,9 @@ export const formatWalletAddress = (address: string, maxLength: number = 10): st
 };
 
 /**
- * Calculate transaction fees
+ * Calculate transaction fees - DEPRECATED: Use FeeService.calculateCompanyFee instead
+ * This function uses the old approach where fee is subtracted from amount
+ * The new approach adds fee to the total amount
  */
 export const calculateTransactionFees = (
   amount: number,

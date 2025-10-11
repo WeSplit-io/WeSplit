@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -8,6 +8,7 @@ import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { spacing } from '../../theme/spacing';
+import { FeeService, TransactionType } from '../../config/feeConfig';
 
 const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const { state } = useApp();
@@ -117,9 +118,10 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
       return;
     }
 
-    // Calculate fees (3% withdrawal fee)
-    const withdrawalFee = numAmount * 0.03;
-    const totalWithdraw = numAmount - withdrawalFee;
+    // Calculate fees using centralized service
+    const feeCalculation = FeeService.calculateCompanyFee(numAmount);
+    const withdrawalFee = feeCalculation.fee;
+    const totalWithdraw = feeCalculation.totalAmount; // User pays amount + fee
 
     navigation.navigate('WithdrawConfirmation', {
       amount: numAmount,
@@ -132,9 +134,14 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
   const isAmountValid = parseFloat(amount) > 0 && walletAddress.trim() !== '';
 
-  // Calculate fees
-  const withdrawalFee = parseFloat(amount) * 0.03 || 0;
-  const totalWithdraw = parseFloat(amount) - withdrawalFee || 0;
+  // Calculate fees using centralized service with transaction type
+  const feeCalculation = useMemo(() => {
+    const numAmount = parseFloat(amount) || 0;
+    return FeeService.calculateCompanyFee(numAmount, 'withdraw');
+  }, [amount]);
+
+  const withdrawalFee = feeCalculation.fee;
+  const totalWithdraw = feeCalculation.totalAmount; // User pays amount + fee
 
   return (
     <SafeAreaView style={styles.container}>
@@ -291,7 +298,7 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
           <View style={styles.transactionSummary}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>
-                Transaction fee (3%)
+                Transaction fee ({FeeService.getCompanyFeeStructure('withdraw').percentage * 100}%)
               </Text>
               <Text style={styles.summaryValue}>
                 {withdrawalFee.toFixed(3)} USDC

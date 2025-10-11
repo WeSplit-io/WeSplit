@@ -22,6 +22,7 @@ import { walletLogoService } from './walletLogoService';
 
 // Import shared constants
 import { RPC_CONFIG, USDC_CONFIG, PHANTOM_SCHEMES } from './shared/walletConstants';
+import { FeeService } from '../config/feeConfig';
 
 // Use shared constants
 const RPC_ENDPOINT = RPC_CONFIG.endpoint;
@@ -758,10 +759,13 @@ export class SolanaAppKitService {
       // Get recent blockhash
       const { blockhash } = await this.connection.getLatestBlockhash();
 
+      // Use centralized fee payer logic - Company pays SOL gas fees
+      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
+      
       // Create transaction
       const transaction = new Transaction({
         recentBlockhash: blockhash,
-        feePayer: fromPublicKey
+        feePayer: feePayerPublicKey
       });
 
       // Add transfer instruction
@@ -824,10 +828,13 @@ export class SolanaAppKitService {
       // Get recent blockhash
       const { blockhash } = await this.connection.getLatestBlockhash();
 
+      // Use centralized fee payer logic - Company pays SOL gas fees
+      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
+      
       // Create transaction
       const transaction = new Transaction({
         recentBlockhash: blockhash,
-        feePayer: fromPublicKey
+        feePayer: feePayerPublicKey
       });
 
       // Get or create associated token account for sender

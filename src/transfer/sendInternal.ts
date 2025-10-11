@@ -22,7 +22,8 @@ import {
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
-import { CURRENT_NETWORK, TRANSACTION_CONFIG, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG } from '../config/chain';
+import { CURRENT_NETWORK, TRANSACTION_CONFIG } from '../config/chain';
+import { FeeService, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG, TransactionType } from '../config/feeConfig';
 import { solanaWalletService } from '../wallet/solanaWallet';
 import { logger } from '../services/loggingService';
 import { moneyTransferNotificationService } from '../services/moneyTransferNotificationService';
@@ -35,6 +36,7 @@ export interface InternalTransferParams {
   groupId?: string;
   userId: string;
   priority?: 'low' | 'medium' | 'high';
+  transactionType?: TransactionType; // Add transaction type for fee calculation
 }
 
 export interface InternalTransferToAddressParams {
@@ -264,8 +266,9 @@ class InternalTransferService {
         };
       }
 
-      // Calculate company fee - NEW APPROACH
-      const { fee: companyFee, totalAmount, recipientAmount } = this.calculateCompanyFee(params.amount);
+      // Calculate company fee using centralized service with transaction type
+      const transactionType = params.transactionType || 'send';
+      const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
 
       // Load wallet using the existing userWalletService
       const { userWalletService } = await import('../services/userWalletService');
@@ -396,7 +399,7 @@ class InternalTransferService {
       
       // Calculate total required amount (including company fee unless skipped)
       const requiredAmount = skipCompanyFee ? amount : (() => {
-        const { fee: companyFee } = this.calculateCompanyFee(amount);
+        const { fee: companyFee } = FeeService.calculateCompanyFee(amount);
         return amount + companyFee;
       })();
 
@@ -452,10 +455,13 @@ class InternalTransferService {
       // Get recent blockhash with retry logic
       const blockhash = await this.getLatestBlockhashWithRetry();
 
+      // Use centralized fee payer logic - Company pays SOL gas fees
+      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
+      
       // Create transaction
       const transaction = new Transaction({
         recentBlockhash: blockhash,
-        feePayer: fromPublicKey
+        feePayer: feePayerPublicKey
       });
 
       // Add priority fee
@@ -585,9 +591,7 @@ class InternalTransferService {
       logger.info('Got recent blockhash', { blockhash }, 'InternalTransferService');
 
       // Use company wallet for fees if configured, otherwise use user wallet
-      const feePayerPublicKey = COMPANY_WALLET_CONFIG.useUserWalletForFees 
-        ? fromPublicKey 
-        : new PublicKey(COMPANY_WALLET_CONFIG.address);
+      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
       
       // Create transaction
       const transaction = new Transaction({
@@ -708,15 +712,15 @@ class InternalTransferService {
       // Prepare signers array
       const signers: Keypair[] = [];
       
-      // If company wallet is the fee payer, we need to add company wallet keypair
+      // Company wallet always pays SOL fees - we need company wallet keypair
       logger.info('Company wallet configuration check', {
-        useUserWalletForFees: COMPANY_WALLET_CONFIG.useUserWalletForFees,
+        companyWalletRequired: true,
         hasCompanySecretKey: !!COMPANY_WALLET_CONFIG.secretKey,
         companyWalletAddress: COMPANY_WALLET_CONFIG.address,
         feePayerAddress: feePayerPublicKey.toBase58()
       }, 'InternalTransferService');
 
-      if (!COMPANY_WALLET_CONFIG.useUserWalletForFees && COMPANY_WALLET_CONFIG.secretKey) {
+      if (COMPANY_WALLET_CONFIG.secretKey) {
         try {
           logger.info('Processing company wallet secret key', {
             secretKeyLength: COMPANY_WALLET_CONFIG.secretKey.length,
@@ -804,17 +808,7 @@ class InternalTransferService {
           throw new Error('Company wallet keypair not available for signing');
         }
       } else {
-        logger.info('Using user wallet for fees', {
-          useUserWalletForFees: COMPANY_WALLET_CONFIG.useUserWalletForFees,
-          hasCompanySecretKey: !!COMPANY_WALLET_CONFIG.secretKey
-        }, 'InternalTransferService');
-        
-        // Add only user keypair to signers array
-        signers.push(userKeypair);
-        logger.info('Added user keypair to signers array', {
-          signersCount: signers.length,
-          signers: signers.map(signer => signer.publicKey.toBase58())
-        }, 'InternalTransferService');
+        throw new Error('Company wallet secret key is required for SOL fee coverage');
       }
 
       // Debug transaction before serialization
@@ -1003,32 +997,7 @@ class InternalTransferService {
     }
   }
 
-  /**
-   * Calculate company fee - NEW APPROACH: Recipient gets full amount, sender pays amount + fees
-   */
-  private calculateCompanyFee(amount: number): { fee: number; totalAmount: number; recipientAmount: number } {
-    const feePercentage = COMPANY_FEE_CONFIG.percentage / 100;
-    let fee = amount * feePercentage;
-    
-    // Apply only max fee limit (no minimum)
-    fee = Math.min(fee, COMPANY_FEE_CONFIG.maxFee);
-    
-    // Recipient gets the full amount they expect
-    const recipientAmount = amount;
-    
-    // Sender pays the amount + fees
-    const totalAmount = amount + fee;
-    
-    console.log('💰 NEW Internal Fee calculation:', {
-      requestedAmount: amount,
-      fee,
-      recipientAmount,
-      totalAmount,
-      feePercentage: COMPANY_FEE_CONFIG.percentage,
-    });
-    
-    return { fee, totalAmount, recipientAmount };
-  }
+  // Fee calculation now handled by centralized FeeService
 
   /**
    * Get priority fee
@@ -1291,7 +1260,7 @@ class InternalTransferService {
       // Calculate company fee - but skip for split wallet payments
       const { fee: companyFee, totalAmount, recipientAmount } = isSplitWalletPayment 
         ? { fee: 0, totalAmount: params.amount, recipientAmount: params.amount }
-        : this.calculateCompanyFee(params.amount);
+        : FeeService.calculateCompanyFee(params.amount);
 
       // Load wallet using the existing userWalletService
       const { userWalletService } = await import('../services/userWalletService');
@@ -1344,9 +1313,7 @@ class InternalTransferService {
       const blockhash = await this.getLatestBlockhashWithRetry();
 
       // Use company wallet for fees if configured, otherwise use user wallet
-      const feePayerPublicKey = COMPANY_WALLET_CONFIG.useUserWalletForFees 
-        ? fromKeypair.publicKey 
-        : new PublicKey(COMPANY_WALLET_CONFIG.address);
+      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromKeypair.publicKey);
 
       // Create transaction with proper blockhash and fee payer
       const transaction = new Transaction({
@@ -1524,8 +1491,8 @@ class InternalTransferService {
       // Prepare signers array
       const signers: Keypair[] = [fromKeypair]; // User always signs for token transfers
       
-      // If company wallet is the fee payer, we need to add company wallet keypair
-      if (!COMPANY_WALLET_CONFIG.useUserWalletForFees && COMPANY_WALLET_CONFIG.secretKey) {
+      // Company wallet always pays SOL fees - we need company wallet keypair
+      if (COMPANY_WALLET_CONFIG.secretKey) {
         try {
           // Try different formats for the company secret key
           let companySecretKeyBuffer: Buffer;

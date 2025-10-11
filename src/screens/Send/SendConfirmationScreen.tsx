@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Alert, ScrollView, Image, Animated, PanResponder, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,6 +6,7 @@ import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { consolidatedTransactionService } from '../../services/consolidatedTransactionService';
+import { FeeService, TransactionType } from '../../config/feeConfig';
 import { GroupMember } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
@@ -195,7 +196,8 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
 
       // Check balance using existing wallet service - check total amount including fees
       const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
-      const totalAmountToPay = amount + (amount * 0.03); // Amount + 3% fee
+      const transactionType: TransactionType = isSettlement ? 'settlement' : 'send';
+      const totalAmountToPay = FeeService.calculateCompanyFee(amount, transactionType).totalAmount; // Amount + fee
       if (balance.usdc < totalAmountToPay) {
         Alert.alert('Insufficient Balance', `You do not have enough USDC balance. Required: ${totalAmountToPay.toFixed(2)} USDC (including fees), Available: ${balance.usdc.toFixed(2)} USDC`);
         return;
@@ -232,13 +234,15 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         });
       } else {
         // For friends/internal transfers, use existing service
+        const transactionType: TransactionType = isSettlement ? 'settlement' : 'send';
         transactionResult = await consolidatedTransactionService.sendUsdcTransaction(
           recipientAddress,
           amount,
-          currentUser.id,
+          currentUser.id.toString(),
           description || (isSettlement ? 'Settlement payment' : 'Payment'),
           groupId?.toString(),
-          'medium'
+          'medium',
+          transactionType
         );
       }
 
@@ -291,56 +295,22 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     }
   };
 
-  // State for fee calculation
-  const [feeEstimate, setFeeEstimate] = useState<{
-    companyFee: number;
-    blockchainFee: number;
-    totalFee: number;
-    netAmount: number;
-    totalAmount?: number;
-  } | null>(null);
+  // Fee calculation now handled by useMemo hook above
 
-  // Calculate fees using existing wallet service - NEW APPROACH
-  useEffect(() => {
-    const calculateFees = async () => {
-      try {
-        if (amount > 0) {
-          // Use the new fee calculation approach
-          const feeCalculation = consolidatedTransactionService.calculateCompanyFee(amount);
-          const blockchainFee = 0.00001; // Company covers blockchain fees
-          
-          setFeeEstimate({
-            companyFee: feeCalculation.fee,
-            blockchainFee: blockchainFee,
-            totalFee: feeCalculation.fee + blockchainFee,
-            netAmount: feeCalculation.recipientAmount, // Recipient gets full amount
-            totalAmount: feeCalculation.totalAmount, // Sender pays amount + fees
-          });
-        }
-      } catch (error) {
-        console.error('Failed to calculate fee estimate:', error);
-        // Fallback to new calculation approach
-        const companyFee = amount * 0.03; // 3% company fee
-        const blockchainFee = 0.00001;
-        setFeeEstimate({
-          companyFee: companyFee,
-          blockchainFee: blockchainFee,
-          totalFee: companyFee + blockchainFee,
-          netAmount: amount, // Recipient gets full amount
-          totalAmount: amount + companyFee, // Sender pays amount + fees
-        });
-      }
-    };
+  // Calculate fees using centralized service with transaction type
+  const feeCalculation = useMemo(() => {
+    if (amount > 0) {
+      const transactionType: TransactionType = isSettlement ? 'settlement' : 'send';
+      return FeeService.calculateCompanyFee(amount, transactionType);
+    }
+    return { fee: 0, totalAmount: 0, recipientAmount: 0 };
+  }, [amount, isSettlement]);
 
-    calculateFees();
-  }, [amount]);
-
-  // Use calculated fees or fallback - NEW APPROACH
-  const companyFee = feeEstimate?.companyFee || amount * 0.03; // 3% company fee
-  const blockchainFee = feeEstimate?.blockchainFee || 0.00001;
-  const totalFee = feeEstimate?.totalFee || companyFee + blockchainFee;
-  const netAmount = feeEstimate?.netAmount || amount; // Recipient gets full amount
-  const totalAmount = feeEstimate?.totalAmount || amount + companyFee; // Sender pays amount + fees
+  const companyFee = feeCalculation.fee;
+  const blockchainFee = 0.00001; // Company covers blockchain fees
+  const totalFee = companyFee + blockchainFee;
+  const netAmount = feeCalculation.recipientAmount; // Recipient gets full amount
+  const totalAmount = feeCalculation.totalAmount; // Sender pays amount + fees
   const destinationAccount = contact?.wallet_address || '';
 
   // Check if user has existing wallet and sufficient balance
@@ -416,7 +386,8 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   }, [currentUser?.id]);
 
   // Check if user has sufficient balance using existing wallet balance - check total amount including fees
-  const totalAmountToPay = amount + (amount * 0.03); // Amount + 3% fee
+  const transactionType: TransactionType = isSettlement ? 'settlement' : 'send';
+  const totalAmountToPay = FeeService.calculateCompanyFee(amount, transactionType).totalAmount; // Amount + fee
   const hasSufficientBalance = existingWalletBalance === null || existingWalletBalance.usdc >= totalAmountToPay;
 
   // Debug logging for slider state
@@ -520,37 +491,44 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
 
         {/* Transaction Details Card (mockup style) */}
         <View style={styles.mockupTransactionDetails}>
-          <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>
-              {destinationType === 'external' ? 'Amount to wallet' : 'Amount to recipient'}
-            </Text>
-            <Text style={styles.mockupFeeValue}>{netAmount.toFixed(2)} USDC</Text>
-          </View>
-          <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>WeSplit fees ({consolidatedTransactionService.getCompanyFeeStructure().percentage * 100}%)</Text>
-            <Text style={styles.mockupFeeValue}>{companyFee.toFixed(2)} USDC</Text>
-          </View>
-          <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Gas fees (Covered)</Text>
-            <Text style={styles.mockupFeeValue}>Free</Text>
-          </View>
-          <View style={styles.mockupFeeRowSeparator} />
-          <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>
-              {destinationType === 'external' ? 'Total you\'ll pay' : 'Total you\'ll pay'}
-            </Text>
-            <Text style={[styles.mockupFeeValue, { color: colors.brandGreen, fontWeight: 'bold' }]}>{totalAmount.toFixed(2)} USDC</Text>
-          </View>
-          <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>
-              {destinationType === 'external' ? 'Destination wallet' : 'Destination account'}
-            </Text>
-            <Text style={styles.mockupFeeValue}>{destinationAccount ? `${destinationAccount.substring(0, 4)}...${destinationAccount.slice(-4)}` : ''}</Text>
-          </View>
-          <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Network</Text>
-            <Text style={styles.mockupFeeValue}>Solana Mainnet (Helius)</Text>
-          </View>
+          {(() => {
+            const transactionType: TransactionType = isSettlement ? 'settlement' : 'send';
+            return (
+              <>
+                <View style={styles.mockupFeeRow}>
+                  <Text style={styles.mockupFeeLabel}>
+                    {destinationType === 'external' ? 'Amount to wallet' : 'Amount to recipient'}
+                  </Text>
+                  <Text style={styles.mockupFeeValue}>{netAmount.toFixed(2)} USDC</Text>
+                </View>
+                <View style={styles.mockupFeeRow}>
+                  <Text style={styles.mockupFeeLabel}>WeSplit fees ({FeeService.getCompanyFeeStructure(transactionType).percentage * 100}%)</Text>
+                  <Text style={styles.mockupFeeValue}>{companyFee.toFixed(2)} USDC</Text>
+                </View>
+                <View style={styles.mockupFeeRow}>
+                  <Text style={styles.mockupFeeLabel}>Gas fees (Covered)</Text>
+                  <Text style={styles.mockupFeeValue}>Free</Text>
+                </View>
+                <View style={styles.mockupFeeRowSeparator} />
+                <View style={styles.mockupFeeRow}>
+                  <Text style={styles.mockupFeeLabel}>
+                    {destinationType === 'external' ? 'Total you\'ll pay' : 'Total you\'ll pay'}
+                  </Text>
+                  <Text style={[styles.mockupFeeValue, { color: colors.brandGreen, fontWeight: 'bold' }]}>{totalAmount.toFixed(2)} USDC</Text>
+                </View>
+                <View style={styles.mockupFeeRow}>
+                  <Text style={styles.mockupFeeLabel}>
+                    {destinationType === 'external' ? 'Destination wallet' : 'Destination account'}
+                  </Text>
+                  <Text style={styles.mockupFeeValue}>{destinationAccount ? `${destinationAccount.substring(0, 4)}...${destinationAccount.slice(-4)}` : ''}</Text>
+                </View>
+                <View style={styles.mockupFeeRow}>
+                  <Text style={styles.mockupFeeLabel}>Network</Text>
+                  <Text style={styles.mockupFeeValue}>Solana Mainnet (Helius)</Text>
+                </View>
+              </>
+            );
+          })()}
         </View>
 
 

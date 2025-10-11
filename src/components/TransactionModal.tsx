@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import { Animated } from 'react-native';
 import { colors } from '../theme/colors';
+import { FeeService, TransactionType } from '../config/feeConfig';
 import { Transaction } from '../types';
 import { styles } from './TransactionModal.styles';
 
@@ -315,19 +316,31 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     )}
 
                     {/* Fees Section - Show for all transactions for testing */}
-                    <View style={styles.transactionDetailRow}>
-                      <Text style={styles.transactionDetailLabel}>Withdrawal fee (3%):</Text>
-                      <Text style={styles.transactionDetailValue}>
-                        {(transaction.amount * 0.03).toFixed(2)} {transaction.currency}
-                      </Text>
-                    </View>
+                    {useMemo(() => {
+                      // Determine transaction type based on transaction type
+                      const transactionType: TransactionType = transaction.type === 'withdraw' ? 'withdraw' : 
+                                                             transaction.type === 'deposit' ? 'deposit' : 'send';
+                      const feeCalculation = FeeService.calculateCompanyFee(transaction.amount, transactionType);
+                      const feePercentage = FeeService.getCompanyFeeStructure(transactionType).percentage * 100;
+                      
+                      return (
+                        <>
+                          <View style={styles.transactionDetailRow}>
+                            <Text style={styles.transactionDetailLabel}>Withdrawal fee ({feePercentage}%):</Text>
+                            <Text style={styles.transactionDetailValue}>
+                              {feeCalculation.fee.toFixed(2)} {transaction.currency}
+                            </Text>
+                          </View>
 
-                    <View style={styles.transactionDetailRow}>
-                      <Text style={styles.transactionDetailLabel}>Total sent:</Text>
-                      <Text style={styles.transactionDetailValue}>
-                        {(transaction.amount * 1.03).toFixed(2)} {transaction.currency}
-                      </Text>
-                    </View>
+                          <View style={styles.transactionDetailRow}>
+                            <Text style={styles.transactionDetailLabel}>Total sent:</Text>
+                            <Text style={styles.transactionDetailValue}>
+                              {feeCalculation.totalAmount.toFixed(2)} {transaction.currency}
+                            </Text>
+                          </View>
+                        </>
+                      );
+                    }, [transaction.amount, transaction.currency])}
 
                     {/* Solscan Link - Show for all transactions for testing */}
                     <View style={styles.transactionDetailRow}>

@@ -100,10 +100,11 @@ export const TRANSACTION_CONSTANTS = {
   },
 };
 
-// Company Fee Configuration
+// Company Fee Configuration - DEPRECATED: Use centralized feeConfig.ts instead
+// This is kept for backward compatibility but should be removed in future versions
 export const COMPANY_FEE_CONFIG = {
   percentage: parseFloat(process.env.EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE || '3.0'),
-  minimumFee: parseFloat(process.env.EXPO_PUBLIC_COMPANY_MIN_FEE || '0.50'),
+  minimumFee: parseFloat(process.env.EXPO_PUBLIC_COMPANY_MIN_FEE || '0.001'), // Updated to match centralized config
   maximumFee: parseFloat(process.env.EXPO_PUBLIC_COMPANY_MAX_FEE || '10.00'),
   currency: 'USDC'
 };

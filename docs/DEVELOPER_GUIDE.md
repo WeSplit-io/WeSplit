@@ -251,7 +251,7 @@ const isClean = await checker.checkProductionBuild();
 EXPO_PUBLIC_FORCE_MAINNET=true
 EXPO_PUBLIC_HELIUS_API_KEY=your_helius_key
 EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE=3.0
-EXPO_PUBLIC_COMPANY_MIN_FEE=0.50
+EXPO_PUBLIC_COMPANY_MIN_FEE=0.001
 EXPO_PUBLIC_COMPANY_MAX_FEE=10.00
 ```
 
@@ -273,7 +273,7 @@ eas build --platform android --profile production
 ```typescript
 export const COMPANY_FEE_CONFIG = {
   percentage: parseFloat(process.env.EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE || '3.0'),
-  minFee: parseFloat(process.env.EXPO_PUBLIC_COMPANY_MIN_FEE || '0.50'),
+  minFee: parseFloat(process.env.EXPO_PUBLIC_COMPANY_MIN_FEE || '0.001'),
   maxFee: parseFloat(process.env.EXPO_PUBLIC_COMPANY_MAX_FEE || '10.00'),
   currency: 'USDC',
 };

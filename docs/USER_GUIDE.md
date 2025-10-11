@@ -95,7 +95,7 @@ If you already have a Solana wallet, you can import it:
 
 ### Company Fees
 - **3%** of transaction amount
-- **Minimum**: $0.50
+- **Minimum**: $0.001
 - **Maximum**: $10.00
 
 ### Blockchain Fees

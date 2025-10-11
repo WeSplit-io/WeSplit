@@ -21,7 +21,8 @@ import {
   TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
 import { logger } from '../services/loggingService';
-import { CURRENT_NETWORK, COMPANY_WALLET_CONFIG, TRANSACTION_CONFIG } from '../config/chain';
+import { CURRENT_NETWORK, TRANSACTION_CONFIG } from '../config/chain';
+import { FeeService, COMPANY_WALLET_CONFIG } from '../config/feeConfig';
 
 export interface UsdcTransferParams {
   fromOwnerPubkey: PublicKey;
@@ -126,12 +127,12 @@ export async function buildUsdcTransfer({
     // Get USDC mint address for current network
     const usdcMint = new PublicKey(CURRENT_NETWORK.usdcMintAddress);
     
-    // Get company wallet public key (fee payer)
-    const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
+    // Use centralized fee payer logic - Company pays SOL gas fees
+    const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromOwnerPubkey);
     
-    // Validate company wallet is configured
+    // Validate company wallet is configured (always required for SOL fee coverage)
     if (!COMPANY_WALLET_CONFIG.address) {
-      throw new Error('Company wallet address not configured');
+      throw new Error('Company wallet address is required for SOL fee coverage');
     }
 
     // Create connection
@@ -154,10 +155,10 @@ export async function buildUsdcTransfer({
     // Get recent blockhash
     const { blockhash } = await connection.getLatestBlockhash();
 
-    // Create transaction with company as fee payer
+    // Create transaction with proper fee payer
     const transaction = new Transaction({
       recentBlockhash: blockhash,
-      feePayer: companyPublicKey // Company pays all fees
+      feePayer: feePayerPublicKey // Company pays SOL gas fees, user pays company fees
     });
 
     // Add priority fee instruction
@@ -219,7 +220,7 @@ export async function buildUsdcTransfer({
       toTokenAccount: toTokenAccount.toBase58(),
       needsAtaCreation: toAtaResult.needsCreation,
       estimatedFees: estimatedFeesSol,
-      feePayer: companyPublicKey.toBase58(),
+      feePayer: feePayerPublicKey.toBase58(),
       cluster
     }, 'UsdcTransfer');
 

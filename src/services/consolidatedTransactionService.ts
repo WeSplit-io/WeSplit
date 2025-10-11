@@ -36,7 +36,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { RPC_CONFIG, USDC_CONFIG } from './shared/walletConstants';
-import { COMPANY_WALLET_CONFIG, CURRENT_NETWORK, TRANSACTION_CONFIG as CHAIN_TRANSACTION_CONFIG } from '../config/chain';
+import { CURRENT_NETWORK, TRANSACTION_CONFIG as CHAIN_TRANSACTION_CONFIG } from '../config/chain';
+import { FeeService, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG, TransactionType } from '../config/feeConfig';
 
 // Types
 export interface TransactionParams {
@@ -46,6 +47,7 @@ export interface TransactionParams {
   memo?: string;
   priority?: 'low' | 'medium' | 'high';
   userId?: string;
+  transactionType?: TransactionType; // Add transaction type for fee calculation
 }
 
 export interface TransactionResult {
@@ -77,12 +79,7 @@ export interface PaymentRequestResult {
   error?: string;
 }
 
-// Company fee structure
-const COMPANY_FEE_STRUCTURE = {
-  percentage: 0.03, // 3% company fee on user currency transfers
-  minimum: 0.01, // 0.01 USDC minimum (reduced to allow small transactions)
-  maximum: 10.0 // 10.0 USDC maximum
-};
+// Company fee structure - now using centralized configuration
 
 // Transaction configuration
 const TRANSACTION_CONFIG = {
@@ -336,16 +333,11 @@ class ConsolidatedTransactionService {
         isProduction: this.isProduction,
       });
 
-      // Calculate company fee - NEW APPROACH
-      const { fee: companyFee, totalAmount, recipientAmount } = this.calculateCompanyFee(params.amount);
+      // Calculate company fee using centralized service with transaction type
+      const transactionType = params.transactionType || 'send';
+      const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
 
-      console.log('💰 Fee calculation:', {
-        originalAmount: params.amount,
-        companyFee,
-        recipientAmount,
-        totalAmount,
-        feePercentage: COMPANY_FEE_STRUCTURE.percentage,
-      });
+      // Fee calculation completed
 
       const fromPublicKey = this.keypair.publicKey;
       const toPublicKey = new PublicKey(params.to);
@@ -356,10 +348,11 @@ class ConsolidatedTransactionService {
       // Get recent blockhash
       const { blockhash } = await this.connection.getLatestBlockhash();
 
-      // Create transaction
+      // Create transaction with company wallet as fee payer for SOL gas fees
+      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
       const transaction = new Transaction({
         recentBlockhash: blockhash,
-        feePayer: fromPublicKey
+        feePayer: feePayerPublicKey
       });
 
       // Add priority fee
@@ -458,16 +451,11 @@ class ConsolidatedTransactionService {
         isProduction: this.isProduction,
       });
 
-      // Calculate company fee - NEW APPROACH
-      const { fee: companyFee, totalAmount, recipientAmount } = this.calculateCompanyFee(params.amount);
+      // Calculate company fee using centralized service with transaction type
+      const transactionType = params.transactionType || 'send';
+      const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
 
-      console.log('💰 Fee calculation:', {
-        originalAmount: params.amount,
-        companyFee,
-        recipientAmount,
-        totalAmount,
-        feePercentage: COMPANY_FEE_STRUCTURE.percentage,
-      });
+      // Fee calculation completed
 
       const fromPublicKey = this.keypair.publicKey;
       const toPublicKey = new PublicKey(params.to);
@@ -478,9 +466,7 @@ class ConsolidatedTransactionService {
       const companyFeeAmount = Math.floor(companyFee * 1_000_000 + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
 
       // Use company wallet for fees if configured, otherwise use user wallet
-      const feePayerPublicKey = COMPANY_WALLET_CONFIG.useUserWalletForFees 
-        ? fromPublicKey 
-        : new PublicKey(COMPANY_WALLET_CONFIG.address);
+      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
 
       // Get associated token addresses
       const fromTokenAccount = await getAssociatedTokenAddress(
@@ -618,29 +604,7 @@ class ConsolidatedTransactionService {
     return CHAIN_TRANSACTION_CONFIG.priorityFees[priority];
   }
 
-  /**
-   * Calculate company fee - NEW APPROACH: Recipient gets full amount, sender pays amount + fees
-   */
-  calculateCompanyFee(amount: number): { fee: number; totalAmount: number; recipientAmount: number } {
-    // Calculate 3% fee on the transaction amount
-    const fee = Math.min(amount * COMPANY_FEE_STRUCTURE.percentage, COMPANY_FEE_STRUCTURE.maximum);
-    
-    // Recipient gets the full amount they expect
-    const recipientAmount = amount;
-    
-    // Sender pays the amount + fees
-    const totalAmount = amount + fee;
-    
-    console.log('💰 NEW Fee calculation:', {
-      requestedAmount: amount,
-      fee,
-      recipientAmount,
-      totalAmount,
-      feePercentage: COMPANY_FEE_STRUCTURE.percentage,
-    });
-    
-    return { fee, totalAmount, recipientAmount };
-  }
+  // Fee calculation now handled by centralized FeeService
 
   // ===== PAYMENT REQUEST METHODS =====
 
@@ -1098,8 +1062,8 @@ class ConsolidatedTransactionService {
     console.log('🔗 ConsolidatedTransactionService: Getting fee estimate:', { amount, currency, priority });
     
     try {
-      // Calculate company fee
-      const companyFee = this.calculateCompanyFee(amount).fee;
+      // Calculate company fee using centralized service with default transaction type
+      const companyFee = FeeService.calculateCompanyFee(amount, 'send').fee;
       
       // Estimate blockchain fee based on transaction type and priority
       let blockchainFee = 0.000005; // Base fee for simple transfer
@@ -1124,8 +1088,8 @@ class ConsolidatedTransactionService {
       return totalFee;
     } catch (error) {
       console.error('Failed to get fee estimate:', error);
-      // Fallback to simple calculation
-      return amount * COMPANY_FEE_STRUCTURE.percentage;
+      // Fallback to simple calculation with default transaction type
+      return FeeService.calculateCompanyFee(amount, 'send').fee;
     }
   }
 
@@ -1138,7 +1102,8 @@ class ConsolidatedTransactionService {
     userId: string, 
     memo?: string, 
     groupId?: string, 
-    priority: 'low' | 'medium' | 'high' = 'medium'
+    priority: 'low' | 'medium' | 'high' = 'medium',
+    transactionType: TransactionType = 'send'
   ): Promise<{ 
     success: boolean; 
     transactionId?: string; 
@@ -1159,7 +1124,8 @@ class ConsolidatedTransactionService {
         memo: memo || `Payment from ${userId}`,
         groupId,
         userId,
-        priority
+        priority,
+        transactionType
       });
 
       if (result.success) {
@@ -1484,7 +1450,7 @@ class ConsolidatedTransactionService {
           const { blockhash } = await connection.getLatestBlockhash();
           const createTransaction = new Transaction({
             recentBlockhash: blockhash,
-            feePayer: companyKeypair.publicKey
+            feePayer: FeeService.getFeePayerPublicKey(walletKeypair.publicKey)
           }).add(createAccountInstruction);
           
           createTransaction.sign(companyKeypair);
@@ -1619,13 +1585,13 @@ class ConsolidatedTransactionService {
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
         const transaction = new Transaction({
           recentBlockhash: blockhash,
-          feePayer: companyKeypair.publicKey // Company wallet pays fees
+          feePayer: FeeService.getFeePayerPublicKey(walletKeypair.publicKey) // Company wallet pays fees
         }).add(createAccountInstruction).add(transferInstruction);
         
         // Use multi-endpoint approach for account creation + transfer
         console.log('🔗 ConsolidatedTransactionService: Sending transaction with account creation using multi-endpoint approach:', {
           recentBlockhash: blockhash,
-          feePayer: companyKeypair.publicKey.toBase58(),
+          feePayer: FeeService.getFeePayerPublicKey(walletKeypair.publicKey).toBase58(),
           instructionCount: transaction.instructions.length
         });
         
@@ -1828,19 +1794,17 @@ class ConsolidatedTransactionService {
       // Get recent blockhash and create properly structured transaction
       const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
       
-      // Use company wallet as fee payer if available, otherwise use split wallet
-      const feePayer = COMPANY_WALLET_CONFIG.address && !COMPANY_WALLET_CONFIG.useUserWalletForFees 
-        ? new PublicKey(COMPANY_WALLET_CONFIG.address)
-        : walletKeypair.publicKey;
+      // Use centralized fee payer logic - Company pays SOL gas fees
+      const feePayer = FeeService.getFeePayerPublicKey(walletKeypair.publicKey);
         
       console.log('🔗 ConsolidatedTransactionService: Fee payer configuration:', {
         companyWalletAddress: COMPANY_WALLET_CONFIG.address,
-        useUserWalletForFees: COMPANY_WALLET_CONFIG.useUserWalletForFees,
+        companyWalletRequired: true,
         selectedFeePayer: feePayer.toBase58(),
         isCompanyWallet: feePayer.equals(new PublicKey(COMPANY_WALLET_CONFIG.address))
       });
       
-      // If using company wallet as fee payer, check its SOL balance
+      // Company wallet always pays SOL fees - check its balance
       if (feePayer.equals(new PublicKey(COMPANY_WALLET_CONFIG.address))) {
         const companySolBalance = await connection.getBalance(feePayer);
         console.log('🔗 ConsolidatedTransactionService: Company wallet SOL balance:', {
@@ -2164,7 +2128,7 @@ class ConsolidatedTransactionService {
    * Get company fee structure
    */
   getCompanyFeeStructure() {
-    return COMPANY_FEE_STRUCTURE;
+    return FeeService.getCompanyFeeStructure();
   }
 }
 

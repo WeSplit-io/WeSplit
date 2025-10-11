@@ -6,6 +6,7 @@ import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import { FeeService } from '../../config/feeConfig';
 
 // --- AppleSlider adapted from SendConfirmationScreen ---
 interface AppleSliderProps {
@@ -261,7 +262,7 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         {/* Transaction Details */}
         <View style={styles.mockupTransactionDetails}>
           <View style={styles.mockupFeeRow}>
-            <Text style={styles.mockupFeeLabel}>Withdrawal fee (3%)</Text>
+            <Text style={styles.mockupFeeLabel}>Withdrawal fee ({FeeService.getCompanyFeeStructure('withdraw').percentage * 100}%)</Text>
             <Text style={styles.mockupFeeValue}>{safeWithdrawalFee.toFixed(3)} USDC</Text>
           </View>
           <View style={styles.mockupFeeRow}>

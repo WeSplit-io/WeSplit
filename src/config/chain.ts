@@ -153,7 +153,7 @@ export const TRANSACTION_CONFIG = {
 // Company fee structure
 export const COMPANY_FEE_CONFIG = {
   percentage: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE') || '3.0'),
-  minFee: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MIN_FEE') || '0.01'), // Reduced from 0.50 to 0.01 to allow small transactions
+  minFee: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MIN_FEE') || '0.001'), // Updated to match centralized config
   maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MAX_FEE') || '10.00'),
   currency: 'USDC',
 };
@@ -176,8 +176,8 @@ export const COMPANY_WALLET_CONFIG = {
   secretKey: companyWalletSecretKey,
   minSolReserve: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE') || '1.0'),
   gasFeeEstimate: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE') || '0.001'),
-  // Allow user wallet to pay fees if company wallet is not configured
-  useUserWalletForFees: !companyWalletAddress || companyWalletAddress.trim() === '',
+  // Company wallet should always pay SOL fees - no fallback to user wallet
+  useUserWalletForFees: false,
 };
 
 // Production validation
@@ -195,9 +195,9 @@ export const validateProductionConfig = (): { isValid: boolean; errors: string[]
       errors.push('Invalid USDC mint address for mainnet');
     }
     
-    // Validate company wallet configuration (only if not using user wallet for fees)
-    if (!COMPANY_WALLET_CONFIG.address && !COMPANY_WALLET_CONFIG.useUserWalletForFees) {
-      errors.push('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS is required for production');
+    // Validate company wallet configuration (always required for SOL fee coverage)
+    if (!COMPANY_WALLET_CONFIG.address) {
+      errors.push('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS is required for production - company wallet must pay SOL fees');
     }
     
     // Check for any devnet/testnet references
@@ -226,7 +226,7 @@ if (__DEV__) {
     appEnv: APP_ENV,
     forceMainnet: FORCE_MAINNET,
     companyWalletConfigured: !!companyWalletAddress,
-    useUserWalletForFees: COMPANY_WALLET_CONFIG.useUserWalletForFees,
+    companyWalletRequired: true,
   });
 }
 
