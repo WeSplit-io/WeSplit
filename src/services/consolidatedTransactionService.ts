@@ -1337,6 +1337,16 @@ class ConsolidatedTransactionService {
         solBalanceLamports: solBalance,
         note: 'Company wallet will pay transaction fees'
       });
+      
+      // Check if split wallet has minimum SOL for transaction (even though company pays fees)
+      const minimumSolRequired = 0.0001; // 0.0001 SOL minimum for account rent
+      if (solBalance / LAMPORTS_PER_SOL < minimumSolRequired) {
+        console.warn('🔗 ConsolidatedTransactionService: Split wallet has very low SOL balance:', {
+          solBalance: solBalance / LAMPORTS_PER_SOL,
+          minimumRequired: minimumSolRequired,
+          note: 'This might cause transaction issues even though company wallet pays fees'
+        });
+      }
 
       // Check the split wallet's USDC balance and account state before attempting transfer
       let transferAmount: number = amount * 1000000; // Default to requested amount
@@ -1736,6 +1746,20 @@ class ConsolidatedTransactionService {
           walletKeypair.publicKey, // authority
           usdcAmount // amount
         );
+        
+        console.log('🔗 ConsolidatedTransactionService: Transfer instruction details:', {
+          fromAccount: walletUsdcAccount.toBase58(),
+          toAccount: recipientUsdcAccount.toBase58(),
+          authority: walletKeypair.publicKey.toBase58(),
+          amount: usdcAmount,
+          programId: TOKEN_PROGRAM_ID.toBase58(),
+          instructionKeys: transferInstruction.keys.map(key => ({
+            pubkey: key.pubkey.toBase58(),
+            isSigner: key.isSigner,
+            isWritable: key.isWritable
+          }))
+        });
+        
         console.log('🔗 ConsolidatedTransactionService: Standard SPL Token transfer instruction created successfully');
       } catch (standardError) {
         console.warn('🔗 ConsolidatedTransactionService: Standard transfer instruction failed, using manual instruction:', standardError);
@@ -1969,9 +1993,75 @@ class ConsolidatedTransactionService {
           const confirmed = await this.confirmTransactionWithTimeout(signature);
           if (!confirmed) {
             console.warn('🔗 ConsolidatedTransactionService: Transaction confirmation timed out, but transaction was sent', { signature });
+            
+            // Even if confirmation timed out, check if the transaction actually succeeded
+            try {
+              const status = await currentConnection.getSignatureStatus(signature, {
+                searchTransactionHistory: true
+              });
+              
+              if (status.value?.err) {
+                console.error('🔗 ConsolidatedTransactionService: Transaction actually failed:', status.value.err);
+                throw new Error(`Transaction failed: ${status.value.err.toString()}`);
+              } else if (status.value?.confirmationStatus) {
+                console.log('🔗 ConsolidatedTransactionService: Transaction actually succeeded despite timeout:', {
+                  signature,
+                  confirmationStatus: status.value.confirmationStatus,
+                  confirmations: status.value.confirmations
+                });
+              } else {
+                console.warn('🔗 ConsolidatedTransactionService: Transaction status unknown - may still be processing');
+              }
+            } catch (statusError) {
+              console.warn('🔗 ConsolidatedTransactionService: Could not verify transaction status:', statusError);
+              // Don't fail the transaction if we can't verify status
+            }
           }
           
           console.log(`🔗 ConsolidatedTransactionService: Transaction successful with endpoint ${i + 1}:`, signature);
+          
+          // Verify the transfer actually succeeded by checking balances
+          try {
+            console.log('🔗 ConsolidatedTransactionService: Verifying transfer by checking balances...');
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for blockchain propagation
+            
+            // Check sender balance (should be reduced)
+            const senderAccount = await getAccount(currentConnection, walletUsdcAccount);
+            const senderBalanceAfter = Number(senderAccount.amount) / 1000000;
+            
+            // Check recipient balance (should be increased)
+            const recipientAccount = await getAccount(currentConnection, recipientUsdcAccount);
+            const recipientBalanceAfter = Number(recipientAccount.amount) / 1000000;
+            
+            console.log('🔗 ConsolidatedTransactionService: Balance verification after transfer:', {
+              senderAddress: fromWalletAddress,
+              senderTokenAccount: walletUsdcAccount.toBase58(),
+              senderBalanceAfter: senderBalanceAfter,
+              recipientAddress: toAddress,
+              recipientTokenAccount: recipientUsdcAccount.toBase58(),
+              recipientBalanceAfter: recipientBalanceAfter,
+              transferAmount: amount,
+              expectedSenderBalance: 0, // Should be 0 after full withdrawal
+              expectedRecipientIncrease: amount
+            });
+            
+            // Verify the transfer actually happened
+            if (senderBalanceAfter > 0.001) { // Allow for small rounding differences
+              console.error('🔗 ConsolidatedTransactionService: CRITICAL - Sender still has funds after transfer!', {
+                senderBalanceAfter,
+                expectedBalance: 0,
+                transferAmount: amount
+              });
+              throw new Error(`Transfer verification failed: Sender still has ${senderBalanceAfter} USDC after transfer`);
+            }
+            
+            console.log('✅ ConsolidatedTransactionService: Transfer verification successful - sender balance is zero');
+            
+          } catch (balanceError) {
+            console.error('🔗 ConsolidatedTransactionService: Transfer verification failed:', balanceError);
+            throw new Error(`Transfer verification failed: ${balanceError instanceof Error ? balanceError.message : 'Unknown error'}`);
+          }
+          
           break;
           
         } catch (error) {

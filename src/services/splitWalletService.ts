@@ -1892,8 +1892,37 @@ export class SplitWalletService {
       const docId = wallet.firebaseDocId || wallet.id;
       await updateDoc(doc(db, 'splitWallets', docId), {
         status: 'completed',
+        completedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
+
+      // Update the main split status to completed as well
+      try {
+        const { SplitStorageService } = await import('./splitStorageService');
+        const splitUpdateResult = await SplitStorageService.updateSplitByBillId(wallet.billId, {
+          status: 'completed',
+          completedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+
+        if (splitUpdateResult.success) {
+          logger.info('Main split status updated to completed', {
+            billId: wallet.billId,
+            splitWalletId: wallet.id
+          }, 'SplitWalletService');
+        } else {
+          logger.warn('Failed to update main split status', {
+            billId: wallet.billId,
+            error: splitUpdateResult.error
+          }, 'SplitWalletService');
+        }
+      } catch (error) {
+        logger.warn('Error updating main split status', {
+          billId: wallet.billId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }, 'SplitWalletService');
+        // Don't fail the withdrawal if main split update fails
+      }
 
       logger.info('Fair Split funds extracted successfully', {
         splitWalletId: wallet.id,

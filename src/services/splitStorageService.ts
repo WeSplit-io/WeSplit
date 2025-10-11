@@ -141,6 +141,44 @@ export class SplitStorageService {
   }
 
   /**
+   * Get a split by billId
+   */
+  static async getSplitByBillId(billId: string): Promise<SplitResult> {
+    try {
+      console.log('🔍 SplitStorageService: Getting split by billId:', billId);
+
+      const splitsRef = collection(db, this.COLLECTION_NAME);
+      const q = query(splitsRef, where('billId', '==', billId));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        return {
+          success: false,
+          error: 'Split not found',
+        };
+      }
+
+      const splitDoc = querySnapshot.docs[0];
+      const splitData = splitDoc.data() as Split;
+      splitData.firebaseDocId = splitDoc.id;
+
+      console.log('🔍 SplitStorageService: Split found by billId:', splitData.id);
+      return {
+        success: true,
+        split: splitData,
+      };
+
+    } catch (error) {
+      console.log('🔍 SplitStorageService: Error getting split by billId:', error);
+      logger.error('Failed to get split by billId', error, 'SplitStorageService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
    * Get a split by ID
    */
   static async getSplit(splitId: string): Promise<SplitResult> {
@@ -312,6 +350,49 @@ export class SplitStorageService {
     } catch (error) {
       console.log('🔍 SplitStorageService: Error updating split with wallet info:', error);
       logger.error('Failed to update split with wallet info', error, 'SplitStorageService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Update a split by billId
+   */
+  static async updateSplitByBillId(billId: string, updates: Partial<Split>): Promise<SplitResult> {
+    try {
+      console.log('🔍 SplitStorageService: Updating split by billId:', billId, updates);
+
+      const splitResult = await this.getSplitByBillId(billId);
+      if (!splitResult.success || !splitResult.split) {
+        return splitResult;
+      }
+
+      const split = splitResult.split;
+      const docId = split.firebaseDocId || split.id;
+
+      const updateData = {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await updateDoc(doc(db, this.COLLECTION_NAME, docId), updateData);
+
+      const updatedSplit: Split = {
+        ...split,
+        ...updateData,
+      };
+
+      console.log('🔍 SplitStorageService: Split updated by billId successfully');
+      return {
+        success: true,
+        split: updatedSplit,
+      };
+
+    } catch (error) {
+      console.log('🔍 SplitStorageService: Error updating split by billId:', error);
+      logger.error('Failed to update split by billId', error, 'SplitStorageService');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',

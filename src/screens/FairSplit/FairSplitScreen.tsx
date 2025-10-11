@@ -1511,6 +1511,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           destination: selectedWallet.address
         });
         
+        // Update local state to reflect completion
+        setSplitWallet(prev => prev ? { 
+          ...prev, 
+          status: 'completed' as const,
+          completedAt: new Date().toISOString()
+        } : null);
+        
         // Show success message
         Alert.alert(
           'Transfer Successful!', 
