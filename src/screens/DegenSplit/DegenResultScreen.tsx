@@ -23,7 +23,6 @@ import { spacing } from '../../theme/spacing';
 import { styles } from './DegenResultStyles';
 import { SplitWalletService } from '../../services/splitWalletService';
 import { NotificationService } from '../../services/notificationService';
-import { MockupDataService } from '../../data/mockupData';
 import { useApp } from '../../context/AppContext';
 
 interface DegenResultScreenProps {
@@ -160,11 +159,13 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'personal-wallet' | 'kast-card' | null>(null);
   const [showSignatureStep, setShowSignatureStep] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
+  const [hasCompletedSplit, setHasCompletedSplit] = useState(false);
+  const [hasSentNotifications, setHasSentNotifications] = useState(false);
 
-  // Determine if current user is the loser (loser pays the full bill, winners get their money back)
-  const isLoser = currentUser && selectedParticipant && 
+  // Determine if current user is the winner (selectedParticipant is the winner from the roulette)
+  const isWinner = currentUser && selectedParticipant && 
     (selectedParticipant.userId || selectedParticipant.id) === currentUser.id.toString();
-  const isWinner = !isLoser;
+  const isLoser = !isWinner;
 
   // Notifications are now sent from DegenSpinScreen when roulette is rolled
   // No need to send duplicate notifications here
@@ -172,7 +173,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   // Check if all losers have paid their shares
   React.useEffect(() => {
     const checkPaymentCompletion = async () => {
-      if (!splitWallet || !selectedParticipant) return;
+      if (!splitWallet || !selectedParticipant || hasCompletedSplit) return;
 
       try {
         const result = await SplitWalletService.getSplitWallet(splitWallet.id);
@@ -183,7 +184,9 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         const losers = wallet.participants.filter(p => p.userId !== winnerId);
         const allLosersPaid = losers.every(loser => loser.status === 'paid');
 
-        if (allLosersPaid && losers.length > 0) {
+        if (allLosersPaid && losers.length > 0 && !hasCompletedSplit) {
+          setHasCompletedSplit(true); // Prevent duplicate processing
+          
           // Get merchant address if available
           const merchantAddress = processedBillData?.merchant?.address || billData?.merchant?.address;
           
@@ -194,23 +197,25 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           );
 
           if (completionResult.success) {
-            // Send completion notifications
-            const completionRecipients = [
-              winnerId, 
-              ...losers.map(l => l.userId).filter(id => id)
-            ].filter(id => id); // Filter out undefined values
-            
-            
-            if (completionRecipients.length > 0) {
-              await NotificationService.sendBulkNotifications(
-                completionRecipients,
-                'split_payment_required', // Use existing notification type
-                {
-                  splitWalletId: splitWallet.id,
-                  billName: splitData?.title || billData?.title || MockupDataService.getBillName(),
-                  amount: totalAmount,
-                }
-              );
+            // Send completion notifications only once
+            if (!hasSentNotifications) {
+              setHasSentNotifications(true);
+              const completionRecipients = [
+                winnerId, 
+                ...losers.map(l => l.userId).filter(id => id)
+              ].filter(id => id); // Filter out undefined values
+              
+              if (completionRecipients.length > 0) {
+                await NotificationService.sendBulkNotifications(
+                  completionRecipients,
+                  'split_completed', // Use appropriate notification type
+                  {
+                    splitWalletId: splitWallet.id,
+                    billName: splitData?.title || billData?.title || 'Degen Split',
+                    amount: totalAmount,
+                  }
+                );
+              }
             }
 
             // Show completion alert
@@ -240,14 +245,14 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           }
         }
       } catch (error) {
-        // Silent error handling
+        console.error('Error checking payment completion:', error);
       }
     };
 
-    // Check every 5 seconds
-    const interval = setInterval(checkPaymentCompletion, 5000);
+    // Check every 10 seconds (reduced frequency)
+    const interval = setInterval(checkPaymentCompletion, 10000);
     return () => clearInterval(interval);
-  }, [splitWallet, selectedParticipant]);
+  }, [splitWallet, selectedParticipant, hasCompletedSplit, hasSentNotifications]);
 
 
   const handleShareOnX = async () => {
@@ -309,37 +314,41 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   const handleInAppPayment = async () => {
     setIsProcessing(true);
     try {
-      // Get the loser's in-app wallet address
-      const loserParticipant = participants.find((p: any) => 
-        (p.userId || p.id) === currentUser!.id.toString()
-      );
-      
-      if (!loserParticipant?.walletAddress) {
-        Alert.alert('Error', 'No wallet address found for your account. Please ensure your wallet is connected.');
-        return;
-      }
-
-      // In degen splits, the loser withdraws their locked funds from the split wallet
-      // to their own wallet so they can pay the bill using their preferred method
-      const result = await SplitWalletService.extractDegenSplitFunds(
+      // NEW Degen Logic: Loser receives funds from split wallet to their in-app wallet
+      const { SplitWalletService } = await import('../../services/splitWalletService');
+      const result = await SplitWalletService.processDegenLoserPayment(
         splitWallet.id,
         currentUser!.id.toString(),
-        currentUser!.wallet_address || '', // Use user's wallet address
-        totalAmount,
-        'Degen Split loser fund extraction'
+        'in-app', // Payment method
+        totalAmount, // Loser receives their locked funds back
+        'Degen Split Loser Payment (In-App Wallet)'
       );
       
       if (result.success) {
-        Alert.alert(
-          'Funds Withdrawn! 💰', 
-          `Successfully withdrew ${totalAmount} USDC from the split wallet to your personal wallet. You can now use this to pay the bill with your preferred payment method.`,
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.navigate('SplitsList')
-            }
-          ]
-        );
+        // Check if this is a withdrawal request (for non-creators)
+        if (result.transactionSignature?.startsWith('WITHDRAWAL_REQUEST_')) {
+          Alert.alert(
+            '📋 Withdrawal Request Submitted', 
+            result.message || 'Your withdrawal request has been submitted. The split creator will process your request.',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('SplitsList')
+              }
+            ]
+          );
+        } else {
+          Alert.alert(
+            '✅ Payment Confirmed!', 
+            `Your locked funds (${totalAmount} USDC) have been successfully withdrawn from the split wallet to your in-app wallet.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('SplitsList')
+              }
+            ]
+          );
+        }
       } else {
         Alert.alert('Payment Failed', result.error || 'Failed to complete payment. Please try again.');
       }
@@ -353,27 +362,41 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   const handleExternalPayment = async () => {
     setIsProcessing(true);
     try {
-      // In degen splits, the loser withdraws their locked funds from the split wallet
-      // to their KAST card wallet so they can pay the bill using their KAST card
-      const result = await SplitWalletService.extractDegenSplitFunds(
+      // NEW Degen Logic: Loser receives funds from split wallet to their KAST card/external wallet
+      const { SplitWalletService } = await import('../../services/splitWalletService');
+      const result = await SplitWalletService.processDegenLoserPayment(
         splitWallet.id,
         currentUser!.id.toString(),
-        currentUser!.wallet_address || '', // Use user's wallet address
-        totalAmount,
-        'Degen Split loser fund extraction to KAST card'
+        'kast-card', // Payment method
+        totalAmount, // Loser receives their locked funds back
+        'Degen Split Loser Payment (KAST Card)'
       );
       
       if (result.success) {
-        Alert.alert(
-          'Funds Withdrawn to KAST! 💳', 
-          `Successfully withdrew ${totalAmount} USDC from the split wallet to your KAST card wallet. You can now use your KAST card to pay the bill.`,
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.navigate('SplitsList')
-            }
-          ]
-        );
+        // Check if this is a withdrawal request (for non-creators)
+        if (result.transactionSignature?.startsWith('WITHDRAWAL_REQUEST_')) {
+          Alert.alert(
+            '📋 Withdrawal Request Submitted', 
+            result.message || 'Your withdrawal request has been submitted. The split creator will process your request.',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('SplitsList')
+              }
+            ]
+          );
+        } else {
+          Alert.alert(
+            '✅ Payment Confirmed!', 
+            `Your locked funds (${totalAmount} USDC) have been successfully withdrawn from the split wallet to your KAST card.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('SplitsList')
+              }
+            ]
+          );
+        }
       } else {
         Alert.alert('KAST Payment Failed', result.error || 'Failed to complete KAST payment. Please try again.');
       }
@@ -384,35 +407,51 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     }
   };
 
-  // Handle winner fund claiming
+  // Handle winner fund claiming - NEW LOGIC: Winner gets full amount
   const handleClaimFunds = async () => {
     setShowClaimModal(false);
     setIsProcessing(true);
     try {
-      // In degen splits, each participant locks the full amount
-      // Winners get back the full amount they locked
-      const winnerAmount = totalAmount;
-      
-      
-      // Transfer funds from split wallet to winner's in-app wallet
+      // NEW Degen Logic: Winner gets the full bill amount from the split wallet
       const { SplitWalletService } = await import('../../services/splitWalletService');
-      const result = await SplitWalletService.extractDegenSplitFunds(
+      const result = await SplitWalletService.processDegenWinnerPayout(
         splitWallet.id,
         currentUser!.id.toString(),
         currentUser!.wallet_address || '', // Use user's wallet address
-        winnerAmount,
-        'Degen Split winner fund extraction'
+        totalAmount, // Winner gets the full amount
+        'Degen Split Winner Payout'
       );
       
       if (result.success) {
-        Alert.alert('Success', `Funds claimed! ${winnerAmount} USDC transferred to your in-app wallet.`);
-        // Navigate back or to a success screen
-        navigation.goBack();
+        // Check if this is a withdrawal request (for non-creators)
+        if (result.transactionSignature?.startsWith('WITHDRAWAL_REQUEST_')) {
+          Alert.alert(
+            '📋 Withdrawal Request Submitted', 
+            result.message || 'Your withdrawal request has been submitted. The split creator will process your request.',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('SplitsList')
+              }
+            ]
+          );
+        } else {
+          Alert.alert(
+            '🎉 Winner Payout Complete!', 
+            `Congratulations! You've received the full amount of ${totalAmount} USDC from the degen split. Your locked funds have been returned to you.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('SplitsList')
+              }
+            ]
+          );
+        }
       } else {
-        Alert.alert('Error', result.error || 'Failed to claim funds. Please try again.');
+        Alert.alert('Error', result.error || 'Failed to claim winner payout. Please try again.');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to claim funds. Please try again.');
+      Alert.alert('Error', 'Failed to claim winner payout. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -460,8 +499,8 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         <View style={styles.messageContainer}>
           <Text style={styles.messageText}>
             {isWinner 
-              ? `You won! You get your ${totalAmount} USDC back.`
-              : `You need to pay the bill: ${totalAmount} USDC. Withdraw your locked funds to pay with your preferred method.`
+              ? `You won! You get the full ${totalAmount} USDC from the split wallet.`
+              : `You lost! You can withdraw your locked funds (${totalAmount} USDC) from the split wallet to your chosen destination.`
             }
           </Text>
           <Text style={styles.luckMessage}>
@@ -525,7 +564,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
                 styles.settleButtonText,
                 isProcessing && styles.actionButtonTextDisabled
               ]}>
-                {isProcessing ? 'Processing...' : 'Transfer to Use'}
+                {isProcessing ? 'Processing...' : 'Pay Bill'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -540,9 +579,9 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             <View style={styles.modalIconContainer}>
               <Text style={styles.modalClaimIcon}>🎉</Text>
             </View>
-            <Text style={styles.modalTitle}>Claim Your Funds</Text>
+            <Text style={styles.modalTitle}>Claim Your Winnings</Text>
             <Text style={styles.modalSubtitle}>
-              You can claim {(totalAmount / participants.length).toFixed(1)} USDC back to your in-app wallet.
+              You won! Claim the full {totalAmount} USDC from the split wallet to your in-app wallet.
             </Text>
             
             <TouchableOpacity
@@ -574,7 +613,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
               <>
                 <Text style={styles.modalTitle}>Choose Payment Method</Text>
                 <Text style={styles.modalSubtitle}>
-                  How would you like to receive the {totalAmount} USDC from the split wallet?
+                  You need to pay the full {totalAmount} USDC bill. How would you like to pay?
                 </Text>
                 
                 <View style={styles.paymentOptionsModalContainer}>
@@ -586,9 +625,9 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
                       <Text style={styles.paymentOptionIconText}>💳</Text>
                     </View>
                     <View style={styles.paymentOptionContent}>
-                      <Text style={styles.paymentOptionTitle}>Personal Wallet</Text>
+                      <Text style={styles.paymentOptionTitle}>In-App Wallet</Text>
                       <Text style={styles.paymentOptionDescription}>
-                        Transfer to your personal wallet address
+                        Withdraw to In-App Wallet
                       </Text>
                     </View>
                     <Text style={styles.paymentOptionArrow}>→</Text>
@@ -604,7 +643,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
                     <View style={styles.paymentOptionContent}>
                       <Text style={styles.paymentOptionTitle}>KAST Card</Text>
                       <Text style={styles.paymentOptionDescription}>
-                        Transfer to your KAST card wallet
+                        Withdraw to KAST Card
                       </Text>
                     </View>
                     <Text style={styles.paymentOptionArrow}>→</Text>
@@ -622,13 +661,10 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
               // Signature Step
               <>
                 <Text style={styles.modalTitle}>
-                  Transfer {totalAmount} USDC to your {selectedPaymentMethod === 'personal-wallet' ? 'Personal Wallet' : 'KAST Card'}
+                  Withdraw Your Locked Funds
                 </Text>
                 <Text style={styles.modalSubtitle}>
-                  {selectedPaymentMethod === 'personal-wallet' 
-                    ? 'Top up your wallet in a few seconds to cover your share.'
-                    : 'Top up your card in a few seconds to cover your share.'
-                  }
+                  Your locked funds will be sent from the split wallet to your chosen destination.
                 </Text>
                 
                 {/* Transfer Visualization */}

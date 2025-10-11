@@ -1276,7 +1276,8 @@ class ConsolidatedTransactionService {
     toAddress: string,
     amount: number,
     memo?: string,
-    priority: 'low' | 'medium' | 'high' = 'medium'
+    priority: 'low' | 'medium' | 'high' = 'medium',
+    isPartialWithdrawal: boolean = false
   ): Promise<{
     success: boolean;
     transactionId?: string;
@@ -1698,12 +1699,15 @@ class ConsolidatedTransactionService {
       }
 
       // Final balance check right before transaction creation
+      let senderBalanceBefore: number = 0; // Initialize with default value
       try {
         const finalBalanceCheck = await getAccount(connection, walletUsdcAccount);
         const finalAvailableAmount = Number(finalBalanceCheck.amount);
+        senderBalanceBefore = finalAvailableAmount / 1000000; // Convert to USDC units
         
         console.log('🔗 ConsolidatedTransactionService: Final balance check before transaction:', {
           finalAvailableAmount,
+          senderBalanceBefore,
           calculatedTransferAmount: transferAmount,
           difference: finalAvailableAmount - transferAmount,
           isSufficient: finalAvailableAmount >= transferAmount
@@ -1722,6 +1726,8 @@ class ConsolidatedTransactionService {
         }
       } catch (finalCheckError) {
         console.warn('🔗 ConsolidatedTransactionService: Final balance check failed, proceeding with calculated amount:', finalCheckError);
+        // If we can't get the balance, we'll skip the balance verification later
+        senderBalanceBefore = -1; // Use -1 to indicate we couldn't get the balance
       }
 
       // Create the transfer instruction using the calculated transfer amount
@@ -2046,16 +2052,40 @@ class ConsolidatedTransactionService {
             });
             
             // Verify the transfer actually happened
-            if (senderBalanceAfter > 0.001) { // Allow for small rounding differences
-              console.error('🔗 ConsolidatedTransactionService: CRITICAL - Sender still has funds after transfer!', {
-                senderBalanceAfter,
-                expectedBalance: 0,
-                transferAmount: amount
-              });
-              throw new Error(`Transfer verification failed: Sender still has ${senderBalanceAfter} USDC after transfer`);
+            if (isPartialWithdrawal) {
+              // For partial withdrawals (like degen splits), just verify the amount was deducted
+              if (senderBalanceBefore >= 0) {
+                const expectedSenderBalance = senderBalanceBefore - amount;
+                const balanceDifference = Math.abs(senderBalanceAfter - expectedSenderBalance);
+                
+                if (balanceDifference > 0.001) { // Allow for small rounding differences
+                  console.error('🔗 ConsolidatedTransactionService: CRITICAL - Sender balance not reduced by expected amount!', {
+                    senderBalanceBefore,
+                    senderBalanceAfter,
+                    expectedSenderBalance,
+                    transferAmount: amount,
+                    balanceDifference
+                  });
+                  throw new Error(`Transfer verification failed: Sender balance not reduced by expected amount. Expected: ${expectedSenderBalance}, Actual: ${senderBalanceAfter}`);
+                }
+                
+                console.log('✅ ConsolidatedTransactionService: Partial withdrawal verification successful - sender balance reduced by expected amount');
+              } else {
+                console.log('⚠️ ConsolidatedTransactionService: Skipping partial withdrawal verification - initial balance not available');
+              }
+            } else {
+              // For complete withdrawals (like fair splits), verify sender balance is zero
+              if (senderBalanceAfter > 0.001) { // Allow for small rounding differences
+                console.error('🔗 ConsolidatedTransactionService: CRITICAL - Sender still has funds after transfer!', {
+                  senderBalanceAfter,
+                  expectedBalance: 0,
+                  transferAmount: amount
+                });
+                throw new Error(`Transfer verification failed: Sender still has ${senderBalanceAfter} USDC after transfer`);
+              }
+              
+              console.log('✅ ConsolidatedTransactionService: Complete withdrawal verification successful - sender balance is zero');
             }
-            
-            console.log('✅ ConsolidatedTransactionService: Transfer verification successful - sender balance is zero');
             
           } catch (balanceError) {
             console.error('🔗 ConsolidatedTransactionService: Transfer verification failed:', balanceError);

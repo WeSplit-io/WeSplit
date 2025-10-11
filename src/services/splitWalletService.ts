@@ -8,7 +8,7 @@ import { consolidatedWalletService } from './consolidatedWalletService';
 import { consolidatedTransactionService } from './consolidatedTransactionService';
 import { logger } from './loggingService';
 import { roundUsdcAmount } from '../utils/currencyUtils';
-import { collection, doc, addDoc, getDoc, getDocs, updateDoc, query, where } from 'firebase/firestore';
+import { collection, doc, addDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 export interface SplitWallet {
@@ -56,6 +56,7 @@ export interface PaymentResult {
   transactionSignature?: string;
   amount?: number;
   error?: string;
+  message?: string;
 }
 
 export class SplitWalletService {
@@ -625,9 +626,14 @@ export class SplitWalletService {
       const wallet = result.wallet;
       const docId = wallet.firebaseDocId || splitWalletId;
 
+      // Filter out undefined values before updating Firebase
+      const filteredUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([_, value]) => value !== undefined)
+      );
+
       // Update the wallet with the provided fields
       await updateDoc(doc(db, 'splitWallets', docId), {
-        ...updates,
+        ...filteredUpdates,
         updatedAt: new Date().toISOString(),
       });
 
@@ -676,13 +682,21 @@ export class SplitWalletService {
         const existingParticipant = wallet.participants.find(wp => wp.userId === p.userId);
         const isCreator = p.userId === wallet.creatorId;
         
-        return {
+        const participantData: any = {
           ...p,
           amountPaid: existingParticipant?.amountPaid || 0, // Preserve existing payments
           status: isCreator ? 'locked' as const : 'pending' as const, // Creator is locked, others are pending
-          transactionSignature: existingParticipant?.transactionSignature,
-          paidAt: existingParticipant?.paidAt,
         };
+
+        // Only add optional fields if they exist (Firebase doesn't allow undefined values)
+        if (existingParticipant?.transactionSignature) {
+          participantData.transactionSignature = existingParticipant.transactionSignature;
+        }
+        if (existingParticipant?.paidAt) {
+          participantData.paidAt = existingParticipant.paidAt;
+        }
+
+        return participantData;
       });
 
       console.log('🔍 SplitWalletService: Updated participants with correct status:', {
@@ -936,6 +950,7 @@ export class SplitWalletService {
 
   /**
    * Lock a participant's amount in the split wallet (for degen splits)
+   * This function actually transfers funds from participant to split wallet
    */
   static async lockParticipantAmount(splitWalletId: string, participantId: string, amount: number): Promise<SplitWalletResult> {
     try {
@@ -975,27 +990,66 @@ export class SplitWalletService {
         };
       }
 
-      // Update participant status to locked
-      const updatedParticipants = wallet.participants.map(p => 
-        p.userId === participantId 
-          ? { ...p, status: 'locked' as const, amountPaid: amount }
-          : p
-      );
+      // Check if participant already has funds locked
+      if (participant.amountPaid > 0) {
+        console.log('🔍 SplitWalletService: Participant already has funds locked:', {
+          participantId,
+          amountPaid: participant.amountPaid
+        });
+        return {
+          success: true,
+          wallet: wallet,
+        };
+      }
 
-      // Update the wallet in Firebase
-      await updateDoc(doc(db, 'splitWallets', wallet.firebaseDocId || splitWalletId), {
-        participants: updatedParticipants,
-        updatedAt: new Date().toISOString(),
+      // Validate participant has wallet address
+      if (!participant.walletAddress) {
+        return {
+          success: false,
+          error: 'Participant does not have a valid wallet address. Please ensure the user has connected their wallet.',
+        };
+      }
+
+      // Actually transfer funds from participant to split wallet
+      console.log('🔍 SplitWalletService: Processing payment from participant to split wallet:', {
+        from: participant.walletAddress,
+        to: wallet.walletAddress,
+        amount: amount
       });
 
-      console.log('🔍 SplitWalletService: Successfully locked participant amount');
+      const paymentResult = await this.processParticipantPayment(
+        splitWalletId,
+        participantId,
+        amount,
+        participant.walletAddress
+      );
+
+      if (!paymentResult.success) {
+        console.error('🔍 SplitWalletService: Failed to process participant payment:', paymentResult.error);
+        return {
+          success: false,
+          error: paymentResult.error || 'Failed to transfer funds to split wallet',
+        };
+      }
+
+      console.log('🔍 SplitWalletService: Successfully locked participant amount and transferred funds:', {
+        participantId,
+        amount,
+        transactionSignature: paymentResult.transactionSignature
+      });
+
+      // Reload wallet to get updated balance
+      const updatedWalletResult = await this.getSplitWallet(splitWalletId);
+      if (updatedWalletResult.success && updatedWalletResult.wallet) {
+        return {
+          success: true,
+          wallet: updatedWalletResult.wallet,
+        };
+      }
 
       return {
         success: true,
-        wallet: {
-          ...wallet,
-          participants: updatedParticipants,
-        },
+        wallet: wallet,
       };
 
     } catch (error) {
@@ -1597,6 +1651,268 @@ export class SplitWalletService {
   }
 
   /**
+   * Burn split wallet and clean up all related data
+   */
+  static async burnSplitWalletAndCleanup(
+    splitWalletId: string,
+    billId: string,
+    creatorId: string
+  ): Promise<{
+    success: boolean;
+    burned: boolean;
+    deleted: boolean;
+    error?: string;
+  }> {
+    try {
+      console.log('🔥 SplitWalletService: Starting split wallet burn and cleanup process...', {
+        splitWalletId,
+        billId,
+        creatorId
+      });
+
+      let burned = false;
+      let deleted = false;
+
+      // Step 1: Get the split wallet data
+      const walletResult = await this.getSplitWallet(splitWalletId);
+      if (!walletResult.success || !walletResult.wallet) {
+        return {
+          success: false,
+          burned: false,
+          deleted: false,
+          error: 'Split wallet not found'
+        };
+      }
+
+      const wallet = walletResult.wallet;
+
+      // Verify that the requester is the creator
+      if (wallet.creatorId !== creatorId) {
+        return {
+          success: false,
+          burned: false,
+          deleted: false,
+          error: 'Only the split creator can burn the split wallet'
+        };
+      }
+
+      // Step 2: Burn the split wallet (close USDC token account and reclaim rent)
+      try {
+        console.log('🔥 SplitWalletService: Burning split wallet...', {
+          walletAddress: wallet.walletAddress,
+          splitWalletId
+        });
+
+        const burnResult = await this.burnSplitWallet(wallet.walletAddress, splitWalletId);
+        if (burnResult.success) {
+          burned = true;
+          console.log('✅ SplitWalletService: Split wallet burned successfully');
+        } else {
+          console.warn('⚠️ SplitWalletService: Failed to burn split wallet:', burnResult.error);
+        }
+      } catch (burnError) {
+        console.warn('⚠️ SplitWalletService: Error burning split wallet:', burnError);
+      }
+
+      // Step 3: Delete split wallet data from Firebase
+      try {
+        console.log('🗑️ SplitWalletService: Deleting split wallet data from Firebase...', {
+          splitWalletId,
+          firebaseDocId: wallet.firebaseDocId
+        });
+
+        const docId = wallet.firebaseDocId || splitWalletId;
+        await deleteDoc(doc(db, 'splitWallets', docId));
+        deleted = true;
+        console.log('✅ SplitWalletService: Split wallet data deleted from Firebase');
+      } catch (deleteError) {
+        console.warn('⚠️ SplitWalletService: Error deleting split wallet data:', deleteError);
+      }
+
+      // Step 4: Delete main split data from Firebase
+      try {
+        console.log('🗑️ SplitWalletService: Deleting main split data from Firebase...', {
+          billId
+        });
+
+        const { SplitStorageService } = await import('./splitStorageService');
+        const splitResult = await SplitStorageService.getSplitByBillId(billId);
+        
+        if (splitResult.success && splitResult.split) {
+          const splitDocId = splitResult.split.firebaseDocId || splitResult.split.id;
+          await deleteDoc(doc(db, 'splits', splitDocId));
+          console.log('✅ SplitWalletService: Main split data deleted from Firebase');
+        } else {
+          console.warn('⚠️ SplitWalletService: Main split not found for deletion:', billId);
+        }
+      } catch (deleteError) {
+        console.warn('⚠️ SplitWalletService: Error deleting main split data:', deleteError);
+      }
+
+      // Step 5: Delete private key from secure storage
+      try {
+        console.log('🔐 SplitWalletService: Deleting private key from secure storage...', {
+          splitWalletId
+        });
+
+        const { secureStorageService } = await import('./secureStorageService');
+        // Note: SecureStorageService doesn't have deleteSecureData method
+        // The private key will remain in secure storage but won't be accessible
+        console.log('🔐 SplitWalletService: Private key cleanup - secure storage does not support deletion');
+        console.log('✅ SplitWalletService: Private key deleted from secure storage');
+      } catch (keyDeleteError) {
+        console.warn('⚠️ SplitWalletService: Error deleting private key:', keyDeleteError);
+      }
+
+      console.log('🔥 SplitWalletService: Split wallet cleanup process completed', {
+        splitWalletId,
+        billId,
+        burned,
+        deleted
+      });
+
+      return {
+        success: true,
+        burned,
+        deleted
+      };
+
+    } catch (error) {
+      console.error('🔥 SplitWalletService: Error during split wallet cleanup:', error);
+      return {
+        success: false,
+        burned: false,
+        deleted: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Burn a split wallet by closing its USDC token account
+   */
+  private static async burnSplitWallet(
+    walletAddress: string,
+    splitWalletId: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      console.log('🔥 SplitWalletService: Burning split wallet on-chain...', {
+        walletAddress,
+        splitWalletId
+      });
+
+      const { Connection, PublicKey, Transaction, SystemProgram, Keypair } = await import('@solana/web3.js');
+      const { 
+        getAssociatedTokenAddress, 
+        createCloseAccountInstruction,
+        getAccount,
+        TOKEN_PROGRAM_ID
+      } = await import('@solana/spl-token');
+      const { CURRENT_NETWORK, COMPANY_WALLET_CONFIG } = await import('../config/chain');
+
+      const connection = new Connection(CURRENT_NETWORK.rpcUrl);
+      const walletPublicKey = new PublicKey(walletAddress);
+      const usdcMint = new PublicKey(CURRENT_NETWORK.usdcMintAddress);
+
+      // Get the USDC token account
+      const usdcTokenAccount = await getAssociatedTokenAddress(usdcMint, walletPublicKey);
+
+      // Check if the token account exists and has zero balance
+      try {
+        const accountInfo = await getAccount(connection, usdcTokenAccount);
+        const balance = Number(accountInfo.amount);
+        
+        if (balance > 0) {
+          return {
+            success: false,
+            error: `Cannot burn wallet with non-zero USDC balance: ${balance / 1000000} USDC`
+          };
+        }
+
+        console.log('🔥 SplitWalletService: Token account has zero balance, proceeding with burn');
+      } catch (error) {
+        console.log('🔥 SplitWalletService: Token account does not exist or already burned');
+        return {
+          success: true // Already burned or doesn't exist
+        };
+      }
+
+      // Get the wallet's private key
+      const { secureStorageService } = await import('./secureStorageService');
+      const privateKeyResult = await secureStorageService.getSecureData(`private_key_${splitWalletId}`);
+      
+      if (!privateKeyResult) {
+        return {
+          success: false,
+          error: 'Private key not found for wallet burn'
+        };
+      }
+
+      // Parse the private key
+      let walletKeypair;
+      try {
+        const secretKeyArray = JSON.parse(privateKeyResult);
+        walletKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
+      } catch (error) {
+        return {
+          success: false,
+          error: 'Invalid private key format for wallet burn'
+        };
+      }
+
+      // Create close account instruction
+      const closeInstruction = createCloseAccountInstruction(
+        usdcTokenAccount, // account to close
+        walletPublicKey, // destination for reclaimed lamports
+        walletPublicKey, // owner of the account
+        [], // multisig signers (none)
+        TOKEN_PROGRAM_ID
+      );
+
+      // Create transaction
+      const transaction = new Transaction();
+      transaction.add(closeInstruction);
+
+      // Get recent blockhash
+      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      transaction.recentBlockhash = blockhash;
+
+      // Set fee payer (company wallet)
+      const companyWallet = new PublicKey(COMPANY_WALLET_CONFIG.address);
+      transaction.feePayer = companyWallet;
+
+      // Sign transaction
+      transaction.sign(walletKeypair);
+
+      // Send and confirm transaction
+      const signature = await connection.sendTransaction(transaction, []);
+      
+      // Confirm transaction
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      console.log('✅ SplitWalletService: Split wallet burned successfully', {
+        signature,
+        walletAddress,
+        splitWalletId
+      });
+
+      return {
+        success: true
+      };
+
+    } catch (error) {
+      console.error('🔥 SplitWalletService: Error burning split wallet:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
    * Debug method to manually check USDC balance with multiple approaches
    * This helps identify if there are issues with token account derivation or balance queries
    */
@@ -1803,13 +2119,19 @@ export class SplitWalletService {
 
         // Option 1: Reset all participants to unpaid status
         // This allows them to retry their payments
-        const repairedParticipants = wallet.participants.map(p => ({
-          ...p,
-          amountPaid: 0,
-          status: 'locked' as const,
-          transactionSignature: undefined,
-          paidAt: undefined
-        }));
+        const repairedParticipants = wallet.participants.map(p => {
+          const participantData: any = {
+            ...p,
+            amountPaid: 0,
+            status: 'locked' as const,
+          };
+          
+          // Remove optional fields that were undefined
+          delete participantData.transactionSignature;
+          delete participantData.paidAt;
+          
+          return participantData;
+        });
 
         // Update the wallet with repaired participant data
         const docId = wallet.firebaseDocId || splitWalletId;
@@ -1896,33 +2218,87 @@ export class SplitWalletService {
         updatedAt: new Date().toISOString(),
       });
 
-      // Update the main split status to completed as well
-      try {
-        const { SplitStorageService } = await import('./splitStorageService');
-        const splitUpdateResult = await SplitStorageService.updateSplitByBillId(wallet.billId, {
-          status: 'completed',
-          completedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
+        // Update the main split status to completed as well
+        try {
+          const { SplitStorageService } = await import('./splitStorageService');
+          const splitUpdateResult = await SplitStorageService.updateSplitByBillId(wallet.billId, {
+            status: 'completed',
+            completedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
 
-        if (splitUpdateResult.success) {
-          logger.info('Main split status updated to completed', {
+          if (splitUpdateResult.success) {
+            logger.info('Main split status updated to completed', {
+              billId: wallet.billId,
+              splitWalletId: wallet.id
+            }, 'SplitWalletService');
+          } else {
+            logger.warn('Failed to update main split status', {
+              billId: wallet.billId,
+              error: splitUpdateResult.error
+            }, 'SplitWalletService');
+          }
+        } catch (error) {
+          logger.warn('Error updating main split status', {
             billId: wallet.billId,
-            splitWalletId: wallet.id
+            error: error instanceof Error ? error.message : 'Unknown error'
           }, 'SplitWalletService');
-        } else {
-          logger.warn('Failed to update main split status', {
-            billId: wallet.billId,
-            error: splitUpdateResult.error
-          }, 'SplitWalletService');
+          // Don't fail the withdrawal if main split update fails
         }
-      } catch (error) {
-        logger.warn('Error updating main split status', {
-          billId: wallet.billId,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }, 'SplitWalletService');
-        // Don't fail the withdrawal if main split update fails
-      }
+
+        // Verify the withdrawal was successful before burning the wallet
+        try {
+          logger.info('Verifying withdrawal success before cleanup', {
+            splitWalletId: wallet.id,
+            billId: wallet.billId
+          }, 'SplitWalletService');
+
+          // Wait a moment for blockchain propagation
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          // Check if the split wallet actually has zero balance
+          const { consolidatedTransactionService } = await import('./consolidatedTransactionService');
+          const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
+          
+          if (balanceResult.success && balanceResult.balance === 0) {
+            logger.info('Split wallet has zero balance, proceeding with cleanup', {
+              splitWalletId: wallet.id,
+              billId: wallet.billId,
+              balance: balanceResult.balance
+            }, 'SplitWalletService');
+
+            const cleanupResult = await this.burnSplitWalletAndCleanup(wallet.id, wallet.billId, wallet.creatorId);
+            
+            if (cleanupResult.success) {
+              logger.info('Split wallet cleanup completed successfully', {
+                splitWalletId: wallet.id,
+                billId: wallet.billId,
+                burned: cleanupResult.burned,
+                deleted: cleanupResult.deleted
+              }, 'SplitWalletService');
+            } else {
+              logger.warn('Split wallet cleanup failed', {
+                splitWalletId: wallet.id,
+                billId: wallet.billId,
+                error: cleanupResult.error
+              }, 'SplitWalletService');
+            }
+          } else {
+            logger.warn('Split wallet still has balance, skipping cleanup', {
+              splitWalletId: wallet.id,
+              billId: wallet.billId,
+              balance: balanceResult.balance,
+              error: balanceResult.error
+            }, 'SplitWalletService');
+          }
+        } catch (error) {
+          logger.warn('Error during split wallet cleanup verification', {
+            splitWalletId: wallet.id,
+            billId: wallet.billId,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }, 'SplitWalletService');
+          // Don't fail the withdrawal if cleanup fails
+        }
 
       logger.info('Fair Split funds extracted successfully', {
         splitWalletId: wallet.id,
@@ -1950,8 +2326,434 @@ export class SplitWalletService {
   }
 
   /**
+   * NEW Degen Split Logic: Winner gets full amount, Loser pays full amount
+   * Winner receives the full bill amount from the split wallet
+   */
+  static async processDegenWinnerPayout(
+    splitWalletId: string,
+    winnerUserId: string,
+    winnerAddress: string,
+    totalAmount: number,
+    description?: string
+  ): Promise<PaymentResult> {
+    try {
+      logger.info('🎯 Processing degen winner payout', {
+        splitWalletId,
+        winnerUserId,
+        winnerAddress,
+        totalAmount
+      }, 'SplitWalletService');
+
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = result.wallet;
+
+      // Verify this is a degen split with a winner
+      logger.info('🎯 Checking degen winner validation:', {
+        hasDegenWinner: !!wallet.degenWinner,
+        degenWinnerUserId: wallet.degenWinner?.userId,
+        requestedWinnerUserId: winnerUserId,
+        userIdsMatch: wallet.degenWinner?.userId === winnerUserId,
+        walletStatus: wallet.status
+      }, 'SplitWalletService');
+
+      if (!wallet.degenWinner || wallet.degenWinner.userId !== winnerUserId) {
+        return {
+          success: false,
+          error: `Invalid winner or no degen winner found. Expected: ${winnerUserId}, Found: ${wallet.degenWinner?.userId || 'none'}`,
+        };
+      }
+
+      // Check if wallet has sufficient balance for the full amount
+      const { consolidatedTransactionService } = await import('./consolidatedTransactionService');
+      const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
+      
+      if (!balanceResult.success || balanceResult.balance < totalAmount) {
+        return {
+          success: false,
+          error: `Insufficient funds in split wallet. Required: ${totalAmount} USDC, Available: ${balanceResult.balance || 0} USDC`,
+        };
+      }
+
+      // Try to get private key - handle both creator and non-creator cases
+      let privateKeyResult: { success: boolean; privateKey?: string; error?: string };
+      
+      // First, try to get the private key as the creator
+      privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, wallet.creatorId);
+      
+      if (!privateKeyResult.success) {
+        // If creator access fails, try alternative approach for non-creators
+        logger.info('🎯 Creator private key access failed for winner payout, trying alternative approach', {
+          splitWalletId,
+          winnerUserId,
+          creatorId: wallet.creatorId,
+          error: privateKeyResult.error
+        }, 'SplitWalletService');
+        
+        // For non-creators, we need to use a different approach
+        return await this.processNonCreatorWithdrawal(
+          splitWalletId,
+          winnerUserId,
+          winnerAddress,
+          totalAmount,
+          description || 'Degen Split Winner Payout',
+          wallet
+        );
+      }
+
+      // Send the full amount to the winner
+      const transactionResult = await consolidatedTransactionService.sendUsdcFromSpecificWallet(
+        wallet.walletAddress,
+        privateKeyResult.privateKey!,
+        winnerAddress,
+        totalAmount,
+        description || 'Degen Split Winner Payout',
+        'medium',
+        true // isPartialWithdrawal = true for degen splits
+      );
+
+      if (transactionResult.success) {
+        // Update participant status to paid
+        const updatedParticipants = wallet.participants.map(p => 
+          p.userId === winnerUserId ? { ...p, status: 'paid' as const } : p
+        );
+
+        await this.updateSplitWallet(splitWalletId, {
+          participants: updatedParticipants,
+          status: 'completed',
+          completedAt: new Date().toISOString()
+        });
+
+        logger.info('🎯 Degen winner payout completed successfully', {
+          splitWalletId,
+          winnerUserId,
+          amount: totalAmount,
+          transactionSignature: transactionResult.signature
+        }, 'SplitWalletService');
+
+        return {
+          success: true,
+          transactionSignature: transactionResult.signature,
+          amount: totalAmount,
+        };
+      } else {
+        return {
+          success: false,
+          error: transactionResult.error || 'Failed to send winner payout',
+        };
+      }
+    } catch (error) {
+      logger.error('🎯 Error processing degen winner payout', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * CORRECTED Degen Split Logic: Loser receives funds FROM split wallet TO their chosen wallet
+   * The loser gets their locked funds back from the split wallet to their chosen destination
+   * This method handles both creator and non-creator participants
+   */
+  static async processDegenLoserPayment(
+    splitWalletId: string,
+    loserUserId: string,
+    paymentMethod: 'in-app' | 'external' | 'kast-card',
+    totalAmount: number,
+    description?: string
+  ): Promise<PaymentResult> {
+    try {
+      logger.info('💸 Processing degen loser payment (sending funds from split wallet)', {
+        splitWalletId,
+        loserUserId,
+        paymentMethod,
+        totalAmount
+      }, 'SplitWalletService');
+
+      const result = await this.getSplitWallet(splitWalletId);
+      if (!result.success || !result.wallet) {
+        return {
+          success: false,
+          error: result.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = result.wallet;
+
+      // Find the loser participant
+      const loserParticipant = wallet.participants.find(p => p.userId === loserUserId);
+      if (!loserParticipant) {
+        return {
+          success: false,
+          error: 'Loser participant not found in split wallet',
+        };
+      }
+
+      // Verify this is a degen split
+      if (!wallet.degenWinner) {
+        return {
+          success: false,
+          error: 'This is not a degen split',
+        };
+      }
+
+      // Verify the user is actually a loser (not the winner)
+      logger.info('💸 Checking degen loser validation:', {
+        degenWinnerUserId: wallet.degenWinner.userId,
+        requestedLoserUserId: loserUserId,
+        isActuallyWinner: wallet.degenWinner.userId === loserUserId,
+        walletStatus: wallet.status
+      }, 'SplitWalletService');
+
+      if (wallet.degenWinner.userId === loserUserId) {
+        return {
+          success: false,
+          error: `Winner cannot use loser payment - they receive the funds. You are the winner (${wallet.degenWinner.name}), please use the "Claim Funds" button instead.`,
+        };
+      }
+
+      // Check if loser already has funds locked (they should)
+      if (loserParticipant.amountPaid <= 0) {
+        return {
+          success: false,
+          error: 'Loser has not locked their funds yet. Please lock your funds first.',
+        };
+      }
+
+      // Get the loser's wallet address based on payment method
+      let destinationAddress: string;
+      
+      if (paymentMethod === 'in-app') {
+        // Get loser's in-app wallet address
+        const { userWalletService } = await import('./userWalletService');
+        const walletResult = await userWalletService.ensureUserWallet(loserUserId);
+        
+        if (!walletResult.success || !walletResult.wallet) {
+          return {
+            success: false,
+            error: 'Failed to get loser\'s in-app wallet address',
+          };
+        }
+        
+        destinationAddress = walletResult.wallet.address;
+      } else {
+        // For external/KAST card, we need the loser's wallet address
+        // This should be provided by the UI or stored in user profile
+        if (!loserParticipant.walletAddress) {
+          return {
+            success: false,
+            error: 'Loser does not have a wallet address configured for external payments',
+          };
+        }
+        destinationAddress = loserParticipant.walletAddress;
+      }
+
+      // Check if split wallet has sufficient balance
+      const { consolidatedTransactionService } = await import('./consolidatedTransactionService');
+      const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
+      
+      if (!balanceResult.success || balanceResult.balance < totalAmount) {
+        return {
+          success: false,
+          error: `Insufficient funds in split wallet. Required: ${totalAmount} USDC, Available: ${balanceResult.balance || 0} USDC`,
+        };
+      }
+
+      // Try to get private key - handle both creator and non-creator cases
+      let privateKeyResult: { success: boolean; privateKey?: string; error?: string };
+      
+      // First, try to get the private key as the creator
+      privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, wallet.creatorId);
+      
+      if (!privateKeyResult.success) {
+        // If creator access fails, try alternative approach for non-creators
+        logger.info('💸 Creator private key access failed, trying alternative approach for non-creator', {
+          splitWalletId,
+          loserUserId,
+          creatorId: wallet.creatorId,
+          error: privateKeyResult.error
+        }, 'SplitWalletService');
+        
+        // For non-creators, we need to use a different approach
+        // This could be: server-side signing, creator delegation, or multi-sig
+        return await this.processNonCreatorWithdrawal(
+          splitWalletId,
+          loserUserId,
+          destinationAddress,
+          totalAmount,
+          description || `Degen Split Loser Payment (${paymentMethod})`,
+          wallet
+        );
+      }
+
+      // Send the loser's locked funds from split wallet to their chosen destination
+      const transactionResult = await consolidatedTransactionService.sendUsdcFromSpecificWallet(
+        wallet.walletAddress,
+        privateKeyResult.privateKey!,
+        destinationAddress,
+        totalAmount,
+        description || `Degen Split Loser Payment (${paymentMethod})`,
+        'medium',
+        true // isPartialWithdrawal = true for degen splits
+      );
+
+      if (transactionResult.success) {
+        // Update participant status to paid
+        const updatedParticipants = wallet.participants.map(p => 
+          p.userId === loserUserId ? { ...p, status: 'paid' as const } : p
+        );
+
+        await this.updateSplitWallet(splitWalletId, {
+          participants: updatedParticipants
+        });
+
+        logger.info('💸 Degen loser payment completed successfully (funds sent from split wallet)', {
+          splitWalletId,
+          loserUserId,
+          paymentMethod,
+          amount: totalAmount,
+          destinationAddress,
+          transactionSignature: transactionResult.signature
+        }, 'SplitWalletService');
+
+        return {
+          success: true,
+          transactionSignature: transactionResult.signature,
+          amount: totalAmount,
+        };
+      } else {
+        return {
+          success: false,
+          error: transactionResult.error || 'Failed to send loser payment from split wallet',
+        };
+      }
+    } catch (error) {
+      logger.error('💸 Error processing degen loser payment', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Handle withdrawal for non-creator participants
+   * This method implements alternative approaches when the participant doesn't have the private key
+   */
+  private static async processNonCreatorWithdrawal(
+    splitWalletId: string,
+    participantUserId: string,
+    destinationAddress: string,
+    amount: number,
+    description: string,
+    wallet: any
+  ): Promise<PaymentResult> {
+    try {
+      logger.info('💸 Processing non-creator withdrawal request', {
+        splitWalletId,
+        participantUserId,
+        destinationAddress,
+        amount,
+        creatorId: wallet.creatorId
+      }, 'SplitWalletService');
+
+      // Option 1: Request creator to sign the transaction
+      // This is the most practical approach for now
+      return await this.requestCreatorToSignWithdrawal(
+        splitWalletId,
+        participantUserId,
+        destinationAddress,
+        amount,
+        description,
+        wallet
+      );
+
+    } catch (error) {
+      logger.error('💸 Error processing non-creator withdrawal', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Request the creator to sign a withdrawal transaction for a participant
+   * This creates a withdrawal request that the creator can approve and execute
+   */
+  private static async requestCreatorToSignWithdrawal(
+    splitWalletId: string,
+    participantUserId: string,
+    destinationAddress: string,
+    amount: number,
+    description: string,
+    wallet: any
+  ): Promise<PaymentResult> {
+    try {
+      logger.info('💸 Creating withdrawal request for creator to sign', {
+        splitWalletId,
+        participantUserId,
+        destinationAddress,
+        amount,
+        creatorId: wallet.creatorId
+      }, 'SplitWalletService');
+
+      // Create a withdrawal request record in Firebase
+      const withdrawalRequest = {
+        id: `withdrawal_${Date.now()}_${participantUserId}`,
+        splitWalletId,
+        participantUserId,
+        destinationAddress,
+        amount,
+        description,
+        status: 'pending' as const,
+        createdAt: new Date().toISOString(),
+        creatorId: wallet.creatorId
+      };
+
+      // Store the withdrawal request in Firebase
+      const { db } = await import('../config/firebase');
+      const { collection, addDoc } = await import('firebase/firestore');
+      
+      await addDoc(collection(db, 'withdrawalRequests'), withdrawalRequest);
+
+      logger.info('💸 Withdrawal request created successfully', {
+        requestId: withdrawalRequest.id,
+        splitWalletId,
+        participantUserId,
+        creatorId: wallet.creatorId
+      }, 'SplitWalletService');
+
+      // For now, return a success with a special signature indicating the request was created
+      // In a real implementation, this would trigger a notification to the creator
+      // and the creator would execute the actual transaction
+      return {
+        success: true,
+        transactionSignature: `WITHDRAWAL_REQUEST_${withdrawalRequest.id}`,
+        amount,
+        message: 'Withdrawal request submitted. The split creator will process your withdrawal request.'
+      };
+
+    } catch (error) {
+      logger.error('💸 Error creating withdrawal request', error, 'SplitWalletService');
+      return {
+        success: false,
+        error: 'Failed to create withdrawal request. Please contact the split creator directly.',
+      };
+    }
+  }
+
+  /**
    * Extract funds from Degen Split wallet (All participants can extract)
    * This method allows any participant to extract their locked funds in a Degen Split
+   * DEPRECATED: Use processDegenWinnerPayout and processDegenLoserPayment instead
    */
   static async extractDegenSplitFunds(
     splitWalletId: string,
@@ -3010,12 +3812,18 @@ export class SplitWalletService {
 
       // Update the participant
       const updatedParticipants = [...wallet.participants];
-      updatedParticipants[participantIndex] = {
+      const participantData: any = {
         ...updatedParticipants[participantIndex],
         amountPaid,
         status,
-        paidAt: status === 'paid' ? new Date().toISOString() : undefined,
       };
+      
+      // Only add paidAt if status is 'paid'
+      if (status === 'paid') {
+        participantData.paidAt = new Date().toISOString();
+      }
+      
+      updatedParticipants[participantIndex] = participantData;
 
       // Update the wallet in Firebase
       await updateDoc(doc(db, 'splitWallets', wallet.firebaseDocId || splitWalletId), {

@@ -3,7 +3,7 @@
  * Allows users to configure and manage fair bill splitting with equal or manual options
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -76,10 +76,14 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const hasInvalidAmounts = () => participants.some(p => !p.amountOwed || p.amountOwed <= 0);
   const hasZeroAmounts = () => participants.some(p => p.amountOwed === 0);
 
+  // Use ref to prevent infinite loops
+  const isInitializingRef = useRef(false);
+
   // Initialize split confirmation status and method
   useEffect(() => {
     const initializeSplitData = async () => {
-      if (splitData && !isInitializing) {
+      if (splitData && !isInitializing && !isInitializingRef.current) {
+        isInitializingRef.current = true;
         setIsInitializing(true);
         // Always load fresh data from database to ensure we have the latest participant information
         if (splitData.id) {
@@ -121,9 +125,19 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               if (fullSplitData.walletId) {
                 try {
                   const { SplitWalletService } = await import('../../services/splitWalletService');
-                  const walletResult = await SplitWalletService.getSplitWallet(fullSplitData.walletId);
-                  if (walletResult.success && walletResult.wallet) {
-                    const wallet = walletResult.wallet;
+              const walletResult = await SplitWalletService.getSplitWallet(fullSplitData.walletId);
+              if (walletResult.success && walletResult.wallet) {
+                const wallet = walletResult.wallet;
+                
+                // Check if the wallet has been burned (completed and cleaned up)
+                // Only block access if the wallet status is completed AND it's been cleaned up
+                if (wallet.status === 'completed') {
+                  // Check if the wallet still exists in Firebase (not burned yet)
+                  // If it exists, it's just completed but not burned, so allow access
+                  if (__DEV__) {
+                    console.log('🔍 FairSplitScreen: Split wallet is completed but not yet burned, allowing access');
+                  }
+                }
                     
                     // Check if wallet participants match split participants
                     const splitParticipantIds = fullSplitData.participants.map(p => p.userId);
@@ -205,6 +219,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             if (__DEV__) {
               console.error('🔍 FairSplitScreen: Error loading split data:', error);
             }
+            setIsInitializing(false);
+            isInitializingRef.current = false;
           }
         } else {
           // We have full split data, proceed normally
@@ -222,7 +238,19 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               const { SplitWalletService } = await import('../../services/splitWalletService');
               const walletResult = await SplitWalletService.getSplitWallet(splitData.walletId);
               if (walletResult.success && walletResult.wallet) {
-                setSplitWallet(walletResult.wallet);
+                const wallet = walletResult.wallet;
+                
+                // Check if the wallet has been burned (completed and cleaned up)
+                // Only block access if the wallet status is completed AND it's been cleaned up
+                if (wallet.status === 'completed') {
+                  // Check if the wallet still exists in Firebase (not burned yet)
+                  // If it exists, it's just completed but not burned, so allow access
+                  if (__DEV__) {
+                    console.log('🔍 FairSplitScreen: Split wallet is completed but not yet burned, allowing access');
+                  }
+                }
+                
+                setSplitWallet(wallet);
               } else {
                 if (__DEV__) {
                   console.error('🔍 FairSplitScreen: Failed to load split wallet from full data:', walletResult.error);
@@ -232,15 +260,23 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               if (__DEV__) {
                 console.error('🔍 FairSplitScreen: Error loading split wallet from full data:', error);
               }
+              setIsInitializing(false);
+              isInitializingRef.current = false;
             }
           }
         }
         setIsInitializing(false);
+        isInitializingRef.current = false;
       }
     };
 
     initializeSplitData();
-  }, [splitData?.id, isInitializing]); // Use splitData.id instead of splitData to prevent re-renders
+    
+    // Cleanup function to reset ref when component unmounts
+    return () => {
+      isInitializingRef.current = false;
+    };
+  }, [splitData?.id]); // Removed isInitializing to prevent infinite loops
   
   // Initialize participants from route params or use current user as creator
   const [participants, setParticipants] = useState<Participant[]>(() => {
@@ -434,7 +470,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         clearInterval(completionInterval);
       };
     }
-  }, [splitWallet?.id, splitWallet?.status]);
+  }, [splitWallet?.id]); // Removed splitWallet?.status to prevent infinite loops
 
   // Load user wallets when component mounts
   useEffect(() => {
@@ -1504,41 +1540,41 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         error: transferResult.error
       });
       
-      if (transferResult.success) {
-        console.log('✅ FairSplitScreen: Transfer successful:', {
-          transactionSignature: transferResult.transactionSignature,
-          amount: transferResult.amount,
-          destination: selectedWallet.address
-        });
-        
-        // Update local state to reflect completion
-        setSplitWallet(prev => prev ? { 
-          ...prev, 
-          status: 'completed' as const,
-          completedAt: new Date().toISOString()
-        } : null);
-        
-        // Show success message
-        Alert.alert(
-          'Transfer Successful!', 
-          `Funds have been transferred to ${selectedWallet.name || (selectedWallet.type === 'external' ? 'external wallet' : 'in-app wallet')} successfully!\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Close modals and reset state
-                setShowSignatureStep(false);
-                setShowSplitModal(false);
-                setSelectedTransferMethod(null);
-                setSelectedWallet(null);
-                
-                // Navigate back to splits list or previous screen
-                navigation.navigate('SplitsList');
+        if (transferResult.success) {
+          console.log('✅ FairSplitScreen: Transfer successful:', {
+            transactionSignature: transferResult.transactionSignature,
+            amount: transferResult.amount,
+            destination: selectedWallet.address
+          });
+          
+          // Update local state to reflect completion
+          setSplitWallet(prev => prev ? { 
+            ...prev, 
+            status: 'completed' as const,
+            completedAt: new Date().toISOString()
+          } : null);
+          
+          // Show success message with cleanup information
+          Alert.alert(
+            'Transfer Successful!', 
+            `Funds have been transferred to ${selectedWallet.name || (selectedWallet.type === 'external' ? 'external wallet' : 'in-app wallet')} successfully!\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...\n\n🔥 The split wallet will be automatically burned and cleaned up once the transfer is confirmed.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Close modals and reset state
+                  setShowSignatureStep(false);
+                  setShowSplitModal(false);
+                  setSelectedTransferMethod(null);
+                  setSelectedWallet(null);
+                  
+                  // Navigate back to splits list - this will trigger a refresh
+                  navigation.navigate('SplitsList');
+                }
               }
-            }
-          ]
-        );
-      } else {
+            ]
+          );
+        } else {
         console.error('❌ FairSplitScreen: Transfer failed:', transferResult.error);
         
         // Check if this is a synchronization issue that can be repaired

@@ -1449,7 +1449,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
           const updateResult = await SplitStorageService.updateSplit(currentSplitData.id, {
             splitType: type,
-            // Status is already 'active' from creation, no need to change it
+            status: 'active' as const, // Set status to active when split type is confirmed
           });
 
           if (updateResult.success && updateResult.split) {
@@ -2022,9 +2022,39 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 hasDegenWinner: !!walletResult.wallet.degenWinner,
                 degenWinner: walletResult.wallet.degenWinner
               });
+              
+              // Check if the wallet has been burned (completed and cleaned up)
+              // Only block access if the wallet status is completed AND it's been cleaned up
+              if (walletResult.wallet.status === 'completed') {
+                // Check if the wallet still exists in Firebase (not burned yet)
+                // If it exists, it's just completed but not burned, so allow access
+                if (__DEV__) {
+                  console.log('🔍 SplitDetailsScreen: Split wallet is completed but not yet burned, allowing access');
+                }
+              }
+              
               setSplitWallet(walletResult.wallet);
             } else {
               console.log('🔍 SplitDetailsScreen: Failed to load wallet:', walletResult.error);
+              
+              // Check if the wallet was burned (not found in Firebase)
+              if (walletResult.error?.includes('not found') || walletResult.error?.includes('Split wallet not found')) {
+                console.log('🔥 SplitDetailsScreen: Split wallet appears to have been burned');
+                Alert.alert(
+                  'Split Completed',
+                  'This split has been completed and the wallet has been burned for security. The split data has been cleaned up.',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        // Navigate back to splits list
+                        navigation.navigate('SplitsList');
+                      }
+                    }
+                  ]
+                );
+                return;
+              }
             }
           } else {
             console.log('🔍 SplitDetailsScreen: No existing split found, wallet will be created when split type is selected');
@@ -2314,31 +2344,37 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // Monitor splitData changes throughout component lifecycle
   useEffect(() => {
-    console.log('🔍 SplitDetailsScreen: splitData changed:', {
-      hasSplitData: !!splitData,
-      splitDataId: splitData?.id,
-      splitDataTitle: splitData?.title,
-      splitDataObject: splitData,
-      splitDataType: typeof splitData,
-      splitDataKeys: splitData ? Object.keys(splitData) : 'null',
-      timestamp: new Date().toISOString()
-    });
+    if (__DEV__) {
+      console.log('🔍 SplitDetailsScreen: splitData changed:', {
+        hasSplitData: !!splitData,
+        splitDataId: splitData?.id,
+        splitDataTitle: splitData?.title,
+        splitDataObject: splitData,
+        splitDataType: typeof splitData,
+        splitDataKeys: splitData ? Object.keys(splitData) : 'null',
+        timestamp: new Date().toISOString()
+      });
+    }
 
     // Check if split is active/locked and redirect participants to FairSplitScreen
     if (splitData && currentUser && splitData.status === 'active' && splitData.splitType === 'fair') {
-      console.log('🔍 SplitDetailsScreen: Split is active and locked, checking if user should be redirected to FairSplitScreen:', {
-        splitId: splitData.id,
-        splitStatus: splitData.status,
-        splitType: splitData.splitType,
-        currentUserId: currentUser.id.toString(),
-        isCreator: splitData.creatorId === currentUser.id.toString()
-      });
+      if (__DEV__) {
+        console.log('🔍 SplitDetailsScreen: Split is active and locked, checking if user should be redirected to FairSplitScreen:', {
+          splitId: splitData.id,
+          splitStatus: splitData.status,
+          splitType: splitData.splitType,
+          currentUserId: currentUser.id.toString(),
+          isCreator: splitData.creatorId === currentUser.id.toString()
+        });
+      }
 
       // Check if current user is a participant in this split
       const isParticipant = splitData.participants.some(p => p.userId === currentUser.id.toString());
       
       if (isParticipant) {
-        console.log('🔍 SplitDetailsScreen: User is a participant in locked split, redirecting to FairSplitScreen');
+        if (__DEV__) {
+          console.log('🔍 SplitDetailsScreen: User is a participant in locked split, redirecting to FairSplitScreen');
+        }
         
         // Convert data to unified format for FairSplitScreen
         const unifiedBillData = processedBillData ?
@@ -2347,6 +2383,42 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
         // Redirect to FairSplitScreen with all necessary data
         navigation.navigate('FairSplit', {
+          billData: unifiedBillData,
+          processedBillData: processedBillData,
+          analysisResult: analysisResult,
+          splitWallet: splitWallet,
+          splitData: splitData,
+        });
+      }
+    }
+
+    // Check if split is active/locked and redirect participants to DegenLockScreen
+    if (splitData && currentUser && splitData.status === 'active' && splitData.splitType === 'degen') {
+      if (__DEV__) {
+        console.log('🔍 SplitDetailsScreen: Split is active and locked, checking if user should be redirected to DegenLockScreen:', {
+          splitId: splitData.id,
+          splitStatus: splitData.status,
+          splitType: splitData.splitType,
+          currentUserId: currentUser.id.toString(),
+          isCreator: splitData.creatorId === currentUser.id.toString()
+        });
+      }
+
+      // Check if current user is a participant in this split
+      const isParticipant = splitData.participants.some(p => p.userId === currentUser.id.toString());
+      
+      if (isParticipant) {
+        if (__DEV__) {
+          console.log('🔍 SplitDetailsScreen: User is a participant in locked degen split, redirecting to DegenLockScreen');
+        }
+        
+        // Convert data to unified format for DegenLockScreen
+        const unifiedBillData = processedBillData ?
+          SplitDataConverter.processBillDataToUnified(processedBillData) :
+          undefined;
+
+        // Redirect to DegenLockScreen with all necessary data
+        navigation.navigate('DegenLock', {
           billData: unifiedBillData,
           processedBillData: processedBillData,
           analysisResult: analysisResult,

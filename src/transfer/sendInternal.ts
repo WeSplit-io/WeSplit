@@ -386,7 +386,7 @@ class InternalTransferService {
   /**
    * Check user balance
    */
-  async checkBalance(userId: string, amount: number, currency: 'SOL' | 'USDC'): Promise<BalanceCheckResult> {
+  async checkBalance(userId: string, amount: number, currency: 'SOL' | 'USDC', skipCompanyFee: boolean = false): Promise<BalanceCheckResult> {
     try {
       // Use the existing userWalletService to get balance
       const { userWalletService } = await import('../services/userWalletService');
@@ -394,9 +394,11 @@ class InternalTransferService {
       
       const currentBalance = currency === 'SOL' ? (balance?.solBalance || 0) : (balance?.usdcBalance || 0);
       
-      // Calculate total required amount (including company fee)
-      const { fee: companyFee } = this.calculateCompanyFee(amount);
-      const requiredAmount = amount + companyFee;
+      // Calculate total required amount (including company fee unless skipped)
+      const requiredAmount = skipCompanyFee ? amount : (() => {
+        const { fee: companyFee } = this.calculateCompanyFee(amount);
+        return amount + companyFee;
+      })();
 
       logger.info('Balance check completed', {
         userId,
@@ -1270,8 +1272,15 @@ class InternalTransferService {
         };
       }
 
-      // Check balance before proceeding
-      const balanceCheck = await this.checkBalance(params.userId, params.amount, params.currency);
+      // Check if this is a split wallet payment (no company fees)
+      const isSplitWalletPayment = Boolean(params.memo && (
+        params.memo.includes('Split payment') || 
+        params.memo.includes('split wallet') ||
+        params.memo.includes('Degen Split')
+      ));
+
+      // Check balance before proceeding - skip company fee for split wallet payments
+      const balanceCheck = await this.checkBalance(params.userId, params.amount, params.currency, isSplitWalletPayment);
       if (!balanceCheck.hasSufficientBalance) {
         return {
           success: false,
@@ -1279,8 +1288,10 @@ class InternalTransferService {
         };
       }
 
-      // Calculate company fee
-      const { fee: companyFee, totalAmount, recipientAmount } = this.calculateCompanyFee(params.amount);
+      // Calculate company fee - but skip for split wallet payments
+      const { fee: companyFee, totalAmount, recipientAmount } = isSplitWalletPayment 
+        ? { fee: 0, totalAmount: params.amount, recipientAmount: params.amount }
+        : this.calculateCompanyFee(params.amount);
 
       // Load wallet using the existing userWalletService
       const { userWalletService } = await import('../services/userWalletService');

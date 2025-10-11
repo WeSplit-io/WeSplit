@@ -143,8 +143,14 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+  },
+  progressBackground: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
     borderWidth: 15,
-    borderColor: colors.white10, // Light gray border for the filled portion
+    borderColor: colors.white10, // Light gray background border
   },
   progressFill: {
     position: 'absolute',
@@ -152,8 +158,11 @@ export const styles = StyleSheet.create({
     height: 200,
     borderRadius: 100,
     borderWidth: 15,
-    borderColor: colors.green, // Light gray for progress
-    transform: [{ rotate: '-90deg' }], // Start from top
+    borderColor: 'transparent', // All borders start transparent
+    borderTopColor: 'transparent', // Will be animated
+    borderRightColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: 'transparent',
   },
   progressInner: {
     alignItems: 'center',
@@ -325,9 +334,22 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
     borderRadius: 4,
+    backgroundColor: colors.green,
   },
   lockedIndicatorText: {
     color: colors.white,
+    fontSize: typography.fontSize.xs,
+    fontWeight: '600',
+  },
+  unlockedIndicator: {
+    marginLeft: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: colors.white10,
+  },
+  unlockedIndicatorText: {
+    color: colors.textSecondary,
     fontSize: typography.fontSize.xs,
     fontWeight: '600',
   },
@@ -454,4 +476,5 @@ export const styles = StyleSheet.create({
     height: 20,
     tintColor: colors.black,
   },
+
 });

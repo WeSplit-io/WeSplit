@@ -20,7 +20,6 @@ import { spacing } from '../../theme/spacing';
 import { styles } from './DegenSpinStyles';
 import { useApp } from '../../context/AppContext';
 import { NotificationService } from '../../services/notificationService';
-import { MockupDataService } from '../../data/mockupData';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -110,7 +109,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
   useEffect(() => {
     const sendSpinNotifications = async () => {
       const participantIds = participants.map(p => p.userId || p.id).filter(id => id);
-      const billName = splitData?.title || billData?.title || MockupDataService.getBillName();
+      const billName = splitData?.title || billData?.title || 'Degen Split';
 
       if (participantIds.length === 0) {
         return;
@@ -211,7 +210,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
       // Send notifications to all participants about the roulette result
       try {
         const { NotificationService } = await import('../../services/notificationService');
-        const billName = splitData?.title || billData?.title || MockupDataService.getBillName();
+        const billName = splitData?.title || billData?.title || 'Degen Split';
         const winnerId = baseParticipantCards[finalIndex].userId;
         const winnerName = baseParticipantCards[finalIndex].name;
 
