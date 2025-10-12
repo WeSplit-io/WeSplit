@@ -87,11 +87,11 @@ src/hooks/
 └── usePerformanceMonitor.ts    # Performance monitoring
 ```
 
-### 6. **Complete State Management Migration**
-- **Replaced Context-based state** with modern Zustand store
+### 6. **State Management Architecture (Ready for Migration)**
 - **Created 10 comprehensive state slices** covering all app processes
-- **Implemented backward compatibility** for gradual migration
-- **Added full TypeScript support** with strict typing
+- **Implemented Zustand store** with full TypeScript support
+- **Maintained backward compatibility** - app still uses old context
+- **Migration strategy planned** - gradual migration approach
 
 ### 7. **Fee Configuration System** (`7a4face`)
 - **Created comprehensive fee configuration** system
@@ -321,21 +321,20 @@ const { updateUser } = useUserActions();
 
 ### **⚠️ CRITICAL: You MUST follow these patterns when adding new features**
 
-### **1. State Management - ALWAYS use Zustand Store**
+### **1. State Management - Currently Using AppContext (Zustand Ready)**
 ```typescript
-// ✅ CORRECT - Use new store
-import { useCurrentUser, useGroups, useUserActions } from '../store';
+// ✅ CURRENT - Use AppContext (working system)
+import { useApp } from '../context/AppContext';
 
 const MyComponent = () => {
-  const currentUser = useCurrentUser();
-  const groups = useGroups();
-  const { updateUser } = useUserActions();
+  const { state, updateUser } = useApp();
+  const { currentUser, groups } = state;
   
   // Component logic
 };
 
-// ❌ WRONG - Don't use old context
-import { useApp } from '../context/AppContext'; // DEPRECATED
+// 🚀 FUTURE - Zustand store (ready for migration)
+import { useCurrentUser, useGroups, useUserActions } from '../store';
 ```
 
 ### **2. Component Structure - Follow the new patterns**
@@ -634,6 +633,17 @@ export default AccountSettingsScreen;
 // ❌ WRONG (causes import errors)
 const accountSettingsScreen = () => { ... };
 export default AccountSettingsScreen;
+```
+
+#### **React Component Naming Error**
+```typescript
+// ✅ CORRECT - React components MUST start with capital letter
+const AvatarComponent = ({ avatar, displayName, style }) => { ... };
+<AvatarComponent avatar={user.avatar} displayName={user.name} />
+
+// ❌ WRONG - Lowercase causes "View config getter callback must be a function" error
+const avatarComponent = ({ avatar, displayName, style }) => { ... };
+<avatarComponent avatar={user.avatar} displayName={user.name} />
 ```
 
 #### **State Management Issues**

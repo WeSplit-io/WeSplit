@@ -42,7 +42,7 @@ import { db } from '../../config/firebase';
 import { getDoc, doc } from 'firebase/firestore';
 
 // Avatar component wrapper for backward compatibility
-const avatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
+const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
   return (
     <UserAvatar
       avatarUrl={avatar}
@@ -53,7 +53,11 @@ const avatarComponent = ({ avatar, displayName, style }: { avatar?: string, disp
 };
 
 
-const DashboardScreen: React.FC<any> = ({ navigation }) => {
+interface DashboardScreenProps {
+  navigation: any;
+}
+
+const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
   const { state, notifications, loadNotifications, refreshNotifications, updateUser } = useApp();
   const { currentUser, isAuthenticated } = state;
 
