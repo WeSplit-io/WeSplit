@@ -1,11 +1,11 @@
 /**
  * Types for bill analysis data structure from OCR processing
+ * 
+ * @deprecated Use types from src/types/unified.ts instead
  */
 
-export interface BillItem {
-  name: string;
-  price: number;
-}
+// Re-export from unified types for backward compatibility
+export { BillItem, BillParticipant, BillSplitSettings, ProcessedBillData, BillAnalysisResult } from './unified';
 
 export interface StoreLocation {
   address: string;

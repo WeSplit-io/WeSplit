@@ -177,7 +177,7 @@ export class TransactionUtils {
     try {
       const confirmationPromise = this.connection.confirmTransaction(signature, 'confirmed');
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Transaction confirmation timeout')), timeout);
+        setTimeout(() => reject(new Error(`Transaction was not confirmed in ${timeout/1000} seconds. It is unknown if it succeeded or failed. Check signature ${signature} using the Solana Explorer or CLI tools.`)), timeout);
       });
 
       const result = await Promise.race([confirmationPromise, timeoutPromise]);
@@ -193,6 +193,51 @@ export class TransactionUtils {
         error: error instanceof Error ? error.message : String(error)
       }, 'TransactionUtils');
       return false;
+    }
+  }
+
+  /**
+   * Get transaction status with better error handling
+   */
+  public async getTransactionStatus(signature: string): Promise<{
+    status: 'pending' | 'confirmed' | 'finalized' | 'failed';
+    confirmations?: number;
+    error?: string;
+  }> {
+    try {
+      const status = await this.connection.getSignatureStatus(signature, {
+        searchTransactionHistory: true
+      });
+
+      if (!status.value) {
+        return { status: 'pending' };
+      }
+
+      if (status.value.err) {
+        return { 
+          status: 'failed', 
+          error: status.value.err.toString() 
+        };
+      }
+
+      const confirmations = status.value.confirmations || 0;
+      if (confirmations >= 32) {
+        return { status: 'finalized', confirmations };
+      } else if (confirmations > 0) {
+        return { status: 'confirmed', confirmations };
+      } else {
+        return { status: 'pending' };
+      }
+    } catch (error) {
+      logger.warn('Failed to get transaction status', { 
+        signature,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, 'TransactionUtils');
+      
+      return { 
+        status: 'pending', 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
     }
   }
 

@@ -1,24 +1,17 @@
 /**
  * Shared wallet types and interfaces
  * Centralized type definitions to avoid duplication across services
+ * 
+ * @deprecated Use types from src/types/unified.ts instead
  */
 
 import { PublicKey } from '@solana/web3.js';
 
-// Wallet information interface
-export interface WalletInfo {
-  address: string;
-  publicKey: string;
-  secretKey?: string;
-  balance: number;
-  usdcBalance: number;
-  isConnected: boolean;
-  walletName?: string;
-  walletType?: 'app-generated' | 'external';
-}
+// Re-export from unified types for backward compatibility
+export { WalletInfo, UserWalletBalance, WalletProvider } from './unified';
 
-// Wallet provider interface
-export interface WalletProvider {
+// Extended wallet provider interface with additional properties
+export interface ExtendedWalletProvider {
   name: string;
   icon: string;
   logoUrl: string;

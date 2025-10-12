@@ -1,34 +1,21 @@
-// OS module stub for React Native
-// This provides a minimal implementation to prevent import errors
-
-const os = {
-  platform: () => 'react-native',
-  arch: () => 'arm64',
-  release: () => '1.0.0',
-  type: () => 'ReactNative',
-  hostname: () => 'react-native-device',
-  homedir: () => '/',
+/**
+ * OS Stub for React Native
+ */
+module.exports = {
+  platform: 'react-native',
+  arch: 'unknown',
+  release: 'unknown',
+  type: 'unknown',
+  homedir: () => '/tmp',
   tmpdir: () => '/tmp',
-  endianness: () => 'LE',
   cpus: () => [],
   networkInterfaces: () => ({}),
-  loadavg: () => [0, 0, 0],
+  userInfo: () => ({ username: 'user', uid: 0, gid: 0, shell: '/bin/sh', homedir: '/tmp' }),
   uptime: () => 0,
-  freemem: () => 0,
   totalmem: () => 0,
-  userInfo: () => ({
-    username: 'react-native-user',
-    uid: 0,
-    gid: 0,
-    shell: '/bin/sh',
-    homedir: '/',
-  }),
+  freemem: () => 0,
+  loadavg: () => [0, 0, 0],
+  hostname: () => 'localhost',
+  endianness: () => 'LE',
   EOL: '\n',
-  constants: {
-    signals: {},
-    errno: {},
-    priority: {},
-  },
 };
-
-module.exports = os;

@@ -7,7 +7,7 @@
 import { ProcessedBillData } from '../types/billAnalysis';
 import { SplitStorageService, Split } from './splitStorageService';
 import { SplitWalletService } from './splitWalletService';
-import { BillAnalysisService } from './billAnalysisService';
+import { consolidatedBillAnalysisService } from './consolidatedBillAnalysisService';
 
 export interface ManualSplitCreationData {
   processedBillData: ProcessedBillData;
@@ -38,7 +38,7 @@ export class ManualSplitCreationService {
       });
 
       // Validate the processed data
-      const validation = BillAnalysisService.validateBillData(data.processedBillData);
+      const validation = consolidatedBillAnalysisService.validateIncomingData(data.processedBillData as any);
       if (!validation.isValid) {
         return {
           success: false,

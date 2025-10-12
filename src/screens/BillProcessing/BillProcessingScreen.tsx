@@ -24,10 +24,7 @@ import { typography } from '../../theme/typography';
 import { styles } from './BillProcessingStyles';
 import { BillItem, OCRProcessingResult, BillSplitCreationData } from '../../types/billSplitting';
 import { BillAnalysisData, BillAnalysisResult, ProcessedBillData } from '../../types/billAnalysis';
-import { BillAnalysisService } from '../../services/billAnalysisService';
-import { MockBillAnalysisService } from '../../services/mockBillAnalysisService';
-import { AIBillAnalysisService } from '../../services/aiBillAnalysisService';
-import { billOCRService } from '../../services/billOCRService';
+import { consolidatedBillAnalysisService } from '../../services/consolidatedBillAnalysisService';
 import { useApp } from '../../context/AppContext';
 import { SplitStorageService } from '../../services/splitStorageService';
 import { SplitWalletService } from '../../services/splitWalletService';
@@ -113,7 +110,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
   // Auto-proceed to split creation when OCR AI processing is complete
   useEffect(() => {
     if (currentProcessedBillData && !isEditing && processingResult?.success) {
-      console.log('🔍 BillProcessingScreen: OCR AI processing complete, auto-proceeding to split creation...');
+      // OCR AI processing complete, auto-proceeding to split creation
       // Keep processing state active and proceed immediately
       proceedToSplitDetails();
     }
@@ -129,14 +126,14 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
     setProcessingMethod(null);
     
     try {
-      console.log('🤖 BillProcessingScreen: Starting AI-powered bill analysis...');
+      // Starting AI-powered bill analysis
       
       // Try AI service first with improved error handling
-      let analysisResult = await AIBillAnalysisService.analyzeBillImage(imageUri, currentUser?.id);
+      let analysisResult = await consolidatedBillAnalysisService.analyzeBillFromImage(imageUri, currentUser?.id, false);
       
       // Handle AI analysis result with better error messages
       if (!analysisResult.success) {
-        console.warn('⚠️ AI analysis failed:', analysisResult.error);
+        // AI analysis failed, using fallback
         
         // Check if it's a rate limiting error
         const isRateLimitError = analysisResult.error?.includes('overloaded') || 
@@ -167,11 +164,11 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         }
         
         // For other errors, fallback to mock service
-        console.warn('⚠️ Falling back to mock data due to AI failure');
+        // Falling back to mock data due to AI failure
         setProcessingMethod('mock');
-        analysisResult = await MockBillAnalysisService.analyzeBillImage(imageUri);
+        analysisResult = await consolidatedBillAnalysisService.analyzeBillFromImage(imageUri, currentUser?.id, true);
       } else {
-        console.log('✅ AI analysis successful!');
+        // AI analysis successful
         setProcessingMethod('ai');
       }
       
@@ -179,7 +176,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
       
       if (analysisResult.success && analysisResult.data) {
         // Process the structured data with current user information
-        const processedData = BillAnalysisService.processBillData(analysisResult.data, currentUser || undefined);
+        const processedData = analysisResult.data;
         setCurrentProcessedBillData(processedData);
       
         // Set the authoritative price in the price management service immediately
@@ -190,11 +187,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
           processedData.currency || 'USDC'
         );
         
-        console.log('💰 BillProcessingScreen: Set authoritative price:', {
-          billId: processedData.id,
-          totalAmount: processedData.totalAmount,
-          currency: processedData.currency || 'USDC'
-        });
+        // Set authoritative price for bill
       
         // Update form fields with processed data
         updateFormWithProcessedData(processedData);
@@ -242,12 +235,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
     setAmount(processedData.totalAmount.toString());
     setConvertedAmount(processedData.totalAmount.toString());
     
-    console.log('📝 BillProcessingScreen: Form updated with processed data:', {
-      title: processedData.title,
-      totalAmount: processedData.totalAmount,
-      merchant: processedData.merchant,
-      itemsCount: processedData.items.length
-    });
+    // Form updated with processed data
   };
 
 
@@ -296,7 +284,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
    */
   const proceedToSplitDetails = async () => {
     try {
-      console.log('🔍 BillProcessingScreen: Creating OCR AI split with wallet...');
+      // Creating OCR AI split with wallet
       
       if (!currentUser) {
         Alert.alert('Error', 'User not authenticated');
@@ -344,19 +332,19 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
 
       // Validate the processed data
       if (currentProcessedData) {
-        const validation = BillAnalysisService.validateBillData(currentProcessedData);
+        const validation = consolidatedBillAnalysisService.validateIncomingData(currentProcessedData as any);
         if (!validation.isValid) {
           Alert.alert('Validation Error', validation.errors.join('\n'));
           return;
         }
       }
 
-      console.log('✅ BillProcessingScreen: Data validated, creating split with wallet...');
+      // Data validated, creating split with wallet
 
       // If editing an existing split, update it in the database
       if (isEditing && existingSplitId && currentUser && currentProcessedData) {
         try {
-          console.log('🔍 BillProcessingScreen: Updating existing split:', existingSplitId);
+          // Updating existing split
           
           const updatedSplitData = {
             billId: currentProcessedData.id,
@@ -389,7 +377,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
           const updateResult = await SplitStorageService.updateSplit(existingSplitId, updatedSplitData);
           
           if (updateResult.success) {
-            console.log('🔍 BillProcessingScreen: Split updated successfully');
+            // Split updated successfully
             
             // Navigate back to SplitDetails with updated data
             navigation.navigate('SplitDetails', { 
@@ -424,7 +412,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
               splitId: existingSplitId, // FIXED: Pass the splitId to prevent duplicate creation
             });
           } else {
-            console.log('🔍 BillProcessingScreen: Failed to update split:', updateResult.error);
+            // Failed to update split
             Alert.alert('Error', updateResult.error || 'Failed to update split');
           }
         } catch (error) {
@@ -435,7 +423,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
       }
 
       // Create new OCR AI split with wallet
-      console.log('🔍 BillProcessingScreen: Creating new OCR AI split with wallet...');
+      // Creating new OCR AI split with wallet
       
       // Create wallet first
       const walletResult = await SplitWalletService.createSplitWallet(
@@ -455,10 +443,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         throw new Error(walletResult.error || 'Failed to create split wallet');
       }
 
-      console.log('✅ BillProcessingScreen: Wallet created successfully:', {
-        walletId: walletResult.wallet.id,
-        walletAddress: walletResult.wallet.walletAddress
-      });
+      // Wallet created successfully
 
       // Ensure the creator is included as a participant
       const allParticipants = [...currentProcessedData.participants];
@@ -518,11 +503,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         throw new Error(createResult.error || 'Failed to create split in database');
       }
 
-      console.log('✅ BillProcessingScreen: OCR AI split created successfully:', {
-        splitId: createResult.split.id,
-        walletId: walletResult.wallet.id,
-        walletAddress: walletResult.wallet.walletAddress
-      });
+      // OCR AI split created successfully
 
       // Navigate to SplitDetails with the created split
       navigation.navigate('SplitDetails', { 

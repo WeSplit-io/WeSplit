@@ -150,13 +150,7 @@ export class FeeService {
     return { fee, totalAmount, recipientAmount };
   }
 
-  /**
-   * Legacy method for backward compatibility
-   * @deprecated Use calculateCompanyFee(amount, transactionType) instead
-   */
-  static calculateCompanyFeeLegacy(amount: number): FeeCalculation {
-    return this.calculateCompanyFee(amount, 'default');
-  }
+  // Legacy method removed - use calculateCompanyFee(amount, transactionType) instead
 
   /**
    * Format fee display for UI components

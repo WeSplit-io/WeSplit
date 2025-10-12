@@ -293,44 +293,44 @@ Modèles disponibles :
 - `groq/llama-4-scout-17b-16e-instruct` (recommandé, 16 experts)
 - `groq/llama-4-maverick-17b-128e-instruct` (128 experts, plus puissant)
 
-## 🐛 Dépannage
+## 🐛 Troubleshooting
 
-### Erreur "Clé API requise"
-→ Vérifie que `OPENROUTER_API_KEY` est bien défini dans `.env`
+### "API Key required" error
+→ Check that `OPENROUTER_API_KEY` is properly defined in `.env`
 
-### Image trop volumineuse
-→ L'optimisation automatique réduit les images > 1MB. Utilise `--no-optimize` pour désactiver.
+### Image too large
+→ Automatic optimization reduces images > 1MB. Use `--no-optimize` to disable.
 
-### JSON invalide retourné
-→ Le modèle peut retourner du texte avec le JSON. Le système extrait automatiquement le JSON, mais vérifie `raw_response` en cas d'erreur.
+### Invalid JSON returned
+→ The model may return text with JSON. The system automatically extracts JSON, but check `raw_response` in case of error.
 
 
-## 🚧 Améliorations à venir
+## 🚧 Future Improvements
 
-Ce projet est un prototype fonctionnel. Voici les points à finaliser pour une intégration production (WeSplit) :
+This is a functional prototype. Here are the points to finalize for production integration (WeSplit):
 
-### 1. **Formatage JSON personnalisé**
-- Le schéma JSON actuel est générique
-- À adapter selon les besoins spécifiques de WeSplit
-- Possibilité d'ajouter/retirer des champs selon le cas d'usage
+### 1. **Custom JSON Formatting**
+- Current JSON schema is generic
+- To be adapted according to WeSplit's specific needs
+- Possibility to add/remove fields according to use case
 
-### 2. **Validation arithmétique stricte**
-- Actuellement, le LLM calcule et vérifie les totaux (`total_matches`)
-- **À faire** : Ajouter une validation côté Python (hors LLM) pour garantir que la somme des articles correspond au total du ticket
-- Ajout de logs d'alerte en cas d'incohérence
+### 2. **Strict Arithmetic Validation**
+- Currently, the LLM calculates and verifies totals (`total_matches`)
+- **To do**: Add Python-side validation (outside LLM) to ensure that the sum of items matches the ticket total
+- Add alert logs in case of inconsistency
 
-### 3. **Optimisation et robustesse**
-- Le code fonctionne mais peut être simplifié
-- Ajout de garde-fous supplémentaires sur l'extraction
-- Gestion d'erreurs avancée (tickets partiellement lisibles, formats exotiques)
-- **Itération** en fonction des retours terrain et des besoins réels de WeSplit
+### 3. **Optimization and Robustness**
+- Code works but can be simplified
+- Add additional safeguards on extraction
+- Advanced error handling (partially readable tickets, exotic formats)
+- **Iteration** based on field feedback and WeSplit's real needs
 
-> 💡 **Note** : Ces améliorations seront implémentées progressivement en fonction des cas d'usage concrets et des retours utilisateurs.
+> 💡 **Note**: These improvements will be implemented progressively based on concrete use cases and user feedback.
 
-## 📝 Licence
+## 📝 License
 
-Projet personnel - Usage libre
+Personal project - Free usage
 
 ## 🤝 Contribution
 
-Pour toute amélioration ou bug, ouvre une issue ou propose une pull request.
+For any improvement or bug, open an issue or propose a pull request.

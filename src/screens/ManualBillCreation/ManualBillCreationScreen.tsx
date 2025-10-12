@@ -22,7 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../../theme/colors';
 import { useApp } from '../../context/AppContext';
-import { ManualBillDataProcessor, ManualBillInput } from '../../services/manualBillDataProcessor';
+import { consolidatedBillAnalysisService, ManualBillInput } from '../../services/consolidatedBillAnalysisService';
 import { ManualSplitCreationService } from '../../services/manualSplitCreationService';
 import { BillAnalysisData } from '../../types/billAnalysis';
 import { convertFiatToUSDC } from '../../services/fiatCurrencyService';
@@ -236,7 +236,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       console.log('🔄 ManualBillCreationScreen: Manual bill input created:', manualBillInput);
 
       // Validate the manual input
-      const validation = ManualBillDataProcessor.validateManualInput(manualBillInput);
+      const validation = consolidatedBillAnalysisService.validateIncomingData(manualBillInput as any);
       if (!validation.isValid) {
         console.error('❌ ManualBillCreationScreen: Validation failed:', validation.errors);
         Alert.alert('Validation Error', validation.errors.join('\n'));
@@ -244,7 +244,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       }
 
       // Create the bill analysis data from manual input
-      const manualBillData = ManualBillDataProcessor.createManualBillData(
+      const manualBillData = await consolidatedBillAnalysisService.processManualBill(
         manualBillInput,
         currentUser
       );
@@ -257,10 +257,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       });
 
       // Process the manual bill data using the same processor as OCR
-      const processedBillData = ManualBillDataProcessor.processManualBillData(
-        manualBillData,
-        currentUser
-      );
+      const processedBillData = manualBillData;
 
       if (isEditing) {
         console.log('✅ ManualBillCreationScreen: Bill updated successfully:', {

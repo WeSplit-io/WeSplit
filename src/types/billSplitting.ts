@@ -1,29 +1,12 @@
 /**
  * Bill Splitting Types
  * Defines the data structures for the bill splitting system
+ * 
+ * @deprecated Use types from src/types/unified.ts instead
  */
 
-export interface BillItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity?: number;
-  category?: string;
-  participants: string[]; // User IDs who are splitting this item
-}
-
-export interface BillParticipant {
-  id: string;
-  userId: string;
-  name: string;
-  email: string;
-  phoneNumber?: string;
-  status: 'pending' | 'accepted' | 'declined';
-  amountOwed: number;
-  items: string[]; // Bill item IDs this participant is responsible for
-  joinedAt?: string;
-  respondedAt?: string;
-}
+// Re-export from unified types for backward compatibility
+export { BillItem, BillParticipant, BillSplitSettings, ProcessedBillData, BillAnalysisResult } from './unified';
 
 export interface BillSplit {
   id: string;

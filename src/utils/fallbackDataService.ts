@@ -5,7 +5,7 @@
  */
 
 import { MockupDataService } from '../data/mockupData';
-import { BillDataProcessor, IncomingBillData } from '../services/billDataProcessor';
+import { consolidatedBillAnalysisService, IncomingBillData } from '../services/consolidatedBillAnalysisService';
 
 export class FallbackDataService {
   /**
@@ -162,7 +162,7 @@ export class FallbackDataService {
     });
 
     // Use the BillDataProcessor to handle the conversion
-    return BillDataProcessor.processIncomingBillData(incomingData, currentUser);
+    return consolidatedBillAnalysisService.processIncomingBillData(incomingData, currentUser);
   }
 
   /**
@@ -173,7 +173,7 @@ export class FallbackDataService {
     currentUser?: { id: string; name: string; email: string; wallet_address: string }
   ) {
     // Validate the incoming data structure
-    const validation = BillDataProcessor.validateIncomingData(data);
+    const validation = consolidatedBillAnalysisService.validateIncomingData(data);
     
     if (!validation.isValid) {
       console.warn('⚠️ FallbackDataService: Invalid incoming data, using fallback:', validation.errors);
@@ -188,6 +188,6 @@ export class FallbackDataService {
    * Get fallback data when processing fails
    */
   static getFallbackData() {
-    return BillDataProcessor.getFallbackData();
+    return consolidatedBillAnalysisService.getFallbackData();
   }
 }

@@ -1,9 +1,11 @@
 /**
  * Environment Configuration
  * Centralized environment variable management
+ * 
+ * @deprecated Use src/config/unified.ts instead
  */
 
-import Constants from 'expo-constants';
+import { getConfig, UnifiedConfig } from './unified';
 
 /**
  * Environment types

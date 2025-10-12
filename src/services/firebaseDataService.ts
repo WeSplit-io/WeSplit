@@ -598,24 +598,7 @@ export const firebaseUserService = {
     }
   },
 
-  // Seed phrase management - DEPRECATED: Use secureSeedPhraseService instead
-  // These functions are kept for backward compatibility but should not be used
-  // Seed phrases are now stored securely on device only, never in database
-  saveUserSeedPhrase: async (userId: string, seedPhrase: string[]): Promise<void> => {
-    console.warn('🔥 DEPRECATED: saveUserSeedPhrase should not be used. Use secureSeedPhraseService instead.');
-    throw new Error('Seed phrase storage in database is not allowed. Use secureSeedPhraseService for device-only storage.');
-  },
-
-  getUserSeedPhrase: async (userId: string): Promise<string[] | null> => {
-    console.warn('🔥 DEPRECATED: getUserSeedPhrase should not be used. Use secureSeedPhraseService instead.');
-    throw new Error('Seed phrase retrieval from database is not allowed. Use secureSeedPhraseService for device-only storage.');
-  },
-
-  markSeedPhraseVerified: async (userId: string): Promise<void> => {
-    console.warn('🔥 DEPRECATED: markSeedPhraseVerified should not be used. Seed phrases are now device-only.');
-    // This function is kept for compatibility but does nothing
-    console.log('🔥 Seed phrase verification is now handled by secureSeedPhraseService');
-  },
+  // Seed phrase management functions removed - use secureSeedPhraseService instead
 
   getUserByWalletAddress: async (walletAddress: string): Promise<User | null> => {
     try {

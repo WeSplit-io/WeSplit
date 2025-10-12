@@ -134,10 +134,30 @@ class InternalTransferService {
           issue: 'No wallet with sufficient balance found. Please ensure you have the correct wallet credentials.'
         }, 'InternalTransferService');
         
-        return {
-          success: false,
-          error: 'Wallet mismatch: No wallet with sufficient balance found. Please import your existing wallet or ensure you have the correct credentials.'
-        };
+        // Try comprehensive wallet recovery as a last resort
+        logger.info('Attempting comprehensive wallet recovery', { userId: params.userId, expectedWalletAddress }, 'InternalTransferService');
+        const recoveryResult = await walletService.recoverWalletForUser(params.userId, expectedWalletAddress);
+        
+        if (recoveryResult.success && recoveryResult.wallet) {
+          logger.info('✅ Wallet recovered successfully, retrying transaction', { 
+            userId: params.userId, 
+            recoveredAddress: recoveryResult.wallet.address 
+          }, 'InternalTransferService');
+          
+          // Retry loading the wallet after recovery
+          const retryWalletLoaded = await solanaWalletService.loadWalletWithBalance(params.userId, expectedWalletAddress, params.currency);
+          if (!retryWalletLoaded) {
+            return {
+              success: false,
+              error: 'Wallet recovery succeeded but wallet still cannot be loaded for transaction.'
+            };
+          }
+        } else {
+          return {
+            success: false,
+            error: 'Wallet mismatch: No wallet with sufficient balance found. Please import your existing wallet or ensure you have the correct credentials.'
+          };
+        }
       }
       logger.info('Wallet loaded successfully for signing', { 
         userId: params.userId, 
@@ -640,6 +660,21 @@ class InternalTransferService {
           signature,
           note: 'Transaction may still be processing on the blockchain'
         }, 'InternalTransferService');
+        
+        // Try to check transaction status one more time after a short delay
+        try {
+          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+          const status = await transactionUtils.getTransactionStatus(signature);
+          
+          if (status.status === 'confirmed' || status.status === 'finalized') {
+            logger.info('Transaction confirmed on retry check', { signature, status }, 'InternalTransferService');
+          } else {
+            logger.warn('Transaction still not confirmed on retry', { signature, status }, 'InternalTransferService');
+          }
+        } catch (error) {
+          logger.warn('Failed to check transaction status on retry', { signature, error }, 'InternalTransferService');
+        }
+        
         // Don't fail the transaction - it might still succeed
       } else {
         logger.info('Transaction confirmed successfully', { signature }, 'InternalTransferService');
