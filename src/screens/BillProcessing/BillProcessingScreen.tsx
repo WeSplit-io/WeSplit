@@ -112,7 +112,11 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
     if (currentProcessedBillData && !isEditing && processingResult?.success) {
       // OCR AI processing complete, auto-proceeding to split creation
       // Keep processing state active and proceed immediately
-      proceedToSplitDetails();
+      proceedToSplitDetails().catch(error => {
+        console.error('❌ BillProcessingScreen: Auto-proceed failed:', error);
+        setIsProcessing(false);
+        Alert.alert('Error', 'Failed to create split automatically. Please try again.');
+      });
     }
   }, [currentProcessedBillData, isEditing, processingResult]);
 
@@ -129,7 +133,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
       // Starting AI-powered bill analysis
       
       // Try AI service first with improved error handling
-      let analysisResult = await consolidatedBillAnalysisService.analyzeBillFromImage(imageUri, currentUser?.id, false);
+      let analysisResult = await consolidatedBillAnalysisService.analyzeBillFromImage(imageUri, currentUser, false);
       
       // Handle AI analysis result with better error messages
       if (!analysisResult.success) {
@@ -166,7 +170,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         // For other errors, fallback to mock service
         // Falling back to mock data due to AI failure
         setProcessingMethod('mock');
-        analysisResult = await consolidatedBillAnalysisService.analyzeBillFromImage(imageUri, currentUser?.id, true);
+        analysisResult = await consolidatedBillAnalysisService.analyzeBillFromImage(imageUri, currentUser, true);
       } else {
         // AI analysis successful
         setProcessingMethod('ai');
@@ -181,6 +185,11 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
       
         // Set the authoritative price in the price management service immediately
         const { priceManagementService } = await import('../../services/priceManagementService');
+        console.log('💰 BillProcessingScreen: Setting bill price', {
+          billId: processedData.id,
+          totalAmount: processedData.totalAmount,
+          currency: processedData.currency || 'USDC'
+        });
         priceManagementService.setBillPrice(
           processedData.id,
           processedData.totalAmount,
@@ -298,6 +307,11 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         // Create processed data from current state
         const billId = existingSplitData?.billId || `split_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         
+        // Validate required fields
+        if (!billName || !convertedAmount || isNaN(parseFloat(convertedAmount))) {
+          throw new Error('Missing required bill information. Please ensure bill name and amount are set.');
+        }
+        
          currentProcessedData = {
            id: billId,
            title: billName,
@@ -309,13 +323,13 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
            totalAmount: parseFloat(convertedAmount),
            subtotal: parseFloat(convertedAmount) * 0.9, // Estimate
            tax: parseFloat(convertedAmount) * 0.1, // Estimate
-          items: extractedItems.map(item => ({
+          items: (extractedItems || []).map(item => ({
             id: item.id,
             name: item.name,
             price: item.price,
             quantity: item.quantity || 1,
             category: item.category || 'Other',
-            participants: item.participants,
+            participants: item.participants || [],
             isSelected: true,
           })),
           participants: [],
@@ -332,7 +346,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
 
       // Validate the processed data
       if (currentProcessedData) {
-        const validation = consolidatedBillAnalysisService.validateIncomingData(currentProcessedData as any);
+        const validation = consolidatedBillAnalysisService.validateProcessedBillData(currentProcessedData);
         if (!validation.isValid) {
           Alert.alert('Validation Error', validation.errors.join('\n'));
           return;
@@ -425,6 +439,10 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
       // Create new OCR AI split with wallet
       // Creating new OCR AI split with wallet
       
+      if (!currentProcessedData) {
+        throw new Error('No processed bill data available for split creation');
+      }
+      
       // Create wallet first
       const walletResult = await SplitWalletService.createSplitWallet(
         currentProcessedData.id,
@@ -445,12 +463,13 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
 
       // Wallet created successfully
 
-      // Ensure the creator is included as a participant
+      // Use participants from processed data (already includes creator if from AI analysis)
       const allParticipants = [...currentProcessedData.participants];
       
-      // Check if creator is already in participants, if not add them
+      // Ensure the creator is included as a participant with correct status
       const creatorExists = allParticipants.some(p => p.id === currentUser.id.toString());
       if (!creatorExists) {
+        // Only add creator if they don't exist (for OCR/mock data)
         allParticipants.push({
           id: currentUser.id.toString(),
           name: currentUser.name,
@@ -459,6 +478,15 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
           status: 'accepted', // Creator should be accepted, not pending
           items: []
         });
+      } else {
+        // Update existing creator to have 'accepted' status
+        const creatorIndex = allParticipants.findIndex(p => p.id === currentUser.id.toString());
+        if (creatorIndex !== -1) {
+          allParticipants[creatorIndex] = {
+            ...allParticipants[creatorIndex],
+            status: 'accepted' // Ensure creator is accepted, not pending
+          };
+        }
       }
 
       // Create split in database with wallet information
@@ -480,6 +508,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
           amountOwed: p.amountOwed,
           amountPaid: 0,
           status: p.id === currentUser.id.toString() ? 'accepted' as const : 'pending' as const,
+          avatar: p.id === currentUser.id.toString() ? currentUser.avatar : undefined,
         })),
         items: currentProcessedData.items.map(item => ({
           id: item.id,

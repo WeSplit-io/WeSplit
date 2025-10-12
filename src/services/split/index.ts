@@ -83,7 +83,7 @@ export class SplitWalletService {
 
   static async createSplitWallet(billId: string, creatorId: string, totalAmount: number, currency?: string, participants?: any[]) {
     await loadModules();
-    return SplitWalletCreation.createSplitWallet(billId, creatorId, totalAmount, currency, participants);
+    return SplitWalletCreation.createSplitWallet(billId, creatorId, totalAmount, currency, participants || []);
   }
 
   static async forceResetSplitWallet(splitWalletId: string) {

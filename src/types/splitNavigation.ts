@@ -77,6 +77,7 @@ export interface SplitDetailsNavigationParams extends SplitNavigationParams {
   isFromNotification?: boolean; // Whether opened from notification
   notificationId?: string; // Notification ID for deletion after join
   shareableLink?: string; // Shareable link for deep link invitations
+  currentSplitData?: Split; // Current split data for state preservation
   splitInvitationData?: string; // Encoded split invitation data from deep links
 }
 

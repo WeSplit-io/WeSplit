@@ -1072,12 +1072,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return; // Use cached notifications
     }
     try {
-      // Removed excessive logging for cleaner console
-      const notifications = await getUserNotifications(state.currentUser.id);
-              // Removed excessive logging for cleaner console
+      logger.info('Loading notifications for user', { userId: state.currentUser.id }, 'AppContext');
+      const notifications = await notificationService.getUserNotifications(state.currentUser.id);
+      logger.info('Loaded notifications', { 
+        count: notifications.length, 
+        types: notifications.map(n => n.type),
+        splitInvites: notifications.filter(n => n.type === 'split_invite').length
+      }, 'AppContext');
       dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications, timestamp: now } });
     } catch (error) {
       console.error('Error loading notifications:', error);
+      logger.error('Failed to load notifications', error, 'AppContext');
       // Set empty notifications to prevent infinite loading
       dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications: [], timestamp: now } });
     }

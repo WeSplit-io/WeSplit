@@ -102,7 +102,7 @@ class ConsolidatedBillAnalysisService {
       apiKey: process.env.EXPO_PUBLIC_OCR_API_KEY,
       timeout: 30000
     };
-    this.aiServiceUrl = process.env.EXPO_PUBLIC_AI_SERVICE_URL || 'https://us-central1-wesplit-35186.cloudfunctions.net/aiService';
+    this.aiServiceUrl = process.env.EXPO_PUBLIC_AI_SERVICE_URL || 'https://us-central1-wesplit-35186.cloudfunctions.net/analyzeBill';
   }
 
   public static getInstance(): ConsolidatedBillAnalysisService {
@@ -117,22 +117,27 @@ class ConsolidatedBillAnalysisService {
    */
   async analyzeBillFromImage(
     imageUri: string, 
-    userId?: string,
+    currentUser?: { id: string; name: string; wallet_address: string },
     useMockData: boolean = false
   ): Promise<BillAnalysisResult> {
     try {
-      logger.info('Starting bill analysis from image', { imageUri, userId, useMockData }, 'BillAnalysis');
+      logger.info('Starting bill analysis from image', { imageUri, userId: currentUser?.id, useMockData }, 'BillAnalysis');
 
       if (useMockData) {
         return await this.analyzeBillWithMockData(imageUri);
       }
 
-      // Try AI service first, fallback to OCR
+      // Try AI service first, fallback to OCR, then mock data
       try {
-        return await this.analyzeBillWithAI(imageUri, userId);
+        return await this.analyzeBillWithAI(imageUri, currentUser);
       } catch (aiError) {
         logger.warn('AI analysis failed, falling back to OCR', { error: aiError }, 'BillAnalysis');
-        return await this.analyzeBillWithOCR(imageUri);
+        try {
+          return await this.analyzeBillWithOCR(imageUri);
+        } catch (ocrError) {
+          logger.warn('OCR analysis failed, falling back to mock data', { error: ocrError }, 'BillAnalysis');
+          return await this.analyzeBillWithMockData(imageUri);
+        }
       }
     } catch (error) {
       logger.error('Bill analysis failed', error, 'BillAnalysis');
@@ -218,9 +223,9 @@ class ConsolidatedBillAnalysisService {
   /**
    * AI-based bill analysis
    */
-  private async analyzeBillWithAI(imageUri: string, userId?: string): Promise<BillAnalysisResult> {
+  private async analyzeBillWithAI(imageUri: string, currentUser?: { id: string; name: string; wallet_address: string }): Promise<BillAnalysisResult> {
     try {
-      logger.info('Starting AI bill analysis', { imageUri, userId }, 'BillAnalysis');
+      logger.info('Starting AI bill analysis', { imageUri, userId: currentUser?.id }, 'BillAnalysis');
 
       // Check if AI service is available
       const isHealthy = await this.checkAIServiceHealth();
@@ -232,7 +237,7 @@ class ConsolidatedBillAnalysisService {
       const imageData = await this.convertImageToBase64(imageUri);
 
       // Call AI service with retry logic
-      const aiResponse = await this.callAIServiceWithRetry(imageData, userId);
+      const aiResponse = await this.callAIServiceWithRetry(imageData, currentUser?.id);
 
       if (!aiResponse.success) {
         throw new Error(aiResponse.error || 'AI analysis failed');
@@ -240,6 +245,9 @@ class ConsolidatedBillAnalysisService {
 
       // Convert AI response to bill data
       const billData = this.convertAIResponseToBillData(aiResponse.data);
+      
+      // Process the bill data to get ProcessedBillData format
+      const processedData = this.processBillData(billData, currentUser);
 
       logger.info('AI analysis completed successfully', { 
         processingTime: aiResponse.processing_time,
@@ -248,7 +256,7 @@ class ConsolidatedBillAnalysisService {
 
       return {
         success: true,
-        data: billData,
+        data: processedData,
         processingTime: aiResponse.processing_time || 0,
         confidence: aiResponse.confidence || 0.95,
         rawText: this.generateRawText(billData)
@@ -278,6 +286,9 @@ class ConsolidatedBillAnalysisService {
 
       if (response.success) {
         const billData = this.convertOCRResponseToBillData(response);
+        
+        // Process the bill data to get ProcessedBillData format
+        const processedData = this.processBillData(billData);
 
         logger.info('OCR analysis completed successfully', { 
           processingTime,
@@ -287,7 +298,7 @@ class ConsolidatedBillAnalysisService {
 
         return {
           success: true,
-          data: billData,
+          data: processedData,
           processingTime,
           confidence: response.confidence,
           rawText: response.rawText
@@ -334,7 +345,7 @@ class ConsolidatedBillAnalysisService {
           time: mockupData.time,
           order_id: "GSREST001",
           employee: "Server",
-          items: mockupData.items.map(item => ({
+          items: (mockupData.items || []).map(item => ({
             name: item.name,
             price: item.price
           })),
@@ -346,10 +357,13 @@ class ConsolidatedBillAnalysisService {
       };
 
       const billData = this.convertIncomingDataToBillData(incomingData);
+      
+      // Process the bill data to get ProcessedBillData format
+      const processedData = this.processBillData(billData);
 
       return {
         success: true,
-        data: billData,
+        data: processedData,
         processingTime: 2.0,
         confidence: 0.95,
         rawText: this.generateRawText(billData)
@@ -370,7 +384,7 @@ class ConsolidatedBillAnalysisService {
     const billId = this.generateBillId();
 
     // Convert items to extended format
-    const extendedItems: ExtendedBillItem[] = analysisData.transaction.items.map((item, index) => ({
+    const extendedItems: ExtendedBillItem[] = (analysisData.transaction?.items || []).map((item, index) => ({
       id: `${billId}_item_${index}`,
       name: item.name,
       price: item.price,
@@ -403,13 +417,13 @@ class ConsolidatedBillAnalysisService {
 
     return {
       id: billId,
-      title: `${analysisData.store.name} - ${analysisData.transaction.date}`,
-      merchant: analysisData.store.name,
-      location: analysisData.store.location.address,
-      date: analysisData.transaction.date,
-      time: analysisData.transaction.time,
-      totalAmount: analysisData.transaction.order_total,
-      currency: analysisData.currency,
+      title: `${analysisData.store?.name || 'Unknown Store'} - ${analysisData.transaction?.date || new Date().toISOString().split('T')[0]}`,
+      merchant: analysisData.store?.name || 'Unknown Merchant',
+      location: analysisData.store?.location?.address || '',
+      date: analysisData.transaction?.date || new Date().toISOString().split('T')[0],
+      time: analysisData.transaction?.time || new Date().toTimeString().split(' ')[0],
+      totalAmount: analysisData.transaction?.order_total || 0,
+      currency: analysisData.currency || 'USDC',
       items: extendedItems,
       participants: defaultParticipants,
       settings: defaultSettings
@@ -420,34 +434,43 @@ class ConsolidatedBillAnalysisService {
    * Convert AI response to bill data format
    */
   private convertAIResponseToBillData(aiData: any): BillAnalysisData {
-    // Implementation depends on AI service response format
-    // This is a placeholder - adjust based on actual AI response structure
+    // Map Firebase AI service response to BillAnalysisData format
+    // Firebase returns: { merchant: {...}, transaction: {...}, totals: {...}, items: [...] }
+    
+    // Convert items from Firebase format to expected format
+    const items = (aiData.items || []).map((item: any) => ({
+      name: item.description || item.name || 'Unknown Item',
+      price: item.total_price || item.unit_price || 0,
+      quantity: item.quantity || 1,
+      category: item.category || 'Other'
+    }));
+
     return {
       category: aiData.category || "Food & Drinks",
-      country: aiData.country || "USA",
+      country: aiData.transaction?.country || "USA",
       store: {
-        name: aiData.store?.name || "Unknown Store",
+        name: aiData.merchant?.name || "Unknown Store",
         location: {
-          address: aiData.store?.location?.address || "",
-          city: aiData.store?.location?.city || "",
-          state: aiData.store?.location?.state || "",
-          zip_code: aiData.store?.location?.zip_code || "",
-          phone: aiData.store?.location?.phone || ""
+          address: aiData.merchant?.address || "",
+          city: "",
+          state: "",
+          zip_code: "",
+          phone: aiData.merchant?.phone || ""
         },
-        store_id: aiData.store?.store_id || ""
+        store_id: aiData.merchant?.vat_number || ""
       },
       transaction: {
         date: aiData.transaction?.date || new Date().toISOString().split('T')[0],
         time: aiData.transaction?.time || new Date().toTimeString().split(' ')[0],
-        order_id: aiData.transaction?.order_id || this.generateBillId(),
-        employee: aiData.transaction?.employee || "",
-        items: aiData.transaction?.items || [],
-        sub_total: aiData.transaction?.sub_total || 0,
-        sales_tax: aiData.transaction?.sales_tax || 0,
-        order_total: aiData.transaction?.order_total || 0,
-        calculated_total: aiData.transaction?.calculated_total || 0
+        order_id: aiData.transaction?.receipt_number || this.generateBillId(),
+        employee: "",
+        items: items,
+        sub_total: aiData.totals?.subtotal || 0,
+        sales_tax: aiData.totals?.tax || 0,
+        order_total: aiData.totals?.total || aiData.totals?.total_calculated || 0,
+        calculated_total: aiData.totals?.total_calculated || aiData.totals?.total || 0
       },
-      currency: aiData.currency || "USD"
+      currency: aiData.transaction?.currency || "USD"
     };
   }
 
@@ -474,7 +497,7 @@ class ConsolidatedBillAnalysisService {
         time: new Date().toTimeString().split(' ')[0],
         order_id: this.generateBillId(),
         employee: "",
-        items: ocrResponse.extractedItems.map(item => ({
+        items: (ocrResponse.extractedItems || []).map(item => ({
           name: item.name,
           price: item.price
         })),
@@ -504,8 +527,8 @@ class ConsolidatedBillAnalysisService {
    * Generate raw text from bill data
    */
   private generateRawText(billData: BillAnalysisData): string {
-    const items = billData.transaction.items.map(item => `${item.name}: $${item.price}`).join('\n');
-    return `${billData.store.name}\n${billData.transaction.date} ${billData.transaction.time}\n\n${items}\n\nTotal: $${billData.transaction.order_total}`;
+    const items = (billData.transaction?.items || []).map(item => `${item.name}: $${item.price}`).join('\n');
+    return `${billData.store?.name || 'Unknown Store'}\n${billData.transaction?.date || ''} ${billData.transaction?.time || ''}\n\n${items}\n\nTotal: $${billData.transaction?.order_total || 0}`;
   }
 
   /**
@@ -567,18 +590,36 @@ class ConsolidatedBillAnalysisService {
    */
   private async checkAIServiceHealth(): Promise<boolean> {
     try {
+      // Only skip health check if service URL is localhost (not for Firebase functions)
+      if (this.aiServiceUrl.includes('localhost') || this.aiServiceUrl.includes('127.0.0.1')) {
+        logger.info('Skipping AI service health check for localhost', { aiServiceUrl: this.aiServiceUrl }, 'BillAnalysis');
+        return false; // Force fallback to OCR for localhost
+      }
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       
-      const response = await fetch(`${this.aiServiceUrl}/health`, {
+      // Use the dedicated health check endpoint
+      const healthCheckUrl = 'https://us-central1-wesplit-35186.cloudfunctions.net/aiHealthCheck';
+      const response = await fetch(healthCheckUrl, {
         method: 'GET',
-        signal: controller.signal
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       
       clearTimeout(timeoutId);
-      return response.ok;
+      
+      if (response.ok) {
+        logger.info('AI service health check passed', { status: response.status }, 'BillAnalysis');
+        return true;
+      } else {
+        logger.warn('AI service health check failed', { status: response.status, statusText: response.statusText }, 'BillAnalysis');
+        return false;
+      }
     } catch (error) {
-      logger.warn('AI service health check failed', error, 'BillAnalysis');
+      logger.warn('AI service health check failed', { error: error instanceof Error ? error.message : 'Unknown error' }, 'BillAnalysis');
       return false;
     }
   }
@@ -589,17 +630,23 @@ class ConsolidatedBillAnalysisService {
   private async callAIServiceWithRetry(imageData: string, userId?: string, maxRetries: number = 3): Promise<AIAnalysisResponse> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        logger.info(`AI service call attempt ${attempt}`, { 
+          url: this.aiServiceUrl, 
+          userId, 
+          imageDataLength: imageData.length 
+        }, 'BillAnalysis');
+        
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.ocrConfig.timeout);
         
-        const response = await fetch(`${this.aiServiceUrl}/analyze`, {
+        const response = await fetch(this.aiServiceUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            image_data: imageData,
-            user_id: userId
+            imageData: imageData,
+            userId: userId
           }),
           signal: controller.signal
         });
@@ -607,7 +654,8 @@ class ConsolidatedBillAnalysisService {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          throw new Error(`AI service responded with status: ${response.status}`);
+          const errorText = await response.text().catch(() => 'Unknown error');
+          throw new Error(`AI service responded with status: ${response.status} - ${errorText}`);
         }
 
         const result = await response.json();
@@ -632,6 +680,12 @@ class ConsolidatedBillAnalysisService {
    */
   private async callOCRService(base64Image: string): Promise<OCRProcessingResult> {
     try {
+      // Only skip OCR service call if it's localhost (not for deployed services)
+      if (this.ocrConfig.baseUrl.includes('localhost') || this.ocrConfig.baseUrl.includes('127.0.0.1')) {
+        logger.info('Skipping OCR service call for localhost', { baseUrl: this.ocrConfig.baseUrl }, 'BillAnalysis');
+        throw new Error('OCR service not available for localhost');
+      }
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.ocrConfig.timeout);
       
@@ -650,13 +704,14 @@ class ConsolidatedBillAnalysisService {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`OCR service responded with status: ${response.status}`);
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`OCR service responded with status: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
       return result;
     } catch (error) {
-      logger.error('OCR service call failed', error, 'BillAnalysis');
+      logger.error('OCR service call failed', { error: error instanceof Error ? error.message : 'Unknown error' }, 'BillAnalysis');
       throw error;
     }
   }
@@ -681,6 +736,66 @@ class ConsolidatedBillAnalysisService {
 
     if (!data.currency) {
       errors.push('Currency is required');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
+   * Validate manual bill input
+   */
+  validateManualBillInput(data: ManualBillInput): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!data.name || data.name.trim() === '') {
+      errors.push('Bill name is required');
+    }
+
+    if (!data.amount || data.amount <= 0) {
+      errors.push('Valid amount is required');
+    }
+
+    if (!data.currency) {
+      errors.push('Currency is required');
+    }
+
+    if (!data.date) {
+      errors.push('Date is required');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
+   * Validate processed bill data
+   */
+  validateProcessedBillData(data: ProcessedBillData): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!data.merchant || data.merchant.trim() === '') {
+      errors.push('Merchant name is required');
+    }
+
+    if (!data.items || data.items.length === 0) {
+      errors.push('At least one item is required');
+    }
+
+    if (!data.totalAmount || data.totalAmount <= 0) {
+      errors.push('Valid total amount is required');
+    }
+
+    if (!data.currency) {
+      errors.push('Currency is required');
+    }
+
+    if (!data.participants || data.participants.length === 0) {
+      errors.push('At least one participant is required');
     }
 
     return {

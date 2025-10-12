@@ -41,7 +41,7 @@ export class ManualSplitCreationService {
         });
 
       // Validate the processed data
-      const validation = consolidatedBillAnalysisService.validateIncomingData(data.processedBillData as any);
+      const validation = consolidatedBillAnalysisService.validateProcessedBillData(data.processedBillData);
       if (!validation.isValid) {
         return {
           success: false,
@@ -110,6 +110,7 @@ export class ManualSplitCreationService {
           amountOwed: p.amountOwed,
           amountPaid: 0,
           status: p.id === data.currentUser.id.toString() ? 'accepted' as const : 'pending' as const,
+          avatar: p.id === data.currentUser.id.toString() ? data.currentUser.avatar : undefined,
         })),
         items: data.processedBillData.items.map(item => ({
           id: item.id,

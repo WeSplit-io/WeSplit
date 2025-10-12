@@ -53,7 +53,7 @@ class PriceManagementService {
   setBillPrice(billId: string, amount: number, currency: string = 'USDC'): void {
     // Validate input parameters
     if (!billId || billId.trim() === '') {
-      console.error('💰 PriceManagementService: Invalid billId provided');
+      console.error('💰 PriceManagementService: Invalid billId provided', { billId, amount, currency });
       return;
     }
     

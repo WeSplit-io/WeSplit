@@ -18,7 +18,7 @@ interface ContactsScreenProps {
 }
 
 const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) => {
-  const { action, onContactSelect, splitId, splitName, returnRoute } = route.params || {};
+  const { action, onContactSelect, splitId, splitName, returnRoute, currentSplitData } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
   
@@ -56,6 +56,8 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
         selectedContacts: selectedContacts,
         splitId: splitId,
         splitName: splitName,
+        // Pass back the current split data to preserve state
+        currentSplitData: currentSplitData
       });
     } else {
       navigation.goBack();

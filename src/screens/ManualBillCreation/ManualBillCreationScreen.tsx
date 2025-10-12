@@ -237,7 +237,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       logger.info('Manual bill input created', { manualBillInput }, 'ManualBillCreationScreen');
 
       // Validate the manual input
-      const validation = consolidatedBillAnalysisService.validateIncomingData(manualBillInput as any);
+      const validation = consolidatedBillAnalysisService.validateManualBillInput(manualBillInput);
       if (!validation.isValid) {
         console.error('❌ ManualBillCreationScreen: Validation failed:', validation.errors);
         Alert.alert('Validation Error', validation.errors.join('\n'));
@@ -251,10 +251,10 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       );
 
       logger.info('Bill analysis data created', {
-        storeName: manualBillData.store.name,
-        totalAmount: manualBillData.transaction.order_total,
+        storeName: manualBillData.merchant,
+        totalAmount: manualBillData.totalAmount,
         currency: manualBillData.currency,
-        category: manualBillData.category
+        category: manualBillData.title
       });
 
       // Process the manual bill data using the same processor as OCR

@@ -18,20 +18,22 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
-import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { styles } from './styles';
-import { ProcessedBillData, BillAnalysisResult } from '../../types/billAnalysis';
+import { ProcessedBillData } from '../../services/consolidatedBillAnalysisService';
+import { BillAnalysisResult } from '../../types/unified';
 import { consolidatedBillAnalysisService } from '../../services/consolidatedBillAnalysisService';
 import { SplitInvitationService } from '../../services/splitInvitationService';
 import { convertFiatToUSDC, formatCurrencyAmount } from '../../services/fiatCurrencyService';
 import { NFCSplitService } from '../../services/nfcService';
 import { useApp } from '../../context/AppContext';
+import { logger } from '../../services/loggingService';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
 import { SplitWalletService } from '../../services/split';
@@ -77,6 +79,7 @@ interface SplitDetailsScreenProps {
       selectedContacts?: any[];
       shareableLink?: string;
       splitInvitationData?: string;
+      currentSplitData?: Split;
     };
   };
 }
@@ -97,7 +100,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     isFromNotification,
     notificationId,
     shareableLink,
-    splitInvitationData
+    splitInvitationData,
+    currentSplitData: routeCurrentSplitData
   } = route?.params || {};
 
   // Utility function to format wallet address
@@ -159,7 +163,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const privateKeyModalTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const privateKeyModalOpacity = useRef(new Animated.Value(0)).current;
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
-  const [currentSplitData, setCurrentSplitData] = useState<Split | null>(splitData || null);
+  const [currentSplitData, setCurrentSplitData] = useState<Split | null>(splitData || routeCurrentSplitData || null);
   const [splitWallet, setSplitWallet] = useState<any>(null);
   const [isCreatingWallet, setIsCreatingWallet] = useState(false);
   const [isProcessingNewBill, setIsProcessingNewBill] = useState(false);
@@ -235,6 +239,22 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     }
   }, [splitId]);
 
+  // Handle returning from Contacts screen - reload split data if we have splitId but no currentSplitData
+  useEffect(() => {
+    if (splitId && !currentSplitData && route?.params?.selectedContacts) {
+      loadSplitData();
+    }
+  }, [route?.params?.selectedContacts]);
+
+  // Update state when currentSplitData is loaded
+  useEffect(() => {
+    if (currentSplitData) {
+      setBillName(currentSplitData.title);
+      setTotalAmount(currentSplitData.totalAmount.toString());
+      setSelectedSplitType(currentSplitData.splitType || null);
+    }
+  }, [currentSplitData]);
+
   useEffect(() => {
     // Ensure split wallet exists
     if (currentSplitData && !splitWallet) {
@@ -276,6 +296,19 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       inviteContact(selectedContact);
     }
   }, [selectedContact]);
+
+  // Handle selected contacts from Contacts screen
+  useEffect(() => {
+    if (route?.params?.selectedContacts && Array.isArray(route.params.selectedContacts)) {
+      // Add all selected contacts to invited users
+      route.params.selectedContacts.forEach((contact: any) => {
+        inviteContact(contact);
+      });
+      
+      // Clear the selected contacts from route params to avoid re-processing
+      navigation.setParams({ selectedContacts: undefined });
+    }
+  }, [route?.params?.selectedContacts]);
 
   useEffect(() => {
     // Check if split is already active/locked and redirect accordingly
@@ -453,20 +486,133 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   const inviteContact = async (contact: any) => {
-    if (!contact) return;
+    if (!contact || !currentUser || !splitId) return;
     
     try {
       setIsInvitingUsers(true);
-      // Add the contact to invited users list
-      setInvitedUsers(prev => [...prev, {
+      
+      // Check if contact is already invited
+      const isAlreadyInvited = invitedUsers.some(u => u.id === (contact.id || contact.userId));
+      if (isAlreadyInvited) {
+        Alert.alert('Already Invited', `${contact.name} has already been invited to this split.`);
+        return;
+      }
+
+      // Add the contact to invited users list locally
+      const newInvitedUser = {
         id: contact.id || contact.userId,
         name: contact.name,
         email: contact.email,
         walletAddress: contact.walletAddress,
         status: 'pending'
-      }]);
+      };
+      
+      setInvitedUsers(prev => [...prev, newInvitedUser]);
+
+      // Add participant to the split in the database
+      const participantData = {
+        userId: contact.id || contact.userId,
+        name: contact.name,
+        email: contact.email || '',
+        walletAddress: contact.walletAddress || '',
+        amountOwed: 0, // Will be calculated when split is finalized
+        amountPaid: 0,
+        status: 'invited' as const,
+        avatar: contact.avatar
+      };
+
+      const addParticipantResult = await SplitStorageService.addParticipant(splitId, participantData);
+      
+      if (!addParticipantResult.success) {
+        console.error('Failed to add participant to split:', addParticipantResult.error);
+        Alert.alert('Error', 'Failed to add participant to split. Please try again.');
+        // Remove from local state if database operation failed
+        setInvitedUsers(prev => prev.filter(u => u.id !== newInvitedUser.id));
+        return;
+      }
+
+      // Update split wallet participants if we have a split wallet
+      if (currentSplitData?.walletId) {
+        try {
+          const { SplitWalletManagement } = await import('../../services/split/SplitWalletManagement');
+          
+          // Get current split data to get all participants
+          const updatedSplitResult = await SplitStorageService.getSplit(splitId);
+          if (updatedSplitResult.success && updatedSplitResult.split) {
+            const allParticipants = updatedSplitResult.split.participants.map(p => ({
+              userId: p.userId,
+              name: p.name,
+              walletAddress: p.walletAddress,
+              amountOwed: p.amountOwed
+            }));
+
+            await SplitWalletManagement.updateSplitWalletParticipants(
+              currentSplitData.walletId,
+              allParticipants
+            );
+          }
+        } catch (walletError) {
+          console.warn('Failed to update split wallet participants:', walletError);
+          // Don't fail the entire operation if wallet update fails
+        }
+      }
+
+      // Send notification to the invited user
+      logger.info('Sending split invitation notification', {
+        toUserId: contact.id || contact.userId,
+        fromUserId: currentUser.id.toString(),
+        splitId: splitId,
+        billName: billName
+      }, 'SplitDetailsScreen');
+      
+      const notificationResult = await notificationService.sendNotification(
+        contact.id || contact.userId,
+        'Split Invitation',
+        `${currentUser.name} has invited you to split "${billName}"`,
+        'split_invite',
+        {
+          splitId: splitId,
+          billName: billName,
+          totalAmount: parseFloat(totalAmount),
+          currency: 'USDC',
+          invitedBy: currentUser.id.toString(),
+          invitedByName: currentUser.name,
+          participantName: contact.name,
+          status: 'pending'
+        }
+      );
+
+      if (notificationResult) {
+        logger.info('Split invitation sent successfully', {
+          splitId,
+          invitedUserId: contact.id || contact.userId,
+          invitedUserName: contact.name,
+          billName
+        }, 'SplitDetailsScreen');
+        
+        Alert.alert(
+          'Invitation Sent!',
+          `${contact.name} has been invited to the split and will receive a notification.`
+        );
+      } else {
+        logger.warn('Failed to send notification, but participant was added', {
+          splitId,
+          invitedUserId: contact.id || contact.userId,
+          invitedUserName: contact.name
+        }, 'SplitDetailsScreen');
+        
+        Alert.alert(
+          'Participant Added',
+          `${contact.name} has been added to the split, but the notification may not have been sent.`
+        );
+      }
+
     } catch (error) {
       console.error('Error inviting contact:', error);
+      Alert.alert('Error', 'Failed to invite contact. Please try again.');
+      
+      // Remove from local state if there was an error
+      setInvitedUsers(prev => prev.filter(u => u.id !== (contact.id || contact.userId)));
     } finally {
       setIsInvitingUsers(false);
     }
@@ -530,6 +676,57 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   const handleAddContacts = () => {
     showAddFriendsModal();
+  };
+
+  const handleAddFromContacts = () => {
+    // Close the current modal
+    hideAddFriendsModal();
+    
+    // Navigate to contacts screen for adding participants
+    navigation.navigate('Contacts', {
+      action: 'split',
+      splitId: splitId,
+      splitName: billName,
+      returnRoute: 'SplitDetails',
+      // Pass current split data to preserve state
+      currentSplitData: currentSplitData
+    });
+  };
+
+  // Test function to manually create a notification (for debugging)
+  const testNotification = async () => {
+    if (!currentUser) return;
+    
+    try {
+      logger.info('Testing notification creation', { userId: currentUser.id }, 'SplitDetailsScreen');
+      
+      const result = await notificationService.sendNotification(
+        currentUser.id.toString(), // Send to self for testing
+        'Test Split Invitation',
+        'This is a test split invitation notification',
+        'split_invite',
+        {
+          splitId: splitId || 'test_split_123',
+          billName: billName || 'Test Bill',
+          totalAmount: 25.50,
+          currency: 'USDC',
+          invitedBy: currentUser.id.toString(),
+          invitedByName: currentUser.name,
+          participantName: 'Test User',
+          status: 'pending'
+        }
+      );
+      
+      if (result) {
+        Alert.alert('Success', 'Test notification sent successfully! Check your notifications.');
+        logger.info('Test notification sent successfully', null, 'SplitDetailsScreen');
+      } else {
+        Alert.alert('Error', 'Failed to send test notification');
+      }
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      Alert.alert('Error', 'Failed to send test notification');
+    }
   };
 
   const handleSplitBill = () => {
@@ -606,7 +803,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           status: 'active' as const,
           creatorId: currentUser?.id?.toString() || '',
           creatorName: currentUser?.name || 'Unknown',
-          participants: participants.map(p => ({
+          participants: participants.map((p: any) => ({
             userId: 'userId' in p ? p.userId : p.id,
             name: p.name,
             walletAddress: p.walletAddress,
@@ -667,7 +864,42 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   const handleLinkShare = async () => {
-    // Implementation for link sharing
+    try {
+      if (!splitId || !currentUser) {
+        Alert.alert('Error', 'Split information is missing');
+        return;
+      }
+
+      // Generate invitation data
+      const invitationData = SplitInvitationService.generateInvitationData(
+        splitId,
+        billName,
+        parseFloat(totalAmount),
+        'USDC',
+        currentUser.id.toString(),
+        24 // 24 hours expiry
+      );
+
+      // Generate shareable link
+      const shareableLink = SplitInvitationService.generateShareableLink(invitationData);
+
+      // Copy to clipboard and show success message
+      await Clipboard.setStringAsync(shareableLink);
+      Alert.alert(
+        'Link Copied!',
+        'The split invitation link has been copied to your clipboard. Share it with friends to invite them to join the split.',
+        [{ text: 'OK' }]
+      );
+
+      logger.info('Shareable link generated and copied', {
+        splitId,
+        link: shareableLink
+      }, 'SplitDetailsScreen');
+
+    } catch (error) {
+      console.error('Error generating shareable link:', error);
+      Alert.alert('Error', 'Failed to generate shareable link. Please try again.');
+    }
   };
 
   // Modal animation functions
@@ -1008,6 +1240,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               <UserAvatar
                 userId={participant.userId || participant.id}
                 displayName={participant.name}
+                avatarUrl={participant.avatar}
                 size={40}
                 style={styles.participantAvatar}
               />
@@ -1267,8 +1500,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   <TouchableOpacity style={styles.shareLinkButton} onPress={handleLinkShare}>
                     <Text style={styles.shareLinkButtonText}>Share Link</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.doneButton} onPress={handleCloseAddFriendsModal}>
-                    <Text style={styles.doneButtonText}>Done</Text>
+                  <TouchableOpacity style={styles.doneButton} onPress={handleAddFromContacts}>
+                    <Text style={styles.doneButtonText}>Add from Contacts</Text>
           </TouchableOpacity>
         </View>
               </Animated.View>
