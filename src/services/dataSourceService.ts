@@ -5,6 +5,8 @@
  */
 
 import { MockupDataService } from '../data/mockupData';
+import { logger } from './loggingService';
+import { ErrorHandler } from '../utils/errorHandler';
 
 export interface BillData {
   id?: string;
@@ -79,7 +81,12 @@ export class DataSourceService {
 
     // Fallback: Mockup data (only for development/testing)
     const fallbackAmount = MockupDataService.getBillAmount();
-    console.warn('DataSourceService: Using fallback amount from MockupDataService:', fallbackAmount);
+    logger.warn('Using fallback amount from MockupDataService', { 
+      fallbackAmount,
+      splitData: splitData?.totalAmount,
+      processedBillData: processedBillData?.totalAmount,
+      billData: billData?.totalAmount
+    }, 'DataSourceService');
     
     return {
       data: fallbackAmount,

@@ -4,6 +4,7 @@
  */
 
 import { PublicKey } from '@solana/web3.js';
+import { ValidationUtils } from '../services/shared/validationUtils';
 
 export interface BalanceInfo {
   available: number;
@@ -29,40 +30,16 @@ export const calculatePercentageAmount = (
 
 /**
  * Validate Solana address format
+ * Uses shared validation utility for consistency
  */
 export const validateSolanaAddress = (address: string): AddressValidationResult => {
-  try {
-    if (!address || typeof address !== 'string') {
-      return {
-        isValid: false,
-        error: 'Address is required',
-        chain: 'solana'
-      };
-    }
-
-    // Basic length check for Solana addresses (32-44 characters)
-    if (address.length < 32 || address.length > 44) {
-      return {
-        isValid: false,
-        error: 'Invalid Solana address length',
-        chain: 'solana'
-      };
-    }
-
-    // Try to create a PublicKey to validate the address
-    new PublicKey(address);
-    
-    return {
-      isValid: true,
-      chain: 'solana'
-    };
-  } catch (error) {
-    return {
-      isValid: false,
-      error: 'Invalid Solana address format',
-      chain: 'solana'
-    };
-  }
+  const result = ValidationUtils.validateSolanaAddress(address);
+  
+  return {
+    isValid: result.isValid,
+    error: result.error,
+    chain: 'solana'
+  };
 };
 
 /**

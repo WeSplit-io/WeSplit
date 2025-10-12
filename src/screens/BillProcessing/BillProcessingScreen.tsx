@@ -27,7 +27,7 @@ import { BillAnalysisData, BillAnalysisResult, ProcessedBillData } from '../../t
 import { consolidatedBillAnalysisService } from '../../services/consolidatedBillAnalysisService';
 import { useApp } from '../../context/AppContext';
 import { SplitStorageService } from '../../services/splitStorageService';
-import { SplitWalletService } from '../../services/splitWalletService';
+import { SplitWalletService } from '../../services/split';
 
 interface RouteParams {
   imageUri: string;

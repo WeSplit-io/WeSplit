@@ -5,7 +5,7 @@
 
 import { ProcessedBillData, BillAnalysisResult } from './billAnalysis';
 import { Split } from '../services/splitStorageService';
-import { SplitWallet } from '../services/splitWalletService';
+import { SplitWallet } from '../services/split';
 
 /**
  * Unified bill data structure for navigation

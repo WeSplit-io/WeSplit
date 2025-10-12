@@ -34,7 +34,7 @@ import { NFCSplitService } from '../../services/nfcService';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
-import { SplitWalletService } from '../../services/splitWalletService';
+import { SplitWalletService } from '../../services/split';
 import { FallbackDataService } from '../../utils/fallbackDataService';
 import { MockupDataService } from '../../data/mockupData';
 import { QRCodeService } from '../../services/qrCodeService';

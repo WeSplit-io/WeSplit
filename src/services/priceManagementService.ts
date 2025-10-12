@@ -5,6 +5,7 @@
  */
 
 import { logger } from './loggingService';
+import { ErrorHandler } from '../utils/errorHandler';
 import { calculateEqualSplit } from '../utils/currencyUtils';
 
 export interface PriceData {

@@ -3,7 +3,7 @@
  * Provides comprehensive validation and consistency checks for split data
  */
 
-import { SplitWallet, SplitWalletParticipant } from './splitWalletService';
+import { SplitWallet, SplitWalletParticipant } from './split';
 import { priceManagementService } from './priceManagementService';
 import { MockupDataService } from '../data/mockupData';
 

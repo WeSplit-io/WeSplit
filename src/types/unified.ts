@@ -103,7 +103,9 @@ export interface WalletInfo {
 export interface UserWalletBalance {
   solBalance: number;
   usdcBalance: number;
-  totalBalance: number;
+  totalUSD: number;
+  address: string;
+  isConnected: boolean;
 }
 
 /**
@@ -145,6 +147,15 @@ export interface TransactionResult {
   txId: string;
   success: boolean;
   error?: string;
+}
+
+/**
+ * Validation Result
+ */
+export interface ValidationResult {
+  isValid: boolean;
+  error?: string;
+  warnings?: string[];
 }
 
 // ============================================================================

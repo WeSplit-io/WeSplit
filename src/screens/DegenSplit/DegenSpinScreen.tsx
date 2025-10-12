@@ -194,7 +194,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
 
       // Save the winner information to the split wallet
       try {
-        const { SplitWalletService } = await import('../../services/splitWalletService');
+        const { SplitWalletService } = await import('../../services/split');
         await SplitWalletService.updateSplitWallet(splitWallet.id, {
           degenWinner: {
             userId: baseParticipantCards[finalIndex].userId,

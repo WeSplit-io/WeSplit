@@ -254,7 +254,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           console.log('🔍 SplitsListScreen: Checking degen split wallet status:', split.walletId);
 
           // Import SplitWalletService dynamically to avoid circular dependencies
-          const { SplitWalletService } = await import('../../services/splitWalletService');
+          const { SplitWalletService } = await import('../../services/split');
           const walletResult = await SplitWalletService.getSplitWallet(split.walletId);
 
           if (walletResult.success && walletResult.wallet) {

@@ -23,26 +23,10 @@ import { validationUtils } from './shared/validationUtils';
 import { collection, addDoc, query, where, getDocs, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { RPC_CONFIG, USDC_CONFIG, WALLET_CONFIG } from './shared/walletConstants';
+import { WalletInfo, UserWalletBalance } from '../types/unified';
 
-// Types
-export interface WalletInfo {
-  address: string;
-  publicKey: string;
-  secretKey?: string;
-  balance?: number;
-  usdcBalance?: number;
-  walletName?: string;
-  walletType?: 'app-generated' | 'external' | 'migrated';
-  isConnected?: boolean;
-}
-
-export interface UserWalletBalance {
-  solBalance: number;
-  usdcBalance: number;
-  totalUSD: number;
-  address: string;
-  isConnected: boolean;
-}
+// Re-export types for backward compatibility
+export type { WalletInfo, UserWalletBalance };
 
 export interface WalletCreationResult {
   success: boolean;

@@ -21,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenResultStyles';
-import { SplitWalletService } from '../../services/splitWalletService';
+import { SplitWalletService } from '../../services/split';
 import { notificationService } from '../../services/notificationService';
 import { useApp } from '../../context/AppContext';
 
@@ -315,7 +315,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     setIsProcessing(true);
     try {
       // NEW Degen Logic: Loser receives funds from split wallet to their in-app wallet
-      const { SplitWalletService } = await import('../../services/splitWalletService');
+      const { SplitWalletService } = await import('../../services/split');
       const result = await SplitWalletService.processDegenLoserPayment(
         splitWallet.id,
         currentUser!.id.toString(),
@@ -363,7 +363,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     setIsProcessing(true);
     try {
       // NEW Degen Logic: Loser receives funds from split wallet to their KAST card/external wallet
-      const { SplitWalletService } = await import('../../services/splitWalletService');
+      const { SplitWalletService } = await import('../../services/split');
       const result = await SplitWalletService.processDegenLoserPayment(
         splitWallet.id,
         currentUser!.id.toString(),
@@ -413,7 +413,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     setIsProcessing(true);
     try {
       // NEW Degen Logic: Winner gets the full bill amount from the split wallet
-      const { SplitWalletService } = await import('../../services/splitWalletService');
+      const { SplitWalletService } = await import('../../services/split');
       const result = await SplitWalletService.processDegenWinnerPayout(
         splitWallet.id,
         currentUser!.id.toString(),

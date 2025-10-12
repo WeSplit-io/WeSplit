@@ -23,7 +23,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenLockStyles';
 import UserAvatar from '../../components/UserAvatar';
-import { SplitWalletService } from '../../services/splitWalletService';
+import { SplitWalletService } from '../../services/split';
 import { notificationService } from '../../services/notificationService';
 import { FallbackDataService } from '../../utils/fallbackDataService';
 import { useApp } from '../../context/AppContext';

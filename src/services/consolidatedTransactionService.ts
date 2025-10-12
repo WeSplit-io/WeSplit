@@ -43,6 +43,7 @@ import { notificationUtils } from './shared/notificationUtils';
 import { keypairUtils } from './shared/keypairUtils';
 import { balanceUtils } from './shared/balanceUtils';
 import { validationUtils } from './shared/validationUtils';
+import { TransactionResult as UnifiedTransactionResult } from '../types/unified';
 
 // Types
 export interface TransactionParams {
@@ -55,11 +56,7 @@ export interface TransactionParams {
   transactionType?: TransactionType; // Add transaction type for fee calculation
 }
 
-export interface TransactionResult {
-  signature: string;
-  txId: string;
-  success: boolean;
-  error?: string;
+export interface TransactionResult extends UnifiedTransactionResult {
   companyFee?: number;
   netAmount?: number;
 }

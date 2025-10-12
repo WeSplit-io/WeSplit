@@ -6,8 +6,9 @@
 
 import { ProcessedBillData } from '../types/billAnalysis';
 import { SplitStorageService, Split } from './splitStorageService';
-import { SplitWalletService } from './splitWalletService';
+import { SplitWalletService } from './split';
 import { consolidatedBillAnalysisService } from './consolidatedBillAnalysisService';
+import { ServiceErrorHandler } from '../utils/serviceErrorHandler';
 
 export interface ManualSplitCreationData {
   processedBillData: ProcessedBillData;
@@ -30,12 +31,13 @@ export class ManualSplitCreationService {
    * Create a split from manual entry data
    */
   static async createManualSplit(data: ManualSplitCreationData): Promise<ManualSplitCreationResult> {
-    try {
-      console.log('🔍 ManualSplitCreationService: Creating manual split:', {
-        title: data.processedBillData.title,
-        totalAmount: data.processedBillData.totalAmount,
-        participantsCount: data.processedBillData.participants.length
-      });
+    return ServiceErrorHandler.handleServiceError(
+      async () => {
+        console.log('🔍 ManualSplitCreationService: Creating manual split:', {
+          title: data.processedBillData.title,
+          totalAmount: data.processedBillData.totalAmount,
+          participantsCount: data.processedBillData.participants.length
+        });
 
       // Validate the processed data
       const validation = consolidatedBillAnalysisService.validateIncomingData(data.processedBillData as any);
@@ -141,14 +143,18 @@ export class ManualSplitCreationService {
           error: createResult.error || 'Failed to create split'
         };
       }
-
-    } catch (error) {
-      console.error('❌ ManualSplitCreationService: Error creating manual split:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      };
-    }
+      },
+      {
+        screen: 'ManualSplitCreation',
+        function: 'createManualSplit',
+        operation: 'create manual split',
+        userId: data.currentUser.id
+      },
+      {
+        returnErrorResult: true,
+        errorCode: 'MANUAL_SPLIT_CREATION_ERROR'
+      }
+    );
   }
 }
 

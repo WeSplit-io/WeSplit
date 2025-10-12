@@ -17,7 +17,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { SplitWalletService, SplitWallet, SplitWalletParticipant } from '../../services/splitWalletService';
+import { SplitWalletService, SplitWallet, SplitWalletParticipant } from '../../services/split';
 import { priceManagementService } from '../../services/priceManagementService';
 import { useApp } from '../../context/AppContext';
 

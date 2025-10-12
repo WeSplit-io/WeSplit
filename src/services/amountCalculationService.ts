@@ -1,10 +1,10 @@
 /**
  * Amount Calculation Service
  * Centralized service for all amount calculations in fair split handling
- * Eliminates code duplication and ensures consistency across the application
+ * Now uses shared utilities from splitUtils for consistency
  */
 
-import { calculateEqualSplit } from '../utils/currencyUtils';
+import { splitUtils } from '../utils/splitUtils';
 
 export interface Participant {
   id: string;
@@ -32,7 +32,7 @@ export class AmountCalculationService {
    * @returns Amount each person should pay
    */
   static calculateEqualSplit(totalAmount: number, participantCount: number): number {
-    return calculateEqualSplit(totalAmount, participantCount);
+    return splitUtils.calculation.calculateEqualSplit(totalAmount, participantCount);
   }
 
   /**
@@ -52,16 +52,32 @@ export class AmountCalculationService {
       return [];
     }
 
-    if (method === 'equal') {
-      const amountPerPerson = this.calculateEqualSplit(totalAmount, participants.length);
-      return participants.map(participant => ({
-        ...participant,
-        amountOwed: amountPerPerson
-      }));
-    }
+    // Transform to shared format and use shared utility
+    const transformedParticipants = participants.map(p => ({
+      id: p.id,
+      name: p.name,
+      amountOwed: p.amountOwed,
+      amountPaid: p.amountPaid,
+      userId: p.id,
+      walletAddress: p.walletAddress
+    }));
 
-    // For manual method, keep existing amounts but validate they sum to total
-    return participants;
+    const result = splitUtils.calculation.calculateParticipantAmounts(
+      totalAmount, 
+      transformedParticipants, 
+      method
+    );
+
+    // Transform back to service format
+    return result.map(p => ({
+      id: p.id,
+      name: p.name,
+      walletAddress: p.walletAddress || '',
+      amountOwed: p.amountOwed,
+      amountPaid: p.amountPaid || 0,
+      amountLocked: 0, // Default value
+      status: 'pending' as const
+    }));
   }
 
   /**
@@ -76,48 +92,28 @@ export class AmountCalculationService {
     totalAmount: number,
     tolerance: number = 0.01
   ): AmountCalculationResult {
-    const errors: string[] = [];
-    
-    if (!participants || participants.length === 0) {
-      errors.push('No participants provided');
-      return {
-        amountPerPerson: 0,
-        totalAmount,
-        participantCount: 0,
-        isValid: false,
-        errors
-      };
-    }
+    // Transform to shared format and use shared utility
+    const transformedParticipants = participants.map(p => ({
+      id: p.id,
+      name: p.name,
+      amountOwed: p.amountOwed,
+      amountPaid: p.amountPaid,
+      userId: p.id,
+      walletAddress: p.walletAddress
+    }));
 
-    const totalAssigned = participants.reduce((sum, p) => sum + (p.amountOwed || 0), 0);
-    const difference = Math.abs(totalAssigned - totalAmount);
-    
-    if (difference > tolerance) {
-      errors.push(
-        `Total assigned amounts (${totalAssigned.toFixed(6)}) do not match bill total (${totalAmount.toFixed(6)}). Difference: ${difference.toFixed(6)}`
-      );
-    }
-
-    // Check for negative amounts
-    const negativeAmounts = participants.filter(p => p.amountOwed < 0);
-    if (negativeAmounts.length > 0) {
-      errors.push(`Participants with negative amounts: ${negativeAmounts.map(p => p.name).join(', ')}`);
-    }
-
-    // Check for zero amounts (might be valid for manual splits)
-    const zeroAmounts = participants.filter(p => p.amountOwed === 0);
-    if (zeroAmounts.length > 0 && zeroAmounts.length === participants.length) {
-      errors.push('All participants have zero amounts assigned');
-    }
-
-    const amountPerPerson = this.calculateEqualSplit(totalAmount, participants.length);
+    const result = splitUtils.calculation.validateAmounts(
+      transformedParticipants,
+      totalAmount,
+      tolerance
+    );
 
     return {
-      amountPerPerson,
-      totalAmount,
-      participantCount: participants.length,
-      isValid: errors.length === 0,
-      errors
+      amountPerPerson: result.amountPerPerson,
+      totalAmount: result.totalAmount,
+      participantCount: result.participantCount,
+      isValid: result.isValid,
+      errors: result.errors
     };
   }
 
@@ -127,8 +123,16 @@ export class AmountCalculationService {
    * @returns Remaining amount to be paid
    */
   static calculateRemainingAmount(participant: Participant): number {
-    const remaining = participant.amountOwed - participant.amountPaid;
-    return Math.max(0, remaining);
+    const transformedParticipant = {
+      id: participant.id,
+      name: participant.name,
+      amountOwed: participant.amountOwed,
+      amountPaid: participant.amountPaid,
+      userId: participant.id,
+      walletAddress: participant.walletAddress
+    };
+    
+    return splitUtils.calculation.calculateRemainingAmount(transformedParticipant);
   }
 
   /**

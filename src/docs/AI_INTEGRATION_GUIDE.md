@@ -46,7 +46,7 @@ Your app now supports the exact AI/OCR data structure you provided:
 ### 1. Basic Integration
 ```typescript
 import { FallbackDataService } from '../utils/fallbackDataService';
-import { BillDataProcessor, IncomingBillData } from '../services/billDataProcessor';
+import { consolidatedBillAnalysisService, IncomingBillData } from '../services/consolidatedBillAnalysisService';
 
 // When you receive AI/OCR data from your service:
 const incomingData: IncomingBillData = {
@@ -85,11 +85,11 @@ if (result) {
 
 ### 3. Complete Integration Example
 ```typescript
-import { RealBillIntegrationExample } from '../services/realBillIntegrationExample';
+import { consolidatedBillAnalysisService } from '../services/consolidatedBillAnalysisService';
 
 // In your split screen component:
 const handleBillData = async (billData: any) => {
-  const result = await RealBillIntegrationExample.processBillForSplit(
+  const result = await consolidatedBillAnalysisService.processManualBill(
     billData,
     currentUser
   );
@@ -132,29 +132,25 @@ const handleBillData = async (billData: any) => {
 
 ## Files Created/Updated
 
-### New Files:
-- `src/services/billDataProcessor.ts` - Main data processing logic
-- `src/services/realBillIntegrationExample.ts` - Integration examples
+### Current Files:
+- `src/services/consolidatedBillAnalysisService.ts` - Main data processing logic
 - `src/docs/AI_INTEGRATION_GUIDE.md` - This guide
-
-### Updated Files:
-- `src/services/mockBillAnalysisService.ts` - Now processes real data
 - `src/utils/fallbackDataService.ts` - Added real data processing methods
 
 ## Testing
 
-The system is currently set up to simulate receiving real AI/OCR data. In `mockBillAnalysisService.ts`, you can see it's already processing the FIVE GUYS data structure you provided.
+The system is currently set up to simulate receiving real AI/OCR data. In `consolidatedBillAnalysisService.ts`, you can see it's already processing the FIVE GUYS data structure you provided.
 
 To test with real data:
-1. Replace the mock data in `mockBillAnalysisService.ts` with your actual AI/OCR response
+1. Replace the mock data in `consolidatedBillAnalysisService.ts` with your actual AI/OCR response
 2. Or call `FallbackDataService.processRealBillData()` directly with your data
 
 ## Next Steps
 
-1. **Replace Mock Service**: Update `mockBillAnalysisService.ts` to call your actual AI/OCR API
+1. **Replace Mock Service**: Update `consolidatedBillAnalysisService.ts` to call your actual AI/OCR API
 2. **Update Split Screens**: Use the integration examples in your split screens
 3. **Test with Real Data**: Process actual bill images and verify the results
-4. **Customize Processing**: Modify `billDataProcessor.ts` for your specific needs
+4. **Customize Processing**: Modify `consolidatedBillAnalysisService.ts` for your specific needs
 
 ## Fallback System
 

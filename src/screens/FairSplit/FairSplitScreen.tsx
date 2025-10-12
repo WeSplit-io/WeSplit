@@ -19,7 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
-import { SplitWalletService, SplitWallet } from '../../services/splitWalletService';
+import { SplitWalletService, SplitWallet } from '../../services/split';
 import { notificationService } from '../../services/notificationService';
 import { priceManagementService } from '../../services/priceManagementService';
 import { useApp } from '../../context/AppContext';
@@ -124,7 +124,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               // Load split wallet if wallet ID is available
               if (fullSplitData.walletId) {
                 try {
-                  const { SplitWalletService } = await import('../../services/splitWalletService');
+                  const { SplitWalletService } = await import('../../services/split');
               const walletResult = await SplitWalletService.getSplitWallet(fullSplitData.walletId);
               if (walletResult.success && walletResult.wallet) {
                 const wallet = walletResult.wallet;
@@ -235,7 +235,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           // Load split wallet if wallet ID is available
           if (splitData.walletId) {
             try {
-              const { SplitWalletService } = await import('../../services/splitWalletService');
+              const { SplitWalletService } = await import('../../services/split');
               const walletResult = await SplitWalletService.getSplitWallet(splitData.walletId);
               if (walletResult.success && walletResult.wallet) {
                 const wallet = walletResult.wallet;
@@ -973,7 +973,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         splitWalletAddress: splitWallet.walletAddress
       });
 
-      const { SplitWalletService } = await import('../../services/splitWalletService');
+      const { SplitWalletService } = await import('../../services/split');
       const debugResult = await SplitWalletService.debugUsdcBalance(splitWallet.walletAddress);
 
       if (debugResult.success) {
@@ -1038,7 +1038,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         creatorId: currentUser.id.toString()
       });
 
-      const { SplitWalletService } = await import('../../services/splitWalletService');
+      const { SplitWalletService } = await import('../../services/split');
       const repairResult = await SplitWalletService.repairSplitWalletSynchronization(
         splitWallet.id,
         currentUser.id.toString()
@@ -1164,7 +1164,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       if (!finalSplitWallet) {
         console.log('🔍 FairSplitScreen: Creating split wallet for confirmed split...');
         
-        const { SplitWalletService } = await import('../../services/splitWalletService');
+        const { SplitWalletService } = await import('../../services/split');
         const walletResult = await SplitWalletService.createSplitWallet(
           splitData!.id,
           currentUser!.id.toString(),
@@ -1638,7 +1638,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       setShowPaymentModal(false);
       
       // Process payment using SplitWalletService
-      const { SplitWalletService } = await import('../../services/splitWalletService');
+      const { SplitWalletService } = await import('../../services/split');
       const result = await SplitWalletService.payParticipantShare(
         splitWallet.id,
         currentUser.id.toString(),
