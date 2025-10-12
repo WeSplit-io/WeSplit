@@ -521,21 +521,27 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         {isWinner && (
           <View style={styles.actionButtonsContainer}>
             <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.claimButton,
-                isProcessing && styles.actionButtonDisabled
-              ]}
+              style={styles.actionButton}
               onPress={() => setShowClaimModal(true)}
               disabled={isProcessing}
             >
-              <Text style={[
-                styles.actionButtonText,
-                styles.claimButtonText,
-                isProcessing && styles.actionButtonTextDisabled
-              ]}>
-                {isProcessing ? 'Processing...' : 'Claim'}
-              </Text>
+              <LinearGradient
+                colors={[colors.green, colors.greenBlue]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[
+                  styles.claimButton,
+                  isProcessing && styles.actionButtonDisabled
+                ]}
+              >
+                <Text style={[
+                  styles.actionButtonText,
+                  styles.claimButtonText,
+                  isProcessing && styles.actionButtonTextDisabled
+                ]}>
+                  {isProcessing ? 'Processing...' : 'Claim'}
+                </Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         )}

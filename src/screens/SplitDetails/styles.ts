@@ -394,6 +394,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     zIndex: 1,
+    backgroundColor: colors.green,
   },
   riskyModeIcon: {
     fontSize: typography.fontSize.sm,

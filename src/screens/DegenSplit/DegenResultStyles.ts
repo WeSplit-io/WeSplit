@@ -233,11 +233,14 @@ export const styles = StyleSheet.create({
   },
   // Claim button styles
   claimButton: {
-    backgroundColor: colors.green,
     width: '100%',
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   claimButtonText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.lg,
     fontWeight: '700',
   },

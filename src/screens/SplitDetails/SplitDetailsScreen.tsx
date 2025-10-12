@@ -1180,7 +1180,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   <Text style={styles.splitOptionTitle}>Degen Split</Text>
                   <Text style={styles.splitOptionDescription}>Winner takes all - high risk, high reward</Text>
                   <View style={styles.riskyModeLabel}>
-                    <Text style={styles.riskyModeIcon}>⚠️</Text>
+                    <Text style={styles.riskyModeIcon}>🔥</Text>
                     <Text style={styles.riskyModeText}>Risky</Text>
                   </View>
                 </TouchableOpacity>
