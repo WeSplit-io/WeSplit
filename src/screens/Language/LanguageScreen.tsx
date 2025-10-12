@@ -5,7 +5,11 @@ import Icon from '../../components/Icon';
 import { useTranslation, i18nService, SupportedLanguage } from '../../services/i18nService';
 import styles from './styles';
 
-const LanguageScreen = ({ navigation }: any) => {
+interface LanguageScreenProps {
+  navigation: any;
+}
+
+const LanguageScreen: React.FC<LanguageScreenProps> = ({ navigation }) => {
   const { t, language, setLanguage, availableLanguages } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>(language);

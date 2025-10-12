@@ -8,7 +8,11 @@ import { SubscriptionService, SubscriptionPlan, UserSubscription, PaymentMethod 
 import { consolidatedTransactionService } from '../../services/consolidatedTransactionService';
 import styles from './styles';
 
-const PremiumScreen = ({ navigation }: any) => {
+interface PremiumScreenProps {
+  navigation: any;
+}
+
+const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
   const { state } = useApp();
   const { currentUser } = state;
   const { isConnected, sendTransaction } = useWallet();

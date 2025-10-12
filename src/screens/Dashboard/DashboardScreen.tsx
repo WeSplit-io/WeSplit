@@ -42,7 +42,7 @@ import { db } from '../../config/firebase';
 import { getDoc, doc } from 'firebase/firestore';
 
 // Avatar component wrapper for backward compatibility
-const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
+const avatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
   return (
     <UserAvatar
       avatarUrl={avatar}

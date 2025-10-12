@@ -12,7 +12,7 @@ import UserAvatar from '../../components/UserAvatar';
 import { logger } from '../../services/loggingService';
 
 // Helper function to safely load images with fallback
-const SafeImage = ({ source, style, fallbackSource }: any) => {
+const safeImage = ({ source, style, fallbackSource }: any) => {
   const [hasError, setHasError] = useState(false);
 
   return (
@@ -25,7 +25,7 @@ const SafeImage = ({ source, style, fallbackSource }: any) => {
 };
 
 // Avatar component wrapper for backward compatibility
-const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
+const avatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
   return (
     <UserAvatar
       avatarUrl={avatar}

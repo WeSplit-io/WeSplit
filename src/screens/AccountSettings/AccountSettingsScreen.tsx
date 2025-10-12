@@ -26,7 +26,11 @@ import { logger } from '../../services/loggingService';
 import styles from './styles';
 
 
-const AccountSettingsScreen = ({ navigation }: any) => {
+interface AccountSettingsScreenProps {
+  navigation: any;
+}
+
+const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigation }) => {
   const { state, updateUser, logoutUser } = useApp();
   const { currentUser } = state;
   const nav = useNavigation();

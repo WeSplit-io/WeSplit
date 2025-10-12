@@ -442,7 +442,7 @@ const WalletManagementScreen: React.FC = () => {
 
 
   // Apple-style slider component
-  const AppleSlider = () => {
+  const appleSlider = () => {
     const maxSlideDistance = 300; // Adjusted for container width minus thumb width
 
     const panResponder = PanResponder.create({
