@@ -12,7 +12,7 @@ import UserAvatar from '../../components/UserAvatar';
 import { logger } from '../../services/loggingService';
 
 // Helper function to safely load images with fallback
-const safeImage = ({ source, style, fallbackSource }: any) => {
+const SafeImage = ({ source, style, fallbackSource }: any) => {
   const [hasError, setHasError] = useState(false);
 
   return (
@@ -25,7 +25,7 @@ const safeImage = ({ source, style, fallbackSource }: any) => {
 };
 
 // Avatar component wrapper for backward compatibility
-const avatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
+const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
   return (
     <UserAvatar
       avatarUrl={avatar}
@@ -35,12 +35,25 @@ const avatarComponent = ({ avatar, displayName, style }: { avatar?: string, disp
   );
 };
 
-const ProfileScreen: React.FC<any> = ({ navigation }) => {
+interface ProfileScreenProps {
+  navigation: any;
+}
+
+const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { state, logoutUser } = useApp();
   const { currentUser } = state;
   const { clearAppWalletState } = useWallet();
   const [faceIdEnabled, setFaceIdEnabled] = useState(false);
   const insets = useSafeAreaInsets();
+
+  // Early return if no current user
+  if (!currentUser) {
+    return (
+      <View style={styles.container}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
 
   const handleLogout = async () => {
     Alert.alert(
