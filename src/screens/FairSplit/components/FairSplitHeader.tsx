@@ -6,9 +6,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../../theme/colors';
-import { spacing } from '../../../theme/spacing';
-import { typography } from '../../../theme/typography';
+import { colors } from '@theme/colors';
+import { spacing } from '@theme/spacing';
+import { typography } from '@theme/typography';
 import { styles } from '../styles';
 
 // Local image mapping for category icons

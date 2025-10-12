@@ -9,13 +9,23 @@
     "target": "es2020",
     "baseUrl": "src",
     "paths": {
+      "@/*": ["*"],
       "@app/*": ["app/*"],
       "@components/*": ["components/*"],
       "@features/*": ["features/*"],
       "@libs/*": ["libs/*"],
       "@config/*": ["config/*"],
       "@theme/*": ["theme/*"],
-      "@storage/*": ["storage/*"]
+      "@storage/*": ["storage/*"],
+      "@services/*": ["services/*"],
+      "@screens/*": ["screens/*"],
+      "@utils/*": ["utils/*"],
+      "@types/*": ["types/*"],
+      "@context/*": ["context/*"],
+      "@hooks/*": ["hooks/*"],
+      "@wallet/*": ["wallet/*"],
+      "@wallets/*": ["wallets/*"],
+      "@transfer/*": ["transfer/*"]
     }
   }
 }

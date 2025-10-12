@@ -25,14 +25,17 @@ import { RPC_CONFIG, USDC_CONFIG, PHANTOM_SCHEMES } from './shared/walletConstan
 import { FeeService } from '../config/feeConfig';
 import { transactionUtils } from './shared/transactionUtils';
 import { balanceUtils } from './shared/balanceUtils';
+import { logger } from './loggingService';
 
 // Use shared constants
 const RPC_ENDPOINT = RPC_CONFIG.endpoint;
 const USDC_MINT_ADDRESS = USDC_CONFIG.mintAddress;
 
-console.log('🌐 SolanaAppKitService: Using network:', RPC_CONFIG.network);
-console.log('🌐 SolanaAppKitService: RPC endpoint:', RPC_ENDPOINT);
-console.log('🌐 SolanaAppKitService: USDC mint address:', USDC_MINT_ADDRESS);
+logger.debug('SolanaAppKitService configuration', {
+  network: RPC_CONFIG.network,
+  rpcEndpoint: RPC_ENDPOINT,
+  usdcMintAddress: USDC_MINT_ADDRESS
+}, 'solanaAppKitService');
 
 export interface WalletInfo {
   address: string;
@@ -161,7 +164,7 @@ export class SolanaAppKitService {
 
   // Initialize available wallet providers
   private async initializeWalletProviders() {
-    console.log('🔧 SolanaAppKitService: initializeWalletProviders called');
+    logger.debug('initializeWalletProviders called', null, 'solanaAppKitService');
     
     try {
       // Get available wallets from the logo service
@@ -186,11 +189,13 @@ export class SolanaAppKitService {
         this.availableProviders.set(provider.name.toLowerCase(), provider);
       });
 
-      console.log('🔧 SolanaAppKitService: Providers added to map:', this.availableProviders.size);
-      console.log('🔧 SolanaAppKitService: Provider keys:', Array.from(this.availableProviders.keys()));
+      logger.debug('Providers added to map', { 
+        providerCount: this.availableProviders.size,
+        providerKeys: Array.from(this.availableProviders.keys())
+      }, 'solanaAppKitService');
 
       if (__DEV__) {
-        console.log('🔧 SolanaAppKitService: Initialized', providers.length, 'wallet providers');
+        logger.debug('Initialized wallet providers', { count: providers.length }, 'solanaAppKitService');
       }
     } catch (error) {
       console.error('Error initializing wallet providers:', error);
@@ -201,7 +206,7 @@ export class SolanaAppKitService {
 
   // Initialize fallback providers if logo service fails
   private initializeFallbackProviders() {
-    console.log('🔧 SolanaAppKitService: Using fallback providers');
+    logger.debug('Using fallback providers', null, 'solanaAppKitService');
     
     const fallbackProviders: WalletProvider[] = [
       {
@@ -245,7 +250,7 @@ export class SolanaAppKitService {
   // Get available wallet providers
   getAvailableProviders(): WalletProvider[] {
     const providers = Array.from(this.availableProviders.values());
-    console.log('🔧 SolanaAppKitService: getAvailableProviders called');
+    logger.debug('getAvailableProviders called', null, 'solanaAppKitService');
     console.log('🔧 SolanaAppKitService: Available providers count:', providers.length);
     console.log('🔧 SolanaAppKitService: Provider names:', providers.map(p => p.name));
     

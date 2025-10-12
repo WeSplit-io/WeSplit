@@ -5,7 +5,7 @@
 
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
-import { CURRENT_NETWORK } from '../config/chain';
+import { getConfig } from '../config/unified';
 import { solanaWalletService } from '../wallet/solanaWallet';
 import { logger } from '../services/loggingService';
 
@@ -37,9 +37,9 @@ class FundingService {
   private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
 
   constructor() {
-    this.connection = new Connection(CURRENT_NETWORK.rpcUrl, {
-      commitment: CURRENT_NETWORK.commitment,
-      confirmTransactionInitialTimeout: CURRENT_NETWORK.timeout,
+    this.connection = new Connection(getConfig().blockchain.rpcUrl, {
+      commitment: getConfig().blockchain.commitment,
+      confirmTransactionInitialTimeout: getConfig().blockchain.timeout,
     });
   }
 
@@ -243,7 +243,7 @@ class FundingService {
       let usdcBalance = 0;
       try {
         const usdcTokenAddress = await getAssociatedTokenAddress(
-          new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+          new PublicKey(getConfig().blockchain.usdcMintAddress),
           publicKey
         );
         const tokenAccount = await getAccount(this.connection, usdcTokenAddress);

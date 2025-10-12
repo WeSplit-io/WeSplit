@@ -22,7 +22,7 @@ import {
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
-import { CURRENT_NETWORK, TRANSACTION_CONFIG } from '../config/chain';
+import { getConfig } from '../config/unified';
 import { FeeService, COMPANY_WALLET_CONFIG, TransactionType } from '../config/feeConfig';
 import { solanaWalletService } from '../wallet/solanaWallet';
 import { logger } from '../services/loggingService';
@@ -344,7 +344,7 @@ class InternalTransferService {
 
       const fromPublicKey = new PublicKey(publicKey);
       const toPublicKey = new PublicKey(params.to);
-      const usdcMint = new PublicKey(CURRENT_NETWORK.usdcMintAddress);
+      const usdcMint = new PublicKey(getConfig().blockchain.usdcMintAddress);
 
       logger.info('USDC transfer setup', {
         fromPublicKey: fromPublicKey.toBase58(),
@@ -632,7 +632,7 @@ class InternalTransferService {
       try {
         logger.info('Attempting to sign and send transaction', {
           connectionEndpoint: transactionUtils.getConnection().rpcEndpoint,
-          commitment: CURRENT_NETWORK.commitment,
+          commitment: getConfig().blockchain.commitment,
           priority: params.priority || 'medium'
         }, 'InternalTransferService');
         
@@ -933,12 +933,12 @@ class InternalTransferService {
       if (params.currency === 'USDC') {
         // USDC transfer logic
         const fromTokenAccount = await getAssociatedTokenAddress(
-          new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+          new PublicKey(getConfig().blockchain.usdcMintAddress),
           fromKeypair.publicKey
         );
 
         const toTokenAccount = await getAssociatedTokenAddress(
-          new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+          new PublicKey(getConfig().blockchain.usdcMintAddress),
           new PublicKey(params.to)
         );
 
@@ -975,7 +975,7 @@ class InternalTransferService {
               feePayerPublicKey, // fee payer pays for account creation
               toTokenAccount, // associated token account
               new PublicKey(params.to), // owner
-              new PublicKey(CURRENT_NETWORK.usdcMintAddress) // mint
+              new PublicKey(getConfig().blockchain.usdcMintAddress) // mint
             )
           );
         }
@@ -1005,7 +1005,7 @@ class InternalTransferService {
         // Add company fee transfer if applicable
         if (companyFee > 0) {
           const companyTokenAccount = await getAssociatedTokenAddress(
-            new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+            new PublicKey(getConfig().blockchain.usdcMintAddress),
             new PublicKey(COMPANY_WALLET_CONFIG.address)
           );
 

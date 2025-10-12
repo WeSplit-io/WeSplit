@@ -20,6 +20,7 @@ import { typography } from '../../theme/typography';
 import { SplitWalletService, SplitWallet, SplitWalletParticipant } from '../../services/split';
 import { priceManagementService } from '../../services/priceManagementService';
 import { useApp } from '../../context/AppContext';
+import { logger } from '../../services/loggingService';
 
 interface RouteParams {
   splitWalletId: string;
@@ -35,7 +36,7 @@ const SplitPaymentScreen: React.FC = () => {
   const { splitWalletId, billName, totalAmount } = route.params as RouteParams;
   
   // Debug: Log the current user data
-  console.log('🔍 SplitPaymentScreen: Current user from context:', {
+  logger.debug('Current user from context', {
     currentUser: currentUser ? {
       id: currentUser.id,
       name: currentUser.name,
@@ -64,7 +65,7 @@ const SplitPaymentScreen: React.FC = () => {
       return;
     }
 
-    console.log('🔍 SplitPaymentScreen: Loading split data with:', {
+    logger.debug('Loading split data with', {
       currentUser: {
         id: currentUser.id,
         name: currentUser.name,
@@ -87,7 +88,7 @@ const SplitPaymentScreen: React.FC = () => {
         }
       }
       
-      console.log('💰 SplitPaymentScreen: Extracting bill ID:', {
+      logger.debug('Extracting bill ID', {
         splitWalletId,
         extractedBillId: billId
       });
@@ -99,7 +100,7 @@ const SplitPaymentScreen: React.FC = () => {
         // Use the authoritative price instead
         const authoritativePrice = priceManagementService.getBillPrice(billId);
         if (authoritativePrice) {
-          console.log('🔍 SplitPaymentScreen: Using authoritative price:', authoritativePrice.amount);
+          logger.debug('Using authoritative price', { amount: authoritativePrice.amount }, 'SplitPaymentScreen');
           // Update the totalAmount to use the authoritative price
           // Note: This would require updating the route params, which is complex
           // For now, we'll just log the discrepancy
@@ -119,7 +120,7 @@ const SplitPaymentScreen: React.FC = () => {
         return;
       }
 
-      console.log('🔍 SplitPaymentScreen: Split wallet loaded:', {
+      logger.debug('Split wallet loaded', {
         wallet: walletResult.wallet,
         participants: walletResult.wallet.participants
       });
@@ -130,7 +131,7 @@ const SplitPaymentScreen: React.FC = () => {
         const existingPrice = priceManagementService.getBillPrice(billId);
         
         if (!existingPrice) {
-          console.log('💰 SplitPaymentScreen: Setting authoritative price from split wallet:', {
+          logger.debug('Setting authoritative price from split wallet', {
             billId,
             totalAmount: walletResult.wallet.totalAmount,
             currency: walletResult.wallet.currency || 'USDC'
@@ -147,7 +148,7 @@ const SplitPaymentScreen: React.FC = () => {
       setSplitWallet(walletResult.wallet);
 
       // Get participant payment status
-      console.log('🔍 SplitPaymentScreen: Getting participant payment status for:', {
+      logger.debug('Getting participant payment status for', {
         splitWalletId,
         currentUserId: currentUser.id.toString(),
         walletParticipants: walletResult.wallet.participants
@@ -158,10 +159,10 @@ const SplitPaymentScreen: React.FC = () => {
         currentUser.id.toString()
       );
 
-      console.log('🔍 SplitPaymentScreen: Participant payment status result:', participantResult);
+      logger.debug('Participant payment status result', { participantResult }, 'SplitPaymentScreen');
 
       if (!participantResult.success || !participantResult.participant) {
-        console.log('🔍 SplitPaymentScreen: Participant not found, checking wallet participants manually:', {
+        logger.debug('Participant not found, checking wallet participants manually', {
           walletParticipants: walletResult.wallet.participants,
           currentUserId: currentUser.id.toString(),
           participantIds: walletResult.wallet.participants.map(p => p.userId)

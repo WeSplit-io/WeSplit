@@ -25,6 +25,7 @@ import { priceManagementService } from '../../services/priceManagementService';
 import { useApp } from '../../context/AppContext';
 import { AmountCalculationService, Participant } from '../../services/amountCalculationService';
 import { DataSourceService } from '../../services/dataSourceService';
+import { logger } from '../../services/loggingService';
 import FairSplitHeader from './components/FairSplitHeader';
 import FairSplitProgress from './components/FairSplitProgress';
 import FairSplitParticipants from './components/FairSplitParticipants';
@@ -135,7 +136,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   // Check if the wallet still exists in Firebase (not burned yet)
                   // If it exists, it's just completed but not burned, so allow access
                   if (__DEV__) {
-                    console.log('🔍 FairSplitScreen: Split wallet is completed but not yet burned, allowing access');
+                    logger.debug('Split wallet is completed but not yet burned, allowing access', null, 'FairSplitScreen');
                   }
                 }
                     
@@ -147,7 +148,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                     if (splitParticipantIds.length !== walletParticipantIds.length || 
                         !splitParticipantIds.every(id => walletParticipantIds.includes(id))) {
                       if (__DEV__) {
-                        console.log('🔍 FairSplitScreen: Participants mismatch detected, syncing wallet participants...');
+                        logger.debug('Participants mismatch detected, syncing wallet participants', null, 'FairSplitScreen');
                       }
                       
                       // Create updated wallet participants from split data with correct amounts
@@ -155,7 +156,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                       const totalAmount = fullSplitData.totalAmount; // Use split data amount as source of truth
                       const amountPerPerson = totalAmount / fullSplitData.participants.length;
                       
-                      console.log('🔧 FairSplitScreen: Syncing participants with split data amount:', {
+                      logger.debug('Syncing participants with split data amount', {
                         splitDataAmount: fullSplitData.totalAmount,
                         splitWalletAmount: wallet.totalAmount,
                         usingAmount: totalAmount,
@@ -246,7 +247,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   // Check if the wallet still exists in Firebase (not burned yet)
                   // If it exists, it's just completed but not burned, so allow access
                   if (__DEV__) {
-                    console.log('🔍 FairSplitScreen: Split wallet is completed but not yet burned, allowing access');
+                    logger.debug('Split wallet is completed but not yet burned, allowing access', null, 'FairSplitScreen');
                   }
                 }
                 
@@ -419,7 +420,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     if (splitMethod === 'equal' && participants.length > 0) {
       // Check if participants have zero amounts and trigger repair if needed
       if (hasZeroAmounts() && splitWallet?.id) {
-        console.log('🔧 FairSplitScreen: Detected participants with zero amounts, triggering repair...');
+        logger.debug('Detected participants with zero amounts, triggering repair', null, 'FairSplitScreen');
         checkAndRepairData();
         return; // Let the repair handle the update
       }
@@ -503,7 +504,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
       // Only proceed if all participants have paid AND the wallet is not already completed
       if (allParticipantsPaid && wallet.participants.length > 0 && wallet.status !== 'completed') {
-        console.log('🎉 All participants have paid, completing split wallet...');
+        logger.debug('All participants have paid, completing split wallet', null, 'FairSplitScreen');
         
         // Get merchant address if available
         const merchantAddress = processedBillData?.merchant?.address || billData?.merchant?.address;
@@ -515,7 +516,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         );
 
         if (completionResult.success) {
-          console.log('✅ Split wallet completed successfully');
+          logger.debug('Split wallet completed successfully', null, 'FairSplitScreen');
           
           // Update local state to reflect completion
           setSplitWallet(prev => prev ? { ...prev, status: 'completed' as const } : null);
@@ -611,7 +612,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         } else if (repairResult.success && !repairResult.repaired) {
           // No repair needed, but validation issues exist
           const summary = SplitDataValidationService.getValidationSummary(validationResult);
-          console.log('🔧 FairSplitScreen: Validation summary:', summary);
+          logger.debug('Validation summary', { summary }, 'FairSplitScreen');
         } else {
           console.error('🔧 FairSplitScreen: Data repair failed:', repairResult.error);
         }
@@ -671,7 +672,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         
         // Only log in development and when there are significant changes
         if (__DEV__ && (newCompletionData.completionPercentage === 100 || newCompletionData.completionPercentage === 0)) {
-          console.log('🔍 FairSplitScreen: Completion data updated:', newCompletionData);
+          logger.debug('Completion data updated', { newCompletionData }, 'FairSplitScreen');
         }
       } else {
         if (__DEV__) {

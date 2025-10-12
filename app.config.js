@@ -6,7 +6,7 @@ export default {
     slug: "WeSplit",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    icon: "./assets/wesplit-logo-new.png",
     userInterfaceStyle: "light",
     newArchEnabled: false,
     sdkVersion: "54.0.0",
@@ -14,7 +14,7 @@ export default {
     splash: {
       image: "./assets/wesplit-logo-new.png",
       resizeMode: "contain",
-      backgroundColor: "#1a1a1a"
+      backgroundColor: "#061113"
     },
     ios: {
       supportsTablet: true,
@@ -38,8 +38,8 @@ export default {
     android: {
       package: "com.wesplit.app",
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#ffffff"
+        foregroundImage: "./assets/wesplit-logo-new.png",
+        backgroundColor: "#061113"
       },
       jsEngine: "jsc",
       permissions: [

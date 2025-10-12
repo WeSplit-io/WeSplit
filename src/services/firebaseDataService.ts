@@ -41,6 +41,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { notificationService } from './notificationService';
+import { logger } from './loggingService';
 
 // Data transformation utilities
 export const firebaseDataTransformers = {
@@ -286,7 +287,7 @@ const updateGroupMemberCount = async (groupId: string) => {
       updated_at: serverTimestamp()
     });
     
-    if (__DEV__) { console.log('🔥 Updated group member count to:', memberCount); }
+    if (__DEV__) { logger.debug('Updated group member count', { memberCount }, 'firebaseDataService'); }
   } catch (error) {
     if (__DEV__) { console.error('🔥 Error updating group member count:', error); }
   }
@@ -307,7 +308,7 @@ const updateGroupExpenseCount = async (groupId: string) => {
       updated_at: serverTimestamp()
     });
     
-    if (__DEV__) { console.log('🔥 Updated group expense count to:', expenseCount); }
+    if (__DEV__) { logger.debug('Updated group expense count', { expenseCount }, 'firebaseDataService'); }
   } catch (error) {
     if (__DEV__) { console.error('🔥 Error updating group expense count:', error); }
   }
@@ -372,7 +373,7 @@ export const firebaseUserService = {
 
   createUserIfNotExists: async (userData: Omit<User, 'id' | 'created_at'>): Promise<User> => {
     try {
-      if (__DEV__) { console.log('🔥 createUserIfNotExists: Checking for existing user with email:', userData.email); }
+      if (__DEV__) { logger.debug('Checking for existing user with email', { email: userData.email }, 'firebaseDataService'); }
       
       // Check if user already exists by email
       const usersRef = collection(db, 'users');
@@ -384,7 +385,7 @@ export const firebaseUserService = {
         const existingUserDoc = userDocs.docs[0];
         const existingUser = firebaseDataTransformers.firestoreToUser(existingUserDoc);
         
-        if (__DEV__) { console.log('🔥 createUserIfNotExists: User already exists, returning existing user:', existingUser.id); }
+        if (__DEV__) { logger.debug('User already exists, returning existing user', { userId: existingUser.id }, 'firebaseDataService'); }
         
         // Update user if new data is provided
         const updates: Partial<User> = {};
@@ -424,7 +425,7 @@ export const firebaseUserService = {
         }
         
         if (hasUpdates) {
-          if (__DEV__) { console.log('🔥 createUserIfNotExists: Updating existing user with new data'); }
+          if (__DEV__) { logger.debug('Updating existing user with new data', null, 'firebaseDataService'); }
           return await firebaseDataService.user.updateUser(existingUser.id.toString(), updates);
         }
         
@@ -432,7 +433,7 @@ export const firebaseUserService = {
       }
       
       // User doesn't exist, create new user
-      if (__DEV__) { console.log('🔥 createUserIfNotExists: Creating new user'); }
+      if (__DEV__) { logger.debug('Creating new user', null, 'firebaseDataService'); }
       
       const userRef = await addDoc(collection(db, 'users'), firebaseDataTransformers.userToFirestore(userData as User));
       const newUser = {
@@ -441,7 +442,7 @@ export const firebaseUserService = {
         created_at: new Date().toISOString()
       } as User;
       
-      if (__DEV__) { console.log('🔥 createUserIfNotExists: New user created:', newUser.id); }
+      if (__DEV__) { logger.debug('New user created', { userId: newUser.id }, 'firebaseDataService'); }
       
       return newUser;
     } catch (error) {
@@ -528,14 +529,14 @@ export const firebaseUserService = {
       });
 
       // Debug logging for avatar data
-      console.log('🔍 firebaseUserService.getUserContacts: Loaded user contacts with avatar data:', 
-        contacts.map(c => ({
+      logger.debug('Loaded user contacts with avatar data', { 
+        contactCount: contacts.length,
+        contacts: contacts.map(c => ({
           id: c.id,
           name: c.name,
-          avatar: c.avatar,
           hasAvatar: !!c.avatar
         }))
-      );
+      }, 'firebaseDataService');
 
       return contacts;
     } catch (error) {
@@ -602,7 +603,7 @@ export const firebaseUserService = {
 
   getUserByWalletAddress: async (walletAddress: string): Promise<User | null> => {
     try {
-      if (__DEV__) { console.log('🔥 getUserByWalletAddress: Searching for user with wallet address:', walletAddress); }
+      if (__DEV__) { logger.debug('Searching for user with wallet address', { walletAddress }, 'firebaseDataService'); }
       
       const usersRef = collection(db, 'users');
       const userQuery = query(usersRef, where('wallet_address', '==', walletAddress));
@@ -612,11 +613,11 @@ export const firebaseUserService = {
         const userDoc = userDocs.docs[0];
         const user = firebaseDataTransformers.firestoreToUser(userDoc);
         
-        if (__DEV__) { console.log('🔥 getUserByWalletAddress: Found user:', user.id, user.name); }
+        if (__DEV__) { logger.debug('Found user', { userId: user.id, userName: user.name }, 'firebaseDataService'); }
         return user;
       }
       
-      if (__DEV__) { console.log('🔥 getUserByWalletAddress: No user found with wallet address:', walletAddress); }
+      if (__DEV__) { logger.debug('No user found with wallet address', { walletAddress }, 'firebaseDataService'); }
       return null;
     } catch (error) {
       if (__DEV__) { console.error('🔥 getUserByWalletAddress: Error finding user by wallet address:', error); }
@@ -842,7 +843,7 @@ export const firebaseGroupService = {
           if (memberData.name === groupName) {
             membersToDelete.push(doc.ref);
             if (__DEV__) {
-              console.log('🔥 Marking for deletion - member with group name:', memberData.name);
+              logger.debug('Marking for deletion - member with group name', { memberName: memberData.name }, 'firebaseDataService');
             }
           }
         });
@@ -854,7 +855,7 @@ export const firebaseGroupService = {
         if (memberData.name === 'Unknown User') {
           membersToDelete.push(doc.ref);
           if (__DEV__) {
-            console.log('🔥 Marking for deletion - member with "Unknown User" name');
+            logger.debug('Marking for deletion - member with "Unknown User" name', null, 'firebaseDataService');
           }
         }
       });
@@ -886,7 +887,7 @@ export const firebaseGroupService = {
           for (let i = 1; i < members.length; i++) {
             membersToDelete.push(members[i].doc.ref);
             if (__DEV__) {
-              console.log('🔥 Marking for deletion - duplicate member with email:', email, 'ID:', members[i].data.user_id);
+              logger.debug('Marking for deletion - duplicate member with email', { email, userId: members[i].data.user_id }, 'firebaseDataService');
             }
           }
         }
@@ -894,7 +895,7 @@ export const firebaseGroupService = {
       
       // Delete all marked members
       if (membersToDelete.length > 0) {
-        console.log('🔥 cleanupPhantomMembers: Deleting members:', membersToDelete.length);
+        logger.debug('Deleting phantom members', { count: membersToDelete.length }, 'firebaseDataService');
         
         const batch = writeBatch(db);
         membersToDelete.forEach(ref => {
@@ -903,7 +904,7 @@ export const firebaseGroupService = {
         await batch.commit();
         
         if (__DEV__) {
-          console.log('🔥 Cleaned up phantom members:', membersToDelete.length);
+          logger.debug('Cleaned up phantom members', { count: membersToDelete.length }, 'firebaseDataService');
         }
       } else {
         // Removed excessive logging for cleaner console
@@ -947,7 +948,7 @@ export const firebaseGroupService = {
       members = members.filter(member => {
         if (groupName && member.name === groupName) {
           if (__DEV__) {
-            console.log('🔥 Filtering out phantom member with group name:', member.name);
+            logger.debug('Filtering out phantom member with group name', { memberName: member.name }, 'firebaseDataService');
           }
           return false;
         }

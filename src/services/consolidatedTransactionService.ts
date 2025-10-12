@@ -36,7 +36,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { USDC_CONFIG } from './shared/walletConstants';
-import { CURRENT_NETWORK, TRANSACTION_CONFIG as CHAIN_TRANSACTION_CONFIG } from '../config/chain';
+import { getConfig } from '../config/unified';
+import { TRANSACTION_CONFIG } from '../config/transactionConfig';
 import { FeeService, COMPANY_WALLET_CONFIG, TransactionType } from '../config/feeConfig';
 import { transactionUtils } from './shared/transactionUtils';
 import { notificationUtils } from './shared/notificationUtils';
@@ -44,6 +45,7 @@ import { keypairUtils } from './shared/keypairUtils';
 import { balanceUtils } from './shared/balanceUtils';
 import { validationUtils } from './shared/validationUtils';
 import { TransactionResult as UnifiedTransactionResult } from '../types/unified';
+import { logger } from './loggingService';
 
 // Types
 export interface TransactionParams {
@@ -83,18 +85,7 @@ export interface PaymentRequestResult {
 
 // Company fee structure - now using centralized configuration
 
-// Transaction configuration
-const TRANSACTION_CONFIG = {
-  retry: {
-    maxRetries: 3,
-    retryDelay: 1000
-  },
-  priorityFees: {
-    low: 1000,
-    medium: 5000,
-    high: 10000
-  }
-};
+// Transaction configuration is now imported from config/transactionConfig.ts
 
 class ConsolidatedTransactionService {
   private static instance: ConsolidatedTransactionService;
@@ -120,7 +111,7 @@ class ConsolidatedTransactionService {
    */
   async loadWallet(): Promise<boolean> {
     try {
-      console.log('🔗 ConsolidatedTransactionService: Loading wallet from secure storage');
+      logger.debug('Loading wallet from secure storage', null, 'consolidatedTransactionService');
       
       // Use the existing solanaWalletService to load the wallet securely
       const { solanaWalletService } = await import('../wallet/solanaWallet');
@@ -134,7 +125,7 @@ class ConsolidatedTransactionService {
           const keypairResult = keypairUtils.createKeypairFromSecretKey(walletInfo.secretKey);
           this.keypair = keypairResult.keypair;
           
-          console.log('🔗 ConsolidatedTransactionService: Wallet loaded successfully', {
+          logger.debug('Wallet loaded successfully', {
             address: this.keypair.publicKey.toBase58()
           });
           
@@ -174,7 +165,7 @@ class ConsolidatedTransactionService {
         throw new Error('No wallet connected');
       }
 
-      console.log('🚀 Sending USDC transaction:', {
+      logger.debug('Sending USDC transaction', {
         to: params.to,
         amount: params.amount,
         currency: params.currency,
@@ -264,7 +255,7 @@ class ConsolidatedTransactionService {
           new PublicKey(COMPANY_WALLET_CONFIG.address)
         );
         
-        console.log('💰 Adding company fee transfer instruction:', {
+        logger.debug('Adding company fee transfer instruction', {
           companyFeeAmount,
           companyFee,
           fromTokenAccount: fromTokenAccount.toBase58(),
@@ -346,7 +337,7 @@ class ConsolidatedTransactionService {
     groupId?: string | number
   ): Promise<PaymentRequest> {
     try {
-      console.log('🔄 Creating payment request:', {
+      logger.debug('Creating payment request', {
         senderId,
         recipientId,
         amount,
@@ -383,7 +374,7 @@ class ConsolidatedTransactionService {
         updated_at: new Date().toISOString()
       };
 
-      console.log('✅ Payment request created:', request.id);
+      logger.debug('Payment request created', { requestId: request.id }, 'consolidatedTransactionService');
       return request;
 
     } catch (error) {
@@ -401,7 +392,7 @@ class ConsolidatedTransactionService {
     priority: 'low' | 'medium' | 'high' = 'medium'
   ): Promise<PaymentRequestResult> {
     try {
-      console.log('🔄 Processing payment request:', {
+      logger.debug('Processing payment request', {
         requestId,
         payerId,
         priority,
@@ -485,7 +476,7 @@ class ConsolidatedTransactionService {
         updated_at: serverTimestamp()
       });
 
-      console.log('✅ Payment request processed successfully:', requestId);
+      logger.debug('Payment request processed successfully', { requestId }, 'consolidatedTransactionService');
 
       return {
         success: true,
@@ -567,7 +558,7 @@ class ConsolidatedTransactionService {
    * Get user wallet balance from on-chain
    */
   async getUserWalletBalance(userId: string): Promise<{ usdc: number; sol: number }> {
-    console.log('🔗 ConsolidatedTransactionService: Getting wallet balance for user:', userId);
+    logger.debug('Getting wallet balance for user', { userId }, 'consolidatedTransactionService');
     
     try {
       // Use the existing userWalletService to get the balance
@@ -611,7 +602,7 @@ class ConsolidatedTransactionService {
         walletAddress,
         usdcMint: usdcMint.toBase58(),
         usdcMintSource: 'USDC_CONFIG.mintAddress',
-        networkName: CURRENT_NETWORK.name,
+        networkName: getConfig().blockchain.network,
         usdcTokenAccount: usdcTokenAccount.toBase58()
       });
       
@@ -895,9 +886,9 @@ class ConsolidatedTransactionService {
       }
 
       // Create a direct Solana transaction with multiple RPC endpoints for better reliability
-      const rpcEndpoints = CURRENT_NETWORK.rpcEndpoints || [CURRENT_NETWORK.rpcUrl];
+      const rpcEndpoints = getConfig().blockchain.rpcEndpoints || [getConfig().blockchain.rpcUrl];
       
-      let connection = new Connection(rpcEndpoints[0], CURRENT_NETWORK.commitment);
+      let connection = new Connection(rpcEndpoints[0], getConfig().blockchain.commitment);
       
       // Get the wallet's USDC token account - use the configured mint address
       const usdcMint = new PublicKey(USDC_CONFIG.mintAddress); // Use configured USDC mint
@@ -907,7 +898,7 @@ class ConsolidatedTransactionService {
       console.log('🔗 ConsolidatedTransactionService: Token account derivation:', {
         usdcMint: usdcMint.toBase58(),
         usdcMintSource: 'USDC_CONFIG.mintAddress',
-        networkName: CURRENT_NETWORK.name,
+        networkName: getConfig().blockchain.network,
         walletPublicKey: walletKeypair.publicKey.toBase58(),
         walletUsdcAccount: walletUsdcAccount.toBase58(),
         recipientPublicKey: toAddress,

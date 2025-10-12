@@ -7,7 +7,7 @@ import { Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { Connection } from '@solana/web3.js';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { CURRENT_NETWORK } from '../config/chain';
+import { getConfig } from '../config/unified';
 import { logger } from '../services/loggingService';
 
 export interface WalletInfo {
@@ -46,9 +46,9 @@ class SolanaWalletService {
   private keypair: Keypair | null = null;
 
   constructor() {
-    this.connection = new Connection(CURRENT_NETWORK.rpcUrl, {
-      commitment: CURRENT_NETWORK.commitment,
-      confirmTransactionInitialTimeout: CURRENT_NETWORK.timeout,
+    this.connection = new Connection(getConfig().blockchain.rpcUrl, {
+      commitment: getConfig().blockchain.commitment,
+      confirmTransactionInitialTimeout: getConfig().blockchain.timeout,
     });
   }
 
@@ -81,7 +81,7 @@ class SolanaWalletService {
       try {
         const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token');
         const usdcTokenAddress = await getAssociatedTokenAddress(
-          new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+          new PublicKey(getConfig().blockchain.usdcMintAddress),
           keypair.publicKey
         );
         const tokenAccount = await getAccount(this.connection, usdcTokenAddress);
@@ -257,7 +257,7 @@ class SolanaWalletService {
       try {
         const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token');
         const usdcTokenAddress = await getAssociatedTokenAddress(
-          new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+          new PublicKey(getConfig().blockchain.usdcMintAddress),
           this.keypair.publicKey
         );
         const tokenAccount = await getAccount(this.connection, usdcTokenAddress);
@@ -697,9 +697,9 @@ class SolanaWalletService {
           const keypair = Keypair.fromSecretKey(privateKeyBuffer);
           
           // Check balance for this wallet
-          const tempConnection = new Connection(CURRENT_NETWORK.rpcUrl, {
-            commitment: CURRENT_NETWORK.commitment,
-            confirmTransactionInitialTimeout: CURRENT_NETWORK.timeout,
+          const tempConnection = new Connection(getConfig().blockchain.rpcUrl, {
+            commitment: getConfig().blockchain.commitment,
+            confirmTransactionInitialTimeout: getConfig().blockchain.timeout,
           });
           
           const balance = await tempConnection.getBalance(keypair.publicKey);
@@ -711,7 +711,7 @@ class SolanaWalletService {
             try {
               const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token');
               const usdcTokenAddress = await getAssociatedTokenAddress(
-                new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+                new PublicKey(getConfig().blockchain.usdcMintAddress),
                 keypair.publicKey
               );
               const tokenAccount = await getAccount(tempConnection, usdcTokenAddress);
@@ -756,9 +756,9 @@ class SolanaWalletService {
             const walletInfo = await walletService.importWallet(seedPhrase);
             
             // Check balance for this wallet
-            const tempConnection = new Connection(CURRENT_NETWORK.rpcUrl, {
-              commitment: CURRENT_NETWORK.commitment,
-              confirmTransactionInitialTimeout: CURRENT_NETWORK.timeout,
+            const tempConnection = new Connection(getConfig().blockchain.rpcUrl, {
+              commitment: getConfig().blockchain.commitment,
+              confirmTransactionInitialTimeout: getConfig().blockchain.timeout,
             });
             
             const balance = await tempConnection.getBalance(new PublicKey(walletInfo.address));
@@ -770,7 +770,7 @@ class SolanaWalletService {
               try {
                 const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token');
                 const usdcTokenAddress = await getAssociatedTokenAddress(
-                  new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+                  new PublicKey(getConfig().blockchain.usdcMintAddress),
                   new PublicKey(walletInfo.address)
                 );
                 const tokenAccount = await getAccount(tempConnection, usdcTokenAddress);
@@ -815,15 +815,15 @@ class SolanaWalletService {
         }, 'SolanaWalletService');
         
         try {
-          const tempConnection = new Connection(CURRENT_NETWORK.rpcUrl, {
-            commitment: CURRENT_NETWORK.commitment,
-            confirmTransactionInitialTimeout: CURRENT_NETWORK.timeout,
+          const tempConnection = new Connection(getConfig().blockchain.rpcUrl, {
+            commitment: getConfig().blockchain.commitment,
+            confirmTransactionInitialTimeout: getConfig().blockchain.timeout,
           });
           
           // Check if the expected address has USDC balance
           const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token');
           const usdcTokenAddress = await getAssociatedTokenAddress(
-            new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+            new PublicKey(getConfig().blockchain.usdcMintAddress),
             new PublicKey(expectedAddress)
           );
           
@@ -1067,15 +1067,15 @@ class SolanaWalletService {
           const tempKeypair = Keypair.fromSecretKey(Buffer.from(walletInfo.secretKey, 'base64'));
           
           // Check if this wallet has USDC balance
-          const tempConnection = new Connection(CURRENT_NETWORK.rpcUrl, {
-            commitment: CURRENT_NETWORK.commitment,
-            confirmTransactionInitialTimeout: CURRENT_NETWORK.timeout,
+          const tempConnection = new Connection(getConfig().blockchain.rpcUrl, {
+            commitment: getConfig().blockchain.commitment,
+            confirmTransactionInitialTimeout: getConfig().blockchain.timeout,
           });
           
           try {
             const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token');
             const usdcTokenAddress = await getAssociatedTokenAddress(
-              new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+              new PublicKey(getConfig().blockchain.usdcMintAddress),
               tempKeypair.publicKey
             );
             const tokenAccount = await getAccount(tempConnection, usdcTokenAddress);
@@ -1110,14 +1110,14 @@ class SolanaWalletService {
       logger.info('Last resort: Checking if expected address has USDC balance', { expectedAddress }, 'SolanaWalletService');
       
       try {
-        const tempConnection = new Connection(CURRENT_NETWORK.rpcUrl, {
-          commitment: CURRENT_NETWORK.commitment,
-          confirmTransactionInitialTimeout: CURRENT_NETWORK.timeout,
+        const tempConnection = new Connection(getConfig().blockchain.rpcUrl, {
+          commitment: getConfig().blockchain.commitment,
+          confirmTransactionInitialTimeout: getConfig().blockchain.timeout,
         });
         
         const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token');
         const usdcTokenAddress = await getAssociatedTokenAddress(
-          new PublicKey(CURRENT_NETWORK.usdcMintAddress),
+          new PublicKey(getConfig().blockchain.usdcMintAddress),
           new PublicKey(expectedAddress)
         );
         

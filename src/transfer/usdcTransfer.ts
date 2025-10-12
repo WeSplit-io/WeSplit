@@ -21,7 +21,8 @@ import {
   TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
 import { logger } from '../services/loggingService';
-import { CURRENT_NETWORK, TRANSACTION_CONFIG } from '../config/chain';
+import { getConfig } from '../config/unified';
+import { TRANSACTION_CONFIG } from '../config/transactionConfig';
 import { FeeService, COMPANY_WALLET_CONFIG } from '../config/feeConfig';
 
 export interface UsdcTransferParams {
@@ -120,12 +121,12 @@ export async function buildUsdcTransfer({
 }: UsdcTransferParams): Promise<UsdcTransferResult> {
   try {
     // Validate cluster matches current network
-    if (cluster !== CURRENT_NETWORK.name && cluster !== 'mainnet' && cluster !== 'devnet') {
+    if (cluster !== getConfig().blockchain.network && cluster !== 'mainnet' && cluster !== 'devnet') {
       throw new Error(`Invalid cluster: ${cluster}. Must be mainnet or devnet.`);
     }
 
     // Get USDC mint address for current network
-    const usdcMint = new PublicKey(CURRENT_NETWORK.usdcMintAddress);
+    const usdcMint = new PublicKey(getConfig().blockchain.usdcMintAddress);
     
     // Use centralized fee payer logic - Company pays SOL gas fees
     const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromOwnerPubkey);
@@ -136,9 +137,9 @@ export async function buildUsdcTransfer({
     }
 
     // Create connection
-    const connection = new Connection(CURRENT_NETWORK.rpcUrl, {
-      commitment: CURRENT_NETWORK.commitment,
-      confirmTransactionInitialTimeout: CURRENT_NETWORK.timeout,
+    const connection = new Connection(getConfig().blockchain.rpcUrl, {
+      commitment: getConfig().blockchain.commitment,
+      confirmTransactionInitialTimeout: getConfig().blockchain.timeout,
     });
 
     // Get associated token addresses
@@ -295,11 +296,11 @@ export async function getTransferPreview(params: UsdcTransferParams): Promise<{
   usdcMint: string;
 }> {
   try {
-    const usdcMint = new PublicKey(CURRENT_NETWORK.usdcMintAddress);
+    const usdcMint = new PublicKey(getConfig().blockchain.usdcMintAddress);
     const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
     
-    const connection = new Connection(CURRENT_NETWORK.rpcUrl, {
-      commitment: CURRENT_NETWORK.commitment,
+    const connection = new Connection(getConfig().blockchain.rpcUrl, {
+      commitment: getConfig().blockchain.commitment,
     });
 
     const fromTokenAccount = await getAssociatedTokenAddress(usdcMint, params.fromOwnerPubkey);

@@ -19,7 +19,8 @@ import {
   getAccount,
   TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
-import { CURRENT_NETWORK, TRANSACTION_CONFIG } from '../config/chain';
+import { getConfig } from '../config/unified';
+import { TRANSACTION_CONFIG } from '../config/transactionConfig';
 import { FeeService, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG, TransactionType } from '../config/feeConfig';
 import { solanaWalletService } from '../wallet/solanaWallet';
 import { logger } from '../services/loggingService';
@@ -57,9 +58,9 @@ class ExternalTransferService {
   private connection: Connection;
 
   constructor() {
-    this.connection = new Connection(CURRENT_NETWORK.rpcUrl, {
-      commitment: CURRENT_NETWORK.commitment,
-      confirmTransactionInitialTimeout: CURRENT_NETWORK.timeout,
+    this.connection = new Connection(getConfig().blockchain.rpcUrl, {
+      commitment: getConfig().blockchain.commitment,
+      confirmTransactionInitialTimeout: getConfig().blockchain.timeout,
     });
   }
 
@@ -258,7 +259,7 @@ class ExternalTransferService {
     try {
       const fromPublicKey = new PublicKey(solanaWalletService.getPublicKey()!);
       const toPublicKey = new PublicKey(params.to);
-      const usdcMint = new PublicKey(CURRENT_NETWORK.usdcMintAddress);
+      const usdcMint = new PublicKey(getConfig().blockchain.usdcMintAddress);
 
       // Use centralized fee payer logic - Company pays SOL gas fees
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
@@ -352,8 +353,8 @@ class ExternalTransferService {
         transaction,
         [], // Signers will be handled by the wallet service
         {
-          commitment: CURRENT_NETWORK.commitment,
-          preflightCommitment: CURRENT_NETWORK.commitment
+          commitment: getConfig().blockchain.commitment,
+          preflightCommitment: getConfig().blockchain.commitment
         }
       );
 

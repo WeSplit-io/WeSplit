@@ -28,6 +28,7 @@ import GroupIcon from '../../components/GroupIcon';
 import Icon from '../../components/Icon';
 import { BillSplitSummary } from '../../types/billSplitting';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
+import { logger } from '../../services/loggingService';
 import { MockupDataService } from '../../data/mockupData';
 import { priceManagementService } from '../../services/priceManagementService';
 import { useApp } from '../../context/AppContext';
@@ -113,7 +114,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     useCallback(() => {
       if (currentUser?.id) {
         if (__DEV__) {
-          console.log('🔍 SplitsListScreen: Screen focused, refreshing splits for user:', currentUser.id);
+          logger.debug('Screen focused, refreshing splits for user', { userId: currentUser.id }, 'SplitsListScreen');
         }
         loadSplits();
       }
@@ -129,18 +130,18 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
   const loadSplits = async () => {
     if (!currentUser?.id) {
-      console.log('🔍 SplitsListScreen: No current user, skipping load');
+      logger.debug('No current user, skipping load', null, 'SplitsListScreen');
       return;
     }
 
     setIsLoading(true);
     try {
-      console.log('🔍 SplitsListScreen: Loading splits for user:', currentUser.id);
+      logger.debug('Loading splits for user', { userId: currentUser.id }, 'SplitsListScreen');
 
       const result = await SplitStorageService.getUserSplits(String(currentUser.id));
 
       if (result.success && result.splits) {
-        console.log('🔍 SplitsListScreen: Loaded splits:', {
+        logger.debug('Loaded splits', {
           count: result.splits.length,
           splits: result.splits.map(s => ({
             id: s.id,
@@ -169,7 +170,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
           // Update price if authoritative price is available
           if (authoritativePrice) {
-            console.log('💰 SplitsListScreen: Using authoritative price for split:', {
+            logger.debug('Using authoritative price for split', {
               splitId: split.id,
               originalAmount: split.totalAmount,
               authoritativeAmount: authoritativePrice.amount
@@ -182,7 +183,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
           const creatorParticipant = updatedSplit.participants.find(p => p.userId === updatedSplit.creatorId);
           if (creatorParticipant && creatorParticipant.status === 'pending') {
-            console.log('🔍 SplitsListScreen: Fixing creator status for split:', updatedSplit.id);
+            logger.debug('Fixing creator status for split', { splitId: updatedSplit.id }, 'SplitsListScreen');
             try {
               await SplitStorageService.updateParticipantStatus(
                 updatedSplit.firebaseDocId || updatedSplit.id,
@@ -208,7 +209,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         // Load participant avatars
         loadParticipantAvatars(updatedSplits);
       } else {
-        console.log('🔍 SplitsListScreen: Failed to load splits:', result.error);
+        logger.error('Failed to load splits', result.error, 'SplitsListScreen');
         Alert.alert('Error', result.error || 'Failed to load splits');
         setSplits([]);
       }
@@ -241,7 +242,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
   const handleSplitPress = useCallback(async (split: Split) => {
     try {
-      console.log('🔍 SplitsListScreen: Opening split:', {
+      logger.debug('Opening split', {
         id: split.id,
         title: split.title,
         status: split.status,

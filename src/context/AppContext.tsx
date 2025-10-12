@@ -10,11 +10,12 @@ import {
   Notification
 } from '../types';
 import { firebaseDataService } from '../services/firebaseDataService';
-import { hybridDataService } from '../servicues/hybridDataService';
+import { hybridDataService } from '../services/hybridDataService';
 import { i18nService } from '../services/i18nService';
 import { notificationService } from '../services/notificationService';
 import { MultiSignStateService } from '../services/multiSignStateService';
 import { calculateGroupBalances, CalculatedBalance } from '../utils/balanceCalculator';
+import { logger } from '../services/loggingService';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -403,13 +404,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (!globalAny.analytics) {
         globalAny.analytics = {
           stopTracking: () => {
-            console.log('Analytics tracking stopped (safe mode)');
+            logger.debug('Analytics tracking stopped (safe mode)', null, 'AppContext');
           },
           startTracking: () => {
-            console.log('Analytics tracking started (safe mode)');
+            logger.debug('Analytics tracking started (safe mode)', null, 'AppContext');
           },
           trackEvent: (event: string, data?: any) => {
-            console.log('Analytics event tracked (safe mode):', event, data);
+            logger.debug('Analytics event tracked (safe mode)', { event, data }, 'AppContext');
           }
         };
       }
@@ -417,7 +418,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Ensure stopTracking method exists
       if (!globalAny.analytics.stopTracking) {
         globalAny.analytics.stopTracking = () => {
-          console.log('Analytics tracking stopped (fallback)');
+          logger.debug('Analytics tracking stopped (fallback)', null, 'AppContext');
         };
       }
 
@@ -426,7 +427,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         try {
           if (!globalAny.firebase.analytics.stopTracking) {
             globalAny.firebase.analytics.stopTracking = () => {
-              console.log('Firebase Analytics tracking stopped (safe mode)');
+              logger.debug('Firebase Analytics tracking stopped (safe mode)', null, 'AppContext');
             };
           }
         } catch (firebaseError) {
@@ -448,17 +449,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         
         // Initialize i18n service
         await i18nService.initialize();
-        console.log('i18n service initialized');
+        logger.debug('i18n service initialized', null, 'AppContext');
         
         // Initialize multi-sign state service
         await MultiSignStateService.initialize();
-        console.log('multi-sign state service initialized');
+        logger.debug('multi-sign state service initialized', null, 'AppContext');
         
         // Fix any users with invalid lastVerifiedAt dates
         const { firestoreService } = await import('../config/firebase');
         const fixedCount = await firestoreService.fixInvalidLastVerifiedAt();
         if (fixedCount > 0) {
-          console.log(`✅ Fixed ${fixedCount} users with invalid lastVerifiedAt dates during app initialization`);
+          logger.debug('Fixed users with invalid lastVerifiedAt dates during app initialization', { fixedCount }, 'AppContext');
         }
         
       } catch (error) {
@@ -618,7 +619,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Data operations - Updated to use real-time listeners
   const loadUserGroups = useCallback(async (forceRefresh: boolean = false) => {
     if (!state.currentUser?.id) {
-      if (__DEV__) { console.log('🔄 AppContext: No current user, skipping group load'); }
+      if (__DEV__) { logger.debug('No current user, skipping group load', null, 'AppContext'); }
       return;
     }
     

@@ -4,19 +4,19 @@
  */
 
 // Import centralized configuration
-import { CURRENT_NETWORK } from '../../config/chain';
+import { getConfig } from '../../config/unified';
 
 // RPC Configuration
 export const RPC_CONFIG = {
-  endpoint: CURRENT_NETWORK.rpcUrl,
-  commitment: CURRENT_NETWORK.commitment,
-  network: CURRENT_NETWORK.name,
-  isProduction: CURRENT_NETWORK.isProduction,
+  endpoint: getConfig().blockchain.rpcUrl,
+  commitment: getConfig().blockchain.commitment,
+  network: getConfig().blockchain.network,
+  isProduction: getConfig().blockchain.isProduction,
 };
 
 // USDC Configuration
 export const USDC_CONFIG = {
-  mintAddress: CURRENT_NETWORK.usdcMintAddress,
+  mintAddress: getConfig().blockchain.usdcMintAddress,
   decimals: 6,
   symbol: 'USDC',
 };

@@ -5,12 +5,12 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import UserAvatar from '../../../components/UserAvatar';
-import { colors } from '../../../theme/colors';
-import { spacing } from '../../../theme/spacing';
-import { typography } from '../../../theme/typography';
+import UserAvatar from '@components/UserAvatar';
+import { colors } from '@theme/colors';
+import { spacing } from '@theme/spacing';
+import { typography } from '@theme/typography';
 import { styles } from '../styles';
-import { Participant } from '../../../services/amountCalculationService';
+import { Participant } from '@services/amountCalculationService';
 
 interface FairSplitParticipantsProps {
   participants: Participant[];

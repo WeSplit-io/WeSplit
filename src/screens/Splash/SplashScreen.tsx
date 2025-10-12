@@ -7,6 +7,7 @@ import { styles } from './styles';
 import { colors } from '../../theme';
 import { useApp } from '../../context/AppContext';
 import { auth } from '../../config/firebase';
+import { logger } from '../../services/loggingService';
 
 interface SplashScreenProps {
   navigation: any;
@@ -19,8 +20,38 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
   // Animation states
   const [progress] = useState(new Animated.Value(0));
   const [logoOpacity] = useState(new Animated.Value(0));
+  const [isAppInitialized, setIsAppInitialized] = useState(false);
 
   useEffect(() => {
+    // Initialize app and start animations
+    const initializeApp = async () => {
+      try {
+        // Initialize push notifications in background
+        const notificationPromise = import('../../services/notificationService')
+          .then(({ notificationService }) => notificationService.initializePushNotifications())
+          .then((initialized) => {
+            if (initialized) {
+              logger.info('Push notifications initialized successfully', null, 'SplashScreen');
+            } else {
+              logger.warn('Push notifications initialization failed - permissions may be denied', null, 'SplashScreen');
+            }
+          })
+          .catch((error) => {
+            logger.warn('Push notifications initialization failed', error, 'SplashScreen');
+          });
+
+        // Mark app as initialized
+        setIsAppInitialized(true);
+        logger.info('App initialized successfully', null, 'SplashScreen');
+        
+        // Let notifications initialize in background
+        notificationPromise;
+      } catch (error) {
+        logger.warn('App initialization warnings (non-blocking)', error, 'SplashScreen');
+        setIsAppInitialized(true);
+      }
+    };
+
     // Start animations
     const startAnimations = () => {
       console.log('🎬 Starting splash screen animations');
@@ -44,13 +75,14 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
       });
     };
 
+    initializeApp();
     startAnimations();
   }, []);
 
   useEffect(() => {
     const checkAuthAndNavigate = async () => {
       try {
-        // Wait a bit for Firebase auth to initialize
+        // Wait for app initialization and minimum splash screen duration
         await new Promise(resolve => setTimeout(resolve, 2000));
 
         // Check Firebase auth state

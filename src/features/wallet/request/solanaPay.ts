@@ -4,7 +4,7 @@
  */
 
 import { PublicKey } from '@solana/web3.js';
-import { USDC_MINT, TOKEN_DECIMALS } from '../../../config/tokens';
+import { USDC_MINT, TOKEN_DECIMALS } from '@config/tokens';
 
 export interface SolanaPayParams {
   recipient: string;

@@ -10,7 +10,8 @@ import {
   Keypair,
   PublicKey
 } from '@solana/web3.js';
-import { CURRENT_NETWORK, TRANSACTION_CONFIG } from '../../config/chain';
+import { getConfig } from '../../config/unified';
+import { TRANSACTION_CONFIG } from '../../config/transactionConfig';
 import { logger } from '../loggingService';
 
 export class TransactionUtils {
@@ -20,7 +21,7 @@ export class TransactionUtils {
   private currentEndpointIndex: number = 0;
 
   private constructor() {
-    this.rpcEndpoints = CURRENT_NETWORK.rpcEndpoints || [CURRENT_NETWORK.rpcUrl];
+    this.rpcEndpoints = getConfig().blockchain.rpcEndpoints || [getConfig().blockchain.rpcUrl];
     this.connection = this.createOptimizedConnection();
   }
 
@@ -35,9 +36,9 @@ export class TransactionUtils {
     const currentEndpoint = this.rpcEndpoints[this.currentEndpointIndex];
     
     return new Connection(currentEndpoint, {
-      commitment: CURRENT_NETWORK.commitment,
+      commitment: getConfig().blockchain.commitment,
       confirmTransactionInitialTimeout: TRANSACTION_CONFIG.timeout.transaction,
-      wsEndpoint: CURRENT_NETWORK.wsUrl,
+      wsEndpoint: getConfig().blockchain.wsUrl,
       disableRetryOnRateLimit: false,
       // Performance optimizations
       httpHeaders: {

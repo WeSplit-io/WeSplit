@@ -17,6 +17,7 @@ import NotificationCard from '../../components/NotificationCard';
 import { useApp } from '../../context/AppContext';
 import { notificationService, NotificationData } from '../../services/notificationService';
 import { firebaseDataService } from '../../services/firebaseDataService';
+import { logger } from '../../services/loggingService';
 import styles from './styles';
 import { colors } from '../../theme/colors';
 import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
@@ -40,7 +41,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         };
       }
     } catch (error) {
-      console.log('🔍 DEBUG: Error fetching user data:', error);
+      logger.error('Error fetching user data', error, 'NotificationsScreen');
     }
     
     // Return fallback data if user not found
@@ -86,7 +87,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const handleNotificationPress = async (notification: NotificationData) => {
-    console.log('🔍 NotificationsScreen: handleNotificationPress called with:', {
+    logger.debug('handleNotificationPress called', {
       notificationId: notification.id,
       notificationType: notification.type,
       notificationData: notification.data,
@@ -94,7 +95,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       fullNotification: notification
     });
     
-    console.log('🔍 NotificationsScreen: handleNotificationPress - notification type check:', {
+    logger.debug('handleNotificationPress - notification type check', {
       type: notification.type,
       isSplitInvite: notification.type === 'split_invite'
     });
@@ -117,9 +118,9 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       }
     } else if (notification.type === 'split_invite') {
       // Handle split invitation by accepting it first, then navigating to split details
-      console.log('🔍 NotificationsScreen: ENTERED split_invite handler in handleNotificationPress');
+      logger.debug('ENTERED split_invite handler in handleNotificationPress', null, 'NotificationsScreen');
       const splitId = notification.data?.splitId;
-      console.log('🔍 NotificationsScreen: Split invite notification data:', {
+      logger.debug('Split invite notification data', {
         notificationId: notification.id,
         splitId: splitId,
         notificationData: notification.data,
@@ -127,16 +128,16 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       });
       
       if (splitId) {
-        console.log('🔍 NotificationsScreen: Handling split invitation tap - accepting invitation first:', splitId);
+        logger.debug('Handling split invitation tap - accepting invitation first', { splitId }, 'NotificationsScreen');
         
         // Accept the invitation first, then navigate
         try {
           const result = await acceptSplitInvitation(notification.id, splitId);
-          console.log('🔍 NotificationsScreen: Split invitation accepted from tap:', result);
+          logger.debug('Split invitation accepted from tap', { result }, 'NotificationsScreen');
           
           if (result.success) {
             // Navigate to SplitDetails after successful acceptance
-            console.log('🔍 NotificationsScreen: About to navigate to SplitDetails with params:', {
+            logger.debug('About to navigate to SplitDetails with params', {
               splitId: splitId,
               isFromNotification: true,
               notificationId: notification.id,
@@ -152,7 +153,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                 isFromNotification: true,
                 notificationId: notification.id
               });
-              console.log('🔍 NotificationsScreen: Navigation call completed successfully');
+              logger.debug('Navigation call completed successfully', null, 'NotificationsScreen');
             } catch (navError) {
               console.error('🔍 NotificationsScreen: Navigation error in handleNotificationPress:', navError);
               Alert.alert('Navigation Error', 'Failed to navigate to split details. Please try again.');

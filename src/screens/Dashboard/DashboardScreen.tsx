@@ -37,6 +37,7 @@ import { walletService, UserWalletBalance } from '../../services/WalletService';
 import { firebaseTransactionService, firebaseDataService } from '../../services/firebaseDataService';
 import { generateProfileLink } from '../../services/deepLinkHandler';
 import { SplitStorageService } from '../../services/splitStorageService';
+import { logger } from '../../services/loggingService';
 import { db } from '../../config/firebase';
 import { getDoc, doc } from 'firebase/firestore';
 
@@ -71,7 +72,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         };
       }
     } catch (error) {
-      console.log('🔍 Dashboard: Error fetching user data:', error);
+      logger.error('Error fetching user data', error, 'DashboardScreen');
     }
     
     // Return fallback data if user not found
@@ -265,7 +266,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
     try {
       setLoadingUserWallet(true);
-      console.log(`💰 Dashboard: Loading user wallet balance... (attempt ${retryCount + 1})`);
+      logger.debug('Loading user wallet balance', { attempt: retryCount + 1 }, 'DashboardScreen');
 
       // First ensure the user has a wallet
       const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
@@ -289,7 +290,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
         // Check if we got a valid balance
         if (balance && balance.totalUSD !== undefined && balance.totalUSD !== null) {
-          console.log('💰 Dashboard: Balance loaded successfully:', balance.totalUSD, 'USD');
+          logger.debug('Balance loaded successfully', { totalUSD: balance.totalUSD }, 'DashboardScreen');
           setUserCreatedWalletBalance(balance);
           setBalanceLoaded(true);
           setConsecutiveFailures(0); // Reset failure counter on success
@@ -317,7 +318,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         errorMessage.includes('Wallet is marked as unrecoverable') ||
         errorMessage.includes('unrecoverable') ||
         errorMessage.includes('FIRESTORE') && errorMessage.includes('INTERNAL ASSERTION FAILED')) {
-        console.log(' Dashboard: Critical error detected, stopping retry loop:', errorMessage);
+        logger.error('Critical error detected, stopping retry loop', { errorMessage }, 'DashboardScreen');
         
         // Handle Firebase assertion failures more gracefully
         if (errorMessage.includes('FIRESTORE') && errorMessage.includes('INTERNAL ASSERTION FAILED')) {
@@ -348,14 +349,14 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                 style: 'cancel',
                 onPress: () => {
                   // User chose to cancel, keep the unrecoverable state
-                  console.log('User chose not to create new wallet');
+                  logger.debug('User chose not to create new wallet', null, 'DashboardScreen');
                 }
               },
               {
                 text: 'Create New Wallet',
                 onPress: async () => {
                   try {
-                    console.log('User chose to create new wallet');
+                    logger.debug('User chose to create new wallet', null, 'DashboardScreen');
                     // Call the new wallet creation method
                     const newWalletResult = await walletService.ensureUserWallet(currentUser.id.toString());
 
@@ -411,7 +412,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       // Auto-retry logic - but only for certain errors, not for User not found
       if (retryCount < 2) { // Reduced from 4 to 2 retries
         const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Reduced max delay to 3 seconds
-        console.log(`🔄 Dashboard: Auto-retrying balance load in ${delay}ms... (attempt ${retryCount + 1}/3)`);
+        logger.debug('Auto-retrying balance load', { delay, attempt: retryCount + 1, maxAttempts: 3 }, 'DashboardScreen');
         setConsecutiveFailures(prev => prev + 1);
         setTimeout(() => {
           loadUserCreatedWalletBalance(retryCount + 1);
@@ -442,7 +443,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   useEffect(() => {
     // Only load balance when user is authenticated and we have a user ID and haven't loaded yet
     if (currentUser?.id && isAuthenticated && !loadingUserWallet && !balanceLoaded) {
-      console.log('🚀 Dashboard: Initial balance load triggered');
+      logger.debug('Initial balance load triggered', null, 'DashboardScreen');
       loadUserCreatedWalletBalance();
     }
   }, [currentUser?.id, isAuthenticated, balanceLoaded, loadUserCreatedWalletBalance]); // Use balanceLoaded to prevent infinite loops
@@ -529,23 +530,23 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
     // Wait for notifications to be available
     if (!notifications) {
-      console.log('⏳ Dashboard: Waiting for notifications to load...');
+      logger.debug('Waiting for notifications to load', null, 'DashboardScreen');
       return;
     }
 
     // If we already have requests and this isn't a refresh, skip loading
     if (initialRequestsLoaded && paymentRequests.length > 0 && notifications.length === 0) {
-      console.log('⏭️ Dashboard: Skipping payment requests load - already loaded and no new notifications');
+      logger.debug('Skipping payment requests load - already loaded and no new notifications', null, 'DashboardScreen');
       return;
     }
 
     setLoadingPaymentRequests(true);
 
     try {
-      console.log('🔄 Dashboard: Loading payment requests...');
+      logger.debug('Loading payment requests', null, 'DashboardScreen');
       // Get actual payment requests from Firebase
       const actualPaymentRequests = await getReceivedPaymentRequests(currentUser.id, 10);
-      console.log('📊 Dashboard: Firebase payment requests:', actualPaymentRequests.length);
+      logger.debug('Firebase payment requests loaded', { count: actualPaymentRequests.length }, 'DashboardScreen');
 
       // Also include notifications of type 'payment_request', 'settlement_request' and 'payment_reminder'
       const notificationRequests = notifications ? notifications.filter(n =>
@@ -553,7 +554,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         n.type === 'settlement_request' ||
         n.type === 'payment_reminder'
       ) : [];
-      console.log('📊 Dashboard: Notification requests:', notificationRequests.length);
+      logger.debug('Notification requests loaded', { count: notificationRequests.length }, 'DashboardScreen');
 
       // Create a map to track processed requests to avoid duplicates
       const processedRequestIds = new Set<string>();
@@ -566,7 +567,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         .forEach(req => {
           const requestId = req.id;
           processedRequestIds.add(requestId);
-          console.log('📝 Dashboard: Added Firebase request:', requestId, req.senderName, req.amount);
+          logger.debug('Added Firebase request', { requestId, senderName: req.senderName, amount: req.amount }, 'DashboardScreen');
 
           allRequests.push({
             id: req.id,
@@ -598,7 +599,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           // Check if this notification corresponds to a Firebase payment request
           const requestId = n.data?.requestId;
           if (requestId && processedRequestIds.has(requestId)) {
-            console.log('🚫 Dashboard: Skipping duplicate notification:', requestId, n.data?.senderName, amount);
+            logger.debug('Skipping duplicate notification', { requestId, senderName: n.data?.senderName, amount }, 'DashboardScreen');
             return false; // Skip this notification as we already have the Firebase request
           }
 

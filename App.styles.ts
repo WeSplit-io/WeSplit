@@ -2,21 +2,6 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from './src/theme';
 
 export const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
-  },
-  loadingLogo: {
-    width: 80,
-    height: 80,
-    marginBottom: spacing.lg,
-  },
-  loadingText: {
-    fontSize: typography.fontSize.lg,
-    color: colors.text,
-  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',

@@ -5,9 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WalletProvider } from './src/context/WalletContext';
 import { AppProvider } from './src/context/AppContext';
 import { WalletLinkingProvider } from './src/context/WalletLinkingContext';
-import { Text, View, Image } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { styles } from './App.styles';
 import NavigationWrapper from './src/components/NavigationWrapper';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { logger } from './src/services/loggingService';
@@ -81,82 +79,7 @@ import ManualBillCreationScreen from './src/screens/ManualBillCreation/ManualBil
 const Stack = createStackNavigator();
 const queryClient = new QueryClient();
 
-// Loading Component
-const LoadingScreen = () => (
-  <View style={styles.loadingContainer}>
-    <Image 
-      source={require('./assets/wesplit-logo-new.png')} 
-      style={styles.loadingLogo}
-      resizeMode="contain"
-    />
-    <Text style={styles.loadingText}>Loading WeSplit...</Text>
-  </View>
-);
-
-// App.tsx loaded - initializing Firebase and Solana wallet system
-
 export default function App() {
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        // Firebase is automatically initialized when the config file is imported
-        
-        // Initialize push notifications
-        const { notificationService } = await import('./src/services/notificationService');
-        const notificationInitialized = await notificationService.initializePushNotifications();
-        if (notificationInitialized) {
-          logger.info('Push notifications initialized successfully', null, 'App');
-        } else {
-          logger.warn('Push notifications initialization failed - permissions may be denied', null, 'App');
-        }
-        
-        // Initialize Solana wallet system
-        logger.info('App initialized successfully', null, 'App');
-        setIsInitialized(true);
-      } catch (error) {
-        // In development, log as warning instead of error
-        if (process.env.NODE_ENV === 'development') {
-          logger.warn('App initialization warnings (non-blocking in development)', error, 'App');
-          setIsInitialized(true);
-        } else {
-          logger.error('Failed to initialize app', error, 'App');
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          setError(errorMessage);
-          setIsInitialized(true);
-        }
-      }
-    };
-
-    initializeApp();
-  }, []);
-
-  // Set up deep link listeners when app is initialized
-  useEffect(() => {
-    if (isInitialized) {
-      // This will be set up in the NavigationContainer
-      // Deep link system ready
-    }
-  }, [isInitialized]);
-
-  // App component rendered
-
-  if (!isInitialized) {
-    return <LoadingScreen />;
-  }
-
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Failed to initialize: {error}</Text>
-        <Text style={styles.errorSubtext}>
-          This might be due to Firebase configuration issues.
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <ErrorBoundary>
