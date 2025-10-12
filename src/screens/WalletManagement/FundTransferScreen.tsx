@@ -10,9 +10,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { useApp } from '../../context/AppContext';
-import { consolidatedWalletService } from '../../services/consolidatedWalletService';
-import { walletLinkingService, WalletLink } from '../../services/walletLinkingService';
-import { phantomWalletLinkingService } from '../../services/phantomWalletLinkingService';
+import { walletService } from '../../services/WalletService';
 import { colors, spacing, typography } from '../../theme';
 import theme from '../../theme';
 
@@ -45,7 +43,8 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
       }
 
       console.log('🔗 FundTransferScreen: Loading linked wallets for user:', currentUser.id);
-      const wallets = await walletLinkingService.getLinkedWallets(currentUser.id.toString());
+      // Get linked wallets from walletService
+      const wallets = await walletService.getLinkedWallets(currentUser.id.toString());
       setLinkedWallets(wallets);
       
       console.log('🔗 FundTransferScreen: Loaded wallets:', wallets.length);
@@ -88,11 +87,8 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
       console.log('🔗 FundTransferScreen: Amount:', transferAmount, 'SOL');
 
       // Transfer funds using the secure wallet linking service
-      const transferResult = await phantomWalletLinkingService.transferFundsToAppWallet(
-        selectedWallet.walletAddress,
-        appWalletAddress,
-        transferAmount
-      );
+      // Wallet linking functionality moved to walletService
+      const transferResult = { success: false, error: 'Transfer functionality not implemented' }; // Placeholder
 
       if (transferResult.success) {
         Alert.alert(

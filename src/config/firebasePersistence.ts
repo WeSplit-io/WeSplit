@@ -12,17 +12,18 @@ import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/aut
  */
 export function initializeFirebaseAuth(app: any) {
   try {
-    // Try to get existing auth instance first
-    return getAuth(app);
+    // Always try to initialize with AsyncStorage persistence first
+    return initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage)
+    });
   } catch (error) {
-    // If no auth instance exists, initialize with AsyncStorage persistence
+    // If initialization fails (e.g., already initialized), try to get existing instance
     try {
-      return initializeAuth(app, {
-        persistence: getReactNativePersistence(AsyncStorage)
-      });
-    } catch (persistenceError) {
-      // Fallback to basic initialization if persistence fails
-      console.warn('Failed to initialize Firebase Auth with persistence, using basic initialization:', persistenceError);
+      console.log('Firebase Auth already initialized, getting existing instance');
+      return getAuth(app);
+    } catch (getAuthError) {
+      // If both fail, fallback to basic initialization
+      console.warn('Failed to initialize Firebase Auth with persistence, using basic initialization:', getAuthError);
       return initializeAuth(app);
     }
   }

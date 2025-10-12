@@ -19,7 +19,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenSpinStyles';
 import { useApp } from '../../context/AppContext';
-import { NotificationService } from '../../services/notificationService';
+import { notificationService } from '../../services/notificationService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -115,7 +115,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
         return;
       }
 
-      const notificationResult = await NotificationService.sendBulkNotifications(
+      const notificationResult = await notificationService.sendBulkNotifications(
         participantIds,
         'split_spin_available',
         {
@@ -209,13 +209,13 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
 
       // Send notifications to all participants about the roulette result
       try {
-        const { NotificationService } = await import('../../services/notificationService');
+        const { notificationService } = await import('../../services/notificationService');
         const billName = splitData?.title || billData?.title || 'Degen Split';
         const winnerId = baseParticipantCards[finalIndex].userId;
         const winnerName = baseParticipantCards[finalIndex].name;
 
         // Send winner notification
-        await NotificationService.sendWinnerNotification(
+        await notificationService.sendNotification(
           winnerId,
           splitWallet.id,
           billName
@@ -228,7 +228,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
           .filter(id => id);
 
         if (loserIds.length > 0) {
-          await NotificationService.sendBulkNotifications(
+          await notificationService.sendBulkNotifications(
             loserIds,
             'split_loser',
             {

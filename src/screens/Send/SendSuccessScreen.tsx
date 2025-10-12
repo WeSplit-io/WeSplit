@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
-import { NotificationCompletionService } from '../../services/notificationCompletionService';
+import { notificationService } from '../../services/notificationService';
 
 const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, wallet, destinationType, amount, description, groupId, transactionId, isSettlement, fromNotification, notificationId } = route.params || {};

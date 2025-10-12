@@ -7,7 +7,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { consolidatedWalletService, TransactionParams as ConsolidatedTransactionParams, TransactionResult as ConsolidatedTransactionResult } from '../services/consolidatedWalletService';
+import { walletService, WalletInfo as ConsolidatedWalletInfo } from '../services/WalletService';
 import { consolidatedTransactionService } from '../services/consolidatedTransactionService';
 import { solanaWalletService } from '../wallet/solanaWallet';
 
@@ -230,7 +230,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const refreshBalance = async () => {
     try {
       if (isConnected && address) {
-        const info = await consolidatedWalletService.getWalletInfo();
+        const info = await walletService.getWalletInfo();
         setBalance(info.balance || null);
       }
     } catch (error) {
@@ -244,7 +244,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setIsLoading(true);
       
       // Import the wallet using the AppKit service
-      const walletInfo = await consolidatedWalletService.getWalletInfo();
+      const walletInfo = await walletService.getWalletInfo();
       
       setIsConnected(true);
       setAddress(walletInfo.address);
@@ -297,7 +297,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setIsLoading(true);
       
       // Connect to the specific wallet provider
-      const walletInfo = await consolidatedWalletService.connectToProvider(providerKey);
+      const walletInfo = await walletService.connectToProvider(providerKey);
       
       setIsConnected(true);
       setAddress(walletInfo.address);
@@ -328,12 +328,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   // Get available wallet providers
   const getAvailableProviders = () => {
-    return consolidatedWalletService.getAvailableProviders();
+    return walletService.getAvailableProviders();
   };
 
   // Check if a provider is available
   const isProviderAvailable = (providerKey: string) => {
-    return true; // TODO: Implement provider availability check
+    // Check if the provider is in the available providers list
+    return availableWallets.some(wallet => wallet.name === providerKey);
   };
 
   const handleConnectWallet = async () => {
@@ -350,7 +351,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       }
       
       // Generate a new wallet if no stored wallets
-      const createWalletResult = await consolidatedWalletService.getWalletInfo();
+      const createWalletResult = await walletService.getWalletInfo();
       const wallet = createWalletResult.wallet;
       
       // Create a new stored wallet entry
@@ -421,11 +422,11 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       if (__DEV__) { console.log('WalletProvider: disconnectWallet called'); }
       setIsLoading(true);
       
-      await consolidatedWalletService.disconnect();
+      await walletService.disconnect();
       
       // Also disconnect from Solana service and AppKit provider
       await solanaWalletService.clearWallet();
-      await consolidatedWalletService.disconnect();
+      await walletService.disconnect();
       
       if (__DEV__) { console.log('Disconnecting wallet...'); }
       setIsConnected(false);
@@ -467,7 +468,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setIsLoading(true);
       
       // Validate the secret key by trying to import it using AppKit
-      const walletInfo = await consolidatedWalletService.getWalletInfo();
+      const walletInfo = await walletService.getWalletInfo();
       
       // Create new stored wallet entry
       const newWallet: StoredWallet = {
@@ -522,8 +523,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const ensureAppWallet = async (userId: string) => {
     try {
       // Import userWalletService to ensure app wallet
-      const { userWalletService } = await import('../services/userWalletService');
-      const walletResult = await userWalletService.ensureUserWallet(userId);
+      const { walletService } = await import('../services/WalletService');
+      const walletResult = await walletService.ensureUserWallet(userId);
       
       if (walletResult.success && walletResult.wallet) {
         setAppWalletAddress(walletResult.wallet.address);
@@ -541,8 +542,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const getAppWalletBalance = async (userId: string): Promise<number> => {
     try {
       // Import userWalletService to get app wallet balance
-      const { userWalletService } = await import('../services/userWalletService');
-      const balance = await userWalletService.getUserWalletBalance(userId);
+      const { walletService } = await import('../services/WalletService');
+      const balance = await walletService.getUserWalletBalance(userId);
       
       const totalUSD = balance?.totalUSD || 0;
       setAppWalletBalance(totalUSD);
@@ -557,8 +558,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const exportAppWallet = async (userId: string) => {
     try {
       // Import userWalletService to export app wallet
-      const { userWalletService } = await import('../services/userWalletService');
-      const result = await userWalletService.exportWallet(userId);
+      const { walletService } = await import('../services/WalletService');
+      const result = await walletService.exportWallet(userId);
       
       if (result.success) {
         console.log('🔍 WalletProvider: Successfully exported app wallet:', {
@@ -583,8 +584,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const getAppWalletInfo = async (userId: string) => {
     try {
       // Import userWalletService to get app wallet info
-      const { userWalletService } = await import('../services/userWalletService');
-      const result = await userWalletService.getWalletInfo(userId);
+      const { walletService } = await import('../services/WalletService');
+      const result = await walletService.getWalletInfoForUser(userId);
       
       if (result.success && result.walletAddress) {
         setAppWalletAddress(result.walletAddress);
@@ -612,8 +613,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const fixAppWalletMismatch = async (userId: string) => {
     try {
       // Import userWalletService to fix wallet mismatch
-      const { userWalletService } = await import('../services/userWalletService');
-      const result = await userWalletService.fixWalletMismatch(userId);
+      const { walletService } = await import('../services/WalletService');
+      const result = await walletService.fixWalletMismatch(userId);
       
       if (result.success && result.wallet) {
         setAppWalletAddress(result.wallet.address);
@@ -656,8 +657,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
         // Refresh app wallet balance
         if (appWalletConnected) {
-          const { userWalletService } = await import('../services/userWalletService');
-          const balance = await userWalletService.getUserWalletBalance(userId);
+          const { walletService } = await import('../services/WalletService');
+          const balance = await walletService.getUserWalletBalance(userId);
           
           if (balance) {
             setAppWalletBalance(balance.totalUSD);
@@ -877,7 +878,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     connectExternalWalletWithAuth: async (providerName: string) => {
       try {
         setIsLoading(true);
-        const result = await consolidatedWalletService.connectToProvider(providerName);
+        const result = await walletService.connectToProvider(providerName);
         
         if (result.success && result.walletAddress) {
           setIsConnected(true);

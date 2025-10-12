@@ -13,10 +13,8 @@ import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
 import { useWallet } from '../../context/WalletContext';
-import { consolidatedWalletService } from '../../services/consolidatedWalletService';
+import { walletService } from '../../services/WalletService';
 import { firebaseDataService } from '../../services/firebaseDataService';
-import { userWalletService } from '../../services/userWalletService';
-import { secureSeedPhraseService } from '../../services/secureSeedPhraseService';
 import { useApp } from '../../context/AppContext';
 
 const SeedPhraseViewScreen: React.FC = () => {
@@ -52,7 +50,8 @@ const SeedPhraseViewScreen: React.FC = () => {
         console.log('🔐 SeedPhraseView: Retrieving seed phrase from secure device storage...');
         
         // Initialize secure wallet if needed
-        const { address, isNew } = await secureSeedPhraseService.initializeSecureWallet(currentUser.id.toString());
+        // Initialize secure wallet
+        const { address, isNew } = await walletService.initializeSecureWallet(currentUser.id.toString());
         
         if (isNew) {
           console.log('🔐 SeedPhraseView: New secure wallet created for user:', currentUser.id);
@@ -61,11 +60,12 @@ const SeedPhraseViewScreen: React.FC = () => {
         }
 
         // Get the seed phrase from secure device storage
-        const mnemonic = await secureSeedPhraseService.getSeedPhraseSecurely();
+        // Get seed phrase from walletService
+        const mnemonic = await walletService.getSeedPhrase(currentUser.id.toString());
         
-        if (mnemonic && secureSeedPhraseService.validateSeedPhrase(mnemonic)) {
+        if (mnemonic) {
           // Format seed phrase for display
-          const seedPhraseWords = secureSeedPhraseService.formatSeedPhraseForDisplay(mnemonic);
+          const seedPhraseWords = mnemonic.split(' ');
           setSeedPhrase(seedPhraseWords);
           console.log('🔐 SeedPhraseView: Seed phrase retrieved successfully from device storage');
         } else {
@@ -128,7 +128,8 @@ const SeedPhraseViewScreen: React.FC = () => {
   };
 
   const handleShowExportInstructions = () => {
-    const instructions = secureSeedPhraseService.getExportInstructions();
+    // Get export instructions from walletService
+    const instructions = walletService.getExportInstructions();
     Alert.alert(
       'Export to External Wallets',
       instructions,

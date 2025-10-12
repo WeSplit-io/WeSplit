@@ -20,7 +20,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
 import { SplitWalletService, SplitWallet } from '../../services/splitWalletService';
-import { NotificationService } from '../../services/notificationService';
+import { notificationService } from '../../services/notificationService';
 import { priceManagementService } from '../../services/priceManagementService';
 import { useApp } from '../../context/AppContext';
 import { AmountCalculationService, Participant } from '../../services/amountCalculationService';
@@ -522,8 +522,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           
           // Send completion notifications (only if not already sent)
           try {
-            const { NotificationService } = await import('../../services/notificationService');
-            await NotificationService.sendBulkNotifications(
+            const { notificationService } = await import('../../services/notificationService');
+            await notificationService.sendBulkNotifications(
               wallet.participants.map(p => p.userId),
               'split_payment_required', // Use existing notification type
               {
@@ -827,7 +827,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     const participantIds = wallet.participants.map(p => p.userId);
     const billName = billInfo.name.data; // Use DataSourceService
 
-    await NotificationService.sendBulkNotifications(
+    await notificationService.sendBulkNotifications(
       participantIds,
       'split_payment_required',
       {
@@ -1211,12 +1211,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         setIsSplitConfirmed(true);
         
         // Send notifications to all participants (except the creator)
-        const { sendNotification } = await import('../../services/firebaseNotificationService');
+        const { notificationService } = await import('../../services/notificationService');
         const notificationPromises = participants
           .filter(p => p.id !== currentUser?.id.toString()) // Don't notify the creator
           .map(async (participant) => {
             try {
-              await sendNotification(
+              await notificationService.sendNotification(
                 participant.id,
                 'Split Confirmed - Time to Pay!',
                 `The split for "${processedBillData?.title || billData?.title || 'Restaurant Night'}" has been confirmed. You owe ${participant.amountOwed.toFixed(2)} USDC. Tap to pay your share!`,

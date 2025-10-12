@@ -39,7 +39,7 @@ import { SplitWalletService } from '../../services/splitWalletService';
 import { FallbackDataService } from '../../utils/fallbackDataService';
 import { MockupDataService } from '../../data/mockupData';
 import { QRCodeService } from '../../services/qrCodeService';
-import { sendNotification } from '../../services/firebaseNotificationService';
+import { notificationService } from '../../services/notificationService';
 import UserAvatar from '../../components/UserAvatar';
 import QRCode from 'react-native-qrcode-svg';
 import {
@@ -1120,7 +1120,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           inviterId: currentUser.id.toString()
         });
 
-        await sendNotification(
+        await notificationService.sendNotification(
           recipientUserId, // Use the found user ID
           `You're invited to split "${billName}"`,
           `${currentUser.name} invited you to split a bill for ${formatCurrencyAmount(parseFloat(totalAmount), processedBillData?.currency || billData?.currency || 'USD')}. Tap to join!`,
@@ -1256,7 +1256,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           }
 
           // Send confirmation notification
-          await sendNotification(
+          await notificationService.sendNotification(
             userId,
             'Welcome to the split!',
             `You've successfully joined "${billName}". The split is ready to begin!`,
@@ -1270,7 +1270,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         }
       } else {
         // Send decline notification to creator
-        await sendNotification(
+        await notificationService.sendNotification(
           currentUser?.id.toString() || '',
           'Invitation Declined',
           `${invitedUsers.find(u => u.id === userId)?.name} declined your invitation to split "${billName}".`,

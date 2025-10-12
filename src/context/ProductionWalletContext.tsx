@@ -6,7 +6,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { consolidatedTransactionService, TransactionParams, TransactionResult } from '../services/consolidatedTransactionService';
 import { Keypair } from '@solana/web3.js';
-import { secureStorageService } from '../services/secureStorageService';
+import { walletService } from '../services/WalletService';
 
 interface ProductionWalletState {
   isConnected: boolean;
@@ -71,7 +71,9 @@ export const ProductionWalletProvider: React.FC<ProductionWalletProviderProps> =
       }));
 
       // Try to restore wallet from secure storage
-      const storedWallet = await secureStorageService.getWallet();
+      // Note: This context should be used with a specific user ID
+      const currentUserId = 'production-user'; // This should be passed from the parent component
+      const storedWallet = await walletService.getUserWallet(currentUserId);
       if (storedWallet && storedWallet.secretKey) {
         try {
           const keypair = Keypair.fromSecretKey(
@@ -82,7 +84,7 @@ export const ProductionWalletProvider: React.FC<ProductionWalletProviderProps> =
         } catch (error) {
           console.warn('Failed to restore wallet:', error);
           // Clear invalid wallet data
-          await secureStorageService.clearWallet();
+          await walletService.clearWalletDataForUser(currentUserId);
         }
       }
     } catch (error) {
@@ -105,7 +107,7 @@ export const ProductionWalletProvider: React.FC<ProductionWalletProviderProps> =
       const balance = await consolidatedTransactionService.getWalletBalance();
 
       // Store wallet securely
-      await secureStorageService.storeWallet({
+      await walletService.storeWalletSecurelyPublic('current', {
         address: walletInfo.address,
         publicKey: walletInfo.publicKey,
         secretKey: JSON.stringify(Array.from(keypair.secretKey)),
@@ -138,7 +140,8 @@ export const ProductionWalletProvider: React.FC<ProductionWalletProviderProps> =
   const disconnectWallet = useCallback(async () => {
     try {
       // Clear secure storage
-      await secureStorageService.clearWallet();
+      const currentUserId = 'production-user'; // This should be passed from the parent component
+      await walletService.clearWalletDataForUser(currentUserId);
       
       // Clear transaction service wallet
       consolidatedTransactionService.setWallet(null as any);
@@ -180,15 +183,13 @@ export const ProductionWalletProvider: React.FC<ProductionWalletProviderProps> =
         });
       }
 
-      // Send transaction based on currency
+      // Send transaction - WeSplit only supports USDC transfers
       let result: TransactionResult;
       
-      if (params.currency === 'SOL') {
-        result = await consolidatedTransactionService.sendSolTransaction(params);
-      } else if (params.currency === 'USDC') {
+      if (params.currency === 'USDC') {
         result = await consolidatedTransactionService.sendUsdcTransaction(params);
       } else {
-        throw new Error(`Unsupported currency: ${params.currency}`);
+        throw new Error(`WeSplit only supports USDC transfers. SOL transfers are not supported within the app.`);
       }
 
       // Refresh balance after successful transaction

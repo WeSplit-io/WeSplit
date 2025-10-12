@@ -40,7 +40,7 @@ import {
   runTransaction
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { sendNotification } from './firebaseNotificationService';
+import { notificationService } from './notificationService';
 
 // Data transformation utilities
 export const firebaseDataTransformers = {
@@ -1760,7 +1760,7 @@ export const firebaseGroupService = {
           }
         });
         
-        await sendNotification(
+        await notificationService.sendNotification(
           invitedUserId,
           'Group Invitation',
           `${invitedByUserName} has invited you to join the group "${groupName}"`,
@@ -1959,7 +1959,7 @@ export const firebaseGroupService = {
       const senderName = senderDoc.exists() ? senderDoc.data().name : 'Unknown';
       
       // Send notification to recipient
-      await sendNotification(
+      await notificationService.sendNotification(
         recipientId,
         'Group Payment Request',
         `${senderName} has requested ${amount} ${currency} in ${groupName}${description ? ` for ${description}` : ''}`,
@@ -2002,7 +2002,7 @@ export const firebaseGroupService = {
       const addedByName = addedByDoc.exists() ? addedByDoc.data().name : 'Unknown';
       
       // Send notification to added user
-      await sendNotification(
+      await notificationService.sendNotification(
         addedUserId,
         'Added to Group',
         `${addedByName} has added you to the group "${groupName}"`,
@@ -2109,7 +2109,7 @@ export const firebaseExpenseService = {
                 }
                 
                 // Send payment request notification
-                await sendNotification(
+                await notificationService.sendNotification(
                   memberId,
                   'Payment Request',
                   `${payerName} has added an expense of ${expenseData.amount} ${expenseData.currency} in ${groupName}. You owe ${amountPerPerson.toFixed(4)} ${expenseData.currency}.`,
@@ -2310,7 +2310,7 @@ export const firebaseTransactionService = {
       const senderName = senderDoc.exists() ? senderDoc.data().name : 'Unknown';
       
       // Send notification to recipient
-      await sendNotification(
+      await notificationService.sendNotification(
         recipientId,
         'Payment Received',
         `You received ${amount} ${currency} from ${senderName}`,
@@ -2334,6 +2334,7 @@ export const firebaseTransactionService = {
 };
 
 // Notification services
+// Notification services moved to NotificationService.ts
 export const firebaseNotificationService = {
   getUserNotifications: async (userId: string): Promise<Notification[]> => {
     try {
@@ -2405,7 +2406,7 @@ export const firebaseSystemService = {
     try {
       if (__DEV__) { console.log('🔥 Sending system warning:', { userId, warningType, message }); }
       
-      await sendNotification(
+      await notificationService.sendNotification(
         userId,
         'System Warning',
         message,
@@ -2433,7 +2434,7 @@ export const firebaseSystemService = {
     try {
       if (__DEV__) { console.log('🔥 Sending system notification:', { userId, title, message }); }
       
-      await sendNotification(
+      await notificationService.sendNotification(
         userId,
         title,
         message,
@@ -2719,7 +2720,7 @@ export const firebaseSettlementService = {
       await addDoc(collection(db, 'reminders'), reminderData);
       
       // Send notification to recipient
-      await sendNotification(
+      await notificationService.sendNotification(
         recipientId,
         'Payment Reminder',
         `${senderData.name} is reminding you about a $${amount.toFixed(2)} payment in ${groupData.name}`,
@@ -2815,7 +2816,7 @@ export const firebaseSettlementService = {
           batch.set(reminderRef, reminderData);
           
           // Send notification
-          await sendNotification(
+          await notificationService.sendNotification(
             debtor.recipientId,
             'Payment Reminder',
             `${senderData.name} is reminding you about a $${debtor.amount.toFixed(2)} payment in ${groupData.name}`,
@@ -2923,6 +2924,128 @@ export const firebaseMultiSigService = {
       if (__DEV__) { console.error('🔥 Error getting user multi-signature transactions:', error); }
       throw error;
     }
+  },
+
+  createMultiSigWallet: async (userId: string, walletData: any): Promise<{ success: boolean; wallet?: any; error?: string }> => {
+    try {
+      if (__DEV__) { console.log('🔥 Creating multi-signature wallet for user:', userId); }
+      
+      const walletRef = await addDoc(collection(db, 'multiSigWallets'), {
+        ...walletData,
+        owners: [userId],
+        created_at: serverTimestamp(),
+        created_by: userId
+      });
+      
+      if (__DEV__) { console.log('🔥 Multi-signature wallet created:', walletRef.id); }
+      
+      return { success: true, wallet: { id: walletRef.id, ...walletData } };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error creating multi-signature wallet:', error); }
+      return { success: false, error: 'Failed to create multi-signature wallet' };
+    }
+  },
+
+  approveMultiSigTransaction: async (transactionId: string, userId: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      if (__DEV__) { console.log('🔥 Approving multi-signature transaction:', transactionId, 'by user:', userId); }
+      
+      const transactionRef = doc(db, 'multiSigTransactions', transactionId);
+      await updateDoc(transactionRef, {
+        [`approvals.${userId}`]: true,
+        updated_at: serverTimestamp()
+      });
+      
+      if (__DEV__) { console.log('🔥 Multi-signature transaction approved'); }
+      
+      return { success: true };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error approving multi-signature transaction:', error); }
+      return { success: false, error: 'Failed to approve multi-signature transaction' };
+    }
+  },
+
+  rejectMultiSigTransaction: async (transactionId: string, userId: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      if (__DEV__) { console.log('🔥 Rejecting multi-signature transaction:', transactionId, 'by user:', userId); }
+      
+      const transactionRef = doc(db, 'multiSigTransactions', transactionId);
+      await updateDoc(transactionRef, {
+        [`rejections.${userId}`]: true,
+        status: 'rejected',
+        updated_at: serverTimestamp()
+      });
+      
+      if (__DEV__) { console.log('🔥 Multi-signature transaction rejected'); }
+      
+      return { success: true };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error rejecting multi-signature transaction:', error); }
+      return { success: false, error: 'Failed to reject multi-signature transaction' };
+    }
+  }
+};
+
+// Linked wallet services (Firebase implementations)
+export const firebaseLinkedWalletService = {
+  getLinkedWallets: async (userId: string): Promise<any[]> => {
+    try {
+      if (__DEV__) { console.log('🔥 Getting linked wallets for user:', userId); }
+      
+      const walletsRef = collection(db, 'linkedWallets');
+      const walletsQuery = query(
+        walletsRef,
+        where('userId', '==', userId),
+        orderBy('created_at', 'desc')
+      );
+      
+      const walletsSnapshot = await getDocs(walletsQuery);
+      const wallets = walletsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      if (__DEV__) { console.log('🔥 Retrieved linked wallets:', wallets.length); }
+      
+      return wallets;
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting linked wallets:', error); }
+      throw error;
+    }
+  },
+
+  addLinkedWallet: async (userId: string, walletData: any): Promise<{ success: boolean; error?: string }> => {
+    try {
+      if (__DEV__) { console.log('🔥 Adding linked wallet for user:', userId); }
+      
+      await addDoc(collection(db, 'linkedWallets'), {
+        ...walletData,
+        userId,
+        created_at: serverTimestamp()
+      });
+      
+      if (__DEV__) { console.log('🔥 Linked wallet added successfully'); }
+      
+      return { success: true };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error adding linked wallet:', error); }
+      return { success: false, error: 'Failed to add linked wallet' };
+    }
+  },
+
+  removeLinkedWallet: async (userId: string, walletId: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      if (__DEV__) { console.log('🔥 Removing linked wallet:', walletId, 'for user:', userId); }
+      
+      await deleteDoc(doc(db, 'linkedWallets', walletId));
+      
+      if (__DEV__) { console.log('🔥 Linked wallet removed successfully'); }
+      
+      return { success: true };
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error removing linked wallet:', error); }
+      return { success: false, error: 'Failed to remove linked wallet' };
+    }
   }
 };
 
@@ -2935,5 +3058,6 @@ export const firebaseDataService = {
   notification: firebaseNotificationService,
   settlement: firebaseSettlementService,
   multiSig: firebaseMultiSigService,
+  linkedWallet: firebaseLinkedWalletService,
   transformers: firebaseDataTransformers
 }; 

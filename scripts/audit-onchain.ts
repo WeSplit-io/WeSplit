@@ -75,9 +75,7 @@ class OnChainAuditor {
     console.log('📱 Auditing wallet implementation...');
     
     const walletFiles = [
-      'src/services/userWalletService.ts',
-      'src/services/consolidatedWalletService.ts',
-      'src/services/secureStorageService.ts',
+      'src/services/WalletService.ts',
       'src/wallet/solanaWallet.ts'
     ];
 
@@ -207,7 +205,7 @@ class OnChainAuditor {
     console.log('🔒 Auditing security practices...');
     
     const securityFiles = [
-      'src/services/secureStorageService.ts',
+      'src/services/WalletService.ts',
       'src/wallet/solanaWallet.ts'
     ];
 

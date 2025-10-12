@@ -13,7 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
-import { consolidatedWalletService, WalletProvider } from '../../services/consolidatedWalletService';
+import { walletService, WalletProvider } from '../../services/WalletService';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
 
@@ -55,7 +55,7 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
       setError(null);
       console.log('🔍 ExternalWalletConnection: Loading providers...');
       
-      const availableProviders = await consolidatedWalletService.getAvailableProviders();
+      const availableProviders = await walletService.getAvailableProviders();
       console.log('🔍 ExternalWalletConnection: Available providers:', availableProviders.map(p => `${p.name} (${p.isAvailable ? 'Available' : 'Not Available'})`));
       
       setProviders(availableProviders);
@@ -77,16 +77,13 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
         throw new Error('User not authenticated');
       }
 
-      // Use the signature-based linking with userId
-      const result = await consolidatedWalletService.connectToProvider(
-        provider.name, 
-        currentUser.id.toString()
-      );
+      // Connect to external wallet provider
+      const result = await walletService.connectToProvider(provider.name);
 
-      if (result.success) {
+      if (result && result.address) {
         Alert.alert(
           'Wallet Connected',
-          `Successfully connected to ${provider.name}!\n\nWallet Address: ${result.walletAddress?.substring(0, 8)}...`,
+          `Successfully connected to ${provider.name}!\n\nWallet Address: ${result.address?.substring(0, 8)}...`,
           [{ 
             text: 'OK',
             onPress: () => {
@@ -95,42 +92,13 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
             }
           }]
         );
-      } else if (result.error === 'MANUAL_INPUT_REQUIRED') {
-        // Navigate to manual signature input screen
-        console.log('🔗 ExternalWalletConnection: Navigating to manual signature input');
-        console.log('🔗 ExternalWalletConnection: Challenge data:', result.challenge);
-        console.log('🔗 ExternalWalletConnection: Provider:', provider.name);
-        
-        // Show user-friendly instructions
-        Alert.alert(
-          'Wallet Opened',
-          `We've opened ${provider.name} for you. Since ${provider.name} doesn't automatically show signature requests, please:\n\n1. Unlock your wallet if needed\n2. Go to the "Sign Message" or "Message" section\n3. Copy and sign this message:\n\n"${result.challenge?.message || 'WeSplit Wallet Linking Challenge'}"\n\n4. Copy the signature and return to WeSplit`,
-          [
-            { 
-              text: 'I Have the Signature', 
-              onPress: () => {
-                console.log('🔗 ExternalWalletConnection: User continuing to manual signature input');
-                // Navigate to manual signature input screen
-                navigation.navigate('ManualSignatureInput', {
-                  challenge: result.challenge,
-                  provider: provider.name,
-                  providerDisplayName: provider.displayName || provider.name
-                });
-              }
-            },
-            { text: 'Cancel', style: 'cancel' }
-          ]
-        );
-        return; // Don't throw error, this is expected behavior
       } else {
-        // Show a more user-friendly error message
-        const errorMessage = result.error || 'Connection failed';
+        // Handle connection failure
         Alert.alert(
           'Connection Failed',
-          `Failed to connect to ${provider.name}: ${errorMessage}`,
+          'Failed to connect to the external wallet. Please try again.',
           [{ text: 'OK' }]
         );
-        return; // Don't throw error, just show alert
       }
     } catch (error) {
       console.error('❌ ExternalWalletConnection: Connection failed:', error);

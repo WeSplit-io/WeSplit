@@ -14,8 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
 import NotificationCard from '../../components/NotificationCard';
 import { useApp } from '../../context/AppContext';
-import { UnifiedNotificationService, NotificationData } from '../../services/unifiedNotificationService';
-import { NotificationNavigationService } from '../../services/notificationNavigationService';
+import { notificationService, NotificationData } from '../../services/notificationService';
 import styles from './styles';
 import { colors } from '../../theme/colors';
 

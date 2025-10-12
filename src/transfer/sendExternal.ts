@@ -115,12 +115,15 @@ class ExternalTransferService {
         };
       }
 
-      // Build and send transaction
+      // Build and send transaction - WeSplit only supports USDC transfers
       let result: ExternalTransferResult;
-      if (params.currency === 'SOL') {
-        result = await this.sendSolTransfer(params, recipientAmount, companyFee);
-      } else {
+      if (params.currency === 'USDC') {
         result = await this.sendUsdcTransfer(params, recipientAmount, companyFee);
+      } else {
+        result = {
+          success: false,
+          error: 'WeSplit only supports USDC transfers. SOL transfers are not supported within the app.'
+        };
       }
 
       if (result.success) {
@@ -203,7 +206,7 @@ class ExternalTransferService {
   }> {
     try {
       const balance = await solanaWalletService.getBalance();
-      const currentBalance = currency === 'SOL' ? balance.sol : balance.usdc;
+      const currentBalance = balance.usdc; // WeSplit only supports USDC
       
       // Calculate total required amount (including company fee)
       const { fee: companyFee } = FeeService.calculateCompanyFee(amount);
@@ -226,86 +229,22 @@ class ExternalTransferService {
   }
 
   /**
-   * Send SOL transfer
+   * SOL transfers are not supported in WeSplit app
+   * Only USDC transfers are allowed within the app
    */
   private async sendSolTransfer(
     params: ExternalTransferParams, 
     recipientAmount: number, 
     companyFee: number
   ): Promise<ExternalTransferResult> {
-    try {
-      const fromPublicKey = new PublicKey(solanaWalletService.getPublicKey()!);
-      const toPublicKey = new PublicKey(params.to);
-      const lamports = recipientAmount * LAMPORTS_PER_SOL;
-
-      // Get recent blockhash
-      const { blockhash } = await this.connection.getLatestBlockhash();
-
-      // Use centralized fee payer logic - Company pays SOL gas fees
-      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
-
-      // Create transaction with proper fee payer
-      const transaction = new Transaction({
-        recentBlockhash: blockhash,
-        feePayer: feePayerPublicKey // Company pays SOL gas fees, user pays company fees
-      });
-
-      // Add priority fee
-      const priorityFee = this.getPriorityFee(params.priority || 'medium');
-      if (priorityFee > 0) {
-        transaction.add(
-          ComputeBudgetProgram.setComputeUnitPrice({
-            microLamports: priorityFee,
-          })
-        );
-      }
-
-      // Add transfer instruction
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: fromPublicKey,
-          toPubkey: toPublicKey,
-          lamports: lamports
-        })
-      );
-
-      // Add memo if provided
-      if (params.memo) {
-        transaction.add(
-          new TransactionInstruction({
-            keys: [{ pubkey: fromPublicKey, isSigner: true, isWritable: true }],
-            data: Buffer.from(params.memo, 'utf8'),
-            programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
-          })
-        );
-      }
-
-      // Sign and send transaction
-      const signature = await sendAndConfirmTransaction(
-        this.connection,
-        transaction,
-        [], // Signers will be handled by the wallet service
-        {
-          commitment: CURRENT_NETWORK.commitment,
-          preflightCommitment: CURRENT_NETWORK.commitment
-        }
-      );
-
-      return {
-        success: true,
-        signature,
-        txId: signature,
-        companyFee,
-        netAmount: recipientAmount,
-        blockchainFee: this.estimateBlockchainFee(transaction)
-      };
-    } catch (error) {
-      logger.error('SOL transfer failed', error, 'ExternalTransferService');
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'SOL transfer failed'
-      };
-    }
+    logger.error('SOL transfer attempted - not supported in WeSplit app', { 
+      currency: params.currency 
+    }, 'ExternalTransferService');
+    
+    return {
+      success: false,
+      error: 'SOL transfers are not supported within WeSplit app. Only USDC transfers are allowed.'
+    };
   }
 
   /**

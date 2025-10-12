@@ -19,7 +19,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { sendNotification } from './firebaseNotificationService';
+import { notificationService } from './notificationService';
 
 export interface PaymentRequest {
   id: string;
@@ -110,7 +110,7 @@ export async function createPaymentRequest(
     const paymentRequest = paymentRequestTransformers.firestoreToPaymentRequest(requestDoc);
     
     // Send notification to recipient
-    await sendNotification(
+    await notificationService.sendNotification(
       recipientId,
       'Payment Request',
       `${senderName} has requested ${amount} ${currency}${description ? ` for ${description}` : ''}`,
@@ -207,7 +207,7 @@ export async function acceptPaymentRequest(requestId: string): Promise<PaymentRe
     const paymentRequest = paymentRequestTransformers.firestoreToPaymentRequest(requestDoc);
     
     // Send notification to sender
-    await sendNotification(
+    await notificationService.sendNotification(
       paymentRequest.senderId,
       'Payment Request Accepted',
       `${paymentRequest.recipientName} has accepted your payment request for ${paymentRequest.amount} ${paymentRequest.currency}`,
@@ -247,7 +247,7 @@ export async function rejectPaymentRequest(requestId: string, reason?: string): 
     const paymentRequest = paymentRequestTransformers.firestoreToPaymentRequest(requestDoc);
     
     // Send notification to sender
-    await sendNotification(
+    await notificationService.sendNotification(
       paymentRequest.senderId,
       'Payment Request Rejected',
       `${paymentRequest.recipientName} has rejected your payment request for ${paymentRequest.amount} ${paymentRequest.currency}${reason ? `: ${reason}` : ''}`,
@@ -288,7 +288,7 @@ export async function cancelPaymentRequest(requestId: string): Promise<PaymentRe
     const paymentRequest = paymentRequestTransformers.firestoreToPaymentRequest(requestDoc);
     
     // Send notification to recipient
-    await sendNotification(
+    await notificationService.sendNotification(
       paymentRequest.recipientId,
       'Payment Request Cancelled',
       `${paymentRequest.senderName} has cancelled their payment request for ${paymentRequest.amount} ${paymentRequest.currency}`,

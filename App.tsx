@@ -105,8 +105,8 @@ export default function App() {
         // Firebase is automatically initialized when the config file is imported
         
         // Initialize push notifications
-        const { NotificationService } = await import('./src/services/notificationService');
-        const notificationInitialized = await NotificationService.initializePushNotifications();
+        const { notificationService } = await import('./src/services/notificationService');
+        const notificationInitialized = await notificationService.initializePushNotifications();
         if (notificationInitialized) {
           logger.info('Push notifications initialized successfully', null, 'App');
         } else {

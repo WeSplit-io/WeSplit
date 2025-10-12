@@ -220,8 +220,8 @@ export async function handleAddContactFromProfile(linkData: DeepLinkData, curren
     
     // Send notification to the added contact
     try {
-      const { sendNotification } = await import('./firebaseNotificationService');
-      await sendNotification(
+      const { notificationService } = await import('./notificationService');
+      await notificationService.sendNotification(
         linkData.userId,
         '👋 New Contact Added You!',
         `${linkData.userName} has added you as a contact. You can now easily send money to each other!`,

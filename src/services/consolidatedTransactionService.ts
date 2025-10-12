@@ -35,9 +35,14 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { RPC_CONFIG, USDC_CONFIG } from './shared/walletConstants';
+import { USDC_CONFIG } from './shared/walletConstants';
 import { CURRENT_NETWORK, TRANSACTION_CONFIG as CHAIN_TRANSACTION_CONFIG } from '../config/chain';
-import { FeeService, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG, TransactionType } from '../config/feeConfig';
+import { FeeService, COMPANY_WALLET_CONFIG, TransactionType } from '../config/feeConfig';
+import { transactionUtils } from './shared/transactionUtils';
+import { notificationUtils } from './shared/notificationUtils';
+import { keypairUtils } from './shared/keypairUtils';
+import { balanceUtils } from './shared/balanceUtils';
+import { validationUtils } from './shared/validationUtils';
 
 // Types
 export interface TransactionParams {
@@ -96,178 +101,13 @@ const TRANSACTION_CONFIG = {
 
 class ConsolidatedTransactionService {
   private static instance: ConsolidatedTransactionService;
-  private connection: Connection;
   private keypair: Keypair | null = null;
   private isProduction: boolean;
-  private rpcEndpoints: string[];
-  private currentEndpointIndex: number = 0;
 
   private constructor() {
-    this.rpcEndpoints = CURRENT_NETWORK.rpcEndpoints || [CURRENT_NETWORK.rpcUrl];
-    this.connection = this.createOptimizedConnection();
     this.isProduction = !__DEV__;
   }
 
-  private createOptimizedConnection(): Connection {
-    const currentEndpoint = this.rpcEndpoints[this.currentEndpointIndex];
-    
-    return new Connection(currentEndpoint, {
-      commitment: CURRENT_NETWORK.commitment,
-      confirmTransactionInitialTimeout: CHAIN_TRANSACTION_CONFIG.timeout.transaction,
-      wsEndpoint: CURRENT_NETWORK.wsUrl,
-      disableRetryOnRateLimit: false,
-      // Performance optimizations
-      httpHeaders: {
-        'User-Agent': 'WeSplit/1.0',
-        'Connection': 'keep-alive',
-      },
-      // Connection pooling with React Native compatible timeout
-      fetch: (url, options) => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), CHAIN_TRANSACTION_CONFIG.timeout.connection);
-        
-        return fetch(url, {
-          ...options,
-          signal: controller.signal,
-        }).finally(() => {
-          clearTimeout(timeoutId);
-        });
-      },
-    });
-  }
-
-  private async switchToNextEndpoint(): Promise<void> {
-    this.currentEndpointIndex = (this.currentEndpointIndex + 1) % this.rpcEndpoints.length;
-    this.connection = this.createOptimizedConnection();
-    console.log(`🔄 ConsolidatedTransactionService: Switched to RPC endpoint: ${this.rpcEndpoints[this.currentEndpointIndex]}`);
-  }
-
-  /**
-   * Get latest blockhash with retry logic and RPC failover
-   */
-  private async getLatestBlockhashWithRetry(commitment: 'confirmed' | 'finalized' = 'confirmed'): Promise<string> {
-    const maxRetries = 3;
-    let lastError: Error | null = null;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        const { blockhash } = await this.connection.getLatestBlockhash(commitment);
-        return blockhash;
-      } catch (error) {
-        lastError = error as Error;
-        console.warn(`⚠️ Failed to get blockhash on attempt ${attempt + 1}/${maxRetries}:`, error);
-        
-        // Check if it's a network error that might benefit from RPC failover
-        if (error instanceof Error && (
-          error.message.includes('fetch') || 
-          error.message.includes('network') || 
-          error.message.includes('timeout') ||
-          error.message.includes('ECONNREFUSED') ||
-          error.message.includes('ENOTFOUND') ||
-          error.message.includes('AbortSignal') ||
-          error.message.includes('aborted')
-        )) {
-          console.log(`🔄 Switching RPC endpoint due to network error...`);
-          await this.switchToNextEndpoint();
-        }
-
-        // Wait before retry (exponential backoff)
-        if (attempt < maxRetries - 1) {
-          const delay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
-          console.log(`⏳ Waiting ${delay}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-
-    throw new Error(`Failed to get blockhash after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
-  }
-
-  /**
-   * Send transaction with retry logic and RPC failover
-   */
-  private async sendTransactionWithRetry(
-    transaction: Transaction, 
-    signers: Keypair[], 
-    priority: 'low' | 'medium' | 'high' = 'medium'
-  ): Promise<string> {
-    const maxRetries = CHAIN_TRANSACTION_CONFIG.retry.maxRetries;
-    let lastError: Error | null = null;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        // Get fresh blockhash for each attempt with retry logic
-        const blockhash = await this.getLatestBlockhashWithRetry('confirmed');
-        transaction.recentBlockhash = blockhash;
-
-        // Sign the transaction
-        transaction.sign(...signers);
-
-        // Send transaction (faster than sendAndConfirmTransaction)
-        const signature = await this.connection.sendRawTransaction(transaction.serialize(), {
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-          maxRetries: 0, // We handle retries ourselves
-        });
-
-        console.log('🔗 ConsolidatedTransactionService: Transaction sent successfully', { 
-          signature, 
-          attempt: attempt + 1,
-          endpoint: this.rpcEndpoints[this.currentEndpointIndex]
-        });
-
-        return signature;
-
-      } catch (error) {
-        lastError = error as Error;
-        console.warn(`🔗 ConsolidatedTransactionService: Transaction send attempt ${attempt + 1} failed`, { 
-          error: lastError.message,
-          endpoint: this.rpcEndpoints[this.currentEndpointIndex]
-        });
-
-        // Switch to next RPC endpoint if available
-        if (this.rpcEndpoints.length > 1) {
-          await this.switchToNextEndpoint();
-        }
-
-        // Wait before retry (exponential backoff)
-        if (attempt < maxRetries - 1) {
-          const delay = CHAIN_TRANSACTION_CONFIG.retry.retryDelay * Math.pow(2, attempt);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-
-    throw new Error(`Transaction failed after ${maxRetries} attempts: ${lastError?.message}`);
-  }
-
-  /**
-   * Confirm transaction with timeout and retry logic
-   */
-  private async confirmTransactionWithTimeout(signature: string): Promise<boolean> {
-    const timeout = CHAIN_TRANSACTION_CONFIG.timeout.confirmation;
-    
-    try {
-      const confirmationPromise = this.connection.confirmTransaction(signature, 'confirmed');
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Transaction confirmation timeout')), timeout);
-      });
-
-      const result = await Promise.race([confirmationPromise, timeoutPromise]);
-      
-      if (result.value?.err) {
-        throw new Error(`Transaction failed: ${result.value.err.toString()}`);
-      }
-
-      return true;
-    } catch (error) {
-      console.warn('🔗 ConsolidatedTransactionService: Transaction confirmation failed or timed out', { 
-        signature, 
-        error: error instanceof Error ? error.message : String(error)
-      });
-      return false;
-    }
-  }
 
   public static getInstance(): ConsolidatedTransactionService {
     if (!ConsolidatedTransactionService.instance) {
@@ -293,9 +133,9 @@ class ConsolidatedTransactionService {
         // Get the keypair from solanaWalletService
         const walletInfo = await solanaWalletService.getWalletInfo();
         if (walletInfo && walletInfo.secretKey) {
-          // Convert secret key back to keypair for this service
-          const secretKeyBuffer = Buffer.from(walletInfo.secretKey, 'base64');
-          this.keypair = Keypair.fromSecretKey(secretKeyBuffer);
+          // Convert secret key back to keypair for this service using shared utility
+          const keypairResult = keypairUtils.createKeypairFromSecretKey(walletInfo.secretKey);
+          this.keypair = keypairResult.keypair;
           
           console.log('🔗 ConsolidatedTransactionService: Wallet loaded successfully', {
             address: this.keypair.publicKey.toBase58()
@@ -316,121 +156,16 @@ class ConsolidatedTransactionService {
   // ===== TRANSACTION METHODS =====
 
   /**
-   * Send SOL transaction with company fee
+   * SOL transactions are not supported in WeSplit app
+   * Only USDC transfers are allowed within the app
    */
   async sendSolTransaction(params: TransactionParams): Promise<TransactionResult> {
-    try {
-      if (!this.keypair) {
-        throw new Error('No wallet connected');
-      }
-
-      console.log('🚀 Sending SOL transaction:', {
-        to: params.to,
-        amount: params.amount,
-        currency: params.currency,
-        userId: params.userId,
-        priority: params.priority,
-        isProduction: this.isProduction,
-      });
-
-      // Calculate company fee using centralized service with transaction type
-      const transactionType = params.transactionType || 'send';
-      const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
-
-      // Fee calculation completed
-
-      const fromPublicKey = this.keypair.publicKey;
-      const toPublicKey = new PublicKey(params.to);
-      
-      // Recipient gets the full amount
-      const lamports = recipientAmount * LAMPORTS_PER_SOL;
-
-      // Get recent blockhash
-      const { blockhash } = await this.connection.getLatestBlockhash();
-
-      // Create transaction with company wallet as fee payer for SOL gas fees
-      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
-      const transaction = new Transaction({
-        recentBlockhash: blockhash,
-        feePayer: feePayerPublicKey
-      });
-
-      // Add priority fee
-      const priorityFee = this.getPriorityFee(params.priority || 'medium');
-      if (priorityFee > 0) {
-        transaction.add(
-          ComputeBudgetProgram.setComputeUnitPrice({
-            microLamports: priorityFee,
-          })
-        );
-      }
-
-      // Add transfer instruction for recipient (full amount)
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: fromPublicKey,
-          toPubkey: toPublicKey,
-          lamports: lamports
-        })
-      );
-
-      // Add company fee transfer instruction to admin wallet
-      if (companyFee > 0) {
-        const companyFeeLamports = companyFee * LAMPORTS_PER_SOL;
-        
-        transaction.add(
-          SystemProgram.transfer({
-            fromPubkey: fromPublicKey,
-            toPubkey: new PublicKey(COMPANY_WALLET_CONFIG.address),
-            lamports: companyFeeLamports
-          })
-        );
-      }
-
-      // Add memo if provided
-      if (params.memo) {
-        const memoInstruction = new TransactionInstruction({
-          keys: [{ pubkey: fromPublicKey, isSigner: true, isWritable: true }],
-          data: Buffer.from(params.memo, 'utf8'),
-          programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
-        });
-        transaction.add(memoInstruction);
-      }
-
-      // Sign and send transaction
-      const signature = await this.sendTransactionWithRetry(transaction, [this.keypair!], params.priority);
-
-      // Save transaction to Firestore
-      if (params.userId) {
-        await this.saveTransactionToFirestore({
-          userId: params.userId,
-          to: params.to,
-          amount: params.amount,
-          currency: params.currency,
-          signature,
-          companyFee,
-          netAmount: recipientAmount, // This is now the recipient amount
-          memo: params.memo
-        });
-      }
-
-      return {
-        signature,
-        txId: signature,
-        success: true,
-        companyFee,
-        netAmount: recipientAmount
-      };
-
-    } catch (error) {
-      console.error('Error sending SOL transaction:', error);
-      return {
-        signature: '',
-        txId: '',
-        success: false,
-        error: error instanceof Error ? error.message : 'Transaction failed'
-      };
-    }
+    return {
+      signature: '',
+      txId: '',
+      success: false,
+      error: 'SOL transfers are not supported within WeSplit app. Only USDC transfers are allowed.'
+    };
   }
 
   /**
@@ -480,7 +215,7 @@ class ConsolidatedTransactionService {
       );
 
       // Get recent blockhash
-      const { blockhash } = await this.connection.getLatestBlockhash();
+      const blockhash = await transactionUtils.getLatestBlockhashWithRetry();
 
       // Create transaction
       const transaction = new Transaction({
@@ -489,7 +224,7 @@ class ConsolidatedTransactionService {
       });
 
       // Add priority fee
-      const priorityFee = this.getPriorityFee(params.priority || 'medium');
+      const priorityFee = transactionUtils.getPriorityFee(params.priority || 'medium');
       if (priorityFee > 0) {
         transaction.add(
           ComputeBudgetProgram.setComputeUnitPrice({
@@ -561,11 +296,11 @@ class ConsolidatedTransactionService {
       }
 
       // Sign and send transaction
-      const signature = await this.sendTransactionWithRetry(transaction, [this.keypair!], params.priority);
+      const signature = await transactionUtils.sendTransactionWithRetry(transaction, [this.keypair!], params.priority);
 
       // Save transaction to Firestore
       if (params.userId) {
-        await this.saveTransactionToFirestore({
+        await notificationUtils.saveTransactionToFirestore({
           userId: params.userId,
           to: params.to,
           amount: params.amount,
@@ -597,12 +332,6 @@ class ConsolidatedTransactionService {
   }
 
 
-  /**
-   * Get priority fee based on priority level
-   */
-  private getPriorityFee(priority: 'low' | 'medium' | 'high'): number {
-    return CHAIN_TRANSACTION_CONFIG.priorityFees[priority];
-  }
 
   // Fee calculation now handled by centralized FeeService
 
@@ -815,114 +544,6 @@ class ConsolidatedTransactionService {
 
   // ===== UTILITY METHODS =====
 
-  /**
-   * Save transaction to Firestore and send notification to recipient
-   */
-  private async saveTransactionToFirestore(transactionData: {
-    userId: string;
-    to: string;
-    amount: number;
-    currency: string;
-    signature: string;
-    companyFee: number;
-    netAmount: number;
-    memo?: string;
-  }): Promise<void> {
-    try {
-      // Save transaction to Firestore
-      await addDoc(collection(db, 'transactions'), {
-        userId: transactionData.userId,
-        to: transactionData.to,
-        amount: transactionData.amount,
-        currency: transactionData.currency,
-        signature: transactionData.signature,
-        companyFee: transactionData.companyFee,
-        netAmount: transactionData.netAmount,
-        memo: transactionData.memo || '',
-        status: 'completed',
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp()
-      });
-
-      // Send notification to recipient
-      await this.sendReceivedFundsNotification(transactionData);
-    } catch (error) {
-      console.error('Error saving transaction to Firestore:', error);
-    }
-  }
-
-  /**
-   * Send notification to recipient when they receive funds
-   */
-  private async sendReceivedFundsNotification(transactionData: {
-    userId: string;
-    to: string;
-    amount: number;
-    currency: string;
-    signature: string;
-    companyFee: number;
-    netAmount: number;
-    memo?: string;
-  }): Promise<void> {
-    try {
-      console.log('🔔 Sending received funds notification:', {
-        to: transactionData.to,
-        amount: transactionData.netAmount,
-        currency: transactionData.currency
-      });
-
-      // Find recipient user by wallet address
-      const { firebaseDataService } = await import('./firebaseDataService');
-      const recipientUser = await firebaseDataService.user.getUserByWalletAddress(transactionData.to);
-
-      if (!recipientUser) {
-        console.log('🔔 No user found with wallet address:', transactionData.to);
-        return; // External wallet, no notification needed
-      }
-
-      // Get sender user info
-      const senderUser = await firebaseDataService.user.getCurrentUser(transactionData.userId);
-
-      // Create notification data
-      const notificationData = {
-        userId: recipientUser.id.toString(),
-        title: '💰 Funds Received',
-        message: `You received ${transactionData.netAmount} ${transactionData.currency} from ${senderUser.name}`,
-        type: 'money_received' as const,
-        data: {
-          transactionId: transactionData.signature,
-          amount: transactionData.netAmount,
-          currency: transactionData.currency,
-          senderId: transactionData.userId,
-          senderName: senderUser.name,
-          memo: transactionData.memo || '',
-          timestamp: new Date().toISOString()
-        },
-        is_read: false
-      };
-
-      // Send notification
-      const { sendNotification } = await import('./firebaseNotificationService');
-      await sendNotification(
-        notificationData.userId,
-        notificationData.title,
-        notificationData.message,
-        notificationData.type,
-        notificationData.data
-      );
-
-      console.log('✅ Received funds notification sent successfully:', {
-        recipientId: recipientUser.id,
-        recipientName: recipientUser.name,
-        amount: transactionData.netAmount,
-        currency: transactionData.currency
-      });
-
-    } catch (error) {
-      console.error('❌ Error sending received funds notification:', error);
-      // Don't throw error - notification failure shouldn't break the transaction
-    }
-  }
 
   /**
    * Set wallet keypair for transactions
@@ -953,8 +574,8 @@ class ConsolidatedTransactionService {
     
     try {
       // Use the existing userWalletService to get the balance
-      const { userWalletService } = await import('./userWalletService');
-      const balance = await userWalletService.getUserWalletBalance(userId);
+      const { walletService } = await import('./WalletService');
+      const balance = await walletService.getUserWalletBalance(userId);
       
       console.log('🔗 ConsolidatedTransactionService: Balance retrieved:', balance);
       
@@ -975,7 +596,7 @@ class ConsolidatedTransactionService {
     try {
       console.log('🔗 ConsolidatedTransactionService: Getting USDC balance for wallet:', walletAddress);
       
-      const connection = new Connection(RPC_CONFIG.endpoint);
+      const connection = transactionUtils.getConnection();
       const usdcMint = new PublicKey(USDC_CONFIG.mintAddress);
       
       // Validate wallet address first
@@ -1073,7 +694,7 @@ class ConsolidatedTransactionService {
       }
       
       // Add priority fee
-      const priorityFee = this.getPriorityFee(priority as 'low' | 'medium' | 'high');
+      const priorityFee = transactionUtils.getPriorityFee(priority as 'low' | 'medium' | 'high');
       const priorityFeeInSol = priorityFee / 1000000; // Convert micro-lamports to SOL
       
       const totalFee = companyFee + blockchainFee + priorityFeeInSol;
@@ -1216,8 +837,8 @@ class ConsolidatedTransactionService {
     
     try {
       // Use the existing userWalletService to get the wallet address
-      const { userWalletService } = await import('./userWalletService');
-      const walletResult = await userWalletService.ensureUserWallet(userId);
+      const { walletService } = await import('./WalletService');
+      const walletResult = await walletService.ensureUserWallet(userId);
       
       if (walletResult.success && walletResult.wallet) {
         console.log('🔗 ConsolidatedTransactionService: Wallet address retrieved:', walletResult.wallet.address);
@@ -1257,9 +878,9 @@ class ConsolidatedTransactionService {
     });
 
     try {
-      // Create keypair from the wallet's secret key
-      const secretKeyBuffer = Buffer.from(fromWalletSecretKey, 'base64');
-      const walletKeypair = Keypair.fromSecretKey(secretKeyBuffer);
+      // Create keypair from the wallet's secret key using shared utility
+      const keypairResult = keypairUtils.createKeypairFromSecretKey(fromWalletSecretKey);
+      const walletKeypair = keypairResult.keypair;
       
       console.log('🔗 ConsolidatedTransactionService: Wallet keypair verification:', {
         expectedAddress: fromWalletAddress,
@@ -1425,14 +1046,14 @@ class ConsolidatedTransactionService {
         
         try {
           // Use company wallet as payer for token account creation (split wallet has 0 SOL)
-          const { COMPANY_WALLET_CONFIG } = require('../config/chain');
+          const { COMPANY_WALLET_CONFIG } = await import('../config/feeConfig');
           if (!COMPANY_WALLET_CONFIG.secretKey) {
             throw new Error('Company wallet secret key not found in configuration');
           }
           
-          // Parse the company wallet secret key (it's stored as JSON array)
-          const secretKeyArray = JSON.parse(COMPANY_WALLET_CONFIG.secretKey);
-          const companyKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
+          // Parse the company wallet secret key using shared utility
+          const companyKeypairResult = keypairUtils.createKeypairFromSecretKey(COMPANY_WALLET_CONFIG.secretKey);
+          const companyKeypair = companyKeypairResult.keypair;
           
           // Check company wallet SOL balance before attempting transaction
           const companySolBalance = await connection.getBalance(companyKeypair.publicKey);
@@ -1531,9 +1152,9 @@ class ConsolidatedTransactionService {
           throw new Error('Company wallet secret key not found in configuration');
         }
         
-        // Parse the company wallet secret key (it's stored as JSON array)
-        const secretKeyArray = JSON.parse(COMPANY_WALLET_CONFIG.secretKey);
-        const companyKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
+        // Parse the company wallet secret key using shared utility
+        const companyKeypairResult = keypairUtils.createKeypairFromSecretKey(COMPANY_WALLET_CONFIG.secretKey);
+        const companyKeypair = companyKeypairResult.keypair;
         
         // Check company wallet SOL balance before attempting transaction
         const companySolBalance = await connection.getBalance(companyKeypair.publicKey);
@@ -1876,38 +1497,23 @@ class ConsolidatedTransactionService {
             });
             
             try {
-              // Try JSON array format first (since it's stored as [80, 80, 80, ...] in env)
-              const secretKeyArray = JSON.parse(COMPANY_WALLET_CONFIG.secretKey);
-              if (Array.isArray(secretKeyArray)) {
-                companyKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
-                console.log('🔗 ConsolidatedTransactionService: Company wallet keypair created from JSON array:', {
-                  arrayLength: secretKeyArray.length,
-                  firstFewBytes: secretKeyArray.slice(0, 5),
-                  lastFewBytes: secretKeyArray.slice(-5),
-                  derivedPublicKey: companyKeypair.publicKey.toBase58(),
-                  expectedPublicKey: COMPANY_WALLET_CONFIG.address,
-                  addressesMatch: companyKeypair.publicKey.toBase58() === COMPANY_WALLET_CONFIG.address
-                });
-              } else {
-                throw new Error('Secret key is not an array');
-              }
-            } catch (jsonError) {
-              try {
-                // Try base64 as fallback
-                companyKeypair = Keypair.fromSecretKey(
-                  Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'base64')
-                );
-                console.log('🔗 ConsolidatedTransactionService: Company wallet keypair created from base64');
-              } catch (base64Error) {
-                console.error('🔗 ConsolidatedTransactionService: Failed to parse company wallet secret key:', {
-                  jsonError: jsonError instanceof Error ? jsonError.message : String(jsonError),
-                  base64Error: base64Error instanceof Error ? base64Error.message : String(base64Error),
-                  secretKeyLength: COMPANY_WALLET_CONFIG.secretKey?.length,
-                  secretKeyPreview: COMPANY_WALLET_CONFIG.secretKey?.substring(0, 50) + '...',
-                  secretKeyType: typeof COMPANY_WALLET_CONFIG.secretKey
-                });
-                throw new Error('Failed to parse company wallet secret key');
-              }
+              // Parse the company wallet secret key using shared utility
+              const companyKeypairResult = keypairUtils.createKeypairFromSecretKey(COMPANY_WALLET_CONFIG.secretKey);
+              companyKeypair = companyKeypairResult.keypair;
+              console.log('🔗 ConsolidatedTransactionService: Company wallet keypair created:', {
+                format: companyKeypairResult.format,
+                derivedPublicKey: companyKeypair.publicKey.toBase58(),
+                expectedPublicKey: COMPANY_WALLET_CONFIG.address,
+                addressesMatch: companyKeypair.publicKey.toBase58() === COMPANY_WALLET_CONFIG.address
+              });
+            } catch (error) {
+              console.error('🔗 ConsolidatedTransactionService: Failed to parse company wallet secret key:', {
+                error: error instanceof Error ? error.message : String(error),
+                secretKeyLength: COMPANY_WALLET_CONFIG.secretKey?.length,
+                secretKeyPreview: COMPANY_WALLET_CONFIG.secretKey?.substring(0, 50) + '...',
+                secretKeyType: typeof COMPANY_WALLET_CONFIG.secretKey
+              });
+              throw new Error(`Failed to parse company wallet secret key: ${error instanceof Error ? error.message : String(error)}`);
             }
             
             // Sign the transaction with both keypairs

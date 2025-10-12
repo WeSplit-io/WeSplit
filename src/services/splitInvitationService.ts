@@ -217,8 +217,8 @@ export class SplitInvitationService {
           }
           
           // Send confirmation notification to the creator
-          const { sendNotification } = await import('./firebaseNotificationService');
-          await sendNotification(
+          const { notificationService } = await import('./notificationService');
+          await notificationService.sendNotification(
             invitationData.creatorId,
             'User Joined Your Split',
             `A user has joined your split "${invitationData.billName}". The split is ready to begin!`,
@@ -282,8 +282,8 @@ export class SplitInvitationService {
       }
 
       // 5. Send confirmation notification to the creator
-      const { sendNotification } = await import('./firebaseNotificationService');
-      await sendNotification(
+      const { notificationService } = await import('./notificationService');
+      await notificationService.sendNotification(
         invitationData.creatorId,
         'User Joined Your Split',
         `A user has joined your split "${invitationData.billName}". The split is ready to begin!`,

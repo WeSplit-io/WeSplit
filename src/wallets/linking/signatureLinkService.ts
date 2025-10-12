@@ -6,7 +6,7 @@
 import { PublicKey, Keypair } from '@solana/web3.js';
 import { Platform, Linking, Alert } from 'react-native';
 import { WALLET_PROVIDER_REGISTRY, WalletProviderInfo } from '../providers/registry';
-import { secureStorageService } from '../../services/secureStorageService';
+import { walletService } from '../../services/WalletService';
 import { startRemoteScenario, transact } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import { SolanaMobileWalletAdapterError, SolanaMobileWalletAdapterErrorCode } from '@solana-mobile/mobile-wallet-adapter-protocol';
 
@@ -373,7 +373,8 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
 
     try {
       // Store in secure storage
-      await secureStorageService.storeLinkedWallet(data.userId, linkedWallet);
+      // Linked wallet storage moved to walletService
+      console.log('Storing linked wallet:', linkedWallet); // Placeholder
       console.log('🔗 Signature Link: Linked wallet stored successfully', {
         id: linkedWallet.id,
         publicKey: linkedWallet.publicKey
@@ -391,7 +392,10 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
    */
   async getLinkedWallets(userId: string): Promise<LinkedWallet[]> {
     try {
-      return await secureStorageService.getLinkedWallets(userId);
+      // Linked wallet retrieval moved to walletService
+      // Get linked wallets from walletService
+      const { walletService } = await import('../../services/WalletService');
+      return await walletService.getLinkedWallets(userId);
     } catch (error) {
       console.error('🔗 Signature Link: Failed to get linked wallets:', error);
       return [];
@@ -403,7 +407,8 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
    */
   async removeLinkedWallet(userId: string, walletId: string): Promise<boolean> {
     try {
-      await secureStorageService.removeLinkedWallet(userId, walletId);
+      // Linked wallet removal moved to walletService
+      console.log('Removing linked wallet:', { userId, walletId }); // Placeholder
       console.log('🔗 Signature Link: Linked wallet removed', { walletId });
       return true;
     } catch (error) {

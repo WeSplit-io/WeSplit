@@ -171,14 +171,7 @@ console.log('🔧 Environment Variables Debug:', {
   expoConfigExtra: !!Constants.expoConfig?.extra
 });
 
-export const COMPANY_WALLET_CONFIG = {
-  address: companyWalletAddress,
-  secretKey: companyWalletSecretKey,
-  minSolReserve: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE') || '1.0'),
-  gasFeeEstimate: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE') || '0.001'),
-  // Company wallet should always pay SOL fees - no fallback to user wallet
-  useUserWalletForFees: false,
-};
+// COMPANY_WALLET_CONFIG moved to feeConfig.ts to avoid duplication
 
 // Production validation
 export const validateProductionConfig = (): { isValid: boolean; errors: string[] } => {
@@ -196,7 +189,7 @@ export const validateProductionConfig = (): { isValid: boolean; errors: string[]
     }
     
     // Validate company wallet configuration (always required for SOL fee coverage)
-    if (!COMPANY_WALLET_CONFIG.address) {
+    if (!companyWalletAddress) {
       errors.push('EXPO_PUBLIC_COMPANY_WALLET_ADDRESS is required for production - company wallet must pay SOL fees');
     }
     

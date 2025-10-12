@@ -23,10 +23,11 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
 import { CURRENT_NETWORK, TRANSACTION_CONFIG } from '../config/chain';
-import { FeeService, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG, TransactionType } from '../config/feeConfig';
+import { FeeService, COMPANY_WALLET_CONFIG, TransactionType } from '../config/feeConfig';
 import { solanaWalletService } from '../wallet/solanaWallet';
 import { logger } from '../services/loggingService';
-import { moneyTransferNotificationService } from '../services/moneyTransferNotificationService';
+import { transactionUtils } from '../services/shared/transactionUtils';
+import { notificationUtils } from '../services/shared/notificationUtils';
 
 export interface InternalTransferParams {
   to: string;
@@ -66,175 +67,10 @@ export interface BalanceCheckResult {
 }
 
 class InternalTransferService {
-  private connection: Connection;
-  private rpcEndpoints: string[];
-  private currentEndpointIndex: number = 0;
-
   constructor() {
-    this.rpcEndpoints = CURRENT_NETWORK.rpcEndpoints || [CURRENT_NETWORK.rpcUrl];
-    this.connection = this.createOptimizedConnection();
+    // Connection management now handled by shared transactionUtils
   }
 
-  private createOptimizedConnection(): Connection {
-    const currentEndpoint = this.rpcEndpoints[this.currentEndpointIndex];
-    
-    return new Connection(currentEndpoint, {
-      commitment: CURRENT_NETWORK.commitment,
-      confirmTransactionInitialTimeout: TRANSACTION_CONFIG.timeout.transaction,
-      wsEndpoint: CURRENT_NETWORK.wsUrl,
-      disableRetryOnRateLimit: false,
-      // Performance optimizations
-      httpHeaders: {
-        'User-Agent': 'WeSplit/1.0',
-        'Connection': 'keep-alive',
-      },
-      // Connection pooling with React Native compatible timeout
-      fetch: (url, options) => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TRANSACTION_CONFIG.timeout.connection);
-        
-        return fetch(url, {
-          ...options,
-          signal: controller.signal,
-        }).finally(() => {
-          clearTimeout(timeoutId);
-        });
-      },
-    });
-  }
-
-  private async switchToNextEndpoint(): Promise<void> {
-    this.currentEndpointIndex = (this.currentEndpointIndex + 1) % this.rpcEndpoints.length;
-    this.connection = this.createOptimizedConnection();
-    console.log(`🔄 Switched to RPC endpoint: ${this.rpcEndpoints[this.currentEndpointIndex]}`);
-  }
-
-  /**
-   * Get latest blockhash with retry logic and RPC failover
-   */
-  private async getLatestBlockhashWithRetry(commitment: 'confirmed' | 'finalized' = 'confirmed'): Promise<string> {
-    const maxRetries = 3;
-    let lastError: Error | null = null;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        const { blockhash } = await this.connection.getLatestBlockhash(commitment);
-        return blockhash;
-      } catch (error) {
-        lastError = error as Error;
-        console.warn(`⚠️ Failed to get blockhash on attempt ${attempt + 1}/${maxRetries}:`, error);
-        
-        // Check if it's a network error that might benefit from RPC failover
-        if (error instanceof Error && (
-          error.message.includes('fetch') || 
-          error.message.includes('network') || 
-          error.message.includes('timeout') ||
-          error.message.includes('ECONNREFUSED') ||
-          error.message.includes('ENOTFOUND') ||
-          error.message.includes('AbortSignal') ||
-          error.message.includes('aborted')
-        )) {
-          console.log(`🔄 Switching RPC endpoint due to network error...`);
-          await this.switchToNextEndpoint();
-        }
-
-        // Wait before retry (exponential backoff)
-        if (attempt < maxRetries - 1) {
-          const delay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
-          console.log(`⏳ Waiting ${delay}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-
-    throw new Error(`Failed to get blockhash after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
-  }
-
-  /**
-   * Send transaction with retry logic and RPC failover
-   */
-  private async sendTransactionWithRetry(
-    transaction: Transaction, 
-    signers: Keypair[], 
-    priority: 'low' | 'medium' | 'high'
-  ): Promise<string> {
-    const maxRetries = TRANSACTION_CONFIG.retry.maxRetries;
-    let lastError: Error | null = null;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        // Get fresh blockhash for each attempt with retry logic
-        const blockhash = await this.getLatestBlockhashWithRetry('confirmed');
-        transaction.recentBlockhash = blockhash;
-
-        // Sign the transaction
-        transaction.sign(...signers);
-
-        // Send transaction (faster than sendAndConfirmTransaction)
-        const signature = await this.connection.sendRawTransaction(transaction.serialize(), {
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-          maxRetries: 0, // We handle retries ourselves
-        });
-
-        logger.info('Transaction sent successfully', { 
-          signature, 
-          attempt: attempt + 1,
-          endpoint: this.rpcEndpoints[this.currentEndpointIndex]
-        }, 'InternalTransferService');
-
-        return signature;
-
-      } catch (error) {
-        lastError = error as Error;
-        logger.warn(`Transaction send attempt ${attempt + 1} failed`, { 
-          error: lastError.message,
-          endpoint: this.rpcEndpoints[this.currentEndpointIndex]
-        }, 'InternalTransferService');
-
-        // Switch to next RPC endpoint if available
-        if (this.rpcEndpoints.length > 1) {
-          await this.switchToNextEndpoint();
-        }
-
-        // Wait before retry (exponential backoff)
-        if (attempt < maxRetries - 1) {
-          const delay = TRANSACTION_CONFIG.retry.retryDelay * Math.pow(2, attempt);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-
-    throw new Error(`Transaction failed after ${maxRetries} attempts: ${lastError?.message}`);
-  }
-
-  /**
-   * Confirm transaction with timeout and retry logic
-   */
-  private async confirmTransactionWithTimeout(signature: string): Promise<boolean> {
-    const timeout = TRANSACTION_CONFIG.timeout.confirmation;
-    
-    try {
-      const confirmationPromise = this.connection.confirmTransaction(signature, 'confirmed');
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Transaction confirmation timeout')), timeout);
-      });
-
-      const result = await Promise.race([confirmationPromise, timeoutPromise]);
-      
-      if (result.value?.err) {
-        throw new Error(`Transaction failed: ${result.value.err.toString()}`);
-      }
-
-      return true;
-    } catch (error) {
-      logger.warn('Transaction confirmation failed or timed out', { 
-        signature, 
-        error: error instanceof Error ? error.message : String(error)
-      }, 'InternalTransferService');
-      return false;
-    }
-  }
 
   /**
    * Send internal P2P transfer
@@ -271,8 +107,8 @@ class InternalTransferService {
       const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
 
       // Load wallet using the existing userWalletService
-      const { userWalletService } = await import('../services/userWalletService');
-      const walletResult = await userWalletService.ensureUserWallet(params.userId);
+      const { walletService } = await import('../services/WalletService');
+      const walletResult = await walletService.ensureUserWallet(params.userId);
       
       if (!walletResult.success || !walletResult.wallet) {
         return {
@@ -316,10 +152,7 @@ class InternalTransferService {
       }, 'InternalTransferService');
 
       let result: InternalTransferResult;
-      if (params.currency === 'SOL') {
-        logger.info('Sending SOL transfer', { recipientAmount, companyFee }, 'InternalTransferService');
-        result = await this.sendSolTransfer(params, recipientAmount, companyFee);
-      } else {
+      if (params.currency === 'USDC') {
         logger.info('Sending USDC transfer', { recipientAmount, companyFee }, 'InternalTransferService');
         try {
           result = await this.sendUsdcTransfer(params, recipientAmount, companyFee);
@@ -335,6 +168,12 @@ class InternalTransferService {
             error: error instanceof Error ? error.message : 'USDC transfer method failed'
           };
         }
+      } else {
+        logger.error('Unsupported currency for internal transfer', { currency: params.currency }, 'InternalTransferService');
+        result = {
+          success: false,
+          error: 'WeSplit only supports USDC transfers. SOL transfers are not supported within the app.'
+        };
       }
 
       logger.info('Transaction result', {
@@ -353,9 +192,9 @@ class InternalTransferService {
 
         // Save transaction to Firebase for history
         try {
-          await this.saveTransactionToFirebase({
+          await notificationUtils.saveTransactionToFirestore({
             userId: params.userId,
-            toAddress: params.to,
+            to: params.to,
             amount: params.amount,
             currency: params.currency,
             signature: result.signature!,
@@ -392,10 +231,10 @@ class InternalTransferService {
   async checkBalance(userId: string, amount: number, currency: 'SOL' | 'USDC', skipCompanyFee: boolean = false): Promise<BalanceCheckResult> {
     try {
       // Use the existing userWalletService to get balance
-      const { userWalletService } = await import('../services/userWalletService');
-      const balance = await userWalletService.getUserWalletBalance(userId);
+      const { walletService } = await import('../services/WalletService');
+      const balance = await walletService.getUserWalletBalance(userId);
       
-      const currentBalance = currency === 'SOL' ? (balance?.solBalance || 0) : (balance?.usdcBalance || 0);
+      const currentBalance = balance?.usdcBalance || 0; // WeSplit only supports USDC
       
       // Calculate total required amount (including company fee unless skipped)
       const requiredAmount = skipCompanyFee ? amount : (() => {
@@ -440,95 +279,22 @@ class InternalTransferService {
   }
 
   /**
-   * Send SOL transfer
+   * SOL transfers are not supported in WeSplit app
+   * Only USDC transfers are allowed within the app
    */
   private async sendSolTransfer(
     params: InternalTransferParams, 
     recipientAmount: number, 
     companyFee: number
   ): Promise<InternalTransferResult> {
-    try {
-      const fromPublicKey = new PublicKey(solanaWalletService.getPublicKey()!);
-      const toPublicKey = new PublicKey(params.to);
-      const lamports = recipientAmount * LAMPORTS_PER_SOL;
-
-      // Get recent blockhash with retry logic
-      const blockhash = await this.getLatestBlockhashWithRetry();
-
-      // Use centralized fee payer logic - Company pays SOL gas fees
-      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
-      
-      // Create transaction
-      const transaction = new Transaction({
-        recentBlockhash: blockhash,
-        feePayer: feePayerPublicKey
-      });
-
-      // Add priority fee
-      const priorityFee = this.getPriorityFee(params.priority || 'medium');
-      if (priorityFee > 0) {
-        transaction.add(
-          ComputeBudgetProgram.setComputeUnitPrice({
-            microLamports: priorityFee,
-          })
-        );
-      }
-
-      // Add transfer instruction
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: fromPublicKey,
-          toPubkey: toPublicKey,
-          lamports: lamports
-        })
-      );
-
-      // Add memo if provided
-      if (params.memo) {
-        transaction.add(
-          new TransactionInstruction({
-            keys: [{ pubkey: fromPublicKey, isSigner: true, isWritable: true }],
-            data: Buffer.from(params.memo, 'utf8'),
-            programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
-          })
-        );
-      }
-
-      // Get wallet keypair for signing
-      const walletInfo = await solanaWalletService.getWalletInfo();
-      if (!walletInfo || !walletInfo.secretKey) {
-        throw new Error('Wallet keypair not available for signing');
-      }
-
-      const secretKeyBuffer = Buffer.from(walletInfo.secretKey, 'base64');
-      const keypair = Keypair.fromSecretKey(secretKeyBuffer);
-
-      // Sign and send transaction
-      const signature = await sendAndConfirmTransaction(
-        this.connection,
-        transaction,
-        [keypair], // Use the actual keypair for signing
-        {
-          commitment: CURRENT_NETWORK.commitment,
-          preflightCommitment: CURRENT_NETWORK.commitment
-        }
-      );
-
-      return {
-        success: true,
-        signature,
-        txId: signature,
-        companyFee,
-        netAmount: recipientAmount,
-        blockchainFee: this.estimateBlockchainFee(transaction)
-      };
-    } catch (error) {
-      logger.error('SOL transfer failed', error, 'InternalTransferService');
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'SOL transfer failed'
-      };
-    }
+    logger.error('SOL transfer attempted - not supported in WeSplit app', { 
+      currency: params.currency 
+    }, 'InternalTransferService');
+    
+    return {
+      success: false,
+      error: 'SOL transfers are not supported within WeSplit app. Only USDC transfers are allowed.'
+    };
   }
 
   /**
@@ -578,7 +344,7 @@ class InternalTransferService {
       // Check if recipient has USDC token account, create if needed
       let needsTokenAccountCreation = false;
       try {
-        await getAccount(this.connection, toTokenAccount);
+        await getAccount(transactionUtils.getConnection(), toTokenAccount);
         logger.info('Recipient USDC token account exists', { toTokenAccount: toTokenAccount.toBase58() }, 'InternalTransferService');
       } catch (error) {
         // Token account doesn't exist, we need to create it
@@ -587,7 +353,7 @@ class InternalTransferService {
       }
 
       // Get recent blockhash with retry logic
-      const blockhash = await this.getLatestBlockhashWithRetry();
+      const blockhash = await transactionUtils.getLatestBlockhashWithRetry();
       logger.info('Got recent blockhash', { blockhash }, 'InternalTransferService');
 
       // Use company wallet for fees if configured, otherwise use user wallet
@@ -606,7 +372,7 @@ class InternalTransferService {
       }, 'InternalTransferService');
 
       // Add priority fee
-      const priorityFee = this.getPriorityFee(params.priority || 'medium');
+      const priorityFee = transactionUtils.getPriorityFee(params.priority || 'medium');
       if (priorityFee > 0) {
         transaction.add(
           ComputeBudgetProgram.setComputeUnitPrice({
@@ -845,13 +611,13 @@ class InternalTransferService {
       let signature: string;
       try {
         logger.info('Attempting to sign and send transaction', {
-          connectionEndpoint: this.connection.rpcEndpoint,
+          connectionEndpoint: transactionUtils.getConnection().rpcEndpoint,
           commitment: CURRENT_NETWORK.commitment,
           priority: params.priority || 'medium'
         }, 'InternalTransferService');
         
         // Use sendTransaction for faster response, then confirm separately
-        signature = await this.sendTransactionWithRetry(transaction, signers, params.priority || 'medium');
+        signature = await transactionUtils.sendTransactionWithRetry(transaction, signers, params.priority || 'medium');
         
         logger.info('Transaction signed and sent successfully', { signature }, 'InternalTransferService');
       } catch (signingError) {
@@ -867,7 +633,7 @@ class InternalTransferService {
       logger.info('Transaction sent successfully', { signature }, 'InternalTransferService');
 
       // Confirm transaction with optimized timeout handling
-      const confirmed = await this.confirmTransactionWithTimeout(signature);
+      const confirmed = await transactionUtils.confirmTransactionWithTimeout(signature);
       
       if (!confirmed) {
         logger.warn('Transaction confirmation timed out, but transaction was sent', { 
@@ -879,55 +645,7 @@ class InternalTransferService {
         logger.info('Transaction confirmed successfully', { signature }, 'InternalTransferService');
       }
 
-      // Create notifications for successful money transfer
-      try {
-        if (params.groupId) {
-          // Group payment notifications
-          await moneyTransferNotificationService.createGroupPaymentSentNotification(
-            params.userId,
-            params.groupId,
-            params.amount,
-            params.currency,
-            signature,
-            params.memo
-          );
-          
-          await moneyTransferNotificationService.createGroupPaymentReceivedNotification(
-            params.groupId,
-            params.amount,
-            params.currency,
-            signature,
-            params.userId,
-            params.memo
-          );
-        } else {
-          // Direct P2P payment notifications
-          await moneyTransferNotificationService.createMoneySentNotification(
-            params.userId,
-            params.to,
-            params.amount,
-            params.currency,
-            signature,
-            params.memo
-          );
-          
-          await moneyTransferNotificationService.createMoneyReceivedNotification(
-            params.userId,
-            params.to,
-            params.amount,
-            params.currency,
-            signature,
-            params.memo
-          );
-        }
-        logger.info('Money transfer notifications created successfully', { signature }, 'InternalTransferService');
-      } catch (notificationError) {
-        logger.warn('Failed to create money transfer notifications', { 
-          signature, 
-          error: notificationError 
-        }, 'InternalTransferService');
-        // Don't fail the transaction if notifications fail
-      }
+      // Notifications are now handled by the shared notificationUtils in saveTransactionToFirestore
 
       return {
         success: true,
@@ -940,21 +658,7 @@ class InternalTransferService {
     } catch (error) {
       logger.error('USDC transfer failed', error, 'InternalTransferService');
       
-      // Create notification for failed transfer
-      try {
-        await moneyTransferNotificationService.createMoneyTransferFailedNotification(
-          params.userId,
-          params.amount,
-          params.currency,
-          error instanceof Error ? error.message : 'Transfer failed',
-          !!params.groupId,
-          params.groupId
-        );
-      } catch (notificationError) {
-        logger.warn('Failed to create money transfer failed notification', { 
-          error: notificationError 
-        }, 'InternalTransferService');
-      }
+      // Failed transfer notifications can be handled by the calling service if needed
       
       return {
         success: false,
@@ -999,154 +703,14 @@ class InternalTransferService {
 
   // Fee calculation now handled by centralized FeeService
 
-  /**
-   * Get priority fee
-   */
-  private getPriorityFee(priority: 'low' | 'medium' | 'high'): number {
-    return TRANSACTION_CONFIG.priorityFees[priority];
-  }
 
   /**
    * Estimate blockchain fee
    */
   private estimateBlockchainFee(transaction: Transaction): number {
-    // Rough estimate: 5000 lamports per signature + compute units
-    const signatureCount = transaction.signatures.length;
-    const computeUnits = TRANSACTION_CONFIG.computeUnits.tokenTransfer;
-    const feePerComputeUnit = 0.000001; // 1 micro-lamport per compute unit
-    
-    return (signatureCount * 5000 + computeUnits * feePerComputeUnit) / LAMPORTS_PER_SOL;
+    return transactionUtils.estimateBlockchainFee(transaction);
   }
 
-  /**
-   * Save transaction to Firebase for history and send notification to recipient
-   */
-  private async saveTransactionToFirebase(transactionData: {
-    userId: string;
-    toAddress: string;
-    amount: number;
-    currency: string;
-    signature: string;
-    companyFee: number;
-    netAmount: number;
-    memo?: string;
-    groupId?: string;
-  }): Promise<void> {
-    try {
-      const { firebaseTransactionService, firebaseDataService } = await import('../services/firebaseDataService');
-      
-      // Find recipient user by wallet address to get their user ID
-      const recipientUser = await firebaseDataService.user.getUserByWalletAddress(transactionData.toAddress);
-      const recipientUserId = recipientUser ? recipientUser.id.toString() : transactionData.toAddress; // Fallback to address if no user found
-      
-      const transaction = {
-        id: transactionData.signature,
-        type: 'send' as const,
-        amount: transactionData.amount,
-        currency: transactionData.currency,
-        from_user: transactionData.userId,
-        to_user: recipientUserId, // Use user ID instead of wallet address
-        from_wallet: '', // Will be filled by the service
-        to_wallet: transactionData.toAddress,
-        tx_hash: transactionData.signature,
-        note: transactionData.memo || `Payment to ${transactionData.toAddress}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        status: 'completed' as const,
-        group_id: transactionData.groupId || null,
-        company_fee: transactionData.companyFee,
-        net_amount: transactionData.netAmount
-      };
-
-      await firebaseTransactionService.createTransaction(transaction);
-      logger.info('Transaction saved to Firebase', { 
-        signature: transactionData.signature,
-        from_user: transactionData.userId,
-        to_user: recipientUserId,
-        to_wallet: transactionData.toAddress
-      }, 'InternalTransferService');
-
-      // Send notification to recipient
-      await this.sendReceivedFundsNotification(transactionData);
-    } catch (error) {
-      logger.error('Failed to save transaction to Firebase', error, 'InternalTransferService');
-      throw error;
-    }
-  }
-
-  /**
-   * Send notification to recipient when they receive funds
-   */
-  private async sendReceivedFundsNotification(transactionData: {
-    userId: string;
-    toAddress: string;
-    amount: number;
-    currency: string;
-    signature: string;
-    companyFee: number;
-    netAmount: number;
-    memo?: string;
-    groupId?: string;
-  }): Promise<void> {
-    try {
-      logger.info('🔔 Sending received funds notification', {
-        to: transactionData.toAddress,
-        amount: transactionData.netAmount,
-        currency: transactionData.currency
-      }, 'InternalTransferService');
-
-      // Find recipient user by wallet address
-      const { firebaseDataService } = await import('../services/firebaseDataService');
-      const recipientUser = await firebaseDataService.user.getUserByWalletAddress(transactionData.toAddress);
-
-      if (!recipientUser) {
-        logger.info('🔔 No user found with wallet address (external wallet):', transactionData.toAddress, 'InternalTransferService');
-        return; // External wallet, no notification needed
-      }
-
-      // Get sender user info
-      const senderUser = await firebaseDataService.user.getCurrentUser(transactionData.userId);
-
-      // Create notification data
-      const notificationData = {
-        userId: recipientUser.id.toString(),
-        title: '💰 Funds Received',
-        message: `You received ${transactionData.netAmount} ${transactionData.currency} from ${senderUser.name}`,
-        type: 'money_received' as const,
-        data: {
-          transactionId: transactionData.signature,
-          amount: transactionData.netAmount,
-          currency: transactionData.currency,
-          senderId: transactionData.userId,
-          senderName: senderUser.name,
-          memo: transactionData.memo || '',
-          timestamp: new Date().toISOString()
-        },
-        is_read: false
-      };
-
-      // Send notification
-      const { sendNotification } = await import('../services/firebaseNotificationService');
-      await sendNotification(
-        notificationData.userId,
-        notificationData.title,
-        notificationData.message,
-        notificationData.type,
-        notificationData.data
-      );
-
-      logger.info('✅ Received funds notification sent successfully', {
-        recipientId: recipientUser.id,
-        recipientName: recipientUser.name,
-        amount: transactionData.netAmount,
-        currency: transactionData.currency
-      }, 'InternalTransferService');
-
-    } catch (error) {
-      logger.error('❌ Error sending received funds notification', error, 'InternalTransferService');
-      // Don't throw error - notification failure shouldn't break the transaction
-    }
-  }
 
   /**
    * Get transaction status
@@ -1157,7 +721,7 @@ class InternalTransferService {
     error?: string;
   }> {
     try {
-      const status = await this.connection.getSignatureStatus(signature, {
+      const status = await transactionUtils.getConnection().getSignatureStatus(signature, {
         searchTransactionHistory: true
       });
 
@@ -1184,15 +748,15 @@ class InternalTransferService {
       logger.warn('Failed to get transaction status, trying next RPC endpoint', { 
         signature,
         error: error instanceof Error ? error.message : 'Unknown error',
-        endpoint: this.rpcEndpoints[this.currentEndpointIndex]
+        endpoint: transactionUtils.getConnection().rpcEndpoint
       }, 'InternalTransferService');
       
       // Switch to next RPC endpoint if available
-      if (this.rpcEndpoints.length > 1) {
-        await this.switchToNextEndpoint();
+      if (transactionUtils.getConnection()) {
+        await transactionUtils.switchToNextEndpoint();
         // Retry once with new endpoint
         try {
-          const retryStatus = await this.connection.getSignatureStatus(signature, {
+          const retryStatus = await transactionUtils.getConnection().getSignatureStatus(signature, {
             searchTransactionHistory: true
           });
           
@@ -1263,8 +827,8 @@ class InternalTransferService {
         : FeeService.calculateCompanyFee(params.amount);
 
       // Load wallet using the existing userWalletService
-      const { userWalletService } = await import('../services/userWalletService');
-      const walletResult = await userWalletService.ensureUserWallet(params.userId);
+      const { walletService } = await import('../services/WalletService');
+      const walletResult = await walletService.ensureUserWallet(params.userId);
       
       if (!walletResult.success || !walletResult.wallet) {
         return {
@@ -1310,7 +874,7 @@ class InternalTransferService {
       }
 
       // Get recent blockhash with retry logic
-      const blockhash = await this.getLatestBlockhashWithRetry();
+      const blockhash = await transactionUtils.getLatestBlockhashWithRetry();
 
       // Use company wallet for fees if configured, otherwise use user wallet
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromKeypair.publicKey);
@@ -1322,7 +886,7 @@ class InternalTransferService {
       });
 
       // Add priority fee
-      const priorityFee = this.getPriorityFee(params.priority || 'medium');
+      const priorityFee = transactionUtils.getPriorityFee(params.priority || 'medium');
       if (priorityFee > 0) {
         transaction.add(
           ComputeBudgetProgram.setComputeUnitPrice({
@@ -1345,7 +909,7 @@ class InternalTransferService {
 
         // Check if sender has USDC token account
         try {
-          const senderAccount = await getAccount(this.connection, fromTokenAccount);
+          const senderAccount = await getAccount(transactionUtils.getConnection(), fromTokenAccount);
           console.log('✅ Sender USDC token account exists:', {
             address: fromTokenAccount.toBase58(),
             balance: senderAccount.amount.toString(),
@@ -1366,7 +930,7 @@ class InternalTransferService {
 
         // Check if recipient has USDC token account, create if not
         try {
-          await getAccount(this.connection, toTokenAccount);
+          await getAccount(transactionUtils.getConnection(), toTokenAccount);
           console.log('✅ Recipient USDC token account exists');
         } catch (error) {
           console.log('🔧 Creating USDC token account for recipient...');
@@ -1466,7 +1030,7 @@ class InternalTransferService {
       if (!hasTokenAccountCreation) {
         try {
           console.log('🔍 Simulating transaction before sending...');
-          const simulationResult = await this.connection.simulateTransaction(transaction);
+          const simulationResult = await transactionUtils.getConnection().simulateTransaction(transaction);
           
           if (simulationResult.value.err) {
             console.error('❌ Transaction simulation failed:', simulationResult.value.err);
@@ -1571,7 +1135,7 @@ class InternalTransferService {
               // Transaction is already signed above with fresh blockhash
               
               // Send transaction first (faster response)
-              signature = await this.connection.sendRawTransaction(transaction.serialize(), {
+              signature = await transactionUtils.getConnection().sendRawTransaction(transaction.serialize(), {
                 skipPreflight: false,
                 preflightCommitment: 'confirmed',
                 maxRetries: 0, // We handle retries ourselves
@@ -1580,7 +1144,7 @@ class InternalTransferService {
               console.log(`📤 Transaction sent with signature: ${signature}, waiting for confirmation...`);
               
               // Confirm transaction with timeout
-              const confirmPromise = this.connection.confirmTransaction(signature, 'confirmed');
+              const confirmPromise = transactionUtils.getConnection().confirmTransaction(signature, 'confirmed');
               const confirmTimeoutPromise = new Promise<never>((_, reject) => {
                 setTimeout(() => reject(new Error('Transaction confirmation timeout after 15 seconds')), 15000);
               });
@@ -1642,7 +1206,7 @@ class InternalTransferService {
       }
 
       // Save transaction to Firestore (without recipient user lookup)
-      await this.saveTransactionToFirestore({
+      await notificationUtils.saveTransactionToFirestore({
         userId: params.userId,
         to: params.to,
         amount: params.amount,
@@ -1654,7 +1218,7 @@ class InternalTransferService {
       });
 
       // Send money sent notification to sender only (no recipient lookup)
-      await this.sendMoneySentNotification({
+      await notificationUtils.sendMoneySentNotification({
         userId: params.userId,
         to: params.to,
         amount: params.amount,
@@ -1702,118 +1266,6 @@ class InternalTransferService {
     }
   }
 
-  /**
-   * Save transaction to Firestore (without recipient user lookup)
-   */
-  private async saveTransactionToFirestore(transactionData: {
-    userId: string;
-    to: string;
-    amount: number;
-    currency: string;
-    signature: string;
-    companyFee: number;
-    netAmount: number;
-    memo?: string;
-  }): Promise<void> {
-    try {
-      const { firebaseTransactionService } = await import('../services/firebaseDataService');
-      
-      const transaction = {
-        id: transactionData.signature,
-        type: 'send' as const,
-        amount: transactionData.amount,
-        currency: transactionData.currency,
-        from_user: transactionData.userId,
-        to_user: transactionData.to, // Use address directly since no user lookup
-        from_wallet: '', // Will be filled by the service
-        to_wallet: transactionData.to,
-        tx_hash: transactionData.signature,
-        note: transactionData.memo || `Payment to ${transactionData.to}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        status: 'completed' as const,
-        group_id: null,
-        company_fee: transactionData.companyFee,
-        net_amount: transactionData.netAmount
-      };
-
-      await firebaseTransactionService.createTransaction(transaction);
-      logger.info('Transaction saved to Firebase', { 
-        signature: transactionData.signature,
-        from_user: transactionData.userId,
-        to_wallet: transactionData.to
-      }, 'InternalTransferService');
-    } catch (error) {
-      logger.error('Failed to save transaction to Firebase', error, 'InternalTransferService');
-      // Don't throw error - Firebase save failure shouldn't break the transaction
-    }
-  }
-
-  /**
-   * Send money sent notification to sender only
-   */
-  private async sendMoneySentNotification(transactionData: {
-    userId: string;
-    to: string;
-    amount: number;
-    currency: string;
-    signature: string;
-    companyFee: number;
-    netAmount: number;
-    memo?: string;
-  }): Promise<void> {
-    try {
-      logger.info('🔔 Sending money sent notification', {
-        from: transactionData.userId,
-        to: transactionData.to,
-        amount: transactionData.netAmount,
-        currency: transactionData.currency
-      }, 'InternalTransferService');
-
-      // Get sender user info
-      const { firebaseDataService } = await import('../services/firebaseDataService');
-      const senderUser = await firebaseDataService.user.getCurrentUser(transactionData.userId);
-
-      // Create notification data
-      const notificationData = {
-        userId: transactionData.userId,
-        title: '💰 Money Sent Successfully',
-        message: `You sent ${transactionData.netAmount} ${transactionData.currency} to ${transactionData.to}`,
-        type: 'money_sent' as const,
-        data: {
-          transactionId: transactionData.signature,
-          amount: transactionData.netAmount,
-          currency: transactionData.currency,
-          recipientId: transactionData.to,
-          recipientName: 'Unknown User', // No user lookup for external addresses
-          memo: transactionData.memo || '',
-          timestamp: new Date().toISOString()
-        },
-        is_read: false
-      };
-
-      // Send notification
-      const { sendNotification } = await import('../services/firebaseNotificationService');
-      await sendNotification(
-        notificationData.userId,
-        notificationData.title,
-        notificationData.message,
-        notificationData.type,
-        notificationData.data
-      );
-
-      logger.info('✅ Money sent notification sent successfully', {
-        senderId: transactionData.userId,
-        senderName: senderUser.name,
-        amount: transactionData.netAmount,
-        currency: transactionData.currency
-      }, 'InternalTransferService');
-
-    } catch (error) {
-      logger.error('❌ Error sending money sent notification', error, 'InternalTransferService');
-      // Don't throw error - notification failure shouldn't break the transaction
-    }
-  }
 }
 
 // Export singleton instance

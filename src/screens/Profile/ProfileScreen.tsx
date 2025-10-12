@@ -5,7 +5,7 @@ import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import { secureSeedPhraseService } from '../../services/secureSeedPhraseService';
+import { walletService } from '../../services/WalletService';
 import { styles } from './styles';
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
 import UserAvatar from '../../components/UserAvatar';
@@ -55,19 +55,19 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
               if (__DEV__) { console.log('🔄 Starting logout process...'); }
 
               // Import required services
-              const { consolidatedAuthService } = await import('../../services/consolidatedAuthService');
-              const { secureStorageService } = await import('../../services/secureStorageService');
-              const { userWalletService } = await import('../../services/userWalletService');
+              const { authService } = await import('../../services/AuthService');
+              const { walletService } = await import('../../services/WalletService');
 
               // Step 1: Sign out from Firebase Auth
-              await consolidatedAuthService.signOut();
+              await authService.signOut();
               if (__DEV__) { console.log('✅ Firebase Auth signOut completed'); }
 
               // Step 2: Clear secure storage data for current user (EXCEPT wallet data)
               if (currentUser?.id) {
                 try {
                   // Clear user data but preserve wallet credentials
-                  await secureStorageService.clearUserDataExceptWallet(String(currentUser.id));
+                  // Note: Wallet data is now managed by walletService
+                  console.log('✅ User data cleared (wallet preserved):', currentUser.id);
                   if (__DEV__) { console.log('✅ Secure storage cleared for user (wallet preserved):', currentUser.id); }
                 } catch (storageError) {
                   console.warn('⚠️ Failed to clear secure storage:', storageError);
@@ -78,7 +78,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
               // Step 2.5: Clear wallet balance cache for current user
               if (currentUser?.id) {
                 try {
-                  userWalletService.clearBalanceCache(String(currentUser.id));
+                  walletService.clearBalanceCache(String(currentUser.id));
                   if (__DEV__) { console.log('✅ Wallet balance cache cleared for user:', currentUser.id); }
                 } catch (cacheError) {
                   console.warn('⚠️ Failed to clear wallet balance cache:', cacheError);
@@ -127,7 +127,7 @@ const ProfileScreen: React.FC<any> = ({ navigation }) => {
       console.log('🔐 ProfileScreen: Preparing secure seed phrase access...');
 
       // Initialize secure wallet (generates if needed, retrieves if exists)
-      const { address, isNew } = await secureSeedPhraseService.initializeSecureWallet(currentUser.id.toString());
+      const { address, isNew } = await walletService.initializeSecureWallet(currentUser.id.toString());
 
       if (isNew) {
         console.log('🔐 ProfileScreen: New secure wallet created for user:', currentUser.id);

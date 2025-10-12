@@ -19,11 +19,11 @@ jest.mock('react-native', () => ({
   },
 }));
 
-// Mock secure storage service
-jest.mock('../src/services/secureStorageService', () => ({
-  secureStorageService: {
-    storeLinkedWallet: jest.fn(),
-    getLinkedWallets: jest.fn(),
+// Mock wallet service (secure storage functionality moved here)
+jest.mock('../src/services/WalletService', () => ({
+  walletService: {
+    storeWalletSecurelyPublic: jest.fn(),
+    getUserWallet: jest.fn(),
     removeLinkedWallet: jest.fn(),
   },
 }));
@@ -105,29 +105,29 @@ describe('Wallet Linking', () => {
 
   describe('Linked Wallet Management', () => {
     test('should get linked wallets', async () => {
-      const { secureStorageService } = require('../src/services/secureStorageService');
-      secureStorageService.getLinkedWallets.mockResolvedValue([]);
+      const { walletService } = require('../src/services/WalletService');
+      walletService.getUserWallet.mockResolvedValue([]);
 
       const wallets = await signatureLinkService.getLinkedWallets('test-user-123');
 
       expect(wallets).toBeDefined();
       expect(Array.isArray(wallets)).toBe(true);
-      expect(secureStorageService.getLinkedWallets).toHaveBeenCalledWith('test-user-123');
+      expect(walletService.getUserWallet).toHaveBeenCalledWith('test-user-123');
     });
 
     test('should remove linked wallets', async () => {
-      const { secureStorageService } = require('../src/services/secureStorageService');
-      secureStorageService.removeLinkedWallet.mockResolvedValue(undefined);
+      const { walletService } = require('../src/services/WalletService');
+      walletService.removeLinkedWallet.mockResolvedValue(undefined);
 
       const result = await signatureLinkService.removeLinkedWallet('test-user-123', 'wallet-456');
 
       expect(result).toBe(true);
-      expect(secureStorageService.removeLinkedWallet).toHaveBeenCalledWith('test-user-123', 'wallet-456');
+      expect(walletService.removeLinkedWallet).toHaveBeenCalledWith('test-user-123', 'wallet-456');
     });
 
     test('should handle removal errors', async () => {
-      const { secureStorageService } = require('../src/services/secureStorageService');
-      secureStorageService.removeLinkedWallet.mockRejectedValue(new Error('Storage error'));
+      const { walletService } = require('../src/services/WalletService');
+      walletService.removeLinkedWallet.mockRejectedValue(new Error('Storage error'));
 
       const result = await signatureLinkService.removeLinkedWallet('test-user-123', 'wallet-456');
 

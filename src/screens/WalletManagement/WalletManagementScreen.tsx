@@ -24,10 +24,8 @@ import NavBar from '../../components/NavBar';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
-import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
-import { multiSigService } from '../../services/multiSigService';
+import { walletService, UserWalletBalance } from '../../services/WalletService';
 import { MultiSignStateService } from '../../services/multiSignStateService';
-import { secureStorageService } from '../../services/secureStorageService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
@@ -100,13 +98,13 @@ const WalletManagementScreen: React.FC = () => {
         await getAppWalletBalance(currentUser.id.toString());
 
         // Also ensure user has a wallet for backward compatibility
-        const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
+        const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
 
         if (walletResult.success && walletResult.wallet) {
           if (__DEV__) { console.log('✅ Wallet ensured for user:', walletResult.wallet.address); }
 
           // Load app wallet balance for local state
-          const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
+          const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
           setLocalAppWalletBalance(balance);
 
           // Load transactions using consolidated function
@@ -135,10 +133,10 @@ const WalletManagementScreen: React.FC = () => {
                   onPress: async () => {
                     try {
                       // Clear existing wallet data first
-                      await userWalletService.clearWalletDataForUser(currentUser.id.toString());
+                      await walletService.clearWalletDataForUser(currentUser.id.toString());
 
                       // Create a new wallet using the existing service
-                      const newWalletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
+                      const newWalletResult = await walletService.ensureUserWallet(currentUser.id.toString());
 
                       if (newWalletResult.success && newWalletResult.wallet) {
                         Alert.alert(
@@ -209,7 +207,7 @@ const WalletManagementScreen: React.FC = () => {
 
     try {
       // Load user's multi-signature wallets
-      const userMultiSigWallets = await multiSigService.getUserMultiSigWallets(currentUser.id.toString());
+      const userMultiSigWallets = await walletService.getUserMultiSigWallets(currentUser.id.toString());
 
       if (__DEV__) {
         console.log('✅ Multi-signature data loaded:', {
@@ -330,13 +328,13 @@ const WalletManagementScreen: React.FC = () => {
       console.log('🔄 WalletManagement: Manual refresh triggered');
 
       // Ensure user has a wallet first
-      const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
+      const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
 
       if (walletResult.success && walletResult.wallet) {
         console.log('💰 WalletManagement: Refreshing wallet balance...');
 
         // Refresh app wallet balance directly
-        const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
+        const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
 
         if (balance) {
           console.log('💰 WalletManagement: New balance detected:', balance.totalUSD, 'USD');
@@ -409,10 +407,7 @@ const WalletManagementScreen: React.FC = () => {
     try {
       if (!currentUser?.id) return;
 
-      const result = await multiSigService.approveMultiSigTransaction(
-        transactionId,
-        currentUser.id.toString()
-      );
+      const result = await walletService.approveMultiSigTransaction(transactionId, currentUser.id.toString());
 
       if (result.success) {
         Alert.alert('Success', 'Transaction approved successfully!');
@@ -431,10 +426,7 @@ const WalletManagementScreen: React.FC = () => {
     try {
       if (!currentUser?.id) return;
 
-      const result = await multiSigService.rejectMultiSigTransaction(
-        transactionId,
-        currentUser.id.toString()
-      );
+      const result = await walletService.rejectMultiSigTransaction(transactionId, currentUser.id.toString());
 
       if (result.success) {
         Alert.alert('Success', 'Transaction rejected successfully!');

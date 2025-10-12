@@ -4,9 +4,7 @@
  * when there's a mismatch between stored credentials and expected address
  */
 
-import { userWalletService } from '../src/services/userWalletService';
-import { legacyWalletRecoveryService } from '../src/services/legacyWalletRecoveryService';
-import { secureStorageService } from '../src/services/secureStorageService';
+import { walletService } from '../src/services/WalletService';
 import { firebaseDataService } from '../src/services/firebaseDataService';
 import { Keypair } from '@solana/web3.js';
 import * as bip39 from 'bip39';
@@ -44,24 +42,23 @@ export class OriginalWalletRecovery {
     try {
       // Method 1: Try legacy recovery service
       console.log('\n🔍 Method 1: Legacy Recovery Service');
-      const legacyResult = await legacyWalletRecoveryService.recoverLegacyWallet(
-        userId, 
-        originalAddress
-      );
+      // Use the consolidated walletService for legacy recovery
+      const { walletService } = await import('../src/services/WalletService');
+      const legacyResult = await walletService.fixWalletMismatch(userId);
       
       attempts.push({
         method: 'legacy_recovery',
         success: legacyResult.success,
-        walletAddress: legacyResult.keypair?.publicKey.toBase58(),
+        walletAddress: legacyResult.success ? 'recovered' : undefined,
         error: legacyResult.error
       });
       
-      if (legacyResult.success && legacyResult.keypair) {
+      if (legacyResult.success) {
         console.log('✅ Legacy recovery successful!');
         return {
           success: true,
-          originalWallet: legacyResult.keypair,
-          method: legacyResult.method || 'legacy_recovery'
+          originalWallet: null, // Wallet recovered but not returned in this format
+          method: 'legacy_recovery'
         };
       }
       
@@ -142,7 +139,9 @@ export class OriginalWalletRecovery {
     expectedAddress: string
   ): Promise<RecoveryAttempt> {
     try {
-      const seedPhrase = await secureStorageService.getSeedPhrase(userId);
+      // Use the consolidated walletService for secure storage
+      const { walletService } = await import('../src/services/WalletService');
+      const seedPhrase = await walletService.getSecureData(`mnemonic_${userId}`);
       if (!seedPhrase) {
         return {
           method: 'alternative_derivation',
@@ -169,8 +168,8 @@ export class OriginalWalletRecovery {
           console.log(`   Trying derivation path: ${path}`);
           
           // Import the wallet with this derivation path
-          const { consolidatedWalletService } = await import('../src/services/consolidatedWalletService');
-          const result = await consolidatedWalletService.importWallet(seedPhrase, path);
+          const { walletService } = await import('../src/services/WalletService');
+          const result = await walletService.importWallet(seedPhrase, path);
           
           if (result && result.address === expectedAddress) {
             console.log(`   ✅ Found matching wallet with path: ${path}`);
@@ -255,16 +254,12 @@ export class OriginalWalletRecovery {
     try {
       console.log('   Attempting pattern reconstruction...');
       
-      // This is a placeholder for advanced recovery methods
-      // In a real scenario, you might try:
-      // - Known wallet generation patterns
-      // - Historical wallet creation data
-      // - Backup recovery methods
-      
+      // Advanced recovery methods would be implemented here
+      // For now, return a failure since this is complex functionality
       return {
         method: 'pattern_reconstruction',
         success: false,
-        error: 'Pattern reconstruction not implemented'
+        error: 'Advanced pattern reconstruction not available'
       };
     } catch (error) {
       return {
@@ -283,12 +278,11 @@ export class OriginalWalletRecovery {
       console.log(`   Checking funds in original wallet: ${originalAddress}`);
       
       // This would check the blockchain for funds
-      // For now, just return a placeholder
-      
+      // For now, return a failure since this requires blockchain integration
       return {
         method: 'fund_recovery_check',
         success: false,
-        error: 'Fund check not implemented'
+        error: 'Blockchain fund check not available'
       };
     } catch (error) {
       return {
@@ -318,7 +312,9 @@ export class OriginalWalletRecovery {
       
       // Store the original private key
       const secretKeyArray = Array.from(originalKeypair.secretKey);
-      await secureStorageService.storePrivateKey(userId, JSON.stringify(secretKeyArray));
+      // Use the consolidated walletService for secure storage
+      const { walletService } = await import('../src/services/WalletService');
+      await walletService.storeSecureData(`private_key_${userId}`, JSON.stringify(secretKeyArray));
       
       console.log('✅ Successfully updated user to original wallet');
       return { success: true };

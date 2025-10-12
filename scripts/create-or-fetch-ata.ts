@@ -12,7 +12,8 @@ import {
   TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
 import { logger } from '../src/services/loggingService';
-import { CURRENT_NETWORK, COMPANY_WALLET_CONFIG } from '../src/config/chain';
+import { CURRENT_NETWORK } from '../src/config/chain';
+import { COMPANY_WALLET_CONFIG } from '../src/config/feeConfig';
 
 interface AtaInfo {
   ata: PublicKey;

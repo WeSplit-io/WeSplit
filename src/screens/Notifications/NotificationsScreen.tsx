@@ -13,10 +13,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
-import NotificationCard, { NotificationData } from '../../components/NotificationCard';
+import NotificationCard from '../../components/NotificationCard';
 import { useApp } from '../../context/AppContext';
-import { getUserNotifications, markNotificationAsRead, sendNotification, Notification } from '../../services/firebaseNotificationService';
-import { updatePaymentRequestStatus, updateSettlementRequestStatus } from '../../services/notificationStatusService';
+import { notificationService, NotificationData } from '../../services/notificationService';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import styles from './styles';
 import { colors } from '../../theme/colors';

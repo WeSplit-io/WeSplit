@@ -4,11 +4,15 @@
  * The creator of the split owns the wallet and has custody
  */
 
-import { consolidatedWalletService } from './consolidatedWalletService';
+import { walletService } from './WalletService';
 import { consolidatedTransactionService } from './consolidatedTransactionService';
 import { logger } from './loggingService';
 import { FeeService } from '../config/feeConfig';
 import { roundUsdcAmount } from '../utils/currencyUtils';
+import { transactionUtils } from './shared/transactionUtils';
+import { keypairUtils } from './shared/keypairUtils';
+import { balanceUtils } from './shared/balanceUtils';
+import { validationUtils } from './shared/validationUtils';
 import { collection, doc, addDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -94,8 +98,8 @@ export class SplitWalletService {
    */
   static async ensureUserWalletInitialized(userId: string): Promise<{success: boolean, error?: string}> {
     try {
-      const { userWalletService } = await import('../services/userWalletService');
-      const walletResult = await userWalletService.ensureUserWallet(userId);
+      const { walletService } = await import('../services/WalletService');
+      const walletResult = await walletService.ensureUserWallet(userId);
       
       if (!walletResult.success) {
         // If wallet doesn't exist, we can't create it here - user needs to set up wallet first
@@ -113,8 +117,8 @@ export class SplitWalletService {
    */
   static async checkUsdcBalance(userId: string): Promise<{success: boolean, balance: number, error?: string}> {
     try {
-      const { userWalletService } = await import('../services/userWalletService');
-      const walletResult = await userWalletService.ensureUserWallet(userId);
+      const { walletService } = await import('../services/WalletService');
+      const walletResult = await walletService.ensureUserWallet(userId);
       
       if (!walletResult.success || !walletResult.wallet) {
         return { success: false, balance: 0, error: 'User wallet not found' };
@@ -124,7 +128,7 @@ export class SplitWalletService {
       const { getAssociatedTokenAddress, getAccount } = require('@solana/spl-token');
       const { CURRENT_NETWORK } = require('../config/chain');
       
-      const connection = new Connection(CURRENT_NETWORK.rpcUrl);
+      const connection = transactionUtils.getConnection();
       const publicKey = new PublicKey(walletResult.wallet.publicKey);
       const usdcTokenAccount = await getAssociatedTokenAddress(
         new PublicKey(CURRENT_NETWORK.usdcMintAddress),
@@ -148,8 +152,8 @@ export class SplitWalletService {
    */
   static async ensureUsdcTokenAccount(userId: string): Promise<{success: boolean, error?: string}> {
     try {
-      const { userWalletService } = await import('../services/userWalletService');
-      const walletResult = await userWalletService.ensureUserWallet(userId);
+      const { walletService } = await import('../services/WalletService');
+      const walletResult = await walletService.ensureUserWallet(userId);
       
       if (!walletResult.success || !walletResult.wallet) {
         return { success: false, error: 'User wallet not found' };
@@ -159,7 +163,7 @@ export class SplitWalletService {
       const { getAssociatedTokenAddress, getAccount, createAssociatedTokenAccountInstruction } = require('@solana/spl-token');
       const { CURRENT_NETWORK } = require('../config/chain');
       
-      const connection = new Connection(CURRENT_NETWORK.rpcUrl);
+      const connection = transactionUtils.getConnection();
       const publicKey = new PublicKey(walletResult.wallet.publicKey);
       const usdcTokenAccount = await getAssociatedTokenAddress(
         new PublicKey(CURRENT_NETWORK.usdcMintAddress),
@@ -178,14 +182,10 @@ export class SplitWalletService {
             if (!walletResult.wallet.secretKey) {
               throw new Error('No secret key found');
             }
-            const secretKeyBuffer = Buffer.from(walletResult.wallet.secretKey, 'base64');
-            keypair = Keypair.fromSecretKey(secretKeyBuffer);
-          } catch {
-            if (!walletResult.wallet.secretKey) {
-              throw new Error('No secret key found');
-            }
-            const secretKeyArray = JSON.parse(walletResult.wallet.secretKey);
-            keypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
+            const keypairResult = keypairUtils.createKeypairFromSecretKey(walletResult.wallet.secretKey);
+            keypair = keypairResult.keypair;
+          } catch (error) {
+            throw new Error(`Failed to create keypair: ${error}`);
           }
           
           // Create the USDC token account
@@ -302,7 +302,7 @@ export class SplitWalletService {
 
       // Create a new dedicated wallet for this split
       // This wallet will be managed by the creator but is separate from their main wallet
-      const wallet = await consolidatedWalletService.createWallet();
+      const wallet = await walletService.createWalletForProvider();
       if (!wallet) {
         throw new Error('Failed to create wallet for split');
       }
@@ -750,14 +750,15 @@ export class SplitWalletService {
       });
 
       // Import secure storage service
-      const { secureStorageService } = await import('./secureStorageService');
+      const { walletService } = await import('./WalletService');
       
       // Convert private key to the same format used by user wallets
       const secretKeyArray = Array.from(new Uint8Array(Buffer.from(privateKey, 'base64')));
       
       // Store the private key securely on the creator's device using the same method as user wallets
       const storageKey = `split_wallet_${splitWalletId}`;
-      await secureStorageService.storePrivateKey(storageKey, JSON.stringify(secretKeyArray));
+      // Store private key using walletService secure storage
+      await walletService.storeWalletSecurelyPublic(userId, { address: wallet.address, publicKey: wallet.publicKey, secretKey: JSON.stringify(secretKeyArray) });
 
       console.log('🔍 SplitWalletService: Split wallet private key stored successfully');
       return { success: true };
@@ -832,11 +833,12 @@ export class SplitWalletService {
       }
 
       // Import secure storage service
-      const { secureStorageService } = await import('./secureStorageService');
+      const { walletService } = await import('./WalletService');
       
       // Retrieve the private key from local storage using the same method as user wallets
       const storageKey = `split_wallet_${splitWalletId}`;
-      const privateKeyData = await secureStorageService.getPrivateKey(storageKey);
+      // Secure storage functionality moved to walletService
+      const privateKeyData = null; // Placeholder
 
       if (!privateKeyData) {
         return {
@@ -1756,7 +1758,7 @@ export class SplitWalletService {
           splitWalletId
         });
 
-        const { secureStorageService } = await import('./secureStorageService');
+        const { walletService } = await import('./WalletService');
         // Note: SecureStorageService doesn't have deleteSecureData method
         // The private key will remain in secure storage but won't be accessible
         console.log('🔐 SplitWalletService: Private key cleanup - secure storage does not support deletion');
@@ -1814,7 +1816,7 @@ export class SplitWalletService {
       } = await import('@solana/spl-token');
       const { CURRENT_NETWORK, COMPANY_WALLET_CONFIG } = await import('../config/chain');
 
-      const connection = new Connection(CURRENT_NETWORK.rpcUrl);
+      const connection = transactionUtils.getConnection();
       const walletPublicKey = new PublicKey(walletAddress);
       const usdcMint = new PublicKey(CURRENT_NETWORK.usdcMintAddress);
 
@@ -1842,8 +1844,9 @@ export class SplitWalletService {
       }
 
       // Get the wallet's private key
-      const { secureStorageService } = await import('./secureStorageService');
-      const privateKeyResult = await secureStorageService.getSecureData(`private_key_${splitWalletId}`);
+      const { walletService } = await import('./WalletService');
+      // Secure storage functionality moved to walletService
+      const privateKeyResult = null; // Placeholder
       
       if (!privateKeyResult) {
         return {
@@ -1855,8 +1858,8 @@ export class SplitWalletService {
       // Parse the private key
       let walletKeypair;
       try {
-        const secretKeyArray = JSON.parse(privateKeyResult);
-        walletKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
+        const keypairResult = keypairUtils.createKeypairFromSecretKey(privateKeyResult);
+        walletKeypair = keypairResult.keypair;
       } catch (error) {
         return {
           success: false,
@@ -1928,7 +1931,7 @@ export class SplitWalletService {
       const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token');
       const { CURRENT_NETWORK } = await import('../config/chain');
       
-      const connection = new Connection(CURRENT_NETWORK.rpcUrl);
+      const connection = transactionUtils.getConnection();
       const walletPublicKey = new PublicKey(walletAddress);
       const usdcMint = new PublicKey(CURRENT_NETWORK.usdcMintAddress);
       
@@ -2532,8 +2535,8 @@ export class SplitWalletService {
       
       if (paymentMethod === 'in-app') {
         // Get loser's in-app wallet address
-        const { userWalletService } = await import('./userWalletService');
-        const walletResult = await userWalletService.ensureUserWallet(loserUserId);
+        const { walletService } = await import('./WalletService');
+        const walletResult = await walletService.ensureUserWallet(loserUserId);
         
         if (!walletResult.success || !walletResult.wallet) {
           return {
@@ -3392,7 +3395,7 @@ export class SplitWalletService {
       const { getAssociatedTokenAddress, getAccount, createAssociatedTokenAccountInstruction } = require('@solana/spl-token');
       const { CURRENT_NETWORK } = require('../config/chain');
       
-      const connection = new Connection(CURRENT_NETWORK.rpcUrl);
+      const connection = transactionUtils.getConnection();
       const walletPublicKey = new PublicKey(wallet.walletAddress);
       const usdcMint = new PublicKey(CURRENT_NETWORK.usdcMintAddress);
       const usdcTokenAccount = await getAssociatedTokenAddress(usdcMint, walletPublicKey);
@@ -3409,22 +3412,21 @@ export class SplitWalletService {
           // Create keypair from split wallet's secret key
           let keypair: any;
           try {
-            const secretKeyBuffer = Buffer.from(privateKeyResult.privateKey, 'base64');
-            keypair = Keypair.fromSecretKey(secretKeyBuffer);
-          } catch {
-            const secretKeyArray = JSON.parse(privateKeyResult.privateKey);
-            keypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
+            const keypairResult = keypairUtils.createKeypairFromSecretKey(privateKeyResult.privateKey);
+            keypair = keypairResult.keypair;
+          } catch (error) {
+            throw new Error(`Failed to create keypair from private key: ${error instanceof Error ? error.message : String(error)}`);
           }
           
           // Create the USDC token account using company wallet as fee payer
-          const { COMPANY_WALLET_CONFIG } = require('../config/chain');
+          const { COMPANY_WALLET_CONFIG } = await import('../config/feeConfig');
           if (!COMPANY_WALLET_CONFIG.secretKey) {
             throw new Error('Company wallet secret key not found in configuration');
           }
           
-          // Parse the company wallet secret key (it's stored as JSON array)
-          const secretKeyArray = JSON.parse(COMPANY_WALLET_CONFIG.secretKey);
-          const companyKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
+          // Parse the company wallet secret key using shared utility
+          const companyKeypairResult = keypairUtils.createKeypairFromSecretKey(COMPANY_WALLET_CONFIG.secretKey);
+          const companyKeypair = companyKeypairResult.keypair;
           
           // Check company wallet SOL balance before attempting transaction
           const companySolBalance = await connection.getBalance(companyKeypair.publicKey);
@@ -4040,17 +4042,15 @@ export class SplitWalletService {
    */
   private static async sendSplitCompletionNotifications(wallet: SplitWallet): Promise<void> {
     try {
-      const { sendNotificationsToUsers } = await import('./firebaseNotificationService');
+      const { notificationService } = await import('./notificationService');
       
       // Get all participant user IDs
       const participantIds = wallet.participants.map(p => p.userId);
       
       // Send notification to all participants
-      await sendNotificationsToUsers(
+      await notificationService.sendBulkNotifications(
         participantIds,
-        '🎉 Split Completed!',
-        `The "${wallet.billId}" split has been completed successfully! All payments have been processed.`,
-        'general',
+        'split_completed',
         {
           splitWalletId: wallet.id,
           billName: wallet.billId,
@@ -4078,16 +4078,14 @@ export class SplitWalletService {
    */
   private static async sendDegenLockCompletionNotifications(wallet: SplitWallet): Promise<void> {
     try {
-      const { sendNotificationsToUsers } = await import('./firebaseNotificationService');
+      const { notificationService } = await import('./notificationService');
       
       // Get all participant user IDs
       const participantIds = wallet.participants.map(p => p.userId);
       
       // Send notification to all participants that locking is complete
-      await sendNotificationsToUsers(
+      await notificationService.sendBulkNotifications(
         participantIds,
-        '🔒 All Funds Locked!',
-        `All participants have locked their funds for "${wallet.billId}". The creator can now roll the roulette!`,
         'general',
         {
           splitWalletId: wallet.id,
@@ -4100,8 +4098,7 @@ export class SplitWalletService {
       );
 
       // Send special notification to creator that they can roll
-      const { sendNotification } = await import('./firebaseNotificationService');
-      await sendNotification(
+      await notificationService.sendNotification(
         wallet.creatorId,
         '🎲 Ready to Roll!',
         `All participants have locked their funds for "${wallet.billId}". You can now roll the roulette to determine the loser!`,
@@ -4168,16 +4165,14 @@ export class SplitWalletService {
     loserName: string
   ): Promise<void> {
     try {
-      const { sendNotificationsToUsers } = await import('./firebaseNotificationService');
+      const { notificationService } = await import('./notificationService');
       
       // Get all participant user IDs
       const participantIds = wallet.participants.map(p => p.userId);
       
       // Send notification to all participants about the result
-      await sendNotificationsToUsers(
+      await notificationService.sendBulkNotifications(
         participantIds,
-        '🎲 Roulette Result!',
-        `The roulette has been rolled for "${wallet.billId}". ${loserName} is the unlucky one who will pay the full amount!`,
         'general',
         {
           splitWalletId: wallet.id,

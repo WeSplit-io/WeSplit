@@ -34,7 +34,7 @@ async function runWalletRecovery() {
     // Create a temporary recovery script
     const recoveryScript = `
 import { ManualWalletRecovery } from './manual-wallet-recovery';
-import { userWalletService } from '../src/services/userWalletService';
+import { walletService } from '../src/services/WalletService';
 
 async function runRecovery() {
   try {
@@ -56,7 +56,7 @@ async function runRecovery() {
     
     // Also try the standard wallet service
     console.log('\\n🔄 Trying standard wallet service...');
-    const walletResult = await userWalletService.ensureUserWallet('${userId || 'unknown'}');
+    const walletResult = await walletService.ensureUserWallet('${userId || 'unknown'}');
     if (walletResult.success) {
       console.log('✅ Standard service found wallet:', walletResult.wallet?.address);
     } else {

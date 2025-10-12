@@ -5,6 +5,7 @@
 
 import { Keypair, Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { CURRENT_NETWORK } from '../config/solanaConfig';
+import { transactionUtils } from './shared/transactionUtils';
 
 export interface CompanyWalletConfig {
   companyWalletAddress: string;
@@ -21,12 +22,11 @@ export interface GasFeeCoverageResult {
 }
 
 export class CompanyWalletService {
-  private connection: Connection;
   private companyKeypair: Keypair | null = null;
   private config: CompanyWalletConfig;
 
   constructor() {
-    this.connection = new Connection(CURRENT_NETWORK.rpcUrl, CURRENT_NETWORK.commitment);
+    // Use shared connection from transactionUtils
     
     // Company wallet configuration
     this.config = {
@@ -71,7 +71,7 @@ export class CompanyWalletService {
     }
 
     try {
-      const solBalance = await this.connection.getBalance(this.companyKeypair.publicKey);
+      const solBalance = await transactionUtils.getConnection().getBalance(this.companyKeypair.publicKey);
       const solBalanceInSol = solBalance / LAMPORTS_PER_SOL;
 
       // For now, we'll assume company wallet only holds SOL for gas fees

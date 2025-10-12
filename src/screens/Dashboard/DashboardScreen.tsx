@@ -31,13 +31,12 @@ import { useGroupList } from '../../hooks/useGroupData';
 import { GroupWithDetails, Expense, GroupMember, Transaction } from '../../types';
 import { formatCryptoAmount } from '../../utils/cryptoUtils';
 import { getTotalSpendingInUSDC } from '../../services/priceService';
-import { getUserNotifications } from '../../services/firebaseNotificationService';
+import { notificationService } from '../../services/notificationService';
 import { createPaymentRequest, getReceivedPaymentRequests } from '../../services/firebasePaymentRequestService';
-import { userWalletService, UserWalletBalance } from '../../services/userWalletService';
+import { walletService, UserWalletBalance } from '../../services/WalletService';
 import { firebaseTransactionService, firebaseDataService } from '../../services/firebaseDataService';
 import { generateProfileLink } from '../../services/deepLinkHandler';
 import { SplitStorageService } from '../../services/splitStorageService';
-import { MockupDataService } from '../../data/mockupData';
 import { db } from '../../config/firebase';
 import { getDoc, doc } from 'firebase/firestore';
 
@@ -269,7 +268,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       console.log(`💰 Dashboard: Loading user wallet balance... (attempt ${retryCount + 1})`);
 
       // First ensure the user has a wallet
-      const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
+      const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
 
       if (walletResult.success && walletResult.wallet) {
         // Update user's wallet information in app context if it's different
@@ -286,7 +285,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         }
 
         // Now get the balance
-        const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
+        const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
 
         // Check if we got a valid balance
         if (balance && balance.totalUSD !== undefined && balance.totalUSD !== null) {
@@ -358,7 +357,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                   try {
                     console.log('User chose to create new wallet');
                     // Call the new wallet creation method
-                    const newWalletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
+                    const newWalletResult = await walletService.ensureUserWallet(currentUser.id.toString());
 
                     if (newWalletResult.success && newWalletResult.wallet) {
                       // Update user context with new wallet
@@ -967,7 +966,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       setBalanceLoaded(false); // Reset balance loaded flag to allow refresh
 
       // Ensure wallet exists and refresh balance
-      const walletResult = await userWalletService.ensureUserWallet(currentUser.id.toString());
+      const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
 
       // Update user's wallet information if it changed
       if (walletResult.success && walletResult.wallet && currentUser.wallet_address !== walletResult.wallet.address) {
@@ -989,7 +988,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           setLoadingUserWallet(true);
 
           // Get the balance directly from the service
-          const balance = await userWalletService.getUserWalletBalance(currentUser.id.toString());
+          const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
 
           if (balance) {
             console.log('💰 Dashboard: New balance detected:', balance.totalUSD ?? 0, 'USD');
@@ -1315,28 +1314,8 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       const result = await SplitStorageService.getUserSplits(currentUser.id.toString());
       
       if (result.success && result.splits) {
-        // Get the 3 most recent splits and ensure they use unified mockup data
-        const recentSplits = result.splits.slice(0, 3).map((split: any) => {
-          // Use unified mockup data for consistency
-          const unifiedAmount = MockupDataService.getBillAmount();
-          
-          console.log('💰 Dashboard: Using unified mockup data for split:', {
-            splitId: split.id,
-            originalAmount: split.totalAmount,
-            unifiedAmount: unifiedAmount
-          });
-          
-          // Update the split with the unified mockup data
-          return {
-            ...split,
-            totalAmount: unifiedAmount,
-            title: MockupDataService.getBillName(),
-            merchant: {
-              name: MockupDataService.getMerchantName(),
-              address: MockupDataService.getLocation(),
-            }
-          };
-        });
+        // Get the 3 most recent splits
+        const recentSplits = result.splits.slice(0, 3);
         
         console.log('🔍 Dashboard: Loaded recent splits:', {
           count: recentSplits.length,

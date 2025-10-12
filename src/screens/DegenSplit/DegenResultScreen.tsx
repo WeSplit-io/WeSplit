@@ -22,7 +22,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenResultStyles';
 import { SplitWalletService } from '../../services/splitWalletService';
-import { NotificationService } from '../../services/notificationService';
+import { notificationService } from '../../services/notificationService';
 import { useApp } from '../../context/AppContext';
 
 interface DegenResultScreenProps {
@@ -206,7 +206,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
               ].filter(id => id); // Filter out undefined values
               
               if (completionRecipients.length > 0) {
-                await NotificationService.sendBulkNotifications(
+                await notificationService.sendBulkNotifications(
                   completionRecipients,
                   'split_completed', // Use appropriate notification type
                   {

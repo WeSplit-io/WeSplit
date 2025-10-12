@@ -13,7 +13,7 @@ import {
 import Icon from './Icon';
 import { useWallet } from '../context/WalletContext';
 import { colors } from '../theme';
-import { consolidatedWalletService } from '../services/consolidatedWalletService';
+import { walletService } from '../services/WalletService';
 
 interface WalletSelectorModalProps {
   visible: boolean;

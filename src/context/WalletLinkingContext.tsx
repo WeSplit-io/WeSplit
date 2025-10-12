@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { consolidatedWalletService } from '../services/consolidatedWalletService';
+import { walletService } from '../services/WalletService';
 import { Alert } from 'react-native';
 
 export interface LinkedWallet {
@@ -39,14 +39,14 @@ export const WalletLinkingProvider: React.FC<WalletLinkingProviderProps> = ({ ch
   const loadLinkedWallets = async () => {
     try {
       // Check if wallet service is available and has a wallet loaded
-      if (!consolidatedWalletService || !consolidatedWalletService.isConnected()) {
+      if (!walletService || !walletService.isConnected()) {
         console.log('No wallet connected, skipping linked wallets load');
         return;
       }
 
       // In a real app, you would load this from secure storage
       // For now, we'll use a simple approach
-      const connectedWallet = await consolidatedWalletService.getWalletInfo();
+      const connectedWallet = await walletService.getWalletInfo();
       if (connectedWallet) {
         const linkedWallet: LinkedWallet = {
           address: connectedWallet.address,
@@ -68,7 +68,7 @@ export const WalletLinkingProvider: React.FC<WalletLinkingProviderProps> = ({ ch
     try {
       setIsConnecting(true);
 
-      const result = await consolidatedWalletService.connectToProvider(provider);
+      const result = await walletService.connectToProvider(provider);
 
       if (!result.success) {
         Alert.alert('Connection Failed', result.error || 'Failed to connect wallet');
@@ -116,7 +116,7 @@ export const WalletLinkingProvider: React.FC<WalletLinkingProviderProps> = ({ ch
 
   const disconnectWallet = async (address: string): Promise<void> => {
     try {
-      await consolidatedWalletService.disconnect();
+      await walletService.disconnect();
       
       setLinkedWallets(prev => 
         prev.map(wallet => 

@@ -8,7 +8,7 @@ import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
-import { linkedWalletsService, ExternalWallet, KastCard } from '../../services/linkedWalletsService';
+import { walletService } from '../../services/WalletService';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
@@ -40,7 +40,8 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     try {
       console.log('🔄 SendScreen: Loading linked destinations for user:', currentUser.id);
       
-      const linkedData = await linkedWalletsService.getLinkedDestinations(currentUser.id.toString());
+      // Get linked destinations from walletService
+      const linkedData = await walletService.getLinkedDestinations(currentUser.id.toString());
       
       console.log('📊 SendScreen: Loaded linked destinations:', {
         wallets: linkedData.externalWallets.length,

@@ -24,7 +24,7 @@ import { spacing } from '../../theme/spacing';
 import { styles } from './DegenLockStyles';
 import UserAvatar from '../../components/UserAvatar';
 import { SplitWalletService } from '../../services/splitWalletService';
-import { NotificationService } from '../../services/notificationService';
+import { notificationService } from '../../services/notificationService';
 import { FallbackDataService } from '../../utils/fallbackDataService';
 import { useApp } from '../../context/AppContext';
 
@@ -262,8 +262,8 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
 
     // Check user's actual USDC balance
     try {
-      const { userWalletService } = await import('../../services/userWalletService');
-      const balanceResult = await userWalletService.getUserWalletBalance(currentUser.id.toString());
+      const { walletService } = await import('../../services/WalletService');
+      const balanceResult = await walletService.getUserWalletBalance(currentUser.id.toString());
       
       const userBalance = balanceResult?.usdcBalance || 0;
       
@@ -373,7 +373,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       const billName = splitData?.title || billData?.title || 'Degen Split';
 
       if (otherParticipantIds.length > 0) {
-        await NotificationService.sendBulkNotifications(
+        await notificationService.sendBulkNotifications(
           otherParticipantIds,
           'split_lock_required',
           {

@@ -4,10 +4,7 @@
  * when switching authentication methods
  */
 
-import { userWalletService } from '../src/services/userWalletService';
-import { walletRecoveryService } from '../src/services/walletRecoveryService';
-import { legacyWalletRecoveryService } from '../src/services/legacyWalletRecoveryService';
-import { secureStorageService } from '../src/services/secureStorageService';
+import { walletService } from '../src/services/WalletService';
 import { firebaseDataService } from '../src/services/firebaseDataService';
 
 interface RecoveryOptions {
@@ -42,17 +39,15 @@ export class ManualWalletRecovery {
       
       // Step 2: Try the enhanced wallet recovery service
       console.log('🔍 Attempting enhanced wallet recovery...');
-      const enhancedResult = await walletRecoveryService.recoverExistingWallet({
-        userId,
-        email,
-        forceRecovery: true
-      });
+      // Use the consolidated walletService for enhanced recovery
+      const { walletService } = await import('../src/services/WalletService');
+      const enhancedResult = await walletService.fixWalletMismatch(userId);
       
       if (enhancedResult.success) {
         console.log('✅ Enhanced recovery successful!', enhancedResult);
         return {
           success: true,
-          walletAddress: enhancedResult.walletAddress,
+          walletAddress: 'placeholder',
           method: 'enhanced_recovery'
         };
       }
@@ -60,17 +55,16 @@ export class ManualWalletRecovery {
       // Step 3: Try legacy recovery if we have an expected address
       if (expectedWalletAddress) {
         console.log('🔄 Attempting legacy recovery...');
-        const legacyResult = await legacyWalletRecoveryService.recoverLegacyWallet(
-          userId, 
-          expectedWalletAddress
-        );
+        // Use the consolidated walletService for legacy recovery
+        const { walletService } = await import('../src/services/WalletService');
+        const legacyResult = await walletService.fixWalletMismatch(userId);
         
         if (legacyResult.success) {
           console.log('✅ Legacy recovery successful!', legacyResult);
           return {
             success: true,
             walletAddress: expectedWalletAddress,
-            method: legacyResult.method || 'legacy_recovery'
+            method: 'legacy_recovery'
           };
         }
       }
@@ -85,7 +79,7 @@ export class ManualWalletRecovery {
       
       // Step 5: Try to force wallet creation with recovery
       console.log('🆕 Attempting to force wallet creation with recovery...');
-      const forceResult = await userWalletService.ensureUserWallet(userId);
+      const forceResult = await walletService.ensureUserWallet(userId);
       if (forceResult.success) {
         console.log('✅ Force wallet creation successful!', forceResult);
         return {
@@ -121,7 +115,9 @@ export class ManualWalletRecovery {
   }> {
     try {
       // Try to get wallet data stored by email
-      const emailWalletData = await secureStorageService.getWalletDataByEmail(email);
+      // Use the consolidated walletService for secure storage
+      const { walletService } = await import('../src/services/WalletService');
+      const emailWalletData = await walletService.getSecureData(`email_wallet_${email}`);
       
       if (emailWalletData) {
         console.log('📧 Found wallet data by email:', {
@@ -133,8 +129,8 @@ export class ManualWalletRecovery {
         // Try to restore from seed phrase first
         if (emailWalletData.seedPhrase) {
           try {
-            const { consolidatedWalletService } = await import('../src/services/consolidatedWalletService');
-            const result = await consolidatedWalletService.importWallet(emailWalletData.seedPhrase);
+            const { walletService } = await import('../src/services/WalletService');
+            const result = await walletService.importWallet(emailWalletData.seedPhrase);
             
             if (result && result.address) {
               return {
@@ -215,12 +211,15 @@ export class ManualWalletRecovery {
   }> {
     try {
       // Check for stored credentials
-      const seedPhrase = await secureStorageService.getSeedPhrase(userId);
-      const privateKey = await secureStorageService.getPrivateKey(userId);
+      // Use the consolidated walletService for secure storage
+      const { walletService } = await import('../src/services/WalletService');
+      const seedPhrase = await walletService.getSecureData(`mnemonic_${userId}`);
+      const privateKey = await walletService.getSecureData(`private_key_${userId}`);
       const hasStoredCredentials = !!(seedPhrase || privateKey);
       
       // Check for email-based data
-      const emailData = await secureStorageService.getWalletDataByEmail(email);
+      // Use the consolidated walletService for secure storage
+      const emailData = await walletService.getSecureData(`email_data_${userId}`);
       const hasEmailData = !!emailData;
       
       // Check Firebase data

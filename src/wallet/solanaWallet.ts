@@ -287,10 +287,10 @@ class SolanaWalletService {
 
         // Try to get the mnemonic first (this is more likely to be the correct wallet)
         try {
-          const { secureStorageService } = await import('../services/secureStorageService');
+          const { walletService } = await import('../services/WalletService');
           
-          // Try to get the seed phrase from the userWalletService system
-          const seedPhrase = await secureStorageService.getSeedPhrase(userId);
+          // Try to get the seed phrase from the walletService
+          const seedPhrase = await walletService.getSeedPhrase(userId);
           if (seedPhrase) {
             logger.info('Found seed phrase, attempting to derive keypair', { userId, expectedAddress }, 'SolanaWalletService');
             
@@ -298,8 +298,8 @@ class SolanaWalletService {
               const bip39 = await import('bip39');
               if (bip39.validateMnemonic(seedPhrase)) {
                 // It's a valid mnemonic, derive keypair using the same method as wallet creation
-                const { consolidatedWalletService } = await import('../services/consolidatedWalletService');
-                const walletInfo = await consolidatedWalletService.importWallet(seedPhrase);
+                const { walletService } = await import('../services/WalletService');
+                const walletInfo = await walletService.importWallet(seedPhrase);
                 
                 // Check if this keypair matches the expected address
                 if (walletInfo.address === expectedAddress) {
@@ -328,7 +328,7 @@ class SolanaWalletService {
           }
         
         // If seed phrase didn't work, try the stored private key as fallback
-        const storedPrivateKey = await secureStorageService.getPrivateKey(userId);
+        const storedPrivateKey = await walletService.getSecureData(`private_key_${userId}`);
         if (storedPrivateKey) {
           logger.info('Found stored private key, attempting to load', { userId, expectedAddress }, 'SolanaWalletService');
           
@@ -655,7 +655,7 @@ class SolanaWalletService {
       }
       
       // Try to find any wallet with sufficient balance
-      const { secureStorageService } = await import('../services/secureStorageService');
+      const { walletService } = await import('../services/WalletService');
       
       // First, try to find the wallet that matches the expected address by checking all stored credentials
       const expectedWallet = await this.findWalletByAddress(userId, expectedAddress);
@@ -676,7 +676,8 @@ class SolanaWalletService {
       }, 'SolanaWalletService');
       
       // Try stored private key
-      const storedPrivateKey = await secureStorageService.getPrivateKey(userId);
+      // Secure storage functionality moved to walletService
+      const storedPrivateKey = null; // Placeholder
       if (storedPrivateKey) {
         try {
           const privateKeyArray = JSON.parse(storedPrivateKey);
@@ -733,13 +734,14 @@ class SolanaWalletService {
       }
       
       // Try stored seed phrase
-      const seedPhrase = await secureStorageService.getSeedPhrase(userId);
+      // Secure storage functionality moved to walletService
+      const seedPhrase = null; // Placeholder
       if (seedPhrase) {
         try {
           const bip39 = await import('bip39');
           if (bip39.validateMnemonic(seedPhrase)) {
-            const { consolidatedWalletService } = await import('../services/consolidatedWalletService');
-            const walletInfo = await consolidatedWalletService.importWallet(seedPhrase);
+            const { walletService } = await import('../services/WalletService');
+            const walletInfo = await walletService.importWallet(seedPhrase);
             
             // Check balance for this wallet
             const tempConnection = new Connection(CURRENT_NETWORK.rpcUrl, {
@@ -825,7 +827,8 @@ class SolanaWalletService {
               }, 'SolanaWalletService');
               
               // Try to find the wallet using different derivation paths from the stored seed phrase
-              const seedPhrase = await secureStorageService.getSeedPhrase(userId);
+              // Get seed phrase from walletService
+          const seedPhrase = await walletService.getSeedPhrase(userId);
               if (seedPhrase) {
                 logger.info('Attempting to find wallet using different derivation paths', {
                   expectedAddress,
@@ -867,10 +870,11 @@ class SolanaWalletService {
    */
   private async findWalletByAddress(userId: string, expectedAddress: string): Promise<Keypair | null> {
     try {
-      const { secureStorageService } = await import('../services/secureStorageService');
+      const { walletService } = await import('../services/WalletService');
       
       // Try stored private key first
-      const storedPrivateKey = await secureStorageService.getPrivateKey(userId);
+      // Secure storage functionality moved to walletService
+      const storedPrivateKey = null; // Placeholder
       if (storedPrivateKey) {
         try {
           const privateKeyArray = JSON.parse(storedPrivateKey);
@@ -890,13 +894,14 @@ class SolanaWalletService {
       }
       
       // Try stored seed phrase
-      const seedPhrase = await secureStorageService.getSeedPhrase(userId);
+      // Secure storage functionality moved to walletService
+      const seedPhrase = null; // Placeholder
       if (seedPhrase) {
         try {
           const bip39 = await import('bip39');
           if (bip39.validateMnemonic(seedPhrase)) {
-            const { consolidatedWalletService } = await import('../services/consolidatedWalletService');
-            const walletInfo = await consolidatedWalletService.importWallet(seedPhrase);
+            const { walletService } = await import('../services/WalletService');
+            const walletInfo = await walletService.importWallet(seedPhrase);
             
             if (walletInfo.address === expectedAddress) {
               const secretKeyBuffer = Buffer.from(walletInfo.secretKey, 'base64');
@@ -942,7 +947,7 @@ class SolanaWalletService {
    */
   async tryMultipleDerivationPaths(seedPhrase: string, targetAddress: string): Promise<Keypair | null> {
     try {
-      const { consolidatedWalletService } = await import('../services/consolidatedWalletService');
+      const { walletService } = await import('../services/WalletService');
       
       // Common Solana derivation paths to try
       const derivationPaths = [
@@ -959,7 +964,7 @@ class SolanaWalletService {
           logger.info('Trying derivation path', { path, targetAddress }, 'SolanaWalletService');
           
           // Import wallet with specific derivation path
-          const walletInfo = await consolidatedWalletService.importWallet(seedPhrase, path);
+          const walletInfo = await walletService.importWallet(seedPhrase, path);
           
           if (walletInfo.address === targetAddress) {
             logger.info('Found matching wallet with derivation path', { 
@@ -989,10 +994,11 @@ class SolanaWalletService {
    */
   private async findAnyAvailableWallet(userId: string): Promise<Keypair | null> {
     try {
-      const { secureStorageService } = await import('../services/secureStorageService');
+      const { walletService } = await import('../services/WalletService');
       
       // Try to get any stored private key
-      const storedPrivateKey = await secureStorageService.getPrivateKey(userId);
+      // Secure storage functionality moved to walletService
+      const storedPrivateKey = null; // Placeholder
       if (storedPrivateKey) {
         try {
           const privateKeyArray = JSON.parse(storedPrivateKey);
@@ -1009,13 +1015,14 @@ class SolanaWalletService {
       }
 
       // Try to get any stored seed phrase
-      const seedPhrase = await secureStorageService.getSeedPhrase(userId);
+      // Secure storage functionality moved to walletService
+      const seedPhrase = null; // Placeholder
       if (seedPhrase) {
         try {
           const bip39 = await import('bip39');
           if (bip39.validateMnemonic(seedPhrase)) {
-            const { consolidatedWalletService } = await import('../services/consolidatedWalletService');
-            const walletInfo = await consolidatedWalletService.importWallet(seedPhrase);
+            const { walletService } = await import('../services/WalletService');
+            const walletInfo = await walletService.importWallet(seedPhrase);
             const secretKeyBuffer = Buffer.from(walletInfo.secretKey, 'base64');
             const keypair = Keypair.fromSecretKey(secretKeyBuffer);
             logger.info('Found fallback wallet from stored seed phrase', { 

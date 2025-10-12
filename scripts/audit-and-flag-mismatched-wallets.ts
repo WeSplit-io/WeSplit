@@ -6,7 +6,7 @@
 
 import { Connection, PublicKey } from '@solana/web3.js';
 import { firebaseDataService } from '../src/services/firebaseDataService';
-import { secureStorageService } from '../src/services/secureStorageService';
+import { walletService } from '../src/services/WalletService';
 import { deriveKeypairFromMnemonic, publicKeyFromMnemonic } from '../src/wallet/derive';
 import { logger } from '../src/services/loggingService';
 import { CURRENT_NETWORK } from '../src/config/chain';
@@ -108,9 +108,10 @@ class WalletAuditService {
    */
   private async getAllUsers(): Promise<any[]> {
     try {
-      // This would need to be implemented based on your Firebase setup
-      // For now, return empty array as placeholder
-      return [];
+      // Use firebaseDataService to get all users
+      const { firebaseDataService } = await import('../src/services/firebaseDataService');
+      const users = await firebaseDataService.user.getAllUsers();
+      return users || [];
     } catch (error) {
       logger.error('Failed to get users from Firebase', error, 'WalletAudit');
       throw error;
@@ -131,7 +132,9 @@ class WalletAuditService {
       }
 
       // Check if user has a stored mnemonic
-      const mnemonic = await secureStorageService.getSeedPhrase(userId);
+      // Use the consolidated walletService for secure storage
+      const { walletService } = await import('../src/services/WalletService');
+      const mnemonic = await walletService.getSecureData(`mnemonic_${user.id}`);
       const hasMnemonic = !!mnemonic;
 
       let issue: WalletIssue;

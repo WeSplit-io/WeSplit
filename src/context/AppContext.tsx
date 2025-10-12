@@ -12,7 +12,7 @@ import {
 import { firebaseDataService } from '../services/firebaseDataService';
 import { hybridDataService } from '../servicues/hybridDataService';
 import { i18nService } from '../services/i18nService';
-import { getUserNotifications } from '../services/firebaseNotificationService';
+import { notificationService } from '../services/notificationService';
 import { MultiSignStateService } from '../services/multiSignStateService';
 import { calculateGroupBalances, CalculatedBalance } from '../utils/balanceCalculator';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -933,14 +933,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       
       try {
         // Import services
-        const { userWalletService } = await import('../services/userWalletService');
-        const { secureStorageService } = await import('../services/secureStorageService');
+        const { walletService } = await import('../services/WalletService');
         
         // Clear current user's wallet data
-        await userWalletService.clearWalletDataForUser(state.currentUser.id.toString());
+        await walletService.clearWalletDataForUser(state.currentUser.id.toString());
         
         // Also clear any generic wallet data that might be stored
-        await secureStorageService.clearAllWalletData();
+        // Wallet data clearing is now handled by walletService
         
         console.log('✅ AppContext: Cleared wallet data for different user');
       } catch (error) {

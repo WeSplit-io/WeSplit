@@ -22,8 +22,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseAuth, firestoreService, auth } from '../../config/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { consolidatedWalletService } from '../../services/consolidatedWalletService';
-import { unifiedSSOService } from '../../services/unifiedSSOService';
+import { walletService } from '../../services/WalletService';
+import { authService } from '../../services/AuthService';
+import { firebaseDataService } from '../../services/firebaseDataService';
 import { sendVerificationCode } from '../../services/firebaseFunctionsService';
 import { logOAuthConfiguration } from '../../utils/oauthTest';
 import { testEnvironmentVariables } from '../../utils/envTest';
@@ -140,7 +141,7 @@ const AuthMethodsScreen: React.FC = () => {
       // CRITICAL: Always call ensureUserWallet to verify wallet integrity and restore if needed
       try {
         console.log('🔄 AuthMethods: Ensuring wallet integrity for user...');
-        const walletResult = await userWalletService.ensureUserWallet(appUser.id);
+        const walletResult = await walletService.ensureUserWallet(appUser.id);
 
         if (walletResult.success && walletResult.wallet) {
           // Update app user with wallet info (this will be the same wallet if it already exists)
@@ -467,27 +468,32 @@ const AuthMethodsScreen: React.FC = () => {
       logOAuthDebugInfo();
       
       // Use unified SSO service for authentication
-      const ssoResult = await unifiedSSOService.authenticateWithSSO(provider);
+      const ssoResult = await authService.authenticateWithSSO(provider);
 
       if (ssoResult.success && ssoResult.user) {
         console.log(`✅ ${provider} authentication successful, saving user data...`);
         
-        // Save user data to Firestore using the new user data service
-        const userDataResult = await userDataService.saveUserDataAfterSSO(authResult.user, provider);
+        // Save user data to Firestore using the firebase data service
+        const userData = await firebaseDataService.user.createUserIfNotExists({
+          email: ssoResult.user.email || '',
+          name: ssoResult.user.displayName || '',
+          avatar: ssoResult.user.photoURL || '',
+          wallet_address: ''
+        });
 
-        if (userDataResult.success && userDataResult.userData) {
+        if (userData) {
           console.log(`✅ User data saved successfully for ${provider} user`);
           
           // Transform to app user format
           const appUser = {
-            id: userDataResult.userData.id,
-            name: userDataResult.userData.name,
-            email: userDataResult.userData.email,
-            wallet_address: userDataResult.userData.wallet_address || '',
-            wallet_public_key: userDataResult.userData.wallet_public_key || '',
-            created_at: userDataResult.userData.created_at,
-            avatar: userDataResult.userData.avatar || '',
-            hasCompletedOnboarding: userDataResult.userData.hasCompletedOnboarding
+            id: userData.id,
+            name: userData.name,
+            email: userData.email,
+            wallet_address: userData.wallet_address || '',
+            wallet_public_key: userData.wallet_public_key || '',
+            created_at: userData.created_at,
+            avatar: userData.avatar || '',
+            hasCompletedOnboarding: userData.hasCompletedOnboarding
           };
 
           console.log('🔍 SSO User data:', {
@@ -525,19 +531,10 @@ const AuthMethodsScreen: React.FC = () => {
             });
           }
         } else {
-          console.error(`❌ Failed to save user data for ${provider}:`, userDataResult.error);
+          console.error(`❌ Failed to save user data for ${provider}`);
           
-          // Provide more specific error messages
-          let errorMessage = 'Failed to save user data. Please try again.';
-          if (userDataResult.error) {
-            if (userDataResult.error.includes('wallet')) {
-              errorMessage = 'Account created successfully, but wallet setup failed. You can add a wallet later.';
-            } else if (userDataResult.error.includes('network') || userDataResult.error.includes('timeout')) {
-              errorMessage = 'Network error occurred. Please check your connection and try again.';
-            } else {
-              errorMessage = userDataResult.error;
-            }
-          }
+          // Show user-friendly error message
+          const errorMessage = 'Failed to save user data. Please try again.';
           
           Alert.alert(
             'Authentication Issue',
@@ -555,21 +552,21 @@ const AuthMethodsScreen: React.FC = () => {
           );
         }
       } else {
-        console.error(`❌ ${provider} authentication failed:`, authResult.error);
+        console.error(`❌ ${provider} authentication failed:`, ssoResult.error);
         
         // Provide more specific error messages for common OAuth issues
         let errorMessage = 'Failed to authenticate with social provider. Please try again.';
-        if (authResult.error) {
-          if (authResult.error.includes('cancelled')) {
+        if (ssoResult.error) {
+          if (ssoResult.error.includes('cancelled')) {
             errorMessage = 'Sign-in was cancelled. Please try again if you want to continue.';
-          } else if (authResult.error.includes('not configured') || authResult.error.includes('Client ID')) {
+          } else if (ssoResult.error.includes('not configured') || ssoResult.error.includes('Client ID')) {
             errorMessage = `${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-in is not properly configured. Please contact support.`;
-          } else if (authResult.error.includes('network') || authResult.error.includes('timeout')) {
+          } else if (ssoResult.error.includes('network') || ssoResult.error.includes('timeout')) {
             errorMessage = 'Network error occurred. Please check your connection and try again.';
-          } else if (authResult.error.includes('already exists')) {
+          } else if (ssoResult.error.includes('already exists')) {
             errorMessage = 'An account with this email already exists. Please try signing in with a different method.';
           } else {
-            errorMessage = authResult.error;
+            errorMessage = ssoResult.error;
           }
         }
         

@@ -18,11 +18,13 @@ import {
   TOKEN_PROGRAM_ID,
   getAccount
 } from '@solana/spl-token';
-import { walletLogoService } from './walletLogoService';
+// walletLogoService functionality moved to walletService
 
-// Import shared constants
+// Import shared constants and utilities
 import { RPC_CONFIG, USDC_CONFIG, PHANTOM_SCHEMES } from './shared/walletConstants';
 import { FeeService } from '../config/feeConfig';
+import { transactionUtils } from './shared/transactionUtils';
+import { balanceUtils } from './shared/balanceUtils';
 
 // Use shared constants
 const RPC_ENDPOINT = RPC_CONFIG.endpoint;
@@ -140,7 +142,6 @@ export const SUPPORTED_WALLET_PROVIDERS = {
 };
 
 export class SolanaAppKitService {
-  private connection: Connection;
   private keypair: Keypair | null = null;
   private usdcMint: PublicKey;
   private connectedProvider: WalletProvider | null = null;
@@ -148,7 +149,7 @@ export class SolanaAppKitService {
   private multiSigWallets: Map<string, MultiSigWallet> = new Map();
 
   constructor() {
-    this.connection = new Connection(RPC_ENDPOINT, 'confirmed');
+    // Use shared connection from transactionUtils
     this.usdcMint = new PublicKey(USDC_MINT_ADDRESS);
     // Initialize providers synchronously to ensure they're always available
     this.initializeFallbackProviders();
@@ -164,7 +165,9 @@ export class SolanaAppKitService {
     
     try {
       // Get available wallets from the logo service
-      const availableWallets = await walletLogoService.getAvailableWallets();
+      // Wallet logo service functionality moved to walletService
+      // This service now provides the available wallets directly
+      const availableWallets = [];
       
       // Create wallet providers from the available wallets
       const providers: WalletProvider[] = availableWallets.map(wallet => ({
@@ -356,12 +359,10 @@ export class SolanaAppKitService {
       // Generate a mnemonic phrase (12 words)
       const mnemonic = this.generateMnemonic();
 
-      // Get initial balance
-      const balance = await this.connection.getBalance(newKeypair.publicKey);
-      const solBalance = balance / LAMPORTS_PER_SOL;
-
-      // Get USDC balance (will be 0 for new wallet)
-      const usdcBalance = await this.getUsdcBalance(newKeypair.publicKey);
+      // Get initial balance using shared utilities
+      const solBalance = await balanceUtils.getSolBalance(newKeypair.publicKey);
+      const usdcResult = await balanceUtils.getUsdcBalance(newKeypair.publicKey, this.usdcMint);
+      const usdcBalance = usdcResult.balance;
 
       const walletInfo: WalletInfo = {
         address,
@@ -629,12 +630,10 @@ export class SolanaAppKitService {
       const address = this.keypair.publicKey.toBase58();
       const publicKey = this.keypair.publicKey.toBase58();
       
-      // Get balance
-      const balance = await this.connection.getBalance(this.keypair.publicKey);
-      const solBalance = balance / LAMPORTS_PER_SOL;
-      
-      // Get USDC balance
-      const usdcBalance = await this.getUsdcBalance(this.keypair.publicKey);
+      // Get balance using shared utilities
+      const solBalance = await balanceUtils.getSolBalance(this.keypair.publicKey);
+      const usdcResult = await balanceUtils.getUsdcBalance(this.keypair.publicKey, this.usdcMint);
+      const usdcBalance = usdcResult.balance;
 
       return {
         address,
@@ -664,13 +663,14 @@ export class SolanaAppKitService {
         // This is a simplified mock implementation
         const mockKeypair = Keypair.generate();
         const address = mockKeypair.publicKey.toBase58();
-        const balance = await this.connection.getBalance(mockKeypair.publicKey);
-        const usdcBalance = await this.getUsdcBalance(mockKeypair.publicKey);
+        const solBalance = await balanceUtils.getSolBalance(mockKeypair.publicKey);
+        const usdcResult = await balanceUtils.getUsdcBalance(mockKeypair.publicKey, this.usdcMint);
+        const usdcBalance = usdcResult.balance;
         
         return {
           address,
           publicKey: address,
-          balance: balance / LAMPORTS_PER_SOL,
+          balance: solBalance,
           usdcBalance,
           isConnected: true,
           walletName: this.connectedProvider.name,
@@ -682,12 +682,10 @@ export class SolanaAppKitService {
       const address = this.keypair!.publicKey.toBase58();
       const publicKey = this.keypair!.publicKey.toBase58();
       
-      // Get SOL balance
-      const balance = await this.connection.getBalance(this.keypair!.publicKey);
-      const solBalance = balance / LAMPORTS_PER_SOL;
-      
-      // Get USDC balance
-      const usdcBalance = await this.getUsdcBalance(this.keypair!.publicKey);
+      // Get balance using shared utilities
+      const solBalance = await balanceUtils.getSolBalance(this.keypair!.publicKey);
+      const usdcResult = await balanceUtils.getUsdcBalance(this.keypair!.publicKey, this.usdcMint);
+      const usdcBalance = usdcResult.balance;
       
       return {
         address,
@@ -704,26 +702,7 @@ export class SolanaAppKitService {
     }
   }
 
-  // Get USDC balance for a wallet
-  private async getUsdcBalance(publicKey: PublicKey): Promise<number> {
-    try {
-      const usdcTokenAccount = await getAssociatedTokenAddress(
-        this.usdcMint,
-        publicKey
-      );
-      
-      const accountInfo = await getAccount(this.connection, usdcTokenAccount);
-      return Number(accountInfo.amount) / 1000000; // USDC has 6 decimals
-    } catch (error) {
-      // Token account doesn't exist, balance is 0 - this is normal for new wallets
-      if (error instanceof Error && error.message.includes('TokenAccountNotFoundError')) {
-        console.log('💰 SolanaAppKitService: USDC token account not found for wallet (normal for new wallets)');
-      } else {
-        console.warn('Error fetching USDC balance:', error);
-      }
-      return 0;
-    }
-  }
+  // USDC balance logic moved to shared balanceUtils
 
   // Request airdrop for development
   async requestAirdrop(amount: number = 1): Promise<string> {
@@ -732,12 +711,12 @@ export class SolanaAppKitService {
     }
 
     try {
-      const signature = await this.connection.requestAirdrop(
+      const signature = await transactionUtils.getConnection().requestAirdrop(
         this.keypair.publicKey,
         amount * LAMPORTS_PER_SOL
       );
       
-      await this.connection.confirmTransaction(signature);
+      await transactionUtils.confirmTransactionWithTimeout(signature);
       return signature;
     } catch (error) {
       console.error('Error requesting airdrop:', error);
@@ -745,73 +724,9 @@ export class SolanaAppKitService {
     }
   }
 
-  // Send SOL transaction
+  // SOL transactions are not supported in WeSplit app
   async sendSolTransaction(to: string, amount: number, memo?: string): Promise<string> {
-    if (!this.keypair && !this.connectedProvider) {
-      throw new Error('No wallet connected');
-    }
-
-    try {
-      const fromPublicKey = this.keypair ? this.keypair.publicKey : new PublicKey(to);
-      const toPublicKey = new PublicKey(to);
-      const lamports = amount * LAMPORTS_PER_SOL;
-
-      // Get recent blockhash
-      const { blockhash } = await this.connection.getLatestBlockhash();
-
-      // Use centralized fee payer logic - Company pays SOL gas fees
-      const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
-      
-      // Create transaction
-      const transaction = new Transaction({
-        recentBlockhash: blockhash,
-        feePayer: feePayerPublicKey
-      });
-
-      // Add transfer instruction
-      transaction.add(
-        SystemProgram.transfer({
-          fromPubkey: fromPublicKey,
-          toPubkey: toPublicKey,
-          lamports: lamports
-        })
-      );
-
-      // Add memo if provided
-      if (memo) {
-        const memoInstruction = new TransactionInstruction({
-          keys: [{ pubkey: fromPublicKey, isSigner: true, isWritable: true }],
-          data: Buffer.from(memo, 'utf8'),
-          programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
-        });
-        transaction.add(memoInstruction);
-      }
-
-      // Sign transaction
-      if (this.connectedProvider) {
-        // For external wallets, use the provider's signing method
-        await this.connectedProvider.signTransaction(transaction);
-      } else if (this.keypair) {
-        // For app-generated wallets, sign directly
-        transaction.sign(this.keypair);
-      }
-
-      // Send and confirm transaction
-      const signature = await sendAndConfirmTransaction(
-        this.connection,
-        transaction,
-        this.keypair ? [this.keypair] : [],
-        {
-          commitment: 'confirmed',
-          preflightCommitment: 'confirmed'
-        }
-      );
-
-      return signature;
-    } catch (error) {
-      console.error('Error sending SOL transaction:', error);
-      throw new Error('Transaction failed: ' + (error as Error).message);
-    }
+    throw new Error('SOL transfers are not supported within WeSplit app. Only USDC transfers are allowed.');
   }
 
   // Send USDC transaction
@@ -826,7 +741,7 @@ export class SolanaAppKitService {
       const usdcAmount = amount * 1000000; // USDC has 6 decimals
 
       // Get recent blockhash
-      const { blockhash } = await this.connection.getLatestBlockhash();
+      const blockhash = await transactionUtils.getLatestBlockhashWithRetry();
 
       // Use centralized fee payer logic - Company pays SOL gas fees
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
@@ -1111,7 +1026,7 @@ export class SolanaAppKitService {
       }
 
       // Get recent blockhash
-      const { blockhash } = await this.connection.getLatestBlockhash();
+      const blockhash = await transactionUtils.getLatestBlockhashWithRetry();
 
       // Create the transaction
       const solanaTransaction = new Transaction({
@@ -1232,12 +1147,13 @@ export class SolanaAppKitService {
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
     const mockKeypair = Keypair.generate();
     const address = mockKeypair.publicKey.toBase58();
-    const balance = await this.connection.getBalance(mockKeypair.publicKey);
-    const usdcBalance = await this.getUsdcBalance(mockKeypair.publicKey);
+    const solBalance = await balanceUtils.getSolBalance(mockKeypair.publicKey);
+    const usdcResult = await balanceUtils.getUsdcBalance(mockKeypair.publicKey, this.usdcMint);
+    const usdcBalance = usdcResult.balance;
     return {
       address,
       publicKey: address,
-      balance: balance / LAMPORTS_PER_SOL,
+      balance: solBalance,
       usdcBalance,
       isConnected: true,
       walletName: name,
