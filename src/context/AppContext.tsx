@@ -663,7 +663,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Try to find the group in the current state first
       const existingGroup = state.groups.find(g => g.id === groupId || g.id === groupId.toString());
       if (existingGroup && !forceRefresh) {
-        if (__DEV__) { console.log('🔄 AppContext: Using cached group details for:', groupId); }
+        if (__DEV__) { logger.debug('Using cached group details for', { groupId }, 'AppContext'); }
         return existingGroup;
       }
       
@@ -708,7 +708,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     try {
-      console.log('🔄 AppContext: Creating group with data:', {
+      logger.debug('Creating group with data', {
         name: groupData.name,
         created_by: groupData.created_by,
         category: groupData.category,
@@ -728,7 +728,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       const group = await firebaseDataService.group.createGroup(validatedGroupData);
       
-      console.log('🔄 AppContext: Group created successfully:', group.id);
+      logger.debug('Group created successfully', { groupId: group.id }, 'AppContext');
       
       // Real-time listener will automatically update the groups state
       // But we can also manually add the group to state for immediate feedback
@@ -774,7 +774,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       await firebaseDataService.group.updateGroup(String(groupId), state.currentUser?.id?.toString() || '', updates);
       
       // Real-time listener will automatically update the groups state
-      console.log('🔄 AppContext: Group updated, real-time listener will update state');
+      logger.debug('Group updated, real-time listener will update state', null, 'AppContext');
     } catch (error) {
       console.error('Error updating group:', error);
       throw error;
@@ -800,7 +800,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         groupListenersRef.current.delete(String(groupId));
       }
       
-      console.log('🔄 AppContext: Group deleted, removed from local state and stopped listener');
+      logger.debug('Group deleted, removed from local state and stopped listener', null, 'AppContext');
       
     } catch (error) {
       console.error('Error deleting group:', error);
@@ -827,7 +827,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         groupListenersRef.current.delete(String(groupId));
       }
       
-      console.log('🔄 AppContext: User left group, removed from local state and stopped listener');
+      logger.debug('User left group, removed from local state and stopped listener', null, 'AppContext');
       
     } catch (error) {
       console.error('Error leaving group:', error);
@@ -849,7 +849,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const expense = await firebaseDataService.expense.createExpense(expenseData);
       
       // Real-time listener will automatically update the groups state
-      console.log('🔄 AppContext: Expense created, real-time listener will update state');
+      logger.debug('Expense created, real-time listener will update state', null, 'AppContext');
       
       return expense;
     } catch (error) {
@@ -886,7 +886,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       
       const unsubscribe = groupListenersRef.current.get(groupId);
       if (unsubscribe) {
-        console.log('🔄 AppContext: Stopping listener for group:', groupId);
+        logger.debug('Stopping listener for group', { groupId }, 'AppContext');
         unsubscribe();
         groupListenersRef.current.delete(groupId);
       }
@@ -905,12 +905,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Stop existing listener if any
       stopGroupListener(groupId);
       
-      console.log('🔄 AppContext: Starting listener for group:', groupId);
+      logger.debug('Starting listener for group', { groupId }, 'AppContext');
       
       const unsubscribe = firebaseDataService.group.listenToGroup(
         groupId,
         (group) => {
-          console.log('🔄 AppContext: Real-time group update:', groupId);
+          logger.debug('Real-time group update', { groupId }, 'AppContext');
           dispatch({ type: 'UPDATE_GROUP', payload: group });
         },
         (error) => {
@@ -930,7 +930,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Only clear wallet data if this is a DIFFERENT user (different email)
     // This prevents wallet loss when users switch authentication methods but are the same person
     if (state.currentUser && state.currentUser.email !== user.email) {
-      console.log('🔄 AppContext: Different user detected (different email), clearing wallet data');
+      logger.info('Different user detected (different email), clearing wallet data', null, 'AppContext');
       
       try {
         // Import services
@@ -942,13 +942,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Also clear any generic wallet data that might be stored
         // Wallet data clearing is now handled by walletService
         
-        console.log('✅ AppContext: Cleared wallet data for different user');
+        logger.info('Cleared wallet data for different user', null, 'AppContext');
       } catch (error) {
         console.warn('⚠️ AppContext: Failed to clear current user wallet data:', error);
         // Continue with authentication even if clearing fails
       }
     } else if (state.currentUser && state.currentUser.email === user.email) {
-      console.log('✅ AppContext: Same user detected (same email), preserving wallet data');
+      logger.info('Same user detected (same email), preserving wallet data', null, 'AppContext');
     }
     
     dispatch({ type: 'AUTHENTICATE_USER', payload: { user, method } });
@@ -991,7 +991,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const group = getGroupById(groupId);
       
       if (__DEV__) {
-        console.log('🔍 getGroupBalances: Processing group:', {
+        logger.debug('Processing group', {
           groupId,
           groupExists: !!group,
           groupName: group?.name,
@@ -1004,7 +1004,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       
       if (!group) {
         if (__DEV__) {
-          console.log('🔍 getGroupBalances: Group not found, returning empty array');
+          logger.warn('Group not found, returning empty array', null, 'AppContext');
         }
         return [];
       }
@@ -1012,7 +1012,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // Use the unified balance calculator
       const balances = await calculateGroupBalancesUnified(group, state.currentUser?.id);
           if (__DEV__) {
-        console.log('🔍 getGroupBalances: Calculated balances:', balances);
+        logger.debug('Calculated balances', { balances }, 'AppContext');
           }
           return balances;
     } catch (error) {
@@ -1038,7 +1038,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const invalidateCache = useCallback((pattern: string) => {
     // Cache invalidation is handled by the invalidateGroupsCache function
-    console.log('Cache invalidation requested for pattern:', pattern);
+    logger.info('Cache invalidation requested for pattern', { pattern }, 'AppContext');
   }, []);
 
   // Add specific cache invalidation for groups
@@ -1048,7 +1048,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       type: 'UPDATE_CACHE_TIMESTAMP', 
       payload: { type: 'groups', timestamp: 0 } 
     });
-    if (__DEV__) { console.log('🔄 AppContext: Groups cache invalidated'); }
+    if (__DEV__) { logger.info('Groups cache invalidated', null, 'AppContext'); }
   }, []);
 
   // Add function to check if groups cache is valid
@@ -1093,18 +1093,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     try {
-      console.log('🔄 AppContext: Starting removeNotification...');
-      console.log('🔄 AppContext: Notification ID:', notificationId);
-      console.log('🔄 AppContext: User ID:', state.currentUser.id);
+      logger.info('Starting removeNotification', { notificationId, userId: state.currentUser.id }, 'AppContext');
 
       // Remove notification from Firebase
       await firebaseDataService.notification.deleteNotification(notificationId);
-      console.log('🔄 AppContext: Notification removed from Firebase');
+      logger.info('Notification removed from Firebase', null, 'AppContext');
 
       // Remove from state
       const updatedNotifications = state.notifications?.filter(n => n.id !== notificationId) || [];
       dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications: updatedNotifications, timestamp: Date.now() } });
-      console.log('🔄 AppContext: Notification removed from state');
+      logger.info('Notification removed from state', null, 'AppContext');
 
     } catch (error) {
       console.error('❌ AppContext: Error removing notification:', error);
@@ -1124,10 +1122,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     try {
-      console.log('🔄 AppContext: Starting acceptSplitInvitation...');
-      console.log('🔄 AppContext: Notification ID:', notificationId);
-      console.log('🔄 AppContext: Split ID:', splitId);
-      console.log('🔄 AppContext: User ID:', state.currentUser.id);
+      logger.info('Starting acceptSplitInvitation', { notificationId, splitId, userId: state.currentUser.id }, 'AppContext');
 
       // Find the notification
       const notification = state.notifications?.find(n => n.id === notificationId);
@@ -1135,7 +1130,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error('Invalid notification or missing split data');
       }
 
-      console.log('🔄 AppContext: Notification data structure:', {
+      logger.debug('Notification data structure', {
         notificationId,
         notificationData: notification.data,
         hasInviterId: !!notification.data.inviterId,
@@ -1158,16 +1153,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         timestamp: new Date().toISOString(),
       };
 
-      console.log('🔄 AppContext: Created invitation data:', invitationData);
+      logger.info('Created invitation data', { invitationData }, 'AppContext');
 
       // Join the split
       const result = await SplitInvitationService.joinSplit(invitationData, state.currentUser.id.toString());
-      console.log('🔄 AppContext: Split invitation accepted successfully:', result);
+      logger.info('Split invitation accepted successfully', { result }, 'AppContext');
 
       if (result.success) {
         // Remove the notification
         await removeNotification(notificationId);
-        console.log('🔄 AppContext: Notification removed from state');
+        logger.info('Notification removed from state', null, 'AppContext');
       }
 
       return result;
@@ -1184,10 +1179,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     try {
-      console.log('🔄 AppContext: Starting acceptGroupInvitation...');
-      console.log('🔄 AppContext: Notification ID:', notificationId);
-      console.log('🔄 AppContext: Group ID:', groupId);
-      console.log('🔄 AppContext: User ID:', state.currentUser.id);
+      logger.info('Starting acceptGroupInvitation', { notificationId, groupId, userId: state.currentUser.id }, 'AppContext');
 
       // Find the notification
       const notification = state.notifications?.find(n => n.id === notificationId);
@@ -1200,20 +1192,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         notification.data.inviteId, 
         state.currentUser.id.toString()
       );
-      console.log('🔄 AppContext: Group invitation accepted successfully:', result);
+      logger.info('Group invitation accepted successfully', { result }, 'AppContext');
 
       // Remove the notification
       await removeNotification(notificationId);
-      console.log('🔄 AppContext: Notification removed from state');
+      logger.info('Notification removed from state', null, 'AppContext');
 
       // Start real-time listener for the new group
       startGroupListener(groupId);
-      console.log('🔄 AppContext: Started real-time listener for group:', groupId);
+      logger.info('Started real-time listener for group', { groupId }, 'AppContext');
 
       // Force refresh user groups to include the new group
       // The real-time listener will handle updates, but we can also force a refresh
       if (__DEV__) {
-        console.log('🔄 AppContext: Real-time listener will handle group updates automatically');
+        logger.info('Real-time listener will handle group updates automatically', null, 'AppContext');
       }
 
     } catch (error) {

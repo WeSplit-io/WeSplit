@@ -31,6 +31,7 @@ import { useGroupData } from '../../hooks/useGroupData';
 
 import { GroupMember, Expense } from '../../types';
 import { hashWalletAddress } from '../../utils/cryptoUtils';
+import { logger } from '../../services/loggingService';
 
 const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId } = route.params;
@@ -64,7 +65,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [profileImages, setProfileImages] = useState<{ [key: string]: string }>({});
 
-  console.log('🔄 GroupSettingsScreen: Group data:', {
+  logger.debug('Group data', {
     groupId,
     groupExists: !!group,
     groupName: group?.name,
@@ -80,7 +81,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   // Debug logging for real-time updates
   useEffect(() => {
     if (group) {
-      console.log('🔄 GroupSettingsScreen: Group data updated via real-time listener:', {
+      logger.debug('Group data updated via real-time listener', {
         name: group.name,
         category: group.category,
         color: group.color,
@@ -95,12 +96,12 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   // Start group listener when component mounts
   useEffect(() => {
     if (groupId) {
-      console.log('🔄 GroupSettingsScreen: Starting group listener for:', groupId);
+      logger.info('Starting group listener for', { groupId }, 'GroupSettingsScreen');
       startGroupListener(groupId.toString());
       
       // Cleanup function to stop listener when component unmounts
       return () => {
-        console.log('🔄 GroupSettingsScreen: Stopping group listener for:', groupId);
+        logger.info('Stopping group listener for', { groupId }, 'GroupSettingsScreen');
         stopGroupListener(groupId.toString());
       };
     }
@@ -113,10 +114,9 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
       
       setLoadingMembers(true);
       try {
-        console.log('🔄 GroupSettingsScreen: Loading members for group:', groupId);
         // Use the hybrid service instead of direct API call
         const members = await firebaseDataService.group.getGroupMembers(groupId.toString(), false, currentUser?.id ? String(currentUser.id) : undefined);
-        console.log('🔄 GroupSettingsScreen: Loaded members:', members.length, members.map(m => ({ id: m.id, name: m.name, email: m.email })));
+        logger.info('Loaded members', { count: members.length, members: members.map(m => ({ id: m.id, name: m.name, email: m.email })) }, 'GroupSettingsScreen');
         setRealMembers(members);
         
         // Fetch profile images for members from database
@@ -167,7 +167,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
           // Use the hybrid service instead of the old groupService
           const inviteData = await firebaseDataService.group.generateInviteLink(group.id.toString(), currentUser.id.toString());
           setInviteLink(inviteData.inviteLink);
-          console.log('✅ GroupSettingsScreen: Generated invite link:', inviteData.inviteLink);
+          logger.info('Generated invite link', { inviteLink: inviteData.inviteLink }, 'GroupSettingsScreen');
         } catch (error) {
           console.error('❌ GroupSettingsScreen: Error generating invite link for QR:', error);
           // Don't set a fallback link - let the QR code show empty if generation fails
@@ -298,25 +298,25 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
       let owesMoney = false;
 
       try {
-        console.log('🔄 GroupSettingsScreen: Checking balances before leaving group...');
+        logger.info('Checking balances before leaving group', null, 'GroupSettingsScreen');
         
         // Get group balances to check if user owes money or is owed money
         const balances = await getGroupBalances(groupId);
-        console.log('🔄 GroupSettingsScreen: Retrieved balances:', balances);
+        logger.debug('Retrieved balances', { balances }, 'GroupSettingsScreen');
         
         if (balances && Array.isArray(balances)) {
           const userBalanceData = balances.find(balance => 
             String(balance.userId) === String(currentUser.id)
           );
           
-          console.log('🔄 GroupSettingsScreen: User balance data:', userBalanceData);
+          logger.debug('User balance data', { userBalanceData }, 'GroupSettingsScreen');
           
           if (userBalanceData) {
             userBalance = userBalanceData.amount || 0;
             owesMoney = userBalance < -0.01; // User owes money if balance is negative
             hasOutstandingBalance = Math.abs(userBalance) > 0.01; // Check if balance is significant
             
-            console.log('🔄 GroupSettingsScreen: Balance analysis:', {
+            logger.info('Balance analysis', {
               userBalance,
               owesMoney,
               hasOutstandingBalance,
@@ -413,7 +413,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   // Helper function to check balances after settlement and proceed with leaving
   const checkBalancesAndLeave = async (groupId: string, isOnlyMember: boolean) => {
     try {
-      console.log('🔄 GroupSettingsScreen: Re-checking balances after settlement...');
+      logger.info('Re-checking balances after settlement', null, 'GroupSettingsScreen');
       
       // Re-check balances after settlement
       const balances = await getGroupBalances(groupId);
@@ -468,9 +468,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
     
     setLoadingMembers(true);
     try {
-      console.log('🔄 GroupSettingsScreen: Refreshing members for group:', groupId);
       const members = await firebaseDataService.group.getGroupMembers(groupId.toString(), true, currentUser?.id ? String(currentUser.id) : undefined);
-      console.log('🔄 GroupSettingsScreen: Refreshed members:', members.length);
       setRealMembers(members);
     } catch (error) {
       console.error('❌ GroupSettingsScreen: Error refreshing members:', error);
@@ -556,16 +554,16 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
         color: editGroupColor
       };
 
-      console.log('🔄 GroupSettingsScreen: Updating group with data:', updateData);
+      logger.info('Updating group with data', { updateData }, 'GroupSettingsScreen');
 
       await updateGroup(groupId, updateData);
 
-      console.log('🔄 GroupSettingsScreen: Group updated successfully, real-time listener will update state...');
+      logger.info('Group updated successfully, real-time listener will update state', null, 'GroupSettingsScreen');
 
       // The real-time listener will automatically update the group data
       // No need to manually refresh since the listener will handle it
 
-      console.log('🔄 GroupSettingsScreen: Group data refreshed, new group data:', {
+      logger.debug('Group data refreshed, new group data', {
         name: group?.name,
         category: group?.category,
         color: group?.color,
@@ -673,7 +671,6 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
       {/* Header - Same as NotificationsScreen */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => {
-          console.log('🔄 GroupSettingsScreen: Back button pressed');
           if (navigation.canGoBack()) {
             navigation.goBack();
           } else {
@@ -768,14 +765,14 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
             const isCurrentUser = String(member.id) === String(currentUser?.id);
             const canRemoveMember = isAdmin && !isCurrentUser && !isInvited;
             
-            console.log('🔄 GroupSettingsScreen: Rendering member:', { 
+            logger.debug('Member details', {
               id: member.id, 
               name: member.name, 
               email: member.email, 
               isInvited, 
               isCurrentUser, 
               canRemoveMember 
-            });
+            }, 'GroupSettingsScreen');
             
             return (
               <View key={`member-${member.id}-${index}`} style={[

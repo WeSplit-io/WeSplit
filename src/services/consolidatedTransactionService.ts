@@ -223,7 +223,7 @@ class ConsolidatedTransactionService {
 
       // Check if recipient has USDC token account, create if not
       try {
-        await getAccount(this.connection, toTokenAccount);
+        await getAccount(transactionUtils.getConnection(), toTokenAccount);
       } catch (error) {
         // Token account doesn't exist, create it
         transaction.add(
@@ -565,7 +565,7 @@ class ConsolidatedTransactionService {
       const { walletService } = await import('./WalletService');
       const balance = await walletService.getUserWalletBalance(userId);
       
-      console.log('🔗 ConsolidatedTransactionService: Balance retrieved:', balance);
+      logger.debug('Balance retrieved', { balance }, 'consolidatedTransactionService');
       
       return {
         sol: balance?.solBalance || 0,
@@ -582,7 +582,7 @@ class ConsolidatedTransactionService {
    */
   async getUsdcBalance(walletAddress: string): Promise<{ success: boolean; balance: number; error?: string }> {
     try {
-      console.log('🔗 ConsolidatedTransactionService: Getting USDC balance for wallet:', walletAddress);
+      logger.debug('Getting USDC balance for wallet', { walletAddress }, 'consolidatedTransactionService');
       
       const connection = transactionUtils.getConnection();
       const usdcMint = new PublicKey(USDC_CONFIG.mintAddress);
@@ -598,7 +598,7 @@ class ConsolidatedTransactionService {
       
       const usdcTokenAccount = await getAssociatedTokenAddress(usdcMint, walletPublicKey);
       
-      console.log('🔗 ConsolidatedTransactionService: Token account derivation:', {
+      logger.debug('Token account derivation', {
         walletAddress,
         usdcMint: usdcMint.toBase58(),
         usdcMintSource: 'USDC_CONFIG.mintAddress',
@@ -609,7 +609,7 @@ class ConsolidatedTransactionService {
       // Additional debugging: Check if the token account exists and get more details
       try {
         const accountInfo = await connection.getAccountInfo(usdcTokenAccount);
-        console.log('🔗 ConsolidatedTransactionService: Token account info:', {
+        logger.debug('Token account info', {
           exists: !!accountInfo,
           owner: accountInfo?.owner.toBase58(),
           executable: accountInfo?.executable,
@@ -617,14 +617,14 @@ class ConsolidatedTransactionService {
           dataLength: accountInfo?.data.length
         });
       } catch (infoError) {
-        console.log('🔗 ConsolidatedTransactionService: Could not get account info:', infoError);
+        logger.error('Could not get account info', infoError, 'consolidatedTransactionService');
       }
       
       try {
         const accountInfo = await getAccount(connection, usdcTokenAccount);
         const balance = Number(accountInfo.amount) / 1000000; // USDC has 6 decimals
         
-        console.log('🔗 ConsolidatedTransactionService: USDC balance retrieved:', {
+        logger.debug('USDC balance retrieved', {
           walletAddress,
           balance,
           rawAmount: accountInfo.amount.toString(),
@@ -634,19 +634,19 @@ class ConsolidatedTransactionService {
         return { success: true, balance };
       } catch (error) {
         if (error instanceof Error && error.message.includes('TokenAccountNotFoundError')) {
-          console.log('🔗 ConsolidatedTransactionService: USDC token account not found (normal for new wallets)');
+          logger.debug('USDC token account not found (normal for new wallets)', null, 'consolidatedTransactionService');
           return { success: true, balance: 0 };
         } else {
           console.error('🔗 ConsolidatedTransactionService: Failed to get USDC balance:', error);
           
           // Add retry logic for blockchain propagation delays
-          console.log('🔗 ConsolidatedTransactionService: Retrying balance check in 2 seconds...');
+          logger.debug('Retrying balance check in 2 seconds', null, 'consolidatedTransactionService');
           await new Promise(resolve => setTimeout(resolve, 2000));
           
           try {
             const accountInfo = await getAccount(connection, usdcTokenAccount);
             const balance = Number(accountInfo.amount) / 1000000;
-            console.log('🔗 ConsolidatedTransactionService: Balance check retry successful:', {
+            logger.debug('Balance check retry successful', {
               balance,
               rawAmount: accountInfo.amount.toString(),
               tokenAccount: usdcTokenAccount.toBase58()
@@ -668,7 +668,7 @@ class ConsolidatedTransactionService {
    * Get transaction fee estimate from on-chain
    */
   async getTransactionFeeEstimate(amount: number, currency: string, priority: string): Promise<number> {
-    console.log('🔗 ConsolidatedTransactionService: Getting fee estimate:', { amount, currency, priority });
+    logger.debug('Getting fee estimate', { amount, currency, priority }, 'consolidatedTransactionService');
     
     try {
       // Calculate company fee using centralized service with default transaction type
@@ -687,12 +687,12 @@ class ConsolidatedTransactionService {
       
       const totalFee = companyFee + blockchainFee + priorityFeeInSol;
       
-      console.log('Fee breakdown:', {
+      logger.debug('Fee breakdown', {
         companyFee,
         blockchainFee,
         priorityFee: priorityFeeInSol,
         totalFee
-      });
+      }, 'consolidatedTransactionService');
       
       return totalFee;
     } catch (error) {
@@ -722,7 +722,7 @@ class ConsolidatedTransactionService {
     fee?: number;
     error?: string 
   }> {
-    console.log('🔗 ConsolidatedTransactionService: Sending USDC transaction:', { toAddress, amount, userId });
+    logger.info('Sending USDC transaction', { toAddress, amount, userId }, 'consolidatedTransactionService');
     
     try {
       // Use the internal transfer service for real USDC transactions
@@ -780,7 +780,7 @@ class ConsolidatedTransactionService {
     fee?: number;
     error?: string 
   }> {
-    console.log('🔗 ConsolidatedTransactionService: Sending USDC to address:', { toAddress, amount, userId });
+    logger.info('Sending USDC to address', { toAddress, amount, userId }, 'consolidatedTransactionService');
     
     try {
       // Use the internal transfer service but with a flag to skip user lookup
@@ -821,7 +821,7 @@ class ConsolidatedTransactionService {
    * Get user wallet address (real implementation)
    */
   async getUserWalletAddress(userId: string): Promise<string | null> {
-    console.log('🔗 ConsolidatedTransactionService: Getting wallet address for user:', userId);
+    logger.debug('Getting wallet address for user', { userId }, 'consolidatedTransactionService');
     
     try {
       // Use the existing userWalletService to get the wallet address
@@ -829,7 +829,7 @@ class ConsolidatedTransactionService {
       const walletResult = await walletService.ensureUserWallet(userId);
       
       if (walletResult.success && walletResult.wallet) {
-        console.log('🔗 ConsolidatedTransactionService: Wallet address retrieved:', walletResult.wallet.address);
+        logger.debug('Wallet address retrieved', { address: walletResult.wallet.address }, 'consolidatedTransactionService');
         return walletResult.wallet.address;
       }
       
@@ -859,23 +859,22 @@ class ConsolidatedTransactionService {
     signature?: string;
     error?: string;
   }> {
-    console.log('🔗 ConsolidatedTransactionService: Sending USDC from specific wallet:', {
+    logger.info('Sending USDC from specific wallet', {
       fromWalletAddress,
       toAddress,
       amount
-    });
+    }, 'consolidatedTransactionService');
 
     try {
       // Create keypair from the wallet's secret key using shared utility
       const keypairResult = keypairUtils.createKeypairFromSecretKey(fromWalletSecretKey);
       const walletKeypair = keypairResult.keypair;
       
-      console.log('🔗 ConsolidatedTransactionService: Wallet keypair verification:', {
+      logger.debug('Wallet keypair verification', {
         expectedAddress: fromWalletAddress,
         actualAddress: walletKeypair.publicKey.toBase58(),
-        addressesMatch: walletKeypair.publicKey.toBase58() === fromWalletAddress,
-        secretKeyLength: fromWalletSecretKey.length
-      });
+        addressesMatch: walletKeypair.publicKey.toBase58() === fromWalletAddress
+      }, 'consolidatedTransactionService');
       
       // Verify the keypair matches the expected address
       if (walletKeypair.publicKey.toBase58() !== fromWalletAddress) {
@@ -895,24 +894,22 @@ class ConsolidatedTransactionService {
       const walletUsdcAccount = await getAssociatedTokenAddress(usdcMint, walletKeypair.publicKey);
       const recipientUsdcAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(toAddress));
       
-      console.log('🔗 ConsolidatedTransactionService: Token account derivation:', {
+      logger.debug('Token account derivation', {
         usdcMint: usdcMint.toBase58(),
-        usdcMintSource: 'USDC_CONFIG.mintAddress',
         networkName: getConfig().blockchain.network,
         walletPublicKey: walletKeypair.publicKey.toBase58(),
         walletUsdcAccount: walletUsdcAccount.toBase58(),
         recipientPublicKey: toAddress,
         recipientUsdcAccount: recipientUsdcAccount.toBase58()
-      });
+      }, 'consolidatedTransactionService');
 
       // Check the split wallet's SOL balance (for logging only - company wallet pays fees)
       const solBalance = await connection.getBalance(walletKeypair.publicKey);
-      console.log('🔗 ConsolidatedTransactionService: Split wallet SOL balance:', {
+      logger.debug('Split wallet SOL balance', {
         address: walletKeypair.publicKey.toBase58(),
         solBalance: solBalance / LAMPORTS_PER_SOL,
-        solBalanceLamports: solBalance,
         note: 'Company wallet will pay transaction fees'
-      });
+      }, 'consolidatedTransactionService');
       
       // Check if split wallet has minimum SOL for transaction (even though company pays fees)
       const minimumSolRequired = 0.0001; // 0.0001 SOL minimum for account rent
@@ -928,7 +925,7 @@ class ConsolidatedTransactionService {
       let transferAmount: number = amount * 1000000; // Default to requested amount
       try {
         const walletAccount = await getAccount(connection, walletUsdcAccount);
-        console.log('🔗 ConsolidatedTransactionService: Split wallet USDC account details:', {
+        logger.debug('Split wallet USDC account details', {
           address: walletUsdcAccount.toBase58(),
           balance: walletAccount.amount.toString(),
           balanceInUSDC: (Number(walletAccount.amount) / 1000000).toFixed(6),
@@ -936,7 +933,7 @@ class ConsolidatedTransactionService {
           mint: walletAccount.mint.toBase58(),
           isFrozen: walletAccount.isFrozen,
           isNative: walletAccount.isNative,
-        });
+        }, 'consolidatedTransactionService');
         
         // CRITICAL: Verify that the split wallet is the owner of the token account
         if (!walletAccount.owner.equals(walletKeypair.publicKey)) {
@@ -948,17 +945,17 @@ class ConsolidatedTransactionService {
         
         // Check if the token account is properly initialized
         if (Number(walletAccount.amount) > 0 && walletAccount.amount.toString() === "0") {
-          console.log('🔗 ConsolidatedTransactionService: Token account has balance but amount shows as 0 - possible initialization issue');
+          logger.warn('Token account has balance but amount shows as 0 - possible initialization issue', null, 'consolidatedTransactionService');
         }
         
         // CRITICAL: Check if the token account was created by the split wallet itself
         // If not, we might need to recreate it with proper authority
-        console.log('🔗 ConsolidatedTransactionService: Token account authority verification:', {
+        logger.debug('Token account authority verification', {
           tokenAccountOwner: walletAccount.owner.toBase58(),
           splitWalletAddress: walletKeypair.publicKey.toBase58(),
           isOwnerCorrect: walletAccount.owner.equals(walletKeypair.publicKey),
           tokenAccountAddress: walletAccount.address.toBase58()
-        });
+        }, 'consolidatedTransactionService');
         
         // Check if wallet has enough USDC with a small buffer for precision
         const requiredAmount = amount * 1000000;
@@ -985,14 +982,14 @@ class ConsolidatedTransactionService {
         // No buffer needed since we're using consistent rounding throughout the system
         transferAmount = Math.min(requiredAmount, availableAmount);
         
-        console.log('🔗 ConsolidatedTransactionService: Transfer amount calculation:', {
+        logger.debug('Transfer amount calculation', {
           requestedAmount: amount,
           requiredAmount,
           availableAmount,
           transferAmount,
           finalTransferAmount: transferAmount / 1000000,
           note: 'Using exact available amount to avoid leaving funds behind'
-        });
+        }, 'consolidatedTransactionService');
         
         // Check if account is frozen or in invalid state
         if (walletAccount.isFrozen) {
@@ -1003,7 +1000,7 @@ class ConsolidatedTransactionService {
         }
         
         // Additional debugging for token account state
-        console.log('🔗 ConsolidatedTransactionService: Detailed token account analysis:', {
+        logger.debug('Detailed token account analysis', {
           accountAddress: walletAccount.address.toBase58(),
           owner: walletAccount.owner.toBase58(),
           mint: walletAccount.mint.toBase58(),
@@ -1014,7 +1011,7 @@ class ConsolidatedTransactionService {
           closeAuthority: walletAccount.closeAuthority?.toBase58(),
           delegate: walletAccount.delegate?.toBase58(),
           delegatedAmount: walletAccount.delegatedAmount?.toString()
-        });
+        }, 'consolidatedTransactionService');
         
         // Note: Account state check removed as it's not reliable - focus on balance and frozen status instead
         
@@ -1030,7 +1027,7 @@ class ConsolidatedTransactionService {
         console.error('🔗 ConsolidatedTransactionService: Failed to check split wallet USDC balance:', error);
         
         // The token account doesn't exist, we need to create it first
-        console.log('🔧 Split wallet USDC token account does not exist, creating it...');
+        logger.info('Split wallet USDC token account does not exist, creating it', null, 'consolidatedTransactionService');
         
         try {
           // Use company wallet as payer for token account creation (split wallet has 0 SOL)
@@ -1065,9 +1062,9 @@ class ConsolidatedTransactionService {
           createTransaction.sign(companyKeypair);
           
           // Use optimized transaction sending approach
-          const signature = await this.sendTransactionWithRetry(createTransaction, [companyKeypair], 'medium');
+          const signature = await transactionUtils.sendTransactionWithRetry(createTransaction, [companyKeypair], 'medium');
           
-          console.log('✅ Created USDC token account for split wallet:', walletUsdcAccount.toBase58());
+          logger.info('Created USDC token account for split wallet', { address: walletUsdcAccount.toBase58() }, 'consolidatedTransactionService');
           
           // Now try to get the account again with retry logic for blockchain propagation
           let walletAccount;
@@ -1077,24 +1074,24 @@ class ConsolidatedTransactionService {
           while (retryCount < maxRetries) {
             try {
               walletAccount = await getAccount(connection, walletUsdcAccount);
-              console.log('🔗 ConsolidatedTransactionService: Split wallet USDC account created successfully:', {
+              logger.info('Split wallet USDC account created successfully', {
                 address: walletAccount.address.toBase58(),
                 owner: walletAccount.owner.toBase58(),
                 amount: walletAccount.amount.toString(),
                 retryAttempt: retryCount + 1
-              });
+              }, 'consolidatedTransactionService');
               break; // Success, exit retry loop
             } catch (error) {
               retryCount++;
               if (retryCount < maxRetries) {
                 const delay = 3000 * retryCount; // Progressive delay: 3s, 6s, 9s, 12s
-                console.log(`🔗 ConsolidatedTransactionService: Balance check failed, retrying in ${delay/1000} seconds... (attempt ${retryCount}/${maxRetries})`);
+                logger.debug(`Balance check failed, retrying in ${delay/1000} seconds`, { attempt: retryCount, maxRetries }, 'consolidatedTransactionService');
                 await new Promise(resolve => setTimeout(resolve, delay));
               } else {
                 console.warn('🔗 ConsolidatedTransactionService: Balance check failed after all retries, but account was created');
                 // Account was created but we can't verify it yet - this is acceptable
                 // Continue with the transfer logic - the fallback will handle the balance
-                console.log('🔗 ConsolidatedTransactionService: Token account created but verification failed, continuing with transfer...');
+                logger.warn('Token account created but verification failed, continuing with transfer', null, 'consolidatedTransactionService');
               }
             }
           }
@@ -1110,7 +1107,7 @@ class ConsolidatedTransactionService {
           // If we successfully created the account but couldn't verify it, continue with transfer
           // The fallback logic in the calling method will handle the balance
           if (!walletAccount) {
-            console.log('🔗 ConsolidatedTransactionService: Token account created but verification failed, continuing with transfer...');
+            logger.warn('Token account created but verification failed, continuing with transfer', null, 'consolidatedTransactionService');
           }
           
         } catch (createError) {
@@ -1118,7 +1115,7 @@ class ConsolidatedTransactionService {
           
           // Check if this is actually a balance verification error, not a creation error
           if (createError instanceof Error && createError.message.includes('TokenAccountNotFoundError')) {
-            console.log('🔗 ConsolidatedTransactionService: Token account creation succeeded but balance verification failed - continuing with transfer');
+            logger.warn('Token account creation succeeded but balance verification failed - continuing with transfer', null, 'consolidatedTransactionService');
             // Continue with transfer logic - the fallback will handle the balance
           } else {
             return {
@@ -1132,9 +1129,9 @@ class ConsolidatedTransactionService {
       // Check if recipient has USDC token account, create if not
       try {
         await getAccount(connection, recipientUsdcAccount);
-        console.log('✅ Recipient USDC token account exists');
+        logger.debug('Recipient USDC token account exists', null, 'consolidatedTransactionService');
       } catch (error) {
-        console.log('🔧 Creating USDC token account for recipient...');
+        logger.info('Creating USDC token account for recipient', null, 'consolidatedTransactionService');
         // Token account doesn't exist, create it using company wallet as payer
         if (!COMPANY_WALLET_CONFIG.secretKey) {
           throw new Error('Company wallet secret key not found in configuration');
@@ -1146,11 +1143,11 @@ class ConsolidatedTransactionService {
         
         // Check company wallet SOL balance before attempting transaction
         const companySolBalance = await connection.getBalance(companyKeypair.publicKey);
-        console.log('🔗 ConsolidatedTransactionService: Company wallet SOL balance check for token account creation:', {
+        logger.debug('Company wallet SOL balance check for token account creation', {
           address: companyKeypair.publicKey.toBase58(),
           solBalance: companySolBalance / 1000000000, // Convert lamports to SOL
           solBalanceLamports: companySolBalance
-        });
+        }, 'consolidatedTransactionService');
         
         if (companySolBalance < 5000000) { // Less than 0.005 SOL (5 million lamports)
           throw new Error(`Company wallet has insufficient SOL balance: ${companySolBalance / 1000000000} SOL. Need at least 0.005 SOL for transaction fees.`);
@@ -1198,7 +1195,7 @@ class ConsolidatedTransactionService {
         }).add(createAccountInstruction).add(transferInstruction);
         
         // Use multi-endpoint approach for account creation + transfer
-        console.log('🔗 ConsolidatedTransactionService: Sending transaction with account creation using multi-endpoint approach:', {
+        logger.info('Sending transaction with account creation using multi-endpoint approach', {
           recentBlockhash: blockhash,
           feePayer: FeeService.getFeePayerPublicKey(walletKeypair.publicKey).toBase58(),
           instructionCount: transaction.instructions.length
@@ -1210,7 +1207,7 @@ class ConsolidatedTransactionService {
         // Try each RPC endpoint until one works
         for (let i = 0; i < rpcEndpoints.length; i++) {
           try {
-            console.log(`🔗 ConsolidatedTransactionService: Trying RPC endpoint ${i + 1}/${rpcEndpoints.length} for account creation: ${rpcEndpoints[i]}`);
+            logger.info('Trying RPC endpoint for account creation', { endpoint: i + 1, total: rpcEndpoints.length, url: rpcEndpoints[i] }, 'consolidatedTransactionService');
             
             // Create new connection for this attempt
             const currentConnection = new Connection(rpcEndpoints[i], 'confirmed');
@@ -1223,13 +1220,16 @@ class ConsolidatedTransactionService {
           // Company wallet is fee payer, wallet is authority for the transfer
           transaction.sign(companyKeypair, walletKeypair);
           
-          console.log(`🔗 ConsolidatedTransactionService: Account creation transaction signed for endpoint ${i + 1}:`, {
-            endpoint: rpcEndpoints[i],
-            freshBlockhash: freshBlockhash,
-            transactionSize: transaction.serialize().length,
-            instructionCount: transaction.instructions.length,
-            isSigned: transaction.signatures.length > 0
-          });
+          logger.info('Account creation transaction signed for endpoint', { 
+            endpoint: i + 1, 
+            details: {
+              endpoint: rpcEndpoints[i],
+              freshBlockhash: freshBlockhash,
+              transactionSize: transaction.serialize().length,
+              instructionCount: transaction.instructions.length,
+              isSigned: transaction.signatures.length > 0
+            }
+          }, 'consolidatedTransactionService');
           
           // Send transaction with optimized approach
           signature = await currentConnection.sendRawTransaction(transaction.serialize(), {
@@ -1239,17 +1239,17 @@ class ConsolidatedTransactionService {
           });
           
           // Confirm transaction with timeout
-          const confirmed = await this.confirmTransactionWithTimeout(signature);
+          const confirmed = await transactionUtils.confirmTransactionWithTimeout(signature);
           if (!confirmed) {
             console.warn('🔗 ConsolidatedTransactionService: Account creation confirmation timed out, but transaction was sent', { signature });
           }
             
-            console.log(`🔗 ConsolidatedTransactionService: Account creation transaction successful with endpoint ${i + 1}:`, signature);
+            logger.info('Account creation transaction successful with endpoint', { endpoint: i + 1, signature }, 'consolidatedTransactionService');
             break;
             
           } catch (error) {
             lastError = error;
-            console.log(`🔗 ConsolidatedTransactionService: Account creation endpoint ${i + 1} failed:`, error);
+            logger.warn('Account creation endpoint failed', { endpoint: i + 1, error: error instanceof Error ? error.message : String(error) }, 'consolidatedTransactionService');
             
             if (i === rpcEndpoints.length - 1) {
               // All endpoints failed
@@ -1264,7 +1264,7 @@ class ConsolidatedTransactionService {
           }
         }
         
-        console.log('🔗 ConsolidatedTransactionService: Account creation transaction confirmed successfully:', signature);
+        logger.info('Account creation transaction confirmed successfully', { signature }, 'consolidatedTransactionService');
         
         return {
           success: true,
@@ -1280,7 +1280,7 @@ class ConsolidatedTransactionService {
         const finalAvailableAmount = Number(finalBalanceCheck.amount);
         senderBalanceBefore = finalAvailableAmount / 1000000; // Convert to USDC units
         
-        console.log('🔗 ConsolidatedTransactionService: Final balance check before transaction:', {
+        logger.info('Final balance check before transaction', {
           finalAvailableAmount,
           senderBalanceBefore,
           calculatedTransferAmount: transferAmount,
@@ -1292,7 +1292,7 @@ class ConsolidatedTransactionService {
         if (finalAvailableAmount < transferAmount) {
           // Use exact available amount to avoid leaving funds behind
           transferAmount = finalAvailableAmount;
-          console.log('🔗 ConsolidatedTransactionService: Adjusted transfer amount due to balance change:', {
+          logger.info('Adjusted transfer amount due to balance change', {
             originalTransferAmount: transferAmount,
             newTransferAmount: transferAmount,
             finalAvailableAmount,
@@ -1307,7 +1307,7 @@ class ConsolidatedTransactionService {
 
       // Create the transfer instruction using the calculated transfer amount
       const usdcAmount = transferAmount; // Use the calculated transfer amount with buffer
-      console.log('🔗 ConsolidatedTransactionService: Creating USDC transfer instruction:', {
+      logger.info('Creating USDC transfer instruction', {
         fromAccount: walletUsdcAccount.toBase58(),
         toAccount: recipientUsdcAccount.toBase58(),
         authority: walletKeypair.publicKey.toBase58(),
@@ -1320,7 +1320,7 @@ class ConsolidatedTransactionService {
       // Try using the standard SPL Token transfer instruction first
       let transferInstruction;
       try {
-        console.log('🔗 ConsolidatedTransactionService: Attempting to create standard SPL Token transfer instruction');
+        logger.info('Attempting to create standard SPL Token transfer instruction', null, 'consolidatedTransactionService');
         transferInstruction = createTransferInstruction(
           walletUsdcAccount, // source
           recipientUsdcAccount, // destination
@@ -1328,7 +1328,7 @@ class ConsolidatedTransactionService {
           usdcAmount // amount
         );
         
-        console.log('🔗 ConsolidatedTransactionService: Transfer instruction details:', {
+        logger.info('Transfer instruction details', {
           fromAccount: walletUsdcAccount.toBase58(),
           toAccount: recipientUsdcAccount.toBase58(),
           authority: walletKeypair.publicKey.toBase58(),
@@ -1341,7 +1341,7 @@ class ConsolidatedTransactionService {
           }))
         });
         
-        console.log('🔗 ConsolidatedTransactionService: Standard SPL Token transfer instruction created successfully');
+        logger.info('Standard SPL Token transfer instruction created successfully', null, 'consolidatedTransactionService');
       } catch (standardError) {
         console.warn('🔗 ConsolidatedTransactionService: Standard transfer instruction failed, using manual instruction:', standardError);
         
@@ -1370,10 +1370,10 @@ class ConsolidatedTransactionService {
             ...new Uint8Array(new BigUint64Array([BigInt(usdcAmount)]).buffer).reverse(),
           ]),
         });
-        console.log('🔗 ConsolidatedTransactionService: Manual transfer instruction created as fallback');
+        logger.info('Manual transfer instruction created as fallback', null, 'consolidatedTransactionService');
       }
       
-      console.log('🔗 ConsolidatedTransactionService: Transfer instruction created:', {
+      logger.info('Transfer instruction created', {
         programId: transferInstruction.programId.toBase58(),
         keys: transferInstruction.keys.map(key => ({
           pubkey: key.pubkey.toBase58(),
@@ -1388,7 +1388,7 @@ class ConsolidatedTransactionService {
       const destinationKey = transferInstruction.keys[1];
       const authorityKey = transferInstruction.keys[2];
       
-      console.log('🔗 ConsolidatedTransactionService: Transfer instruction key verification:', {
+      logger.info('Transfer instruction key verification', {
         sourceAccount: sourceKey.pubkey.toBase58(),
         sourceIsWritable: sourceKey.isWritable,
         sourceIsSigner: sourceKey.isSigner,
@@ -1406,7 +1406,7 @@ class ConsolidatedTransactionService {
       // Use centralized fee payer logic - Company pays SOL gas fees
       const feePayer = FeeService.getFeePayerPublicKey(walletKeypair.publicKey);
         
-      console.log('🔗 ConsolidatedTransactionService: Fee payer configuration:', {
+      logger.info('Fee payer configuration', {
         companyWalletAddress: COMPANY_WALLET_CONFIG.address,
         companyWalletRequired: true,
         selectedFeePayer: feePayer.toBase58(),
@@ -1416,7 +1416,7 @@ class ConsolidatedTransactionService {
       // Company wallet always pays SOL fees - check its balance
       if (feePayer.equals(new PublicKey(COMPANY_WALLET_CONFIG.address))) {
         const companySolBalance = await connection.getBalance(feePayer);
-        console.log('🔗 ConsolidatedTransactionService: Company wallet SOL balance:', {
+        logger.info('Company wallet SOL balance', {
           address: feePayer.toBase58(),
           solBalance: companySolBalance / LAMPORTS_PER_SOL,
           solBalanceLamports: companySolBalance
@@ -1437,14 +1437,14 @@ class ConsolidatedTransactionService {
       }).add(transferInstruction);
       
       // Verify the transaction fee payer is set correctly
-      console.log('🔗 ConsolidatedTransactionService: Transaction fee payer verification:', {
+      logger.info('Transaction fee payer verification', {
         transactionFeePayer: transaction.feePayer?.toBase58(),
         expectedFeePayer: feePayer.toBase58(),
         feePayerMatches: transaction.feePayer?.equals(feePayer)
       });
       
       // Use sendAndConfirmTransaction with retry logic for different RPC endpoints
-      console.log('🔗 ConsolidatedTransactionService: NEW MULTI-ENDPOINT APPROACH - Sending transaction with confirmation:', {
+      logger.info('NEW MULTI-ENDPOINT APPROACH - Sending transaction with confirmation', {
         recentBlockhash: blockhash,
         feePayer: feePayer.toBase58(), // Use the actual feePayer variable
         instructionCount: transaction.instructions.length,
@@ -1460,7 +1460,7 @@ class ConsolidatedTransactionService {
       // Try each RPC endpoint until one works
       for (let i = 0; i < rpcEndpoints.length; i++) {
         try {
-          console.log(`🔗 ConsolidatedTransactionService: Trying RPC endpoint ${i + 1}/${rpcEndpoints.length}: ${rpcEndpoints[i]}`);
+          logger.info('Trying RPC endpoint', { endpoint: i + 1, total: rpcEndpoints.length, url: rpcEndpoints[i] }, 'consolidatedTransactionService');
           
           // Create new connection for this attempt
           const currentConnection = new Connection(rpcEndpoints[i], 'confirmed');
@@ -1476,7 +1476,7 @@ class ConsolidatedTransactionService {
             // Get company wallet keypair with proper error handling
             
             // Debug the secret key format
-            console.log('🔗 ConsolidatedTransactionService: Company wallet secret key debug:', {
+            logger.debug('Company wallet secret key debug', {
               secretKeyType: typeof COMPANY_WALLET_CONFIG.secretKey,
               secretKeyLength: COMPANY_WALLET_CONFIG.secretKey?.length,
               secretKeyPreview: COMPANY_WALLET_CONFIG.secretKey?.substring(0, 100) + '...',
@@ -1488,7 +1488,7 @@ class ConsolidatedTransactionService {
               // Parse the company wallet secret key using shared utility
               const companyKeypairResult = keypairUtils.createKeypairFromSecretKey(COMPANY_WALLET_CONFIG.secretKey);
               companyKeypair = companyKeypairResult.keypair;
-              console.log('🔗 ConsolidatedTransactionService: Company wallet keypair created:', {
+              logger.info('Company wallet keypair created', {
                 format: companyKeypairResult.format,
                 derivedPublicKey: companyKeypair.publicKey.toBase58(),
                 expectedPublicKey: COMPANY_WALLET_CONFIG.address,
@@ -1508,7 +1508,7 @@ class ConsolidatedTransactionService {
             transaction.sign(walletKeypair, companyKeypair);
             
             // Verify signatures are present
-            console.log('🔗 ConsolidatedTransactionService: Transaction signature verification:', {
+            logger.info('Transaction signature verification', {
               signatureCount: transaction.signatures.length,
               signatures: transaction.signatures.map(sig => ({
                 publicKey: sig.publicKey.toBase58(),
@@ -1521,26 +1521,29 @@ class ConsolidatedTransactionService {
               throw new Error('Transaction is not fully signed');
             }
             
-            console.log('🔗 ConsolidatedTransactionService: Transaction signed with both split wallet and company wallet');
+            logger.info('Transaction signed with both split wallet and company wallet', null, 'consolidatedTransactionService');
           } else {
             transaction.sign(walletKeypair);
-            console.log('🔗 ConsolidatedTransactionService: Transaction signed with split wallet only');
+            logger.info('Transaction signed with split wallet only', null, 'consolidatedTransactionService');
           }
           
-          console.log(`🔗 ConsolidatedTransactionService: Attempting transaction with endpoint ${i + 1}:`, {
-            endpoint: rpcEndpoints[i],
-            freshBlockhash: freshBlockhash,
-            transactionSize: transaction.serialize().length,
-            instructionCount: transaction.instructions.length,
-            isSigned: transaction.signatures.length > 0
-          });
+          logger.info('Attempting transaction with endpoint', { 
+            endpoint: i + 1, 
+            details: {
+              endpoint: rpcEndpoints[i],
+              freshBlockhash: freshBlockhash,
+              transactionSize: transaction.serialize().length,
+              instructionCount: transaction.instructions.length,
+              isSigned: transaction.signatures.length > 0
+            }
+          }, 'consolidatedTransactionService');
           
           // Use the correct signers based on fee payer
           const signers = feePayer.equals(new PublicKey(COMPANY_WALLET_CONFIG.address)) 
             ? [walletKeypair, companyKeypair!]
             : [walletKeypair];
             
-          console.log('🔗 ConsolidatedTransactionService: Using signers for sendAndConfirmTransaction:', {
+          logger.info('Using signers for sendAndConfirmTransaction', {
             signerCount: signers.length,
             signers: signers.map(signer => signer.publicKey.toBase58()),
             feePayer: feePayer.toBase58()
@@ -1554,7 +1557,7 @@ class ConsolidatedTransactionService {
           });
           
           // Confirm transaction with timeout
-          const confirmed = await this.confirmTransactionWithTimeout(signature);
+          const confirmed = await transactionUtils.confirmTransactionWithTimeout(signature);
           if (!confirmed) {
             console.warn('🔗 ConsolidatedTransactionService: Transaction confirmation timed out, but transaction was sent', { signature });
             
@@ -1568,7 +1571,7 @@ class ConsolidatedTransactionService {
                 console.error('🔗 ConsolidatedTransactionService: Transaction actually failed:', status.value.err);
                 throw new Error(`Transaction failed: ${status.value.err.toString()}`);
               } else if (status.value?.confirmationStatus) {
-                console.log('🔗 ConsolidatedTransactionService: Transaction actually succeeded despite timeout:', {
+                logger.info('Transaction actually succeeded despite timeout', {
                   signature,
                   confirmationStatus: status.value.confirmationStatus,
                   confirmations: status.value.confirmations
@@ -1582,11 +1585,11 @@ class ConsolidatedTransactionService {
             }
           }
           
-          console.log(`🔗 ConsolidatedTransactionService: Transaction successful with endpoint ${i + 1}:`, signature);
+          logger.info('Transaction successful with endpoint', { endpoint: i + 1, signature }, 'consolidatedTransactionService');
           
           // Verify the transfer actually succeeded by checking balances
           try {
-            console.log('🔗 ConsolidatedTransactionService: Verifying transfer by checking balances...');
+            logger.info('Verifying transfer by checking balances', null, 'consolidatedTransactionService');
             await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for blockchain propagation
             
             // Check sender balance (should be reduced)
@@ -1597,7 +1600,7 @@ class ConsolidatedTransactionService {
             const recipientAccount = await getAccount(currentConnection, recipientUsdcAccount);
             const recipientBalanceAfter = Number(recipientAccount.amount) / 1000000;
             
-            console.log('🔗 ConsolidatedTransactionService: Balance verification after transfer:', {
+            logger.info('Balance verification after transfer', {
               senderAddress: fromWalletAddress,
               senderTokenAccount: walletUsdcAccount.toBase58(),
               senderBalanceAfter: senderBalanceAfter,
@@ -1627,9 +1630,9 @@ class ConsolidatedTransactionService {
                   throw new Error(`Transfer verification failed: Sender balance not reduced by expected amount. Expected: ${expectedSenderBalance}, Actual: ${senderBalanceAfter}`);
                 }
                 
-                console.log('✅ ConsolidatedTransactionService: Partial withdrawal verification successful - sender balance reduced by expected amount');
+                logger.info('Partial withdrawal verification successful - sender balance reduced by expected amount', null, 'consolidatedTransactionService');
               } else {
-                console.log('⚠️ ConsolidatedTransactionService: Skipping partial withdrawal verification - initial balance not available');
+                logger.warn('Skipping partial withdrawal verification - initial balance not available', null, 'consolidatedTransactionService');
               }
             } else {
               // For complete withdrawals (like fair splits), verify sender balance is zero
@@ -1642,19 +1645,19 @@ class ConsolidatedTransactionService {
                 throw new Error(`Transfer verification failed: Sender still has ${senderBalanceAfter} USDC after transfer`);
               }
               
-              console.log('✅ ConsolidatedTransactionService: Complete withdrawal verification successful - sender balance is zero');
+              logger.info('Complete withdrawal verification successful - sender balance is zero', null, 'consolidatedTransactionService');
             }
             
           } catch (balanceError) {
             console.error('🔗 ConsolidatedTransactionService: Transfer verification failed:', balanceError);
-            throw new Error(`Transfer verification failed: ${balanceError instanceof Error ? balanceError.message : 'Unknown error'}`);
+            throw new Error(`Transfer verification failed: ${balanceError instanceof Error ? balanceError.message : String(balanceError)}`);
           }
           
           break;
           
         } catch (error) {
           lastError = error;
-          console.log(`🔗 ConsolidatedTransactionService: Endpoint ${i + 1} failed:`, error);
+          logger.warn('Endpoint failed', { endpoint: i + 1, error: error instanceof Error ? error.message : String(error) }, 'consolidatedTransactionService');
           
           if (i === rpcEndpoints.length - 1) {
             // All endpoints failed
@@ -1669,7 +1672,7 @@ class ConsolidatedTransactionService {
         }
       }
       
-      console.log('🔗 ConsolidatedTransactionService: Transaction confirmed successfully:', signature);
+      logger.info('Transaction confirmed successfully', { signature }, 'consolidatedTransactionService');
 
       return {
         success: true,
@@ -1690,13 +1693,13 @@ class ConsolidatedTransactionService {
    * Check if user has sufficient SOL for gas (company covers all blockchain fees)
    */
   async hasSufficientSolForGas(userId: string): Promise<{ hasSufficient: boolean; currentSol: number; requiredSol: number }> {
-    console.log('🔗 ConsolidatedTransactionService: SOL gas check - company covers all blockchain fees');
+    logger.info('SOL gas check - company covers all blockchain fees', null, 'consolidatedTransactionService');
     
     try {
       const balance = await this.getUserWalletBalance(userId);
       
       // Company covers all blockchain fees, so SOL check always passes
-      console.log('🔗 ConsolidatedTransactionService: SOL gas check result (company covers fees):', {
+      logger.info('SOL gas check result (company covers fees)', {
         hasSufficient: true,
         currentSol: balance.sol,
         requiredSol: 0

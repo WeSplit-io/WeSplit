@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenSpinStyles';
+import { logger } from '../../services/loggingService';
 import { useApp } from '../../context/AppContext';
 import { notificationService } from '../../services/notificationService';
 
@@ -124,7 +125,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
         }
       );
 
-      console.log('🔍 DegenSpinScreen: Spin available notification result:', notificationResult);
+      logger.info('Spin available notification result', { notificationResult }, 'DegenSpinScreen');
     };
 
     sendSpinNotifications();

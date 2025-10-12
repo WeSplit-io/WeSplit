@@ -1,6 +1,7 @@
 import { auth, db } from '../config/firebase';
 import { collection, doc, getDoc } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
+import { logger } from '../services/loggingService';
 
 export const checkFirebaseConfiguration = () => {
   try {
@@ -15,11 +16,7 @@ export const checkFirebaseConfiguration = () => {
     };
 
     if (__DEV__) {
-      console.log('🔥 Firebase Configuration Check:');
-      console.log('  - Auth initialized:', !!auth);
-      console.log('  - Firestore initialized:', !!db);
-      console.log('  - Project ID:', config.projectId || 'NOT SET');
-      console.log('  - API Key:', config.apiKey ? 'SET' : 'NOT SET');
+      logger.info('Firebase Configuration Check', { authInitialized: !!auth, firestoreInitialized: !!db, projectId: config.projectId || 'NOT SET', apiKeySet: !!config.apiKey }, 'firebaseCheck');
     }
 
     return {
@@ -28,11 +25,7 @@ export const checkFirebaseConfiguration = () => {
     };
   } catch (error) {
     if (__DEV__) {
-      console.log('🔥 Firebase Configuration Check:');
-      console.log('  - Auth initialized:', !!auth);
-      console.log('  - Firestore initialized:', !!db);
-      console.log('  - Project ID: NOT SET');
-      console.log('  - API Key: NOT SET');
+      logger.warn('Firebase Configuration Check - Missing Config', { authInitialized: !!auth, firestoreInitialized: !!db, projectId: 'NOT SET', apiKeySet: false }, 'firebaseCheck');
     }
 
     return {
@@ -48,7 +41,7 @@ export const testFirebaseConnection = async () => {
     const testDoc = await getDoc(doc(db, 'test', 'connection-test'));
     
     if (__DEV__) {
-      console.log('✅ Firebase connection test successful');
+      logger.info('Firebase connection test successful', null, 'firebaseCheck');
     }
     
     return { success: true, error: null };

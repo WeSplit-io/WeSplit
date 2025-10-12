@@ -17,6 +17,7 @@ import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '@theme';
 import { parseUri, extractRecipientAddress, isSolanaPayUri } from './solanaPay';
+import { logger } from '../../services/loggingService';
 import { isValidSolanaAddress } from '@libs/validation';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -67,7 +68,7 @@ const ScannerScreen: React.FC<ScannerScreenProps> = ({
     setScanned(true);
     setIsScanning(false);
     
-    console.log('QR Code scanned:', data);
+    logger.info('QR Code scanned', { data }, 'ScannerScreen');
     
     try {
       // Check if it's a Solana Pay URI

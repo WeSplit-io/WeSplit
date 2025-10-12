@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { walletService } from '../services/WalletService';
 import { Alert } from 'react-native';
+import { logger } from '../services/loggingService';
 
 export interface LinkedWallet {
   address: string;
@@ -40,7 +41,7 @@ export const WalletLinkingProvider: React.FC<WalletLinkingProviderProps> = ({ ch
     try {
       // Check if wallet service is available and has a wallet loaded
       if (!walletService || !walletService.isConnected()) {
-        console.log('No wallet connected, skipping linked wallets load');
+        logger.info('No wallet connected, skipping linked wallets load', null, 'WalletLinkingContext');
         return;
       }
 

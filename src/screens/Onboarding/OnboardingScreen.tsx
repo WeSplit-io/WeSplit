@@ -3,6 +3,7 @@ import { View, Text, Image, TouchableOpacity, ScrollView, Dimensions } from 'rea
 import { useNavigation } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { useApp } from '../../context/AppContext';
+import { logger } from '../../services/loggingService';
 
 const slides = [
   {
@@ -38,7 +39,7 @@ const OnboardingScreen: React.FC = () => {
   const markOnboardingCompleted = async () => {
     try {
       await updateUser({ hasCompletedOnboarding: true });
-      console.log('✅ Onboarding marked as completed');
+      logger.info('Onboarding marked as completed', null, 'OnboardingScreen');
     } catch (error) {
       console.error('❌ Failed to mark onboarding as completed:', error);
     }

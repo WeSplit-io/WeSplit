@@ -606,13 +606,13 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           // Also check if we've already processed this notification ID
           const notificationId = String(n.id);
           if (processedNotificationIds.has(notificationId)) {
-            console.log('🚫 Dashboard: Skipping duplicate notification ID:', notificationId, n.data?.senderName, amount);
+            logger.debug('Skipping duplicate notification ID', { notificationId, senderName: n.data?.senderName, amount }, 'DashboardScreen');
             return false;
           }
 
           // Add to processed set to prevent duplicates within notifications
           processedNotificationIds.add(notificationId);
-          console.log('📝 Dashboard: Added notification request:', n.id, n.data?.senderName, amount);
+          logger.debug('Added notification request', { id: n.id, senderName: n.data?.senderName, amount }, 'DashboardScreen');
           return true;
         })
         .forEach(n => {
@@ -696,22 +696,24 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           });
         }
       } catch (e) {
-        console.log('⚠️ Dashboard: Could not enrich sender avatars:', e);
+        logger.warn('Could not enrich sender avatars', { error: e.message }, 'DashboardScreen');
       }
 
-      console.log('✅ Dashboard: Payment requests loaded successfully:', allRequests.length);
-      console.log('📋 Dashboard: Final requests:', allRequests.map(r => ({
-        id: r.id,
-        sender: r.data?.senderName || r.data?.fromUser,
-        amount: r.data?.amount,
-        type: r.type
-      })));
+      logger.info('Payment requests loaded successfully', { count: allRequests.length }, 'DashboardScreen');
+      logger.debug('Final requests', { 
+        requests: allRequests.map(r => ({
+          id: r.id,
+          sender: r.data?.senderName || r.data?.fromUser,
+          amount: r.data?.amount,
+          type: r.type
+        }))
+      }, 'DashboardScreen');
       setPaymentRequests(allRequests);
 
       // Mark as initially loaded if this is the first successful load
       if (!initialRequestsLoaded) {
         setInitialRequestsLoaded(true);
-        console.log('🎯 Dashboard: Initial payment requests loaded');
+        logger.info('Initial payment requests loaded', null, 'DashboardScreen');
       }
     } catch (error) {
       // Keep error logging for debugging
@@ -891,7 +893,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
   useEffect(() => {
     if (userCreatedWalletBalance) {
       // This effect will trigger when the balance changes
-      console.log('💰 Dashboard: Balance updated:', userCreatedWalletBalance.totalUSD);
+      logger.info('Balance updated', { totalUSD: userCreatedWalletBalance.totalUSD }, 'DashboardScreen');
     }
   }, [userCreatedWalletBalance?.totalUSD]); // Removed forceUpdate dependency to prevent excessive re-renders
 
@@ -902,7 +904,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
       if (isAuthenticated && currentUser?.id) {
         // Load balance immediately and independently of app wallet
         if (!balanceLoaded && !loadingUserWallet) {
-          console.log('🚀 Dashboard: Focus effect - loading balance immediately');
+          logger.debug('Focus effect - loading balance immediately', null, 'DashboardScreen');
           loadUserCreatedWalletBalance();
         }
 
@@ -963,7 +965,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
     if (!isAuthenticated || !currentUser?.id) return;
 
     try {
-      console.log('🔄 Dashboard: Manual refresh triggered');
+      logger.info('Manual refresh triggered', null, 'DashboardScreen');
       setBalanceLoaded(false); // Reset balance loaded flag to allow refresh
 
       // Ensure wallet exists and refresh balance
@@ -983,7 +985,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
       // Refresh the wallet balance directly
       if (walletResult.success && walletResult.wallet) {
-        console.log('💰 Dashboard: Refreshing wallet balance...');
+        logger.info('Refreshing wallet balance', null, 'DashboardScreen');
 
         try {
           setLoadingUserWallet(true);
@@ -992,7 +994,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
           const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
 
           if (balance) {
-            console.log('💰 Dashboard: New balance detected:', balance.totalUSD ?? 0, 'USD');
+            logger.info('New balance detected', { totalUSD: balance.totalUSD ?? 0, currency: 'USD' }, 'DashboardScreen');
 
             // Simple state update without complex setTimeout logic
             setUserCreatedWalletBalance(balance);
@@ -1013,7 +1015,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         loadRealTransactions(),
       ]);
 
-      console.log('✅ Dashboard: Refresh completed successfully');
+      logger.info('Refresh completed successfully', null, 'DashboardScreen');
 
     } catch (error) {
       console.error('❌ Dashboard: Error during refresh:', error);
@@ -1310,7 +1312,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
 
     setLoadingSplits(true);
     try {
-      console.log('🔍 Dashboard: Loading recent splits for user:', currentUser.id);
+      logger.info('Loading recent splits for user', { userId: currentUser.id }, 'DashboardScreen');
       
       const result = await SplitStorageService.getUserSplits(currentUser.id.toString());
       
@@ -1318,7 +1320,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         // Get the 3 most recent splits
         const recentSplits = result.splits.slice(0, 3);
         
-        console.log('🔍 Dashboard: Loaded recent splits:', {
+        logger.info('Loaded recent splits', {
           count: recentSplits.length,
           splits: recentSplits.map((s: any) => ({
             id: s.id,
@@ -1332,7 +1334,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
         });
         setRecentSplits(recentSplits);
       } else {
-        console.log('🔍 Dashboard: Failed to load splits:', result.error);
+        logger.error('Failed to load splits', { error: result.error }, 'DashboardScreen');
         setRecentSplits([]);
       }
     } catch (error) {
@@ -1678,7 +1680,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                         style={styles.requestSendButtonNew}
                         onPress={async () => {
                           try {
-                            console.log('🔍 Dashboard: Send button pressed for request:', {
+                            logger.info('Send button pressed for request', {
                               requestId: request.id,
                               requestData: request.data,
                               amount,
@@ -1694,12 +1696,12 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                               return;
                             }
 
-                            console.log('🔍 Dashboard: Fetching user data for sender ID:', senderId);
+                            logger.debug('Fetching user data for sender ID', { senderId }, 'DashboardScreen');
                             
                             // Fetch user data to get wallet address and other details
                             const contact = await fetchUserData(senderId);
                             
-                            console.log('🔍 Dashboard: Fetched contact data:', {
+                            logger.debug('Fetched contact data', {
                               id: contact.id,
                               name: contact.name,
                               email: contact.email,
@@ -1713,7 +1715,7 @@ const DashboardScreen: React.FC<any> = ({ navigation }) => {
                             }
                             
                             // Navigate to SendAmount screen with pre-filled data
-                            console.log('🔍 Dashboard: Navigating to SendAmount with data:', {
+                            logger.info('Navigating to SendAmount with data', {
                               contact: contact.name,
                               amount,
                               currency,

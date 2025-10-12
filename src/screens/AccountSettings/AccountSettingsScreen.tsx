@@ -22,6 +22,7 @@ import { colors, spacing } from '../../theme';
 import * as ImagePicker from 'expo-image-picker';
 import AccountDeletionService, { DeletionProgress } from '../../services/accountDeletionService';
 import { UserImageService } from '../../services/userImageService';
+import { logger } from '../../services/loggingService';
 import styles from './styles';
 
 
@@ -185,7 +186,7 @@ const AccountSettingsScreen = ({ navigation }: any) => {
       
       // If avatar has changed and is a local URI, upload it
       if (avatar && avatar !== currentUser.avatar && avatar.startsWith('file://')) {
-        console.log('📸 AccountSettings: Uploading new avatar...');
+        logger.info('Uploading new avatar', null, 'AccountSettingsScreen');
         const uploadResult = await UserImageService.uploadUserAvatar(
           currentUser.id.toString(), 
           avatar
@@ -193,19 +194,19 @@ const AccountSettingsScreen = ({ navigation }: any) => {
         
         if (uploadResult.success && uploadResult.imageUrl) {
           finalAvatarUrl = uploadResult.imageUrl;
-          console.log('📸 AccountSettings: Avatar uploaded successfully');
+          logger.info('Avatar uploaded successfully', null, 'AccountSettingsScreen');
         } else {
           Alert.alert('Error', uploadResult.error || 'Failed to upload avatar');
           return;
         }
       } else if (avatar === null && currentUser.avatar) {
         // Avatar was removed
-        console.log('🗑️ AccountSettings: Removing avatar...');
+        logger.info('Removing avatar', null, 'AccountSettingsScreen');
         const deleteResult = await UserImageService.deleteUserAvatar(currentUser.id.toString());
         
         if (deleteResult.success) {
           finalAvatarUrl = '';
-          console.log('🗑️ AccountSettings: Avatar removed successfully');
+          logger.info('Avatar removed successfully', null, 'AccountSettingsScreen');
         } else {
           console.warn('🗑️ AccountSettings: Failed to remove avatar:', deleteResult.error);
           // Continue with profile update even if avatar deletion fails

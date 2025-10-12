@@ -27,6 +27,7 @@ import { authService } from '../../services/AuthService';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { sendVerificationCode } from '../../services/firebaseFunctionsService';
 import { logOAuthConfiguration } from '../../utils/oauthTest';
+import { logger } from '../../services/loggingService';
 import { testEnvironmentVariables } from '../../utils/envTest';
 import { logOAuthDebugInfo } from '../../utils/oauthDebugger';
 
@@ -96,7 +97,7 @@ const AuthMethodsScreen: React.FC = () => {
       }
 
       // Debug: Log the user data to understand what we're getting
-      console.log('🔍 AuthMethods: Retrieved user data:', {
+      logger.debug('Retrieved user data', {
         id: userData.id,
         email: userData.email,
         wallet_address: userData.wallet_address,
@@ -127,7 +128,7 @@ const AuthMethodsScreen: React.FC = () => {
       };
 
       // Debug: Log the transformed app user
-      console.log('🔍 AuthMethods: Transformed app user:', {
+      logger.debug('Transformed app user', {
         id: appUser.id,
         email: appUser.email,
         wallet_address: appUser.wallet_address,
@@ -140,7 +141,7 @@ const AuthMethodsScreen: React.FC = () => {
       // Ensure user has a wallet using the centralized wallet service
       // CRITICAL: Always call ensureUserWallet to verify wallet integrity and restore if needed
       try {
-        console.log('🔄 AuthMethods: Ensuring wallet integrity for user...');
+        logger.info('Ensuring wallet integrity for user', null, 'AuthMethodsScreen');
         const walletResult = await walletService.ensureUserWallet(appUser.id);
 
         if (walletResult.success && walletResult.wallet) {
@@ -148,7 +149,7 @@ const AuthMethodsScreen: React.FC = () => {
           appUser.wallet_address = walletResult.wallet.address;
           appUser.wallet_public_key = walletResult.wallet.publicKey;
           
-          console.log('✅ AuthMethods: Wallet ensured for user:', walletResult.wallet.address);
+          logger.info('Wallet ensured for user', { address: walletResult.wallet.address }, 'AuthMethodsScreen');
           
           // Update user in AppContext
           updateUser(appUser);
@@ -193,30 +194,26 @@ const AuthMethodsScreen: React.FC = () => {
 
   // Handle email authentication using Firebase directly
   const handleEmailAuth = async () => {
-    console.log('🚀 handleEmailAuth called with email:', email);
+    logger.info('handleEmailAuth called', { email }, 'AuthMethodsScreen');
     
     // Sanitize email by trimming whitespace and newlines
     const sanitizedEmail = email?.trim().replace(/\s+/g, '') || '';
-    console.log('🧹 Sanitized email:', sanitizedEmail);
 
     if (!sanitizedEmail) {
-      console.log('❌ No email provided');
+      logger.warn('No email provided', null, 'AuthMethodsScreen');
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
-    console.log('⏳ Setting loading to true');
     setLoading(true);
 
     try {
-      console.log('🔄 Starting email authentication process...');
+      logger.info('Starting email authentication process', null, 'AuthMethodsScreen');
       
       // Import firestore service
       const { firestoreService } = await import('../../config/firebase');
-      console.log('✅ Firebase service imported');
 
       // Check if user has verified within 30 days (with shorter timeout to prevent hanging)
-      console.log('🔍 Checking if user has verified within 30 days...');
       let hasVerifiedRecently = false;
       try {
         hasVerifiedRecently = await Promise.race([
@@ -225,7 +222,6 @@ const AuthMethodsScreen: React.FC = () => {
             setTimeout(() => reject(new Error('Verification check timeout')), 15000)
           )
         ]) as boolean;
-        console.log('📅 Has verified recently:', hasVerifiedRecently);
       } catch (timeoutError) {
         console.warn('⚠️ Verification check timed out after 5 seconds, proceeding with verification flow');
         // If verification check times out, assume user needs verification
@@ -234,7 +230,7 @@ const AuthMethodsScreen: React.FC = () => {
 
       if (hasVerifiedRecently) {
         if (__DEV__) {
-          console.log('✅ User has already verified within the last 30 days, bypassing verification');
+          logger.info('User has already verified within the last 30 days, bypassing verification', null, 'AuthMethodsScreen');
         }
 
         // Show loading indicator for bypass
@@ -251,7 +247,7 @@ const AuthMethodsScreen: React.FC = () => {
             const userDoc = querySnapshot.docs[0];
             const userData = userDoc.data();
 
-            if (__DEV__) { console.log('📋 Found existing user in Firestore:', userData); }
+            if (__DEV__) { logger.debug('Found existing user in Firestore', { userData }, 'AuthMethodsScreen'); }
 
             // Check if user exists in Firebase Auth
             let firebaseUser = auth.currentUser;
@@ -267,7 +263,7 @@ const AuthMethodsScreen: React.FC = () => {
                 try {
                   // Try to create a new Firebase Auth user
                   firebaseUser = await firebaseAuth.createUserWithEmail(sanitizedEmail, temporaryPassword);
-                  if (__DEV__) { console.log('✅ Created new Firebase Auth user for existing Firestore user'); }
+                  if (__DEV__) { logger.info('Created new Firebase Auth user for existing Firestore user', null, 'AuthMethodsScreen'); }
                 } catch (createError: any) {
                   if (createError.code === 'auth/email-already-in-use') {
                     // User already exists in Firebase Auth, we need to handle this
@@ -296,14 +292,14 @@ const AuthMethodsScreen: React.FC = () => {
                     const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
                     
                     if (needsProfile) {
-                      console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
+                      logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'AuthMethodsScreen');
                       navigation.reset({
                         index: 0,
                         routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
                       });
                     } else {
                       // User has a profile, go directly to Dashboard
-                      console.log('✅ User has profile, navigating to Dashboard');
+                      logger.info('User has profile, navigating to Dashboard', null, 'AuthMethodsScreen');
                       navigation.reset({
                         index: 0,
                         routes: [{ name: 'Dashboard' }],
@@ -345,14 +341,14 @@ const AuthMethodsScreen: React.FC = () => {
             const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
 
             if (needsProfile) {
-              console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
+              logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'AuthMethodsScreen');
               navigation.reset({
                 index: 0,
                 routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
               });
             } else {
               // User has a profile, go directly to Dashboard
-              console.log('✅ User has profile, navigating to Dashboard');
+              logger.info('User has profile, navigating to Dashboard', null, 'AuthMethodsScreen');
               navigation.reset({
                 index: 0,
                 routes: [{ name: 'Dashboard' }],
@@ -360,7 +356,7 @@ const AuthMethodsScreen: React.FC = () => {
             }
           } else {
             // User doesn't exist in Firestore, create new user
-            if (__DEV__) { console.log('🆕 Creating new user since not found in Firestore'); }
+            if (__DEV__) { logger.info('Creating new user since not found in Firestore', null, 'AuthMethodsScreen'); }
 
             const temporaryPassword = `WeSplit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             const userCredential = await firebaseAuth.createUserWithEmail(email, temporaryPassword);
@@ -373,11 +369,11 @@ const AuthMethodsScreen: React.FC = () => {
       } else {
         // User needs verification (not verified within 30 days)
         if (__DEV__) {
-          console.log('🔄 User needs verification (not verified within 30 days), sending OTP');
+          logger.info('User needs verification (not verified within 30 days), sending OTP', null, 'AuthMethodsScreen');
         }
 
         // Send verification code (with longer timeout to allow Firebase Functions to complete)
-        console.log('📧 Sending verification code...');
+        logger.info('Sending verification code', null, 'AuthMethodsScreen');
         try {
           await Promise.race([
             sendVerificationCode(sanitizedEmail),
@@ -385,20 +381,17 @@ const AuthMethodsScreen: React.FC = () => {
               setTimeout(() => reject(new Error('Verification code send timeout')), 60000)
             )
           ]);
-          console.log('✅ Verification code sent successfully');
+          logger.info('Verification code sent successfully', null, 'AuthMethodsScreen');
         } catch (sendError) {
           console.warn('⚠️ Verification code send failed or timed out:', sendError);
           // Continue anyway - user can request a new code on the verification screen
         }
 
         // Navigate to verification screen (always navigate, regardless of send success)
-        console.log('🧭 Navigating to verification screen...');
         navigation.navigate('Verification', { email: sanitizedEmail });
       }
           } catch (error: any) {
-        console.log('❌ Error in email authentication:', error);
-        console.log('🔍 Error code:', error.code);
-        console.log('📝 Error message:', error.message);
+        logger.error('Error in email authentication', { error: error.message, code: error.code }, 'AuthMethodsScreen');
         
         // Convert expected errors to warnings
         if (error.code === 'auth/email-already-in-use') {
@@ -410,21 +403,20 @@ const AuthMethodsScreen: React.FC = () => {
           console.warn('⚠️ Verification check timed out, proceeding with verification flow');
           // If verification check times out, proceed with sending verification code
           try {
-            console.log('📧 Sending verification code after timeout...');
+            logger.info('Sending verification code after timeout', null, 'AuthMethodsScreen');
             await Promise.race([
               sendVerificationCode(sanitizedEmail),
               new Promise((_, reject) => 
                 setTimeout(() => reject(new Error('Verification code send timeout')), 60000)
               )
             ]);
-            console.log('✅ Verification code sent successfully');
+            logger.info('Verification code sent successfully', null, 'AuthMethodsScreen');
           } catch (sendError) {
             console.warn('⚠️ Verification code send failed or timed out:', sendError);
             // Continue anyway - user can request a new code on the verification screen
           }
           
           // Always navigate to verification screen
-          console.log('🧭 Navigating to verification screen after timeout...');
           navigation.navigate('Verification', { email: sanitizedEmail });
         } else if (error.message === 'Verification code send timeout') {
           console.warn('⚠️ Verification code send timed out');
@@ -450,7 +442,7 @@ const AuthMethodsScreen: React.FC = () => {
           }
         }
       } finally {
-        console.log('🏁 Email authentication process finished, setting loading to false');
+        logger.info('Email authentication process finished, setting loading to false', null, 'AuthMethodsScreen');
         setLoading(false);
       }
   };
@@ -462,7 +454,7 @@ const AuthMethodsScreen: React.FC = () => {
     
     try {
       // Log OAuth configuration for debugging
-      console.log(`🔧 Testing OAuth configuration for ${provider}...`);
+      logger.info('Testing OAuth configuration for provider', { provider }, 'AuthMethodsScreen');
       testEnvironmentVariables();
       logOAuthConfiguration();
       logOAuthDebugInfo();
@@ -471,7 +463,7 @@ const AuthMethodsScreen: React.FC = () => {
       const ssoResult = await authService.authenticateWithSSO(provider);
 
       if (ssoResult.success && ssoResult.user) {
-        console.log(`✅ ${provider} authentication successful, saving user data...`);
+        logger.info('Provider authentication successful, saving user data', { provider }, 'AuthMethodsScreen');
         
         // Save user data to Firestore using the firebase data service
         const userData = await firebaseDataService.user.createUserIfNotExists({
@@ -482,7 +474,7 @@ const AuthMethodsScreen: React.FC = () => {
         });
 
         if (userData) {
-          console.log(`✅ User data saved successfully for ${provider} user`);
+          logger.info('User data saved successfully for provider user', { provider }, 'AuthMethodsScreen');
           
           // Transform to app user format
           const appUser = {
@@ -496,7 +488,7 @@ const AuthMethodsScreen: React.FC = () => {
             hasCompletedOnboarding: userData.hasCompletedOnboarding
           };
 
-          console.log('🔍 SSO User data:', {
+          logger.info('SSO User data', {
             id: appUser.id,
             email: appUser.email,
             name: appUser.name,
@@ -512,19 +504,19 @@ const AuthMethodsScreen: React.FC = () => {
           const needsProfile = !appUser.name || appUser.name.trim() === '';
 
           if (needsProfile) {
-            console.log('🔄 User needs profile creation, navigating to CreateProfile');
+            logger.info('User needs profile creation, navigating to CreateProfile', null, 'AuthMethodsScreen');
             navigation.reset({
               index: 0,
               routes: [{ name: 'CreateProfile', params: { email: appUser.email } }],
             });
           } else if (appUser.hasCompletedOnboarding) {
-            console.log('✅ User has completed onboarding, navigating to Dashboard');
+            logger.info('User has completed onboarding, navigating to Dashboard', null, 'AuthMethodsScreen');
             navigation.reset({
               index: 0,
               routes: [{ name: 'Dashboard' }],
             });
           } else {
-            console.log('🔄 User needs onboarding, navigating to Onboarding');
+            logger.info('User needs onboarding, navigating to Onboarding', null, 'AuthMethodsScreen');
             navigation.reset({
               index: 0,
               routes: [{ name: 'Onboarding' }],
@@ -717,7 +709,7 @@ const AuthMethodsScreen: React.FC = () => {
               placeholderTextColor={colors.white50}
               value={email}
               onChangeText={(text) => {
-                console.log('📝 Email input changed:', text);
+                logger.debug('Email input changed', { text }, 'AuthMethodsScreen');
                 setEmail(text);
               }}
               keyboardType="email-address"
@@ -731,10 +723,7 @@ const AuthMethodsScreen: React.FC = () => {
           <TouchableOpacity
             style={[styles.nextButton, (!email || loading || socialLoading !== null) && styles.nextButtonDisabled]}
             onPress={() => {
-              console.log('🔘 Next button pressed!');
-              console.log('📧 Email value:', email);
-              console.log('⏳ Loading state:', loading);
-              console.log('🔗 Social loading state:', socialLoading);
+              logger.info('Next button pressed', { email, loading, socialLoading }, 'AuthMethodsScreen');
               handleEmailAuth();
             }}
             disabled={!email || loading || socialLoading !== null}

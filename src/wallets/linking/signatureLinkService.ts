@@ -9,6 +9,7 @@ import { WALLET_PROVIDER_REGISTRY, WalletProviderInfo } from '../providers/regis
 import { walletService } from '../../services/WalletService';
 import { startRemoteScenario, transact } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import { SolanaMobileWalletAdapterError, SolanaMobileWalletAdapterErrorCode } from '@solana-mobile/mobile-wallet-adapter-protocol';
+import { logger } from '../services/loggingService';
 
 export interface SignatureChallenge {
   nonce: string;
@@ -65,7 +66,7 @@ class SignatureLinkService {
   async linkExternalWallet(options: SignatureLinkOptions): Promise<SignatureLinkResult> {
     const { userId, provider, label, timeout = this.DEFAULT_TIMEOUT } = options;
 
-    console.log('🔗 Signature Link: Starting wallet linking process', {
+    logger.info('Starting wallet linking process', {
       userId,
       provider,
       label,
@@ -81,7 +82,7 @@ class SignatureLinkService {
 
       // Generate signature challenge
       const challenge = this.generateSignatureChallenge(userId);
-      console.log('🔗 Signature Link: Generated challenge', {
+      logger.debug('Generated challenge', {
         nonce: challenge.nonce,
         expiresAt: new Date(challenge.expiresAt).toISOString()
       });
@@ -122,7 +123,7 @@ class SignatureLinkService {
         userId
       });
 
-      console.log('🔗 Signature Link: Wallet linked successfully', {
+      logger.info('Wallet linked successfully', {
         publicKey: linkedWallet.publicKey,
         provider: linkedWallet.provider
       });
@@ -186,7 +187,7 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
     challenge: SignatureChallenge,
     timeout: number
   ): Promise<SignatureLinkResult> {
-    console.log('🔗 Signature Link: Requesting signature from wallet', {
+    logger.info('Requesting signature from wallet', {
       provider: provider.name,
       message: challenge.message
     });
@@ -194,26 +195,25 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
     try {
       // Since MWA requires complex setup, let's use deep link approach directly
       // This will provide a better user experience with real wallet interaction
-      console.log('🔗 Signature Link: Using deep link approach for', provider.name);
+      logger.debug('Using deep link approach for', { providerName: provider.name }, 'signatureLinkService');
       
       // For now, just open the wallet app with a simple deep link
       // Most wallets don't support complex signature request deep links
       const simpleDeepLink = provider.deepLinkScheme || `${provider.name}://`;
       
-      console.log('🔗 Signature Link: Attempting to open wallet with simple deep link:', simpleDeepLink);
+      logger.debug('Attempting to open wallet with simple deep link', { simpleDeepLink }, 'signatureLinkService');
       
       // Always try to open the wallet app, even if canOpenURL returns false
       // This is because canOpenURL can be unreliable on some devices
       try {
         await Linking.openURL(simpleDeepLink);
-        console.log('🔗 Signature Link: Successfully opened wallet app');
+        logger.info('Successfully opened wallet app', null, 'signatureLinkService');
       } catch (openError) {
-        console.log('🔗 Signature Link: Failed to open wallet app:', openError);
+        logger.warn('Failed to open wallet app', { error: openError.message }, 'signatureLinkService');
         // Continue anyway - user can manually open the app
       }
 
       // Don't show alert here - let the calling screen handle the user flow
-      console.log('🔗 Signature Link: Wallet app opened, proceeding to manual input flow');
 
       // Always return manual input required since we can't capture the signature automatically
       const result = {
@@ -223,7 +223,7 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
         challenge: challenge // Include challenge for manual input
       };
       
-      console.log('🔗 Signature Link: Returning result:', {
+      logger.debug('Returning result', {
         success: result.success,
         error: result.error,
         provider: result.provider,
@@ -237,7 +237,6 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
       console.error('🔗 Signature Link: Signature request failed:', error);
       
       // Even if deep link fails, we can still provide manual input
-      console.log('🔗 Signature Link: Deep link failed, proceeding to manual input flow');
 
       const result = {
         success: false,
@@ -246,7 +245,7 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
         challenge: challenge // Include challenge for manual input
       };
       
-      console.log('🔗 Signature Link: Returning result from catch block:', {
+      logger.debug('Returning result from catch block', {
         success: result.success,
         error: result.error,
         provider: result.provider,
@@ -316,7 +315,7 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
     challenge: SignatureChallenge,
     signature: string
   ): Promise<{ success: boolean; error?: string }> {
-    console.log('🔗 Signature Link: Verifying signature', {
+    logger.info('Verifying signature', {
       publicKey,
       nonce: challenge.nonce
     });
@@ -374,8 +373,7 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
     try {
       // Store in secure storage
       // Linked wallet storage moved to walletService
-      console.log('Storing linked wallet:', linkedWallet); // Placeholder
-      console.log('🔗 Signature Link: Linked wallet stored successfully', {
+      logger.info('Linked wallet stored successfully', {
         id: linkedWallet.id,
         publicKey: linkedWallet.publicKey
       });
@@ -408,8 +406,7 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
   async removeLinkedWallet(userId: string, walletId: string): Promise<boolean> {
     try {
       // Linked wallet removal moved to walletService
-      console.log('Removing linked wallet:', { userId, walletId }); // Placeholder
-      console.log('🔗 Signature Link: Linked wallet removed', { walletId });
+      logger.info('Linked wallet removed', { walletId }, 'signatureLinkService');
       return true;
     } catch (error) {
       console.error('🔗 Signature Link: Failed to remove linked wallet:', error);
@@ -472,7 +469,7 @@ This signature proves ownership of the wallet and authorizes linking to WeSplit.
    * Test signature linking (for debugging)
    */
   async testSignatureLinking(providerName: string, userId: string): Promise<SignatureLinkResult> {
-    console.log('🔗 Signature Link: Testing signature linking', { providerName, userId });
+    logger.info('Testing signature linking', { providerName, userId }, 'signatureLinkService');
     
     return this.linkExternalWallet({
       userId,

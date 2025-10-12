@@ -1,54 +1,16 @@
 /**
  * Amount Formatting Utilities
- * Centralized formatting for currency amounts, balances, and financial values
+ * @deprecated Use formatUtils from src/utils/formatUtils.ts instead
  */
 
-import { LAMPORTS_PER_SOL } from '@solana/web3.js';
-
-/**
- * Format SOL amount from lamports to human-readable format
- */
-function formatSolAmount(lamports: number, decimals: number = 6): string {
-  const sol = lamports / LAMPORTS_PER_SOL;
-  return formatNumber(sol, decimals);
-}
-
-/**
- * Format USDC amount from micro-units to human-readable format
- */
-function formatUsdcAmount(microUnits: number, decimals: number = 2): string {
-  const usdc = microUnits / Math.pow(10, 6); // USDC has 6 decimals
-  return formatNumber(usdc, decimals);
-}
-
-/**
- * Format any amount with specified decimals
- */
-function formatAmount(amount: number, decimals: number = 2): string {
-  return formatNumber(amount, decimals);
-}
-
-/**
- * Format number with specified decimal places
- */
-export function formatNumber(value: number, decimals: number = 2): string {
-  if (isNaN(value) || !isFinite(value)) {
-    return '0.00';
-  }
-
-  return value.toLocaleString('en-US', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
-
-/**
- * Format currency with symbol
- */
-function formatCurrency(amount: number, currency: string = 'USD', decimals: number = 2): string {
-  const formattedAmount = formatNumber(amount, decimals);
-  return `${currency} ${formattedAmount}`;
-}
+// Re-export from unified format utils for backward compatibility
+export { 
+  formatNumber,
+  formatSolAmount,
+  formatUsdcAmount,
+  formatAmount,
+  formatCurrency
+} from '../../utils/formatUtils';
 
 /**
  * Format percentage

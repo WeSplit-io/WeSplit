@@ -11,6 +11,7 @@ import { colors } from '../../theme/colors';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { User } from '../../types';
 import { generateSendLink } from '../../services/deepLinkHandler';
+import { logger } from '../../services/loggingService';
 
 const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId } = route.params || {};
@@ -46,7 +47,7 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
         isFavorite: false
       });
       
-      console.log('✅ Contact added successfully:', user.name);
+      logger.info('Contact added successfully', { userName: user.name }, 'RequestContactsScreen');
     } catch (error) {
       console.error('❌ Error adding contact:', error);
     }

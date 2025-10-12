@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { GroupWithDetails, Expense, GroupMember } from '../types';
+import { logger } from '../services/loggingService';
 
 // Custom hook for group data management with caching and automatic refetching
 export const useGroupData = (groupId: number | null) => {
@@ -138,24 +139,20 @@ export const useExpenseOperations = (groupId: number | string) => {
     setError(null);
     
     try {
-      console.log('🔍 useExpenseOperations: Starting expense creation...');
-      console.log('🔍 useExpenseOperations: Group ID:', groupId);
-      console.log('🔍 useExpenseOperations: Expense data:', expenseData);
-      console.log('🔍 useExpenseOperations: Current group:', group);
+      logger.info('Starting expense creation', { groupId, expenseData, group }, 'useGroupData');
       
       const expense = await createExpense({
         ...expenseData,
         group_id: groupId
       });
       
-      console.log('🔍 useExpenseOperations: Expense created successfully:', expense);
-      console.log('🔍 useExpenseOperations: Refreshing group...');
+      logger.info('Expense created successfully, refreshing group', { expense }, 'useGroupData');
       
       // Refresh group to get updated data - convert to number for refreshGroup
       const numericGroupId = typeof groupId === 'string' ? parseInt(groupId) || 0 : groupId;
       await refreshGroup(numericGroupId);
       
-      console.log('🔍 useExpenseOperations: Group refreshed successfully');
+      logger.info('Group refreshed successfully', null, 'useGroupData');
       
       return expense;
     } catch (err) {

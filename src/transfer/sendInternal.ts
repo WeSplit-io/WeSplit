@@ -887,13 +887,13 @@ class InternalTransferService {
         // Try base64 format first
         const secretKeyBuffer = Buffer.from(userWallet.secretKey, 'base64');
         fromKeypair = Keypair.fromSecretKey(secretKeyBuffer);
-        console.log('✅ Successfully created keypair from base64 secret key');
+        logger.debug('Successfully created keypair from base64 secret key', null, 'sendInternal');
       } catch (base64Error) {
         try {
           // Try JSON array format (stored in secure storage)
           const secretKeyArray = JSON.parse(userWallet.secretKey);
           fromKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
-          console.log('✅ Successfully created keypair from JSON array secret key');
+          logger.debug('Successfully created keypair from JSON array secret key', null, 'sendInternal');
         } catch (jsonError) {
           console.error('❌ Failed to create keypair from secret key:', {
             base64Error: (base64Error as Error).message,
@@ -945,7 +945,7 @@ class InternalTransferService {
         // Check if sender has USDC token account
         try {
           const senderAccount = await getAccount(transactionUtils.getConnection(), fromTokenAccount);
-          console.log('✅ Sender USDC token account exists:', {
+          logger.debug('Sender USDC token account exists', {
             address: fromTokenAccount.toBase58(),
             balance: senderAccount.amount.toString(),
             balanceInUSDC: (Number(senderAccount.amount) / 1000000).toFixed(6),
@@ -966,9 +966,9 @@ class InternalTransferService {
         // Check if recipient has USDC token account, create if not
         try {
           await getAccount(transactionUtils.getConnection(), toTokenAccount);
-          console.log('✅ Recipient USDC token account exists');
+          logger.debug('Recipient USDC token account exists', null, 'sendInternal');
         } catch (error) {
-          console.log('🔧 Creating USDC token account for recipient...');
+          logger.debug('Creating USDC token account for recipient', null, 'sendInternal');
           // Token account doesn't exist, create it
           transaction.add(
             createAssociatedTokenAccountInstruction(
@@ -984,7 +984,7 @@ class InternalTransferService {
         // Use precise conversion to avoid floating point issues
         const transferAmount = Math.floor(recipientAmount * 1000000 + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
         
-        console.log('🔍 USDC Transfer Amount Conversion:', {
+        logger.debug('USDC Transfer Amount Conversion', {
           recipientAmount,
           rawCalculation: recipientAmount * 1000000,
           transferAmount,
@@ -1064,7 +1064,7 @@ class InternalTransferService {
       
       if (!hasTokenAccountCreation) {
         try {
-          console.log('🔍 Simulating transaction before sending...');
+          logger.debug('Simulating transaction before sending', null, 'sendInternal');
           const simulationResult = await transactionUtils.getConnection().simulateTransaction(transaction);
           
           if (simulationResult.value.err) {
@@ -1075,7 +1075,7 @@ class InternalTransferService {
             };
           }
           
-          console.log('✅ Transaction simulation successful');
+          logger.debug('Transaction simulation successful', null, 'sendInternal');
         } catch (simulationError) {
           console.error('❌ Transaction simulation error:', simulationError);
           return {
@@ -1084,7 +1084,7 @@ class InternalTransferService {
           };
         }
       } else {
-        console.log('🔧 Skipping simulation due to token account creation - proceeding with transaction');
+        logger.debug('Skipping simulation due to token account creation - proceeding with transaction', null, 'sendInternal');
       }
 
       // Prepare signers array
@@ -1123,7 +1123,7 @@ class InternalTransferService {
           
           const companyKeypair = Keypair.fromSecretKey(companySecretKeyBuffer);
           signers.push(companyKeypair);
-          console.log('✅ Company wallet keypair added to signers');
+          logger.info('Company wallet keypair added to signers', null, 'sendInternal');
         } catch (error) {
           console.error('❌ Failed to create company wallet keypair:', error);
           return {
@@ -1134,7 +1134,7 @@ class InternalTransferService {
       }
 
       // Send transaction with retry logic for blockhash expiration
-      console.log('🚀 Sending transaction...');
+      logger.info('Sending transaction', null, 'sendInternal');
       let signature: string | undefined;
       let lastError: any;
       
@@ -1142,13 +1142,16 @@ class InternalTransferService {
         // Try up to 3 times with fresh blockhashes and exponential backoff
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
-            console.log(`🔄 Transaction attempt ${attempt}/3`);
-            console.log(`🔍 Transaction details:`, {
-              instructionCount: transaction.instructions.length,
-              feePayer: transaction.feePayer?.toBase58(),
-              signerCount: signers.length,
-              signers: signers.map(s => s.publicKey.toBase58())
-            });
+            logger.info('Transaction attempt', { 
+              attempt, 
+              maxAttempts: 3, 
+              details: {
+                instructionCount: transaction.instructions.length,
+                feePayer: transaction.feePayer?.toBase58(),
+                signerCount: signers.length,
+                signers: signers.map(s => s.publicKey.toBase58())
+              }
+            }, 'sendInternal');
             
             // Get fresh blockhash for each attempt with retry
             const freshBlockhash = await this.getLatestBlockhashWithRetry('confirmed');
@@ -1159,13 +1162,13 @@ class InternalTransferService {
             // Clear previous signatures and re-sign with fresh blockhash
             transaction.signatures = [];
             transaction.sign(...signers);
-            console.log(`✅ Transaction re-signed with fresh blockhash: ${freshBlockhash}`);
+            logger.info('Transaction re-signed with fresh blockhash', { freshBlockhash }, 'sendInternal');
             
-            console.log(`🔍 Attempting sendAndConfirmTransaction with fresh blockhash: ${freshBlockhash}`);
+            logger.info('Attempting sendAndConfirmTransaction with fresh blockhash', { freshBlockhash }, 'sendInternal');
             
             // Use optimized transaction sending approach
             try {
-              console.log(`⏳ Sending transaction with optimized approach...`);
+              logger.info('Sending transaction with optimized approach', null, 'sendInternal');
               
               // Transaction is already signed above with fresh blockhash
               
@@ -1176,7 +1179,7 @@ class InternalTransferService {
                 maxRetries: 0, // We handle retries ourselves
               });
               
-              console.log(`📤 Transaction sent with signature: ${signature}, waiting for confirmation...`);
+              logger.info('Transaction sent with signature, waiting for confirmation', { signature }, 'sendInternal');
               
               // Confirm transaction with timeout
               const confirmPromise = transactionUtils.getConnection().confirmTransaction(signature, 'confirmed');
@@ -1185,7 +1188,7 @@ class InternalTransferService {
               });
               
               await Promise.race([confirmPromise, confirmTimeoutPromise]);
-              console.log(`✅ Transaction confirmed: ${signature}`);
+              logger.info('Transaction confirmed', { signature }, 'sendInternal');
               
             } catch (confirmError) {
               console.warn(`⚠️ Transaction confirmation failed:`, (confirmError as Error).message);
@@ -1195,7 +1198,7 @@ class InternalTransferService {
               throw new Error(`Transaction confirmation failed: ${(confirmError as Error).message}. Transaction may have failed or is still pending.`);
             }
             
-            console.log(`✅ Transaction successful on attempt ${attempt} with signature: ${signature}`);
+            logger.info('Transaction successful on attempt', { attempt, signature }, 'sendInternal');
             break; // Success, exit retry loop
             
           } catch (error) {
@@ -1204,9 +1207,9 @@ class InternalTransferService {
             
             // Check if it's a blockhash expiration error
             if ((error as Error).message.includes('block height exceeded') || (error as Error).message.includes('blockhash')) {
-              console.log(`🔄 Blockhash expired, retrying with fresh blockhash...`);
+              logger.info('Blockhash expired, retrying with fresh blockhash', null, 'sendInternal');
             } else {
-              console.log(`🔄 Transaction failed for other reason, retrying...`);
+              logger.info('Transaction failed for other reason, retrying', null, 'sendInternal');
             }
             
             if (attempt === 3) {
@@ -1220,7 +1223,7 @@ class InternalTransferService {
             
             // Wait with exponential backoff before retrying
             const backoffDelay = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s
-            console.log(`⏳ Waiting ${backoffDelay}ms before retry...`);
+            logger.info('Waiting before retry', { backoffDelay }, 'sendInternal');
             await new Promise(resolve => setTimeout(resolve, backoffDelay));
           }
         }

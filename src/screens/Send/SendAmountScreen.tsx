@@ -11,6 +11,7 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
+import { logger } from '../../services/loggingService';
 
 const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const {
@@ -38,7 +39,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Debug logging to ensure data is passed correctly
   useEffect(() => {
-    console.log('💰 SendAmount: Data received:', {
+    logger.info('Data received', {
       destinationType,
       contact: contact ? {
         name: contact.name || 'No name',

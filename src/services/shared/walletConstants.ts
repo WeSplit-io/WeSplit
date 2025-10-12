@@ -5,6 +5,7 @@
 
 // Import centralized configuration
 import { getConfig } from '../../config/unified';
+import { logger } from '../loggingService';
 
 // RPC Configuration
 export const RPC_CONFIG = {
@@ -121,7 +122,7 @@ export const WALLET_CONFIG = {
 
 // Logging configuration
 if (__DEV__) {
-  console.log('🔧 Wallet Constants initialized:', {
+  logger.info('Wallet Constants initialized', {
     rpcEndpoint: RPC_CONFIG.endpoint,
     usdcMint: USDC_CONFIG.mintAddress,
     network: RPC_CONFIG.network,

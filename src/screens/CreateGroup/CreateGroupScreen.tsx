@@ -5,6 +5,7 @@ import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { styles } from './styles';
 import { colors } from '../../theme';
+import { logger } from '../../services/loggingService';
 
 // Category options matching the mockup
 const CATEGORIES = [
@@ -63,11 +64,11 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
         created_by: currentUser.id.toString(),
       };
 
-      console.log('🔄 CreateGroupScreen: Creating group with data:', groupData);
+      logger.info('Creating group with data', { groupData }, 'CreateGroupScreen');
 
       const createdGroup = await createGroup(groupData);
 
-      console.log('🔄 CreateGroupScreen: Group created successfully:', createdGroup.id);
+      logger.info('Group created successfully', { groupId: createdGroup.id }, 'CreateGroupScreen');
 
       navigation.navigate('GroupCreated', {
         groupId: createdGroup.id,
@@ -125,11 +126,11 @@ const CreateGroupScreen: React.FC<any> = ({ navigation }) => {
         created_by: currentUser.id.toString(),
       };
 
-      console.log('🔄 CreateGroupScreen: Creating group for AddMembers with data:', groupData);
+      logger.info('Creating group for AddMembers with data', { groupData }, 'CreateGroupScreen');
 
       const createdGroup = await createGroup(groupData);
 
-      console.log('🔄 CreateGroupScreen: Group created for AddMembers:', createdGroup.id);
+      logger.info('Group created for AddMembers', { groupId: createdGroup.id }, 'CreateGroupScreen');
 
       // Navigate to AddMembers with the created group ID
       navigation.navigate('AddMembers', {

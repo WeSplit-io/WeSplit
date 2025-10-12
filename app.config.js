@@ -110,8 +110,8 @@ export default {
       
       // Solana Configuration
       EXPO_PUBLIC_HELIUS_API_KEY: process.env.EXPO_PUBLIC_HELIUS_API_KEY,
-      EXPO_PUBLIC_FORCE_MAINNET: process.env.EXPO_PUBLIC_FORCE_MAINNET,
-      EXPO_PUBLIC_DEV_NETWORK: process.env.EXPO_PUBLIC_DEV_NETWORK,
+      EXPO_PUBLIC_FORCE_MAINNET: process.env.EXPO_PUBLIC_FORCE_MAINNET || 'true',
+      EXPO_PUBLIC_DEV_NETWORK: process.env.EXPO_PUBLIC_DEV_NETWORK || 'mainnet',
       
       // Company Fee Structure
       EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE: process.env.EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE,

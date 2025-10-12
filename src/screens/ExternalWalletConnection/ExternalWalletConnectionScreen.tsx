@@ -16,6 +16,7 @@ import { colors } from '../../theme/colors';
 import { walletService, WalletProvider } from '../../services/WalletService';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
+import { logger } from '../../services/loggingService';
 
 interface ExternalWalletConnectionScreenProps {
   navigation: any;
@@ -53,10 +54,10 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
     try {
       setLoading(true);
       setError(null);
-      console.log('🔍 ExternalWalletConnection: Loading providers...');
+      logger.info('Loading providers', null, 'ExternalWalletConnectionScreen');
       
       const availableProviders = await walletService.getAvailableProviders();
-      console.log('🔍 ExternalWalletConnection: Available providers:', availableProviders.map(p => `${p.name} (${p.isAvailable ? 'Available' : 'Not Available'})`));
+      logger.info('Available providers', { providers: availableProviders.map(p => `${p.name} (${p.isAvailable ? 'Available' : 'Not Available'})`) }, 'ExternalWalletConnectionScreen');
       
       setProviders(availableProviders);
     } catch (error) {
@@ -71,7 +72,7 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
     try {
       setConnectingProvider(provider.name);
       setError(null);
-      console.log('🔗 ExternalWalletConnection: Starting connection to', provider.name);
+      logger.info('Starting connection to', { providerName: provider.name }, 'ExternalWalletConnectionScreen');
       
       if (!currentUser?.id) {
         throw new Error('User not authenticated');

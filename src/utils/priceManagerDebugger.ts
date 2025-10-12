@@ -6,37 +6,36 @@
 
 import { priceManagementService } from '../services/priceManagementService';
 import { MockupDataService } from '../data/mockupData';
+import { logger } from '../services/loggingService';
 
 export class PriceManagerDebugger {
   /**
    * Debug the current state of price management
    */
   static debugPriceManagement(billId: string): void {
-    console.log('🔍 PriceManagerDebugger: Debugging price management for bill:', billId);
     
     // Get all cached prices
     const allPrices = priceManagementService.getAllPrices();
-    console.log('📊 All cached prices:', Array.from(allPrices.entries()));
+    logger.info('All cached prices', { prices: Array.from(allPrices.entries()) }, 'priceManagerDebugger');
     
     // Get specific bill price
     const billPrice = priceManagementService.getBillPrice(billId);
-    console.log('💰 Bill price for', billId, ':', billPrice);
     
     // Get unified mockup amount
     const unifiedAmount = MockupDataService.getBillAmount();
-    console.log('🎯 Unified mockup amount:', unifiedAmount);
     
     // Check if price is consistent
     if (billPrice) {
       const isConsistent = Math.abs(billPrice.amount - unifiedAmount) < 0.01;
-      console.log('✅ Price consistency check:', {
-        billPrice: billPrice.amount,
-        unifiedAmount,
-        isConsistent,
-        difference: Math.abs(billPrice.amount - unifiedAmount)
-      });
+      if (!isConsistent) {
+        logger.warn('Price inconsistency detected', {
+          billPrice: billPrice.amount,
+          unifiedAmount,
+          difference: Math.abs(billPrice.amount - unifiedAmount)
+        }, 'PriceManagerDebugger');
+      }
     } else {
-      console.log('❌ No price found for bill:', billId);
+      logger.error('No price found for bill', { billId }, 'PriceManagerDebugger');
     }
   }
 
@@ -44,7 +43,6 @@ export class PriceManagerDebugger {
    * Force fix price management for a bill
    */
   static forceFixPriceManagement(billId: string): void {
-    console.log('🔧 PriceManagerDebugger: Force fixing price management for bill:', billId);
     
     const unifiedAmount = MockupDataService.getBillAmount();
     
@@ -54,33 +52,17 @@ export class PriceManagerDebugger {
     // Set the correct price
     priceManagementService.forceSetBillPrice(billId, unifiedAmount, 'USDC');
     
-    console.log('✅ PriceManagerDebugger: Price management fixed:', {
-      billId,
-      amount: unifiedAmount,
-      currency: 'USDC'
-    });
   }
 
   /**
    * Test split calculation
    */
   static testSplitCalculation(billId: string, participantCount: number): void {
-    console.log('🧪 PriceManagerDebugger: Testing split calculation:', {
-      billId,
-      participantCount
-    });
     
     const splitData = priceManagementService.calculateSplitAmounts(billId, participantCount, 'equal');
     
     if (splitData) {
-      console.log('✅ Split calculation successful:', {
-        totalAmount: splitData.totalAmount,
-        amountPerParticipant: splitData.amountPerParticipant,
-        participantCount: splitData.participantCount,
-        currency: splitData.currency
-      });
     } else {
-      console.log('❌ Split calculation failed - no price data available');
     }
   }
 
@@ -88,38 +70,17 @@ export class PriceManagerDebugger {
    * Debug split wallet data
    */
   static debugSplitWalletData(splitWallet: any): void {
-    console.log('🔍 PriceManagerDebugger: Debugging split wallet data...');
     
     if (!splitWallet) {
-      console.log('❌ No split wallet provided');
       return;
     }
     
-    console.log('📊 Split Wallet Data:', {
-      id: splitWallet.id,
-      totalAmount: splitWallet.totalAmount,
-      currency: splitWallet.currency,
-      participantsCount: splitWallet.participants?.length || 0,
-      participants: splitWallet.participants?.map((p: any) => ({
-        userId: p.userId,
-        amountOwed: p.amountOwed,
-        amountPaid: p.amountPaid,
-        status: p.status
-      })) || []
-    });
     
     // Calculate totals
     const totalOwed = splitWallet.participants?.reduce((sum: number, p: any) => sum + (p.amountOwed || 0), 0) || 0;
     const totalPaid = splitWallet.participants?.reduce((sum: number, p: any) => sum + (p.amountPaid || 0), 0) || 0;
     const completionPercentage = splitWallet.totalAmount > 0 ? Math.round((totalPaid / splitWallet.totalAmount) * 100) : 0;
     
-    console.log('💰 Split Wallet Totals:', {
-      totalAmount: splitWallet.totalAmount,
-      totalOwed,
-      totalPaid,
-      completionPercentage: `${completionPercentage}%`,
-      remainingAmount: splitWallet.totalAmount - totalPaid
-    });
     
     // Check for inconsistencies
     const inconsistencies = [];
@@ -136,7 +97,6 @@ export class PriceManagerDebugger {
     if (inconsistencies.length > 0) {
       console.warn('⚠️ Split Wallet Inconsistencies:', inconsistencies);
     } else {
-      console.log('✅ Split wallet data is consistent');
     }
   }
 
@@ -149,7 +109,6 @@ export class PriceManagerDebugger {
     routeParams?: any;
     splitWallet?: any;
   }) {
-    console.log('🔍 PriceManagerDebugger: Debugging bill amounts for:', billId);
     
     const results = {
       billId,
@@ -179,7 +138,7 @@ export class PriceManagerDebugger {
       results.inconsistencies.push(`No authoritative price set, but sources have amounts: ${amounts.join(', ')}`);
     }
     
-    console.log('🔍 PriceManagerDebugger: Results:', results);
+    logger.info('PriceManagerDebugger Results', { results }, 'priceManagerDebugger');
     
     if (results.inconsistencies.length > 0) {
       console.warn('⚠️ PriceManagerDebugger: Inconsistencies found:', results.inconsistencies);
@@ -196,7 +155,7 @@ export class PriceManagerDebugger {
     
     if (!existingPrice) {
       priceManagementService.setBillPrice(billId, amount, currency);
-      console.log('💰 PriceManagerDebugger: Set authoritative price:', { billId, amount, currency });
+      logger.info('Set authoritative price', { billId, amount, currency }, 'priceManagerDebugger');
       return true;
     } else if (existingPrice.amount !== amount) {
       console.warn('⚠️ PriceManagerDebugger: Authoritative price mismatch:', {
@@ -215,7 +174,7 @@ export class PriceManagerDebugger {
    */
   static getAllCachedPrices() {
     const allPrices = priceManagementService.getAllPrices();
-    console.log('📊 All cached prices:', Array.from(allPrices.entries()));
+    logger.info('All cached prices', { prices: Array.from(allPrices.entries()) }, 'priceManagerDebugger');
     return allPrices;
   }
 
@@ -223,24 +182,22 @@ export class PriceManagerDebugger {
    * Run comprehensive debug
    */
   static runComprehensiveDebug(billId: string, participantCount: number = 2): void {
-    console.log('🔍 PriceManagerDebugger: Running comprehensive debug...');
-    console.log('================================================');
+    logger.info('Running comprehensive debug', null, 'priceManagerDebugger');
     
     // Debug current state
     this.debugPriceManagement(billId);
     
-    console.log('\n--- Testing Split Calculation ---');
+    logger.info('Testing Split Calculation', null, 'priceManagerDebugger');
     this.testSplitCalculation(billId, participantCount);
     
-    console.log('\n--- Force Fixing Price Management ---');
+    logger.info('Force Fixing Price Management', null, 'priceManagerDebugger');
     this.forceFixPriceManagement(billId);
     
-    console.log('\n--- Testing After Fix ---');
+    logger.info('Testing After Fix', null, 'priceManagerDebugger');
     this.debugPriceManagement(billId);
     this.testSplitCalculation(billId, participantCount);
     
-    console.log('================================================');
-    console.log('✅ Comprehensive debug completed');
+    logger.info('Comprehensive debug completed', null, 'priceManagerDebugger');
   }
 }
 

@@ -131,7 +131,6 @@ export class SplitWalletCreation {
    */
   static async testSplitWalletCreation(): Promise<{ success: boolean; error?: string; walletId?: string }> {
     try {
-      console.log('🧪 SplitWalletCreation: Testing split wallet creation...');
       
       const testBillId = `test_bill_${Date.now()}`;
       const testCreatorId = 'test_creator_123';
@@ -161,10 +160,6 @@ export class SplitWalletCreation {
       );
 
       if (result.success && result.wallet) {
-        console.log('✅ SplitWalletCreation: Test wallet created successfully:', {
-          walletId: result.wallet.id,
-          walletAddress: result.wallet.walletAddress
-        });
         return { 
           success: true, 
           walletId: result.wallet.id 
@@ -197,13 +192,6 @@ export class SplitWalletCreation {
     participants: Omit<SplitWalletParticipant, 'amountPaid' | 'status' | 'transactionSignature' | 'paidAt'>[]
   ): Promise<SplitWalletResult> {
     try {
-      console.log('🔍 SplitWalletCreation: Starting createSplitWallet with:', {
-        billId, 
-        creatorId, 
-        totalAmount, 
-        currency,
-        participantsCount: participants.length
-      });
       
       logger.info('Creating split wallet', { 
         billId, 
@@ -225,10 +213,6 @@ export class SplitWalletCreation {
         throw new Error('Failed to create wallet for split');
       }
       
-      console.log('🔍 SplitWalletCreation: Wallet created successfully:', {
-        address: wallet.address,
-        publicKey: wallet.publicKey
-      });
       
       logger.info('Split wallet created with address', { 
         walletAddress: wallet.address,
@@ -244,7 +228,7 @@ export class SplitWalletCreation {
         creatorId,
         walletAddress: wallet.address,
         publicKey: wallet.publicKey,
-        totalAmount: this.roundUsdcAmount(totalAmount),
+        totalAmount: SplitWalletCreation.roundUsdcAmount(totalAmount),
         currency,
         status: 'active',
         participants: participants.map(p => ({
@@ -264,10 +248,6 @@ export class SplitWalletCreation {
         firebaseDocId: docRef.id,
       };
 
-      console.log('🔍 SplitWalletCreation: Split wallet stored in Firebase:', {
-        splitWalletId: createdSplitWallet.id,
-        firebaseDocId: docRef.id
-      });
 
       logger.info('Split wallet created and stored successfully', {
         splitWalletId: createdSplitWallet.id,
@@ -297,7 +277,6 @@ export class SplitWalletCreation {
    */
   static async forceResetSplitWallet(splitWalletId: string): Promise<SplitWalletResult> {
     try {
-      console.log('🔧 SplitWalletCreation: Force resetting split wallet:', { splitWalletId });
 
       // Get the current wallet
       const currentWalletResult = await this.getSplitWallet(splitWalletId);
@@ -341,10 +320,6 @@ export class SplitWalletCreation {
         ...updatedWalletData,
       };
 
-      console.log('✅ SplitWalletCreation: Split wallet reset successfully:', {
-        splitWalletId,
-        newWalletAddress: newWallet.address
-      });
 
       logger.info('Split wallet force reset completed', {
         splitWalletId,

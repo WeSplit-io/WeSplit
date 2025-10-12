@@ -7,6 +7,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { consolidatedTransactionService, TransactionParams, TransactionResult } from '../services/consolidatedTransactionService';
 import { Keypair } from '@solana/web3.js';
 import { walletService } from '../services/WalletService';
+import { logger } from '../services/loggingService';
 
 interface ProductionWalletState {
   isConnected: boolean;
@@ -124,7 +125,7 @@ export const ProductionWalletProvider: React.FC<ProductionWalletProviderProps> =
       }));
 
       if (__DEV__) {
-        console.log('✅ Production wallet connected:', {
+        logger.info('Production wallet connected', {
           address: walletInfo.address,
           walletName,
           balance,
@@ -156,7 +157,7 @@ export const ProductionWalletProvider: React.FC<ProductionWalletProviderProps> =
       }));
 
       if (__DEV__) {
-        console.log('✅ Production wallet disconnected');
+        logger.info('Production wallet disconnected', null, 'ProductionWalletContext');
       }
     } catch (error) {
       console.error('Failed to disconnect wallet:', error);
@@ -174,7 +175,7 @@ export const ProductionWalletProvider: React.FC<ProductionWalletProviderProps> =
       }
 
       if (__DEV__) {
-        console.log('🚀 Sending production transaction:', {
+        logger.info('Sending production transaction', {
           to: params.to,
           amount: params.amount,
           currency: params.currency,
@@ -196,7 +197,7 @@ export const ProductionWalletProvider: React.FC<ProductionWalletProviderProps> =
       await refreshBalance();
 
       if (__DEV__) {
-        console.log('✅ Production transaction successful:', {
+        logger.info('Production transaction successful', {
           signature: result.signature,
           txId: result.txId,
           fee: result.fee,
@@ -225,7 +226,7 @@ export const ProductionWalletProvider: React.FC<ProductionWalletProviderProps> =
       }));
 
       if (__DEV__) {
-        console.log('💰 Balance refreshed:', balance);
+        logger.info('Balance refreshed', { balance }, 'ProductionWalletContext');
       }
     } catch (error) {
       console.error('Failed to refresh balance:', error);

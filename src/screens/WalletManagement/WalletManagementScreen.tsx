@@ -31,6 +31,7 @@ import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
 import { QRCodeScreen } from '../QRCode';
 import { generateProfileLink } from '../../services/deepLinkHandler';
+import { logger } from '../../services/loggingService';
 
 const WalletManagementScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -93,7 +94,7 @@ const WalletManagementScreen: React.FC = () => {
         setIsLoading(true);
 
         // Initialize app wallet for the user
-        console.log('🔍 WalletManagement: Initializing app wallet for user:', currentUser.id);
+        logger.info('Initializing app wallet for user', { userId: currentUser.id }, 'WalletManagementScreen');
         await ensureAppWallet(currentUser.id.toString());
         await getAppWalletBalance(currentUser.id.toString());
 
@@ -101,7 +102,7 @@ const WalletManagementScreen: React.FC = () => {
         const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
 
         if (walletResult.success && walletResult.wallet) {
-          if (__DEV__) { console.log('✅ Wallet ensured for user:', walletResult.wallet.address); }
+          if (__DEV__) { logger.info('Wallet ensured for user', { address: walletResult.wallet.address }, 'WalletManagementScreen'); }
 
           // Load app wallet balance for local state
           const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
@@ -196,8 +197,7 @@ const WalletManagementScreen: React.FC = () => {
   // Monitor balance changes
   useEffect(() => {
     if (localAppWalletBalance) {
-      console.log('💰 WalletManagement: Balance updated:', localAppWalletBalance.totalUSD, 'USD');
-      console.log('💰 WalletManagement: USDC balance:', localAppWalletBalance.usdcBalance, 'USDC');
+      logger.info('Balance updated', { totalUSD: localAppWalletBalance.totalUSD, usdcBalance: localAppWalletBalance.usdcBalance }, 'WalletManagementScreen');
     }
   }, [localAppWalletBalance?.totalUSD, localAppWalletBalance?.usdcBalance]);
 
@@ -210,7 +210,7 @@ const WalletManagementScreen: React.FC = () => {
       const userMultiSigWallets = await walletService.getUserMultiSigWallets(currentUser.id.toString());
 
       if (__DEV__) {
-        console.log('✅ Multi-signature data loaded:', {
+        logger.info('Multi-signature data loaded', {
           walletsCount: userMultiSigWallets.length
         });
       }
@@ -253,18 +253,18 @@ const WalletManagementScreen: React.FC = () => {
               const sender = await firebaseDataService.user.getCurrentUser(tx.from_user);
               senderName = sender.name || 'Unknown';
               if (__DEV__) {
-                console.log('🔍 Fetched sender:', { userId: tx.from_user, name: senderName });
+                logger.debug('Fetched sender', { userId: tx.from_user, name: senderName }, 'WalletManagementScreen');
               }
             }
             if (tx.to_user) {
               const recipient = await firebaseDataService.user.getCurrentUser(tx.to_user);
               recipientName = recipient.name || 'Unknown';
               if (__DEV__) {
-                console.log('🔍 Fetched recipient:', { userId: tx.to_user, name: recipientName });
+                logger.debug('Fetched recipient', { userId: tx.to_user, name: recipientName }, 'WalletManagementScreen');
               }
             }
           } catch (error) {
-            console.log('Could not fetch user details for transaction:', tx.id, error);
+            logger.warn('Could not fetch user details for transaction', { transactionId: tx.id, error: error.message }, 'WalletManagementScreen');
           }
 
           return {
@@ -288,7 +288,7 @@ const WalletManagementScreen: React.FC = () => {
       setTransactions(formattedTransactions);
 
       if (__DEV__) {
-        console.log('✅ Loaded transactions:', formattedTransactions.length);
+        logger.info('Loaded transactions', { count: formattedTransactions.length }, 'WalletManagementScreen');
       }
     } catch (error) {
       console.error('Error loading transactions:', error);
@@ -325,20 +325,19 @@ const WalletManagementScreen: React.FC = () => {
       setRefreshing(true);
       if (!currentUser?.id) return;
 
-      console.log('🔄 WalletManagement: Manual refresh triggered');
+      logger.info('Manual refresh triggered', null, 'WalletManagementScreen');
 
       // Ensure user has a wallet first
       const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
 
       if (walletResult.success && walletResult.wallet) {
-        console.log('💰 WalletManagement: Refreshing wallet balance...');
+        logger.info('Refreshing wallet balance', null, 'WalletManagementScreen');
 
         // Refresh app wallet balance directly
         const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
 
         if (balance) {
-          console.log('💰 WalletManagement: New balance detected:', balance.totalUSD, 'USD');
-          console.log('💰 WalletManagement: USDC balance:', balance.usdcBalance, 'USDC');
+          logger.info('New balance detected', { totalUSD: balance.totalUSD, usdcBalance: balance.usdcBalance }, 'WalletManagementScreen');
 
           // Update local balance state
           setLocalAppWalletBalance(balance);
@@ -348,7 +347,7 @@ const WalletManagementScreen: React.FC = () => {
             try {
               await getAppWalletBalance(currentUser.id.toString());
             } catch (error) {
-              console.log('Could not update context balance:', error);
+              logger.warn('Could not update context balance', { error: error.message }, 'WalletManagementScreen');
             }
           }
         } else {
@@ -370,7 +369,7 @@ const WalletManagementScreen: React.FC = () => {
           setMultiSignRemainingDays(remainingDays);
         }
 
-        console.log('✅ WalletManagement: Refresh completed successfully');
+        logger.info('Refresh completed successfully', null, 'WalletManagementScreen');
       } else {
         console.error('❌ Failed to ensure wallet during refresh:', walletResult.error);
       }
@@ -681,7 +680,7 @@ const WalletManagementScreen: React.FC = () => {
   );
 
   const handleExternalWalletConnectionSuccess = (result: any) => {
-    console.log('🔐 WalletManagement: External wallet connected successfully:', result);
+    logger.info('External wallet connected successfully', { result }, 'WalletManagementScreen');
 
     Alert.alert(
       'External Wallet Connected',

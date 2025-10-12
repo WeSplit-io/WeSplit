@@ -2,6 +2,8 @@
  * Monitoring service for detecting and handling rate limiting issues
  */
 
+import { logger } from './loggingService';
+
 interface RequestMetrics {
   endpoint: string;
   timestamp: number;
@@ -76,11 +78,7 @@ class MonitoringService {
   }
 
   private suggestOptimizations(endpoint: string) {
-    console.log(`💡 Suggestions for ${endpoint}:`);
-    console.log('   - Increase cache duration');
-    console.log('   - Implement request batching');
-    console.log('   - Add exponential backoff');
-    console.log('   - Consider using WebSocket for real-time data');
+    logger.info('Performance suggestions for endpoint', { endpoint, suggestions: ['Increase cache duration', 'Implement request batching', 'Add exponential backoff', 'Consider using WebSocket for real-time data'] }, 'monitoringService');
   }
 
   getRateLimitStats(): RateLimitInfo[] {

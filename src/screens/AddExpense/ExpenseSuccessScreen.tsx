@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
 import { styles } from './ExpenseSuccessStyles';
+import { logger } from '../../services/loggingService';
 
 const ExpenseSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   const { 
@@ -16,7 +17,7 @@ const ExpenseSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   } = route.params;
   
   // Debug logging to understand the conversion values
-  console.log('🔍 ExpenseSuccessScreen: Route params:', {
+  logger.debug('Route params', {
     amount,
     currency,
     originalAmount,
@@ -34,7 +35,7 @@ const ExpenseSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   const convertedAmount = showConversion ? amount : originalAmount;
   const convertedCurrency = showConversion ? 'USD' : currency;
   
-  console.log('🔍 ExpenseSuccessScreen: Conversion values:', {
+  logger.debug('Conversion values', {
     showConversion,
     convertedAmount,
     convertedCurrency
@@ -44,13 +45,12 @@ const ExpenseSuccessScreen: React.FC<any> = ({ navigation, route }) => {
     // Navigate back to the group using the group object passed from AddExpenseScreen
     const groupId = route.params.group?.id || route.params.groupId;
     
-    console.log('🔍 ExpenseSuccessScreen: Navigating back with groupId:', groupId);
-    console.log('🔍 ExpenseSuccessScreen: Route params:', route.params);
+    logger.info('Navigating back with groupId', { groupId, routeParams: route.params }, 'ExpenseSuccessScreen');
     
     if (groupId) {
       // Ensure groupId is properly converted to string for navigation
       const groupIdString = String(groupId);
-      console.log('🔍 ExpenseSuccessScreen: Navigating to GroupDetails with groupId:', groupIdString);
+      logger.info('Navigating to GroupDetails with groupId', { groupId: groupIdString }, 'ExpenseSuccessScreen');
       navigation.navigate('GroupDetails', { groupId: groupIdString });
     } else {
       // Fallback: go back to the previous screen

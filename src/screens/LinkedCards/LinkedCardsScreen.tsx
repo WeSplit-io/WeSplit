@@ -7,6 +7,7 @@ import { formatKastIdentifier } from '../../utils/sendUtils';
 import AddDestinationSheet from '../../components/AddDestinationSheet';
 import { walletService } from '../../services/WalletService';
 import { styles } from './styles';
+import { logger } from '../../services/loggingService';
 
 // Interfaces are now imported from the service
 
@@ -37,13 +38,13 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      console.log('🔄 Loading linked destinations for user:', currentUser.id);
+      logger.info('Loading linked destinations for user', { userId: currentUser.id }, 'LinkedCardsScreen');
       
       // Load from the linked wallets service
       // Get linked destinations from walletService
       const linkedData = await walletService.getLinkedDestinations(currentUser.id.toString());
       
-      console.log('📊 Loaded linked destinations:', {
+      logger.info('Loaded linked destinations', {
         wallets: linkedData.externalWallets.length,
         cards: linkedData.kastCards.length
       });
@@ -66,7 +67,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
 
     setIsAdding(true);
     try {
-      console.log('💾 Adding new destination:', destination);
+      logger.info('Adding new destination', { destination }, 'LinkedCardsScreen');
       
       if (destination.type === 'wallet') {
         // Add external wallet using walletService
@@ -82,7 +83,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
         if (result.success) {
           const newWallet = { id: Date.now().toString(), type: 'wallet', ...destination };
           setExternalWallets(prev => [...prev, newWallet]);
-          console.log('✅ External wallet added successfully');
+          logger.info('External wallet added successfully', null, 'LinkedCardsScreen');
           Alert.alert('Success', `Wallet "${newWallet.label}" has been linked successfully!`);
         } else {
           Alert.alert('Error', result.error || 'Failed to add external wallet');
@@ -100,7 +101,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
         if (result.success) {
           const newCard = { id: Date.now().toString(), type: 'kast', ...destination };
           setKastCards(prev => [...prev, newCard]);
-          console.log('✅ KAST card added successfully');
+          logger.info('KAST card added successfully', null, 'LinkedCardsScreen');
           Alert.alert('Success', `KAST card "${newCard.label}" has been linked successfully!`);
         } else {
           Alert.alert('Error', result.error || 'Failed to add KAST card');
@@ -140,10 +141,9 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           onPress: async () => {
             try {
               // Linked wallets functionality moved to walletService
-              console.log('Removing external wallet:', walletId); // Placeholder
               setExternalWallets(prev => prev.filter(wallet => wallet.id !== walletId));
               setExpandedItemId(null);
-              console.log('✅ External wallet unlinked successfully');
+              logger.info('External wallet unlinked successfully', null, 'LinkedCardsScreen');
             } catch (error) {
               console.error('❌ Error unlinking wallet:', error);
               const errorMessage = error instanceof Error ? error.message : 'Failed to unlink wallet';
@@ -172,10 +172,9 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           onPress: async () => {
             try {
               // Linked wallets functionality moved to walletService
-              console.log('Removing kast card:', cardId); // Placeholder
               setKastCards(prev => prev.filter(card => card.id !== cardId));
               setExpandedItemId(null);
-              console.log('✅ KAST card unlinked successfully');
+              logger.info('KAST card unlinked successfully', null, 'LinkedCardsScreen');
             } catch (error) {
               console.error('❌ Error unlinking KAST card:', error);
               const errorMessage = error instanceof Error ? error.message : 'Failed to unlink KAST card';

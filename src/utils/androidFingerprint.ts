@@ -49,22 +49,12 @@ export function getAndroidFingerprintInfo(): AndroidFingerprintInfo {
 export function logAndroidFingerprintInstructions(): void {
   const info = getAndroidFingerprintInfo();
   
-  console.log('🔧 Android SHA-1 Fingerprint Configuration:');
-  console.log('Platform:', info.platform);
-  console.log('Package Name:', info.packageName);
-  console.log('Is Android:', info.isAndroid);
+  logger.info('Android SHA-1 Fingerprint Configuration', { platform: info.platform, packageName: info.packageName, isAndroid: info.isAndroid }, 'androidFingerprint');
   
   if (info.isAndroid) {
-    console.log('📋 Instructions:');
-    info.instructions.forEach(instruction => {
-      if (instruction.trim() === '') {
-        console.log('');
-      } else {
-        console.log(instruction);
-      }
-    });
+    logger.info('Instructions', { instructions: info.instructions }, 'androidFingerprint');
   } else {
-    console.log('ℹ️ This is not an Android platform, SHA-1 fingerprint not needed');
+    logger.info('This is not an Android platform, SHA-1 fingerprint not needed', null, 'androidFingerprint');
   }
 }
 

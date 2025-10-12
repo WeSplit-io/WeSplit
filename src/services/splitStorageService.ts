@@ -91,7 +91,7 @@ export class SplitStorageService {
    */
   static async createSplit(splitData: Omit<Split, 'id' | 'createdAt' | 'updatedAt' | 'firebaseDocId'>): Promise<SplitResult> {
     try {
-      console.log('🔍 SplitStorageService: Creating split:', {
+      logger.info('Creating split', {
         title: splitData.title,
         totalAmount: splitData.totalAmount,
         splitType: splitData.splitType,
@@ -113,7 +113,7 @@ export class SplitStorageService {
         firebaseDocId: docRef.id,
       };
 
-      console.log('🔍 SplitStorageService: Split created successfully:', {
+      logger.info('Split created successfully', {
         splitId: createdSplit.id,
         firebaseDocId: docRef.id
       });
@@ -131,7 +131,7 @@ export class SplitStorageService {
       };
 
     } catch (error) {
-      console.log('🔍 SplitStorageService: Error creating split:', error);
+      logger.error('Error creating split', { error: error.message }, 'splitStorageService');
       logger.error('Failed to create split', error, 'SplitStorageService');
       return {
         success: false,
@@ -145,7 +145,6 @@ export class SplitStorageService {
    */
   static async getSplitByBillId(billId: string): Promise<SplitResult> {
     try {
-      console.log('🔍 SplitStorageService: Getting split by billId:', billId);
 
       const splitsRef = collection(db, this.COLLECTION_NAME);
       const q = query(splitsRef, where('billId', '==', billId));
@@ -162,14 +161,14 @@ export class SplitStorageService {
       const splitData = splitDoc.data() as Split;
       splitData.firebaseDocId = splitDoc.id;
 
-      console.log('🔍 SplitStorageService: Split found by billId:', splitData.id);
+      logger.debug('Split found by billId', { splitId: splitData.id }, 'splitStorageService');
       return {
         success: true,
         split: splitData,
       };
 
     } catch (error) {
-      console.log('🔍 SplitStorageService: Error getting split by billId:', error);
+      logger.error('Error getting split by billId', { error: error.message, billId }, 'splitStorageService');
       logger.error('Failed to get split by billId', error, 'SplitStorageService');
       return {
         success: false,
@@ -219,7 +218,7 @@ export class SplitStorageService {
       };
 
     } catch (error) {
-      console.log('🔍 SplitStorageService: Error getting split:', error);
+      logger.error('Error getting split', { error: error.message }, 'splitStorageService');
       logger.error('Failed to get split', error, 'SplitStorageService');
       return {
         success: false,
@@ -300,7 +299,7 @@ export class SplitStorageService {
       };
 
     } catch (error) {
-      console.log('🔍 SplitStorageService: Error getting user splits:', error);
+      logger.error('Error getting user splits', { error: error.message }, 'splitStorageService');
       logger.error('Failed to get user splits', error, 'SplitStorageService');
       return {
         success: false,
@@ -314,7 +313,7 @@ export class SplitStorageService {
    */
   static async updateSplitWithWallet(splitId: string, walletId: string, walletAddress: string): Promise<SplitResult> {
     try {
-      console.log('🔍 SplitStorageService: Updating split with wallet info:', {
+      logger.info('Updating split with wallet info', {
         splitId,
         walletId,
         walletAddress
@@ -336,7 +335,7 @@ export class SplitStorageService {
           firebaseDocId: splitId,
         };
 
-        console.log('🔍 SplitStorageService: Split updated with wallet info successfully');
+        logger.info('Split updated with wallet info successfully', null, 'splitStorageService');
         return {
           success: true,
           split: updatedSplit,
@@ -348,7 +347,7 @@ export class SplitStorageService {
         };
       }
     } catch (error) {
-      console.log('🔍 SplitStorageService: Error updating split with wallet info:', error);
+      logger.error('Error updating split with wallet info', { error: error.message }, 'splitStorageService');
       logger.error('Failed to update split with wallet info', error, 'SplitStorageService');
       return {
         success: false,
@@ -362,7 +361,7 @@ export class SplitStorageService {
    */
   static async updateSplitByBillId(billId: string, updates: Partial<Split>): Promise<SplitResult> {
     try {
-      console.log('🔍 SplitStorageService: Updating split by billId:', billId, updates);
+      logger.info('Updating split by billId', { billId, updates }, 'splitStorageService');
 
       const splitResult = await this.getSplitByBillId(billId);
       if (!splitResult.success || !splitResult.split) {
@@ -384,14 +383,14 @@ export class SplitStorageService {
         ...updateData,
       };
 
-      console.log('🔍 SplitStorageService: Split updated by billId successfully');
+      logger.info('Split updated by billId successfully', null, 'splitStorageService');
       return {
         success: true,
         split: updatedSplit,
       };
 
     } catch (error) {
-      console.log('🔍 SplitStorageService: Error updating split by billId:', error);
+      logger.error('Error updating split by billId', { error: error.message, billId }, 'splitStorageService');
       logger.error('Failed to update split by billId', error, 'SplitStorageService');
       return {
         success: false,
@@ -405,7 +404,7 @@ export class SplitStorageService {
    */
   static async updateSplit(splitId: string, updates: Partial<Split>): Promise<SplitResult> {
     try {
-      console.log('🔍 SplitStorageService: Updating split:', splitId, updates);
+      logger.info('Updating split', { splitId, updates }, 'splitStorageService');
 
       const splitResult = await this.getSplit(splitId);
       if (!splitResult.success || !splitResult.split) {
@@ -427,7 +426,7 @@ export class SplitStorageService {
         ...updateData,
       };
 
-      console.log('🔍 SplitStorageService: Split updated successfully');
+      logger.info('Split updated successfully', null, 'splitStorageService');
 
       return {
         success: true,
@@ -435,7 +434,7 @@ export class SplitStorageService {
       };
 
     } catch (error) {
-      console.log('🔍 SplitStorageService: Error updating split:', error);
+      logger.error('Error updating split', { error: error.message }, 'splitStorageService');
       logger.error('Failed to update split', error, 'SplitStorageService');
       return {
         success: false,
@@ -449,7 +448,7 @@ export class SplitStorageService {
    */
   static async addParticipant(splitId: string, participant: SplitParticipant): Promise<SplitResult> {
     try {
-      console.log('🔍 SplitStorageService: Adding/updating participant in split:', {
+      logger.info('Adding/updating participant in split', {
         splitId,
         participantName: participant.name,
         participantId: participant.userId,
@@ -470,8 +469,10 @@ export class SplitStorageService {
       
       if (existingParticipantIndex >= 0) {
         // Participant exists, update their status and data
-        console.log('🔍 SplitStorageService: Participant exists, updating status from', 
-          split.participants[existingParticipantIndex].status, 'to', participant.status);
+        logger.info('Participant exists, updating status', { 
+          from: split.participants[existingParticipantIndex].status, 
+          to: participant.status
+        }, 'splitStorageService');
         
         updatedParticipants = [...split.participants];
         updatedParticipants[existingParticipantIndex] = {
@@ -482,7 +483,7 @@ export class SplitStorageService {
         };
       } else {
         // Participant doesn't exist, add them
-        console.log('🔍 SplitStorageService: Participant does not exist, adding new participant');
+        logger.info('Participant does not exist, adding new participant', null, 'splitStorageService');
         updatedParticipants = [...split.participants, {
           ...participant,
           joinedAt: new Date().toISOString(),
@@ -494,7 +495,7 @@ export class SplitStorageService {
       });
 
     } catch (error) {
-      console.log('🔍 SplitStorageService: Error adding/updating participant:', error);
+      logger.error('Error adding/updating participant', { error: error.message }, 'splitStorageService');
       logger.error('Failed to add/update participant', error, 'SplitStorageService');
       return {
         success: false,
@@ -514,7 +515,7 @@ export class SplitStorageService {
     transactionSignature?: string
   ): Promise<SplitResult> {
     try {
-      console.log('🔍 SplitStorageService: Updating participant status:', {
+      logger.info('Updating participant status', {
         splitId,
         userId,
         status,
@@ -546,7 +547,7 @@ export class SplitStorageService {
       });
 
     } catch (error) {
-      console.log('🔍 SplitStorageService: Error updating participant status:', error);
+      logger.error('Error updating participant status', { error: error.message }, 'splitStorageService');
       logger.error('Failed to update participant status', error, 'SplitStorageService');
       return {
         success: false,
@@ -560,7 +561,7 @@ export class SplitStorageService {
    */
   static async deleteSplit(splitId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('🔍 SplitStorageService: Deleting split:', splitId);
+      logger.info('Deleting split', { splitId }, 'splitStorageService');
 
       const splitResult = await this.getSplit(splitId);
       if (!splitResult.success || !splitResult.split) {
@@ -575,14 +576,14 @@ export class SplitStorageService {
 
       await deleteDoc(doc(db, this.COLLECTION_NAME, docId));
 
-      console.log('🔍 SplitStorageService: Split deleted successfully');
+      logger.info('Split deleted successfully', null, 'splitStorageService');
 
       return {
         success: true,
       };
 
     } catch (error) {
-      console.log('🔍 SplitStorageService: Error deleting split:', error);
+      logger.error('Error deleting split', { error: error.message }, 'splitStorageService');
       logger.error('Failed to delete split', error, 'SplitStorageService');
       return {
         success: false,
@@ -596,7 +597,7 @@ export class SplitStorageService {
    */
   static async getSplitsByStatus(status: Split['status'], userId?: string): Promise<SplitListResult> {
     try {
-      console.log('🔍 SplitStorageService: Getting splits by status:', { status, userId });
+      logger.info('Getting splits by status', { status, userId }, 'splitStorageService');
 
       const splitsRef = collection(db, this.COLLECTION_NAME);
       let q;
@@ -623,7 +624,7 @@ export class SplitStorageService {
         return splitData;
       });
 
-      console.log('🔍 SplitStorageService: Found splits by status:', {
+      logger.info('Found splits by status', {
         status,
         count: splits.length
       });
@@ -634,7 +635,7 @@ export class SplitStorageService {
       };
 
     } catch (error) {
-      console.log('🔍 SplitStorageService: Error getting splits by status:', error);
+      logger.error('Error getting splits by status', { error: error.message }, 'splitStorageService');
       logger.error('Failed to get splits by status', error, 'SplitStorageService');
       return {
         success: false,

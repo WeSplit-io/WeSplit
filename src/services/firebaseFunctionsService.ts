@@ -6,6 +6,7 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { initializeApp } from 'firebase/app';
 import Constants from 'expo-constants';
+import { logger } from './loggingService';
 
 // Get environment variables from Expo Constants
 const getEnvVar = (key: string): string => {
@@ -101,14 +102,13 @@ export interface FirebaseVerificationResponse {
  * Send verification code via Firebase Functions
  */
 export async function sendVerificationCode(email: string): Promise<{ success: boolean; error?: string }> {
-  if (__DEV__) { console.log('=== sendVerificationCode called (Firebase Functions) ==='); }
-  if (__DEV__) { console.log('Email:', email); }
+  if (__DEV__) { logger.info('sendVerificationCode called (Firebase Functions)', null, 'firebaseFunctionsService'); }
+  if (__DEV__) { logger.debug('Email', { email }, 'firebaseFunctionsService'); }
   
   try {
     // Generate a 4-digit verification code
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     
-    if (__DEV__) { console.log('Generated code:', code); }
     
     // First, store the verification code in Firestore
     const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
@@ -124,7 +124,7 @@ export async function sendVerificationCode(email: string): Promise<{ success: bo
     
     await addDoc(collection(db, 'verificationCodes'), verificationData);
     
-    if (__DEV__) { console.log('✅ Verification code stored in Firestore'); }
+    if (__DEV__) { logger.info('Verification code stored in Firestore', null, 'firebaseFunctionsService'); }
     
     // Call Firebase Function to send verification email
     const result = await sendVerificationEmailFunction({
@@ -134,10 +134,10 @@ export async function sendVerificationCode(email: string): Promise<{ success: bo
     
     const response = result.data as FirebaseAuthResponse;
     
-    if (__DEV__) { console.log('Firebase Functions response:', response); }
+    if (__DEV__) { logger.debug('Firebase Functions response', { response }, 'firebaseFunctionsService'); }
     
     if (response.success) {
-      if (__DEV__) { console.log('✅ Verification code sent successfully via Firebase Functions'); }
+      if (__DEV__) { logger.info('Verification code sent successfully via Firebase Functions', null, 'firebaseFunctionsService'); }
       return { success: true };
     } else {
       throw new Error(response.message || 'Failed to send verification code');
@@ -163,8 +163,8 @@ export async function sendVerificationCode(email: string): Promise<{ success: bo
  * Verify code via Firebase Functions
  */
 export async function verifyCode(email: string, code: string): Promise<FirebaseVerificationResponse> {
-  if (__DEV__) { console.log('=== verifyCode called (Firebase Functions) ==='); }
-  if (__DEV__) { console.log('Email:', email, 'Code:', code); }
+  if (__DEV__) { logger.info('verifyCode called (Firebase Functions)', null, 'firebaseFunctionsService'); }
+  if (__DEV__) { logger.debug('Email and Code', { email, code }, 'firebaseFunctionsService'); }
   
   try {
     // Call Firebase Function to verify code
@@ -175,10 +175,10 @@ export async function verifyCode(email: string, code: string): Promise<FirebaseV
     
     const response = result.data as FirebaseVerificationResponse;
     
-    if (__DEV__) { console.log('Firebase Functions verification response:', response); }
+    if (__DEV__) { logger.debug('Firebase Functions verification response', { response }, 'firebaseFunctionsService'); }
     
     if (response.success) {
-      if (__DEV__) { console.log('✅ Code verified successfully via Firebase Functions'); }
+      if (__DEV__) { logger.info('Code verified successfully via Firebase Functions', null, 'firebaseFunctionsService'); }
       
       // Mark the verification code as used in Firestore
       try {
@@ -197,7 +197,7 @@ export async function verifyCode(email: string, code: string): Promise<FirebaseV
         if (!querySnapshot.empty) {
           const doc = querySnapshot.docs[0];
           await updateDoc(doc.ref, { used: true });
-          if (__DEV__) { console.log('✅ Verification code marked as used'); }
+          if (__DEV__) { logger.info('Verification code marked as used', null, 'firebaseFunctionsService'); }
         }
       } catch (firestoreError) {
         if (__DEV__) { console.warn('⚠️ Could not mark verification code as used:', firestoreError); }

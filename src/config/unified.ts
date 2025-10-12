@@ -5,6 +5,7 @@
  */
 
 import Constants from 'expo-constants';
+import { logger } from '../services/loggingService';
 
 // ============================================================================
 // ENVIRONMENT TYPES
@@ -106,7 +107,17 @@ export function getUnifiedConfig(): UnifiedConfig {
   const isStaging = environment === 'staging';
   
   const heliusApiKey = getEnvVar('HELIUS_API_KEY');
-  const network = (extra.DEV_NETWORK as 'devnet' | 'testnet' | 'mainnet') || 'devnet';
+  // Temporarily force mainnet to test balance fetching
+  const network = 'mainnet'; // (extra.DEV_NETWORK as 'devnet' | 'testnet' | 'mainnet') || 'devnet';
+  
+  // Debug configuration loading
+  logger.info('Configuration Debug', {
+    extra: extra,
+    DEV_NETWORK: extra.DEV_NETWORK,
+    FORCE_MAINNET: extra.FORCE_MAINNET,
+    resolvedNetwork: network,
+    heliusApiKey: heliusApiKey ? 'SET' : 'NOT_SET'
+  });
   
   // Validate production environment
   if (isProduction && !heliusApiKey) {

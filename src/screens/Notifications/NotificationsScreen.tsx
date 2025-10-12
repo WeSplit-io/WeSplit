@@ -87,18 +87,6 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const handleNotificationPress = async (notification: NotificationData) => {
-    logger.debug('handleNotificationPress called', {
-      notificationId: notification.id,
-      notificationType: notification.type,
-      notificationData: notification.data,
-      isRead: notification.is_read,
-      fullNotification: notification
-    });
-    
-    logger.debug('handleNotificationPress - notification type check', {
-      type: notification.type,
-      isSplitInvite: notification.type === 'split_invite'
-    });
     
     // Mark as read if not already read
     if (!notification.is_read) {
@@ -118,22 +106,13 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       }
     } else if (notification.type === 'split_invite') {
       // Handle split invitation by accepting it first, then navigating to split details
-      logger.debug('ENTERED split_invite handler in handleNotificationPress', null, 'NotificationsScreen');
       const splitId = notification.data?.splitId;
-      logger.debug('Split invite notification data', {
-        notificationId: notification.id,
-        splitId: splitId,
-        notificationData: notification.data,
-        fullNotification: notification
-      });
       
       if (splitId) {
-        logger.debug('Handling split invitation tap - accepting invitation first', { splitId }, 'NotificationsScreen');
         
         // Accept the invitation first, then navigate
         try {
           const result = await acceptSplitInvitation(notification.id, splitId);
-          logger.debug('Split invitation accepted from tap', { result }, 'NotificationsScreen');
           
           if (result.success) {
             // Navigate to SplitDetails after successful acceptance
@@ -153,7 +132,6 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                 isFromNotification: true,
                 notificationId: notification.id
               });
-              logger.debug('Navigation call completed successfully', null, 'NotificationsScreen');
             } catch (navError) {
               console.error('🔍 NotificationsScreen: Navigation error in handleNotificationPress:', navError);
               Alert.alert('Navigation Error', 'Failed to navigate to split details. Please try again.');
@@ -197,13 +175,10 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       if (!globalAny.analytics) {
         globalAny.analytics = {
           stopTracking: () => {
-            console.log('Analytics tracking stopped (safe mode)');
           },
           startTracking: () => {
-            console.log('Analytics tracking started (safe mode)');
           },
           trackEvent: (event: string, data?: any) => {
-            console.log('Analytics event tracked (safe mode):', event, data);
           }
         };
       }
@@ -211,7 +186,6 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       // Ensure stopTracking method exists
       if (!globalAny.analytics.stopTracking) {
         globalAny.analytics.stopTracking = () => {
-          console.log('Analytics tracking stopped (fallback)');
         };
       }
 
@@ -220,7 +194,6 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         try {
           if (!globalAny.firebase.analytics.stopTracking) {
             globalAny.firebase.analytics.stopTracking = () => {
-              console.log('Firebase Analytics tracking stopped (safe mode)');
             };
           }
         } catch (firebaseError) {
@@ -233,7 +206,6 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       const originalConsoleError = console.error;
       console.error = function(...args: any[]) {
         if (args[0] && typeof args[0] === 'string' && args[0].includes('stopTracking')) {
-          console.log('🔍 Intercepted stopTracking error in console.error:', args[0]);
           return; // Don't log the error
         }
         originalConsoleError.apply(console, args);
@@ -253,7 +225,6 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     const originalConsoleError = console.error;
     console.error = function(...args: any[]) {
       if (args[0] && typeof args[0] === 'string' && args[0].includes('stopTracking')) {
-        console.log('🔍 DEBUG: Intercepted stopTracking error in console.error:', args[0]);
         return; // Don't log the error
       }
       originalConsoleError.apply(console, args);
@@ -265,7 +236,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       const customErrorHandler = (error: Error, isFatal?: boolean) => {
         // Check if this is a stopTracking error
         if (error.message && error.message.includes('stopTracking')) {
-          console.log('🔍 DEBUG: Global error handler caught stopTracking error:', {
+          logger.debug('Global error handler caught stopTracking error', {
             message: error.message,
             stack: error.stack,
             isFatal: isFatal
@@ -302,7 +273,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   const notificationActionHandler = async (notification: NotificationData) => {
     const notificationId = notification.id;
     
-    console.log('🔍 NotificationsScreen: notificationActionHandler called with:', {
+    logger.debug('notificationActionHandler called', {
       notificationId: notification.id,
       notificationType: notification.type,
       notificationData: notification.data
@@ -327,8 +298,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Add debugging to identify where the error is coming from
-        console.log('🔍 DEBUG: Starting notification action for type:', notification.type);
-        console.log('🔍 DEBUG: Notification type check:', {
+        logger.debug('Notification type check', {
           type: notification.type,
           isSplitInvite: notification.type === 'split_invite',
           isPaymentRequest: notification.type === 'payment_request',
@@ -336,7 +306,6 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         });
 
         if (notification.type === 'payment_request' || notification.type === 'payment_reminder') {
-          console.log('🔍 DEBUG: Handling payment request/reminder');
           // Handle payment request
           if (notification.status === 'paid') {
             showToast('Payment already completed');
@@ -347,7 +316,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           const notificationData = notification.data as any;
           if (notificationData?.splitId && notificationData?.splitWalletId) {
             // This is a split payment notification - navigate to SplitPayment screen
-            console.log('🔍 DEBUG: Split payment notification detected:', {
+            logger.info('Split payment notification detected', {
               splitId: notificationData.splitId,
               splitWalletId: notificationData.splitWalletId,
               participantAmount: notificationData.participantAmount,
@@ -361,7 +330,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               
               if (splitResult.success && splitResult.split) {
                 const split = splitResult.split;
-                console.log('🔍 NotificationsScreen: Loaded split data for navigation:', {
+                logger.info('Loaded split data for navigation', {
                   splitId: split.id,
                   splitType: split.splitType,
                   splitMethod: split.splitMethod,
@@ -410,7 +379,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           const currency = notification.data?.currency || 'USDC';
           const groupId = notification.data?.groupId;
 
-          console.log('🔍 DEBUG: Regular payment request notification data:', {
+          logger.debug('Regular payment request notification data', {
             requesterId,
             amount,
             currency,
@@ -424,10 +393,9 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           }
 
           // Fetch the user data to get wallet address and other details
-          console.log('🔍 DEBUG: Fetching user data for ID:', requesterId);
           const contact = await fetchUserData(requesterId);
           
-          console.log('🔍 DEBUG: Fetched contact data:', {
+          logger.debug('Fetched contact data', {
             id: contact.id,
             name: contact.name,
             email: contact.email,
@@ -435,7 +403,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           });
 
           // Navigate directly to SendAmount screen with pre-filled data
-          console.log('🔍 DEBUG: About to navigate to SendAmount screen with pre-filled data:', {
+          logger.info('Navigating to SendAmount screen with pre-filled data', {
             contact: contact.name,
             amount: amount,
             currency: currency,
@@ -451,14 +419,11 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               fromNotification: true,
               notificationId: notificationId
             });
-            console.log('🔍 DEBUG: Successfully navigated to SendAmount screen');
             
             // Mark notification as in progress but don't delete it yet
             // It will be deleted when the payment process is completed
-            console.log('🔍 DEBUG: Payment request notification marked as in progress, will be deleted after payment completion');
             
           } catch (navError) {
-            console.log('🔍 DEBUG: Navigation error (non-critical):', navError);
             // Even if navigation fails, we don't want to show an error to the user
             // The navigation should work fine, this is just a safety net
           }
@@ -478,25 +443,22 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
         } else if (notification.type === 'split_invite') {
           // Handle split invitation
-          console.log('🔍 NotificationsScreen: ENTERED split_invite handler in notificationActionHandler');
-          console.log('🔍 DEBUG: Processing split_invite notification');
           const splitId = notification.data?.splitId;
           
-          console.log('🔍 NotificationsScreen: Action button - split invite notification data:', {
+          logger.info('Action button - split invite notification data', {
             notificationId: notification.id,
             splitId: splitId,
-            notificationData: notification.data,
-            fullNotification: notification
-          });
+            notificationData: notification.data
+          }, 'NotificationsScreen');
           
           if (!splitId) {
             throw new Error('Missing split data in notification');
           }
 
           // Accept the split invitation using AppContext method
-          console.log('🔍 NotificationsScreen: Accepting split invitation:', splitId);
+          logger.info('Accepting split invitation', { splitId }, 'NotificationsScreen');
           try {
-            console.log('🔍 NotificationsScreen: Calling acceptSplitInvitation with:', {
+            logger.info('Calling acceptSplitInvitation with', {
               notificationId,
               splitId,
               notificationData: notification.data
@@ -504,7 +466,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             
             const result = await acceptSplitInvitation(notificationId, splitId);
             
-            console.log('🔍 NotificationsScreen: acceptSplitInvitation result:', result);
+            logger.info('acceptSplitInvitation result', { result }, 'NotificationsScreen');
             
             if (result.success) {
               // Update action state
@@ -514,7 +476,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               }));
 
               // Navigate to SplitDetailsScreen immediately after successful acceptance
-              console.log('🔍 NotificationsScreen: About to navigate to SplitDetails with params (action button):', {
+              logger.info('About to navigate to SplitDetails with params (action button)', {
                 splitId: splitId,
                 isFromNotification: true,
                 resultSplitId: result.splitId,
@@ -523,7 +485,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               
               try {
                 const currentRoute = navigation.getState()?.routes[navigation.getState()?.index]?.name;
-                console.log('🔍 NotificationsScreen: About to navigate with params (action button):', {
+                logger.info('About to navigate with params (action button)', {
                   splitId: splitId,
                   isFromNotification: true,
                   currentRoute: currentRoute,
@@ -534,19 +496,19 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                 
                 // Check if we're already on SplitDetails screen
                 if (currentRoute === 'SplitDetails') {
-                  console.log('🔍 NotificationsScreen: Already on SplitDetails, using replace instead of navigate');
+                  logger.info('Already on SplitDetails, using replace instead of navigate', null, 'NotificationsScreen');
                   navigation.replace('SplitDetails', { 
                     splitId: splitId,
                     isFromNotification: true
                   });
                 } else {
-                  console.log('🔍 NotificationsScreen: Navigating to SplitDetails from:', currentRoute);
+                  logger.info('Navigating to SplitDetails from', { currentRoute }, 'NotificationsScreen');
                   navigation.navigate('SplitDetails', { 
                     splitId: splitId,
                     isFromNotification: true
                   });
                 }
-                console.log('✅ NotificationsScreen: Successfully called navigation (action button)');
+                logger.info('Successfully called navigation (action button)', null, 'NotificationsScreen');
               } catch (navError) {
                 console.error('❌ NotificationsScreen: Navigation error (action button):', navError);
                 Alert.alert('Navigation Error', 'Failed to navigate to split details. Please try again.');
@@ -566,7 +528,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           } catch (error) {
             // Check if this is a stopTracking error (non-critical)
             if (error instanceof Error && error.message.includes('stopTracking')) {
-              console.log('🔍 NotificationsScreen: Non-critical stopTracking error in split invitation:', error.message);
+              logger.warn('Non-critical stopTracking error in split invitation', { error: error.message }, 'NotificationsScreen');
               // Don't treat this as an error, just log it and continue with navigation
               setActionStates(prev => ({
                 ...prev,
@@ -579,7 +541,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                   splitId: splitId,
                   isFromNotification: true
                 });
-                console.log('🔍 NotificationsScreen: Navigation completed despite stopTracking error');
+                logger.info('Navigation completed despite stopTracking error', null, 'NotificationsScreen');
               } catch (navError) {
                 console.error('🔍 NotificationsScreen: Navigation error after stopTracking error:', navError);
               }
@@ -603,12 +565,11 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           }
 
           // Navigate to group details
-          console.log('🔍 DEBUG: Navigating to GroupDetails for group invitation:', groupId);
+          logger.info('Navigating to GroupDetails for group invitation', { groupId }, 'NotificationsScreen');
           try {
             navigation.navigate('GroupDetails', { groupId });
-            console.log('🔍 DEBUG: Successfully navigated to GroupDetails');
+            logger.info('Successfully navigated to GroupDetails', null, 'NotificationsScreen');
           } catch (navError) {
-            console.log('🔍 DEBUG: Navigation error (non-critical):', navError);
             // Even if navigation fails, we don't want to show an error to the user
           }
 
@@ -785,7 +746,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           const expenseId = notificationData?.expenseId;
           const addedBy = notificationData?.addedBy;
           
-          console.log('🔍 DEBUG: Expense added notification data:', {
+          logger.info('Expense added notification data', {
             groupId,
             expenseId,
             addedBy,
@@ -852,10 +813,10 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           
           if (requesterId && amount && currency) {
             // Fetch the user data to get wallet address and other details
-            console.log('🔍 DEBUG: Fetching user data for group payment request ID:', requesterId);
+            logger.info('Fetching user data for group payment request ID', { requesterId }, 'NotificationsScreen');
             const contact = await fetchUserData(requesterId);
             
-            console.log('🔍 DEBUG: Fetched contact data for group payment request:', {
+            logger.info('Fetched contact data for group payment request', {
               id: contact.id,
               name: contact.name,
               email: contact.email,
@@ -875,7 +836,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             
             // Mark notification as in progress but don't delete it yet
             // It will be deleted when the payment process is completed
-            console.log('🔍 DEBUG: Group payment request notification marked as in progress, will be deleted after payment completion');
+            logger.info('Group payment request notification marked as in progress, will be deleted after payment completion', null, 'NotificationsScreen');
             
             // Mark as in progress
             setActionStates(prev => ({
@@ -964,7 +925,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             
             // Mark notification as in progress but don't delete it yet
             // It will be deleted when the settlement process is completed
-            console.log('🔍 DEBUG: Settlement request notification marked as in progress, will be deleted after settlement completion');
+            logger.info('Settlement request notification marked as in progress, will be deleted after settlement completion', null, 'NotificationsScreen');
             
             // Mark as in progress
             setActionStates(prev => ({
@@ -1438,7 +1399,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   // Function to delete notification after it has served its purpose
   const deleteNotification = async (notificationId: string) => {
     try {
-      console.log('🗑️ DEBUG: Deleting notification after action:', notificationId);
+      logger.info('Deleting notification after action', { notificationId }, 'NotificationsScreen');
       
       // Delete from Firestore
       await deleteDoc(doc(db, 'notifications', notificationId));
@@ -1446,7 +1407,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       // Refresh notifications to update the list
       loadNotifications();
       
-      console.log('🗑️ DEBUG: Notification deleted successfully');
+      logger.info('Notification deleted successfully', null, 'NotificationsScreen');
     } catch (error) {
       console.error('🗑️ DEBUG: Error deleting notification:', error);
       // Don't show error to user as this is not critical

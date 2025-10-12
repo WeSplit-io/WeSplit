@@ -7,6 +7,7 @@ import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import styles from './styles';
+import { logger } from '../../services/loggingService';
 
 interface MoonPayWebViewParams {
   url: string;
@@ -32,7 +33,7 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
   const params: MoonPayWebViewParams = route?.params || {};
   const { url, targetWallet, onSuccess, isAppWallet, userId } = params;
 
-  console.log('🔍 MoonPayWebView: Screen loaded with params:', {
+  logger.debug('Screen loaded with params', {
     url,
     isAppWallet,
     userId,
@@ -47,7 +48,7 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
     return null;
   }
 
-  console.log('🔍 MoonPayWebView: Loading URL:', url);
+  logger.info('Loading URL', { url }, 'MoonPayWebViewScreen');
 
   const handleBack = () => {
     if (canGoBack && webViewRef) {
@@ -62,12 +63,10 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const handleLoadStart = () => {
-    console.log('🔍 MoonPayWebView: WebView load started');
     setLoading(true);
   };
 
   const handleLoadEnd = () => {
-    console.log('🔍 MoonPayWebView: WebView load ended');
     setLoading(false);
   };
 
@@ -77,17 +76,17 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
       
       // Handle MoonPay success/failure messages
       if (data.type === 'moonpay-success') {
-        console.log('🔍 MoonPayWebView: Purchase successful, refreshing app wallet balance...');
+        logger.info('Purchase successful, refreshing app wallet balance', null, 'MoonPayWebViewScreen');
         
         // If this is for app wallet, refresh the balance
         if (isAppWallet && userId) {
           try {
             // Refresh app wallet balance
             await getAppWalletBalance(userId);
-            console.log('🔍 MoonPayWebView: App wallet balance refreshed successfully');
+            logger.info('App wallet balance refreshed successfully', null, 'MoonPayWebViewScreen');
             
             // Log successful balance refresh
-            console.log('🔍 MoonPayWebView: App wallet balance refreshed successfully');
+            logger.info('App wallet balance refreshed successfully', null, 'MoonPayWebViewScreen');
           } catch (balanceError) {
             console.error('🔍 MoonPayWebView: Error refreshing app wallet balance:', balanceError);
           }
@@ -129,7 +128,7 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
       }
     });
     } catch (error) {
-      console.log('MoonPay WebView: Error setting up message listener');
+      logger.error('Error setting up message listener', null, 'MoonPayWebViewScreen');
         }
     
     true;
@@ -182,7 +181,6 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
             Alert.alert('HTTP Error', 'Failed to load MoonPay. Please check your connection and try again.');
           }}
           onShouldStartLoadWithRequest={(request) => {
-            console.log('🔍 MoonPayWebView: Loading request:', request.url);
             return true;
           }}
         />

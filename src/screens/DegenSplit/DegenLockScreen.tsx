@@ -27,6 +27,7 @@ import { SplitWalletService } from '../../services/split';
 import { notificationService } from '../../services/notificationService';
 import { FallbackDataService } from '../../utils/fallbackDataService';
 import { useApp } from '../../context/AppContext';
+import { logger } from '../../services/loggingService';
 
 // AppleSlider component adapted from SendConfirmationScreen
 interface AppleSliderProps {
@@ -221,7 +222,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     const totalCount = participants.length;
     const progressPercentage = totalCount > 0 ? lockedCount / totalCount : 0;
     
-    console.log('🔄 DegenLockScreen: Updating circle progress', {
+    logger.debug('Updating circle progress', {
       lockedCount,
       totalCount,
       progressPercentage: (progressPercentage * 100).toFixed(1) + '%',
@@ -443,7 +444,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
                          !splitParticipantIds.every(id => walletParticipantIds.includes(id));
         
         if (needsSync) {
-          console.log('🔄 DegenLockScreen: Syncing participants between split data and wallet');
+          logger.info('Syncing participants between split data and wallet', null, 'DegenLockScreen');
           const participantsForUpdate = participants.map(p => ({
             userId: p.userId || p.id,
             name: p.name,
@@ -504,7 +505,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         // Update circle progress animation
         updateCircleProgress();
         
-        console.log('🔍 DegenLockScreen: Participant lock status updated', {
+        logger.info('Participant lock status updated', {
           totalParticipants,
           lockedCount,
           allLocked,
@@ -563,7 +564,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
               if (userParticipant && userParticipant.amountPaid > 0) {
                 setIsLocked(true);
                 setLockedParticipants(prev => [...prev, currentUser.id.toString()]);
-                console.log('🔍 DegenLockScreen: Current user already locked funds', {
+                logger.info('Current user already locked funds', {
                   userId: currentUser.id.toString(),
                   amountPaid: userParticipant.amountPaid
                 });
@@ -600,7 +601,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       // Update circle progress animation
       updateCircleProgress();
       
-      console.log('🔄 DegenLockScreen: Wallet participants updated', {
+      logger.info('Wallet participants updated', {
         totalParticipants: participants.length,
         lockedCount,
         allLocked

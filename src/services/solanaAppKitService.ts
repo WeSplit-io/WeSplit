@@ -31,11 +31,7 @@ import { logger } from './loggingService';
 const RPC_ENDPOINT = RPC_CONFIG.endpoint;
 const USDC_MINT_ADDRESS = USDC_CONFIG.mintAddress;
 
-logger.debug('SolanaAppKitService configuration', {
-  network: RPC_CONFIG.network,
-  rpcEndpoint: RPC_ENDPOINT,
-  usdcMintAddress: USDC_MINT_ADDRESS
-}, 'solanaAppKitService');
+// Configuration loaded
 
 export interface WalletInfo {
   address: string;
@@ -164,7 +160,6 @@ export class SolanaAppKitService {
 
   // Initialize available wallet providers
   private async initializeWalletProviders() {
-    logger.debug('initializeWalletProviders called', null, 'solanaAppKitService');
     
     try {
       // Get available wallets from the logo service
@@ -189,13 +184,8 @@ export class SolanaAppKitService {
         this.availableProviders.set(provider.name.toLowerCase(), provider);
       });
 
-      logger.debug('Providers added to map', { 
-        providerCount: this.availableProviders.size,
-        providerKeys: Array.from(this.availableProviders.keys())
-      }, 'solanaAppKitService');
 
       if (__DEV__) {
-        logger.debug('Initialized wallet providers', { count: providers.length }, 'solanaAppKitService');
       }
     } catch (error) {
       console.error('Error initializing wallet providers:', error);
@@ -206,7 +196,6 @@ export class SolanaAppKitService {
 
   // Initialize fallback providers if logo service fails
   private initializeFallbackProviders() {
-    logger.debug('Using fallback providers', null, 'solanaAppKitService');
     
     const fallbackProviders: WalletProvider[] = [
       {
@@ -250,13 +239,11 @@ export class SolanaAppKitService {
   // Get available wallet providers
   getAvailableProviders(): WalletProvider[] {
     const providers = Array.from(this.availableProviders.values());
-    logger.debug('getAvailableProviders called', null, 'solanaAppKitService');
-    console.log('🔧 SolanaAppKitService: Available providers count:', providers.length);
-    console.log('🔧 SolanaAppKitService: Provider names:', providers.map(p => p.name));
+    logger.info('Available providers', { count: providers.length, names: providers.map(p => p.name) }, 'solanaAppKitService');
     
     // Fallback: if no providers are available, return some basic ones
     if (providers.length === 0) {
-      console.log('🔧 SolanaAppKitService: No providers found, creating fallback providers');
+      logger.warn('No providers found, creating fallback providers', null, 'solanaAppKitService');
       const fallbackProviders: WalletProvider[] = [
         {
           name: 'Phantom',
@@ -295,7 +282,7 @@ export class SolanaAppKitService {
         this.availableProviders.set(provider.name.toLowerCase(), provider);
       });
       
-      console.log('🔧 SolanaAppKitService: Fallback providers added');
+      logger.info('Fallback providers added', null, 'solanaAppKitService');
       return fallbackProviders;
     }
     
@@ -859,7 +846,7 @@ export class SolanaAppKitService {
       this.multiSigWallets.set(multiSigAddress, multiSigWallet);
 
       if (__DEV__) {
-        console.log('✅ Multi-signature wallet created:', {
+        logger.info('Multi-signature wallet created', {
           address: multiSigAddress,
           owners,
           threshold
@@ -902,7 +889,7 @@ export class SolanaAppKitService {
       multiSigWallet.pendingTransactions.push(multiSigTransaction);
 
       if (__DEV__) {
-        console.log('✅ Multi-signature transaction created:', {
+        logger.info('Multi-signature transaction created', {
           transactionId,
           multiSigAddress,
           signersCount: signers.length
@@ -951,7 +938,7 @@ export class SolanaAppKitService {
       }
 
       if (__DEV__) {
-        console.log('✅ Multi-signature transaction approved:', {
+        logger.info('Multi-signature transaction approved', {
           transactionId,
           approver,
           approvalsCount: transaction.approvals.length,
@@ -992,7 +979,7 @@ export class SolanaAppKitService {
       }
 
       if (__DEV__) {
-        console.log('❌ Multi-signature transaction rejected:', {
+        logger.warn('Multi-signature transaction rejected', {
           transactionId,
           rejector,
           rejectionsCount: transaction.rejections.length
@@ -1063,7 +1050,7 @@ export class SolanaAppKitService {
       transaction.executed = true;
 
       if (__DEV__) {
-        console.log('✅ Multi-signature transaction executed:', {
+        logger.info('Multi-signature transaction executed', {
           transactionId,
           signature,
           approvalsCount: transaction.approvals.length
@@ -1140,7 +1127,7 @@ export class SolanaAppKitService {
   // Mock methods for development
   private async mockConnectProvider(name: string): Promise<WalletInfo> {
     if (__DEV__) {
-      console.log(`Mock connecting to ${name}...`);
+      logger.info('Mock connecting to provider', { name }, 'solanaAppKitService');
     }
     
     // For Phantom, use passive detection instead of opening the app
@@ -1171,7 +1158,7 @@ export class SolanaAppKitService {
    */
   private async connectToPhantomWalletPassively(): Promise<WalletInfo> {
     try {
-      console.log('🔗 SolanaAppKitService: Attempting to connect to Phantom wallet passively...');
+      logger.info('Attempting to connect to Phantom wallet passively', null, 'solanaAppKitService');
       
       const { Linking, Platform } = require('react-native');
       
@@ -1185,14 +1172,14 @@ export class SolanaAppKitService {
       for (const scheme of phantomSchemes) {
         try {
           const schemeCanOpen = await Linking.canOpenURL(scheme);
-          console.log(`🔗 SolanaAppKitService: Testing scheme ${scheme}: ${schemeCanOpen}`);
+          logger.debug('Testing scheme', { scheme, canOpen: schemeCanOpen }, 'solanaAppKitService');
           if (schemeCanOpen) {
             canOpen = true;
             workingScheme = scheme;
             break;
           }
         } catch (error) {
-          console.log(`🔗 SolanaAppKitService: Scheme ${scheme} test failed:`, error);
+          logger.warn('Scheme test failed', { scheme, error: error.message }, 'solanaAppKitService');
         }
       }
       
@@ -1201,12 +1188,12 @@ export class SolanaAppKitService {
         try {
           const packageCanOpen = await Linking.canOpenURL('app.phantom://');
           if (packageCanOpen) {
-            console.log('🔗 SolanaAppKitService: Phantom package detection successful');
+            logger.info('Phantom package detection successful', null, 'solanaAppKitService');
             canOpen = true;
             workingScheme = 'app.phantom://';
           }
         } catch (error) {
-          console.log('🔗 SolanaAppKitService: Phantom package detection failed:', error);
+          logger.warn('Phantom package detection failed', { error: error.message }, 'solanaAppKitService');
         }
       }
       
@@ -1214,7 +1201,7 @@ export class SolanaAppKitService {
         throw new Error('Phantom wallet is not available on this device');
       }
       
-      console.log(`🔗 SolanaAppKitService: Phantom wallet detected via ${workingScheme}`);
+      logger.info('Phantom wallet detected via scheme', { workingScheme }, 'solanaAppKitService');
       
       // For now, we'll use a temporary connection since we can't get the actual wallet address
       // In a real implementation, you would need to implement the Solana Wallet Adapter protocol
@@ -1224,7 +1211,7 @@ export class SolanaAppKitService {
       const tempKeypair = Keypair.generate();
       const address = tempKeypair.publicKey.toBase58();
       
-      console.log('🔗 SolanaAppKitService: Generated temporary wallet address:', address);
+      logger.info('Generated temporary wallet address', { address }, 'solanaAppKitService');
       
       return {
         address,
@@ -1246,7 +1233,7 @@ export class SolanaAppKitService {
 
   private async mockDisconnectProvider(): Promise<void> {
     if (__DEV__) {
-      console.log('Mock disconnecting provider...');
+      logger.info('Mock disconnecting provider', null, 'solanaAppKitService');
     }
     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
     this.connectedProvider = null;
@@ -1255,7 +1242,7 @@ export class SolanaAppKitService {
 
   private async mockSignTransaction(transaction: Transaction): Promise<Transaction> {
     if (__DEV__) {
-      console.log('Mock signing transaction...');
+      logger.info('Mock signing transaction', null, 'solanaAppKitService');
     }
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
     if (this.keypair) {
@@ -1266,7 +1253,7 @@ export class SolanaAppKitService {
 
   private async mockSignMessage(message: Uint8Array): Promise<Uint8Array> {
     if (__DEV__) {
-      console.log('Mock signing message...');
+      logger.info('Mock signing message', null, 'solanaAppKitService');
     }
     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
     return message; // Mock signing is a no-op for now
@@ -1277,5 +1264,5 @@ export class SolanaAppKitService {
 export const solanaAppKitService = new SolanaAppKitService();
 
 // Ensure providers are initialized
-console.log('🔧 SolanaAppKitService: Singleton instance created');
-console.log('🔧 SolanaAppKitService: Available providers after initialization:', solanaAppKitService.getAvailableProviders().length); 
+logger.info('Singleton instance created', null, 'solanaAppKitService');
+logger.info('Available providers after initialization', { count: solanaAppKitService.getAvailableProviders().length }, 'solanaAppKitService'); 

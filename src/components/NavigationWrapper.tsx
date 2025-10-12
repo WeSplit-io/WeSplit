@@ -3,6 +3,7 @@ import { NavigationContainer, NavigationContainerRef } from '@react-navigation/n
 import { Linking } from 'react-native';
 import { setupDeepLinkListeners } from '../services/deepLinkHandler';
 import { useApp } from '../context/AppContext';
+import { logger } from '../services/loggingService';
 
 interface NavigationWrapperProps {
   children: React.ReactNode;
@@ -27,7 +28,7 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
       currentUserIdRef.current !== currentUser.id && 
       !deepLinkSetupRef.current
     ) {
-      console.log('🔥 Setting up deep link listeners for user:', currentUser.id);
+      logger.info('Setting up deep link listeners for user', { userId: currentUser.id }, 'NavigationWrapper');
       
       // Set up deep link listeners when navigation and user are available
       const subscription = setupDeepLinkListeners(navigationRef.current, currentUser);
@@ -52,7 +53,7 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
       try {
         const initialURL = await Linking.getInitialURL();
         if (initialURL) {
-          console.log('🔥 App opened with URL:', initialURL);
+          logger.info('App opened with URL', { initialURL }, 'NavigationWrapper');
           // The deep link handler will process this URL
         }
       } catch (error) {

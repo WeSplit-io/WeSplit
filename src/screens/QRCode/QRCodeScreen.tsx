@@ -18,6 +18,7 @@ import { parseUri, extractRecipientAddress, isSolanaPayUri } from '@features/qr/
 import { isValidSolanaAddress } from '@libs/validation';
 import { QRCodeService } from '../../services/qrCodeService';
 import { SplitInvitationService } from '../../services/splitInvitationService';
+import { logger } from '../../services/loggingService';
 
 // Fonction pour hacher l'adresse du wallet
 const hashWalletAddress = (address: string): string => {
@@ -77,7 +78,7 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
     setScanned(true);
     setIsScanning(false);
     
-    console.log('QR Code scanned:', data);
+    logger.info('QR Code scanned', { data }, 'QRCodeScreen');
     
     try {
       // Check if it's a split invitation QR code
@@ -195,7 +196,6 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
       <TouchableOpacity 
         style={styles.backButton} 
         onPress={() => {
-          console.log('Back button pressed');
           onBack();
         }}
         activeOpacity={0.7}

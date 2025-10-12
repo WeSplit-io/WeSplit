@@ -4,6 +4,7 @@
  */
 
 import { CalculatedBalance } from './balanceCalculator';
+import { logger } from 'services/loggingService';
 
 export interface SettleTransaction {
   fromUserId: string;
@@ -42,11 +43,13 @@ export function getOptimizedSettlementTransactions(
     .filter(user => Math.abs(user.balance) >= 0.01); // Remove settled users
 
   if (__DEV__) {
-    console.log('🧮 Settlement Optimizer: Normalized balances:', normalizedBalances.map(b => ({
-      userId: b.userId,
-      userName: b.userName,
-      balance: `$${b.balance.toFixed(2)}`
-    })));
+    logger.debug('Normalized balances', { 
+      balances: normalizedBalances.map(b => ({
+        userId: b.userId,
+        userName: b.userName,
+        balance: `$${b.balance.toFixed(2)}`
+      }))
+    }, 'settlementOptimizer');
   }
 
   // Step 2: Separate creditors and debtors
@@ -59,16 +62,20 @@ export function getOptimizedSettlementTransactions(
     .sort((a, b) => a.balance - b.balance); // Sort by lowest balance first
 
   if (__DEV__) {
-    console.log('🧮 Settlement Optimizer: Creditors:', creditors.map(c => ({ 
-      userId: c.userId, 
-      name: c.userName, 
-      balance: `$${c.balance.toFixed(2)}` 
-    })));
-    console.log('🧮 Settlement Optimizer: Debtors:', debtors.map(d => ({ 
-      userId: d.userId, 
-      name: d.userName, 
-      balance: `$${d.balance.toFixed(2)}` 
-    })));
+    logger.debug('Creditors', { 
+      creditors: creditors.map(c => ({ 
+        userId: c.userId, 
+        name: c.userName, 
+        balance: `$${c.balance.toFixed(2)}` 
+      }))
+    }, 'settlementOptimizer');
+    logger.debug('Debtors', { 
+      debtors: debtors.map(d => ({ 
+        userId: d.userId, 
+        name: d.userName, 
+        balance: `$${d.balance.toFixed(2)}` 
+      }))
+    }, 'settlementOptimizer');
   }
 
   // Step 3: Greedy matching algorithm
@@ -123,7 +130,7 @@ export function getOptimizedSettlementTransactions(
       );
 
       if (__DEV__) {
-        console.log('🧮 Settlement Optimizer: Current user analysis:', {
+        logger.debug('Current user analysis', {
           userId: currentUserId,
           userName: currentUserBalance.userName,
           balance: `$${currentUserBalance.balance.toFixed(2)}`,
@@ -158,7 +165,7 @@ export function getOptimizedSettlementTransactions(
       netBalances[t.toUserId] = (netBalances[t.toUserId] || 0) + t.amount;
     });
 
-    console.log('🧮 Settlement Summary:', {
+    logger.info('Settlement Summary', {
       currentUserId,
       netBalances: Object.entries(netBalances).map(([userId, balance]) => ({
         userId,
@@ -245,8 +252,7 @@ export function validateSettlementTransactions(transactions: SettleTransaction[]
   const totalBalance = Object.values(userBalances).reduce((sum, balance) => sum + balance, 0);
   
   if (__DEV__) {
-    console.log('🤖 Settlement Optimizer: Validation - Total balance:', totalBalance.toFixed(2));
-    console.log('🤖 Settlement Optimizer: Validation - User balances:', userBalances);
+    logger.debug('Validation', { totalBalance: totalBalance.toFixed(2), userBalances }, 'settlementOptimizer');
   }
   
   return Math.abs(totalBalance) < 0.01;

@@ -22,6 +22,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { styles } from './BillCameraStyles';
+import { logger } from '../../services/loggingService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -39,16 +40,15 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('BillCameraScreen: Component mounted');
-    console.log('BillCameraScreen: Permission status:', permission);
-    console.log('BillCameraScreen: CameraView object:', CameraView);
+    logger.debug('Component mounted', null, 'BillCameraScreen');
+    logger.debug('Permission status', { permission }, 'BillCameraScreen');
   }, [permission]);
 
   const handleRequestPermission = async () => {
     try {
-      console.log('BillCameraScreen: Requesting camera permission...');
+      logger.info('Requesting camera permission', null, 'BillCameraScreen');
       const result = await requestPermission();
-      console.log('BillCameraScreen: Permission request result:', result);
+      logger.info('Permission request result', { result }, 'BillCameraScreen');
       
       if (!result.granted) {
         Alert.alert(
@@ -133,10 +133,9 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
     );
   };
 
-  console.log('BillCameraScreen: Rendering with permission:', permission);
+  logger.debug('Rendering with permission', { permission }, 'BillCameraScreen');
 
   if (!permission) {
-    console.log('BillCameraScreen: Rendering permission request screen');
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />

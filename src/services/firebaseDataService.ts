@@ -954,7 +954,7 @@ export const firebaseGroupService = {
         }
         if (member.name === 'Unknown User') {
           if (__DEV__) {
-            console.log('🔥 Filtering out phantom member with "Unknown User" name');
+            logger.debug('Filtering out phantom member with "Unknown User" name', null, 'firebaseDataService');
           }
           return false;
         }
@@ -971,7 +971,7 @@ export const firebaseGroupService = {
           const existingMemberWithEmail = members.find(m => m.email === currentUser.email);
           if (existingMemberWithEmail) {
             if (__DEV__) {
-              console.log('🔥 Found existing member with same email, updating ID:', {
+              logger.debug('Found existing member with same email, updating ID', {
                 existingId: existingMemberWithEmail.id,
                 newId: currentUser.id,
                 email: currentUser.email
@@ -1004,7 +1004,7 @@ export const firebaseGroupService = {
               });
               
               if (__DEV__) {
-                console.log('🔥 Added current user to group members in database');
+                logger.debug('Added current user to group members in database', null, 'firebaseDataService');
               }
             }
             
@@ -1022,7 +1022,7 @@ export const firebaseGroupService = {
             });
             
             if (__DEV__) {
-              console.log('🔥 Added current user to members array:', {
+              logger.debug('Added current user to members array', {
                 id: currentUser.id,
                 name: currentUser.name || 'You'
               });
@@ -1052,7 +1052,7 @@ export const firebaseGroupService = {
         throw new Error('Group name is required');
       }
 
-      console.log('🔥 Firebase: Creating group with data:', {
+      logger.debug('Firebase: Creating group with data', {
         name: groupData.name,
         created_by: groupData.created_by,
         category: groupData.category,
@@ -1111,7 +1111,7 @@ export const firebaseGroupService = {
       // Commit the batch
       await batch.commit();
       
-      console.log('🔥 Firebase: Group created successfully with ID:', groupRef.id);
+      logger.debug('Firebase: Group created successfully with ID', { groupId: groupRef.id }, 'firebaseDataService');
       
       // Return the created group with proper structure
       const createdGroup: Group = {
@@ -1241,7 +1241,7 @@ export const firebaseGroupService = {
 
   addMemberToGroup: async (groupId: string, memberData: Omit<GroupMember, 'id' | 'joined_at'>): Promise<GroupMember> => {
     try {
-      if (__DEV__) { console.log('🔥 Adding member to group:', { groupId, memberData }); }
+      if (__DEV__) { logger.debug('Adding member to group', { groupId, memberData }, 'firebaseDataService'); }
       
       const groupMembersRef = collection(db, 'groupMembers');
       
@@ -1254,7 +1254,7 @@ export const firebaseGroupService = {
       const existingMemberDocs = await getDocs(existingMemberQuery);
       
       if (!existingMemberDocs.empty) {
-        if (__DEV__) { console.log('🔥 Member already exists in group, updating status'); }
+        if (__DEV__) { logger.debug('Member already exists in group, updating status', null, 'firebaseDataService'); }
         
         // Update existing membership to accepted
         const existingMemberDoc = existingMemberDocs.docs[0];
@@ -1287,7 +1287,7 @@ export const firebaseGroupService = {
         invitation_status: 'accepted'
       });
       
-      if (__DEV__) { console.log('🔥 Member added to group with ID:', memberRef.id); }
+      if (__DEV__) { logger.debug('Member added to group with ID', { memberId: memberRef.id }, 'firebaseDataService'); }
       
       // Update group member count
       await updateGroupMemberCount(groupId);
@@ -1306,7 +1306,7 @@ export const firebaseGroupService = {
 
   removeMemberFromGroup: async (groupId: string, memberId: string): Promise<{ message: string }> => {
     try {
-      if (__DEV__) { console.log('🔥 Removing member from group:', { groupId, memberId }); }
+      if (__DEV__) { logger.debug('Removing member from group', { groupId, memberId }, 'firebaseDataService'); }
       
       const groupMembersRef = collection(db, 'groupMembers');
       const memberQuery = query(
@@ -1316,18 +1316,14 @@ export const firebaseGroupService = {
       );
       const memberDocs = await getDocs(memberQuery);
       
-      if (__DEV__) { console.log('🔥 Found member documents:', memberDocs.docs.length); }
       
     if (!memberDocs.empty) {
         const memberDocId = memberDocs.docs[0].id;
-        if (__DEV__) { console.log('🔥 Deleting member document:', memberDocId); }
         
         await deleteDoc(doc(db, 'groupMembers', memberDocId));
       await updateGroupMemberCount(groupId);
         
-        if (__DEV__) { console.log('🔥 Member removed successfully'); }
       } else {
-        if (__DEV__) { console.log('🔥 No member found to remove'); }
     }
     
     return { message: 'Member removed successfully' };
@@ -1392,14 +1388,12 @@ export const firebaseGroupService = {
       const contacts = Array.from(contactsMap.values());
       
       // Debug logging for avatar data
-      console.log('🔍 firebaseGroupService.getUserContacts: Loaded contacts with avatar data:', 
-        contacts.map(c => ({
-          id: c.id,
-          name: c.name,
-          avatar: c.avatar,
-          hasAvatar: !!c.avatar
-        }))
-      );
+      if (__DEV__) {
+        logger.debug('Loaded contacts with avatar data', {
+          contactsCount: contacts.length,
+          contactsWithAvatars: contacts.filter(c => !!c.avatar).length
+        }, 'firebaseDataService');
+      }
       
       return contacts;
     } catch (error) {
@@ -1411,7 +1405,7 @@ export const firebaseGroupService = {
   // Search users by username/name
   searchUsersByUsername: async (searchTerm: string, excludeUserId?: string): Promise<User[]> => {
     try {
-      if (__DEV__) { console.log('🔥 Searching users by username:', searchTerm); }
+      if (__DEV__) { logger.debug('Searching users by username', { searchTerm }, 'firebaseDataService'); }
       
       const usersRef = collection(db, 'users');
       
@@ -1482,7 +1476,7 @@ export const firebaseGroupService = {
       // Limit results to 10
       const limitedResults = results.slice(0, 10);
       
-      if (__DEV__) { console.log('🔥 Found users:', limitedResults.length, 'for search term:', searchTerm); }
+      if (__DEV__) { logger.debug('Found users for search', { resultsCount: limitedResults.length, searchTerm }, 'firebaseDataService'); }
       
       return limitedResults;
     } catch (error) {
@@ -1526,7 +1520,7 @@ export const firebaseGroupService = {
 
   joinGroupViaInvite: async (inviteId: string, userId: string): Promise<{ message: string; groupId: string; groupName: string }> => {
     try {
-      if (__DEV__) { console.log('🔥 Firebase: Joining group via invite:', { inviteId, userId }); }
+      if (__DEV__) { logger.info('Joining group via invite', { inviteId, userId }, 'firebaseDataService'); }
       
       // Use Firebase transaction to ensure data consistency
       const result = await runTransaction(db, async (transaction) => {
@@ -1590,7 +1584,7 @@ export const firebaseGroupService = {
             const duplicateData = duplicateDoc.data();
             if (duplicateData.invitation_status === 'pending') {
                 transaction.delete(doc(db, 'groupMembers', duplicateDoc.id));
-                if (__DEV__) { console.log('🔥 Firebase: Deleted duplicate pending invitation:', duplicateDoc.id); }
+                if (__DEV__) { logger.debug('Deleted duplicate pending invitation', { duplicateDocId: duplicateDoc.id }, 'firebaseDataService'); }
             }
           }
         } else {
@@ -1647,7 +1641,7 @@ export const firebaseGroupService = {
         return { groupId, groupName, memberDocId };
       });
       
-      if (__DEV__) { console.log('🔥 Firebase: Successfully joined group:', { groupId: result.groupId, groupName: result.groupName }); }
+      if (__DEV__) { logger.info('Successfully joined group', { groupId: result.groupId, groupName: result.groupName }, 'firebaseDataService'); }
       
       return {
         message: 'Successfully joined group',
@@ -1688,7 +1682,7 @@ export const firebaseGroupService = {
   ): Promise<void> => {
     try {
       if (__DEV__) { 
-        console.log('🔥 Sending group invitation (DEV mode):', { groupId, groupName, invitedByUserId, invitedUserId }); 
+        logger.info('Sending group invitation (DEV mode)', { groupId, groupName, invitedByUserId, invitedUserId }, 'firebaseDataService'); 
         
         // DEV MODE: Send direct notification to user
         // Check if user is already a member or has a pending invitation
@@ -1729,20 +1723,12 @@ export const firebaseGroupService = {
         });
         
         // Send notification to invited user (DEV only)
-        console.log('🔥 About to send notification to user:', invitedUserId);
-        console.log('🔥 Notification data:', {
-          title: 'Group Invitation',
-          message: `${invitedByUserName} has invited you to join the group "${groupName}"`,
-          type: 'group_invite',
-          data: {
-            groupId,
-            groupName,
-            invitedBy: invitedByUserId,
-            invitedByName: invitedByUserName,
-            inviteLink: inviteData.inviteLink,
-            expiresAt: inviteData.expiresAt
-          }
-        });
+        logger.debug('About to send notification to user', { 
+          invitedUserId,
+          groupId,
+          groupName,
+          invitedByUserName
+        }, 'firebaseDataService');
         
         await notificationService.sendNotification(
           invitedUserId,
@@ -1759,12 +1745,12 @@ export const firebaseGroupService = {
           }
         );
         
-        console.log('🔥 Notification sent successfully to user:', invitedUserId);
+        logger.debug('Notification sent successfully to user', { invitedUserId }, 'firebaseDataService');
         
-        console.log('🔥 Group invitation sent successfully (DEV mode)');
+        logger.info('Group invitation sent successfully (DEV mode)', null, 'firebaseDataService');
       } else {
         // PROD MODE: Only generate link, no direct notifications
-        console.log('🔥 PROD mode: Direct invitations disabled. Use share link instead.');
+        logger.info('PROD mode: Direct invitations disabled. Use share link instead.', null, 'firebaseDataService');
         throw new Error('Direct invitations are disabled in production. Please use the share link feature.');
       }
     } catch (error) {
@@ -1776,7 +1762,7 @@ export const firebaseGroupService = {
   // Update invited user info when they view the group
   updateInvitedUserInfo: async (groupId: string, userId: string): Promise<void> => {
     try {
-      if (__DEV__) { console.log('🔥 Updating invited user info:', { groupId, userId }); }
+      if (__DEV__) { logger.debug('Updating invited user info', { groupId, userId }, 'firebaseDataService'); }
       
       // Update the user's invitation status in the group members collection
       const memberRef = doc(db, 'groupMembers', `${groupId}_${userId}`);
@@ -1785,7 +1771,7 @@ export const firebaseGroupService = {
         joined_at: serverTimestamp()
       });
       
-      if (__DEV__) { console.log('🔥 Successfully updated invited user info'); }
+      if (__DEV__) { logger.debug('Successfully updated invited user info', null, 'firebaseDataService'); }
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error updating invited user info:', error); }
       throw error;
@@ -1865,7 +1851,7 @@ export const firebaseGroupService = {
 
   listenToGroup: (groupId: string, callback: (group: GroupWithDetails) => void, onError?: (error: any) => void) => {
     try {
-      if (__DEV__) { console.log('🔥 Setting up real-time listener for group:', groupId); }
+      if (__DEV__) { logger.debug('Setting up real-time listener for group', { groupId }, 'firebaseDataService'); }
       
       const groupRef = doc(db, 'groups', groupId);
       const unsubscribe = onSnapshot(groupRef, async (snapshot) => {
@@ -1930,7 +1916,7 @@ export const firebaseGroupService = {
     description?: string
   ): Promise<void> => {
     try {
-      if (__DEV__) { console.log('🔥 Sending group payment request notification:', { groupId, senderId, recipientId, amount, currency, description }); }
+      if (__DEV__) { logger.info('Sending group payment request notification', { groupId, senderId, recipientId, amount, currency, description }, 'firebaseDataService'); }
       
       // Get group and user data
       const [groupDoc, senderDoc, recipientDoc] = await Promise.all([
@@ -1960,7 +1946,7 @@ export const firebaseGroupService = {
         }
       );
       
-      if (__DEV__) { console.log('🔥 Group payment request notification sent successfully'); }
+      if (__DEV__) { logger.info('Group payment request notification sent successfully', null, 'firebaseDataService'); }
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error sending group payment request notification:', error); }
       throw error;
@@ -1974,7 +1960,7 @@ export const firebaseGroupService = {
     addedByUserId: string
   ): Promise<void> => {
     try {
-      if (__DEV__) { console.log('🔥 Sending group added notification:', { groupId, addedUserId, addedByUserId }); }
+      if (__DEV__) { logger.info('Sending group added notification', { groupId, addedUserId, addedByUserId }, 'firebaseDataService'); }
       
       // Get group and user data
       const [groupDoc, addedByDoc] = await Promise.all([
@@ -2000,7 +1986,7 @@ export const firebaseGroupService = {
         }
       );
       
-      if (__DEV__) { console.log('🔥 Group added notification sent successfully'); }
+      if (__DEV__) { logger.info('Group added notification sent successfully', null, 'firebaseDataService'); }
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error sending group added notification:', error); }
       throw error;
@@ -2030,13 +2016,12 @@ export const firebaseExpenseService = {
   createExpense: async (expenseData: any): Promise<Expense> => {
     try {
       if (__DEV__) { 
-        console.log('🔥 createExpense: Starting expense creation...');
-        console.log('🔥 createExpense: Expense data:', JSON.stringify(expenseData, null, 2));
+        logger.info('Starting expense creation', { expenseData }, 'firebaseDataService');
       }
       
       const expenseRef = await addDoc(collection(db, 'expenses'), firebaseDataTransformers.expenseToFirestore(expenseData));
       
-      if (__DEV__) { console.log('🔥 createExpense: Expense document created with ID:', expenseRef.id); }
+      if (__DEV__) { logger.info('Expense document created', { expenseId: expenseRef.id }, 'firebaseDataService'); }
       
       // Update group expense count
       await updateGroupExpenseCount(expenseData.group_id || expenseData.groupId);
@@ -2048,32 +2033,27 @@ export const firebaseExpenseService = {
         updated_at: new Date().toISOString()
       } as Expense;
       
-      if (__DEV__) { console.log('🔥 createExpense: Expense object created:', JSON.stringify(expense, null, 2)); }
       
       // Only send notifications if amount per person is greater than 0
       if (expenseData.splitData && expenseData.splitData.memberIds) {
         if (__DEV__) { 
-          console.log('🔥 createExpense: Sending payment request notifications for expense:', expense.id);
-          console.log('🔥 createExpense: Split data:', JSON.stringify(expenseData.splitData, null, 2));
+          logger.info('Sending payment request notifications for expense', { expenseId: expense.id, splitData: expenseData.splitData }, 'firebaseDataService');
         }
         
         // Get group data for notification
         const groupDoc = await getDoc(doc(db, 'groups', expenseData.group_id || expenseData.groupId));
         const groupName = groupDoc.exists() ? groupDoc.data()?.name : 'Group';
         
-        if (__DEV__) { console.log('🔥 createExpense: Group name:', groupName); }
         
         // Get payer data
         const payerDoc = await getDoc(doc(db, 'users', expenseData.paid_by));
         const payerName = payerDoc.exists() ? payerDoc.data()?.name : 'Unknown';
         
-        if (__DEV__) { console.log('🔥 createExpense: Payer name:', payerName); }
         
         // Calculate amount per person
         const amountPerPerson = expenseData.splitData.amountPerPerson || 
           (expenseData.amount / expenseData.splitData.memberIds.length);
         
-        if (__DEV__) { console.log('🔥 createExpense: Amount per person:', amountPerPerson); }
         
         // Only send notifications if amount per person is greater than 0
         if (amountPerPerson > 0) {
@@ -2081,7 +2061,6 @@ export const firebaseExpenseService = {
         for (const memberId of expenseData.splitData.memberIds) {
           if (memberId !== expenseData.paid_by) {
             try {
-              if (__DEV__) { console.log('🔥 createExpense: Processing member:', memberId); }
               
               // Get member data
               const memberDoc = await getDoc(doc(db, 'users', memberId));
@@ -2089,7 +2068,7 @@ export const firebaseExpenseService = {
                 const memberData = memberDoc.data();
                 
                 if (__DEV__) { 
-                  console.log(`🔥 createExpense: Sending payment request to ${memberData.name} for ${amountPerPerson} ${expenseData.currency}`); 
+                  logger.info('Sending payment request', { memberName: memberData.name, amount: amountPerPerson, currency: expenseData.currency }, 'firebaseDataService'); 
                 }
                 
                 // Send payment request notification
@@ -2111,26 +2090,22 @@ export const firebaseExpenseService = {
                   }
                 );
                 
-                if (__DEV__) { console.log(`✅ createExpense: Payment request sent to ${memberData.name}`); }
               } else {
-                if (__DEV__) { console.log(`❌ createExpense: Member ${memberId} not found`); }
+                if (__DEV__) { logger.warn('Member not found', { memberId }, 'firebaseDataService'); }
               }
             } catch (error) {
               if (__DEV__) { console.error(`❌ createExpense: Error sending payment request to ${memberId}:`, error); }
               // Don't throw error to prevent expense creation failure
             }
           } else {
-            if (__DEV__) { console.log(`🔥 createExpense: Skipping payer ${memberId} (they don't owe money)`); }
           }
           }
         } else {
-          if (__DEV__) { console.log('🔥 createExpense: Amount per person is 0 or negative, skipping payment request notifications'); }
         }
       } else {
-        if (__DEV__) { console.log('🔥 createExpense: No split data or memberIds, skipping payment request notifications'); }
       }
       
-      if (__DEV__) { console.log('🔥 createExpense: Expense created successfully:', expense); }
+      if (__DEV__) { logger.info('Expense created successfully', { expenseId: expense.id }, 'firebaseDataService'); }
       return expense;
     } catch (error) {
       if (__DEV__) { console.error('🔥 createExpense: Error creating expense:', error); }
@@ -2283,7 +2258,7 @@ export const firebaseTransactionService = {
     transactionId: string
   ): Promise<void> => {
     try {
-      if (__DEV__) { console.log('🔥 Sending payment received notification:', { recipientId, senderId, amount, currency, transactionId }); }
+      if (__DEV__) { logger.info('Sending payment received notification', { recipientId, senderId, amount, currency, transactionId }, 'firebaseDataService'); }
       
       // Get sender and recipient data
       const [senderDoc, recipientDoc] = await Promise.all([
@@ -2309,7 +2284,6 @@ export const firebaseTransactionService = {
         }
       );
       
-      if (__DEV__) { console.log('🔥 Payment received notification sent successfully'); }
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error sending payment received notification:', error); }
       throw error;
@@ -2388,7 +2362,7 @@ export const firebaseSystemService = {
     data?: any
   ): Promise<void> => {
     try {
-      if (__DEV__) { console.log('🔥 Sending system warning:', { userId, warningType, message }); }
+      if (__DEV__) { logger.warn('Sending system warning', { userId, warningType, message }, 'firebaseDataService'); }
       
       await notificationService.sendNotification(
         userId,
@@ -2402,7 +2376,6 @@ export const firebaseSystemService = {
         }
       );
       
-      if (__DEV__) { console.log('🔥 System warning sent successfully'); }
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error sending system warning:', error); }
       throw error;
@@ -2416,7 +2389,7 @@ export const firebaseSystemService = {
     data?: any
   ): Promise<void> => {
     try {
-      if (__DEV__) { console.log('🔥 Sending system notification:', { userId, title, message }); }
+      if (__DEV__) { logger.info('Sending system notification', { userId, title, message }, 'firebaseDataService'); }
       
       await notificationService.sendNotification(
         userId,
@@ -2429,7 +2402,6 @@ export const firebaseSystemService = {
         }
       );
       
-      if (__DEV__) { console.log('🔥 System notification sent successfully'); }
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error sending system notification:', error); }
       throw error;
@@ -2441,7 +2413,6 @@ export const firebaseSystemService = {
 export const firebaseSettlementService = {
   getSettlementCalculation: async (groupId: string): Promise<SettlementCalculation[]> => {
     try {
-      if (__DEV__) { console.log('🔥 Getting settlement calculation for group:', groupId); }
       
       // Get all expenses for the group
       const expenses = await firebaseExpenseService.getGroupExpenses(groupId);
@@ -2521,7 +2492,7 @@ export const firebaseSettlementService = {
         }
       }
       
-      if (__DEV__) { console.log('🔥 Settlement calculations:', settlements); }
+      if (__DEV__) { logger.info('Settlement calculations', { settlementsCount: settlements.length }, 'firebaseDataService'); }
       return settlements;
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error in getSettlementCalculation:', error); }
@@ -2535,7 +2506,7 @@ export const firebaseSettlementService = {
     settlementType: 'individual' | 'full' = 'individual'
   ): Promise<SettlementResult> => {
     try {
-      if (__DEV__) { console.log('🔥 Settling group expenses:', { groupId, userId, settlementType }); }
+      if (__DEV__) { logger.info('Settling group expenses', { groupId, userId, settlementType }, 'firebaseDataService'); }
       
       // For now, return a success message
       // In a real implementation, this would:
@@ -2563,7 +2534,7 @@ export const firebaseSettlementService = {
     currency: string = 'USDC'
   ): Promise<{ success: boolean; message: string }> => {
     try {
-      if (__DEV__) { console.log('🔥 Recording personal settlement:', { groupId, userId, recipientId, amount, currency }); }
+      if (__DEV__) { logger.info('Recording personal settlement', { groupId, userId, recipientId, amount, currency }, 'firebaseDataService'); }
       
       // Create settlement record in Firestore
       const settlementRef = await addDoc(collection(db, 'settlements'), {
@@ -2577,7 +2548,6 @@ export const firebaseSettlementService = {
         settlement_type: 'personal'
       });
       
-      if (__DEV__) { console.log('🔥 Settlement recorded with ID:', settlementRef.id); }
       
       return {
         success: true,
@@ -2591,7 +2561,6 @@ export const firebaseSettlementService = {
 
   getReminderStatus: async (groupId: string, userId: string): Promise<ReminderStatus> => {
     try {
-      if (__DEV__) { console.log('🔥 Getting reminder status for user:', userId, 'in group:', groupId); }
       
       // Get reminder records from Firestore
       const remindersRef = collection(db, 'reminders');
@@ -2638,7 +2607,6 @@ export const firebaseSettlementService = {
         bulkCooldown
       };
       
-      if (__DEV__) { console.log('🔥 Reminder status:', status); }
       return status;
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error in getReminderStatus:', error); }
@@ -2653,7 +2621,7 @@ export const firebaseSettlementService = {
     amount: number
   ): Promise<{ success: boolean; message: string; recipientName: string; amount: number }> => {
     try {
-      if (__DEV__) { console.log('🔥 Sending payment reminder:', { groupId, senderId, recipientId, amount }); }
+      if (__DEV__) { logger.info('Sending payment reminder', { groupId, senderId, recipientId, amount }, 'firebaseDataService'); }
       
       // Get sender and recipient data
       const [senderDoc, recipientDoc, groupDoc] = await Promise.all([
@@ -2719,7 +2687,6 @@ export const firebaseSettlementService = {
         }
       );
       
-      if (__DEV__) { console.log('🔥 Payment reminder sent successfully'); }
       
       return {
         success: true,
@@ -2744,7 +2711,7 @@ export const firebaseSettlementService = {
     totalAmount: number;
   }> => {
     try {
-      if (__DEV__) { console.log('🔥 Sending bulk payment reminders:', { groupId, senderId, debtorsCount: debtors.length }); }
+      if (__DEV__) { logger.info('Sending bulk payment reminders', { groupId, senderId, debtorsCount: debtors.length }, 'firebaseDataService'); }
       
       // Get sender and group data
       const [senderDoc, groupDoc] = await Promise.all([
@@ -2841,7 +2808,6 @@ export const firebaseSettlementService = {
       const successCount = results.filter(r => r.success).length;
       const totalAmount = debtors.reduce((sum, d) => sum + d.amount, 0);
       
-      if (__DEV__) { console.log('🔥 Bulk payment reminders sent successfully'); }
       
       return {
         success: true,
@@ -2860,7 +2826,6 @@ export const firebaseSettlementService = {
 export const firebaseMultiSigService = {
   getUserMultiSigWallets: async (userId: string): Promise<any[]> => {
     try {
-      if (__DEV__) { console.log('🔥 Getting user multi-signature wallets for:', userId); }
       
       const walletsRef = collection(db, 'multiSigWallets');
       const walletsQuery = query(
@@ -2875,7 +2840,6 @@ export const firebaseMultiSigService = {
         ...doc.data()
       }));
       
-      if (__DEV__) { console.log('🔥 Retrieved multi-signature wallets:', wallets.length); }
       
       return wallets;
     } catch (error) {
@@ -2886,7 +2850,6 @@ export const firebaseMultiSigService = {
 
   getUserTransactions: async (userId: string): Promise<any[]> => {
     try {
-      if (__DEV__) { console.log('🔥 Getting user multi-signature transactions for:', userId); }
       
       const transactionsRef = collection(db, 'multiSigTransactions');
       const transactionsQuery = query(
@@ -2901,7 +2864,6 @@ export const firebaseMultiSigService = {
         ...doc.data()
       }));
       
-      if (__DEV__) { console.log('🔥 Retrieved multi-signature transactions:', transactions.length); }
       
       return transactions;
     } catch (error) {
@@ -2912,7 +2874,7 @@ export const firebaseMultiSigService = {
 
   createMultiSigWallet: async (userId: string, walletData: any): Promise<{ success: boolean; wallet?: any; error?: string }> => {
     try {
-      if (__DEV__) { console.log('🔥 Creating multi-signature wallet for user:', userId); }
+      if (__DEV__) { logger.info('Creating multi-signature wallet', { userId }, 'firebaseDataService'); }
       
       const walletRef = await addDoc(collection(db, 'multiSigWallets'), {
         ...walletData,
@@ -2921,7 +2883,6 @@ export const firebaseMultiSigService = {
         created_by: userId
       });
       
-      if (__DEV__) { console.log('🔥 Multi-signature wallet created:', walletRef.id); }
       
       return { success: true, wallet: { id: walletRef.id, ...walletData } };
     } catch (error) {
@@ -2932,7 +2893,7 @@ export const firebaseMultiSigService = {
 
   approveMultiSigTransaction: async (transactionId: string, userId: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      if (__DEV__) { console.log('🔥 Approving multi-signature transaction:', transactionId, 'by user:', userId); }
+      if (__DEV__) { logger.info('Approving multi-signature transaction', { transactionId, userId }, 'firebaseDataService'); }
       
       const transactionRef = doc(db, 'multiSigTransactions', transactionId);
       await updateDoc(transactionRef, {
@@ -2940,7 +2901,6 @@ export const firebaseMultiSigService = {
         updated_at: serverTimestamp()
       });
       
-      if (__DEV__) { console.log('🔥 Multi-signature transaction approved'); }
       
       return { success: true };
     } catch (error) {
@@ -2951,7 +2911,7 @@ export const firebaseMultiSigService = {
 
   rejectMultiSigTransaction: async (transactionId: string, userId: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      if (__DEV__) { console.log('🔥 Rejecting multi-signature transaction:', transactionId, 'by user:', userId); }
+      if (__DEV__) { logger.info('Rejecting multi-signature transaction', { transactionId, userId }, 'firebaseDataService'); }
       
       const transactionRef = doc(db, 'multiSigTransactions', transactionId);
       await updateDoc(transactionRef, {
@@ -2960,7 +2920,6 @@ export const firebaseMultiSigService = {
         updated_at: serverTimestamp()
       });
       
-      if (__DEV__) { console.log('🔥 Multi-signature transaction rejected'); }
       
       return { success: true };
     } catch (error) {
@@ -2974,7 +2933,6 @@ export const firebaseMultiSigService = {
 export const firebaseLinkedWalletService = {
   getLinkedWallets: async (userId: string): Promise<any[]> => {
     try {
-      if (__DEV__) { console.log('🔥 Getting linked wallets for user:', userId); }
       
       const walletsRef = collection(db, 'linkedWallets');
       const walletsQuery = query(
@@ -2989,7 +2947,6 @@ export const firebaseLinkedWalletService = {
         ...doc.data()
       }));
       
-      if (__DEV__) { console.log('🔥 Retrieved linked wallets:', wallets.length); }
       
       return wallets;
     } catch (error) {
@@ -3000,7 +2957,7 @@ export const firebaseLinkedWalletService = {
 
   addLinkedWallet: async (userId: string, walletData: any): Promise<{ success: boolean; error?: string }> => {
     try {
-      if (__DEV__) { console.log('🔥 Adding linked wallet for user:', userId); }
+      if (__DEV__) { logger.info('Adding linked wallet', { userId }, 'firebaseDataService'); }
       
       await addDoc(collection(db, 'linkedWallets'), {
         ...walletData,
@@ -3008,7 +2965,6 @@ export const firebaseLinkedWalletService = {
         created_at: serverTimestamp()
       });
       
-      if (__DEV__) { console.log('🔥 Linked wallet added successfully'); }
       
       return { success: true };
     } catch (error) {
@@ -3019,11 +2975,10 @@ export const firebaseLinkedWalletService = {
 
   removeLinkedWallet: async (userId: string, walletId: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      if (__DEV__) { console.log('🔥 Removing linked wallet:', walletId, 'for user:', userId); }
+      if (__DEV__) { logger.info('Removing linked wallet', { walletId, userId }, 'firebaseDataService'); }
       
       await deleteDoc(doc(db, 'linkedWallets', walletId));
       
-      if (__DEV__) { console.log('🔥 Linked wallet removed successfully'); }
       
       return { success: true };
     } catch (error) {

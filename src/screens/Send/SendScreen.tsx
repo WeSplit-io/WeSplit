@@ -12,6 +12,7 @@ import { walletService } from '../../services/WalletService';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import { logger } from '../../services/loggingService';
 
 const SendScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId, initialTab } = route.params || {};
@@ -38,12 +39,12 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     
     setLoadingLinkedDestinations(true);
     try {
-      console.log('🔄 SendScreen: Loading linked destinations for user:', currentUser.id);
+      logger.info('Loading linked destinations for user', { userId: currentUser.id }, 'SendScreen');
       
       // Get linked destinations from walletService
       const linkedData = await walletService.getLinkedDestinations(currentUser.id.toString());
       
-      console.log('📊 SendScreen: Loaded linked destinations:', {
+      logger.info('Loaded linked destinations', {
         wallets: linkedData.externalWallets.length,
         cards: linkedData.kastCards.length
       });
@@ -83,7 +84,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   );
 
   const handleSelectContact = (contact: UserContact) => {
-    console.log('📱 SendScreen: Selected contact for sending:', {
+    logger.info('Selected contact for sending', {
       name: contact.name || 'No name',
       email: contact.email,
       wallet: contact.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet',
@@ -101,7 +102,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const handleSelectWallet = (destination: ExternalWallet | KastCard) => {
-    console.log('📱 SendScreen: Selected external destination for sending:', {
+    logger.info('Selected external destination for sending', {
       name: destination.label,
       address: destination.address,
       id: destination.id,
@@ -129,7 +130,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
         isFavorite: false
       });
       
-      console.log('✅ Contact added successfully:', user.name);
+      logger.info('Contact added successfully', { userName: user.name }, 'SendScreen');
     } catch (error) {
       console.error('❌ Error adding contact:', error);
     }
@@ -146,7 +147,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     navigation.navigate('LinkedCards', {
       onSuccess: () => {
         // Refresh the screen to show newly connected wallet
-        console.log('External wallet connected successfully');
+        logger.info('External wallet connected successfully', null, 'SendScreen');
         loadLinkedDestinations(); // Reload linked destinations
       }
     });

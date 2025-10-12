@@ -6,6 +6,7 @@
 
 import { MockupDataService } from '../data/mockupData';
 import { consolidatedBillAnalysisService, IncomingBillData } from '../services/consolidatedBillAnalysisService';
+import { logger } from '../services/loggingService';
 
 export class FallbackDataService {
   /**
@@ -51,7 +52,7 @@ export class FallbackDataService {
     billData?: any,
     isRecent: boolean = true
   ): string {
-    console.log('🔍 FallbackDataService: generateBillDate called with:', {
+    logger.info('generateBillDate called with', {
       processedBillDataDate: processedBillData?.transaction?.date,
       billDataDate: billData?.date,
       processedBillDataKeys: processedBillData ? Object.keys(processedBillData) : 'null',
@@ -60,7 +61,7 @@ export class FallbackDataService {
 
     // Always use mockup data for consistency across all screens
     // This ensures all screens show the same date regardless of invalid data
-    console.log('🔍 FallbackDataService: Using mockup data date for consistency');
+    logger.info('Using mockup data date for consistency', null, 'fallbackDataService');
     return MockupDataService.getBillDate();
   }
 
@@ -155,7 +156,7 @@ export class FallbackDataService {
     incomingData: IncomingBillData,
     currentUser?: { id: string; name: string; email: string; wallet_address: string }
   ) {
-    console.log('🔄 FallbackDataService: Processing real AI/OCR data:', {
+    logger.info('Processing real AI/OCR data', {
       merchant: incomingData.store.name,
       total: incomingData.transaction.order_total,
       itemsCount: incomingData.transaction.items.length

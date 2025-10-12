@@ -13,6 +13,7 @@ import {
   TextStyle,
 } from 'react-native';
 import { colors } from '../theme/colors';
+import { logger } from '../services/loggingService';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { UserImageService, UserImageInfo } from '../services/userImageService';
@@ -54,7 +55,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    console.log('🔍 UserAvatar: Props received:', {
+    logger.debug('Props received', {
       userId,
       userName,
       displayName,
@@ -65,11 +66,9 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
 
     if (userImageInfo) {
       // Use provided userImageInfo
-      console.log('🔍 UserAvatar: Using provided userImageInfo');
       setImageInfo(userImageInfo);
     } else if (avatarUrl) {
       // Use provided avatarUrl directly
-      console.log('🔍 UserAvatar: Using provided avatarUrl:', avatarUrl);
       setImageInfo({
         userId: userId || 'unknown',
         imageUrl: avatarUrl,
@@ -78,11 +77,11 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
       });
     } else if (userId) {
       // Fetch image info if userId is provided
-      console.log('🔍 UserAvatar: Fetching image info from service');
+      logger.debug('Fetching image info from service', null, 'UserAvatar');
       const fetchImageInfo = async () => {
         try {
           const info = await UserImageService.getUserImageInfo(userId, userName || displayName);
-          console.log('🔍 UserAvatar: Fetched image info:', info);
+          logger.debug('Fetched image info', { info }, 'UserAvatar');
           setImageInfo(info);
         } catch (error) {
           console.error('UserAvatar: Error fetching image info:', error);
@@ -99,7 +98,6 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
       fetchImageInfo();
     } else {
       // No userId provided, use displayName for initials
-      console.log('🔍 UserAvatar: No userId, using displayName for fallback');
       setImageInfo({
         userId: 'unknown',
         imageUrl: undefined,
@@ -113,7 +111,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   useEffect(() => {
     if (isLoading) {
       const timeout = setTimeout(() => {
-        console.log('⏰ UserAvatar: Loading timeout, falling back to placeholder');
+        logger.warn('Loading timeout, falling back to placeholder', null, 'UserAvatar');
         setIsLoading(false);
         setImageError(true);
       }, loadingTimeout);
@@ -123,7 +121,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
   }, [isLoading, loadingTimeout]);
 
   const handleImageError = () => {
-    console.log('UserAvatar: Image failed to load, using fallback');
+    logger.warn('Image failed to load, using fallback', null, 'UserAvatar');
     setImageError(true);
     setIsLoading(false);
   };

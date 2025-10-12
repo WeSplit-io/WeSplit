@@ -5,6 +5,7 @@ import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import MoonPayWidget from '../../components/MoonPayWidget';
 import styles from './styles';
+import { logger } from '../../services/loggingService';
 
 interface DepositParams {
   targetWallet?: {
@@ -51,7 +52,7 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
     }
 
     // Verify app wallet is available
-    console.log('🔍 DepositScreen: Checking app wallet availability:', {
+    logger.info('Checking app wallet availability', {
       appWalletAddress,
       appWalletConnected: !!appWalletAddress,
       currentUserWallet: currentUser?.wallet_address,
@@ -80,7 +81,7 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
       });
     }
 
-    console.log('🔍 DepositScreen: Opening MoonPay widget with app wallet:', {
+    logger.info('Opening MoonPay widget with app wallet', {
       appWalletAddress,
       depositAddress,
       userId: currentUser.id

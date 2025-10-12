@@ -10,6 +10,7 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
 import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
+import { logger } from '../../services/loggingService';
 
 interface ContactActionScreenProps {
   navigation: any;
@@ -23,7 +24,7 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
 
   // Debug logging for contact data
   useEffect(() => {
-    console.log('🔍 ContactAction: Selected contact data:', {
+    logger.debug('Selected contact data', {
       id: selectedContact?.id,
       name: selectedContact?.name,
       avatar: selectedContact?.avatar,
@@ -98,7 +99,7 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
 
       setProcessing(true);
       try {
-        console.log('💰 ContactAction: Creating payment request...', {
+        logger.info('Creating payment request', {
           senderId: currentUser.id,
           recipientId: selectedContact.id,
           amount: numAmount,
@@ -114,7 +115,7 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
           note.trim()
         );
 
-        console.log('✅ ContactAction: Payment request created successfully:', paymentRequest);
+        logger.info('Payment request created successfully', { paymentRequest }, 'ContactActionScreen');
 
         // Navigate to success screen with the actual request data
         navigation.navigate('RequestSuccess', {

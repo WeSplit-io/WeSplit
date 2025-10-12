@@ -7,6 +7,7 @@ import { useWallet } from '../../context/WalletContext';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { FeeService } from '../../config/feeConfig';
+import { logger } from '../../services/loggingService';
 
 // --- AppleSlider adapted from SendConfirmationScreen ---
 interface AppleSliderProps {
@@ -151,7 +152,7 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         throw new Error('App wallet not connected. Please ensure your app wallet is properly initialized.');
       } else {
         // Send the actual withdrawal transaction from app wallet to external wallet
-        console.log('🔍 WithdrawConfirmation: Sending from app wallet to external wallet:', {
+        logger.info('Sending from app wallet to external wallet', {
           from: appWalletAddress,
           to: externalWalletAddress || walletAddress,
           amount: safeTotalWithdraw
@@ -165,7 +166,7 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         });
       }
 
-      console.log('Withdrawal transaction successful:', transactionResult);
+      logger.info('Withdrawal transaction successful', { transactionResult }, 'WithdrawConfirmationScreen');
       
       // Navigate to success screen with transaction data
       navigation.navigate('WithdrawSuccess', {

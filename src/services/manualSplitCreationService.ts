@@ -9,6 +9,7 @@ import { SplitStorageService, Split } from './splitStorageService';
 import { SplitWalletService } from './split';
 import { consolidatedBillAnalysisService } from './consolidatedBillAnalysisService';
 import { ServiceErrorHandler } from '../utils/serviceErrorHandler';
+import { logger } from './loggingService';
 
 export interface ManualSplitCreationData {
   processedBillData: ProcessedBillData;
@@ -33,7 +34,7 @@ export class ManualSplitCreationService {
   static async createManualSplit(data: ManualSplitCreationData): Promise<ManualSplitCreationResult> {
     return ServiceErrorHandler.handleServiceError(
       async () => {
-        console.log('🔍 ManualSplitCreationService: Creating manual split:', {
+        logger.info('Creating manual split', {
           title: data.processedBillData.title,
           totalAmount: data.processedBillData.totalAmount,
           participantsCount: data.processedBillData.participants.length
@@ -69,7 +70,7 @@ export class ManualSplitCreationService {
         };
       }
 
-      console.log('✅ ManualSplitCreationService: Wallet created successfully:', {
+      logger.info('Wallet created successfully', {
         walletId: walletResult.wallet.id,
         walletAddress: walletResult.wallet.walletAddress
       });
@@ -130,7 +131,7 @@ export class ManualSplitCreationService {
       const createResult = await SplitStorageService.createSplit(splitData);
       
       if (createResult.success && createResult.split) {
-        console.log('✅ ManualSplitCreationService: Manual split created successfully:', createResult.split.id);
+        logger.info('Manual split created successfully', { splitId: createResult.split.id }, 'manualSplitCreationService');
         
         return {
           success: true,

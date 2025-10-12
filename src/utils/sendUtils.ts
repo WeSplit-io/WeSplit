@@ -125,29 +125,8 @@ export const formatWalletAddress = (address: string, maxLength: number = 10): st
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
-/**
- * Calculate transaction fees - DEPRECATED: Use FeeService.calculateCompanyFee instead
- * This function uses the old approach where fee is subtracted from amount
- * The new approach adds fee to the total amount
- */
-export const calculateTransactionFees = (
-  amount: number,
-  feePercentage: number = 0.03
-): {
-  fee: number;
-  netAmount: number;
-  totalAmount: number;
-} => {
-  const fee = amount * feePercentage;
-  const netAmount = amount - fee;
-  const totalAmount = amount;
-
-  return {
-    fee,
-    netAmount,
-    totalAmount
-  };
-};
+// DEPRECATED: calculateTransactionFees function removed
+// Use FeeService.calculateCompanyFee instead
 
 /**
  * Check if amount exceeds balance

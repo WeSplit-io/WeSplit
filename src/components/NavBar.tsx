@@ -6,6 +6,7 @@ import { colors } from '../theme';
 import NavIcon from './NavIcon';
 import { styles } from './NavBar.styles';
 import platformUtils from '../utils/platformUtils';
+import { logger } from '../services/loggingService';
 
 
 const isImagePath = (icon: string) => {
@@ -61,7 +62,7 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
     }
 
     try {
-      console.log(`NavBar: Navigating to ${route}`);
+      logger.info('Navigating to route', { route }, 'NavBar');
       
       // Handle special navigation cases
       if (route === 'Contacts') {

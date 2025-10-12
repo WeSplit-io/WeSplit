@@ -5,12 +5,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
+import { logger } from '../../services/loggingService';
 
 const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, amount, description, groupId, requestId, paymentRequest } = route.params || {};
 
   // Debug logging
-  console.log('✅ RequestSuccess: Route params:', {
+  logger.info('Route params', {
     contact: contact?.name,
     amount,
     description,

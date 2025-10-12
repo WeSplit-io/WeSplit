@@ -12,7 +12,7 @@ import { transactionUtils } from '../shared/transactionUtils';
 import { keypairUtils } from '../shared/keypairUtils';
 import { balanceUtils } from '../shared/balanceUtils';
 import { validationUtils } from '../shared/validationUtils';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult, PaymentResult } from './types';
 
@@ -27,7 +27,7 @@ export class SplitWalletPayments {
     transactionSignature?: string
   ): Promise<PaymentResult> {
     try {
-      console.log('🔍 SplitWalletPayments: Processing participant payment:', {
+      logger.debug('Processing participant payment', {
         splitWalletId,
         participantId,
         amount,
@@ -92,7 +92,7 @@ export class SplitWalletPayments {
         updatedAt: new Date().toISOString(),
       });
 
-      console.log('✅ SplitWalletPayments: Participant payment processed successfully:', {
+      logger.debug('Participant payment processed successfully', {
         splitWalletId,
         participantId,
         amount: roundedAmount
@@ -131,7 +131,7 @@ export class SplitWalletPayments {
     description?: string
   ): Promise<PaymentResult> {
     try {
-      console.log('🔍 SplitWalletPayments: Sending to cast account:', {
+      logger.debug('Sending to cast account', {
         splitWalletId,
         castAccountAddress,
         description
@@ -185,7 +185,7 @@ export class SplitWalletPayments {
         };
       }
 
-      console.log('✅ SplitWalletPayments: Funds sent to cast account successfully:', {
+      logger.debug('Funds sent to cast account successfully', {
         splitWalletId,
         castAccountAddress,
         amount: wallet.totalAmount,
@@ -225,7 +225,7 @@ export class SplitWalletPayments {
     amount: number
   ): Promise<PaymentResult> {
     try {
-      console.log('🔍 SplitWalletPayments: Transferring to user wallet:', {
+      logger.debug('Transferring to user wallet', {
         splitWalletId,
         userId,
         amount
@@ -289,7 +289,7 @@ export class SplitWalletPayments {
         };
       }
 
-      console.log('✅ SplitWalletPayments: Funds transferred to user wallet successfully:', {
+      logger.debug('Funds transferred to user wallet successfully', {
         splitWalletId,
         userId,
         amount: roundedAmount,
@@ -330,7 +330,7 @@ export class SplitWalletPayments {
     description?: string
   ): Promise<PaymentResult> {
     try {
-      console.log('🔍 SplitWalletPayments: Extracting Fair Split funds:', {
+      logger.debug('Extracting Fair Split funds', {
         splitWalletId,
         recipientAddress,
         creatorId,
@@ -360,7 +360,7 @@ export class SplitWalletPayments {
       const privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, creatorId);
       if (!privateKeyResult.success || !privateKeyResult.privateKey) {
         // MIGRATION: For existing splits created before local storage was implemented
-        console.log('🔍 SplitWalletPayments: Private key not found in local storage, checking for migration...');
+        logger.debug('Private key not found in local storage, checking for migration', null, 'SplitWalletPayments');
         
         // Check if this is an old split that needs migration
         if (privateKeyResult.error?.includes('not found in local storage')) {
@@ -376,7 +376,7 @@ export class SplitWalletPayments {
         };
       }
 
-      console.log('🔍 SplitWalletPayments: extractFairSplitFunds - Private key retrieved from local storage');
+      logger.debug('extractFairSplitFunds - Private key retrieved from local storage', null, 'SplitWalletPayments');
 
       // Validate recipient address
       if (!validationUtils.isValidSolanaAddress(recipientAddress)) {
@@ -423,7 +423,7 @@ export class SplitWalletPayments {
         };
       }
 
-      console.log('✅ SplitWalletPayments: Fair Split funds extracted successfully:', {
+      logger.info('Fair Split funds extracted successfully', {
         splitWalletId,
         recipientAddress,
         amount: availableBalance,
@@ -465,7 +465,7 @@ export class SplitWalletPayments {
     description?: string
   ): Promise<PaymentResult> {
     try {
-      console.log('🔍 SplitWalletPayments: Processing degen winner payout:', {
+      logger.info('Processing degen winner payout', {
         splitWalletId,
         winnerUserId,
         winnerAddress,
@@ -513,7 +513,7 @@ export class SplitWalletPayments {
         };
       }
 
-      console.log('✅ SplitWalletPayments: Degen winner payout processed successfully:', {
+      logger.info('Degen winner payout processed successfully', {
         splitWalletId,
         winnerUserId,
         totalAmount,
@@ -548,7 +548,7 @@ export class SplitWalletPayments {
     description?: string
   ): Promise<PaymentResult> {
     try {
-      console.log('🔍 SplitWalletPayments: Processing degen loser payment:', {
+      logger.info('Processing degen loser payment', {
         splitWalletId,
         loserUserId,
         paymentMethod,
@@ -593,7 +593,7 @@ export class SplitWalletPayments {
       const docId = wallet.firebaseDocId || splitWalletId;
       await this.updateWalletParticipants(docId, updatedParticipants);
 
-      console.log('✅ SplitWalletPayments: Degen loser payment processed successfully:', {
+      logger.info('Degen loser payment processed successfully', {
         splitWalletId,
         loserUserId,
         totalAmount
@@ -624,7 +624,7 @@ export class SplitWalletPayments {
     amount: number
   ): Promise<PaymentResult> {
     try {
-      console.log('🔍 SplitWalletPayments: Paying participant share:', {
+      logger.info('Paying participant share', {
         splitWalletId,
         participantId,
         amount

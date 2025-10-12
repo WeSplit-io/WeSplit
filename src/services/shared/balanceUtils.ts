@@ -28,7 +28,26 @@ export class BalanceUtils {
   static async getSolBalance(publicKey: PublicKey): Promise<number> {
     try {
       const balance = await transactionUtils.getConnection().getBalance(publicKey);
-      return balance / LAMPORTS_PER_SOL;
+      const solBalance = balance / LAMPORTS_PER_SOL;
+      
+      // Add debugging for very small balances
+      if (balance > 0 && solBalance === 0) {
+        logger.warn('BalanceUtils: Very small SOL balance detected', {
+          publicKey: publicKey.toBase58(),
+          balanceLamports: balance,
+          solBalance: solBalance,
+          note: 'Balance is too small to be represented accurately'
+        }, 'BalanceUtils');
+      }
+      
+      logger.debug('BalanceUtils: SOL balance calculation', {
+        publicKey: publicKey.toBase58(),
+        balanceLamports: balance,
+        solBalance: solBalance,
+        lamportsPerSol: LAMPORTS_PER_SOL
+      }, 'BalanceUtils');
+      
+      return solBalance;
     } catch (error) {
       logger.error('BalanceUtils: Failed to get SOL balance', {
         publicKey: publicKey.toBase58(),
@@ -45,7 +64,20 @@ export class BalanceUtils {
   static async getUsdcBalance(publicKey: PublicKey, usdcMint: PublicKey): Promise<UsdcBalanceResult> {
     try {
       const usdcTokenAccount = await getAssociatedTokenAddress(usdcMint, publicKey);
+      
+      logger.debug('BalanceUtils: USDC token account derivation', {
+        publicKey: publicKey.toBase58(),
+        usdcMint: usdcMint.toBase58(),
+        usdcTokenAccount: usdcTokenAccount.toBase58()
+      }, 'BalanceUtils');
+      
       const accountInfo = await getAccount(transactionUtils.getConnection(), usdcTokenAccount);
+      
+      logger.debug('BalanceUtils: USDC balance retrieved successfully', {
+        publicKey: publicKey.toBase58(),
+        balance: Number(accountInfo.amount) / 1000000,
+        rawAmount: accountInfo.amount.toString()
+      }, 'BalanceUtils');
       
       return {
         balance: Number(accountInfo.amount) / 1000000, // USDC has 6 decimals
@@ -55,7 +87,8 @@ export class BalanceUtils {
       // Token account doesn't exist, balance is 0 - this is normal for new wallets
       logger.info('BalanceUtils: USDC token account does not exist (normal for new wallets)', {
         publicKey: publicKey.toBase58(),
-        usdcMint: usdcMint.toBase58()
+        usdcMint: usdcMint.toBase58(),
+        error: error instanceof Error ? error.message : String(error)
       }, 'BalanceUtils');
       
       return {
@@ -80,6 +113,15 @@ export class BalanceUtils {
       ]);
 
       const totalUSD = (solBalance * solPrice) + usdcResult.balance;
+
+      logger.debug('BalanceUtils: Complete balance calculation', {
+        publicKey: publicKey.toBase58(),
+        solBalance,
+        usdcBalance: usdcResult.balance,
+        solPrice,
+        totalUSD,
+        usdcAccountExists: usdcResult.accountExists
+      }, 'BalanceUtils');
 
       return {
         solBalance,

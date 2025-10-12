@@ -4,6 +4,7 @@
  */
 
 import { PublicKey } from '@solana/web3.js';
+import { logger } from '../services/loggingService';
 
 // Solana mainnet configuration - hard-enforced in production
 export const SOLANA_CLUSTER = 'mainnet-beta';
@@ -50,7 +51,7 @@ export const validateUsdcConfig = (): { isValid: boolean; errors: string[] } => 
 
 // Log configuration
 if (__DEV__) {
-  console.log('💰 USDC Token Configuration:', {
+  logger.info('USDC Token Configuration', {
     mint: USDC_MINT.toString(),
     decimals: TOKEN_DECIMALS,
     symbol: USDC_TOKEN_INFO.symbol,

@@ -136,7 +136,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   // Check if the wallet still exists in Firebase (not burned yet)
                   // If it exists, it's just completed but not burned, so allow access
                   if (__DEV__) {
-                    logger.debug('Split wallet is completed but not yet burned, allowing access', null, 'FairSplitScreen');
                   }
                 }
                     
@@ -148,7 +147,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                     if (splitParticipantIds.length !== walletParticipantIds.length || 
                         !splitParticipantIds.every(id => walletParticipantIds.includes(id))) {
                       if (__DEV__) {
-                        logger.debug('Participants mismatch detected, syncing wallet participants', null, 'FairSplitScreen');
                       }
                       
                       // Create updated wallet participants from split data with correct amounts
@@ -156,13 +154,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                       const totalAmount = fullSplitData.totalAmount; // Use split data amount as source of truth
                       const amountPerPerson = totalAmount / fullSplitData.participants.length;
                       
-                      logger.debug('Syncing participants with split data amount', {
-                        splitDataAmount: fullSplitData.totalAmount,
-                        splitWalletAmount: wallet.totalAmount,
-                        usingAmount: totalAmount,
-                        amountPerPerson,
-                        reason: 'Split data is the authoritative source for bill amounts'
-                      });
                       
                       const updatedWalletParticipants = fullSplitData.participants.map(p => {
                         const existingWalletParticipant = wallet.participants.find(wp => wp.userId === p.userId);
@@ -247,7 +238,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   // Check if the wallet still exists in Firebase (not burned yet)
                   // If it exists, it's just completed but not burned, so allow access
                   if (__DEV__) {
-                    logger.debug('Split wallet is completed but not yet burned, allowing access', null, 'FairSplitScreen');
                   }
                 }
                 
@@ -420,7 +410,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     if (splitMethod === 'equal' && participants.length > 0) {
       // Check if participants have zero amounts and trigger repair if needed
       if (hasZeroAmounts() && splitWallet?.id) {
-        logger.debug('Detected participants with zero amounts, triggering repair', null, 'FairSplitScreen');
         checkAndRepairData();
         return; // Let the repair handle the update
       }
@@ -504,7 +493,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
       // Only proceed if all participants have paid AND the wallet is not already completed
       if (allParticipantsPaid && wallet.participants.length > 0 && wallet.status !== 'completed') {
-        logger.debug('All participants have paid, completing split wallet', null, 'FairSplitScreen');
         
         // Get merchant address if available
         const merchantAddress = processedBillData?.merchant?.address || billData?.merchant?.address;
@@ -516,7 +504,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         );
 
         if (completionResult.success) {
-          logger.debug('Split wallet completed successfully', null, 'FairSplitScreen');
           
           // Update local state to reflect completion
           setSplitWallet(prev => prev ? { ...prev, status: 'completed' as const } : null);
@@ -754,14 +741,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     }
 
     if (__DEV__) {
-    console.log('🔍 FairSplitScreen: Creating split wallet with participants:', {
-      currentUser: {
-        id: currentUser.id,
-          name: currentUser.name
-        },
-        participants: participantsWithAmounts.length,
+    logger.info('Creating split wallet with participants', {
+      currentUserId: currentUser.id,
+      currentUserName: currentUser.name,
+      participantsCount: participantsWithAmounts.length,
       totalAmount
-    });
+    }, 'FairSplitScreen');
     }
 
     // Use existing split wallet - wallet should already be created during bill processing
@@ -779,7 +764,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       const wallet = splitWallet as SplitWallet; // Type assertion since we've already checked for existence
       
       if (__DEV__) {
-      console.log('🔍 FairSplitScreen: Using existing split wallet:', {
+      logger.info('Using existing split wallet', {
         walletId: wallet.id,
         participants: wallet.participants?.length || 0
       });
@@ -791,10 +776,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           const unifiedAmount = totalAmount;
           
           if (__DEV__) {
-            console.log('💰 FairSplitScreen: Setting authoritative price:', {
-            billId: walletBillId,
+            logger.debug('Setting authoritative price', {
+              billId: walletBillId,
               totalAmount: unifiedAmount
-          });
+            }, 'FairSplitScreen');
           }
           
           priceManagementService.setBillPrice(
@@ -845,18 +830,18 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       return;
     }
 
-    console.log('🔍 FairSplitScreen: handlePayMyShare - Checking participant lookup:', {
+    logger.debug('Checking participant lookup for payment', {
       currentUserId: currentUser.id.toString(),
-      splitWalletParticipants: splitWallet.participants,
-      splitWalletId: splitWallet.id
-    });
+      splitWalletId: splitWallet.id,
+      participantsCount: splitWallet.participants.length
+    }, 'FairSplitScreen');
 
     const participant = splitWallet.participants.find(p => p.userId === currentUser.id.toString());
     if (!participant) {
-      console.log('🔍 FairSplitScreen: Participant not found in splitWallet, checking local participants:', {
-        localParticipants: participants,
+      logger.debug('Participant not found in splitWallet, checking local participants', {
+        localParticipantsCount: participants.length,
         currentUserId: currentUser.id.toString()
-      });
+      }, 'FairSplitScreen');
       
       // Fallback: check if user exists in local participants
       const localParticipant = participants.find(p => p.id === currentUser.id.toString());
@@ -865,14 +850,16 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         return;
       }
       
-      console.log('🔍 FairSplitScreen: Using local participant data for navigation');
+      logger.debug('Using local participant data for navigation', null, 'FairSplitScreen');
     } else {
       // Check if participant data looks incorrect (amountOwed = 0, amountPaid > 0)
       if (participant.amountOwed === 0 && participant.amountPaid > 0) {
-        console.log('🔍 FairSplitScreen: Detected incorrect participant data, showing warning:', {
-          participant,
+        logger.warn('Detected incorrect participant data', {
+          participantId: participant.userId,
+          amountOwed: participant.amountOwed,
+          amountPaid: participant.amountPaid,
           expectedAmountOwed: totalAmount / participants.length
-        });
+        }, 'FairSplitScreen');
         
         Alert.alert(
           'Data Issue Detected',
@@ -936,10 +923,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         }
       }
       
-      console.log('🔍 FairSplitScreen: Loaded user wallets:', {
-        externalWallets: externalWalletsData,
-        inAppWallet: userDocSnapshot.exists() ? { address: userDocSnapshot.data().wallet_address } : null
-      });
+      logger.debug('Loaded user wallets', {
+        externalWalletsCount: externalWalletsData.length,
+        hasInAppWallet: userDocSnapshot.exists() && userDocSnapshot.data().wallet_address
+      }, 'FairSplitScreen');
       
     } catch (error) {
       console.error('❌ FairSplitScreen: Error loading user wallets:', error);
@@ -970,15 +957,15 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     }
 
     try {
-      console.log('🔍 FairSplitScreen: Starting USDC balance debug...', {
+      logger.debug('Starting USDC balance debug', {
         splitWalletAddress: splitWallet.walletAddress
-      });
+      }, 'FairSplitScreen');
 
       const { SplitWalletService } = await import('../../services/split');
       const debugResult = await SplitWalletService.debugUsdcBalance(splitWallet.walletAddress);
 
       if (debugResult.success) {
-        console.log('🔍 FairSplitScreen: USDC balance debug results:', debugResult.results);
+        logger.debug('USDC balance debug results', debugResult.results, 'FairSplitScreen');
         
         // Show results in a detailed alert
         const results = debugResult.results;
@@ -1034,10 +1021,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     }
 
     try {
-      console.log('🔧 FairSplitScreen: Starting split wallet repair...', {
+      logger.info('Starting split wallet repair', {
         splitWalletId: splitWallet.id,
         creatorId: currentUser.id.toString()
-      });
+      }, 'FairSplitScreen');
 
       const { SplitWalletService } = await import('../../services/split');
       const repairResult = await SplitWalletService.repairSplitWalletSynchronization(
@@ -1046,7 +1033,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       );
 
       if (repairResult.success && repairResult.repaired) {
-        console.log('✅ FairSplitScreen: Split wallet repaired successfully');
+        logger.info('Split wallet repaired successfully', null, 'FairSplitScreen');
         
         Alert.alert(
           'Split Wallet Repaired!',
@@ -1106,18 +1093,17 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       return;
     }
 
-    console.log('🚀 DEV: Independent fund withdrawal triggered:', {
+    logger.info('Independent fund withdrawal triggered', {
       splitWalletId: splitWallet.id,
       billName: billInfo.name.data,
       totalAmount: totalAmount,
       collectedAmount: completionData?.collectedAmount || 0,
       completionPercentage: completionData?.completionPercentage || 0,
-      participants: participants,
-      splitWallet: splitWallet,
+      participantsCount: participants.length,
       isCreator: isCurrentUserCreator(),
       currentUserId: currentUser?.id,
       creatorId: splitWallet.creatorId
-    });
+    }, 'FairSplitScreen');
 
     // Show confirmation dialog
     Alert.alert(
@@ -1163,7 +1149,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       // Create split wallet if it doesn't exist
       let finalSplitWallet = splitWallet;
       if (!finalSplitWallet) {
-        console.log('🔍 FairSplitScreen: Creating split wallet for confirmed split...');
+        logger.info('Creating split wallet for confirmed split', null, 'FairSplitScreen');
         
         const { SplitWalletService } = await import('../../services/split');
         const walletResult = await SplitWalletService.createSplitWallet(
@@ -1185,7 +1171,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         
         finalSplitWallet = walletResult.wallet;
         setSplitWallet(finalSplitWallet);
-        console.log('🔍 FairSplitScreen: Split wallet created successfully:', finalSplitWallet.id);
+        logger.info('Split wallet created successfully', { splitWalletId: finalSplitWallet.id }, 'FairSplitScreen');
       }
       
       // Update the split in the database with the confirmed repartition
@@ -1279,7 +1265,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   }
                 }
               );
-              console.log(`🔔 Notification sent to participant: ${participant.name}`);
+              logger.info('Notification sent to participant', { participantName: participant.name }, 'FairSplitScreen');
             } catch (notificationError) {
               console.error(`❌ Failed to send notification to ${participant.name}:`, notificationError);
             }
@@ -1418,7 +1404,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     
     setIsSigning(true);
     try {
-      console.log('🔍 FairSplitScreen: Processing transfer to selected wallet:', {
+      logger.info('Processing transfer to selected wallet', {
         selectedWallet,
         totalAmount,
         splitWalletId: splitWallet.id,
@@ -1449,7 +1435,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       const totalPaid = calculateTotalPaid(splitWallet.participants);
       const tolerance = 0.001; // 0.001 USDC tolerance for rounding differences
       
-      console.log('🔍 FairSplitScreen: Fund collection check:', {
+      logger.info('Fund collection check', {
         totalAmount: splitWallet.totalAmount,
         totalPaid,
         tolerance,
@@ -1477,13 +1463,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       }
       
       // Double-check the actual on-chain balance before attempting withdrawal
-      console.log('🔍 FairSplitScreen: Verifying on-chain balance before withdrawal...');
+      logger.info('Verifying on-chain balance before withdrawal', null, 'FairSplitScreen');
       try {
         const { consolidatedTransactionService } = await import('../../services/consolidatedTransactionService');
         const balanceResult = await consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress);
         
         if (balanceResult.success) {
-          console.log('🔍 FairSplitScreen: On-chain balance check:', {
+          logger.info('On-chain balance check', {
             onChainBalance: balanceResult.balance,
             expectedBalance: splitWallet.totalAmount,
             difference: Math.abs(balanceResult.balance - splitWallet.totalAmount),
@@ -1499,7 +1485,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             });
             
             // Still proceed but log the discrepancy
-            console.log('🔍 FairSplitScreen: Proceeding with withdrawal despite balance discrepancy - this may be due to rounding or timing issues');
+            logger.warn('Proceeding with withdrawal despite balance discrepancy - this may be due to rounding or timing issues', null, 'FairSplitScreen');
           }
         } else {
           console.warn('⚠️ FairSplitScreen: Could not verify on-chain balance:', balanceResult.error);
@@ -1513,7 +1499,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       // Process the transfer - both external and in-app use the same method
       const description = `Split funds transfer to ${selectedWallet.name || (selectedWallet.type === 'external' ? 'external wallet' : 'in-app wallet')}`;
       
-      console.log('🚀 FairSplitScreen: Initiating blockchain transfer:', {
+      logger.info('Initiating blockchain transfer', {
         splitWalletId: splitWallet.id,
         splitWalletAddress: splitWallet.walletAddress,
         destinationAddress: selectedWallet.address,
@@ -1534,7 +1520,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         description
       );
       
-      console.log('🔍 FairSplitScreen: Transfer result received:', {
+      logger.info('Transfer result received', {
         success: transferResult.success,
         transactionSignature: transferResult.transactionSignature,
         amount: transferResult.amount,
@@ -1542,7 +1528,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       });
       
         if (transferResult.success) {
-          console.log('✅ FairSplitScreen: Transfer successful:', {
+          logger.info('Transfer successful', {
             transactionSignature: transferResult.transactionSignature,
             amount: transferResult.amount,
             destination: selectedWallet.address
@@ -1647,7 +1633,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       );
       
       if (result.success) {
-        console.log('✅ FairSplitScreen: Payment successful:', {
+        logger.info('Payment successful', {
           amount: amount,
           transactionSignature: result.transactionSignature
         });

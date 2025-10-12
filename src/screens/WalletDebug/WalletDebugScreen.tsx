@@ -23,6 +23,7 @@ import { mwaDiscoveryService, MWADiscoveryResult } from '../../wallets/discovery
 import { signatureLinkService } from '../../wallets/linking/signatureLinkService';
 import { WALLET_PROVIDER_REGISTRY, getAllWalletProviders } from '../../wallets/providers/registry';
 import { useApp } from '../../context/AppContext';
+import { logger } from '../../services/loggingService';
 
 interface WalletDebugScreenProps {
   navigation: any;
@@ -67,7 +68,7 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
   const runDiscovery = async () => {
     setIsDiscovering(true);
     try {
-      console.log('🔍 Running wallet discovery...');
+      logger.info('Running wallet discovery', null, 'WalletDebugScreen');
       const results = await mwaDiscoveryService.discoverProviders({
         useCache,
         includeUnsupported
@@ -76,7 +77,7 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
       setDiscoveryResults(results);
       loadDiscoveryStats();
       
-      console.log('🔍 Discovery completed:', results);
+      logger.info('Discovery completed', { results }, 'WalletDebugScreen');
     } catch (error) {
       console.error('Discovery failed:', error);
       Alert.alert('Discovery Failed', error instanceof Error ? error.message : 'Unknown error');
@@ -87,7 +88,7 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
 
   const testProviderDiscovery = async (providerName: string) => {
     try {
-      console.log(`🔍 Testing discovery for ${providerName}...`);
+      logger.info('Testing discovery for provider', { providerName }, 'WalletDebugScreen');
       const result = await mwaDiscoveryService.testDiscovery(providerName);
       
       Alert.alert(
@@ -107,7 +108,7 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
 
     setIsLinking(true);
     try {
-      console.log(`🔗 Testing signature linking for ${testProvider}...`);
+      logger.info('Testing signature linking for provider', { testProvider }, 'WalletDebugScreen');
       const result = await signatureLinkService.testSignatureLinking(testProvider, testUserId);
       
       if (result.success) {

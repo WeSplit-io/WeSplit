@@ -249,7 +249,7 @@ class PriceManagementService {
   clearCache(): void {
     this.priceCache.clear();
     this.conversionRates.clear();
-    console.log('💰 PriceManagementService: Cache cleared');
+    logger.info('Cache cleared', null, 'priceManagementService');
   }
 
   /**

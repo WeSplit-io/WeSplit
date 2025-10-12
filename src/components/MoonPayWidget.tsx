@@ -7,6 +7,7 @@ import { useWallet } from '../context/WalletContext';
 import { firebaseMoonPayService } from '../services/firebaseMoonPayService';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { logger } from '../services/loggingService';
 
 interface MoonPayWidgetProps {
   isVisible: boolean;
@@ -107,7 +108,7 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
   const handleOpenMoonPay = async () => {
     try {
       setIsLoading(true);
-      console.log('🔍 MoonPay Widget: Opening purchase flow...');
+      logger.info('Opening purchase flow', null, 'MoonPayWidget');
       
       const amountValue = parseFloat(amount);
       if (isNaN(amountValue) || amountValue <= 0) {
@@ -115,14 +116,14 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
       }
 
       // Verify app wallet is available and log details
-      console.log('🔍 MoonPay Widget: App wallet verification:', {
+      logger.info('App wallet verification', {
         appWalletAddress,
         appWalletConnected: !!appWalletAddress,
         addressLength: appWalletAddress?.length,
         addressFormat: appWalletAddress ? 'Solana (base58)' : 'Not available'
       });
 
-      console.log('🔍 MoonPay Widget: Config:', {
+      logger.debug('Config', {
         amount: amountValue,
         walletAddress: appWalletAddress,
         currency: 'usdc_sol',
@@ -146,12 +147,12 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
       // Copy app wallet address to clipboard for easy pasting in MoonPay
       try {
         await Clipboard.setString(appWalletAddress);
-        console.log('🔍 MoonPay Widget: App wallet address copied to clipboard:', appWalletAddress);
+        logger.info('App wallet address copied to clipboard', { appWalletAddress }, 'MoonPayWidget');
       } catch (clipboardError) {
         console.warn('🔍 MoonPay Widget: Failed to copy wallet address to clipboard:', clipboardError);
       }
 
-      console.log('🔍 MoonPay Widget: Calling Firebase function with app wallet:', {
+      logger.info('Calling Firebase function with app wallet', {
         walletAddress: appWalletAddress,
         amount: amountValue,
         currency: 'usdc_sol',
@@ -165,7 +166,7 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
         'usdc_sol' // Use Solana USDC currency code
       );
 
-      console.log('🔍 MoonPay Widget: Created URL via Firebase:', {
+      logger.info('Created URL via Firebase', {
         url: moonpayResponse.url,
         walletAddress: moonpayResponse.walletAddress,
         currency: moonpayResponse.currency,
@@ -189,7 +190,7 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
             text: 'Continue to MoonPay',
             onPress: () => {
               // Open MoonPay URL in WebView
-              console.log('🔍 MoonPay Widget: Opening purchase URL:', moonpayResponse.url);
+              logger.info('Opening purchase URL', { url: moonpayResponse.url }, 'MoonPayWidget');
               
               if (navigation) {
                 // Navigate to WebView screen with the MoonPay URL
@@ -198,7 +199,7 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
                   isAppWallet: true,
                   userId: currentUser.id,
                   onSuccess: () => {
-                    console.log('🔍 MoonPay Widget: Purchase completed via WebView');
+                    logger.info('Purchase completed via WebView', null, 'MoonPayWidget');
                     onSuccess?.();
                   }
                 });
@@ -217,7 +218,7 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
                         setTimeout(async () => {
                           try {
                             await getAppWalletBalance(currentUser.id.toString());
-                            console.log('🔍 MoonPay Widget: Balance refreshed successfully');
+                            logger.info('Balance refreshed successfully', null, 'MoonPayWidget');
                             onSuccess?.();
                           } catch (balanceError) {
                             console.error('🔍 MoonPay Widget: Error refreshing balance:', balanceError);

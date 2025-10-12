@@ -27,6 +27,7 @@ import { ManualSplitCreationService } from '../../services/manualSplitCreationSe
 import { BillAnalysisData } from '../../types/billAnalysis';
 import { convertFiatToUSDC } from '../../services/fiatCurrencyService';
 import { styles } from './styles';
+import { logger } from '../../services/loggingService';
 
 // Category options with images
 const CATEGORIES = [
@@ -211,7 +212,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
     setIsCreating(true);
 
     try {
-      console.log('🔄 ManualBillCreationScreen: Starting bill creation process:', {
+      logger.info('Starting bill creation process', {
         billName: billName.trim(),
         originalAmount: parseFloat(amount),
         originalCurrency: selectedCurrency.code,
@@ -233,7 +234,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
           : `Manual bill created on ${selectedDate.toLocaleDateString()} (${amount} ${selectedCurrency.code} converted to ${convertedAmount.toFixed(4)} USDC)`,
       };
 
-      console.log('🔄 ManualBillCreationScreen: Manual bill input created:', manualBillInput);
+      logger.info('Manual bill input created', { manualBillInput }, 'ManualBillCreationScreen');
 
       // Validate the manual input
       const validation = consolidatedBillAnalysisService.validateIncomingData(manualBillInput as any);
@@ -249,7 +250,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
         currentUser
       );
 
-      console.log('🔄 ManualBillCreationScreen: Bill analysis data created:', {
+      logger.info('Bill analysis data created', {
         storeName: manualBillData.store.name,
         totalAmount: manualBillData.transaction.order_total,
         currency: manualBillData.currency,
@@ -260,7 +261,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       const processedBillData = manualBillData;
 
       if (isEditing) {
-        console.log('✅ ManualBillCreationScreen: Bill updated successfully:', {
+        logger.info('Bill updated successfully', {
           title: processedBillData.title,
           totalAmount: processedBillData.totalAmount,
           currency: processedBillData.currency,
@@ -278,7 +279,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
         // Navigate back or to appropriate screen
         navigation.goBack();
       } else {
-        console.log('✅ ManualBillCreationScreen: Bill processed successfully:', {
+        logger.info('Bill processed successfully', {
           title: processedBillData.title,
           totalAmount: processedBillData.totalAmount,
           currency: processedBillData.currency,
@@ -300,7 +301,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
           throw new Error(splitCreationResult.error || 'Failed to create split');
         }
 
-        console.log('✅ ManualBillCreationScreen: Split created successfully:', {
+        logger.info('Split created successfully', {
           splitId: splitCreationResult.split?.id,
           title: splitCreationResult.split?.title
         });

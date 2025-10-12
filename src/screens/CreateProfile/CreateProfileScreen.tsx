@@ -24,6 +24,7 @@ import { colors } from '../../theme';
 import { UserImageService } from '../../services/userImageService';
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
 import * as ImagePicker from 'expo-image-picker';
+import { logger } from '../../services/loggingService';
 
 const CreateProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -139,7 +140,7 @@ const CreateProfileScreen: React.FC = () => {
 
   const handleNext = async () => {
     try {
-      console.log('Next pressed');
+      logger.info('Next pressed', null, 'CreateProfileScreen');
       if (!pseudo) {
         setError('Pseudo is required');
         return;
@@ -147,7 +148,7 @@ const CreateProfileScreen: React.FC = () => {
       
       // Prevent multiple submissions
       if (isLoading) {
-        console.log('Already processing, ignoring duplicate request');
+        logger.debug('Already processing, ignoring duplicate request', null, 'CreateProfileScreen');
         return;
       }
       
@@ -162,7 +163,7 @@ const CreateProfileScreen: React.FC = () => {
         const existingUser = await firebaseDataService.user.getUserByEmail(email);
         
         if (existingUser && existingUser.name && existingUser.name.trim() !== '') {
-          console.log('✅ User already has username, skipping profile creation:', existingUser.name);
+          logger.info('User already has username, skipping profile creation', { name: existingUser.name }, 'CreateProfileScreen');
           
           // User already has a username, authenticate them directly
           const user = {
@@ -188,7 +189,7 @@ const CreateProfileScreen: React.FC = () => {
           return;
         }
       } catch (error) {
-        console.log('Could not check existing user, proceeding with profile creation');
+        logger.warn('Could not check existing user, proceeding with profile creation', null, 'CreateProfileScreen');
       }
 
       // Create or get user using unified service
@@ -199,19 +200,19 @@ const CreateProfileScreen: React.FC = () => {
           avatar: avatar || undefined,
         };
 
-        console.log('Creating/getting user with firebase service:', { email, name: pseudo });
+        logger.info('Creating/getting user with firebase service', { email, name: pseudo }, 'CreateProfileScreen');
         const user = await firebaseDataService.user.createUserIfNotExists(userData);
         
         if (!user) {
           throw new Error('Failed to create user');
         }
 
-        console.log('User created/retrieved successfully:', user);
+        logger.info('User created/retrieved successfully', { user }, 'CreateProfileScreen');
 
         // Upload avatar if provided
         let finalAvatarUrl = user.avatar;
         if (avatar && avatar.startsWith('file://')) {
-          console.log('📸 CreateProfile: Uploading avatar...');
+          logger.info('Uploading avatar', null, 'CreateProfileScreen');
           const uploadResult = await UserImageService.uploadUserAvatar(
             user.id.toString(), 
             avatar
@@ -219,7 +220,7 @@ const CreateProfileScreen: React.FC = () => {
           
           if (uploadResult.success && uploadResult.imageUrl) {
             finalAvatarUrl = uploadResult.imageUrl;
-            console.log('📸 CreateProfile: Avatar uploaded successfully');
+            logger.info('Avatar uploaded successfully', null, 'CreateProfileScreen');
           } else {
             console.warn('📸 CreateProfile: Failed to upload avatar:', uploadResult.error);
             // Continue with profile creation even if avatar upload fails

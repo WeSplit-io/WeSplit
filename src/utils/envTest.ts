@@ -2,7 +2,7 @@
  * Environment Variables Test Utility
  * Helps debug environment variable loading issues
  */
-
+import { logger } from '../services/loggingService';
 import Constants from 'expo-constants';
 
 // Environment variable helper
@@ -17,8 +17,7 @@ const getEnvVar = (key: string): string => {
 };
 
 export function testEnvironmentVariables(): void {
-  console.log('🔧 Environment Variables Test:');
-  console.log('================================');
+  logger.info('Environment Variables Test', null, 'envTest');
   
   // Test Google OAuth variables
   const googleClientId = getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_ID');
@@ -26,29 +25,32 @@ export function testEnvironmentVariables(): void {
   const iosClientId = getEnvVar('IOS_GOOGLE_CLIENT_ID');
   const googleClientSecret = getEnvVar('EXPO_PUBLIC_GOOGLE_CLIENT_SECRET');
   
-  console.log('Google OAuth Variables:');
-  console.log('  EXPO_PUBLIC_GOOGLE_CLIENT_ID:', googleClientId ? `${googleClientId.substring(0, 20)}...` : 'NOT_FOUND');
-  console.log('  ANDROID_GOOGLE_CLIENT_ID:', androidClientId ? `${androidClientId.substring(0, 20)}...` : 'NOT_FOUND');
-  console.log('  IOS_GOOGLE_CLIENT_ID:', iosClientId ? `${iosClientId.substring(0, 20)}...` : 'NOT_FOUND');
-  console.log('  EXPO_PUBLIC_GOOGLE_CLIENT_SECRET:', googleClientSecret ? `${googleClientSecret.substring(0, 10)}...` : 'NOT_FOUND');
+  logger.info('Google OAuth Variables', {
+    googleClientId: googleClientId ? `${googleClientId.substring(0, 20)}...` : 'NOT_FOUND',
+    androidClientId: androidClientId ? `${androidClientId.substring(0, 20)}...` : 'NOT_FOUND',
+    iosClientId: iosClientId ? `${iosClientId.substring(0, 20)}...` : 'NOT_FOUND',
+    googleClientSecret: googleClientSecret ? `${googleClientSecret.substring(0, 10)}...` : 'NOT_FOUND'
+  }, 'envTest');
   
   // Test Firebase variables
   const firebaseApiKey = getEnvVar('EXPO_PUBLIC_FIREBASE_API_KEY');
   const firebaseProjectId = getEnvVar('EXPO_PUBLIC_FIREBASE_PROJECT_ID');
   
-  console.log('Firebase Variables:');
-  console.log('  EXPO_PUBLIC_FIREBASE_API_KEY:', firebaseApiKey ? `${firebaseApiKey.substring(0, 20)}...` : 'NOT_FOUND');
-  console.log('  EXPO_PUBLIC_FIREBASE_PROJECT_ID:', firebaseProjectId || 'NOT_FOUND');
+  logger.info('Firebase Variables', {
+    firebaseApiKey: firebaseApiKey ? `${firebaseApiKey.substring(0, 20)}...` : 'NOT_FOUND',
+    firebaseProjectId: firebaseProjectId || 'NOT_FOUND'
+  }, 'envTest');
   
   // Test Constants.expoConfig
-  console.log('Constants.expoConfig.extra keys:', Object.keys(Constants.expoConfig?.extra || {}));
+  logger.debug('Constants.expoConfig.extra keys', { keys: Object.keys(Constants.expoConfig?.extra || {}) }, 'envTest');
   
   // Test process.env
-  console.log('process.env keys (filtered):', Object.keys(process.env).filter(key => 
-    key.includes('GOOGLE') || key.includes('FIREBASE') || key.includes('EXPO_PUBLIC')
-  ));
+  logger.debug('process.env keys (filtered)', { 
+    keys: Object.keys(process.env).filter(key => 
+      key.includes('GOOGLE') || key.includes('FIREBASE') || key.includes('EXPO_PUBLIC')
+    )
+  }, 'envTest');
   
-  console.log('================================');
   
   // Check for issues
   const issues: string[] = [];
@@ -60,13 +62,8 @@ export function testEnvironmentVariables(): void {
   if (issues.length > 0) {
     console.warn('⚠️ Environment Variable Issues:');
     issues.forEach(issue => console.warn('  -', issue));
-    console.log('');
-    console.log('💡 Solutions:');
-    console.log('  1. Make sure your .env file is in the project root');
-    console.log('  2. Restart your development server (npx expo start --clear)');
-    console.log('  3. Check that your .env file has the correct variable names');
-    console.log('  4. Make sure there are no spaces around the = sign in .env');
+    logger.info('Solutions', { solutions: ['Make sure your .env file is in the project root', 'Restart your development server (npx expo start --clear)', 'Check that your .env file has the correct variable names', 'Make sure there are no spaces around the = sign in .env'] }, 'envTest');
   } else {
-    console.log('✅ All environment variables found!');
+    logger.info('All environment variables found!', null, 'envTest');
   }
 }

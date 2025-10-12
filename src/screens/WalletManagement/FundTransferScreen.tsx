@@ -13,6 +13,7 @@ import { useApp } from '../../context/AppContext';
 import { walletService } from '../../services/WalletService';
 import { colors, spacing, typography } from '../../theme';
 import theme from '../../theme';
+import { logger } from '../../services/loggingService';
 
 interface FundTransferScreenProps {
   navigation: any;
@@ -38,16 +39,16 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
     try {
       setLoading(true);
       if (!currentUser?.id) {
-        console.log('🔗 FundTransferScreen: No current user');
+        logger.warn('No current user', null, 'FundTransferScreen');
         return;
       }
 
-      console.log('🔗 FundTransferScreen: Loading linked wallets for user:', currentUser.id);
+      logger.info('Loading linked wallets for user', { userId: currentUser.id }, 'FundTransferScreen');
       // Get linked wallets from walletService
       const wallets = await walletService.getLinkedWallets(currentUser.id.toString());
       setLinkedWallets(wallets);
       
-      console.log('🔗 FundTransferScreen: Loaded wallets:', wallets.length);
+      logger.info('Loaded wallets', { count: wallets.length }, 'FundTransferScreen');
     } catch (error) {
       console.error('🔗 FundTransferScreen: Error loading linked wallets:', error);
       Alert.alert('Error', 'Failed to load linked wallets');
@@ -81,10 +82,7 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
 
       setTransferring(true);
 
-      console.log('🔗 FundTransferScreen: Starting fund transfer...');
-      console.log('🔗 FundTransferScreen: From:', selectedWallet.walletAddress);
-      console.log('🔗 FundTransferScreen: To:', appWalletAddress);
-      console.log('🔗 FundTransferScreen: Amount:', transferAmount, 'SOL');
+      logger.info('Starting fund transfer', { from: selectedWallet.walletAddress, to: appWalletAddress, amount: transferAmount, currency: 'SOL' }, 'FundTransferScreen');
 
       // Transfer funds using the secure wallet linking service
       // Wallet linking functionality moved to walletService

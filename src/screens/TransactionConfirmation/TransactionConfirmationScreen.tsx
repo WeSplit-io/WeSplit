@@ -14,6 +14,7 @@ import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { formatCryptoAmount } from '../../utils/cryptoUtils';
 import styles from './styles';
+import { logger } from '../../services/loggingService';
 
 interface TransactionParams {
   type: 'payment' | 'settlement';
@@ -71,7 +72,7 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
         groupId: params.groupId
       });
 
-      console.log('Transaction completed:', transactionResult);
+      logger.info('Transaction completed', { transactionResult }, 'TransactionConfirmationScreen');
       
       setStep('success');
       

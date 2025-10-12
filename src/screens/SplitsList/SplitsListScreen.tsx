@@ -26,7 +26,7 @@ import NavBar from '../../components/NavBar';
 import UserAvatar from '../../components/UserAvatar';
 import GroupIcon from '../../components/GroupIcon';
 import Icon from '../../components/Icon';
-import { BillSplitSummary } from '../../types/billSplitting';
+import { BillSplitSummary } from '../../types/unified';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
 import { logger } from '../../services/loggingService';
 import { MockupDataService } from '../../data/mockupData';
@@ -252,7 +252,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
       // Check if this is a completed degen split that should go to result screen
       if (split.splitType === 'degen' && split.walletId) {
         try {
-          console.log('🔍 SplitsListScreen: Checking degen split wallet status:', split.walletId);
+          logger.debug('Checking degen split wallet status', { walletId: split.walletId }, 'SplitsListScreen');
 
           // Import SplitWalletService dynamically to avoid circular dependencies
           const { SplitWalletService } = await import('../../services/split');
@@ -260,7 +260,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
           if (walletResult.success && walletResult.wallet) {
             const wallet = walletResult.wallet;
-            console.log('🔍 SplitsListScreen: Wallet status check:', {
+            logger.info('Wallet status check', {
               walletId: wallet.id,
               walletStatus: wallet.status,
               hasDegenWinner: !!wallet.degenWinner,
@@ -270,7 +270,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
             // If the degen split is completed and has a winner, navigate to result screen
             if ((wallet.status === 'completed' || wallet.status === 'spinning_completed') && wallet.degenWinner) {
-              console.log('🔍 SplitsListScreen: Navigating to DegenResult for completed split');
+              logger.info('Navigating to DegenResult for completed split', null, 'SplitsListScreen');
 
               // Find the winner participant
               const winnerParticipant = split.participants.find(p => p.userId === wallet.degenWinner?.userId);
@@ -320,7 +320,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
       }
 
       // Debug: Log the split data being passed to navigation
-      console.log('🔍 SplitsListScreen: Navigating to SplitDetails with split data:', {
+      logger.info('Navigating to SplitDetails with split data', {
         splitId: split.id,
         splitTitle: split.title,
         splitObject: split,

@@ -4,6 +4,8 @@
  * Stores transactions in both user's app space and database
  */
 
+import { logger } from './loggingService';
+
 import { 
   collection, 
   doc, 
@@ -69,7 +71,7 @@ export class TransactionHistoryService {
   ): Promise<SaveTransactionResult> {
     try {
       if (__DEV__) {
-        console.log('💾 TransactionHistoryService: Saving transaction:', {
+        logger.info('Saving transaction', {
           type: transaction.type,
           amount: transaction.amount,
           currency: transaction.currency,
@@ -106,7 +108,7 @@ export class TransactionHistoryService {
       );
 
       if (__DEV__) {
-        console.log('✅ TransactionHistoryService: Transaction saved successfully:', {
+        logger.info('Transaction saved successfully', {
           transactionId: transactionRef.id,
           userTransactionId: userTransactionRef.id
         });
@@ -135,7 +137,7 @@ export class TransactionHistoryService {
   ): Promise<TransactionHistoryResult> {
     try {
       if (__DEV__) {
-        console.log('📊 TransactionHistoryService: Getting transaction history for user:', userId, 'with filters:', filters);
+        logger.info('Getting transaction history for user', { userId, filters }, 'transactionHistoryService');
       }
 
       // Build query for user transactions
@@ -198,7 +200,7 @@ export class TransactionHistoryService {
       });
 
       if (__DEV__) {
-        console.log('✅ TransactionHistoryService: Retrieved transactions:', {
+        logger.info('Retrieved transactions', {
           count: transactions.length,
           userId
         });
@@ -231,7 +233,7 @@ export class TransactionHistoryService {
   ): Promise<SaveTransactionResult> {
     try {
       if (__DEV__) {
-        console.log('🔄 TransactionHistoryService: Updating transaction status:', {
+        logger.info('Updating transaction status', {
           transactionId,
           status,
           userId
@@ -268,7 +270,7 @@ export class TransactionHistoryService {
       });
 
       if (__DEV__) {
-        console.log('✅ TransactionHistoryService: Transaction status updated successfully');
+        logger.info('Transaction status updated successfully', null, 'transactionHistoryService');
       }
 
       return {

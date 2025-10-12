@@ -6,6 +6,7 @@
 
 import { GroupWithDetails, Balance, Expense, GroupMember } from '../types';
 import { convertToUSDC } from '../services/priceService';
+import { logger } from '../services/loggingService';
 
 export interface BalanceCalculationOptions {
   normalizeToUSDC?: boolean;
@@ -124,7 +125,7 @@ async function calculateBalancesFromExpenses(
       });
     } else {
       if (__DEV__) {
-        console.log('💰 Skipping expense due to missing paid_by or members:', {
+        logger.warn('Skipping expense due to missing paid_by or members', {
           expenseId: expense.id,
           paid_by: expense.paid_by,
           membersInSplit

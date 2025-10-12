@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { monitoringService } from '../services/monitoringService';
+import { logger } from '../services/loggingService';
 // Centralized API configuration for WeSplit app
 // Handles backend URL resolution with multiple fallback options
 
@@ -81,22 +82,22 @@ async function testBackendConnection(url: string): Promise<boolean> {
     });
     return response.ok;
   } catch (error) {
-    console.log(`Backend test failed for ${url}:`, error instanceof Error ? error.message : 'Unknown error');
+    logger.warn('Backend test failed', { url, error: error instanceof Error ? error.message : 'Unknown error' }, 'api');
     return false;
   }
 }
 
 // Initialize and find the best backend URL
 export async function initializeBackendURL(): Promise<string> {
-  console.log('🔍 Initializing backend URL...');
+  logger.info('Initializing backend URL', null, 'api');
   
   for (const url of POSSIBLE_BACKEND_URLS) {
-    console.log(`Testing backend URL: ${url}`);
+    logger.debug('Testing backend URL', { url }, 'api');
     const isAvailable = await testBackendConnection(url);
     
     if (isAvailable) {
       API_BASE_URL = url;
-      console.log(`✅ Backend found at: ${url}`);
+      logger.info('Backend found at', { url }, 'api');
       return url;
     }
   }
@@ -115,7 +116,7 @@ export function getBackendURL(): string {
 // Set a specific backend URL (for testing or manual override)
 export function setBackendURL(url: string): void {
   API_BASE_URL = url;
-  console.log(`🔧 Backend URL manually set to: ${url}`);
+  logger.info('Backend URL manually set to', { url }, 'api');
 }
 
 // Generic API request handler with automatic retry and error handling
@@ -131,7 +132,7 @@ export async function apiRequest<T>(
         const startTime = Date.now();
         
         try {
-          console.log(`🌐 API Request (attempt ${attempt + 1}): ${options.method || 'GET'} ${endpoint}`);
+          logger.debug('API Request attempt', { attempt: attempt + 1, method: options.method || 'GET', endpoint }, 'api');
           
           const response = await fetch(url, {
             headers: {
@@ -166,7 +167,7 @@ export async function apiRequest<T>(
         }
 
         const data = await response.json();
-        console.log(`✅ API Request successful: ${endpoint}`);
+        logger.info('API Request successful', { endpoint }, 'api');
         
         // Log successful request to monitoring
         monitoringService.logRequest(endpoint, response.status, Date.now() - startTime);
@@ -186,7 +187,7 @@ export async function apiRequest<T>(
         
         // If it's a network error and we haven't tried all backend URLs yet, try to find a working one
         if (error instanceof Error && error.message.includes('Network request failed')) {
-          console.log('🔄 Network error detected, trying to find working backend...');
+          logger.warn('Network error detected, trying to find working backend', null, 'api');
           try {
             await initializeBackendURL();
             // Continue to next attempt with new URL
@@ -200,7 +201,7 @@ export async function apiRequest<T>(
         const jitter = Math.random() * 1000; // Add up to 1 second of random jitter
         const waitTime = baseDelay + jitter;
         
-        console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+        logger.debug('Waiting before retry', { waitTime }, 'api');
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }

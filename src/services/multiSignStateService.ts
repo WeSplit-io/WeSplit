@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from './loggingService';
 
 interface MultiSignState {
   isEnabled: boolean;
@@ -36,7 +37,7 @@ export class MultiSignStateService {
           await AsyncStorage.removeItem(MULTI_SIGN_STORAGE_KEY);
           
           if (__DEV__) {
-            console.log('🧹 Cleaned up expired multi-sign state');
+            logger.info('Cleaned up expired multi-sign state', null, 'multiSignStateService');
           }
         }
       }
@@ -62,7 +63,7 @@ export class MultiSignStateService {
       await AsyncStorage.setItem(MULTI_SIGN_STORAGE_KEY, JSON.stringify(state));
       
       if (__DEV__) {
-        console.log('✅ Multi-sign state saved:', {
+        logger.info('Multi-sign state saved', {
           isEnabled,
           activatedAt: now.toISOString(),
           expiresAt: expiresAt.toISOString()
@@ -95,14 +96,14 @@ export class MultiSignStateService {
         await AsyncStorage.removeItem(MULTI_SIGN_STORAGE_KEY);
         
         if (__DEV__) {
-          console.log('⚠️ Multi-sign state expired, removed from storage');
+          logger.warn('Multi-sign state expired, removed from storage', null, 'multiSignStateService');
         }
         
         return false;
       }
       
       if (__DEV__) {
-        console.log('✅ Multi-sign state loaded:', {
+        logger.info('Multi-sign state loaded', {
           isEnabled: state.isEnabled,
           activatedAt: state.activatedAt,
           expiresAt: state.expiresAt,
@@ -125,7 +126,7 @@ export class MultiSignStateService {
       await AsyncStorage.removeItem(MULTI_SIGN_STORAGE_KEY);
       
       if (__DEV__) {
-        console.log('✅ Multi-sign state cleared');
+        logger.info('Multi-sign state cleared', null, 'multiSignStateService');
       }
     } catch (error) {
       console.error('Error clearing multi-sign state:', error);

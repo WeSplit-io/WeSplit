@@ -5,7 +5,7 @@
  */
 
 import { logger } from '../loggingService';
-import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, collection } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult } from './types';
 
@@ -18,10 +18,6 @@ export class SplitWalletCleanup {
     reason?: string
   ): Promise<SplitWalletResult> {
     try {
-      console.log('🔍 SplitWalletCleanup: Cancelling split wallet:', {
-        splitWalletId,
-        reason
-      });
 
       // Get current wallet
       const walletResult = await this.getSplitWallet(splitWalletId);
@@ -64,10 +60,6 @@ export class SplitWalletCleanup {
         ...updatedWalletData,
       };
 
-      console.log('✅ SplitWalletCleanup: Split wallet cancelled successfully:', {
-        splitWalletId,
-        reason
-      });
 
       logger.info('Split wallet cancelled', {
         splitWalletId,
@@ -99,10 +91,6 @@ export class SplitWalletCleanup {
     merchantAddress?: string
   ): Promise<SplitWalletResult> {
     try {
-      console.log('🔍 SplitWalletCleanup: Completing split wallet:', {
-        splitWalletId,
-        merchantAddress
-      });
 
       // Get current wallet
       const walletResult = await this.getSplitWallet(splitWalletId);
@@ -155,10 +143,6 @@ export class SplitWalletCleanup {
         updatedAt: new Date().toISOString(),
       };
 
-      console.log('✅ SplitWalletCleanup: Split wallet completed successfully:', {
-        splitWalletId,
-        merchantAddress
-      });
 
       logger.info('Split wallet completed successfully', {
         splitWalletId,
@@ -190,11 +174,6 @@ export class SplitWalletCleanup {
     reason?: string
   ): Promise<SplitWalletResult> {
     try {
-      console.log('🔍 SplitWalletCleanup: Burning split wallet and cleanup:', {
-        splitWalletId,
-        creatorId,
-        reason
-      });
 
       // Get current wallet
       const walletResult = await this.getSplitWallet(splitWalletId);
@@ -243,11 +222,6 @@ export class SplitWalletCleanup {
       const docId = wallet.firebaseDocId || splitWalletId;
       await deleteDoc(doc(db, 'splitWallets', docId));
 
-      console.log('✅ SplitWalletCleanup: Split wallet burned and cleaned up successfully:', {
-        splitWalletId,
-        creatorId,
-        reason
-      });
 
       logger.info('Split wallet burned and cleaned up', {
         splitWalletId,
@@ -283,10 +257,6 @@ export class SplitWalletCleanup {
     creatorId: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('🔍 SplitWalletCleanup: Burning split wallet funds:', {
-        splitWalletId,
-        creatorId
-      });
 
       // Get the private key
       const privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, creatorId);
@@ -319,7 +289,6 @@ export class SplitWalletCleanup {
 
       const balance = balanceResult.balance;
       if (balance.usdcBalance <= 0) {
-        console.log('🔍 SplitWalletCleanup: No funds to burn, wallet is empty');
         return { success: true };
       }
 
@@ -354,11 +323,6 @@ export class SplitWalletCleanup {
         };
       }
 
-      console.log('✅ SplitWalletCleanup: Split wallet funds burned successfully:', {
-        splitWalletId,
-        amount: balance.usdcBalance,
-        transactionSignature: transactionResult.transactionSignature
-      });
 
       return { success: true };
 

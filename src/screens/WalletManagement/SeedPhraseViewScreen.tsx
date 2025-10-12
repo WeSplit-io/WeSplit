@@ -16,6 +16,7 @@ import { useWallet } from '../../context/WalletContext';
 import { walletService } from '../../services/WalletService';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { useApp } from '../../context/AppContext';
+import { logger } from '../../services/loggingService';
 
 const SeedPhraseViewScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -47,16 +48,16 @@ const SeedPhraseViewScreen: React.FC = () => {
           return;
         }
 
-        console.log('🔐 SeedPhraseView: Retrieving seed phrase from secure device storage...');
+        logger.info('Retrieving seed phrase from secure device storage', null, 'SeedPhraseViewScreen');
         
         // Initialize secure wallet if needed
         // Initialize secure wallet
         const { address, isNew } = await walletService.initializeSecureWallet(currentUser.id.toString());
         
         if (isNew) {
-          console.log('🔐 SeedPhraseView: New secure wallet created for user:', currentUser.id);
+          logger.info('New secure wallet created for user', { userId: currentUser.id }, 'SeedPhraseViewScreen');
         } else {
-          console.log('🔐 SeedPhraseView: Existing app wallet seed phrase retrieved for user:', currentUser.id);
+          logger.info('Existing app wallet seed phrase retrieved for user', { userId: currentUser.id }, 'SeedPhraseViewScreen');
         }
 
         // Get the seed phrase from secure device storage
@@ -67,10 +68,10 @@ const SeedPhraseViewScreen: React.FC = () => {
           // Format seed phrase for display
           const seedPhraseWords = mnemonic.split(' ');
           setSeedPhrase(seedPhraseWords);
-          console.log('🔐 SeedPhraseView: Seed phrase retrieved successfully from device storage');
+          logger.info('Seed phrase retrieved successfully from device storage', null, 'SeedPhraseViewScreen');
         } else {
           // Don't show error - just leave seed phrase empty for user-friendly experience
-          console.log('🔐 SeedPhraseView: No seed phrase found - user will see empty state');
+          logger.info('No seed phrase found - user will see empty state', null, 'SeedPhraseViewScreen');
         }
       } catch (err) {
         console.error('🔐 SeedPhraseView: Error retrieving secure seed phrase:', err);

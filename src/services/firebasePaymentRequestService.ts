@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { notificationService } from './notificationService';
+import { logger } from './loggingService';
 
 export interface PaymentRequest {
   id: string;
@@ -80,7 +81,7 @@ export async function createPaymentRequest(
   groupId?: string | number
 ): Promise<PaymentRequest> {
   try {
-    if (__DEV__) { console.log('🔥 Creating payment request:', { senderId, recipientId, amount, currency, description, groupId }); }
+    if (__DEV__) { logger.info('Creating payment request', { senderId, recipientId, amount, currency, description, groupId }, 'firebasePaymentRequestService'); }
     
     // Get sender and recipient names
     const [senderDoc, recipientDoc] = await Promise.all([
@@ -127,7 +128,7 @@ export async function createPaymentRequest(
       }
     );
     
-    if (__DEV__) { console.log('🔥 Payment request created successfully:', paymentRequest); }
+    if (__DEV__) { logger.info('Payment request created successfully', { paymentRequest }, 'firebasePaymentRequestService'); }
     
     return paymentRequest;
   } catch (error) {
@@ -194,7 +195,7 @@ export async function getSentPaymentRequests(userId: string | number, limitCount
 // Accept a payment request
 export async function acceptPaymentRequest(requestId: string): Promise<PaymentRequest> {
   try {
-    if (__DEV__) { console.log('🔥 Accepting payment request:', requestId); }
+    if (__DEV__) { logger.info('Accepting payment request', { requestId }, 'firebasePaymentRequestService'); }
     
     const requestRef = doc(db, 'paymentRequests', requestId);
     await updateDoc(requestRef, {
@@ -222,7 +223,7 @@ export async function acceptPaymentRequest(requestId: string): Promise<PaymentRe
       }
     );
     
-    if (__DEV__) { console.log('🔥 Payment request accepted successfully:', paymentRequest); }
+    if (__DEV__) { logger.info('Payment request accepted successfully', { paymentRequest }, 'firebasePaymentRequestService'); }
     
     return paymentRequest;
   } catch (error) {
@@ -234,7 +235,7 @@ export async function acceptPaymentRequest(requestId: string): Promise<PaymentRe
 // Reject a payment request
 export async function rejectPaymentRequest(requestId: string, reason?: string): Promise<PaymentRequest> {
   try {
-    if (__DEV__) { console.log('🔥 Rejecting payment request:', requestId); }
+    if (__DEV__) { logger.info('Rejecting payment request', { requestId }, 'firebasePaymentRequestService'); }
     
     const requestRef = doc(db, 'paymentRequests', requestId);
     await updateDoc(requestRef, {
@@ -263,7 +264,7 @@ export async function rejectPaymentRequest(requestId: string, reason?: string): 
       }
     );
     
-    if (__DEV__) { console.log('🔥 Payment request rejected successfully:', paymentRequest); }
+    if (__DEV__) { logger.info('Payment request rejected successfully', { paymentRequest }, 'firebasePaymentRequestService'); }
     
     return paymentRequest;
   } catch (error) {
@@ -275,7 +276,7 @@ export async function rejectPaymentRequest(requestId: string, reason?: string): 
 // Cancel a payment request (by sender)
 export async function cancelPaymentRequest(requestId: string): Promise<PaymentRequest> {
   try {
-    if (__DEV__) { console.log('🔥 Cancelling payment request:', requestId); }
+    if (__DEV__) { logger.info('Cancelling payment request', { requestId }, 'firebasePaymentRequestService'); }
     
     const requestRef = doc(db, 'paymentRequests', requestId);
     await updateDoc(requestRef, {
@@ -303,7 +304,7 @@ export async function cancelPaymentRequest(requestId: string): Promise<PaymentRe
       }
     );
     
-    if (__DEV__) { console.log('🔥 Payment request cancelled successfully:', paymentRequest); }
+    if (__DEV__) { logger.info('Payment request cancelled successfully', { paymentRequest }, 'firebasePaymentRequestService'); }
     
     return paymentRequest;
   } catch (error) {
@@ -315,18 +316,16 @@ export async function cancelPaymentRequest(requestId: string): Promise<PaymentRe
 // Get a specific payment request by ID
 export async function getPaymentRequest(requestId: string): Promise<PaymentRequest | null> {
   try {
-    if (__DEV__) { console.log('🔥 Getting payment request:', requestId); }
     
     const requestDoc = await getDoc(doc(db, 'paymentRequests', requestId));
     
     if (!requestDoc.exists()) {
-      if (__DEV__) { console.log('🔥 Payment request not found:', requestId); }
+      if (__DEV__) { logger.warn('Payment request not found', { requestId }, 'firebasePaymentRequestService'); }
       return null;
     }
     
     const paymentRequest = paymentRequestTransformers.firestoreToPaymentRequest(requestDoc);
     
-    if (__DEV__) { console.log('🔥 Retrieved payment request:', paymentRequest); }
     
     return paymentRequest;
   } catch (error) {
@@ -338,7 +337,6 @@ export async function getPaymentRequest(requestId: string): Promise<PaymentReque
 // Get pending payment requests count for a user
 export async function getPendingPaymentRequestsCount(userId: string | number): Promise<number> {
   try {
-    if (__DEV__) { console.log('🔥 Getting pending payment requests count for user:', userId); }
     
     const requestsRef = collection(db, 'paymentRequests');
     const pendingQuery = query(
@@ -350,7 +348,6 @@ export async function getPendingPaymentRequestsCount(userId: string | number): P
     const querySnapshot = await getDocs(pendingQuery);
     const count = querySnapshot.docs.length;
     
-    if (__DEV__) { console.log('🔥 Pending payment requests count:', count); }
     
     return count;
   } catch (error) {

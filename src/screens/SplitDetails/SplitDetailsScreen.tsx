@@ -947,8 +947,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
                     return (
                       <UserAvatar
-                        key={participant.id}
-                        userId={participant.id}
+                        key={participant.userId || participant.id || index}
+                        userId={participant.userId || participant.id}
                         displayName={participant.name}
                         size={32}
                         style={avatarStyle}
@@ -1004,9 +1004,9 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           <Text style={styles.participantsTitle}>In the pool:</Text>
 
           {participants.map((participant: any) => (
-            <View key={participant.id} style={styles.participantCard}>
+            <View key={participant.userId || participant.id} style={styles.participantCard}>
               <UserAvatar
-                userId={participant.id}
+                userId={participant.userId || participant.id}
                 displayName={participant.name}
                 size={40}
                 style={styles.participantAvatar}

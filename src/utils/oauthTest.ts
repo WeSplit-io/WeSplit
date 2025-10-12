@@ -6,6 +6,7 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { logAndroidFingerprintInstructions } from './androidFingerprint';
+import { logger } from 'services/loggingService';
 
 // Environment variable helper
 const getEnvVar = (key: string): string => {
@@ -104,15 +105,7 @@ export function testOAuthConfiguration(): OAuthConfigTest {
 export function logOAuthConfiguration(): void {
   const config = testOAuthConfiguration();
   
-  console.log('🔧 OAuth Configuration Test Results:');
-  console.log('Platform:', config.platform);
-  console.log('Development Mode:', config.isDevelopment);
-  console.log('Google Client ID (Web):', config.googleClientId.substring(0, 20) + '...');
-  console.log('Android Google Client ID:', config.androidGoogleClientId.substring(0, 20) + '...');
-  console.log('iOS Google Client ID:', config.iosGoogleClientId.substring(0, 20) + '...');
-  console.log('Twitter Client ID:', config.twitterClientId.substring(0, 20) + '...');
-  console.log('Apple Client ID:', config.appleClientId.substring(0, 20) + '...');
-  console.log('Redirect URI:', config.redirectUri);
+  logger.info('OAuth Configuration Test Results', { platform: config.platform, isDevelopment: config.isDevelopment, googleClientId: config.googleClientId.substring(0, 20) + '...', androidGoogleClientId: config.androidGoogleClientId.substring(0, 20) + '...', iosGoogleClientId: config.iosGoogleClientId.substring(0, 20) + '...', twitterClientId: config.twitterClientId.substring(0, 20) + '...', appleClientId: config.appleClientId.substring(0, 20) + '...', redirectUri: config.redirectUri }, 'oauthTest');
   
   if (config.issues.length > 0) {
     console.warn('⚠️ OAuth Configuration Issues:');
@@ -120,17 +113,15 @@ export function logOAuthConfiguration(): void {
   }
   
   if (config.recommendations.length > 0) {
-    console.log('💡 Recommendations:');
-    config.recommendations.forEach(rec => console.log('  -', rec));
+    logger.info('Recommendations', { recommendations: config.recommendations }, 'oauthTest');
   }
   
   // Add Android-specific fingerprint instructions
   if (config.platform === 'android') {
-    console.log('');
     logAndroidFingerprintInstructions();
   }
   
   if (config.issues.length === 0) {
-    console.log('✅ OAuth configuration looks good!');
+    logger.info('OAuth configuration looks good!', null, 'oauthTest');
   }
 }

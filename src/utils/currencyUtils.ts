@@ -1,26 +1,16 @@
 /**
  * Currency utility functions for consistent handling of USDC amounts
+ * @deprecated Use formatUtils from src/utils/formatUtils.ts instead
  */
 
-/**
- * Round USDC amount to proper precision (6 decimal places)
- * Uses proper rounding to avoid floating point precision issues
- * This ensures consistency across all services
- */
-export function roundUsdcAmount(amount: number): number {
-  // Use proper rounding to avoid floating point precision issues
-  return Math.round(amount * 1000000) / 1000000;
-}
+// Re-export from unified format utils for backward compatibility
+export { roundUsdcAmount, formatUsdcAmount } from './formatUtils';
+import { logger } from '../services/loggingService';
 
-/**
- * Format USDC amount for display (removes trailing zeros and weird precision)
- * @param amount Amount in USDC
- * @param decimals Number of decimal places to show (default: 6)
- * @returns Formatted string
- */
-export function formatUsdcAmount(amount: number, decimals: number = 6): string {
-  const rounded = roundUsdcAmount(amount);
-  return rounded.toFixed(decimals).replace(/\.?0+$/, '');
+// Verify export at module load time
+if (__DEV__) {
+  const { roundUsdcAmount: testFunc } = require('./formatUtils');
+  logger.debug('roundUsdcAmount export verified', { type: typeof testFunc }, 'currencyUtils');
 }
 
 /**
@@ -41,7 +31,8 @@ export function calculateEqualSplit(totalAmount: number, participantCount: numbe
   }
   
   const amountPerPerson = totalAmount / participantCount;
-  return roundUsdcAmount(amountPerPerson);
+  // Use inline rounding to avoid circular dependency issues
+  return Math.round(amountPerPerson * 1000000) / 1000000;
 }
 
 /**

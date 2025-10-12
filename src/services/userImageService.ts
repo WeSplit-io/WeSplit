@@ -26,14 +26,14 @@ export class UserImageService {
    */
   static async getUserImage(userId: string): Promise<UserImageResult> {
     try {
-      console.log('🔍 UserImageService: Fetching user image for:', userId);
+      logger.info('Fetching user image for', { userId }, 'userImageService');
       
       const user = await firebaseUserService.getCurrentUser(userId);
       
       if (user) {
         // First check if user has avatar URL in Firestore
         if (user.avatar && user.avatar.trim() !== '') {
-          console.log('🔍 UserImageService: Found user avatar in Firestore:', user.avatar);
+          logger.info('Found user avatar in Firestore', { avatar: user.avatar }, 'userImageService');
           return {
             success: true,
             imageUrl: user.avatar,
@@ -41,16 +41,16 @@ export class UserImageService {
         }
         
         // If no avatar in Firestore, check Firebase Storage
-        console.log('🔍 UserImageService: No avatar in Firestore, checking Firebase Storage');
+        logger.info('No avatar in Firestore, checking Firebase Storage', null, 'userImageService');
         const storageAvatarUrl = await AvatarUploadService.getAvatarUrl(userId);
         
         if (storageAvatarUrl) {
-          console.log('🔍 UserImageService: Found avatar in Firebase Storage:', storageAvatarUrl);
+          logger.info('Found avatar in Firebase Storage', { storageAvatarUrl }, 'userImageService');
           
           // Update Firestore with the storage URL for future use
           try {
             await firebaseUserService.updateUser(userId, { avatar: storageAvatarUrl });
-            console.log('🔍 UserImageService: Updated Firestore with storage URL');
+            logger.info('Updated Firestore with storage URL', null, 'userImageService');
           } catch (updateError) {
             console.warn('🔍 UserImageService: Failed to update Firestore with storage URL:', updateError);
           }
@@ -61,13 +61,13 @@ export class UserImageService {
           };
         }
         
-        console.log('🔍 UserImageService: No avatar found anywhere');
+        logger.info('No avatar found anywhere', null, 'userImageService');
         return {
           success: true,
           imageUrl: undefined,
         };
       } else {
-        console.log('🔍 UserImageService: User not found');
+        logger.warn('User not found', null, 'userImageService');
         return {
           success: false,
           error: 'User not found',
@@ -132,7 +132,7 @@ export class UserImageService {
     const imageMap = new Map<string, UserImageInfo>();
     
     try {
-      console.log('🔍 UserImageService: Fetching images for multiple users:', userIds.length);
+      logger.info('Fetching images for multiple users', { count: userIds.length }, 'userImageService');
       
       // Fetch all users in parallel
       const userPromises = userIds.map(async (userId) => {
@@ -172,7 +172,7 @@ export class UserImageService {
         imageMap.set(userId, imageInfo);
       });
       
-      console.log('🔍 UserImageService: Successfully fetched images for', imageMap.size, 'users');
+      logger.info('Successfully fetched images for users', { count: imageMap.size }, 'userImageService');
       
     } catch (error) {
       console.error('🔍 UserImageService: Error fetching multiple user images:', error);
@@ -205,7 +205,7 @@ export class UserImageService {
     onProgress?: (progress: number) => void
   ): Promise<UserImageResult> {
     try {
-      console.log('📸 UserImageService: Starting avatar upload for user:', userId);
+      logger.info('Starting avatar upload for user', { userId }, 'userImageService');
       
       // Upload to Firebase Storage
       const uploadResult = await AvatarUploadService.uploadAvatar(userId, imageUri, onProgress);
@@ -220,7 +220,7 @@ export class UserImageService {
       // Update user document in Firestore with the new avatar URL
       await firebaseUserService.updateUser(userId, { avatar: uploadResult.avatarUrl });
       
-      console.log('📸 UserImageService: Avatar uploaded and user updated successfully');
+      logger.info('Avatar uploaded and user updated successfully', null, 'userImageService');
       
       return {
         success: true,
@@ -242,7 +242,7 @@ export class UserImageService {
    */
   static async deleteUserAvatar(userId: string): Promise<UserImageResult> {
     try {
-      console.log('🗑️ UserImageService: Starting avatar deletion for user:', userId);
+      logger.info('Starting avatar deletion for user', { userId }, 'userImageService');
       
       // Delete from Firebase Storage
       const deleteResult = await AvatarUploadService.deleteAvatar(userId);
@@ -257,7 +257,7 @@ export class UserImageService {
       // Update user document in Firestore to remove avatar URL
       await firebaseUserService.updateUser(userId, { avatar: '' });
       
-      console.log('🗑️ UserImageService: Avatar deleted and user updated successfully');
+      logger.info('Avatar deleted and user updated successfully', null, 'userImageService');
       
       return {
         success: true,

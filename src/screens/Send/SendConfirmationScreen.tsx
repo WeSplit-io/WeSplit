@@ -12,6 +12,7 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
+import { logger } from '../../services/loggingService';
 
 // --- AppleSlider adapted from WalletManagementScreen ---
 interface AppleSliderProps {
@@ -27,24 +28,23 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
   const [isSliderActive, setIsSliderActive] = useState(false);
 
   // Debug logging for slider props
-  console.log('🔍 AppleSlider: Props debug:', {
-    disabled,
-    loading,
-    text,
-    onSlideComplete: !!onSlideComplete
-  });
+  if (__DEV__) {
+    logger.debug('AppleSlider props', {
+      disabled,
+      loading,
+      text,
+      onSlideComplete: !!onSlideComplete
+    }, 'SendConfirmationScreen');
+  }
 
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => {
-      console.log('🔍 AppleSlider: onStartShouldSetPanResponder called, disabled:', disabled, 'loading:', loading);
       return !disabled && !loading;
     },
     onMoveShouldSetPanResponder: () => {
-      console.log('🔍 AppleSlider: onMoveShouldSetPanResponder called, disabled:', disabled, 'loading:', loading);
       return !disabled && !loading;
     },
     onPanResponderGrant: () => {
-      console.log('🔍 AppleSlider: onPanResponderGrant - slider activated');
       setIsSliderActive(true);
     },
     onPanResponderMove: (_, gestureState) => {
@@ -58,7 +58,6 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
           duration: 200,
           useNativeDriver: false,
         }).start(() => {
-          console.log('🔍 AppleSlider: Slide completed, calling onSlideComplete');
           if (onSlideComplete) onSlideComplete();
           setTimeout(() => {
             sliderValue.setValue(0);
@@ -153,26 +152,26 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Debug logging to ensure recipient data is passed correctly
   useEffect(() => {
-    console.log('💰 SendConfirmation: Recipient data received:', {
+    logger.debug('Recipient data received', {
       destinationType,
       name: recipientName,
       address: recipientAddress ? `${recipientAddress.substring(0, 6)}...${recipientAddress.substring(recipientAddress.length - 6)}` : 'No address',
       fullAddress: recipientAddress,
       id: recipient?.id
     });
-    console.log('💰 SendConfirmation: Contact data:', {
+    logger.debug('Contact data', {
       contactId: contact?.id,
       contactName: contact?.name,
       contactAvatar: contact?.avatar,
       hasAvatar: !!contact?.avatar
     });
-    console.log('💰 SendConfirmation: Transaction details:', {
+    logger.info('Transaction details', {
       amount,
       description,
       groupId,
       isSettlement
     });
-    console.log('💰 SendConfirmation: Avatar display logic:', {
+    logger.debug('UI state', {
       destinationType,
       hasContact: !!contact,
       willShowUserAvatar: (destinationType === 'friend' || (contact && !destinationType)) && contact,
@@ -204,7 +203,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       }
 
       if (__DEV__) {
-        console.log('💰 SendConfirmation: Balance check passed:', {
+        logger.info('Balance check passed', {
           amountToRecipient: amount,
           totalAmountToPay: totalAmountToPay,
           available: balance.usdc,
@@ -217,7 +216,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       // Get fee estimate for display
       const feeEstimate = await consolidatedTransactionService.getTransactionFeeEstimate(amount, 'USDC', 'medium');
       
-      console.log('💰 Transaction fee estimate:', feeEstimate);
+      logger.info('Transaction fee estimate', { feeEstimate }, 'SendConfirmationScreen');
 
       // Send transaction using appropriate service based on destination type
       let transactionResult: any;
@@ -246,7 +245,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         );
       }
 
-      console.log('✅ Transaction successful:', {
+      logger.info('Transaction successful', {
         signature: transactionResult.signature || transactionResult.transactionId,
         txId: transactionResult.txId || transactionResult.transactionId,
         companyFee: transactionResult.companyFee,
@@ -331,11 +330,11 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         setWalletLoading(true);
         setWalletError(null);
         
-        console.log('🔍 SendConfirmation: Starting wallet validation checks...');
+        logger.info('Starting wallet validation checks', null, 'SendConfirmationScreen');
         
         // Check wallet address
         const walletAddress = await consolidatedTransactionService.getUserWalletAddress(currentUser.id);
-        console.log('🔍 SendConfirmation: Wallet address check result:', walletAddress);
+        logger.debug('Wallet address check result', { walletAddress }, 'SendConfirmationScreen');
         
         if (!walletAddress) {
           throw new Error('No wallet address found for user');
@@ -343,11 +342,11 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         
         // Check balance
         const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
-        console.log('🔍 SendConfirmation: Balance check result:', balance);
+        logger.debug('Balance check result', { balance }, 'SendConfirmationScreen');
         
         // Check SOL for gas
         const solCheck = await consolidatedTransactionService.hasSufficientSolForGas(currentUser.id);
-        console.log('🔍 SendConfirmation: SOL check result:', solCheck);
+        logger.debug('SOL check result', { solCheck }, 'SendConfirmationScreen');
         
         // Set states
         setHasExistingWallet(true);
@@ -355,7 +354,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         setHasSufficientSol(solCheck.hasSufficient);
         setWalletError(null);
         
-        console.log('🔍 SendConfirmation: Wallet validation completed successfully:', {
+        logger.info('Wallet validation completed successfully', {
           walletAddress,
           balance,
           hasWallet: true,
@@ -391,17 +390,19 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const hasSufficientBalance = existingWalletBalance === null || existingWalletBalance.usdc >= totalAmountToPay;
 
   // Debug logging for slider state
-  console.log('🔍 SendConfirmation: Slider state debug:', {
-    sending,
-    hasExistingWallet,
-    hasSufficientBalance,
-    hasSufficientSol,
-    existingWalletBalance,
-    amount,
-    walletLoading,
-    walletError,
-    disabled: walletLoading || sending || !hasExistingWallet || !hasSufficientBalance || !hasSufficientSol || !!walletError
-  });
+  if (__DEV__) {
+    logger.debug('Slider state', {
+      sending,
+      hasExistingWallet,
+      hasSufficientBalance,
+      hasSufficientSol,
+      existingWalletBalance,
+      amount,
+      walletLoading,
+      walletError,
+      disabled: walletLoading || sending || !hasExistingWallet || !hasSufficientBalance || !hasSufficientSol || !!walletError
+    }, 'SendConfirmationScreen');
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top','bottom']}>

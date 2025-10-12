@@ -18,6 +18,7 @@ import { logger } from './loggingService';
 import { firebaseDataService } from './firebaseDataService';
 import { transactionUtils } from './shared/transactionUtils';
 import { balanceUtils } from './shared/balanceUtils';
+import { getConfig } from '../config/unified';
 import { keypairUtils } from './shared/keypairUtils';
 import { validationUtils } from './shared/validationUtils';
 import { collection, addDoc, query, where, getDocs, orderBy, limit, serverTimestamp } from 'firebase/firestore';
@@ -481,7 +482,29 @@ class WalletService {
       const publicKey = new PublicKey(wallet.address);
       const usdcMint = new PublicKey(USDC_CONFIG.mintAddress);
       
-      const balance = await balanceUtils.getCompleteBalance(publicKey, usdcMint);
+      // Debug network configuration
+      logger.debug('WalletService: Network configuration', {
+        network: getConfig().blockchain.network,
+        usdcMintAddress: USDC_CONFIG.mintAddress,
+        walletAddress: wallet.address
+      }, 'WalletService');
+      
+      // Get SOL price for accurate USD calculation
+      let solPrice = 0;
+      try {
+        const { getCryptoPrice } = await import('./priceService');
+        const priceData = await getCryptoPrice('SOL');
+        solPrice = priceData?.price_usd || 0;
+        
+        if (solPrice === 0) {
+          logger.warn('SOL price is 0, this may indicate a price service issue', { priceData }, 'WalletService');
+        }
+      } catch (priceError) {
+        logger.warn('Failed to fetch SOL price, using 0 for USD calculation', { error: priceError }, 'WalletService');
+        // Consider using a cached price or fallback price here if available
+      }
+      
+      const balance = await balanceUtils.getCompleteBalance(publicKey, usdcMint, solPrice);
       
       const result: UserWalletBalance = {
         solBalance: balance.solBalance,
@@ -499,7 +522,9 @@ class WalletService {
         userId,
         address: wallet.address,
         solBalance: result.solBalance,
-        usdcBalance: result.usdcBalance
+        usdcBalance: result.usdcBalance,
+        totalUSD: result.totalUSD,
+        solPrice
       }, 'WalletService');
 
       return result;

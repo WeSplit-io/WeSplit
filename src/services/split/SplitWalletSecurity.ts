@@ -20,11 +20,6 @@ export class SplitWalletSecurity {
     privateKey: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('🔍 SplitWalletSecurity: Storing split wallet private key:', {
-        splitWalletId,
-        creatorId,
-        hasPrivateKey: !!privateKey
-      });
 
       if (!privateKey || typeof privateKey !== 'string') {
         return {
@@ -39,11 +34,6 @@ export class SplitWalletSecurity {
       // Store the private key securely
       await SecureStore.setItemAsync(storageKey, privateKey);
 
-      console.log('✅ SplitWalletSecurity: Split wallet private key stored successfully:', {
-        splitWalletId,
-        creatorId,
-        storageKey
-      });
 
       logger.info('Split wallet private key stored securely', {
         splitWalletId,
@@ -71,10 +61,6 @@ export class SplitWalletSecurity {
     creatorId: string
   ): Promise<{ success: boolean; hasKey: boolean; error?: string }> {
     try {
-      console.log('🔍 SplitWalletSecurity: Checking for local private key:', {
-        splitWalletId,
-        creatorId
-      });
 
       const storageKey = `${this.PRIVATE_KEY_PREFIX}${splitWalletId}_${creatorId}`;
       
@@ -82,11 +68,6 @@ export class SplitWalletSecurity {
       const privateKey = await SecureStore.getItemAsync(storageKey);
       const hasKey = !!privateKey;
 
-      console.log('🔍 SplitWalletSecurity: Local private key check result:', {
-        splitWalletId,
-        creatorId,
-        hasKey
-      });
 
       return { 
         success: true, 
@@ -113,10 +94,6 @@ export class SplitWalletSecurity {
     requesterId: string
   ): Promise<{ success: boolean; privateKey?: string; error?: string }> {
     try {
-      console.log('🔍 SplitWalletSecurity: Retrieving split wallet private key:', {
-        splitWalletId,
-        requesterId
-      });
 
       const storageKey = `${this.PRIVATE_KEY_PREFIX}${splitWalletId}_${requesterId}`;
       
@@ -124,11 +101,6 @@ export class SplitWalletSecurity {
       const privateKey = await SecureStore.getItemAsync(storageKey);
       
       if (!privateKey) {
-        console.log('🔍 SplitWalletSecurity: Private key not found in local storage:', {
-          splitWalletId,
-          requesterId,
-          storageKey
-        });
         
         return {
           success: false,
@@ -136,11 +108,6 @@ export class SplitWalletSecurity {
         };
       }
 
-      console.log('✅ SplitWalletSecurity: Split wallet private key retrieved successfully:', {
-        splitWalletId,
-        requesterId,
-        hasPrivateKey: !!privateKey
-      });
 
       logger.info('Split wallet private key retrieved from local storage', {
         splitWalletId,
@@ -171,21 +138,12 @@ export class SplitWalletSecurity {
     creatorId: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('🔍 SplitWalletSecurity: Deleting split wallet private key:', {
-        splitWalletId,
-        creatorId
-      });
 
       const storageKey = `${this.PRIVATE_KEY_PREFIX}${splitWalletId}_${creatorId}`;
       
       // Delete the private key from secure storage
       await SecureStore.deleteItemAsync(storageKey);
 
-      console.log('✅ SplitWalletSecurity: Split wallet private key deleted successfully:', {
-        splitWalletId,
-        creatorId,
-        storageKey
-      });
 
       logger.info('Split wallet private key deleted from local storage', {
         splitWalletId,
@@ -212,15 +170,11 @@ export class SplitWalletSecurity {
     creatorId: string
   ): Promise<{ success: boolean; keys: string[]; error?: string }> {
     try {
-      console.log('🔍 SplitWalletSecurity: Listing stored private keys for creator:', {
-        creatorId
-      });
 
       // Note: SecureStore doesn't provide a way to list all keys
       // This is a limitation of the secure storage implementation
       // In a real implementation, you might want to maintain a separate index
       
-      console.log('⚠️ SplitWalletSecurity: Cannot list all stored keys - SecureStore limitation');
       
       return {
         success: true,
@@ -247,15 +201,11 @@ export class SplitWalletSecurity {
     olderThanDays: number = 30
   ): Promise<{ success: boolean; cleanedCount: number; error?: string }> {
     try {
-      console.log('🔍 SplitWalletSecurity: Cleaning up old private keys:', {
-        olderThanDays
-      });
 
       // Note: This is a placeholder implementation
       // In a real implementation, you would need to maintain a separate index
       // of stored keys with timestamps to enable cleanup
       
-      console.log('⚠️ SplitWalletSecurity: Cleanup not implemented - requires key index');
       
       return {
         success: true,

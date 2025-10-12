@@ -20,6 +20,7 @@ import { Transaction, Group } from '../../types';
 import TransactionModal from '../../components/TransactionModal';
 import styles from './styles';
 import { colors } from '../../theme/colors';
+import { logger } from '../../services/loggingService';
 
 type TabType = 'all' | 'income' | 'expenses';
 
@@ -39,16 +40,16 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
 
   const loadTransactions = useCallback(async () => {
     if (!currentUser?.id) {
-      console.log('❌ No currentUser.id available');
+      logger.warn('No currentUser.id available', null, 'TransactionHistoryScreen');
       return;
     }
 
     try {
       setLoading(true);
-      console.log('🔄 Loading transactions for user:', currentUser.id);
+      logger.info('Loading transactions for user', { userId: currentUser.id }, 'TransactionHistoryScreen');
       
       const userTransactions = await firebaseTransactionService.getUserTransactions(currentUser.id.toString());
-      console.log('✅ Loaded transactions:', userTransactions.length, userTransactions);
+      logger.info('Loaded transactions', { count: userTransactions.length, transactions: userTransactions }, 'TransactionHistoryScreen');
       
       setTransactions(userTransactions);
     } catch (error) {
@@ -180,7 +181,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
               return sum + (total * rate);
             }, 0);
             
-            console.log(`🔧 TransactionHistory: Calculated total from individual expenses for group "${group.name}": $${(totalAmount || 0).toFixed(2)}`);
+            logger.info('Calculated total from individual expenses for group', { groupName: group.name, totalAmount: (totalAmount || 0).toFixed(2) }, 'TransactionHistoryScreen');
           }
         } catch (error) {
           console.error(`Error fetching individual expenses for group ${group.id}:`, error);
@@ -421,8 +422,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
 
     loadFilteredTransactions();
   }, [createUnifiedTransactionList, activeTab]);
-  console.log('🔍 Filtered transactions:', filteredTransactions.length, 'Active tab:', activeTab);
-  console.log('👥 Groups:', groups.length);
+  logger.debug('Filtered transactions and groups', { filteredCount: filteredTransactions.length, activeTab, groupsCount: groups.length }, 'TransactionHistoryScreen');
 
   // Render unified transaction item
   const renderUnifiedTransactionItem = (transaction: any) => {

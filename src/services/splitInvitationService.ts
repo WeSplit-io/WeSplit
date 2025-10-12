@@ -105,7 +105,7 @@ export class SplitInvitationService {
     userId: string
   ): Promise<SplitJoinResult> {
     try {
-      console.log('🔍 SplitInvitationService: joinSplit called with:', {
+      logger.info('joinSplit called with', {
         invitationData,
         userId
       });
@@ -118,7 +118,7 @@ export class SplitInvitationService {
 
       // Validate invitation
       if (invitationData.creatorId === userId) {
-        console.log('🔍 SplitInvitationService: User trying to join their own split');
+        logger.warn('User trying to join their own split', null, 'splitInvitationService');
         return {
           success: false,
           error: 'You cannot join your own split',
@@ -141,7 +141,7 @@ export class SplitInvitationService {
       const { SplitStorageService } = await import('./splitStorageService');
       const splitResult = await SplitStorageService.getSplit(invitationData.splitId);
       
-      console.log('🔍 SplitInvitationService: Split fetch result:', {
+      logger.info('Split fetch result', {
         success: splitResult.success,
         hasSplit: !!splitResult.split,
         splitId: splitResult.split?.id,
@@ -149,7 +149,7 @@ export class SplitInvitationService {
       });
       
       if (!splitResult.success || !splitResult.split) {
-        console.log('🔍 SplitInvitationService: Split not found or error:', splitResult.error);
+        logger.warn('Split not found or error', { error: splitResult.error }, 'splitInvitationService');
         return {
           success: false,
           error: 'Split not found or has been deleted',
@@ -157,7 +157,7 @@ export class SplitInvitationService {
       }
 
       const split = splitResult.split;
-      console.log('🔍 SplitInvitationService: Split data:', {
+      logger.info('Split data', {
         id: split.id,
         title: split.title,
         participantsCount: split.participants.length,
@@ -169,7 +169,7 @@ export class SplitInvitationService {
 
       // 2. Check if user is already a participant
       const existingParticipant = split.participants.find(p => p.userId === userId);
-      console.log('🔍 SplitInvitationService: Existing participant check:', {
+      logger.info('Existing participant check', {
         userId,
         existingParticipant: existingParticipant ? {
           userId: existingParticipant.userId,
@@ -182,7 +182,7 @@ export class SplitInvitationService {
       if (existingParticipant) {
         // If user is already accepted, they're already in the split
         if (existingParticipant.status === 'accepted') {
-          console.log('🔍 SplitInvitationService: User already accepted');
+          logger.info('User already accepted', null, 'splitInvitationService');
           return {
             success: true,
             splitId: invitationData.splitId,
@@ -192,7 +192,7 @@ export class SplitInvitationService {
         
         // If user is pending or invited, update their status to accepted
         if (existingParticipant.status === 'pending' || existingParticipant.status === 'invited') {
-          console.log('🔍 SplitInvitationService: User is pending/invited, updating status to accepted');
+          logger.info('User is pending/invited, updating status to accepted', null, 'splitInvitationService');
           logger.info('User is pending/invited, updating status to accepted', {
             splitId: invitationData.splitId,
             userId,
@@ -207,7 +207,7 @@ export class SplitInvitationService {
           };
           
           const updateResult = await SplitStorageService.addParticipant(invitationData.splitId, updatedParticipant);
-          console.log('🔍 SplitInvitationService: Update participant result:', updateResult);
+          logger.info('Update participant result', { updateResult }, 'splitInvitationService');
           
           if (!updateResult.success) {
             return {
@@ -244,7 +244,7 @@ export class SplitInvitationService {
         }
         
         // If user has some other status, return an error
-        console.log('🔍 SplitInvitationService: User has invalid status:', existingParticipant.status);
+        logger.warn('User has invalid status', { status: existingParticipant.status }, 'splitInvitationService');
         return {
           success: false,
           error: `You cannot join this split with your current status: ${existingParticipant.status}`,

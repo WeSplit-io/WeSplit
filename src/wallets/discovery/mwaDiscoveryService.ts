@@ -7,6 +7,7 @@ import { Platform, Linking } from 'react-native';
 import { WALLET_PROVIDER_REGISTRY, WalletProviderInfo, getMWASupportedProviders } from '../providers/registry';
 import { startRemoteScenario, transact } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import { SolanaMobileWalletAdapterError, SolanaMobileWalletAdapterErrorCode } from '@solana-mobile/mobile-wallet-adapter-protocol';
+import { logger } from '../services/loggingService';
 
 export interface MWADiscoveryResult {
   provider: WalletProviderInfo;
@@ -45,7 +46,7 @@ class MWADiscoveryService {
       includeUnsupported = false
     } = options;
 
-    console.log('🔍 MWA Discovery: Starting provider discovery...', {
+    logger.info('Starting provider discovery', {
       timeout,
       useCache,
       includeUnsupported,
@@ -80,7 +81,7 @@ class MWADiscoveryService {
         })
         .filter(result => result !== null) as MWADiscoveryResult[];
 
-      console.log('🔍 MWA Discovery: Discovery completed', {
+      logger.info('Discovery completed', {
         totalProviders: providers.length,
         availableProviders: discoveryResults.filter(r => r.isAvailable).length,
         results: discoveryResults.map(r => ({
@@ -111,12 +112,12 @@ class MWADiscoveryService {
     if (useCache) {
       const cached = this.discoveryCache.get(cacheKey);
       if (cached && this.isCacheValid(cached.timestamp)) {
-        console.log(`🔍 MWA Discovery: Using cached result for ${provider.name}`);
+        logger.debug('Using cached result for', { providerName: provider.name }, 'mwaDiscoveryService');
         return cached;
       }
     }
 
-    console.log(`🔍 MWA Discovery: Discovering ${provider.name}...`);
+    logger.info('Discovering provider', { providerName: provider.name }, 'mwaDiscoveryService');
 
     try {
       const result = await this.performDiscovery(provider, timeout);
@@ -126,7 +127,7 @@ class MWADiscoveryService {
         this.discoveryCache.set(cacheKey, result);
       }
 
-      console.log(`🔍 MWA Discovery: ${provider.name} discovery completed`, {
+      logger.info('Provider discovery completed', {
         available: result.isAvailable,
         method: result.detectionMethod,
         error: result.error
@@ -222,14 +223,14 @@ class MWADiscoveryService {
     provider: WalletProviderInfo, 
     timeout: number
   ): Promise<MWADiscoveryResult> {
-    console.log(`🔍 MWA Discovery: Trying MWA discovery for ${provider.name}`);
+    logger.info('Trying MWA discovery for', { providerName: provider.name }, 'mwaDiscoveryService');
     
     try {
       // For now, we'll use a simplified MWA test
       // The actual MWA API requires more complex setup
       // This is a placeholder that will be updated when we have the full MWA implementation
       
-      console.log('🔍 MWA Discovery: Testing MWA availability for', provider.name);
+      logger.debug('Testing MWA availability for', { providerName: provider.name }, 'mwaDiscoveryService');
       
       // Simulate MWA discovery test
       // In a real implementation, this would use the actual MWA protocol
@@ -239,9 +240,9 @@ class MWADiscoveryService {
       const isAvailable = provider.mwaSupported || false;
       
       if (isAvailable) {
-        console.log('✅ MWA Discovery: Provider available via MWA', provider.name);
+        logger.info('Provider available via MWA', { providerName: provider.name }, 'mwaDiscoveryService');
       } else {
-        console.log('❌ MWA Discovery: Provider not available via MWA', provider.name);
+        logger.warn('Provider not available via MWA', { providerName: provider.name }, 'mwaDiscoveryService');
       }
       
       return {
@@ -252,7 +253,7 @@ class MWADiscoveryService {
       };
       
     } catch (mwaError) {
-      console.log('❌ MWA Discovery: Provider not available via MWA', provider.name, mwaError);
+      logger.warn('Provider not available via MWA', { providerName: provider.name, error: mwaError.message }, 'mwaDiscoveryService');
       
       return {
         provider,
@@ -271,7 +272,7 @@ class MWADiscoveryService {
     provider: WalletProviderInfo, 
     timeout: number
   ): Promise<MWADiscoveryResult> {
-    console.log(`🔍 MWA Discovery: Trying deep link discovery for ${provider.name}`);
+    logger.info('Trying deep link discovery for', { providerName: provider.name }, 'mwaDiscoveryService');
     
     if (!provider.deepLinkScheme) {
       return {
@@ -315,7 +316,7 @@ class MWADiscoveryService {
     provider: WalletProviderInfo, 
     timeout: number
   ): Promise<MWADiscoveryResult> {
-    console.log(`🔍 MWA Discovery: Trying package discovery for ${provider.name}`);
+    logger.info('Trying package discovery for', { providerName: provider.name }, 'mwaDiscoveryService');
     
     if (Platform.OS !== 'android' || !provider.packageName) {
       return {
@@ -364,7 +365,7 @@ class MWADiscoveryService {
    * Clear discovery cache
    */
   clearCache(): void {
-    console.log('🔍 MWA Discovery: Clearing discovery cache');
+    logger.info('Clearing discovery cache', null, 'mwaDiscoveryService');
     this.discoveryCache.clear();
   }
 
@@ -384,7 +385,7 @@ class MWADiscoveryService {
       throw new Error(`Provider ${providerName} not found`);
     }
 
-    console.log(`🔍 MWA Discovery: Testing discovery for ${providerName}`);
+    logger.info('Testing discovery for', { providerName }, 'mwaDiscoveryService');
     return this.discoverProvider(provider, { useCache: false });
   }
 

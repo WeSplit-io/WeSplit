@@ -9,6 +9,7 @@ import { useApp } from '../context/AppContext';
 import { consolidatedBillAnalysisService } from '../services/consolidatedBillAnalysisService';
 import { SplitStorageService } from '../services/splitStorageService';
 import { UnifiedBillData } from '../types/unified';
+import { logger } from '../services/loggingService';
 
 interface UseSplitDetailsParams {
   routeParams: any;
@@ -231,7 +232,7 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
   // Copy to clipboard
   const copyToClipboard = useCallback((text: string) => {
     // This would typically use a clipboard library
-    console.log('Copy to clipboard:', text);
+    logger.info('Copy to clipboard', { text }, 'useSplitDetails');
   }, []);
 
   // Load data on mount

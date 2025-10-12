@@ -12,6 +12,8 @@ export type {
   PaymentResult
 } from './types';
 
+// Import utility functions - using inline implementation to avoid import issues
+
 // Import modules using dynamic imports to avoid circular dependencies
 let SplitWalletCreation: any;
 let SplitWalletManagement: any;
@@ -50,8 +52,8 @@ export class SplitWalletService {
   // Creation methods
   static roundUsdcAmount(amount: number) {
     // These are synchronous utility methods, so we can call them directly
-    const { roundUsdcAmount } = require('../../utils/currencyUtils');
-    return roundUsdcAmount(amount);
+    // Use inline implementation to avoid import issues
+    return Math.round(amount * 1000000) / 1000000;
   }
 
   static isValidWalletAddress(address: string) {

@@ -1,6 +1,7 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { initializeApp } from 'firebase/app';
 import Constants from 'expo-constants';
+import { logger } from './loggingService';
 
 // Get environment variables from Expo Constants
 const getEnvVar = (key: string): string => {
@@ -85,14 +86,14 @@ export const createMoonPayURL = async (
   currency: string = 'usdc'
 ): Promise<MoonPayURLResponse> => {
   try {
-    console.log('🔍 Firebase MoonPay: Creating URL...', {
+    logger.info('Creating URL', {
       walletAddress,
       amount,
       currency
     });
 
     // Verify wallet address format and log details
-    console.log('🔍 Firebase MoonPay: Wallet address verification:', {
+    logger.debug('Wallet address verification', {
       walletAddress,
       addressLength: walletAddress?.length,
       addressFormat: walletAddress ? 'Solana (base58)' : 'Not available',
@@ -103,7 +104,7 @@ export const createMoonPayURL = async (
     // MoonPay supports USDC on Solana with currency code 'usdc_sol'
     const solanaCurrency = currency === 'usdc' ? 'usdc_sol' : currency;
 
-    console.log('🔍 Firebase MoonPay: Currency mapping:', {
+    logger.debug('Currency mapping', {
       originalCurrency: currency,
       solanaCurrency,
       amount
@@ -120,7 +121,7 @@ export const createMoonPayURL = async (
       data.amount = amount;
     }
 
-    console.log('🔍 Firebase MoonPay: Calling Firebase function with data:', data);
+    logger.debug('Calling Firebase function with data', { data }, 'firebaseMoonPayService');
 
     // Call Firebase Function - authentication is handled by the function
     const createMoonPayURLFunction = httpsCallable(functions, 'createMoonPayURL', {
@@ -129,7 +130,7 @@ export const createMoonPayURL = async (
     const result = await createMoonPayURLFunction(data);
 
     const response = result.data as MoonPayURLResponse;
-    console.log('🔍 Firebase MoonPay: URL created successfully:', {
+    logger.info('URL created successfully', {
       url: response.url,
       walletAddress: response.walletAddress,
       currency: response.currency,
@@ -172,7 +173,7 @@ export const getMoonPayTransactionStatus = async (
   transactionId: string
 ): Promise<MoonPayTransactionStatusResponse> => {
   try {
-    console.log('🔍 Firebase MoonPay: Getting transaction status...', { transactionId });
+    logger.info('Getting transaction status', { transactionId }, 'firebaseMoonPayService');
 
     // Call Firebase Function - authentication is handled by the function
     const getTransactionStatusFunction = httpsCallable(functions, 'getMoonPayTransactionStatus', {
@@ -181,7 +182,7 @@ export const getMoonPayTransactionStatus = async (
     const result = await getTransactionStatusFunction({ transactionId });
 
     const response = result.data as MoonPayTransactionStatusResponse;
-    console.log('🔍 Firebase MoonPay: Transaction status retrieved:', response);
+    logger.info('Transaction status retrieved', { response }, 'firebaseMoonPayService');
 
     return response;
   } catch (error) {
@@ -195,7 +196,7 @@ export const getUserMoonPayTransactions = async (
   limit: number = 10
 ): Promise<{ transactions: MoonPayTransaction[] }> => {
   try {
-    console.log('🔍 Firebase MoonPay: Getting user transactions...', { limit });
+    logger.info('Getting user transactions', { limit }, 'firebaseMoonPayService');
 
     // Call Firebase Function - authentication is handled by the function
     const getUserTransactionsFunction = httpsCallable(functions, 'getUserMoonPayTransactions', {
@@ -204,7 +205,7 @@ export const getUserMoonPayTransactions = async (
     const result = await getUserTransactionsFunction({ limit });
 
     const response = result.data as { transactions: MoonPayTransaction[] };
-    console.log('🔍 Firebase MoonPay: User transactions retrieved:', response);
+    logger.info('User transactions retrieved', { response }, 'firebaseMoonPayService');
 
     return response;
   } catch (error) {
@@ -219,16 +220,16 @@ export const pollTransactionStatus = async (
   maxAttempts: number = 30,
   intervalMs: number = 2000
 ): Promise<MoonPayTransactionStatusResponse> => {
-  console.log('🔍 Firebase MoonPay: Starting transaction polling...', { transactionId });
+  logger.info('Starting transaction polling', { transactionId }, 'firebaseMoonPayService');
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const status = await getMoonPayTransactionStatus(transactionId);
       
-      console.log(`🔍 Firebase MoonPay: Poll attempt ${attempt}/${maxAttempts}:`, status);
+      logger.debug(`Poll attempt ${attempt}/${maxAttempts}`, { status }, 'firebaseMoonPayService');
 
       if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
-        console.log('🔍 Firebase MoonPay: Transaction polling completed:', status.status);
+        logger.info('Transaction polling completed', { status: status.status }, 'firebaseMoonPayService');
         return status;
       }
 

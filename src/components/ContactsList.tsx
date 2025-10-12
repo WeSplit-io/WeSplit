@@ -10,6 +10,7 @@ import { parseWeSplitDeepLink, handleJoinGroupDeepLink, handleAddContactFromProf
 import { UserContact, User } from '../types';
 import { colors } from '../theme';
 import { styles } from './ContactsList.styles';
+import { logger } from '../services/loggingService';
 import UserAvatar from './UserAvatar';
 
 interface ContactsListProps {
@@ -118,20 +119,18 @@ const ContactsList: React.FC<ContactsListProps> = ({
   // Handle user search
   const handleUserSearch = async (query: string) => {
     if (!query.trim() || query.length < 2) {
-      console.log('🔍 Search query too short or empty:', query);
       setSearchResults([]);
       return;
     }
 
     try {
-      console.log('🔍 Starting user search for:', query);
+      logger.info('Starting user search for', { query }, 'ContactsList');
       setIsSearching(true);
       const results = await firebaseDataService.group.searchUsersByUsername(
         query.trim(),
         currentUser?.id ? String(currentUser.id) : undefined
       );
-      console.log('🔍 Search results received:', results.length, 'users');
-      console.log('🔍 Search results:', results.map(r => ({ name: r.name, email: r.email })));
+      logger.info('Search results received', { count: results.length, results: results.map(r => ({ name: r.name, email: r.email })) }, 'ContactsList');
       setSearchResults(results);
     } catch (error) {
       console.error('❌ Error searching users:', error);
@@ -143,35 +142,33 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
   // Debounced search
   useEffect(() => {
-    console.log('🔍 Search effect triggered:', { activeTab, searchQuery: searchQuery.trim() });
+    logger.debug('Search effect triggered', { activeTab, searchQuery: searchQuery.trim() }, 'ContactsList');
     
     if (activeTab === 'Search' && searchQuery.trim()) {
-      console.log('🔍 Setting up debounced search for:', searchQuery);
+      logger.debug('Setting up debounced search for', { searchQuery }, 'ContactsList');
       const timeoutId = setTimeout(() => {
         handleUserSearch(searchQuery);
       }, 500);
 
       return () => clearTimeout(timeoutId);
     } else if (activeTab === 'Search') {
-      console.log('🔍 Clearing search results - no query');
       setSearchResults([]);
     } else {
       // Clear search results when not in search tab
-      console.log('🔍 Clearing search results - not in search tab');
       setSearchResults([]);
     }
   }, [searchQuery, activeTab]);
 
   const loadContacts = async () => {
     if (!currentUser) {
-      console.log('No current user found');
+      logger.warn('No current user found', null, 'ContactsList');
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      console.log('🔄 Loading contacts for user:', currentUser.id, 'groupId:', groupId);
+      logger.info('Loading contacts for user', { userId: currentUser.id, groupId }, 'ContactsList');
 
       if (groupId && group?.members) {
         // Use cached group members from useGroupData hook
@@ -183,11 +180,11 @@ const ContactsList: React.FC<ContactsListProps> = ({
           mutual_groups_count: 1,
           isFavorite: false // Default to false for group members
         }));
-        console.log('📱 Loaded', otherMembers.length, 'group members');
+        logger.info('Loaded group members', { count: otherMembers.length }, 'ContactsList');
         setContacts(otherMembers);
       } else {
         // Load contacts from both sources: groups and user's added contacts
-        console.log('📱 Loading all user contacts...');
+        logger.info('Loading all user contacts', null, 'ContactsList');
 
         // Get contacts from groups
         const groupContacts = await firebaseDataService.group.getUserContacts(currentUser.id.toString());
@@ -251,13 +248,16 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
         const allContacts = Array.from(contactsMap.values());
 
-        console.log('📱 Loaded', allContacts.length, 'total contacts:', allContacts.map((c: UserContact) => ({
-          name: c.name || 'No name',
-          email: c.email,
-          wallet: c.wallet_address ? formatWalletAddress(c.wallet_address) : 'No wallet',
-          fullWallet: c.wallet_address,
-          source: contactsMap.has(String(c.id)) ? 'combined' : 'unknown'
-        })));
+        logger.info('Loaded total contacts', { 
+          count: allContacts.length, 
+          contacts: allContacts.map((c: UserContact) => ({
+            name: c.name || 'No name',
+            email: c.email,
+            wallet: c.wallet_address ? formatWalletAddress(c.wallet_address) : 'No wallet',
+            fullWallet: c.wallet_address,
+            source: contactsMap.has(String(c.id)) ? 'combined' : 'unknown'
+          }))
+        }, 'ContactsList');
 
         setContacts(allContacts);
       }
@@ -280,7 +280,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
     );
 
     if (existingContact) {
-      console.log('⚠️ Contact already exists:', user.name);
+      logger.warn('Contact already exists', { name: user.name }, 'ContactsList');
       return;
     }
 
@@ -293,7 +293,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
       // Refresh contacts list
       await loadContacts();
 
-      console.log('✅ Contact added successfully:', user.name);
+      logger.info('Contact added successfully', { userName: user.name }, 'ContactsList');
     } catch (error) {
       console.error('❌ Error adding contact:', error);
     } finally {
@@ -334,7 +334,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
     setIsProcessingQR(true);
     
     try {
-      console.log('🔍 Scanned QR code:', data);
+      logger.info('Scanned QR code', { data }, 'ContactsList');
       
       // Parse the deep link
       const linkData = parseWeSplitDeepLink(data);
@@ -344,7 +344,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
         return;
       }
       
-      console.log('🔍 Parsed QR data:', linkData);
+      logger.info('Parsed QR data', { linkData }, 'ContactsList');
       
       // Handle different QR code types
       switch (linkData.action) {
@@ -495,7 +495,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
   const renderContact = (item: UserContact, section: 'friends' | 'others' | 'all' | 'favorite') => {
     // Debug logging for contact avatar data
-    console.log('🔍 ContactsList: Rendering contact:', {
+    logger.debug('Rendering contact', {
       id: item.id,
       name: item.name,
       avatar: item.avatar,
@@ -717,7 +717,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                     <Text style={styles.sectionTitle}>Search Results</Text>
                     {searchResults.map((user) => {
                       // Debug logging for search result user data
-                      console.log('🔍 ContactsList: Search result user:', {
+                      logger.debug('Search result user', {
                         id: user.id,
                         name: user.name,
                         avatar: user.avatar,

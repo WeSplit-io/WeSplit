@@ -5,6 +5,7 @@
 
 import { Platform } from 'react-native';
 import { getEnvVar, getPlatformGoogleClientId, getOAuthRedirectUri } from './environmentUtils';
+import { logger } from 'services/loggingService';
 
 export interface OAuthDebugInfo {
   platform: string;
@@ -98,15 +99,16 @@ export function debugOAuthConfiguration(): OAuthDebugInfo {
 export function logOAuthDebugInfo(): void {
   const debugInfo = debugOAuthConfiguration();
   
-  console.log('🔍 OAuth Configuration Debug:');
-  console.log('================================');
-  console.log('Platform:', debugInfo.platform);
-  console.log('Client IDs:');
-  console.log('  Web:', debugInfo.clientIds.web.substring(0, 20) + '...');
-  console.log('  Android:', debugInfo.clientIds.android.substring(0, 20) + '...');
-  console.log('  iOS:', debugInfo.clientIds.ios.substring(0, 20) + '...');
-  console.log('  Current:', debugInfo.clientIds.current.substring(0, 20) + '...');
-  console.log('Redirect URI:', debugInfo.redirectUri);
+  logger.info('OAuth Configuration Debug', {
+    platform: debugInfo.platform,
+    clientIds: {
+      web: debugInfo.clientIds.web.substring(0, 20) + '...',
+      android: debugInfo.clientIds.android.substring(0, 20) + '...',
+      ios: debugInfo.clientIds.ios.substring(0, 20) + '...',
+      current: debugInfo.clientIds.current.substring(0, 20) + '...'
+    },
+    redirectUri: debugInfo.redirectUri
+  }, 'oauthDebugger');
   
   if (debugInfo.issues.length > 0) {
     console.warn('⚠️ Issues Found:');
@@ -114,15 +116,13 @@ export function logOAuthDebugInfo(): void {
   }
   
   if (debugInfo.recommendations.length > 0) {
-    console.log('💡 Recommendations:');
-    debugInfo.recommendations.forEach(rec => console.log('  -', rec));
+    logger.info('Recommendations', { recommendations: debugInfo.recommendations }, 'oauthDebugger');
   }
   
-  console.log('================================');
   
   if (debugInfo.issues.length === 0) {
-    console.log('✅ OAuth configuration looks correct!');
+    logger.info('OAuth configuration looks correct', null, 'oauthDebugger');
   } else {
-    console.log('❌ OAuth configuration has issues that need to be fixed.');
+    logger.warn('OAuth configuration has issues that need to be fixed', null, 'oauthDebugger');
   }
 }

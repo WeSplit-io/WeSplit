@@ -5,7 +5,7 @@
  */
 
 import { logger } from '../services/loggingService';
-import { calculateEqualSplit as currencyCalculateEqualSplit, roundUsdcAmount } from './currencyUtils';
+import { calculateEqualSplit as currencyCalculateEqualSplit } from './currencyUtils';
 
 // Types
 export interface SplitCalculationResult {

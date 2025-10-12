@@ -9,6 +9,7 @@ import { Clipboard } from 'react-native';
 import styles from './styles';
 import { colors } from '../../theme';
 import { generateTransferLink } from '../../services/deepLinkHandler';
+import { logger } from '../../services/loggingService';
 
 interface CryptoTransferParams {
   targetWallet?: {
@@ -51,7 +52,7 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
   const [isTransferring, setIsTransferring] = useState(false);
 
   const handleExternalWalletConnectionSuccess = (result: any) => {
-    console.log('🔐 CryptoTransfer: External wallet connected successfully:', result);
+    logger.info('External wallet connected successfully', { result }, 'CryptoTransferScreen');
     
     Alert.alert(
       'External Wallet Connected',

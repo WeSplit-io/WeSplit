@@ -34,6 +34,7 @@ import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { initializeFirebaseAuth } from './firebasePersistence';
+import { logger } from '../services/loggingService';
 
 // Get environment variables from Expo Constants
 const getEnvVar = (key: string): string => {
@@ -353,11 +354,7 @@ export const firestoreService = {
       const hasVerifiedWithin30Days = lastVerified > thirtyDaysAgo;
       
       if (__DEV__) {
-        console.log('📅 30-day verification check for', email);
-        console.log('Last verified:', lastVerified);
-        console.log('Current date:', now);
-        console.log('30 days ago:', thirtyDaysAgo);
-        console.log('Has verified within 30 days:', hasVerifiedWithin30Days);
+        logger.debug('30-day verification check', { email, lastVerified, now, thirtyDaysAgo, hasVerifiedWithin30Days }, 'firebase');
       }
       
       return hasVerifiedWithin30Days;
@@ -383,7 +380,7 @@ export const firestoreService = {
         });
         
         if (__DEV__) {
-          console.log('✅ Updated lastVerifiedAt for', email);
+          logger.info('Updated lastVerifiedAt for', { email }, 'firebase');
         }
       }
     } catch (error) {
@@ -419,7 +416,7 @@ export const firestoreService = {
       }
       
       if (fixedCount > 0) {
-        console.log(`✅ Fixed ${fixedCount} users with invalid lastVerifiedAt dates`);
+        logger.info('Fixed users with invalid lastVerifiedAt dates', { fixedCount }, 'firebase');
       }
       
       return fixedCount;
@@ -441,7 +438,7 @@ export const firestoreService = {
       // Check if user has a wallet address (indicates they've gone through the setup process)
       if (userData.wallet_address && userData.wallet_address.trim() !== '') {
         if (__DEV__) {
-          console.log('✅ Existing user has wallet, assuming onboarding completed');
+          logger.info('Existing user has wallet, assuming onboarding completed', null, 'firebase');
         }
         // Update the user document to set hasCompletedOnboarding to true
         await this.updateExistingUserOnboardingStatus(userData.id, true);
@@ -451,7 +448,7 @@ export const firestoreService = {
       // Check if user has a name (indicates they've created a profile)
       if (userData.name && userData.name.trim() !== '') {
         if (__DEV__) {
-          console.log('✅ Existing user has name, assuming onboarding completed');
+          logger.info('Existing user has name, assuming onboarding completed', null, 'firebase');
         }
         // Update the user document to set hasCompletedOnboarding to true
         await this.updateExistingUserOnboardingStatus(userData.id, true);
@@ -461,7 +458,7 @@ export const firestoreService = {
       // Check if user has been verified before (indicates they've used the app)
       if (userData.lastVerifiedAt) {
         if (__DEV__) {
-          console.log('✅ Existing user has verification history, assuming onboarding completed');
+          logger.info('Existing user has verification history, assuming onboarding completed', null, 'firebase');
         }
         // Update the user document to set hasCompletedOnboarding to true
         await this.updateExistingUserOnboardingStatus(userData.id, true);
@@ -470,7 +467,7 @@ export const firestoreService = {
 
       // Default to false for truly new users
       if (__DEV__) {
-        console.log('❓ Existing user has no activity indicators, requiring onboarding');
+        logger.info('Existing user has no activity indicators, requiring onboarding', null, 'firebase');
       }
       return false;
     } catch (error) {
@@ -489,7 +486,7 @@ export const firestoreService = {
       });
       
       if (__DEV__) {
-        console.log(`✅ Updated onboarding status for user ${userId}: ${hasCompletedOnboarding}`);
+        logger.info('Updated onboarding status for user', { userId, hasCompletedOnboarding }, 'firebase');
       }
     } catch (error) {
       console.error('Error updating existing user onboarding status:', error);
@@ -539,7 +536,7 @@ export const firestoreService = {
       const existingCodesSnapshot = await getDocs(existingCodesQuery);
       
       if (__DEV__) { 
-        console.log('🧹 Cleaning up', existingCodesSnapshot.docs.length, 'existing unused codes for', email);
+        logger.info('Cleaning up existing unused codes', { count: existingCodesSnapshot.docs.length, email }, 'firebase');
       }
       
       // Delete existing unused codes
@@ -556,7 +553,7 @@ export const firestoreService = {
       });
       
       if (__DEV__) { 
-        console.log('💾 Stored new verification code:', code, 'for email:', email);
+        logger.info('Stored new verification code', { code, email }, 'firebase');
       }
     } catch (error) {
       console.error('Error storing verification code:', error);
@@ -567,7 +564,7 @@ export const firestoreService = {
   // Verify code from Firestore
   async verifyCode(email: string, code: string): Promise<boolean> {
     try {
-      if (__DEV__) { console.log('🔍 Firestore: Looking for code', code, 'for email', email); }
+      if (__DEV__) { logger.debug('Looking for code', { code, email }, 'firebase'); }
       
       const verificationRef = collection(db, 'verificationCodes');
       const q = query(
@@ -579,7 +576,7 @@ export const firestoreService = {
       
       const querySnapshot = await getDocs(q);
       
-      if (__DEV__) { console.log('🔍 Firestore: Found', querySnapshot.docs.length, 'matching documents'); }
+      if (__DEV__) { logger.debug('Found matching documents', { count: querySnapshot.docs.length }, 'firebase'); }
       
       // Debug: Show all verification codes for this email
       if (__DEV__) {
@@ -588,40 +585,42 @@ export const firestoreService = {
           where('email', '==', email)
         );
         const allCodesSnapshot = await getDocs(allCodesQuery);
-        console.log('🔍 Firestore: All codes for this email:', allCodesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          code: doc.data().code,
-          used: doc.data().used,
-          expiresAt: doc.data().expiresAt,
-          createdAt: doc.data().createdAt
-        })));
+        logger.debug('All codes for this email', { 
+          codes: allCodesSnapshot.docs.map(doc => ({
+            id: doc.id,
+            code: doc.data().code,
+            used: doc.data().used,
+            expiresAt: doc.data().expiresAt,
+            createdAt: doc.data().createdAt
+          }))
+        }, 'firebase');
       }
       
       if (querySnapshot.empty) {
-        if (__DEV__) { console.log('🔍 Firestore: No matching documents found'); }
+        if (__DEV__) { logger.debug('No matching documents found', null, 'firebase'); }
         return false;
       }
 
       const doc = querySnapshot.docs[0];
       const data = doc.data();
       
-      if (__DEV__) { console.log('🔍 Firestore: Document data:', data); }
+      if (__DEV__) { logger.debug('Document data', { data }, 'firebase'); }
       
       // Check if code is expired
       const expiresAt = data.expiresAt?.toDate ? data.expiresAt.toDate() : new Date(data.expiresAt);
       const now = new Date();
       
-      if (__DEV__) { console.log('🔍 Firestore: Code expires at:', expiresAt, 'Current time:', now); }
+      if (__DEV__) { logger.debug('Code expires at', { expiresAt, now }, 'firebase'); }
       
       if (now > expiresAt) {
-        if (__DEV__) { console.log('🔍 Firestore: Code is expired'); }
+        if (__DEV__) { logger.debug('Code is expired', null, 'firebase'); }
         return false;
       }
 
       // Mark code as used
       await updateDoc(doc.ref, { used: true });
       
-      if (__DEV__) { console.log('🔍 Firestore: Code verified successfully'); }
+      if (__DEV__) { logger.info('Code verified successfully', null, 'firebase'); }
       return true;
     } catch (error) {
       console.error('Error verifying code:', error);
@@ -640,7 +639,7 @@ export const firestoreService = {
       const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
       await Promise.all(deletePromises);
       
-      console.log(`Cleaned up ${querySnapshot.docs.length} expired verification codes`);
+      logger.info('Cleaned up expired verification codes', { count: querySnapshot.docs.length }, 'firebase');
     } catch (error) {
       console.error('Error cleaning up expired codes:', error);
     }

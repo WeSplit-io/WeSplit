@@ -15,6 +15,7 @@ import { firebaseDataService } from '../../services/firebaseDataService';
 import { styles } from './styles';
 import { colors } from '../../theme/colors';
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
+import { logger } from '../../services/loggingService';
 
 // Updated categories with more vibrant colors matching the screenshots
 const categories = [
@@ -331,12 +332,12 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
         converted_currency: 'USDC'
       };
 
-      console.log('🔄 AddExpenseScreen: Creating expense with data:', expenseData);
+      logger.info('Creating expense with data', { expenseData }, 'AddExpenseScreen');
 
       // Use context method to create expense
       const result = await createExpense(expenseData);
 
-      console.log('✅ AddExpenseScreen: Expense created successfully:', result);
+      logger.info('Expense created successfully', { result }, 'AddExpenseScreen');
 
       // Send notifications to all group members except the payer
       try {
@@ -350,7 +351,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
           }
           
           // Debug logging for notification creation
-          console.log('🔄 AddExpenseScreen: Creating notification for member:', {
+          logger.info('Creating notification for member', {
             memberId: member.id,
             memberName: member.name,
             userId: String(member.id)
@@ -373,7 +374,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
           });
         }
 
-        console.log('✅ AddExpenseScreen: Notifications sent to', membersToNotify.length, 'members');
+        logger.info('Notifications sent to members', { count: membersToNotify.length }, 'AddExpenseScreen');
       } catch (notificationError) {
         console.error('❌ AddExpenseScreen: Error sending notifications:', notificationError);
         // Don't fail the expense creation if notifications fail
@@ -388,7 +389,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
         convertedAmount: convertedAmount
       };
       
-      console.log('🔄 AddExpenseScreen: Navigating to ExpenseSuccess with params:', {
+      logger.info('Navigating to ExpenseSuccess with params', {
         groupId: selectedGroup?.id,
         groupName: selectedGroup?.name,
         expenseId: result?.id
@@ -487,7 +488,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
 
       if (!result.canceled && result.assets && result.assets[0]) {
         setSelectedImage(result.assets[0].uri);
-        console.log('Photo taken:', result.assets[0].uri);
+        logger.info('Photo taken', { uri: result.assets[0].uri }, 'AddExpenseScreen');
       }
     } catch (error) {
       console.error('Error taking photo:', error);
@@ -514,7 +515,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
 
       if (!result.canceled && result.assets && result.assets[0]) {
         setSelectedImage(result.assets[0].uri);
-        console.log('Selected image:', result.assets[0].uri);
+        logger.info('Selected image', { uri: result.assets[0].uri }, 'AddExpenseScreen');
       }
     } catch (error) {
       console.error('Error picking image:', error);

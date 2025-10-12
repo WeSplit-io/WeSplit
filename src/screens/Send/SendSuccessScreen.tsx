@@ -6,6 +6,7 @@ import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { notificationService } from '../../services/notificationService';
+import { logger } from '../../services/loggingService';
 
 const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, wallet, destinationType, amount, description, groupId, transactionId, isSettlement, fromNotification, notificationId } = route.params || {};
@@ -16,7 +17,7 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
     const completeNotificationProcess = async () => {
       if (fromNotification && notificationId && transactionId) {
         try {
-          console.log('🔍 SendSuccess: Completing notification process for payment request');
+          logger.info('Completing notification process for payment request', null, 'SendSuccessScreen');
           
           // Get current user ID from navigation state or context
           // For now, we'll use a placeholder - in a real app, you'd get this from context
@@ -34,7 +35,7 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
             }
           );
           
-          console.log('🔍 SendSuccess: Notification process completed successfully');
+          logger.info('Notification process completed successfully', null, 'SendSuccessScreen');
         } catch (error) {
           console.error('🔍 SendSuccess: Failed to complete notification process:', error);
           // Don't fail the success screen if notification completion fails

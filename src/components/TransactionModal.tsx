@@ -13,6 +13,7 @@ import {
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import { Animated } from 'react-native';
 import { colors } from '../theme/colors';
+import { logger } from '../services/loggingService';
 import { FeeService, TransactionType } from '../config/feeConfig';
 import { Transaction } from '../types';
 import { styles } from './TransactionModal.styles';
@@ -184,7 +185,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const { amount, color } = getTransactionAmount(transaction);
 
   // Debug logs
-  console.log('🔍 Transaction Modal Debug:', {
+  logger.debug('Transaction Modal Debug', {
     type: transaction.type,
     amount: transaction.amount,
     currency: transaction.currency,

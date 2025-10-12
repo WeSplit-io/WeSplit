@@ -10,6 +10,7 @@ import UserAvatar from '../../components/UserAvatar';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
+import { logger } from '../../services/loggingService';
 
 const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, groupId } = route.params || {};
@@ -24,7 +25,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Debug logging to ensure contact data is passed correctly
   useEffect(() => {
-    console.log('💰 RequestAmount: Contact data received:', {
+    logger.debug('Contact data received', {
       name: contact?.name || 'No name',
       email: contact?.email,
       wallet: contact?.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet',
@@ -69,7 +70,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
     }
 
     try {
-      console.log('💰 RequestAmount: Creating payment request...', {
+      logger.info('Creating payment request', {
         senderId: currentUser?.id,
         recipientId: contact.id,
         amount: numAmount,
@@ -87,7 +88,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
         groupId
       );
 
-      console.log('✅ RequestAmount: Payment request created successfully:', paymentRequest);
+      logger.info('Payment request created successfully', { paymentRequest }, 'RequestAmountScreen');
 
       // Navigate to success screen with the actual request data
     navigation.navigate('RequestSuccess', {

@@ -1,4 +1,5 @@
 import { apiRequest } from '../config/api';
+import { logger } from './loggingService';
 
 export interface PriceData {
   symbol: string;
@@ -60,7 +61,7 @@ export async function getCryptoPrice(symbol: string): Promise<PriceData | null> 
         lastFetchTime[symbol] = now;
 
         if (__DEV__) {
-          console.log(`💰 Price service: ${symbol} = $${priceUsd} USD/USDC`);
+          logger.info('Price service update', { symbol, priceUsd }, 'priceService');
         }
 
         return priceData;
@@ -94,7 +95,7 @@ export async function convertToUSDC(amount: number, fromCurrency: string): Promi
   const convertedAmount = amount * priceData.price_usdc;
   
   if (__DEV__) {
-    console.log(`💰 Converting ${amount} ${fromCurrency} to USDC: ${amount} × $${priceData.price_usdc} = $${convertedAmount}`);
+    logger.info('Converting currency to USDC', { amount, fromCurrency, priceUsdc: priceData.price_usdc, convertedAmount }, 'priceService');
   }
 
   return convertedAmount;
@@ -126,7 +127,7 @@ export async function getTotalSpendingInUSDC(expenses: Array<{amount: number, cu
   // Check if we have a recent cached result
   if (conversionCache[cacheKey] && (now - conversionCache[cacheKey].timestamp) < CONVERSION_CACHE_DURATION) {
     if (__DEV__) {
-      console.log(`💰 Using cached conversion result: $${conversionCache[cacheKey].value.toFixed(2)}`);
+      logger.debug('Using cached conversion result', { value: conversionCache[cacheKey].value.toFixed(2) }, 'priceService');
     }
     return conversionCache[cacheKey].value;
   }
@@ -145,7 +146,7 @@ export async function getTotalSpendingInUSDC(expenses: Array<{amount: number, cu
   };
 
   if (__DEV__) {
-    console.log(`💰 Cached new conversion result: $${totalUSDC.toFixed(2)}`);
+    logger.debug('Cached new conversion result', { value: totalUSDC.toFixed(2) }, 'priceService');
   }
 
   return totalUSDC;

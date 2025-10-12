@@ -10,6 +10,7 @@ import { firebaseDataService } from '../../services/firebaseDataService';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
+import { logger } from '../../services/loggingService';
 
 interface ContactsScreenProps {
   navigation: any;
@@ -76,7 +77,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
         isFavorite: false
       });
       
-      console.log('✅ Contact added successfully:', user.name);
+      logger.info('Contact added successfully', { name: user.name }, 'ContactsScreen');
     } catch (error) {
       console.error('❌ Error adding contact:', error);
     }

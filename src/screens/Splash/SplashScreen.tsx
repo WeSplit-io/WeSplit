@@ -54,7 +54,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
     // Start animations
     const startAnimations = () => {
-      console.log('🎬 Starting splash screen animations');
+      logger.debug('Starting splash screen animations', null, 'SplashScreen');
 
       // Logo fade in
       Animated.timing(logoOpacity, {
@@ -62,7 +62,6 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
         duration: 800,
         useNativeDriver: true,
       }).start(() => {
-        console.log('✅ Logo fade in completed');
       });
 
       // Progress bar animation
@@ -71,7 +70,6 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
         duration: 2000,
         useNativeDriver: false,
       }).start(() => {
-        console.log('✅ Progress bar animation completed');
       });
     };
 
@@ -90,41 +88,41 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
         if (firebaseUser && firebaseUser.emailVerified) {
           // User is authenticated and email is verified
-          console.log('✅ SplashScreen: User authenticated, checking profile and onboarding status');
+          logger.info('User authenticated, checking profile and onboarding status', null, 'SplashScreen');
 
           // Check if user needs to create a profile (has no name/pseudo)
           const needsProfile = !currentUser?.name || currentUser.name.trim() === '';
 
           if (needsProfile) {
-            console.log('🔄 SplashScreen: User needs to create profile (no name), navigating to CreateProfile');
+            logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'SplashScreen');
             navigation.replace('CreateProfile', { email: currentUser?.email || '' });
           } else if (currentUser?.hasCompletedOnboarding) {
-            console.log('✅ SplashScreen: User completed onboarding, navigating to Dashboard');
+            logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
             navigation.replace('Dashboard');
           } else {
-            console.log('🔄 SplashScreen: User needs onboarding, navigating to Onboarding');
+            logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
             navigation.replace('Onboarding');
           }
         } else if (isAuthenticated && currentUser) {
           // User is authenticated in app context
-          console.log('✅ SplashScreen: User authenticated in app context, checking profile and onboarding status');
+          logger.info('User authenticated in app context, checking profile and onboarding status', null, 'SplashScreen');
 
           // Check if user needs to create a profile (has no name/pseudo)
           const needsProfile = !currentUser.name || currentUser.name.trim() === '';
 
           if (needsProfile) {
-            console.log('🔄 SplashScreen: User needs to create profile (no name), navigating to CreateProfile');
+            logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'SplashScreen');
             navigation.replace('CreateProfile', { email: currentUser.email });
           } else if (currentUser.hasCompletedOnboarding) {
-            console.log('✅ SplashScreen: User completed onboarding, navigating to Dashboard');
+            logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
             navigation.replace('Dashboard');
           } else {
-            console.log('🔄 SplashScreen: User needs onboarding, navigating to Onboarding');
+            logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
             navigation.replace('Onboarding');
           }
         } else {
           // User is not authenticated, go through onboarding
-          console.log('🔄 SplashScreen: User not authenticated, navigating to GetStarted');
+          logger.info('User not authenticated, navigating to GetStarted', null, 'SplashScreen');
           navigation.replace('GetStarted');
         }
       } catch (error) {

@@ -5,7 +5,7 @@
  */
 
 import { logger } from '../loggingService';
-import { doc, getDoc, getDocs, query, where, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, query, where, updateDoc, collection } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult } from './types';
 
@@ -15,7 +15,7 @@ export class SplitWalletQueries {
    */
   static async getSplitWallet(splitWalletId: string): Promise<SplitWalletResult> {
     try {
-      console.log('🔍 SplitWalletQueries: Getting split wallet:', { splitWalletId });
+      logger.debug('Getting split wallet', { splitWalletId }, 'SplitWalletQueries');
 
       // Try to get by Firebase document ID first
       const docRef = doc(db, 'splitWallets', splitWalletId);
@@ -28,7 +28,7 @@ export class SplitWalletQueries {
           firebaseDocId: docSnap.id,
         };
 
-        console.log('✅ SplitWalletQueries: Split wallet found by Firebase ID:', {
+        logger.debug('Split wallet found by Firebase ID', {
           splitWalletId,
           firebaseDocId: docSnap.id,
           status: wallet.status
@@ -61,7 +61,7 @@ export class SplitWalletQueries {
           firebaseDocId: doc.id,
         };
 
-        console.log('✅ SplitWalletQueries: Split wallet found by custom ID:', {
+        logger.debug('Split wallet found by custom ID', {
           splitWalletId,
           firebaseDocId: doc.id,
           status: wallet.status
@@ -79,7 +79,7 @@ export class SplitWalletQueries {
         };
       }
 
-      console.log('❌ SplitWalletQueries: Split wallet not found:', { splitWalletId });
+      logger.error('Split wallet not found', { splitWalletId }, 'SplitWalletQueries');
       return {
         success: false,
         error: 'Split wallet not found',
@@ -100,7 +100,7 @@ export class SplitWalletQueries {
    */
   static async getSplitWalletByBillId(billId: string): Promise<SplitWalletResult> {
     try {
-      console.log('🔍 SplitWalletQueries: Getting split wallet by bill ID:', { billId });
+      logger.debug('Getting split wallet by bill ID', { billId }, 'SplitWalletQueries');
 
       const q = query(
         collection(db, 'splitWallets'),
@@ -109,7 +109,7 @@ export class SplitWalletQueries {
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        console.log('❌ SplitWalletQueries: No split wallet found for bill ID:', { billId });
+        logger.error('No split wallet found for bill ID', { billId }, 'SplitWalletQueries');
         return {
           success: false,
           error: 'No split wallet found for this bill',
@@ -124,7 +124,7 @@ export class SplitWalletQueries {
         firebaseDocId: doc.id,
       };
 
-      console.log('✅ SplitWalletQueries: Split wallet found by bill ID:', {
+      logger.debug('Split wallet found by bill ID', {
         billId,
         splitWalletId: wallet.id,
         firebaseDocId: doc.id,
@@ -162,7 +162,7 @@ export class SplitWalletQueries {
     amount: number
   ): Promise<SplitWalletResult> {
     try {
-      console.log('🔍 SplitWalletQueries: Locking participant amount:', {
+      logger.debug('Locking participant amount', {
         splitWalletId,
         participantId,
         amount
@@ -212,7 +212,7 @@ export class SplitWalletQueries {
         updatedAt: new Date().toISOString(),
       };
 
-      console.log('✅ SplitWalletQueries: Participant amount locked successfully:', {
+      logger.debug('Participant amount locked successfully', {
         splitWalletId,
         participantId,
         amount
@@ -244,7 +244,7 @@ export class SplitWalletQueries {
    */
   static async getSplitWalletsByCreator(creatorId: string): Promise<{ success: boolean; wallets: SplitWallet[]; error?: string }> {
     try {
-      console.log('🔍 SplitWalletQueries: Getting split wallets by creator:', { creatorId });
+      logger.info('Getting split wallets by creator', { creatorId }, 'SplitWalletQueries');
 
       const q = query(
         collection(db, 'splitWallets'),
@@ -260,7 +260,7 @@ export class SplitWalletQueries {
         };
       });
 
-      console.log('✅ SplitWalletQueries: Split wallets retrieved for creator:', {
+      logger.info('Split wallets retrieved for creator', {
         creatorId,
         count: wallets.length
       });
@@ -291,7 +291,7 @@ export class SplitWalletQueries {
    */
   static async getSplitWalletsByStatus(status: SplitWallet['status']): Promise<{ success: boolean; wallets: SplitWallet[]; error?: string }> {
     try {
-      console.log('🔍 SplitWalletQueries: Getting split wallets by status:', { status });
+      logger.info('Getting split wallets by status', { status }, 'SplitWalletQueries');
 
       const q = query(
         collection(db, 'splitWallets'),
@@ -307,7 +307,7 @@ export class SplitWalletQueries {
         };
       });
 
-      console.log('✅ SplitWalletQueries: Split wallets retrieved by status:', {
+      logger.info('Split wallets retrieved by status', {
         status,
         count: wallets.length
       });
@@ -338,7 +338,7 @@ export class SplitWalletQueries {
    */
   static async splitWalletExists(splitWalletId: string): Promise<{ success: boolean; exists: boolean; error?: string }> {
     try {
-      console.log('🔍 SplitWalletQueries: Checking if split wallet exists:', { splitWalletId });
+      logger.info('Checking if split wallet exists', { splitWalletId }, 'SplitWalletQueries');
 
       const result = await this.getSplitWallet(splitWalletId);
       
@@ -370,7 +370,7 @@ export class SplitWalletQueries {
     error?: string;
   }> {
     try {
-      console.log('🔍 SplitWalletQueries: Getting split wallet completion:', { splitWalletId });
+      logger.info('Getting split wallet completion', { splitWalletId }, 'SplitWalletQueries');
 
       const result = await this.getSplitWallet(splitWalletId);
       if (!result.success || !result.wallet) {
@@ -386,7 +386,7 @@ export class SplitWalletQueries {
       const remainingAmount = totalAmount - collectedAmount;
       const completionPercentage = totalAmount > 0 ? (collectedAmount / totalAmount) * 100 : 0;
 
-      console.log('🔍 SplitWalletQueries: getSplitWalletCompletion calculation:', {
+      logger.debug('getSplitWalletCompletion calculation', {
         walletId: splitWalletId,
         totalAmount,
         collectedAmount,

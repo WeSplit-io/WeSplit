@@ -6,7 +6,7 @@
 
 import { logger } from '../loggingService';
 import { roundUsdcAmount } from '../../utils/currencyUtils';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult } from './types';
 
@@ -20,11 +20,6 @@ export class SplitWalletManagement {
     currency: string = 'USDC'
   ): Promise<SplitWalletResult> {
     try {
-      console.log('🔍 SplitWalletManagement: Updating split wallet amount:', {
-        splitWalletId,
-        newTotalAmount,
-        currency
-      });
 
       // Get current wallet
       const currentWalletResult = await this.getSplitWallet(splitWalletId);
@@ -54,11 +49,6 @@ export class SplitWalletManagement {
         ...updatedWalletData,
       };
 
-      console.log('✅ SplitWalletManagement: Split wallet amount updated successfully:', {
-        splitWalletId,
-        oldAmount: currentWallet.totalAmount,
-        newAmount: roundedAmount
-      });
 
       logger.info('Split wallet amount updated', {
         splitWalletId,
@@ -90,10 +80,6 @@ export class SplitWalletManagement {
     updates: Partial<SplitWallet>
   ): Promise<SplitWalletResult> {
     try {
-      console.log('🔍 SplitWalletManagement: Updating split wallet:', {
-        splitWalletId,
-        updates: Object.keys(updates)
-      });
 
       // Get current wallet
       const currentWalletResult = await this.getSplitWallet(splitWalletId);
@@ -126,10 +112,6 @@ export class SplitWalletManagement {
         ...updateData,
       };
 
-      console.log('✅ SplitWalletManagement: Split wallet updated successfully:', {
-        splitWalletId,
-        updatedFields: Object.keys(updates)
-      });
 
       logger.info('Split wallet updated', {
         splitWalletId,
@@ -159,10 +141,6 @@ export class SplitWalletManagement {
     participants: Omit<SplitWalletParticipant, 'amountPaid' | 'status' | 'transactionSignature' | 'paidAt'>[]
   ): Promise<SplitWalletResult> {
     try {
-      console.log('🔍 SplitWalletManagement: Updating split wallet participants:', {
-        splitWalletId,
-        participantsCount: participants.length
-      });
 
       // Get current wallet
       const currentWalletResult = await this.getSplitWallet(splitWalletId);
@@ -197,11 +175,6 @@ export class SplitWalletManagement {
         ...updatedWalletData,
       };
 
-      console.log('✅ SplitWalletManagement: Split wallet participants updated successfully:', {
-        splitWalletId,
-        oldParticipantsCount: currentWallet.participants.length,
-        newParticipantsCount: updatedParticipants.length
-      });
 
       logger.info('Split wallet participants updated', {
         splitWalletId,
@@ -229,7 +202,6 @@ export class SplitWalletManagement {
    */
   static async lockSplitWallet(splitWalletId: string): Promise<SplitWalletResult> {
     try {
-      console.log('🔍 SplitWalletManagement: Locking split wallet:', { splitWalletId });
 
       // Get current wallet
       const currentWalletResult = await this.getSplitWallet(splitWalletId);
@@ -265,9 +237,6 @@ export class SplitWalletManagement {
         ...updatedWalletData,
       };
 
-      console.log('✅ SplitWalletManagement: Split wallet locked successfully:', {
-        splitWalletId
-      });
 
       logger.info('Split wallet locked', {
         splitWalletId,
@@ -299,7 +268,6 @@ export class SplitWalletManagement {
     error?: string;
   }> {
     try {
-      console.log('🔍 SplitWalletManagement: Debugging USDC balance:', { walletAddress });
 
       // This is a placeholder implementation
       // In a real implementation, you would check the actual USDC balance
@@ -335,7 +303,6 @@ export class SplitWalletManagement {
     repaired?: boolean;
   }> {
     try {
-      console.log('🔍 SplitWalletManagement: Repairing split wallet data:', { splitWalletId });
 
       // Get current wallet
       const walletResult = await this.getSplitWallet(splitWalletId);
@@ -374,10 +341,6 @@ export class SplitWalletManagement {
         await this.updateWalletParticipants(docId, repairedParticipants);
       }
 
-      console.log('✅ SplitWalletManagement: Split wallet data repair completed:', {
-        splitWalletId,
-        repaired
-      });
 
       return {
         success: true,
@@ -403,18 +366,10 @@ export class SplitWalletManagement {
     creatorId: string
   ): Promise<{ success: boolean; repaired: boolean; error?: string }> {
     try {
-      console.log('🔍 SplitWalletManagement: Repairing split wallet synchronization:', {
-        splitWalletId,
-        creatorId
-      });
 
       // This is a placeholder implementation
       // In a real implementation, you would synchronize the wallet data
       
-      console.log('✅ SplitWalletManagement: Split wallet synchronization repair completed:', {
-        splitWalletId,
-        creatorId
-      });
 
       return {
         success: true,

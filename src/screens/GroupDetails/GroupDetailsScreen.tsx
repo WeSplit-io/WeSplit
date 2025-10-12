@@ -17,6 +17,7 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
+import { logger } from '../../services/loggingService';
 
 const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   // Validate and extract groupId from route params
@@ -438,7 +439,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   // Auto-open expense details if expenseId is provided from notification
   useEffect(() => {
     if (expenseIdToOpen && fromNotification && individualExpenses.length > 0 && !modalOpenedFromParams) {
-      console.log('🔍 GroupDetails: Auto-opening expense details for expenseId:', expenseIdToOpen);
+      logger.info('Auto-opening expense details for expenseId', { expenseId: expenseIdToOpen }, 'GroupDetailsScreen');
       
       // Find the expense in the loaded expenses
       const targetExpense = individualExpenses.find(expense => 
@@ -446,7 +447,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
       );
       
       if (targetExpense) {
-        console.log('🔍 GroupDetails: Found expense, opening details:', targetExpense);
+        logger.info('Found expense, opening details', { targetExpense }, 'GroupDetailsScreen');
         const transaction = convertExpenseToTransaction(targetExpense);
         setSelectedTransaction(transaction);
         setTransactionModalVisible(true);
@@ -458,7 +459,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           fromNotification: undefined
         });
       } else {
-        console.log('🔍 GroupDetails: Expense not found in loaded expenses:', expenseIdToOpen);
+        logger.warn('Expense not found in loaded expenses', { expenseId: expenseIdToOpen }, 'GroupDetailsScreen');
       }
     }
   }, [expenseIdToOpen, fromNotification, individualExpenses, modalOpenedFromParams, convertExpenseToTransaction, navigation]);
@@ -550,7 +551,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           const sharePerPerson = totalGroupExpenses / memberCount;
 
           if (__DEV__) {
-            console.log('💰 GroupDetailsScreen: Balance calculation details:', {
+            logger.debug('Balance calculation details', {
               totalGroupExpenses,
               memberCount,
               sharePerPerson,

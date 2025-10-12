@@ -35,18 +35,6 @@ const SplitPaymentScreen: React.FC = () => {
   const { currentUser } = state;
   const { splitWalletId, billName, totalAmount } = route.params as RouteParams;
   
-  // Debug: Log the current user data
-  logger.debug('Current user from context', {
-    currentUser: currentUser ? {
-      id: currentUser.id,
-      name: currentUser.name,
-      email: currentUser.email,
-      wallet_address: currentUser.wallet_address,
-      wallet_public_key: currentUser.wallet_public_key
-    } : null,
-    isAuthenticated: state.isAuthenticated,
-    authMethod: state.authMethod
-  });
 
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -171,7 +159,11 @@ const SplitPaymentScreen: React.FC = () => {
         // Fallback: Try to find participant manually in wallet participants
         const manualParticipant = walletResult.wallet.participants.find(p => p.userId === currentUser.id.toString());
         if (manualParticipant) {
-          console.log('🔍 SplitPaymentScreen: Found participant manually, using fallback data:', manualParticipant);
+          logger.debug('Found participant manually, using fallback data', { 
+            userId: manualParticipant.userId,
+            amountOwed: manualParticipant.amountOwed,
+            status: manualParticipant.status 
+          }, 'SplitPaymentScreen');
           
           // Validate and correct participant amount using centralized price management
           let billId = walletResult.wallet.billId || splitWalletId;
@@ -183,11 +175,11 @@ const SplitPaymentScreen: React.FC = () => {
             }
           }
           
-          console.log('💰 SplitPaymentScreen: Using bill ID for participant amount:', {
+          logger.debug('Using bill ID for participant amount calculation', {
             originalBillId: walletResult.wallet.billId,
             splitWalletId,
             finalBillId: billId
-          });
+          }, 'SplitPaymentScreen');
           
           const participantAmount = priceManagementService.getParticipantAmount(
             billId,
@@ -199,7 +191,7 @@ const SplitPaymentScreen: React.FC = () => {
           // If no authoritative price found, use the split wallet's totalAmount as fallback
           if (participantAmount === 0 && walletResult.wallet.totalAmount > 0) {
             const fallbackAmount = walletResult.wallet.totalAmount / walletResult.wallet.participants.length;
-            console.log('💰 SplitPaymentScreen: Using split wallet totalAmount as fallback (manual):', {
+            logger.info('Using split wallet totalAmount as fallback (manual)', {
               walletTotalAmount: walletResult.wallet.totalAmount,
               participantsCount: walletResult.wallet.participants.length,
               fallbackAmount,
@@ -210,10 +202,10 @@ const SplitPaymentScreen: React.FC = () => {
               manualParticipant.amountOwed = fallbackAmount;
             }
           } else if (participantAmount > 0 && participantAmount !== manualParticipant.amountOwed) {
-            console.log('💰 SplitPaymentScreen: Correcting fallback participant amount:', {
+            logger.debug('Correcting fallback participant amount', {
               originalAmount: manualParticipant.amountOwed,
               correctedAmount: participantAmount
-            });
+            }, 'SplitPaymentScreen');
             manualParticipant.amountOwed = participantAmount;
           }
           
@@ -227,7 +219,11 @@ const SplitPaymentScreen: React.FC = () => {
         return;
       }
 
-      console.log('🔍 SplitPaymentScreen: Participant loaded:', participantResult.participant);
+      logger.debug('Participant loaded successfully', {
+        userId: participantResult.participant?.userId,
+        amountOwed: participantResult.participant?.amountOwed,
+        status: participantResult.participant?.status
+      }, 'SplitPaymentScreen');
       
       // Validate and correct participant amount using centralized price management
       let billId = walletResult.wallet.billId || splitWalletId;
@@ -239,11 +235,11 @@ const SplitPaymentScreen: React.FC = () => {
         }
       }
       
-      console.log('💰 SplitPaymentScreen: Using bill ID for participant amount (main):', {
+      logger.debug('Using bill ID for participant amount calculation', {
         originalBillId: walletResult.wallet.billId,
         splitWalletId,
         finalBillId: billId
-      });
+      }, 'SplitPaymentScreen');
       
       const participantAmount = priceManagementService.getParticipantAmount(
         billId,
@@ -255,21 +251,21 @@ const SplitPaymentScreen: React.FC = () => {
       // If no authoritative price found, use the split wallet's totalAmount as fallback
       if (participantAmount === 0 && walletResult.wallet.totalAmount > 0) {
         const fallbackAmount = walletResult.wallet.totalAmount / walletResult.wallet.participants.length;
-        console.log('💰 SplitPaymentScreen: Using split wallet totalAmount as fallback:', {
+        logger.debug('Using split wallet totalAmount as fallback', {
           walletTotalAmount: walletResult.wallet.totalAmount,
           participantsCount: walletResult.wallet.participants.length,
           fallbackAmount,
           originalAmount: participantResult.participant.amountOwed
-        });
+        }, 'SplitPaymentScreen');
         
         if (fallbackAmount !== participantResult.participant.amountOwed) {
           participantResult.participant.amountOwed = fallbackAmount;
         }
       } else if (participantAmount > 0 && participantAmount !== participantResult.participant.amountOwed) {
-        console.log('💰 SplitPaymentScreen: Correcting participant amount:', {
+        logger.debug('Correcting participant amount', {
           originalAmount: participantResult.participant.amountOwed,
           correctedAmount: participantAmount
-        });
+        }, 'SplitPaymentScreen');
         participantResult.participant.amountOwed = participantAmount;
       }
 
@@ -292,14 +288,12 @@ const SplitPaymentScreen: React.FC = () => {
       return;
     }
 
-    console.log('🔍 SplitPaymentScreen: Attempting to pay full amount:', {
+    logger.info('Attempting to pay full amount', {
       remainingAmount,
-      participant,
-      currentUser: {
-        id: currentUser.id,
-        wallet_address: currentUser.wallet_address
-      }
-    });
+      participantId: participant.userId,
+      currentUserId: currentUser.id,
+      walletAddress: currentUser.wallet_address
+    }, 'SplitPaymentScreen');
 
     await processPayment(remainingAmount);
   };
@@ -322,12 +316,12 @@ const SplitPaymentScreen: React.FC = () => {
   const processPayment = async (amount: number) => {
     if (!currentUser?.id || !splitWalletId) return;
 
-    console.log('🔍 SplitPaymentScreen: Processing payment:', {
+    logger.info('Processing payment', {
       amount,
       currentUserId: currentUser.id.toString(),
       splitWalletId,
-      participant: participant
-    });
+      participantId: participant?.userId
+    }, 'SplitPaymentScreen');
 
     setIsProcessing(true);
 
@@ -338,7 +332,11 @@ const SplitPaymentScreen: React.FC = () => {
         amount
       );
       
-      console.log('🔍 SplitPaymentScreen: Payment result:', result);
+      logger.info('Payment result', {
+        success: result.success,
+        transactionSignature: result.transactionSignature,
+        error: result.error
+      }, 'SplitPaymentScreen');
 
       if (result.success) {
         Alert.alert(

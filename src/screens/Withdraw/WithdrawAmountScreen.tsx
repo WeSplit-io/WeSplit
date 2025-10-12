@@ -9,6 +9,7 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import { spacing } from '../../theme/spacing';
 import { FeeService, TransactionType } from '../../config/feeConfig';
+import { logger } from '../../services/loggingService';
 
 const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const { state } = useApp();
@@ -79,7 +80,7 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const handleExternalWalletConnectionSuccess = (result: any) => {
-    console.log('🔐 WithdrawAmount: External wallet connected successfully:', result);
+    logger.info('External wallet connected successfully', { result }, 'WithdrawAmountScreen');
     
     Alert.alert(
       'External Wallet Connected',

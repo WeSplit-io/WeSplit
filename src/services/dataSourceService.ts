@@ -368,7 +368,7 @@ export class DataSourceService {
     const billInfo = this.getBillInfo(splitData, processedBillData, billData);
     const contextStr = context ? `[${context}] ` : '';
     
-    console.log(`${contextStr}DataSourceService: Data source usage:`, {
+    logger.info('Data source usage', {
       amount: { value: billInfo.amount.data, source: billInfo.amount.source, isFallback: billInfo.amount.isFallback },
       name: { value: billInfo.name.data, source: billInfo.name.source, isFallback: billInfo.name.isFallback },
       currency: { value: billInfo.currency.data, source: billInfo.currency.source, isFallback: billInfo.currency.isFallback },

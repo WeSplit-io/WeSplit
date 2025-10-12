@@ -28,12 +28,12 @@ export class AvatarUploadService {
     onProgress?: (progress: number) => void
   ): Promise<AvatarUploadResult> {
     try {
-      console.log('📸 AvatarUploadService: Starting avatar upload for user:', userId);
+      logger.info('Starting avatar upload for user', { userId }, 'avatarUploadService');
       
       // TEMPORARY WORKAROUND: Check if storage rules are deployed
       // If not, return the local URI as a temporary solution
       if (imageUri.startsWith('file://')) {
-        console.log('📸 AvatarUploadService: Storage rules not deployed yet, using local URI temporarily');
+        logger.warn('Storage rules not deployed yet, using local URI temporarily', null, 'avatarUploadService');
         return {
           success: true,
           avatarUrl: imageUri, // Use local URI temporarily
@@ -52,11 +52,11 @@ export class AvatarUploadService {
       }
       
       await uploadTask;
-      console.log('📸 AvatarUploadService: Upload completed, getting download URL');
+      logger.info('Upload completed, getting download URL', null, 'avatarUploadService');
       
       const downloadURL = await getDownloadURL(avatarRef);
       
-      console.log('📸 AvatarUploadService: Avatar uploaded successfully:', downloadURL);
+      logger.info('Avatar uploaded successfully', { downloadURL }, 'avatarUploadService');
       
       return {
         success: true,
@@ -68,7 +68,7 @@ export class AvatarUploadService {
       
       // TEMPORARY WORKAROUND: If upload fails due to permissions, use local URI
       if (error instanceof Error && error.message.includes('unauthorized')) {
-        console.log('📸 AvatarUploadService: Storage rules not deployed, using local URI temporarily');
+        logger.warn('Storage rules not deployed, using local URI temporarily', null, 'avatarUploadService');
         return {
           success: true,
           avatarUrl: imageUri, // Use local URI temporarily
@@ -106,11 +106,11 @@ export class AvatarUploadService {
     try {
       const avatarRef = ref(storage, `avatars/${userId}/profile.jpg`);
       await deleteObject(avatarRef);
-      console.log('📸 AvatarUploadService: Avatar deleted successfully for user:', userId);
+      logger.info('Avatar deleted successfully for user', { userId }, 'avatarUploadService');
       return { success: true };
     } catch (error: any) {
       if (error.code === 'storage/object-not-found') {
-        console.log('📸 AvatarUploadService: No avatar found to delete for user:', userId);
+        logger.info('No avatar found to delete for user', { userId }, 'avatarUploadService');
         return { success: true }; // Already deleted or never existed
       }
       console.error('📸 AvatarUploadService: Error deleting avatar:', error);

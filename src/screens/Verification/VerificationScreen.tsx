@@ -7,6 +7,7 @@ import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { verifyCode, sendVerificationCode } from '../../services/firebaseFunctionsService';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme';
+import { logger } from '../../services/loggingService';
 
 const CODE_LENGTH = 4; // 4-digit code
 const RESEND_SECONDS = 30;
@@ -68,7 +69,7 @@ const VerificationScreen: React.FC = () => {
       }
 
       const codeString = code.join('');
-      if (__DEV__) { console.log('🔐 Verifying code:', codeString, 'for email:', email); }
+      if (__DEV__) { logger.info('Verifying code', { codeString, email }, 'VerificationScreen'); }
       
       const authResponse = await verifyCode(email, codeString);
 
@@ -77,7 +78,7 @@ const VerificationScreen: React.FC = () => {
       }
 
       // Code verified successfully and user is now authenticated
-      if (__DEV__) { console.log('✅ Authentication successful:', authResponse.user); }
+      if (__DEV__) { logger.info('Authentication successful', { user: authResponse.user }, 'VerificationScreen'); }
       
       // Transform API response to match User type (snake_case)
       // Keep Firebase user ID as string to match Firestore format
@@ -94,14 +95,14 @@ const VerificationScreen: React.FC = () => {
       
       // CRITICAL FIX: If Firebase Functions didn't return user data, fetch it from Firestore
       if (!transformedUser.name || !transformedUser.wallet_address) {
-        if (__DEV__) { console.log('🔄 Firebase Functions returned empty data, fetching from Firestore...'); }
+        if (__DEV__) { logger.info('Firebase Functions returned empty data, fetching from Firestore', null, 'VerificationScreen'); }
         
         try {
           const { firestoreService } = await import('../../config/firebase');
           const existingUserData = await firestoreService.getUserDocument(transformedUser.id);
           
           if (existingUserData && existingUserData.name && existingUserData.wallet_address) {
-            if (__DEV__) { console.log('✅ Found existing user data in Firestore:', existingUserData); }
+            if (__DEV__) { logger.info('Found existing user data in Firestore', { existingUserData }, 'VerificationScreen'); }
             
             // Update transformed user with existing data
             transformedUser = {
@@ -112,7 +113,7 @@ const VerificationScreen: React.FC = () => {
               hasCompletedOnboarding: existingUserData.hasCompletedOnboarding || false
             };
             
-            if (__DEV__) { console.log('✅ Updated user data from Firestore:', transformedUser); }
+            if (__DEV__) { logger.info('Updated user data from Firestore', { transformedUser }, 'VerificationScreen'); }
           }
         } catch (firestoreError) {
           if (__DEV__) { console.warn('⚠️ Could not fetch user data from Firestore:', firestoreError); }
@@ -120,9 +121,9 @@ const VerificationScreen: React.FC = () => {
       }
       
       if (__DEV__) {
-        console.log('🔍 Verification: Raw API Response:', authResponse);
-        console.log('🔍 Verification: Transformed User:', transformedUser);
-        console.log('🔍 Verification: User Data Analysis:', {
+        logger.debug('Raw API Response', { authResponse }, 'VerificationScreen');
+        logger.debug('Transformed User', { transformedUser }, 'VerificationScreen');
+        logger.debug('User Data Analysis', {
           id: transformedUser.id,
           name: transformedUser.name,
           nameType: typeof transformedUser.name,
@@ -137,13 +138,13 @@ const VerificationScreen: React.FC = () => {
       
       // Update the global app context with the authenticated user
       authenticateUser(transformedUser, 'email');
-      if (__DEV__) { console.log('📱 User authenticated in app context'); }
+      if (__DEV__) { logger.info('User authenticated in app context', null, 'VerificationScreen'); }
       
       // Check if user needs to create a profile (has no name/pseudo)
       const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
       
       if (__DEV__) {
-        console.log('🔍 Verification: Profile Creation Check:', {
+        logger.debug('Profile Creation Check', {
           name: transformedUser.name,
           nameLength: transformedUser.name?.length,
           trimmedName: transformedUser.name?.trim(),
@@ -155,14 +156,14 @@ const VerificationScreen: React.FC = () => {
       }
       
       if (needsProfile) {
-        console.log('🔄 User needs to create profile (no name), navigating to CreateProfile');
+        logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'VerificationScreen');
         (navigation as any).reset({
           index: 0,
           routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
         });
       } else {
         // User already has a name, go directly to Dashboard
-        console.log('✅ User already has name, navigating to Dashboard:', transformedUser.name);
+        logger.info('User already has name, navigating to Dashboard', { name: transformedUser.name }, 'VerificationScreen');
         (navigation as any).reset({
           index: 0,
           routes: [{ name: 'Dashboard' }],

@@ -10,6 +10,7 @@ import { convertToUSDC } from '../../services/priceService';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { GroupMember, Expense, Balance } from '../../types';
 import { styles } from './styles';
+import { logger } from '../../services/loggingService';
 
 interface SettleUpModalProps {
   visible?: boolean;
@@ -295,7 +296,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
             avatars[member.id.toString()] = userProfile.avatar;
           }
         } catch (error) {
-          console.log(`Could not fetch avatar for user ${member.id}:`, error);
+          logger.warn('Could not fetch avatar for user', { userId: member.id, error: error.message }, 'SettleUpModal');
         }
       }
 
@@ -359,7 +360,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
     // If we still don't have balances, create fallback balances
     if (balances.length === 0 && group) {
       if (__DEV__) {
-        console.log('🔍 SettleUpModal: No balances available, creating fallback balances');
+        logger.info('No balances available, creating fallback balances', null, 'SettleUpModal');
       }
 
       // Create fallback balances using group summary data
@@ -394,12 +395,12 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
         }
 
         if (__DEV__) {
-          console.log('🔍 SettleUpModal: Created fallback balances:', balances);
+          logger.info('Created fallback balances', { balances }, 'SettleUpModal');
         }
       }
     }
 
-    console.log('🔍 SettleUpModal - groupBalances calculation:', {
+    logger.debug('GroupBalances calculation', {
       realBalances: realBalances?.length || 0,
       calculatedBalances: balances?.length || 0,
       actualGroupId,
@@ -416,7 +417,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
   const currentUserId = String(currentUser?.id);
   const currentUserBalance = useMemo(() => {
     const balance = groupBalances.find((balance: Balance) => balance.userId === currentUserId);
-    console.log('🔍 SettleUpModal - currentUserBalance:', {
+    logger.debug('CurrentUserBalance', {
       currentUserId,
       balance,
       groupBalancesLength: groupBalances.length
@@ -431,7 +432,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
     const owe: Array<{ name: string; amount: number; amountUSD: number; currency: string; memberId: string }> = [];
     const owed: Array<{ name: string; amount: number; amountUSD: number; currency: string; memberId: string }> = [];
 
-    console.log('🔍 SettleUpModal - Processing balances:', {
+    logger.debug('Processing balances', {
       groupBalancesLength: groupBalances.length,
       currentUserId,
       currentUserBalance,
@@ -445,7 +446,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
         const amountKey = `${balance.userId}_${balance.currency}`;
         const amountUSD = usdAmounts[amountKey] || 0;
 
-        console.log('🔍 SettleUpModal - Processing balance:', {
+        logger.debug('Processing balance', {
           balance,
           amountKey,
           amountUSD,
@@ -479,7 +480,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
         }
       });
 
-    console.log('🔍 SettleUpModal - Final oweData/owedData:', {
+    logger.debug('Final oweData/owedData', {
       oweDataLength: owe.length,
       owedDataLength: owed.length,
       oweData: owe,

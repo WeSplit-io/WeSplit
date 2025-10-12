@@ -1,7 +1,10 @@
 /**
  * Fiat Currency Conversion Service
  * Handles conversion between fiat currencies (USD, EUR, GBP, etc.) and USDC
+ * @deprecated Format functions moved to src/utils/formatUtils.ts
  */
+
+import { logger } from './loggingService';
 
 export interface FiatCurrencyRate {
   from: string;
@@ -73,7 +76,7 @@ export async function getExchangeRate(fromCurrency: string, toCurrency: string =
       exchangeRateCache[cacheKey] = exchangeRate;
 
       if (__DEV__) {
-        console.log(`💱 Exchange rate: 1 ${fromCurrency} = ${rate} ${toCurrency}`);
+        logger.info('Exchange rate', { fromCurrency, rate, toCurrency }, 'fiatCurrencyService');
       }
 
       return exchangeRate;
@@ -110,7 +113,7 @@ export async function convertFiatToUSDC(amount: number, fromCurrency: string): P
   const convertedAmount = amount * exchangeRate.rate;
   
   if (__DEV__) {
-    console.log(`💱 Converting ${amount} ${fromCurrency} to USDC: ${amount} × ${exchangeRate.rate} = $${convertedAmount.toFixed(2)}`);
+    logger.info('Converting to USDC', { amount, fromCurrency, rate: exchangeRate.rate, convertedAmount: convertedAmount.toFixed(2) }, 'fiatCurrencyService');
   }
 
   return convertedAmount;
@@ -133,7 +136,7 @@ export async function convertUSDCToFiat(amount: number, toCurrency: string): Pro
   const convertedAmount = amount * exchangeRate.rate;
   
   if (__DEV__) {
-    console.log(`💱 Converting ${amount} USDC to ${toCurrency}: ${amount} × ${exchangeRate.rate} = ${convertedAmount.toFixed(2)} ${toCurrency}`);
+    logger.info('Converting from USDC', { amount, toCurrency, rate: exchangeRate.rate, convertedAmount: convertedAmount.toFixed(2) }, 'fiatCurrencyService');
   }
 
   return convertedAmount;

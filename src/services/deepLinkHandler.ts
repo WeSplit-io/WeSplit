@@ -5,6 +5,7 @@
 
 import { Linking, Alert } from 'react-native';
 import { firebaseDataService } from './firebaseDataService';
+import { logger } from './loggingService';
 
 export interface DeepLinkData {
   action: 'join' | 'invite' | 'profile' | 'send' | 'transfer' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback' | 'join-split';
@@ -30,7 +31,7 @@ export interface DeepLinkData {
  */
 export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
   try {
-    console.log('🔥 Parsing deep link URL:', url);
+    logger.debug('Parsing deep link URL', { url }, 'deepLinkHandler');
     
     if (!url.startsWith('wesplit://')) {
       console.warn('🔥 URL does not start with wesplit://:', url);
@@ -41,7 +42,7 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
     const action = urlParts[0];
     const params = urlParts.slice(1);
 
-    console.log('🔥 Parsed URL parts:', { action, params });
+    logger.debug('Parsed URL parts', { action, params }, 'deepLinkHandler');
 
     switch (action) {
       case 'join':
@@ -155,11 +156,11 @@ export function parseWeSplitDeepLink(url: string): DeepLinkData | null {
  */
 export async function handleJoinGroupDeepLink(inviteId: string, userId: string) {
   try {
-    console.log('🔥 Handling join group deep link:', { inviteId, userId });
+    logger.info('Handling join group deep link', { inviteId, userId }, 'deepLinkHandler');
     
     const result = await firebaseDataService.group.joinGroupViaInvite(inviteId, userId);
     
-    console.log('🔥 Successfully joined group via deep link:', result);
+    logger.info('Successfully joined group via deep link', { result }, 'deepLinkHandler');
     
     return {
       success: true,
@@ -181,7 +182,7 @@ export async function handleJoinGroupDeepLink(inviteId: string, userId: string) 
  */
 export async function handleAddContactFromProfile(linkData: DeepLinkData, currentUserId: string) {
   try {
-    console.log('🔥 Handling add contact from profile deep link:', { linkData, currentUserId });
+    logger.info('Handling add contact from profile deep link', { linkData, currentUserId }, 'deepLinkHandler');
     
     if (!linkData.userId || !linkData.userName) {
       throw new Error('Invalid profile QR code - missing user information');
@@ -216,7 +217,7 @@ export async function handleAddContactFromProfile(linkData: DeepLinkData, curren
 
     const newContact = await firebaseDataService.user.addContact(currentUserId, contactData);
     
-    console.log('🔥 Successfully added contact via deep link:', newContact);
+    logger.info('Successfully added contact via deep link', { newContact }, 'deepLinkHandler');
     
     // Send notification to the added contact
     try {
@@ -233,7 +234,6 @@ export async function handleAddContactFromProfile(linkData: DeepLinkData, curren
           type: 'contact_added'
         }
       );
-      console.log('🔥 Contact add notification sent successfully');
     } catch (notificationError) {
       console.error('🔥 Failed to send contact add notification:', notificationError);
       // Don't fail the contact addition if notification fails
@@ -259,7 +259,7 @@ export async function handleAddContactFromProfile(linkData: DeepLinkData, curren
  */
 export function setupDeepLinkListeners(navigation: any, currentUser: any) {
   const handleDeepLink = async (url: string) => {
-    console.log('🔥 Received deep link:', url);
+    logger.info('Received deep link', { url }, 'deepLinkHandler');
     
     const linkData = parseWeSplitDeepLink(url);
     if (!linkData) {
@@ -268,7 +268,7 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
       return;
     }
 
-    console.log('🔥 Parsed deep link data:', linkData);
+    logger.debug('Parsed deep link data', { linkData }, 'deepLinkHandler');
 
     switch (linkData.action) {
       case 'join':
@@ -280,11 +280,11 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
           return;
         }
 
-        console.log('🔥 Attempting to join group with inviteId:', linkData.inviteId);
+        logger.info('Attempting to join group with inviteId', { inviteId: linkData.inviteId }, 'deepLinkHandler');
         const joinResult = await handleJoinGroupDeepLink(linkData.inviteId!, currentUser.id);
         
         if (joinResult.success) {
-          console.log('🔥 Successfully joined group, navigating to GroupDetails');
+          logger.info('Successfully joined group, navigating to GroupDetails', null, 'deepLinkHandler');
           Alert.alert('Success', `Successfully joined ${joinResult.groupName}!`);
           // Navigate to the group details
           navigation.navigate('GroupDetails', { 
@@ -305,11 +305,11 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
           return;
         }
 
-        console.log('🔥 Attempting to add contact from profile QR:', linkData);
+        logger.info('Attempting to add contact from profile QR', { linkData }, 'deepLinkHandler');
         const addContactResult = await handleAddContactFromProfile(linkData, currentUser.id);
         
         if (addContactResult.success) {
-          console.log('🔥 Successfully added contact, navigating to Contacts');
+          logger.info('Successfully added contact, navigating to Contacts', null, 'deepLinkHandler');
           Alert.alert('Contact Added', `Successfully added ${addContactResult.contactName} to your contacts!`);
           // Navigate to contacts screen
           navigation.navigate('Contacts');
@@ -327,7 +327,7 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
           return;
         }
 
-        console.log('🔥 Attempting to navigate to Send screen with recipient:', linkData.recipientWalletAddress);
+        logger.info('Attempting to navigate to Send screen with recipient', { recipientWalletAddress: linkData.recipientWalletAddress }, 'deepLinkHandler');
         
         // Navigate to Send screen with recipient wallet address
         navigation.navigate('Send', {
@@ -345,7 +345,7 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
           return;
         }
 
-        console.log('🔥 Attempting to initiate external wallet transfer to:', linkData.recipientWalletAddress);
+        logger.info('Attempting to initiate external wallet transfer to', { recipientWalletAddress: linkData.recipientWalletAddress }, 'deepLinkHandler');
         
         // Navigate to CryptoTransfer screen with recipient wallet address
         navigation.navigate('CryptoTransfer', {
@@ -359,17 +359,17 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
         break;
       
       case 'moonpay-success':
-        console.log('🔥 MoonPay success, navigating to Dashboard');
+        logger.info('MoonPay success, navigating to Dashboard', null, 'deepLinkHandler');
         navigation.navigate('Dashboard');
         break;
       
       case 'moonpay-failure':
-        console.log('🔥 MoonPay failure, navigating to Dashboard');
+        logger.info('MoonPay failure, navigating to Dashboard', null, 'deepLinkHandler');
         navigation.navigate('Dashboard');
         break;
       
       case 'oauth-callback':
-        console.log('🔥 OAuth callback received:', linkData);
+        logger.info('OAuth callback received', { linkData }, 'deepLinkHandler');
         // Handle OAuth callback - this will be processed by the OAuth services
         // The OAuth services will handle the code exchange and user authentication
         if (linkData.oauthError) {
@@ -379,7 +379,7 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
             `OAuth authentication failed: ${linkData.oauthError}`
           );
         } else if (linkData.oauthCode) {
-          console.log('🔥 OAuth callback success, code received');
+          logger.info('OAuth callback success, code received', null, 'deepLinkHandler');
           // The OAuth service should handle this automatically
           // This is just for logging and debugging
         }
@@ -399,7 +399,7 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
           return;
         }
 
-        console.log('🔥 Attempting to join split with invitation data:', linkData.splitInvitationData);
+        logger.info('Attempting to join split with invitation data', { splitInvitationData: linkData.splitInvitationData }, 'deepLinkHandler');
         
         // Navigate to SplitDetails screen with the invitation data
         navigation.navigate('SplitDetails', {
@@ -416,7 +416,7 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
 
   // Listen for incoming links when app is already running
   const subscription = Linking.addEventListener('url', (event) => {
-    console.log('🔥 Deep link event received:', event.url);
+    logger.info('Deep link event received', { url: event.url }, 'deepLinkHandler');
     handleDeepLink(event.url);
   });
 
@@ -424,7 +424,7 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
   // Note: This is now handled in NavigationWrapper to avoid duplicate calls
   // Linking.getInitialURL().then((url) => {
   //   if (url) {
-  //     console.log('🔥 Initial URL found:', url);
+  //     logger.info('Initial URL found', { url }, 'deepLinkHandler');
   //     handleDeepLink(url);
   //   }
   // });
@@ -513,39 +513,36 @@ export function generateTransferLink(walletAddress: string, userName?: string, u
  * This can be called to test the invitation system
  */
 export function testDeepLinkFlow() {
-  console.log('🧪 Testing deep link flow...');
+  logger.info('Testing deep link flow', null, 'deepLinkHandler');
   
   // Test URL parsing
   const testUrl = 'wesplit://join/invite_123_1234567890_abc123';
   const parsed = parseWeSplitDeepLink(testUrl);
-  console.log('🧪 Parsed test URL:', parsed);
+  logger.info('Parsed test URL', { parsed }, 'deepLinkHandler');
   
   // Test invalid URL
   const invalidUrl = 'https://example.com/invalid';
   const invalidParsed = parseWeSplitDeepLink(invalidUrl);
-  console.log('🧪 Parsed invalid URL:', invalidParsed);
+  logger.info('Parsed invalid URL', { invalidParsed }, 'deepLinkHandler');
   
   // Test URL generation
   const generatedUrl = generateShareableLink('invite_123_1234567890_abc123', 'Test Group');
-  console.log('🧪 Generated URL:', generatedUrl);
+  logger.info('Generated URL', { generatedUrl }, 'deepLinkHandler');
   
   // Test profile URL generation and parsing
   const profileUrl = generateProfileLink('user123', 'John Doe', 'john@example.com', 'wallet123');
   const profileParsed = parseWeSplitDeepLink(profileUrl);
-  console.log('🧪 Generated profile URL:', profileUrl);
-  console.log('🧪 Parsed profile URL:', profileParsed);
+  logger.info('Generated profile URL', { profileUrl, profileParsed }, 'deepLinkHandler');
   
   // Test send URL generation and parsing
   const sendUrl = generateSendLink('wallet123', 'John Doe', 'john@example.com');
   const sendParsed = parseWeSplitDeepLink(sendUrl);
-  console.log('🧪 Generated send URL:', sendUrl);
-  console.log('🧪 Parsed send URL:', sendParsed);
+  logger.info('Generated send URL', { sendUrl, sendParsed }, 'deepLinkHandler');
   
   // Test transfer URL generation and parsing
   const transferUrl = generateTransferLink('wallet123', 'John Doe', 'john@example.com', '100');
   const transferParsed = parseWeSplitDeepLink(transferUrl);
-  console.log('🧪 Generated transfer URL:', transferUrl);
-  console.log('🧪 Parsed transfer URL:', transferParsed);
+  logger.info('Generated transfer URL', { transferUrl, transferParsed }, 'deepLinkHandler');
   
   return {
     testUrl,

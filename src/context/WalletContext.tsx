@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { walletService, WalletInfo as ConsolidatedWalletInfo } from '../services/WalletService';
 import { consolidatedTransactionService } from '../services/consolidatedTransactionService';
 import { solanaWalletService } from '../wallet/solanaWallet';
+import { logger } from '../services/loggingService';
 
 // WalletInfo interface for backward compatibility
 interface WalletInfo {
@@ -176,7 +177,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [balancePollingInterval, setBalancePollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (__DEV__) { console.log('WalletProvider mounted successfully'); }
+    if (__DEV__) { logger.info('WalletProvider mounted successfully', null, 'WalletContext'); }
   }, [address, isConnected, chainId, balance, walletName, currentWalletId]);
 
   // Load stored wallets from AsyncStorage
@@ -275,7 +276,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Try to connect the Solana service as well
       try {
         await solanaWalletService.importWallet(wallet.secretKey);
-        if (__DEV__) { console.log('Solana blockchain service connected successfully'); }
+        if (__DEV__) { logger.info('Solana blockchain service connected successfully', null, 'WalletContext'); }
       } catch (solanaError) {
         console.warn('Failed to connect Solana blockchain service:', solanaError);
       }
@@ -339,7 +340,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   const handleConnectWallet = async () => {
     try {
-      if (__DEV__) { console.log('WalletProvider: connectWallet called'); }
+      if (__DEV__) { logger.info('WalletProvider: connectWallet called', null, 'WalletContext'); }
       setIsLoading(true);
       
       // If we have stored wallets, show selection
@@ -392,7 +393,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         // Try to connect the Solana service as well
         try {
           await solanaWalletService.importWallet(wallet.secretKey);
-          if (__DEV__) { console.log('Solana blockchain service connected successfully'); }
+          if (__DEV__) { logger.info('Solana blockchain service connected successfully', null, 'WalletContext'); }
         } catch (solanaError) {
           console.warn('Failed to connect Solana blockchain service:', solanaError);
         }
@@ -419,7 +420,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   const handleDisconnectWallet = async () => {
     try {
-      if (__DEV__) { console.log('WalletProvider: disconnectWallet called'); }
+      if (__DEV__) { logger.info('WalletProvider: disconnectWallet called', null, 'WalletContext'); }
       setIsLoading(true);
       
       await walletService.disconnect();
@@ -428,7 +429,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       await solanaWalletService.clearWallet();
       await walletService.disconnect();
       
-      if (__DEV__) { console.log('Disconnecting wallet...'); }
+      if (__DEV__) { logger.info('Disconnecting wallet', null, 'WalletContext'); }
       setIsConnected(false);
       setAddress(null);
       setChainId(null);
@@ -437,7 +438,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setWalletName(null);
       setSecretKey(null);
       setCurrentWalletId(null);
-      if (__DEV__) { console.log('Wallet disconnected successfully'); }
+      if (__DEV__) { logger.info('Wallet disconnected successfully', null, 'WalletContext'); }
       
     } catch (error) {
       console.error('Error in disconnectWallet:', error);
@@ -511,7 +512,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         await handleDisconnectWallet();
       }
       
-      if (__DEV__) { console.log('Removed wallet:', walletId); }
+      if (__DEV__) { logger.info('Removed wallet', { walletId }, 'WalletContext'); }
       
     } catch (error) {
       console.error('Error removing wallet:', error);
@@ -562,7 +563,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       const result = await walletService.exportWallet(userId);
       
       if (result.success) {
-        console.log('🔍 WalletProvider: Successfully exported app wallet:', {
+        logger.info('Successfully exported app wallet', {
           walletAddress: result.walletAddress,
           hasSeedPhrase: !!result.seedPhrase,
           hasPrivateKey: !!result.privateKey
@@ -620,7 +621,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         setAppWalletAddress(result.wallet.address);
         setAppWalletConnected(true);
         
-        console.log('🔍 WalletProvider: Successfully fixed wallet mismatch:', {
+        logger.info('Successfully fixed wallet mismatch', {
           walletAddress: result.wallet.address
         });
       } else {
@@ -643,7 +644,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const startBalancePolling = useCallback(async (userId: string) => {
     if (!autoRefreshEnabled || balancePollingInterval) return;
 
-    console.log('🔄 WalletProvider: Starting balance polling for user:', userId);
+    logger.info('Starting balance polling for user', { userId }, 'WalletContext');
     
     const interval = setInterval(async () => {
       try {
@@ -651,7 +652,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         const now = Date.now();
         const lastCheck = lastBalanceCheck?.getTime() || 0;
         if (now - lastCheck < 30000) {
-          console.log('🔄 WalletProvider: Skipping balance check - too recent');
+          logger.debug('Skipping balance check - too recent', null, 'WalletContext');
           return;
         }
 
@@ -689,16 +690,16 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     if (balancePollingInterval) {
       clearInterval(balancePollingInterval);
       setBalancePollingInterval(null);
-      console.log('🛑 WalletProvider: Balance polling stopped');
+      logger.info('Balance polling stopped', null, 'WalletContext');
     }
   }, [balancePollingInterval]);
 
   const toggleAutoRefresh = useCallback((enabled: boolean) => {
     setAutoRefreshEnabled(enabled);
     if (enabled) {
-      console.log('✅ WalletProvider: Auto-refresh enabled');
+      logger.info('Auto-refresh enabled', null, 'WalletContext');
     } else {
-      console.log('❌ WalletProvider: Auto-refresh disabled');
+      logger.info('Auto-refresh disabled', null, 'WalletContext');
       stopBalancePolling();
     }
   }, [stopBalancePolling]);
@@ -707,7 +708,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const enhancedRefreshBalance = useCallback(async () => {
     try {
       if (__DEV__) {
-        console.log('🔄 WalletProvider: Manual balance refresh triggered');
+        logger.info('Manual balance refresh triggered', null, 'WalletContext');
       }
       
       // Refresh external wallet balance if connected
@@ -718,7 +719,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       setLastBalanceCheck(new Date());
       
       if (__DEV__) {
-        console.log('✅ WalletProvider: Manual balance refresh completed');
+        logger.info('Manual balance refresh completed', null, 'WalletContext');
       }
     } catch (error) {
       console.error('❌ WalletProvider: Error during manual balance refresh:', error);
@@ -731,7 +732,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         throw new Error('External wallet not connected');
       }
 
-      if (__DEV__) { console.log('Sending transaction:', params); }
+      if (__DEV__) { logger.info('Sending transaction', { params }, 'WalletContext'); }
       
       // Try to use real Solana blockchain transaction
       try {
@@ -763,7 +764,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           userId: undefined // Will be set by the service
         });
         
-        if (__DEV__) { console.log('Real blockchain transaction sent successfully:', result); }
+        if (__DEV__) { logger.info('Real blockchain transaction sent successfully', { result }, 'WalletContext'); }
         
         return { 
           signature: result.signature, 
@@ -782,7 +783,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   // Clear all wallet state for user logout (but preserve wallet creation state)
   const clearAppWalletState = useCallback(() => {
     try {
-      if (__DEV__) { console.log('🔄 WalletProvider: Clearing wallet UI state for user logout (preserving wallet data)'); }
+      if (__DEV__) { logger.info('Clearing wallet UI state for user logout (preserving wallet data)', null, 'WalletContext'); }
       
       // Stop any active polling
       stopBalancePolling();
@@ -812,7 +813,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // NOTE: We intentionally do NOT clear wallet creation state here
       // This allows the wallet to be restored when the user logs back in
       
-      if (__DEV__) { console.log('✅ WalletProvider: Wallet UI state cleared for user logout (wallet data preserved)'); }
+      if (__DEV__) { logger.info('Wallet UI state cleared for user logout (wallet data preserved)', null, 'WalletContext'); }
     } catch (error) {
       console.error('❌ Error clearing wallet state:', error);
     }
@@ -821,7 +822,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   // Clear all wallet state when switching users (including wallet creation state)
   const clearAllWalletStateForUserSwitch = useCallback(() => {
     try {
-      if (__DEV__) { console.log('🔄 WalletProvider: Clearing all wallet state for user switch'); }
+      if (__DEV__) { logger.info('Clearing all wallet state for user switch', null, 'WalletContext'); }
       
       // Stop any active polling
       stopBalancePolling();
@@ -848,7 +849,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Clear available wallets (user-specific)
       setAvailableWallets([]);
       
-      if (__DEV__) { console.log('✅ WalletProvider: All wallet state cleared for user switch'); }
+      if (__DEV__) { logger.info('All wallet state cleared for user switch', null, 'WalletContext'); }
     } catch (error) {
       console.error('❌ Error clearing wallet state for user switch:', error);
     }
@@ -938,7 +939,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   useEffect(() => {
     // Disabled automatic polling to prevent rate limiting and infinite loops
     // Users can manually refresh balances when needed
-    console.log('🔄 WalletProvider: Auto-refresh disabled to prevent rate limiting');
+    logger.info('Auto-refresh disabled to prevent rate limiting', null, 'WalletContext');
     
     return () => {
       // Cleanup polling on unmount
