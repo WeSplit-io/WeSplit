@@ -1,6 +1,6 @@
 /**
  * Degen Spin Screen
- * Roulette-style selection to pick who pays the entire bill
+ * Uses modular hooks and components for better maintainability
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -21,6 +21,10 @@ import { styles } from './DegenSpinStyles';
 import { logger } from '../../services/loggingService';
 import { useApp } from '../../context/AppContext';
 import { notificationService } from '../../services/notificationService';
+
+// Import our custom hooks and components
+import { useDegenSplitState, useDegenSplitLogic } from './hooks';
+import { DegenSplitHeader, DegenRoulette } from './components';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -48,6 +52,24 @@ interface Participant {
 
 const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) => {
   const { billData, participants, totalAmount, splitWallet, processedBillData, splitData } = route.params;
+
+  // Initialize our custom hooks
+  const degenState = useDegenSplitState(splitWallet);
+  const degenLogic = useDegenSplitLogic(degenState, (updates) => {
+    // Update state function
+    Object.keys(updates).forEach(key => {
+      const setter = (degenState as any)[`set${key.charAt(0).toUpperCase() + key.slice(1)}`];
+      if (setter) {
+        setter(updates[key as keyof typeof updates]);
+      }
+    });
+  });
+
+  // Initialize animation refs
+  useEffect(() => {
+    degenState.spinAnimationRef.current = new Animated.Value(0);
+    degenState.cardScaleRef.current = new Animated.Value(1);
+  }, []);
 
   // Function to get category icon dynamically
   const getCategoryIcon = () => {
@@ -95,21 +117,12 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
   const { currentUser } = state;
 
   // Check if current user is the creator
-  const isCreator = currentUser && splitData && currentUser.id.toString() === splitData.creatorId;
-
-  // Animation state
-  const [isSpinning, setIsSpinning] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [hasSpun, setHasSpun] = useState(false);
-
-  // Animation references
-  const spinAnimation = useRef(new Animated.Value(0)).current;
-  const cardScale = useRef(new Animated.Value(1)).current;
+  const isCreator = degenLogic.isCurrentUserCreator(currentUser, splitData);
 
   // Effects
   useEffect(() => {
     const sendSpinNotifications = async () => {
-      const participantIds = participants.map(p => p.userId || p.id).filter(id => id);
+      const participantIds = participants.map((p: any) => p.userId || p.id).filter((id: any) => id);
       const billName = splitData?.title || billData?.title || 'Degen Split';
 
       if (participantIds.length === 0) {
@@ -155,206 +168,55 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
   });
 
   // Event handlers
-  const handleStartSpinning = () => {
-    if (isSpinning || hasSpun) return;
+  const handleStartSpinning = async () => {
+    if (degenState.isSpinning || degenState.hasSpun) return;
 
-    setIsSpinning(true);
+    await degenLogic.handleStartSpinning(
+      baseParticipantCards,
+      splitWallet,
+      splitData,
+      billData,
+      totalAmount
+    );
 
-    // Select random participant from original participants (not duplicates)
-    const finalIndex = Math.floor(Math.random() * baseParticipantCards.length);
-
-
-    // Reset animation values
-    spinAnimation.setValue(0);
-    cardScale.setValue(1);
-
-    // Animate the spin sequence
-    Animated.sequence([
-      // Scale down during spin
-      Animated.timing(cardScale, {
-        toValue: 0.8,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      // Main spin animation
-      Animated.timing(spinAnimation, {
-        toValue: 1,
-        duration: 4000,
-        useNativeDriver: true,
-      }),
-      // Scale back up
-      Animated.timing(cardScale, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(async () => {
-      setSelectedIndex(finalIndex);
-      setIsSpinning(false);
-      setHasSpun(true);
-
-      // Save the winner information to the split wallet
-      try {
-        const { SplitWalletService } = await import('../../services/split');
-        await SplitWalletService.updateSplitWallet(splitWallet.id, {
-          degenWinner: {
-            userId: baseParticipantCards[finalIndex].userId,
-            name: baseParticipantCards[finalIndex].name,
-            selectedAt: new Date().toISOString()
-          },
-          status: 'spinning_completed'
-        });
-      } catch (error) {
-        console.error('Failed to save winner information:', error);
-      }
-
-      // Send notifications to all participants about the roulette result
-      try {
-        const { notificationService } = await import('../../services/notificationService');
-        const billName = splitData?.title || billData?.title || 'Degen Split';
-        const winnerId = baseParticipantCards[finalIndex].userId;
-        const winnerName = baseParticipantCards[finalIndex].name;
-
-        // Send winner notification
-        await notificationService.sendNotification(
-          winnerId,
-          splitWallet.id,
-          billName
-        );
-
-        // Send loser notifications to all other participants
-        const loserIds = participants
-          .filter(p => (p.userId || p.id) !== winnerId)
-          .map(p => p.userId || p.id)
-          .filter(id => id);
-
-        if (loserIds.length > 0) {
-          await notificationService.sendBulkNotifications(
-            loserIds,
-            'split_loser',
-            {
-              splitWalletId: splitWallet.id,
-              billName,
-              amount: totalAmount,
-            }
-          );
-        }
-      } catch (error) {
-        console.error('Failed to send roulette result notifications:', error);
-      }
-
-      // Navigate to result screen after delay
-      setTimeout(() => {
-        navigation.navigate('DegenResult', {
-          billData,
-          participants,
-          totalAmount,
-          selectedParticipant: baseParticipantCards[finalIndex],
-          splitWallet,
-          processedBillData,
-        });
-      }, 2000);
-    });
+    // Navigate to result screen after delay
+    setTimeout(() => {
+      navigation.navigate('DegenResult', {
+        billData,
+        participants,
+        totalAmount,
+        selectedParticipant: baseParticipantCards[degenState.selectedIndex],
+        splitWallet,
+        processedBillData,
+      });
+    }, 2000);
   };
 
   const handleBack = () => {
     navigation.goBack();
   };
 
-  // Animation configuration
-  const CARD_WIDTH = 140 + (spacing.xs * 2);
-  const TOTAL_CARDS = participantCards.length;
-  const BASE_PARTICIPANTS = baseParticipantCards.length;
-  const ROTATIONS = 5; // Multiple full cycles through all participants
-  const TOTAL_ROTATION_DISTANCE = ROTATIONS * BASE_PARTICIPANTS * CARD_WIDTH;
-
-  // Animation interpolations - create infinite cycling effect
-  const spinTranslation = spinAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -TOTAL_ROTATION_DISTANCE],
-  });
-
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
 
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.backButtonIcon}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Degen Split</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <DegenSplitHeader
+        title="Degen Split"
+        onBackPress={handleBack}
+      />
 
       {/* Main Content */}
       <View style={styles.content}>
         {/* Roulette Cards Container - Main Focus */}
-        <View style={styles.rouletteContainer}>
-          <Animated.View
-            style={[
-              styles.rouletteCards,
-              {
-                transform: [
-                  { translateX: spinTranslation },
-                  { scale: cardScale },
-                ],
-              },
-            ]}
-          >
-            {participantCards.map((participant, index) => (
-              <View
-                key={participant.id}
-                style={[
-                  styles.rouletteCard,
-                  index === selectedIndex && styles.selectedCard,
-                  // Add tilt effect for outer cards
-                  Math.abs(index - selectedIndex) > 1 && styles.tiltedCard,
-                ]}
-              >
-                {/* Background Image */}
-                <Image
-                  source={require('../../../assets/card-split-bg.png')}
-                  style={styles.rouletteCardBackground}
-                  resizeMode="cover"
-                />
-
-                {/* Content */}
-                <View style={styles.rouletteCardContent}>
-                  {/* WeSplit Logo */}
-                  <Image
-                    source={require('../../../assets/wesplit-logo-card.png')}
-                    style={styles.rouletteCardLogo}
-                    resizeMode="contain"
-                  />
-                  <View style={styles.rouletteCardHeader}>
-                    {/* Pseudo */}
-                    <Text style={styles.rouletteCardName}>{participant.name}</Text>
-
-                    {/* Hashed Address */}
-                    <Text style={styles.rouletteCardHash}>
-                      {participant.userId ?
-                        `${participant.userId.slice(0, 4)}...${participant.userId.slice(-4)}` :
-                        `${participant.id.slice(0, 4)}...${participant.id.slice(-4)}`
-                      }
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Selection indicator - only show on selected card */}
-                {index === selectedIndex && (
-                  <View style={styles.selectionIndicator}>
-                    <Text style={styles.selectionText}>SELECTED</Text>
-                  </View>
-                )}
-              </View>
-            ))}
-          </Animated.View>
-        </View>
+        <DegenRoulette
+          participants={participantCards}
+          isSpinning={degenState.isSpinning}
+          hasSpun={degenState.hasSpun}
+          selectedIndex={degenState.selectedIndex}
+          spinAnimationRef={degenState.spinAnimationRef}
+          cardScaleRef={degenState.cardScaleRef}
+        />
 
         {/* Bill Summary - Moved below roulette */}
         <View style={styles.billSummaryContainer}>
@@ -386,20 +248,20 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
           end={{ x: 1, y: 0 }}
           style={[
             styles.spinButtonGradient,
-            (isSpinning || hasSpun || !isCreator) && styles.spinButtonDisabled
+            (degenState.isSpinning || degenState.hasSpun || !isCreator) && styles.spinButtonDisabled
           ]}
         >
           <TouchableOpacity
             style={styles.spinButton}
             onPress={handleStartSpinning}
-            disabled={isSpinning || hasSpun || !isCreator}
+            disabled={degenState.isSpinning || degenState.hasSpun || !isCreator}
           >
             <Text style={[
               styles.spinButtonText,
-              (isSpinning || hasSpun) && styles.spinButtonTextDisabled
+              (degenState.isSpinning || degenState.hasSpun) && styles.spinButtonTextDisabled
             ]}>
-              {isSpinning ? 'Spinning...' :
-                hasSpun ? 'Spinning Complete!' :
+              {degenState.isSpinning ? 'Spinning...' :
+                degenState.hasSpun ? 'Spinning Complete!' :
                   isCreator ? 'Start spinning' : 'Waiting for owner to spin...'}
             </Text>
           </TouchableOpacity>
@@ -408,6 +270,5 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
     </SafeAreaView>
   );
 };
-
 
 export default DegenSpinScreen;

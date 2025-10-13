@@ -107,14 +107,14 @@ export function getUnifiedConfig(): UnifiedConfig {
   const isStaging = environment === 'staging';
   
   const heliusApiKey = getEnvVar('HELIUS_API_KEY');
-  // Temporarily force mainnet to test balance fetching
-  const network = 'mainnet'; // (extra.DEV_NETWORK as 'devnet' | 'testnet' | 'mainnet') || 'devnet';
+  // Use environment network setting, fallback to devnet for development
+  const network = (getEnvVar('DEV_NETWORK') as 'devnet' | 'testnet' | 'mainnet') || 'devnet';
   
   // Debug configuration loading
   logger.info('Configuration Debug', {
     extra: extra,
-    DEV_NETWORK: extra.DEV_NETWORK,
-    FORCE_MAINNET: extra.FORCE_MAINNET,
+    DEV_NETWORK: getEnvVar('DEV_NETWORK'),
+    FORCE_MAINNET: getEnvVar('FORCE_MAINNET'),
     resolvedNetwork: network,
     heliusApiKey: heliusApiKey ? 'SET' : 'NOT_SET'
   });
@@ -129,10 +129,10 @@ export function getUnifiedConfig(): UnifiedConfig {
     switch (network) {
       case 'mainnet':
         return {
-          rpcUrl: heliusApiKey 
+          rpcUrl: heliusApiKey && heliusApiKey !== 'YOUR_HELIUS_API_KEY_HERE'
             ? `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`
             : 'https://api.mainnet-beta.solana.com',
-          rpcEndpoints: heliusApiKey 
+          rpcEndpoints: heliusApiKey && heliusApiKey !== 'YOUR_HELIUS_API_KEY_HERE'
             ? [
                 `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`,
                 'https://api.mainnet-beta.solana.com',
@@ -250,6 +250,12 @@ export function getConfig(): UnifiedConfig {
     configInstance = getUnifiedConfig();
   }
   return configInstance;
+}
+
+// Clear configuration cache to force reload
+export function clearConfigCache(): void {
+  configInstance = null;
+  logger.info('Configuration cache cleared', null, 'unified');
 }
 
 // Convenience exports

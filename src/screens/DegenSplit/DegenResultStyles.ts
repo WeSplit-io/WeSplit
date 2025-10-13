@@ -98,6 +98,19 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
+  amountLabel: {
+    color: colors.white70,
+    fontSize: typography.fontSize.md,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  amountValue: {
+    color: colors.white,
+    fontSize: typography.fontSize.xxl,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   messageContainer: {
     marginBottom: spacing.xl,
     paddingHorizontal: spacing.lg,
@@ -239,10 +252,84 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  claimButtonGradient: {
+    width: '100%',
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   claimButtonText: {
     color: colors.black,
     fontSize: typography.fontSize.lg,
     fontWeight: '700',
+  },
+  // Pay button styles
+  payButton: {
+    width: '100%',
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payButtonGradient: {
+    width: '100%',
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
+  },
+  // Wallet info styles
+  walletInfoContainer: {
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.md,
+    width: '100%',
+  },
+  walletInfoTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '600',
+    marginBottom: spacing.md,
+  },
+  walletInfoCard: {
+    backgroundColor: colors.white10,
+    borderRadius: 12,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.white20,
+  },
+  walletAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  walletAddressLabel: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    fontWeight: '500',
+    marginRight: spacing.sm,
+  },
+  walletAddressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  walletAddressText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontFamily: 'monospace',
+    flex: 1,
+  },
+  copyIcon: {
+    width: 16,
+    height: 16,
+    tintColor: colors.white70,
+    marginLeft: spacing.sm,
   },
   // Modal styles
   modalOverlay: {
@@ -278,9 +365,26 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     lineHeight: 22,
   },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.white30,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
   modalIconContainer: {
     alignItems: 'center',
     marginBottom: spacing.lg,
+  },
+  modalIcon: {
+    fontSize: 48,
+    marginBottom: spacing.md,
+    textAlign: 'center',
   },
   modalClaimIcon: {
     fontSize: 48,
@@ -321,6 +425,11 @@ export const styles = StyleSheet.create({
   paymentOptionDescription: {
     color: colors.textSecondary,
     fontSize: typography.fontSize.sm,
+  },
+  paymentOptionText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
   },
   paymentOptionArrow: {
     color: colors.green,
@@ -482,5 +591,121 @@ export const styles = StyleSheet.create({
     width: 16,
     height: 16,
     tintColor: colors.white,
+  },
+  // Private key modal styles
+  privateKeyModal: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: spacing.lg,
+    margin: spacing.lg,
+    maxHeight: '80%',
+  },
+  privateKeyModalTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  privateKeyModalSubtitle: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+    lineHeight: 20,
+  },
+  privateKeyDisplay: {
+    backgroundColor: colors.white5,
+    borderRadius: 8,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  privateKeyText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontFamily: 'monospace',
+    textAlign: 'center',
+  },
+  privateKeyWarning: {
+    backgroundColor: colors.red20,
+    borderRadius: 8,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.red,
+  },
+  privateKeyWarningText: {
+    color: colors.red,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  privateKeyButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  copyPrivateKeyButton: {
+    flex: 1,
+    backgroundColor: colors.green,
+    borderRadius: 8,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  copyPrivateKeyButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+  },
+  closePrivateKeyButton: {
+    flex: 1,
+    backgroundColor: colors.white10,
+    borderRadius: 8,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  closePrivateKeyButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+  },
+  // Private key button styles (for wallet info section)
+  privateKeyButton: {
+    backgroundColor: colors.white10,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  privateKeyButtonIcon: {
+    width: 20,
+    height: 20,
+    objectFit: 'contain',
+    marginRight: spacing.xs,
+  },
+  privateKeyButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: '600',
+  },
+  claimedStatusContainer: {
+    backgroundColor: colors.green + '20',
+    borderRadius: 12,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  claimedStatusText: {
+    color: colors.green,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  claimedStatusSubtext: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
   },
 });

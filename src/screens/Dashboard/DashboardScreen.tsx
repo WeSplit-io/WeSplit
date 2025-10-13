@@ -55,9 +55,10 @@ const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, disp
 
 interface DashboardScreenProps {
   navigation: any;
+  route?: any;
 }
 
-const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
+const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) => {
   const { state, notifications, loadNotifications, refreshNotifications, updateUser } = useApp();
   const { currentUser, isAuthenticated } = state;
 
@@ -950,6 +951,27 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
     }, [isAuthenticated, currentUser?.id, groups.length, balanceLoaded, loadingUserWallet, loadUserCreatedWalletBalance]) // Simplified dependencies to prevent unnecessary re-runs
   );
 
+  // Handle refreshBalance parameter from navigation
+  useEffect(() => {
+    if (route?.params?.refreshBalance && currentUser?.id) {
+      // Clear the refreshBalance parameter to prevent infinite loops
+      navigation.setParams({ refreshBalance: undefined });
+      
+      // Clear configuration cache to ensure latest network settings are used
+      try {
+        const { clearConfigCache } = require('../../config/unified');
+        clearConfigCache();
+        logger.info('Configuration cache cleared for balance refresh', null, 'DashboardScreen');
+      } catch (error) {
+        logger.warn('Failed to clear configuration cache', { error }, 'DashboardScreen');
+      }
+      
+      // Force refresh the balance
+      loadUserCreatedWalletBalance();
+      logger.info('Balance refresh triggered from navigation parameter', null, 'DashboardScreen');
+    }
+  }, [route?.params?.refreshBalance, currentUser?.id, navigation, loadUserCreatedWalletBalance]);
+
   // Load notifications when dashboard loads
   useEffect(() => {
     if (isAuthenticated && currentUser?.id) {
@@ -971,6 +993,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
     try {
       logger.info('Manual refresh triggered', null, 'DashboardScreen');
       setBalanceLoaded(false); // Reset balance loaded flag to allow refresh
+
+      // Clear configuration cache to ensure latest network settings are used
+      try {
+        const { clearConfigCache } = require('../../config/unified');
+        clearConfigCache();
+        logger.info('Configuration cache cleared during manual refresh', null, 'DashboardScreen');
+      } catch (error) {
+        logger.warn('Failed to clear configuration cache during refresh', { error }, 'DashboardScreen');
+      }
 
       // Ensure wallet exists and refresh balance
       const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());

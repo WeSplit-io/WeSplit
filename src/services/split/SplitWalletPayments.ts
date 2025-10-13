@@ -608,6 +608,17 @@ export class SplitWalletPayments {
         transactionSignature
       }, 'SplitWalletPayments');
 
+      // Trigger balance refresh for the participant
+      try {
+        const { walletService } = await import('../WalletService');
+        if (walletService.clearBalanceCache) {
+          walletService.clearBalanceCache(participantId);
+        }
+        logger.info('Balance cache cleared for participant', { participantId }, 'SplitWalletPayments');
+      } catch (error) {
+        logger.warn('Failed to clear balance cache for participant', { error, participantId }, 'SplitWalletPayments');
+      }
+
       return {
         success: true,
         transactionSignature,
@@ -661,7 +672,8 @@ export class SplitWalletPayments {
       }
 
       // Get split wallet private key
-      const privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, wallet.creatorId);
+      const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
+      const privateKeyResult = await SplitWalletSecurity.getSplitWalletPrivateKey(splitWalletId, wallet.creatorId);
       if (!privateKeyResult.success || !privateKeyResult.privateKey) {
         return {
           success: false,
@@ -679,8 +691,12 @@ export class SplitWalletPayments {
         transactionType: 'split_wallet_withdrawal' as const, // No company fees for split wallet withdrawals
       };
 
-      // Execute transaction
-      const transactionResult = await consolidatedTransactionService.sendUSDCTransaction(transactionParams);
+      // Execute transaction using split wallet
+      const transactionResult = await this.sendSplitWalletTransaction({
+        ...transactionParams,
+        fromPrivateKey: privateKeyResult.privateKey,
+        fromAddress: wallet.walletAddress,
+      });
       
       if (!transactionResult.success) {
         return {
@@ -695,6 +711,17 @@ export class SplitWalletPayments {
         amount: wallet.totalAmount,
         transactionSignature: transactionResult.signature
       });
+
+      // Trigger balance refresh for the creator
+      try {
+        const { walletService } = await import('../WalletService');
+        if (walletService.clearBalanceCache) {
+          walletService.clearBalanceCache(wallet.creatorId);
+        }
+        logger.info('Balance cache cleared for creator', { creatorId: wallet.creatorId }, 'SplitWalletPayments');
+      } catch (error) {
+        logger.warn('Failed to clear balance cache for creator', { error, creatorId: wallet.creatorId }, 'SplitWalletPayments');
+      }
 
       // Verify transaction on blockchain
       if (transactionResult.signature) {
@@ -820,7 +847,8 @@ export class SplitWalletPayments {
       }
 
       // Get split wallet private key
-      const privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, wallet.creatorId);
+      const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
+      const privateKeyResult = await SplitWalletSecurity.getSplitWalletPrivateKey(splitWalletId, wallet.creatorId);
       if (!privateKeyResult.success || !privateKeyResult.privateKey) {
         return {
           success: false,
@@ -838,8 +866,12 @@ export class SplitWalletPayments {
         transactionType: 'split_wallet_withdrawal' as const, // No company fees for split wallet withdrawals
       };
 
-      // Execute transaction
-      const transactionResult = await consolidatedTransactionService.sendUSDCTransaction(transactionParams);
+      // Execute transaction using split wallet
+      const transactionResult = await this.sendSplitWalletTransaction({
+        ...transactionParams,
+        fromPrivateKey: privateKeyResult.privateKey,
+        fromAddress: wallet.walletAddress,
+      });
       
       if (!transactionResult.success) {
         return {
@@ -1168,8 +1200,26 @@ export class SplitWalletPayments {
 
       const wallet = walletResult.wallet;
 
-      // Get the private key
-      const privateKeyResult = await this.getSplitWalletPrivateKey(splitWalletId, wallet.creatorId);
+      // Check if the winner has already claimed their funds
+      const winnerParticipant = wallet.participants.find(p => p.userId === winnerUserId);
+      if (!winnerParticipant) {
+        return {
+          success: false,
+          error: 'Winner not found in split wallet participants',
+        };
+      }
+
+      if (winnerParticipant.status === 'paid') {
+        return {
+          success: false,
+          error: 'Winner has already claimed their funds. Each participant can only claim once.',
+        };
+      }
+
+      // Get the private key - use SplitWalletSecurity for proper degen split support
+      // For degen splits, any participant (including the winner) can access the private key
+      const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
+      const privateKeyResult = await SplitWalletSecurity.getSplitWalletPrivateKey(splitWalletId, winnerUserId);
       if (!privateKeyResult.success || !privateKeyResult.privateKey) {
         return {
           success: false,
@@ -1177,7 +1227,7 @@ export class SplitWalletPayments {
         };
       }
 
-      // Create transaction
+      // Create transaction with split wallet private key
       const transactionParams = {
         to: winnerAddress, // Use 'to' parameter as expected by TransactionParams interface
         amount: totalAmount,
@@ -1185,10 +1235,12 @@ export class SplitWalletPayments {
         memo: description || `Degen Split winner payout for ${winnerUserId}`,
         userId: wallet.creatorId, // Add userId parameter required by sendUSDCTransaction
         transactionType: 'split_wallet_withdrawal' as const, // No company fees for split wallet withdrawals
+        fromPrivateKey: privateKeyResult.privateKey, // Use split wallet private key
+        fromAddress: wallet.walletAddress, // Use split wallet address
       };
 
-      // Execute transaction
-      const transactionResult = await this.sendTransaction(transactionParams);
+      // Execute transaction using split wallet
+      const transactionResult = await this.sendSplitWalletTransaction(transactionParams);
       
       if (!transactionResult.success) {
         return {
@@ -1197,12 +1249,42 @@ export class SplitWalletPayments {
         };
       }
 
+      // Update participant status to 'paid' to prevent multiple claims
+      const updatedParticipants = wallet.participants.map(p => {
+        if (p.userId === winnerUserId) {
+          return {
+            ...p,
+            status: 'paid' as const,
+            paidAt: new Date().toISOString(),
+            transactionSignature: transactionResult.transactionSignature,
+          };
+        }
+        return p;
+      });
+
+      // Update the split wallet with the new participant status
+      const docId = wallet.firebaseDocId || splitWalletId;
+      await this.updateWalletParticipants(docId, updatedParticipants);
+
       logger.info('Degen winner payout processed successfully', {
         splitWalletId,
         winnerUserId,
         totalAmount,
-        transactionSignature: transactionResult.transactionSignature
+        transactionSignature: transactionResult.transactionSignature,
+        participantStatusUpdated: true
       });
+
+      // Trigger balance refresh for the winner
+      try {
+        const { walletService } = await import('../WalletService');
+        // Clear cached balance to force refresh
+        if (walletService.clearBalanceCache) {
+          walletService.clearBalanceCache(winnerUserId);
+        }
+        logger.info('Balance cache cleared for winner', { winnerUserId }, 'SplitWalletPayments');
+      } catch (error) {
+        logger.warn('Failed to clear balance cache for winner', { error, winnerUserId }, 'SplitWalletPayments');
+      }
 
       return {
         success: true,
@@ -1260,6 +1342,14 @@ export class SplitWalletPayments {
         };
       }
 
+      // Check if the participant has already been paid
+      if (participant.status === 'paid') {
+        return {
+          success: false,
+          error: 'Participant has already been paid. Each participant can only be paid once.',
+        };
+      }
+
       // Update participant payment status
       const updatedParticipants = wallet.participants.map(p => {
         if (p.userId === loserUserId) {
@@ -1289,6 +1379,17 @@ export class SplitWalletPayments {
         loserUserId,
         totalAmount
       });
+
+      // Trigger balance refresh for the loser
+      try {
+        const { walletService } = await import('../WalletService');
+        if (walletService.clearBalanceCache) {
+          walletService.clearBalanceCache(loserUserId);
+        }
+        logger.info('Balance cache cleared for loser', { loserUserId }, 'SplitWalletPayments');
+      } catch (error) {
+        logger.warn('Failed to clear balance cache for loser', { error, loserUserId }, 'SplitWalletPayments');
+      }
 
       return {
         success: true,
@@ -1865,6 +1966,64 @@ export class SplitWalletPayments {
       error: result.error,
       transactionSignature: result.signature
     };
+  }
+
+  /**
+   * Send transaction from split wallet with company wallet covering fees
+   */
+  private static async sendSplitWalletTransaction(params: any): Promise<{ success: boolean; error?: string; transactionSignature?: string; signature?: string }> {
+    try {
+      const { TransactionProcessor } = await import('../transaction/TransactionProcessor');
+      const { KeypairUtils } = await import('../shared/keypairUtils');
+      
+      // Create keypair from split wallet private key
+      const keypairResult = KeypairUtils.createKeypairFromSecretKey(params.fromPrivateKey);
+      if (!keypairResult.success || !keypairResult.keypair) {
+        return {
+          success: false,
+          error: keypairResult.error || 'Failed to create keypair from split wallet private key',
+        };
+      }
+
+      // Verify the keypair address matches the split wallet address
+      const keypairAddress = keypairResult.keypair.publicKey.toBase58();
+      if (keypairAddress !== params.fromAddress) {
+        return {
+          success: false,
+          error: `Keypair address mismatch: expected ${params.fromAddress}, got ${keypairAddress}`,
+        };
+      }
+
+      // Create transaction processor instance
+      const transactionProcessor = new TransactionProcessor();
+      
+      // Prepare transaction parameters
+      const transactionParams = {
+        to: params.to,
+        amount: params.amount,
+        currency: params.currency,
+        memo: params.memo,
+        priority: params.priority,
+        userId: params.userId,
+        transactionType: params.transactionType,
+      };
+
+      // Execute transaction using split wallet keypair
+      const result = await transactionProcessor.sendUSDCTransaction(transactionParams, keypairResult.keypair);
+      
+      return {
+        success: result.success,
+        error: result.error,
+        transactionSignature: result.signature,
+        signature: result.signature // Add alias for backward compatibility
+      };
+    } catch (error) {
+      logger.error('Failed to send split wallet transaction', error, 'SplitWalletPayments');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
   }
 
   private static async updateWalletParticipants(docId: string, participants: SplitWalletParticipant[]): Promise<void> {
