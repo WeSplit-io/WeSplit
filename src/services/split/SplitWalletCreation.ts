@@ -7,7 +7,7 @@
 import { walletService } from '../WalletService';
 import { logger } from '../loggingService';
 import { roundUsdcAmount as currencyRoundUsdcAmount } from '../../utils/currencyUtils';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult } from './types';
 
@@ -93,38 +93,6 @@ export class SplitWalletCreation {
     }
   }
 
-  /**
-   * Ensure USDC token account exists for user
-   */
-  static async ensureUsdcTokenAccount(userId: string): Promise<{success: boolean, error?: string}> {
-    try {
-      const userWallet = await walletService.getUserWallet(userId);
-      if (!userWallet) {
-        return { success: false, error: 'User wallet not found' };
-      }
-
-      // Check if USDC token account exists
-      const hasUsdcAccount = await walletService.hasUsdcTokenAccount(userId);
-      if (!hasUsdcAccount) {
-        // Create USDC token account
-        const createResult = await walletService.createUsdcTokenAccount(userId);
-        if (!createResult.success) {
-          return { 
-            success: false, 
-            error: createResult.error || 'Failed to create USDC token account' 
-          };
-        }
-      }
-
-      return { success: true };
-    } catch (error) {
-      logger.error('Failed to ensure USDC token account', error, 'SplitWalletCreation');
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
-    }
-  }
 
   /**
    * Test split wallet creation (for debugging)
@@ -233,6 +201,7 @@ export class SplitWalletCreation {
         status: 'active',
         participants: participants.map(p => ({
           ...p,
+          amountOwed: SplitWalletCreation.roundUsdcAmount(p.amountOwed), // Round amountOwed to fix precision issues
           amountPaid: 0,
           status: 'pending' as const,
         })),
@@ -248,13 +217,42 @@ export class SplitWalletCreation {
         firebaseDocId: docRef.id,
       };
 
+      // Store private key securely for the creator (Regular Split)
+      // The wallet service returns secretKey (base64), not privateKey
+      const privateKey = wallet.secretKey;
+      if (!privateKey) {
+        logger.error('No private key available from wallet service', { 
+          walletAddress: wallet.address,
+          publicKey: wallet.publicKey,
+          hasSecretKey: !!wallet.secretKey
+        }, 'SplitWalletCreation');
+        throw new Error('No private key available from wallet service');
+      }
+
+      const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
+      const storeResult = await SplitWalletSecurity.storeFairSplitPrivateKey(
+        splitWalletId,
+        creatorId,
+        privateKey
+      );
+
+      if (!storeResult.success) {
+        logger.error('Failed to store private key for creator', { error: storeResult.error }, 'SplitWalletCreation');
+        // Don't fail the entire operation, but log the error
+      } else {
+        logger.info('Private key stored securely for creator', {
+          splitWalletId,
+          creatorId
+        }, 'SplitWalletCreation');
+      }
 
       logger.info('Split wallet created and stored successfully', {
         splitWalletId: createdSplitWallet.id,
         firebaseDocId: docRef.id,
         walletAddress: wallet.address,
         totalAmount: createdSplitWallet.totalAmount,
-        participantsCount: createdSplitWallet.participants.length
+        participantsCount: createdSplitWallet.participants.length,
+        privateKeyStored: storeResult.success
       }, 'SplitWalletCreation');
 
       return {
@@ -317,6 +315,7 @@ export class SplitWalletCreation {
         status: 'active',
         participants: participants.map(p => ({
           ...p,
+          amountOwed: SplitWalletCreation.roundUsdcAmount(p.amountOwed), // Round amountOwed to fix precision issues
           amountPaid: 0,
           status: 'pending' as const,
         })),
@@ -339,8 +338,7 @@ export class SplitWalletCreation {
         logger.error('No private key available from wallet service', { 
           walletAddress: wallet.address,
           publicKey: wallet.publicKey,
-          hasSecretKey: !!wallet.secretKey,
-          hasPrivateKey: !!wallet.privateKey
+          hasSecretKey: !!wallet.secretKey
         }, 'SplitWalletCreation');
         throw new Error('No private key available from wallet service');
       }

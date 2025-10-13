@@ -9,9 +9,52 @@ import { logger } from '../loggingService';
 
 export class SplitWalletSecurity {
   private static readonly PRIVATE_KEY_PREFIX = 'split_wallet_private_key_';
+  private static readonly FAIR_SPLIT_PRIVATE_KEY_PREFIX = 'fair_split_private_key_';
 
   /**
-   * Store split wallet private key securely in local storage
+   * Store Fair split wallet private key securely in local storage (creator-only access)
+   * This is separate from the shared private key handling used for Degen splits
+   * SECURITY: Private keys are NEVER stored in Firebase
+   */
+  static async storeFairSplitPrivateKey(
+    splitWalletId: string, 
+    creatorId: string, 
+    privateKey: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (!privateKey || typeof privateKey !== 'string') {
+        return {
+          success: false,
+          error: 'Invalid private key provided',
+        };
+      }
+
+      // Create a unique key for this Fair split wallet and creator combination
+      const storageKey = `${this.FAIR_SPLIT_PRIVATE_KEY_PREFIX}${splitWalletId}_${creatorId}`;
+      
+      // Store the private key securely
+      await SecureStore.setItemAsync(storageKey, privateKey);
+
+      logger.info('Fair split wallet private key stored securely', {
+        splitWalletId,
+        creatorId,
+        storageKey
+      }, 'SplitWalletSecurity');
+
+      return { success: true };
+
+    } catch (error) {
+      console.error('🔍 SplitWalletSecurity: Error storing Fair split wallet private key:', error);
+      logger.error('Failed to store Fair split wallet private key', error, 'SplitWalletSecurity');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Store split wallet private key securely in local storage (shared access for Degen splits)
    * SECURITY: Private keys are NEVER stored in Firebase
    */
   static async storeSplitWalletPrivateKey(

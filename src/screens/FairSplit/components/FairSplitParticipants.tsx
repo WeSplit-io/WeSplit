@@ -44,6 +44,16 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
                 : participant.walletAddress || 'No wallet address'
               }
             </Text>
+            {/* Payment Status */}
+            {participant.amountPaid > 0 && (
+              <View style={styles.paymentStatusContainer}>
+                {participant.amountPaid >= participant.amountOwed ? (
+                  <Text style={styles.paymentStatusPaid}>✅ Paid: ${participant.amountPaid.toFixed(2)}</Text>
+                ) : (
+                  <Text style={styles.paymentStatusPartial}>💰 Partial: ${participant.amountPaid.toFixed(2)} / ${participant.amountOwed.toFixed(2)}</Text>
+                )}
+              </View>
+            )}
           </View>
           <View style={styles.participantAmountContainer}>
             {!isSplitConfirmed && isCurrentUserCreator && splitMethod === 'manual' ? (

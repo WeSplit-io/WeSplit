@@ -284,6 +284,19 @@ export const styles = StyleSheet.create({
     color: colors.white70,
     fontSize: typography.fontSize.sm,
   },
+  paymentStatusContainer: {
+    marginTop: spacing.xs,
+  },
+  paymentStatusPaid: {
+    color: colors.green,
+    fontSize: typography.fontSize.xs,
+    fontWeight: '600',
+  },
+  paymentStatusPartial: {
+    color: colors.warning,
+    fontSize: typography.fontSize.xs,
+    fontWeight: '600',
+  },
   participantAmountContainer: {
     alignItems: 'flex-end',
   },
@@ -973,6 +986,39 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: spacing.md,
+  },
+  // Error state styles
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    backgroundColor: colors.black,
+  },
+  errorTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: '600',
+    color: colors.red,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: typography.fontSize.md,
+    color: colors.white70,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 24,
+  },
+  retryButton: {
+    backgroundColor: colors.green,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
   },
   copyPrivateKeyButton: {
     backgroundColor: colors.green,

@@ -43,6 +43,6 @@ export const TRANSACTION_CONFIG: TransactionConfig = {
   timeout: {
     connection: 30000,
     transaction: 60000,
-    confirmation: 120000
+    confirmation: 180000 // Increased to 3 minutes for split wallet transactions
   }
 };

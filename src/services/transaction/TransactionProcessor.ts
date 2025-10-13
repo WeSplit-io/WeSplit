@@ -160,8 +160,9 @@ export class TransactionProcessor {
         });
         
         // Token account doesn't exist, create it
+        // Use fee payer (company wallet) as the payer for token account creation
         createTokenAccountInstruction = createAssociatedTokenAccountInstruction(
-          fromPublicKey, // payer
+          feePayerPublicKey, // payer - use company wallet to pay for token account creation
           toTokenAccount, // associated token account
           toPublicKey, // owner
           usdcMintPublicKey // mint

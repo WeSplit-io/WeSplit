@@ -23,6 +23,7 @@ export type TransactionType =
   | 'payment_request' // Requested payments
   | 'group_payment'  // Group-related payments
   | 'premium'        // Premium subscription payments
+  | 'split_wallet_withdrawal' // Split wallet fund withdrawals (no company fees)
   | 'default';       // Fallback for unknown types
 
 // Individual fee configurations for each transaction type
@@ -87,6 +88,13 @@ export const TRANSACTION_FEE_CONFIGS = {
     percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PREMIUM_PERCENTAGE') || '0.0'),
     minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PREMIUM_MIN') || '0.0'),
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PREMIUM_MAX') || '0.0'),
+    currency: 'USDC',
+  },
+  // Split Wallet Withdrawals - No company fees to prevent insufficient funds
+  split_wallet_withdrawal: {
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_WALLET_WITHDRAWAL_PERCENTAGE') || '0.0'),
+    minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_WALLET_WITHDRAWAL_MIN') || '0.0'),
+    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_WALLET_WITHDRAWAL_MAX') || '0.0'),
     currency: 'USDC',
   },
   // Default fallback

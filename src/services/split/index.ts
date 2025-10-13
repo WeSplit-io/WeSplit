@@ -138,6 +138,12 @@ export class SplitWalletService {
     return SplitWalletManagement.repairSplitWalletSynchronization(splitWalletId, creatorId);
   }
 
+  static async fixSplitWalletDataConsistency(splitWalletId: string) {
+    await loadModules();
+    const { fixSplitWalletDataConsistency } = await import('./SplitWalletManagement');
+    return fixSplitWalletDataConsistency(splitWalletId);
+  }
+
   // Payment methods
   static async processParticipantPayment(splitWalletId: string, participantId: string, amount: number, transactionSignature?: string) {
     await loadModules();
@@ -171,7 +177,7 @@ export class SplitWalletService {
 
   static async payParticipantShare(splitWalletId: string, participantId: string, amount: number) {
     await loadModules();
-    return SplitWalletPayments.payParticipantShare(splitWalletId, participantId, amount);
+    return SplitWalletPayments.payParticipantShareNEW(splitWalletId, participantId, amount);
   }
 
   // Security methods

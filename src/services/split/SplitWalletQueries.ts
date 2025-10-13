@@ -382,17 +382,37 @@ export class SplitWalletQueries {
 
       const wallet = result.wallet;
       const totalAmount = wallet.totalAmount;
-      const collectedAmount = wallet.participants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+      
+      // Get actual on-chain balance to verify against database values
+      let actualOnChainBalance = 0;
+      try {
+        const { consolidatedTransactionService } = await import('../consolidatedTransactionService');
+        const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
+        if (balanceResult.success) {
+          actualOnChainBalance = balanceResult.balance;
+        }
+      } catch (error) {
+        logger.warn('Could not get on-chain balance for completion calculation', { error }, 'SplitWalletQueries');
+      }
+      
+      // Calculate database-based completion
+      const databaseCollectedAmount = wallet.participants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+      
+      // Use the more conservative (lower) value between database and on-chain balance
+      const collectedAmount = Math.min(databaseCollectedAmount, actualOnChainBalance);
       const remainingAmount = totalAmount - collectedAmount;
       const completionPercentage = totalAmount > 0 ? (collectedAmount / totalAmount) * 100 : 0;
 
       logger.debug('getSplitWalletCompletion calculation', {
         walletId: splitWalletId,
         totalAmount,
-        collectedAmount,
+        databaseCollectedAmount,
+        actualOnChainBalance,
+        finalCollectedAmount: collectedAmount,
         remainingAmount,
         completionPercentage,
-        participantsCount: wallet.participants.length
+        participantsCount: wallet.participants.length,
+        dataConsistencyIssue: Math.abs(databaseCollectedAmount - actualOnChainBalance) > 0.001
       });
 
       return {

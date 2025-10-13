@@ -6,9 +6,137 @@
 
 import { logger } from '../loggingService';
 import { roundUsdcAmount } from '../../utils/currencyUtils';
-import { doc, updateDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import type { SplitWallet, SplitWalletParticipant, SplitWalletResult } from './types';
+
+/**
+ * Fix data consistency issues in split wallets
+ * Checks if participants marked as "paid" actually have funds on-chain
+ */
+export async function fixSplitWalletDataConsistency(splitWalletId: string): Promise<{ success: boolean; error?: string; fixed?: boolean }> {
+  try {
+    const { SplitWalletQueries } = await import('./SplitWalletQueries');
+    const { consolidatedTransactionService } = await import('../consolidatedTransactionService');
+    const walletResult = await SplitWalletQueries.getSplitWallet(splitWalletId);
+    
+    if (!walletResult.success || !walletResult.wallet) {
+      return { success: false, error: 'Split wallet not found' };
+    }
+
+    const wallet = walletResult.wallet;
+    
+    // Check actual on-chain balance
+    const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
+    if (!balanceResult.success) {
+      return { success: false, error: 'Failed to check on-chain balance' };
+    }
+
+    const onChainBalance = balanceResult.balance;
+    const expectedBalance = wallet.participants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+    
+    logger.info('Data consistency check', {
+      splitWalletId,
+      onChainBalance,
+      expectedBalance,
+      difference: Math.abs(onChainBalance - expectedBalance)
+    }, 'SplitWalletManagement');
+
+    // If there's a significant difference, fix the participant data
+    const tolerance = 0.001; // 0.001 USDC tolerance
+    if (Math.abs(onChainBalance - expectedBalance) > tolerance) {
+      logger.warn('⚠️ Data inconsistency detected, fixing participant data', {
+        splitWalletId,
+        onChainBalance,
+        expectedBalance,
+        difference: Math.abs(onChainBalance - expectedBalance)
+      }, 'SplitWalletManagement');
+
+      // Reset participants to reflect actual on-chain balance
+      const updatedParticipants = wallet.participants.map(p => {
+        // If on-chain balance is 0, reset all participants to unpaid
+        if (onChainBalance < tolerance) {
+          return {
+            ...p,
+            amountPaid: 0,
+            status: 'pending' as const,
+            transactionSignature: undefined,
+            paidAt: undefined
+          };
+        }
+        
+        // If on-chain balance is less than expected, we need to determine which participants actually paid
+        // For now, we'll use a proportional approach, but this could be improved with transaction verification
+        const ratio = onChainBalance / expectedBalance;
+        const adjustedAmountPaid = p.amountPaid * ratio;
+        const isFullyPaid = adjustedAmountPaid >= p.amountOwed;
+        
+        // If the adjusted amount is very close to the original amount (within tolerance), keep it
+        const amountDifference = Math.abs(adjustedAmountPaid - p.amountPaid);
+        const finalAmountPaid = amountDifference < tolerance ? p.amountPaid : roundUsdcAmount(adjustedAmountPaid);
+        
+        return {
+          ...p,
+          amountPaid: finalAmountPaid,
+          status: isFullyPaid ? 'paid' as const : 'pending' as const,
+          transactionSignature: isFullyPaid ? p.transactionSignature : undefined,
+          paidAt: isFullyPaid ? p.paidAt : undefined
+        };
+      });
+
+      // Update wallet in Firebase
+      const docId = wallet.firebaseDocId || splitWalletId;
+      await updateDoc(doc(db, 'splitWallets', docId), {
+        participants: updatedParticipants,
+        updatedAt: new Date().toISOString(),
+      });
+
+      return { success: true, fixed: true };
+    }
+
+    return { success: true, fixed: false };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to fix data consistency' 
+    };
+  }
+}
+
+/**
+ * Fix precision issues in existing split wallets by rounding participant amountOwed values
+ */
+export async function fixSplitWalletPrecision(splitWalletId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { SplitWalletQueries } = await import('./SplitWalletQueries');
+    const walletResult = await SplitWalletQueries.getSplitWallet(splitWalletId);
+    
+    if (!walletResult.success || !walletResult.wallet) {
+      return { success: false, error: 'Split wallet not found' };
+    }
+
+    const wallet = walletResult.wallet;
+    
+    // Round all participant amountOwed values
+    const updatedParticipants = wallet.participants.map(p => ({
+      ...p,
+      amountOwed: roundUsdcAmount(p.amountOwed)
+    }));
+
+    // Update wallet in Firebase
+    const docId = wallet.firebaseDocId || splitWalletId;
+    await updateDoc(doc(db, 'splitWallets', docId), {
+      participants: updatedParticipants,
+      updatedAt: new Date().toISOString(),
+    });
+
+    return { success: true };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to fix precision' 
+    };
+  }
+}
 
 export class SplitWalletManagement {
   /**
