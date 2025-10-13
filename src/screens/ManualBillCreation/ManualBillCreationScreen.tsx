@@ -310,7 +310,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
         navigation.navigate('SplitDetails', {
           splitData: splitCreationResult.split,
           splitId: splitCreationResult.split?.id,
-          splitWallet: splitCreationResult.splitWallet, // Pass the wallet information
+          currentSplitData: splitCreationResult.split, // Pass as currentSplitData for proper loading
           billData: {
             title: processedBillData.title,
             totalAmount: processedBillData.totalAmount,
@@ -326,8 +326,8 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
             confidence: 1.0,
             rawText: `Manual bill: ${billName} - ${amount} ${selectedCurrency.code} (${convertedAmount.toFixed(4)} USDC)`,
           },
-          isNewBill: false, // Not a new bill since we already created the split
-          isManualCreation: false, // Not manual creation since we already processed it
+          isNewBill: true, // This is a new bill/split
+          isManualCreation: true, // This is a manual creation
         });
       }
 

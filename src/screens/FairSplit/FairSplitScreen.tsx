@@ -14,6 +14,7 @@ import {
   StatusBar,
   TextInput,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
@@ -58,6 +59,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const [showSignatureStep, setShowSignatureStep] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
   
+  // Wallet recap modal state
+  const [showWalletRecapModal, setShowWalletRecapModal] = useState(false);
+  const [showPrivateKeyModal, setShowPrivateKeyModal] = useState(false);
+  const [privateKey, setPrivateKey] = useState<string | null>(null);
+  
   // Wallet management state
   const [externalWallets, setExternalWallets] = useState<Array<{id: string, address: string, name?: string}>>([]);
   const [inAppWallet, setInAppWallet] = useState<{address: string} | null>(null);
@@ -68,6 +74,48 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const isCurrentUserCreator = () => {
     if (!currentUser || !splitData) return false;
     return splitData.creatorId === currentUser.id.toString();
+  };
+
+  // Wallet recap functions
+  const formatWalletAddress = (address: string) => {
+    if (!address || address.length < 8) return address;
+    return `${address.slice(0, 4)}...${address.slice(-4)}`;
+  };
+
+  const handleShowPrivateKey = async () => {
+    if (splitWallet?.id && currentUser?.id) {
+      try {
+        const { SplitWalletService } = await import('../../services/split');
+        const result = await SplitWalletService.getSplitWalletPrivateKey(splitWallet.id, currentUser.id.toString());
+        if (result.success && result.privateKey) {
+          setPrivateKey(result.privateKey);
+          setShowPrivateKeyModal(true);
+        } else {
+          Alert.alert('Error', 'Could not retrieve private key');
+        }
+      } catch (error) {
+        console.error('Error getting private key:', error);
+        Alert.alert('Error', 'Could not retrieve private key');
+      }
+    }
+  };
+
+  const handleClosePrivateKeyModal = () => {
+    setShowPrivateKeyModal(false);
+  };
+
+  const handleCopyPrivateKey = () => {
+    if (privateKey) {
+      const { Clipboard } = require('react-native');
+      Clipboard.setString(privateKey);
+      Alert.alert('Copied', 'Private key copied to clipboard');
+    }
+  };
+
+  const handleCopyWalletAddress = (address: string) => {
+    const { Clipboard } = require('react-native');
+    Clipboard.setString(address);
+    Alert.alert('Success', 'Wallet address copied to clipboard');
   };
 
   // Helper functions for common calculations
@@ -109,9 +157,27 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               const totalAmount = fullSplitData.totalAmount; // Use split data amount as source of truth
               const amountPerPerson = totalAmount / fullSplitData.participants.length;
               
+              // Fetch latest user data for all participants to get current wallet addresses
+              const participantsWithLatestData = await Promise.all(
+                fullSplitData.participants.map(async (p: any) => {
+                  try {
+                    const { firebaseDataService } = await import('../../services/firebaseDataService');
+                    const latestUserData = await firebaseDataService.user.getCurrentUser(p.userId);
+                    
+                    return {
+                      ...p,
+                      walletAddress: latestUserData?.wallet_address || p.walletAddress || ''
+                    };
+                  } catch (error) {
+                    console.warn(`Could not fetch latest data for participant ${p.userId}:`, error);
+                    return p; // Return original participant data if fetch fails
+                  }
+                })
+              );
+              
               // Using split data amount as source of truth for calculations
               
-              const transformedParticipants = fullSplitData.participants.map((p: any) => ({
+              const transformedParticipants = participantsWithLatestData.map((p: any) => ({
                 id: p.userId,
                 name: p.name,
                 walletAddress: p.walletAddress,
@@ -1274,11 +1340,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         // Wait for all notifications to be sent
         await Promise.all(notificationPromises);
         
-        Alert.alert(
-          'Split Confirmed!',
-          'The repartition has been locked and all participants have been notified to pay their share.',
-          [{ text: 'OK' }]
-        );
+        // Show wallet recap modal after successful wallet creation
+        setShowWalletRecapModal(true);
       } else {
         Alert.alert('Error', updateResult.error || 'Failed to confirm split');
       }
@@ -1723,6 +1786,39 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           totalAmount={totalAmount}
           isLoading={isLoadingCompletionData}
         />
+
+        {/* Split Wallet Section - Show when wallet exists */}
+        {splitWallet && (
+          <View style={styles.splitWalletSection}>
+            <Text style={styles.splitWalletTitle}>Split Wallet</Text>
+            <View style={styles.splitWalletCard}>
+              <View style={styles.splitWalletInfo}>
+                <Text style={styles.splitWalletLabel}>Wallet Address</Text>
+                <View style={styles.walletAddressContainer}>
+                  <Text style={styles.splitWalletAddress}>
+                    {formatWalletAddress(splitWallet.walletAddress)}
+                  </Text>
+                  <TouchableOpacity onPress={() => handleCopyWalletAddress(splitWallet.walletAddress)}>
+                    <Image
+                      source={require('../../../assets/copy-icon.png')}
+                      style={styles.copyIcon}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.privateKeyButton}
+                onPress={handleShowPrivateKey}
+              >
+                <Image
+                  source={require('../../../assets/id-icon-white.png')}
+                  style={styles.privateKeyButtonIcon}
+                />
+                <Text style={styles.privateKeyButtonText}>View Private Key</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Split Method Selection - Only for creator before confirmation */}
         {!isSplitConfirmed && isCurrentUserCreator() && (
@@ -2241,6 +2337,94 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             )}
           </View>
       </View>
+      )}
+
+      {/* Wallet Recap Modal */}
+      {showWalletRecapModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.walletRecapModal}>
+            <Text style={styles.walletRecapTitle}>🎉 Split Wallet Created!</Text>
+            <Text style={styles.walletRecapSubtitle}>
+              Your split wallet has been created and is ready for payments. Keep your private key secure!
+            </Text>
+            
+            {splitWallet && (
+              <View style={styles.walletRecapContent}>
+                <View style={styles.walletInfoCard}>
+                  <Text style={styles.walletInfoLabel}>Wallet Address</Text>
+                  <View style={styles.walletAddressContainer}>
+                    <Text style={styles.walletAddressText}>
+                      {formatWalletAddress(splitWallet.walletAddress)}
+                    </Text>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        const { Clipboard } = require('react-native');
+                        Clipboard.setString(splitWallet.walletAddress);
+                        Alert.alert('Copied', 'Wallet address copied to clipboard');
+                      }}
+                      style={styles.copyButton}
+                    >
+                      <Text style={styles.copyButtonText}>Copy</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.privateKeyButton} 
+                  onPress={handleShowPrivateKey}
+                >
+                  <Text style={styles.privateKeyButtonText}>🔑 View Private Key</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            <View style={styles.walletRecapButtons}>
+              <TouchableOpacity 
+                style={styles.walletRecapButton}
+                onPress={() => setShowWalletRecapModal(false)}
+              >
+                <Text style={styles.walletRecapButtonText}>Continue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Private Key Modal */}
+      {showPrivateKeyModal && privateKey && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.privateKeyModal}>
+            <Text style={styles.privateKeyModalTitle}>🔑 Private Key</Text>
+            <Text style={styles.privateKeyModalSubtitle}>
+              Keep this private key secure. Anyone with access to this key can control your split wallet.
+            </Text>
+            
+            <View style={styles.privateKeyDisplay}>
+              <Text style={styles.privateKeyText}>{privateKey}</Text>
+            </View>
+            
+            <View style={styles.privateKeyWarning}>
+              <Text style={styles.privateKeyWarningText}>
+                ⚠️ Never share your private key with anyone. Store it in a secure location.
+              </Text>
+            </View>
+            
+            <View style={styles.privateKeyButtons}>
+              <TouchableOpacity 
+                style={styles.copyPrivateKeyButton}
+                onPress={handleCopyPrivateKey}
+              >
+                <Text style={styles.copyPrivateKeyButtonText}>Copy Key</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.closePrivateKeyButton}
+                onPress={handleClosePrivateKeyModal}
+              >
+                <Text style={styles.closePrivateKeyButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );

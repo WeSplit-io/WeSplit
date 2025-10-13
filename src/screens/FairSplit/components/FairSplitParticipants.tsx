@@ -39,9 +39,9 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
           <View style={styles.participantInfo}>
             <Text style={styles.participantName}>{participant.name}</Text>
             <Text style={styles.participantWallet}>
-              {participant.walletAddress.length > 10 
+              {participant.walletAddress && participant.walletAddress.length > 10 
                 ? `${participant.walletAddress.slice(0, 4)}...${participant.walletAddress.slice(-4)}`
-                : participant.walletAddress
+                : participant.walletAddress || 'No wallet address'
               }
             </Text>
           </View>

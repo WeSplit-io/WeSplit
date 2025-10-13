@@ -49,31 +49,7 @@ export class ManualSplitCreationService {
         };
       }
 
-      // Create wallet first
-      const walletResult = await SplitWalletService.createSplitWallet(
-        data.processedBillData.id,
-        data.currentUser.id.toString(),
-        data.processedBillData.totalAmount,
-        data.processedBillData.currency || 'USDC',
-        data.processedBillData.participants.map(p => ({
-          userId: p.id,
-          name: p.name,
-          walletAddress: p.walletAddress,
-          amountOwed: p.amountOwed,
-        }))
-      );
-
-      if (!walletResult.success || !walletResult.wallet) {
-        return {
-          success: false,
-          error: walletResult.error || 'Failed to create split wallet'
-        };
-      }
-
-      logger.info('Wallet created successfully', {
-        walletId: walletResult.wallet.id,
-        walletAddress: walletResult.wallet.walletAddress
-      });
+      // Wallet creation moved to split type selection (FairSplit/DegenLock screens)
 
       // Ensure the creator is included as a participant
       const allParticipants = [...data.processedBillData.participants];
@@ -124,8 +100,7 @@ export class ManualSplitCreationService {
           phone: '',
         },
         date: data.processedBillData.date,
-        walletId: walletResult.wallet.id,
-        walletAddress: walletResult.wallet.walletAddress,
+        // walletId and walletAddress removed - will be set when wallet is created in FairSplit/DegenLock
       };
 
       // Create the split in the database
@@ -137,7 +112,7 @@ export class ManualSplitCreationService {
         return {
           success: true,
           split: createResult.split,
-          splitWallet: walletResult.wallet
+          // splitWallet removed - will be created in FairSplit/DegenLock screens
         };
       } else {
         return {

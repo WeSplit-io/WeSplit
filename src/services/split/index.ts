@@ -56,6 +56,17 @@ export class SplitWalletService {
     return Math.round(amount * 1000000) / 1000000;
   }
 
+  static async createDegenSplitWallet(
+    billId: string,
+    creatorId: string,
+    totalAmount: number,
+    currency: string,
+    participants: Array<{ userId: string; name: string; walletAddress: string; amountOwed: number }>
+  ) {
+    await loadModules();
+    return SplitWalletCreation.createDegenSplitWallet(billId, creatorId, totalAmount, currency, participants);
+  }
+
   static isValidWalletAddress(address: string) {
     // This is a synchronous utility method
     return address && address.length > 0 && address.startsWith('1') || address.startsWith('9');
@@ -182,6 +193,24 @@ export class SplitWalletService {
   static async deleteSplitWalletPrivateKey(splitWalletId: string, creatorId: string) {
     await loadModules();
     return SplitWalletSecurity.deleteSplitWalletPrivateKey(splitWalletId, creatorId);
+  }
+
+  // Degen Split methods for shared private key access
+  static async storeSplitWalletPrivateKeyForAllParticipants(
+    splitWalletId: string,
+    participants: Array<{ userId: string; name: string }>,
+    privateKey: string
+  ) {
+    await loadModules();
+    return SplitWalletSecurity.storeSplitWalletPrivateKeyForAllParticipants(splitWalletId, participants, privateKey);
+  }
+
+  static async deleteSplitWalletPrivateKeyForAllParticipants(
+    splitWalletId: string,
+    participants: Array<{ userId: string; name: string }>
+  ) {
+    await loadModules();
+    return SplitWalletSecurity.deleteSplitWalletPrivateKeyForAllParticipants(splitWalletId, participants);
   }
 
   static async listStoredPrivateKeys(creatorId: string) {

@@ -273,6 +273,120 @@ export class SplitWalletCreation {
   }
 
   /**
+   * Create split wallet for Degen Split with shared private key access
+   * All participants get access to the private key for withdrawal/claiming
+   */
+  static async createDegenSplitWallet(
+    billId: string,
+    creatorId: string,
+    totalAmount: number,
+    currency: string,
+    participants: Array<{ userId: string; name: string; walletAddress: string; amountOwed: number }>
+  ): Promise<SplitWalletResult> {
+    try {
+      logger.info('Creating Degen Split wallet with shared private key access', {
+        billId,
+        creatorId,
+        totalAmount,
+        currency,
+        participantsCount: participants.length
+      }, 'SplitWalletCreation');
+
+      // Create a new dedicated wallet for this Degen Split
+      const wallet = await walletService.createWalletForProvider();
+      if (!wallet) {
+        throw new Error('Failed to create wallet for Degen Split');
+      }
+      
+      logger.info('Degen Split wallet created with address', { 
+        walletAddress: wallet.address,
+        publicKey: wallet.publicKey 
+      }, 'SplitWalletCreation');
+
+      // Create split wallet record
+      const splitWalletId = `degen_split_wallet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const splitWalletData: Omit<SplitWallet, 'firebaseDocId'> = {
+        id: splitWalletId,
+        billId,
+        creatorId,
+        walletAddress: wallet.address,
+        publicKey: wallet.publicKey,
+        totalAmount: SplitWalletCreation.roundUsdcAmount(totalAmount),
+        currency,
+        status: 'active',
+        participants: participants.map(p => ({
+          ...p,
+          amountPaid: 0,
+          status: 'pending' as const,
+        })),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Store in Firebase
+      const docRef = await addDoc(collection(db, 'splitWallets'), splitWalletData);
+      
+      const createdSplitWallet: SplitWallet = {
+        ...splitWalletData,
+        firebaseDocId: docRef.id,
+      };
+
+      // Store private key for ALL participants (Degen Split feature)
+      // The wallet service returns secretKey (base64), not privateKey
+      const privateKey = wallet.secretKey;
+      if (!privateKey) {
+        logger.error('No private key available from wallet service', { 
+          walletAddress: wallet.address,
+          publicKey: wallet.publicKey,
+          hasSecretKey: !!wallet.secretKey,
+          hasPrivateKey: !!wallet.privateKey
+        }, 'SplitWalletCreation');
+        throw new Error('No private key available from wallet service');
+      }
+
+      const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
+      const storeResult = await SplitWalletSecurity.storeSplitWalletPrivateKeyForAllParticipants(
+        splitWalletId,
+        participants.map(p => ({ userId: p.userId, name: p.name })),
+        privateKey
+      );
+
+      if (!storeResult.success) {
+        logger.error('Failed to store private keys for all participants', { error: storeResult.error }, 'SplitWalletCreation');
+        // Don't fail the entire operation, but log the error
+      } else {
+        logger.info('Private keys stored for all Degen Split participants', {
+          splitWalletId,
+          participantsCount: participants.length
+        }, 'SplitWalletCreation');
+      }
+
+      logger.info('Degen Split wallet created and stored successfully', {
+        splitWalletId: createdSplitWallet.id,
+        firebaseDocId: docRef.id,
+        walletAddress: wallet.address,
+        totalAmount: createdSplitWallet.totalAmount,
+        participantsCount: createdSplitWallet.participants.length,
+        sharedPrivateKeyAccess: true
+      }, 'SplitWalletCreation');
+
+      return {
+        success: true,
+        wallet: createdSplitWallet,
+      };
+
+    } catch (error) {
+      console.error('🔍 SplitWalletCreation: Error creating Degen Split wallet:', error);
+      logger.error('Failed to create Degen Split wallet', error, 'SplitWalletCreation');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
    * Force reset a split wallet (for debugging/testing)
    */
   static async forceResetSplitWallet(splitWalletId: string): Promise<SplitWalletResult> {

@@ -36,7 +36,7 @@ import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/loggingService';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
-import { SplitWalletService } from '../../services/split';
+// Removed SplitWalletService import - wallets are now created only when split type is selected
 import { FallbackDataService } from '../../utils/fallbackDataService';
 import { MockupDataService } from '../../data/mockupData';
 import { QRCodeService } from '../../services/qrCodeService';
@@ -116,7 +116,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // Debug logging removed for production
 
   const [billName, setBillName] = useState(() => {
-    // Use data from existing split if available, otherwise use mockup data for new splits
+    // Use data from existing split if available, otherwise use processed data
+    if (routeCurrentSplitData?.title) {
+      return routeCurrentSplitData.title;
+    }
     if (splitData?.title) {
       return splitData.title;
     }
@@ -126,11 +129,14 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     if (billData?.title) {
       return billData.title;
     }
-    return MockupDataService.getBillName();
+    return 'New Split'; // Default fallback instead of mockup data
   });
 
   const [totalAmount, setTotalAmount] = useState(() => {
-    // Use data from existing split if available, otherwise use mockup data for new splits
+    // Use data from existing split if available, otherwise use processed data
+    if (routeCurrentSplitData?.totalAmount) {
+      return routeCurrentSplitData.totalAmount.toString();
+    }
     if (splitData?.totalAmount) {
       return splitData.totalAmount.toString();
     }
@@ -140,18 +146,20 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     if (billData?.totalAmount) {
       return billData.totalAmount.toString();
     }
-    return MockupDataService.getBillAmount().toString();
+    return '0'; // Default fallback instead of mockup data
   });
   const [showSplitModalState, setShowSplitModalState] = useState(false);
   const [selectedSplitType, setSelectedSplitType] = useState<'fair' | 'degen' | null>(() => {
     // Initialize with existing split type if available
+    if (routeCurrentSplitData?.splitType) {
+      return routeCurrentSplitData.splitType;
+    }
     if (splitData?.splitType) {
       return splitData.splitType;
     }
     return null;
   });
-  const [showPrivateKeyModalState, setShowPrivateKeyModalState] = useState(false);
-  const [splitWalletPrivateKey, setSplitWalletPrivateKey] = useState<string | null>(null);
+  // Private key modal state moved to FairSplit/DegenLock screens
   const [showAddFriendsModalState, setShowAddFriendsModalState] = useState(false);
 
   // Animation refs for modals
@@ -160,8 +168,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const splitModalOpacity = useRef(new Animated.Value(0)).current;
   const addFriendsModalTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const addFriendsModalOpacity = useRef(new Animated.Value(0)).current;
-  const privateKeyModalTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const privateKeyModalOpacity = useRef(new Animated.Value(0)).current;
+  // Private key modal animation refs moved to FairSplit/DegenLock screens
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [currentSplitData, setCurrentSplitData] = useState<Split | null>(splitData || routeCurrentSplitData || null);
   const [splitWallet, setSplitWallet] = useState<any>(null);
@@ -216,7 +223,6 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     }
     return null;
   });
-  const [invitedUsers, setInvitedUsers] = useState<any[]>([]);
   const [isInvitingUsers, setIsInvitingUsers] = useState(false);
   const [createdSplitId, setCreatedSplitId] = useState<string | null>(null);
   const [isJoiningSplit, setIsJoiningSplit] = useState(false);
@@ -234,7 +240,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   useEffect(() => {
     // Load split data if we have a splitId
-    if (splitId && !currentSplitData) {
+    // Always load from database to get the most up-to-date information
+    if (splitId) {
       loadSplitData();
     }
   }, [splitId]);
@@ -252,15 +259,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       setBillName(currentSplitData.title);
       setTotalAmount(currentSplitData.totalAmount.toString());
       setSelectedSplitType(currentSplitData.splitType || null);
+      
+      // No longer managing separate invited users state - all participants are shown in the main list
     }
   }, [currentSplitData]);
 
-  useEffect(() => {
-    // Ensure split wallet exists
-    if (currentSplitData && !splitWallet) {
-      ensureSplitWithWalletExists();
-    }
-  }, [currentSplitData]);
+  // Removed automatic wallet creation - wallets should only be created when split type is selected
 
   useEffect(() => {
     // Convert currency to USDC
@@ -354,39 +358,62 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     try {
       const result = await SplitStorageService.getSplit(splitId);
       if (result.success && result.split) {
-        setCurrentSplitData(result.split);
+        const splitData = result.split;
+        
+        // Fetch latest user data for all participants to get current wallet addresses
+        const updatedParticipants = await Promise.all(
+          splitData.participants.map(async (participant: any) => {
+            try {
+              const { firebaseDataService } = await import('../../services/firebaseDataService');
+              const latestUserData = await firebaseDataService.user.getCurrentUser(participant.userId);
+              
+              // Debug logging for user data
+              console.log(`🔍 User data for ${participant.userId}:`, {
+                name: latestUserData?.name,
+                wallet_address: latestUserData?.wallet_address,
+                originalWalletAddress: participant.walletAddress
+              });
+              
+              // Use latest wallet address if available, otherwise keep existing data
+              return {
+                ...participant,
+                walletAddress: latestUserData?.wallet_address || participant.walletAddress || participant.wallet_address || ''
+              };
+            } catch (error) {
+              console.warn(`Could not fetch latest data for participant ${participant.userId}:`, error);
+              return participant; // Return original participant data if fetch fails
+            }
+          })
+        );
+        
+        // Update split data with refreshed participant information
+        const updatedSplitData = {
+          ...splitData,
+          participants: updatedParticipants
+        };
+        
+        setCurrentSplitData(updatedSplitData);
+        
+        // Debug logging for split data
+        console.log('🔍 Loaded split data:', {
+          splitId: splitData.id,
+          title: splitData.title,
+          participantsCount: updatedParticipants.length,
+          participants: updatedParticipants.map(p => ({
+            name: p.name,
+            status: p.status,
+            walletAddress: p.walletAddress
+          }))
+        });
+        
+        // No longer managing separate invited users state - all participants are shown in the main list
       }
     } catch (error) {
       console.error('Error loading split data:', error);
     }
   };
 
-  const ensureSplitWithWalletExists = async () => {
-    if (!currentSplitData || splitWallet) return;
-    
-    try {
-      setIsCreatingWallet(true);
-      const walletResult = await SplitWalletService.createSplitWallet(
-        currentSplitData.id,
-        currentSplitData.creatorId,
-        currentSplitData.totalAmount,
-        currentSplitData.currency || 'USDC',
-        currentSplitData.participants.map(p => ({
-          userId: p.userId,
-          name: p.name,
-          walletAddress: p.walletAddress,
-          amountOwed: p.amountOwed
-        }))
-      );
-      if (walletResult.success) {
-        setSplitWallet(walletResult.wallet);
-      }
-    } catch (error) {
-      console.error('Error creating split wallet:', error);
-    } finally {
-      setIsCreatingWallet(false);
-    }
-  };
+  // Removed ensureSplitWithWalletExists - wallets should only be created when split type is selected
 
   const convertCurrencyToUSDC = async () => {
     if (!totalAmount) return;
@@ -411,14 +438,23 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   const generateQRCodeData = () => {
     const splitIdToUse = createdSplitId || currentSplitData?.id || splitId;
+    const titleToUse = billName || currentSplitData?.title || 'Split';
+    const amountToUse = totalAmount || currentSplitData?.totalAmount || '0';
+    
     if (splitIdToUse) {
       const qrData = JSON.stringify({
         type: 'split_invitation',
         splitId: splitIdToUse,
-        title: billName,
-        amount: totalAmount
+        title: titleToUse,
+        amount: amountToUse
       });
       setQrCodeData(qrData);
+    } else {
+      // Set a fallback QR code data if no split ID is available
+      setQrCodeData(JSON.stringify({
+        type: 'split_invitation',
+        message: 'Join this split'
+      }));
     }
   };
 
@@ -491,30 +527,33 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     try {
       setIsInvitingUsers(true);
       
-      // Check if contact is already invited
-      const isAlreadyInvited = invitedUsers.some(u => u.id === (contact.id || contact.userId));
-      if (isAlreadyInvited) {
-        Alert.alert('Already Invited', `${contact.name} has already been invited to this split.`);
+      // Check if contact is already a participant
+      const isAlreadyParticipant = participants.some((p: any) => (p.userId || p.id) === (contact.id || contact.userId));
+      if (isAlreadyParticipant) {
+        Alert.alert('Already Added', `${contact.name} is already in this split.`);
         return;
       }
 
-      // Add the contact to invited users list locally
-      const newInvitedUser = {
-        id: contact.id || contact.userId,
-        name: contact.name,
-        email: contact.email,
-        walletAddress: contact.walletAddress,
-        status: 'pending'
-      };
-      
-      setInvitedUsers(prev => [...prev, newInvitedUser]);
+      // Fetch the latest user data to get current wallet address
+      let latestWalletAddress = contact.walletAddress || contact.wallet_address || '';
+      try {
+        const { firebaseDataService } = await import('../../services/firebaseDataService');
+        const latestUserData = await firebaseDataService.user.getCurrentUser(contact.id || contact.userId);
+        if (latestUserData?.wallet_address) {
+          latestWalletAddress = latestUserData.wallet_address;
+        }
+      } catch (error) {
+        console.warn('Could not fetch latest user data, using contact data:', error);
+      }
+
+      // No longer managing local invited users state - participants are managed through the database
 
       // Add participant to the split in the database
       const participantData = {
         userId: contact.id || contact.userId,
         name: contact.name,
         email: contact.email || '',
-        walletAddress: contact.walletAddress || '',
+        walletAddress: latestWalletAddress,
         amountOwed: 0, // Will be calculated when split is finalized
         amountPaid: 0,
         status: 'invited' as const,
@@ -526,10 +565,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       if (!addParticipantResult.success) {
         console.error('Failed to add participant to split:', addParticipantResult.error);
         Alert.alert('Error', 'Failed to add participant to split. Please try again.');
-        // Remove from local state if database operation failed
-        setInvitedUsers(prev => prev.filter(u => u.id !== newInvitedUser.id));
         return;
       }
+
+      // Reload split data to show the newly added participant
+      await loadSplitData();
 
       // Update split wallet participants if we have a split wallet
       if (currentSplitData?.walletId) {
@@ -610,9 +650,6 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     } catch (error) {
       console.error('Error inviting contact:', error);
       Alert.alert('Error', 'Failed to invite contact. Please try again.');
-      
-      // Remove from local state if there was an error
-      setInvitedUsers(prev => prev.filter(u => u.id !== (contact.id || contact.userId)));
     } finally {
       setIsInvitingUsers(false);
     }
@@ -654,19 +691,17 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     return [];
   })();
 
-  // Helper function to check if all invited users have accepted
-  const areAllInvitedUsersAccepted = () => {
-    if (invitedUsers.length === 0) return true;
+  // Helper function to check if all participants have accepted
+  const areAllParticipantsAccepted = () => {
+    const participants = currentSplitData?.participants || [];
+    if (participants.length === 0) return true;
     
-    const pendingInvitedUsers = invitedUsers.filter((user: any) => user.status === 'pending');
-    const nonPendingInvitedUsers = invitedUsers.filter((user: any) => user.status !== 'pending');
+    // Check if all participants have 'accepted' status
+    const acceptedParticipants = participants.filter((participant: any) => 
+      participant.status === 'accepted'
+    );
     
-    if (nonPendingInvitedUsers.length > 0) {
-      const acceptedInvitedUsers = nonPendingInvitedUsers.filter((user: any) => user.status === 'accepted');
-      return acceptedInvitedUsers.length === nonPendingInvitedUsers.length;
-    }
-    
-    return pendingInvitedUsers.length === 0;
+    return acceptedParticipants.length === participants.length;
   };
 
   // Missing function implementations - these would be added from the original implementation
@@ -741,9 +776,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     hideAddFriendsModal();
   };
 
-  const handleClosePrivateKeyModal = () => {
-    hidePrivateKeyModal();
-  };
+  // Private key modal functions moved to FairSplit/DegenLock screens
 
   const handleSplitTypeSelection = async (type: 'fair' | 'degen') => {
     setSelectedSplitType(type);
@@ -764,7 +797,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         const updatedSplitData = {
           ...currentSplitData,
           splitType: selectedSplitType,
-          status: 'active' as const
+          status: 'pending' as const // Keep as pending until wallet is created
         };
         
         const updateResult = await SplitStorageService.updateSplit(splitIdToUse, updatedSplitData);
@@ -778,14 +811,14 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               splitData: updateResult.split,
               billData: billData,
               processedBillData: currentProcessedBillData,
-              splitWallet: splitWallet
+              // NO splitWallet passed - will be created in FairSplit
             });
           } else if (selectedSplitType === 'degen') {
             navigation.navigate('DegenLock', {
               splitData: updateResult.split,
               billData: billData,
               processedBillData: currentProcessedBillData,
-              splitWallet: splitWallet
+              // NO splitWallet passed - will be created in DegenLock
             });
           }
         } else {
@@ -800,7 +833,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           totalAmount: parseFloat(totalAmount),
           currency: currentProcessedBillData?.currency || 'USDC',
           splitType: selectedSplitType,
-          status: 'active' as const,
+          status: 'pending' as const, // Keep as pending until wallet is created
           creatorId: currentUser?.id?.toString() || '',
           creatorName: currentUser?.name || 'Unknown',
           participants: participants.map((p: any) => ({
@@ -828,14 +861,14 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               splitData: createResult.split,
               billData: billData,
               processedBillData: currentProcessedBillData,
-              splitWallet: splitWallet
+              // NO splitWallet passed - will be created in FairSplit
             });
           } else if (selectedSplitType === 'degen') {
             navigation.navigate('DegenLock', {
               splitData: createResult.split,
               billData: billData,
               processedBillData: currentProcessedBillData,
-              splitWallet: splitWallet
+              // NO splitWallet passed - will be created in DegenLock
             });
           }
         } else {
@@ -849,19 +882,9 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     }
   };
 
-  const handleShowPrivateKey = async () => {
-    if (splitWallet?.privateKey) {
-      setSplitWalletPrivateKey(splitWallet.privateKey);
-      showPrivateKeyModal();
-    }
-  };
+  // Private key handling moved to FairSplit/DegenLock screens
 
-  const handleCopyPrivateKey = () => {
-    if (splitWalletPrivateKey) {
-      Clipboard.setString(splitWalletPrivateKey);
-      Alert.alert('Copied', 'Private key copied to clipboard');
-    }
-  };
+  // Private key copy function moved to FairSplit/DegenLock screens
 
   const handleLinkShare = async () => {
     try {
@@ -937,6 +960,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   const showAddFriendsModal = () => {
+    // Generate QR code data if not already available
+    if (!qrCodeData) {
+      generateQRCodeData();
+    }
+    
     setShowAddFriendsModalState(true);
     Animated.parallel([
       Animated.timing(addFriendsModalTranslateY, {
@@ -969,38 +997,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     });
   };
 
-  const showPrivateKeyModal = () => {
-    setShowPrivateKeyModalState(true);
-    Animated.parallel([
-      Animated.timing(privateKeyModalTranslateY, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(privateKeyModalOpacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  const hidePrivateKeyModal = () => {
-    Animated.parallel([
-      Animated.timing(privateKeyModalTranslateY, {
-        toValue: SCREEN_HEIGHT,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(privateKeyModalOpacity, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowPrivateKeyModalState(false);
-    });
-  };
+  // Private key modal animations moved to FairSplit/DegenLock screens
 
   // Animation handlers - simplified versions
   const handleSplitModalGestureEvent = Animated.event(
@@ -1035,21 +1032,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     }
   };
 
-  const handlePrivateKeyModalGestureEvent = Animated.event(
-    [{ nativeEvent: { translationY: privateKeyModalTranslateY } }],
-    { useNativeDriver: true }
-  );
-
-  const handlePrivateKeyModalStateChange = (event: PanGestureHandlerGestureEvent) => {
-    const { translationY, state } = event.nativeEvent;
-    if (state === 4 || state === 5) { // END or CANCELLED
-      if (translationY > 100) {
-        hidePrivateKeyModal();
-      } else {
-        Animated.spring(privateKeyModalTranslateY, { toValue: 0, useNativeDriver: true }).start();
-      }
-    }
-  };
+  // Private key modal gesture handlers moved to FairSplit/DegenLock screens
 
   // Show processing screen for new bills
   if (isProcessingNewBill) {
@@ -1201,35 +1184,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           </View>
         </LinearGradient>
 
-        {/* Split Wallet Section */}
-        {splitWallet && (
-          <View style={styles.splitWalletSection}>
-            <Text style={styles.splitWalletTitle}>Split Wallet</Text>
-            <View style={styles.splitWalletCard}>
-              <View style={styles.splitWalletInfo}>
-                <Text style={styles.splitWalletLabel}>Wallet Address</Text>
-                <View style={styles.walletAddressContainer}>
-                  <Text style={styles.splitWalletAddress}>
-                    {formatWalletAddress(splitWallet.address)}
-                  </Text>
-                  <TouchableOpacity onPress={() => Clipboard.setString(splitWallet.address)}>
-                    <Image
-                      source={require('../../../assets/copy-icon.png')}
-                      style={styles.copyIcon}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <TouchableOpacity style={styles.privateKeyButton} onPress={handleShowPrivateKey}>
-                <Image
-                  source={require('../../../assets/eye-icon.png')}
-                  style={styles.privateKeyButtonIcon}
-                />
-                <Text style={styles.privateKeyButtonText}>View Private Key</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+        {/* Split Wallet Section - MOVED TO FAIR/DEGEN SCREENS */}
+        {/* Wallet creation and recap now happens in FairSplit/DegenLock screens */}
 
         {/* Participants Section */}
         <View style={styles.participantsSection}>
@@ -1246,7 +1202,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               />
               <View style={styles.participantInfo}>
                 <Text style={styles.participantName}>{participant.name}</Text>
-                <Text style={styles.participantWallet}>{formatWalletAddress(participant.walletAddress)}</Text>
+                <Text style={styles.participantWallet}>
+                  {participant.walletAddress ? 
+                    formatWalletAddress(participant.walletAddress) : 
+                    'No wallet address'
+                  }
+                </Text>
               </View>
               <View style={styles.participantStatus}>
                 {participant.status === 'accepted' ? (
@@ -1261,43 +1222,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             </View>
           ))}
 
-          {/* Invited Users Section */}
-          {invitedUsers.length > 0 && (
-            <>
-              <Text style={styles.participantsTitle}>Invited:</Text>
-              {invitedUsers.map((invitedUser: any) => {
-                return (
-                  <View key={invitedUser.id} style={styles.participantCard}>
-                    <UserAvatar
-                      userId={invitedUser.id}
-                      displayName={invitedUser.name}
-                      size={40}
-                      style={styles.participantAvatar}
-                    />
-                    <View style={styles.participantInfo}>
-                      <Text style={styles.participantName}>{invitedUser.name}</Text>
-                      <Text style={styles.participantWallet}>{invitedUser.walletAddress || invitedUser.email || 'No wallet address'}</Text>
-                    </View>
-                    <View style={styles.participantStatus}>
-                      <Text style={styles.statusPending}>Invited</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </>
-          )}
         </View>
 
 
-        {/* Loading indicator when creating wallet */}
-        {isCreatingWallet && (
-          <View style={styles.splitWalletSection}>
-            <Text style={styles.splitWalletTitle}>Creating Split Wallet...</Text>
-            <View style={styles.splitWalletCard}>
-              <Text style={styles.splitWalletLabel}>Please wait while we create your split wallet...</Text>
-            </View>
-          </View>
-        )}
+        {/* Loading indicator when creating wallet - MOVED TO FAIR/DEGEN SCREENS */}
       </ScrollView>
 
       {/* Bottom Action Button - Only visible to creators */}
@@ -1306,27 +1234,27 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           <TouchableOpacity
             style={styles.splitButton}
             onPress={handleSplitBill}
-            disabled={!areAllInvitedUsersAccepted()}
+            disabled={!areAllParticipantsAccepted()}
           >
             <LinearGradient
-              colors={areAllInvitedUsersAccepted() ? [colors.green, colors.greenLight] : [colors.surface, colors.surface]}
+              colors={areAllParticipantsAccepted() ? [colors.green, colors.greenLight] : [colors.surface, colors.surface]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.splitButtonGradient}
             >
               <Text style={[
                 styles.splitButtonText,
-                !areAllInvitedUsersAccepted() && styles.splitButtonTextDisabled
+                !areAllParticipantsAccepted() && styles.splitButtonTextDisabled
               ]}>
                 {(() => {
-                  const allAccepted = areAllInvitedUsersAccepted();
-                  const pendingInvitedUsers = invitedUsers.filter((user: any) => user.status === 'pending');
-                  const nonPendingInvitedUsers = invitedUsers.filter((user: any) => user.status !== 'pending');
-                  const acceptedInvitedUsers = nonPendingInvitedUsers.filter((user: any) => user.status === 'accepted');
-                  const declinedInvitedUsers = nonPendingInvitedUsers.filter((user: any) => user.status === 'declined');
-
-                  // Count users who need to accept (pending + non-accepted non-pending)
-                  const usersNeedingAcceptance = pendingInvitedUsers.length + (nonPendingInvitedUsers.length - acceptedInvitedUsers.length);
+                  const allAccepted = areAllParticipantsAccepted();
+                  
+                  // Count users who need to accept
+                  const participants = currentSplitData?.participants || [];
+                  const acceptedParticipants = participants.filter((participant: any) => 
+                    participant.status === 'accepted'
+                  );
+                  const usersNeedingAcceptance = participants.length - acceptedParticipants.length;
 
                   if (allAccepted) {
                     return 'Split';
@@ -1480,13 +1408,19 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 
                 <View style={styles.qrCodeSection}>
                   <View style={styles.qrCodeContainer}>
-            <QRCode
-                      value={qrCodeData || ''}
-              size={200}
-                      color="black"
-                      backgroundColor="white"
-            />
-          </View>
+                    {qrCodeData && qrCodeData.length > 0 ? (
+                      <QRCode
+                        value={qrCodeData}
+                        size={200}
+                        color="black"
+                        backgroundColor="white"
+                      />
+                    ) : (
+                      <View style={styles.qrCodePlaceholder}>
+                        <Text style={styles.qrCodeText}>Loading...</Text>
+                      </View>
+                    )}
+                  </View>
                   <View style={styles.splitContext}>
                     <Image
                       source={require('../../../assets/split-icon.png')}
@@ -1510,77 +1444,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         </Animated.View>
       </Modal>
 
-      {/* Private Key Modal */}
-      <Modal
-        visible={showPrivateKeyModalState}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={handleClosePrivateKeyModal}
-        statusBarTranslucent={true}
-      >
-        <Animated.View style={[styles.modalOverlay, { opacity: privateKeyModalOpacity }]}>
-          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-            <TouchableOpacity
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-              activeOpacity={1}
-              onPress={handleClosePrivateKeyModal}
-            />
-            
-            <PanGestureHandler
-              onGestureEvent={handlePrivateKeyModalGestureEvent}
-              onHandlerStateChange={handlePrivateKeyModalStateChange}
-            >
-              <Animated.View
-                style={[
-                  styles.privateKeyModalContainer,
-                  {
-                    transform: [{ translateY: privateKeyModalTranslateY }],
-                  },
-                ]}
-              >
-                <View style={styles.dragHandle} />
-                
-                <View style={styles.privateKeyModalContent}>
-                  <View style={styles.privateKeyMainContent}>
-                    <Text style={styles.privateKeyModalTitle}>Private Key</Text>
-                    <Text style={styles.privateKeyModalSubtitle}>
-                      Keep this private key secure. Anyone with access to this key can control your split wallet.
-                    </Text>
-                    
-                    <View style={styles.privateKeyDisplayContainer}>
-                      <Text style={styles.privateKeyLabel}>Private Key:</Text>
-                      <View style={styles.privateKeyTextContainer}>
-                        <Text style={styles.privateKeyText}>{splitWalletPrivateKey}</Text>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.privateKeyWarning}>
-                      <Text style={styles.privateKeyWarningIcon}>⚠️</Text>
-                      <Text style={styles.privateKeyWarningText}>
-                        Never share your private key with anyone. Store it in a secure location.
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.privateKeyButtonContainer}>
-                    <TouchableOpacity style={styles.copyButton} onPress={handleCopyPrivateKey}>
-                      <LinearGradient
-                        colors={[colors.green, colors.greenLight]}
-                        style={styles.copyButtonGradient}
-                      >
-                        <Text style={styles.copyButtonText}>Copy Key</Text>
-                      </LinearGradient>
-            </TouchableOpacity>
-                    <TouchableOpacity style={styles.closePrivateKeyButton} onPress={handleClosePrivateKeyModal}>
-                      <Text style={styles.closePrivateKeyButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-              </Animated.View>
-            </PanGestureHandler>
-          </View>
-        </Animated.View>
-      </Modal>
+      {/* Private Key Modal - MOVED TO FAIR/DEGEN SCREENS */}
 
     </SafeAreaView>
   );

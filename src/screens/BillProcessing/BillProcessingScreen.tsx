@@ -27,7 +27,6 @@ import { BillAnalysisData, BillAnalysisResult, ProcessedBillData } from '../../t
 import { consolidatedBillAnalysisService } from '../../services/consolidatedBillAnalysisService';
 import { useApp } from '../../context/AppContext';
 import { SplitStorageService } from '../../services/splitStorageService';
-import { SplitWalletService } from '../../services/split';
 
 interface RouteParams {
   imageUri: string;
@@ -443,25 +442,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         throw new Error('No processed bill data available for split creation');
       }
       
-      // Create wallet first
-      const walletResult = await SplitWalletService.createSplitWallet(
-        currentProcessedData.id,
-        currentUser.id.toString(),
-        currentProcessedData.totalAmount,
-        currentProcessedData.currency || 'USDC',
-        currentProcessedData.participants.map(p => ({
-          userId: p.id,
-          name: p.name,
-          walletAddress: p.walletAddress,
-          amountOwed: p.amountOwed,
-        }))
-      );
-
-      if (!walletResult.success || !walletResult.wallet) {
-        throw new Error(walletResult.error || 'Failed to create split wallet');
-      }
-
-      // Wallet created successfully
+      // Wallet creation moved to split type selection (FairSplit/DegenLock screens)
 
       // Use participants from processed data (already includes creator if from AI analysis)
       const allParticipants = [...currentProcessedData.participants];
@@ -522,8 +503,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
           phone: '',
         },
         date: currentProcessedData.date,
-        walletId: walletResult.wallet.id,
-        walletAddress: walletResult.wallet.walletAddress,
+        // walletId and walletAddress removed - will be set when wallet is created in FairSplit/DegenLock
       };
 
       // Create split in database
@@ -565,7 +545,10 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         analysisResult: processingResult,
         splitData: createResult.split,
         splitId: createResult.split.id,
-        splitWallet: walletResult.wallet,
+        currentSplitData: createResult.split, // Pass as currentSplitData for proper loading
+        isNewBill: true, // This is a new bill/split
+        isManualCreation: false, // This is OCR creation, not manual
+        // splitWallet removed - will be created in FairSplit/DegenLock screens
       });
       
     } catch (error) {
