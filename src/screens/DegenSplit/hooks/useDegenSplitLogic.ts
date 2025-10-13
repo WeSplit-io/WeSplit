@@ -382,10 +382,11 @@ export const useDegenSplitLogic = (
         return false;
       }
 
-      // For degen split, each participant pays the FULL bill amount (not their individual share)
+      // For degen split, each participant locks the FULL bill amount (not their individual share)
       // This is different from fair split where they pay their individual share
+      // Use the new degen fund locking function that preserves participant status as 'locked'
       const { SplitWalletService } = await import('../../../services/split');
-      const paymentResult = await SplitWalletService.payParticipantShare(
+      const paymentResult = await SplitWalletService.processDegenFundLocking(
         walletToUse.id,
         currentUser.id.toString(),
         totalAmount // Full bill amount for each participant in degen split
@@ -491,12 +492,12 @@ export const useDegenSplitLogic = (
         }
         
         const totalParticipants = participants.length;
-        // For degen split, check if participants have paid their full amount (totalAmount)
-        const lockedCount = wallet.participants.filter((p: any) => p.amountPaid >= p.amountOwed).length;
+        // For degen split, check if participants have locked their funds (status 'locked' or amountPaid >= amountOwed)
+        const lockedCount = wallet.participants.filter((p: any) => p.status === 'locked' || p.amountPaid >= p.amountOwed).length;
         
         // Update locked participants list for UI
         const lockedParticipantIds = wallet.participants
-          .filter((p: any) => p.amountPaid >= p.amountOwed)
+          .filter((p: any) => p.status === 'locked' || p.amountPaid >= p.amountOwed)
           .map((p: any) => p.userId);
         
         setState({ 

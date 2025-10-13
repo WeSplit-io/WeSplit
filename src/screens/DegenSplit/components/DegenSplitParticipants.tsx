@@ -44,7 +44,7 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
             (p: any) => p.userId === (participant.userId || participant.id)
           );
           const isParticipantLocked = walletParticipant ? 
-            walletParticipant.amountPaid >= walletParticipant.amountOwed : 
+            walletParticipant.status === 'locked' || walletParticipant.amountPaid >= walletParticipant.amountOwed : 
             false;
           
           // Check if this is the current user

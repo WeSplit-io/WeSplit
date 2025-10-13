@@ -215,6 +215,27 @@ export class TransactionProcessor {
       // Add create token account instruction if needed
       if (createTokenAccountInstruction) {
         logger.info('🔍 TransactionProcessor: Adding create token account instruction');
+        
+        // Check if company wallet has enough SOL for rent exemption
+        const companySolBalance = await this.connection.getBalance(feePayerPublicKey);
+        const rentExemptionAmount = 2039280; // ~0.00203928 SOL for token account rent exemption
+        
+        if (companySolBalance < rentExemptionAmount) {
+          logger.error('❌ TransactionProcessor: Company wallet has insufficient SOL for rent exemption', {
+            companySolBalance,
+            rentExemptionAmount,
+            needed: rentExemptionAmount - companySolBalance,
+            companyWalletAddress: feePayerPublicKey.toBase58()
+          });
+          
+          return {
+            success: false,
+            error: `Company wallet has insufficient SOL for transaction. Required: ${(rentExemptionAmount / 1e9).toFixed(6)} SOL, Available: ${(companySolBalance / 1e9).toFixed(6)} SOL. Please contact support to fund the company wallet.`,
+            signature: '',
+            txId: ''
+          };
+        }
+        
         transaction.add(createTokenAccountInstruction);
         logger.info('✅ TransactionProcessor: Create token account instruction added');
       }

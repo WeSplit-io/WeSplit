@@ -180,6 +180,25 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   // Check if the current user has already claimed/paid their funds
   const currentUserParticipant = currentSplitWallet?.participants.find((p: any) => p.userId === currentUser?.id.toString());
   const hasAlreadyClaimed = currentUserParticipant?.status === 'paid';
+  
+  // Debug logging
+  React.useEffect(() => {
+    if (currentSplitWallet && currentUser) {
+      console.log('🔍 DegenResultScreen Debug:', {
+        splitWalletId: currentSplitWallet.id,
+        currentUserId: currentUser.id,
+        currentUserParticipant: currentUserParticipant,
+        hasAlreadyClaimed,
+        allParticipants: currentSplitWallet.participants.map(p => ({
+          userId: p.userId,
+          name: p.name,
+          status: p.status,
+          amountPaid: p.amountPaid,
+          amountOwed: p.amountOwed
+        }))
+      });
+    }
+  }, [currentSplitWallet, currentUser, currentUserParticipant, hasAlreadyClaimed]);
 
   // Load split wallet data to show current status
   React.useEffect(() => {
@@ -207,9 +226,126 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   };
 
   const handleExternalPayment = async () => {
-    const success = await degenLogic.handleExternalPayment(currentUser, splitWallet, totalAmount);
-    if (success) {
-      // Handle successful external payment
+    degenState.setIsProcessing(true);
+    try {
+      // NEW Degen Logic: Loser receives funds from split wallet to their KAST card/external wallet
+      const { SplitWalletService } = await import('../../services/split');
+      const result = await SplitWalletService.processDegenLoserPayment(
+        splitWallet.id,
+        currentUser!.id.toString(),
+        'kast-card', // Payment method
+        totalAmount, // Loser receives their locked funds back
+        'Degen Split Loser Payment (KAST Card)'
+      );
+      
+      if (result.success) {
+        // Check if this is a withdrawal request (for non-creators)
+        if (result.transactionSignature?.startsWith('WITHDRAWAL_REQUEST_')) {
+          Alert.alert(
+            '📋 Withdrawal Request Submitted', 
+            result.message || 'Your withdrawal request has been submitted. The split creator will process your request.',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('SplitsList')
+              }
+            ]
+          );
+        } else {
+          Alert.alert(
+            '✅ Payment Confirmed!', 
+            `Your locked funds (${totalAmount} USDC) have been successfully withdrawn from the split wallet to your KAST card.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('SplitsList')
+              }
+            ]
+          );
+        }
+      } else {
+        Alert.alert('KAST Payment Failed', result.error || 'Failed to complete KAST payment. Please try again.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to process KAST payment. Please try again.');
+    } finally {
+      degenState.setIsProcessing(false);
+    }
+  };
+
+  // Handle signature step
+  const handleSignatureStep = async () => {
+    if (!degenState.selectedPaymentMethod) return;
+    
+    degenState.setIsSigning(true);
+    try {
+      // Simulate signature process
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Process the payment based on selected method
+      if (degenState.selectedPaymentMethod === 'personal-wallet') {
+        await handleInAppPayment();
+      } else {
+        await handleExternalPayment();
+      }
+      
+      // Close modals
+      degenState.setShowSignatureStep(false);
+      degenState.setShowPaymentOptionsModal(false);
+      degenState.setSelectedPaymentMethod(null);
+    } catch (error) {
+      console.error('Error during signature process:', error);
+      Alert.alert('Error', 'Failed to complete signature. Please try again.');
+    } finally {
+      degenState.setIsSigning(false);
+    }
+  };
+
+  const handleInAppPayment = async () => {
+    degenState.setIsProcessing(true);
+    try {
+      // NEW Degen Logic: Loser receives funds from split wallet to their in-app wallet
+      const { SplitWalletService } = await import('../../services/split');
+      const result = await SplitWalletService.processDegenLoserPayment(
+        splitWallet.id,
+        currentUser!.id.toString(),
+        'in-app', // Payment method
+        totalAmount, // Loser receives their locked funds back
+        'Degen Split Loser Payment (In-App Wallet)'
+      );
+      
+      if (result.success) {
+        // Check if this is a withdrawal request (for non-creators)
+        if (result.transactionSignature?.startsWith('WITHDRAWAL_REQUEST_')) {
+          Alert.alert(
+            '📋 Withdrawal Request Submitted', 
+            result.message || 'Your withdrawal request has been submitted. The split creator will process your request.',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('SplitsList')
+              }
+            ]
+          );
+        } else {
+          Alert.alert(
+            '✅ Payment Confirmed!', 
+            `Your locked funds (${totalAmount} USDC) have been successfully withdrawn from the split wallet to your in-app wallet.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('SplitsList')
+              }
+            ]
+          );
+        }
+      } else {
+        Alert.alert('Payment Failed', result.error || 'Failed to complete payment. Please try again.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to complete payment. Please try again.');
+    } finally {
+      degenState.setIsProcessing(false);
     }
   };
 
@@ -430,42 +566,114 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       {degenState.showPaymentOptionsModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalContent}>
-              <View style={styles.modalIconContainer}>
-                <Text style={styles.modalIcon}>💳</Text>
-              </View>
-              <Text style={styles.modalTitle}>
-                Pay Your Share
-              </Text>
-              <Text style={styles.modalSubtitle}>
-                You need to pay {totalAmount} USDC to complete the degen split.
-              </Text>
-              
-              <View style={styles.paymentOptionsContainer}>
-                <TouchableOpacity
-                  style={styles.paymentOptionButton}
-                  onPress={() => {
-                    degenState.setSelectedPaymentMethod('personal-wallet');
-                    degenState.setShowPaymentOptionsModal(false);
-                    // Handle personal wallet payment
-                  }}
-                >
-                  <Text style={styles.paymentOptionText}>Personal Wallet</Text>
-                </TouchableOpacity>
+            {!degenState.showSignatureStep ? (
+              // Payment Method Selection Step
+              <>
+                <Text style={styles.modalTitle}>Choose Payment Method</Text>
+                <Text style={styles.modalSubtitle}>
+                  You need to pay the full {totalAmount} USDC bill. How would you like to pay?
+                </Text>
                 
-                <TouchableOpacity
-                  style={styles.paymentOptionButton}
+                <View style={styles.paymentOptionsModalContainer}>
+                  <TouchableOpacity 
+                    style={styles.paymentOptionButton}
+                    onPress={() => {
+                      degenState.setSelectedPaymentMethod('personal-wallet');
+                      degenState.setShowSignatureStep(true);
+                    }}
+                  >
+                    <View style={styles.paymentOptionIcon}>
+                      <Text style={styles.paymentOptionIconText}>💳</Text>
+                    </View>
+                    <View style={styles.paymentOptionContent}>
+                      <Text style={styles.paymentOptionTitle}>In-App Wallet</Text>
+                      <Text style={styles.paymentOptionDescription}>
+                        Withdraw to In-App Wallet
+                      </Text>
+                    </View>
+                    <Text style={styles.paymentOptionArrow}>→</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.paymentOptionButton}
+                    onPress={() => {
+                      degenState.setSelectedPaymentMethod('kast-card');
+                      degenState.setShowSignatureStep(true);
+                    }}
+                  >
+                    <View style={styles.paymentOptionIcon}>
+                      <Text style={styles.paymentOptionIconText}>🏦</Text>
+                    </View>
+                    <View style={styles.paymentOptionContent}>
+                      <Text style={styles.paymentOptionTitle}>KAST Card</Text>
+                      <Text style={styles.paymentOptionDescription}>
+                        Withdraw to KAST Card
+                      </Text>
+                    </View>
+                    <Text style={styles.paymentOptionArrow}>→</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity 
+                  style={styles.modalCancelButton}
+                  onPress={() => degenState.setShowPaymentOptionsModal(false)}
+                >
+                  <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              // Signature Step
+              <>
+                <Text style={styles.modalTitle}>
+                  Withdraw Your Locked Funds
+                </Text>
+                <Text style={styles.modalSubtitle}>
+                  Your locked funds will be sent from the split wallet to your chosen destination.
+                </Text>
+                
+                {/* Transfer Visualization */}
+                <View style={styles.transferVisualization}>
+                  <View style={styles.transferIcon}>
+                    <Image 
+                      source={require('../../../assets/wesplit-logo-card.png')} 
+                      style={styles.transferIconImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <View style={styles.transferArrows}>
+                    <Text style={styles.transferArrowText}>{'>>>>'}</Text>
+                  </View>
+                  <View style={styles.transferIcon}>
+                    <Image 
+                      source={require('../../../assets/kast-logo.png')} 
+                      style={styles.transferIconImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+                </View>
+
+                <AppleSlider
+                  onSlideComplete={handleSignatureStep}
+                  disabled={degenState.isSigning}
+                  loading={degenState.isSigning}
+                  text="Slide to Transfer"
+                />
+
+                <TouchableOpacity 
+                  style={styles.modalBackButton}
                   onPress={() => {
-                    degenState.setSelectedPaymentMethod('kast-card');
-                    degenState.setShowPaymentOptionsModal(false);
-                    // Handle Kast card payment
+                    degenState.setShowSignatureStep(false);
+                    degenState.setSelectedPaymentMethod(null);
                   }}
                 >
-                  <Text style={styles.paymentOptionText}>Kast Card</Text>
+                  <Image 
+                    source={require('../../../assets/chevron-left.png')} 
+                    style={styles.modalBackButtonIcon}
+                  />
+                  <Text style={styles.modalBackButtonText}>Back</Text>
                 </TouchableOpacity>
-              </View>
-            </View>
+              </>
+            )}
           </View>
         </View>
       )}

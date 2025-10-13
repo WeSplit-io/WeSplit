@@ -180,6 +180,11 @@ export class SplitWalletService {
     return SplitWalletPayments.payParticipantShareNEW(splitWalletId, participantId, amount);
   }
 
+  static async processDegenFundLocking(splitWalletId: string, participantId: string, amount: number, transactionSignature?: string) {
+    await loadModules();
+    return SplitWalletPayments.processDegenFundLocking(splitWalletId, participantId, amount, transactionSignature);
+  }
+
   // Security methods
   static async storeSplitWalletPrivateKey(splitWalletId: string, creatorId: string, privateKey: string) {
     await loadModules();

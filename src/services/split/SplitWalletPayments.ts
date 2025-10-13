@@ -500,6 +500,124 @@ import type { SplitWallet, SplitWalletParticipant, SplitWalletResult, PaymentRes
 
 export class SplitWalletPayments {
   /**
+   * Process degen split fund locking (participants lock funds but status remains 'locked', not 'paid')
+   */
+  static async processDegenFundLocking(
+    splitWalletId: string,
+    participantId: string,
+    amount: number,
+    transactionSignature?: string
+  ): Promise<PaymentResult> {
+    try {
+      logger.debug('Processing degen split fund locking', {
+        splitWalletId,
+        participantId,
+        amount,
+        transactionSignature
+      });
+
+      // Get split wallet
+      const walletResult = await this.getSplitWallet(splitWalletId);
+      if (!walletResult.success || !walletResult.wallet) {
+        return {
+          success: false,
+          error: walletResult.error || 'Split wallet not found',
+        };
+      }
+
+      const wallet = walletResult.wallet;
+
+      // Find participant
+      const participant = wallet.participants.find(p => p.userId === participantId);
+      if (!participant) {
+        return {
+          success: false,
+          error: 'Participant not found in split wallet',
+        };
+      }
+
+      // Validate amount
+      const roundedAmount = roundUsdcAmount(amount);
+      if (roundedAmount <= 0) {
+        return {
+          success: false,
+          error: 'Invalid locking amount',
+        };
+      }
+
+      // Check if participant has already locked their funds
+      if (participant.status === 'locked' || participant.amountPaid >= participant.amountOwed) {
+        return {
+          success: false,
+          error: 'Participant has already locked their funds',
+        };
+      }
+
+      // Check if the locking amount would exceed what they owe
+      const newAmountPaid = participant.amountPaid + roundedAmount;
+      if (newAmountPaid > participant.amountOwed) {
+        return {
+          success: false,
+          error: `Locking amount would exceed what participant owes. Maximum: ${participant.amountOwed} USDC`,
+        };
+      }
+
+      // Update participant locking status (status remains 'locked', not 'paid')
+      const updatedParticipants = wallet.participants.map(p => {
+        if (p.userId === participantId) {
+          const isFullyLocked = newAmountPaid >= participant.amountOwed;
+          return {
+            ...p,
+            amountPaid: newAmountPaid,
+            status: isFullyLocked ? 'locked' as const : 'pending' as const,
+            transactionSignature: transactionSignature || p.transactionSignature,
+            paidAt: isFullyLocked ? new Date().toISOString() : p.paidAt,
+          };
+        }
+        return p;
+      });
+
+      // Update wallet in Firebase
+      const docId = wallet.firebaseDocId || splitWalletId;
+      await this.updateWalletParticipants(docId, updatedParticipants);
+
+      // Trigger balance refresh for the participant
+      try {
+        const { walletService } = await import('../WalletService');
+        if (walletService.clearBalanceCache) {
+          walletService.clearBalanceCache(participantId);
+        }
+        logger.info('Balance cache cleared for participant', { participantId }, 'SplitWalletPayments');
+      } catch (error) {
+        logger.warn('Failed to clear balance cache for participant', { error, participantId }, 'SplitWalletPayments');
+      }
+
+      logger.info('Degen split fund locking processed successfully', {
+        splitWalletId,
+        participantId,
+        amount: roundedAmount,
+        newAmountPaid,
+        status: updatedParticipants.find(p => p.userId === participantId)?.status
+      }, 'SplitWalletPayments');
+
+      return {
+        success: true,
+        transactionSignature,
+        amount: roundedAmount,
+        message: 'Degen split fund locking processed successfully',
+      };
+
+    } catch (error) {
+      console.error('🔍 SplitWalletPayments: Error processing degen split fund locking:', error);
+      logger.error('Failed to process degen split fund locking', error, 'SplitWalletPayments');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
    * Process participant payment to split wallet
    */
   static async processParticipantPayment(
@@ -1209,6 +1327,26 @@ export class SplitWalletPayments {
         };
       }
 
+      // Debug logging for winner claim status
+      logger.info('🔍 Winner claim status check', {
+        splitWalletId,
+        winnerUserId,
+        winnerParticipant: {
+          userId: winnerParticipant.userId,
+          name: winnerParticipant.name,
+          status: winnerParticipant.status,
+          amountPaid: winnerParticipant.amountPaid,
+          amountOwed: winnerParticipant.amountOwed
+        },
+        allParticipants: wallet.participants.map(p => ({
+          userId: p.userId,
+          name: p.name,
+          status: p.status,
+          amountPaid: p.amountPaid,
+          amountOwed: p.amountOwed
+        }))
+      }, 'SplitWalletPayments');
+
       if (winnerParticipant.status === 'paid') {
         return {
           success: false,
@@ -1350,22 +1488,59 @@ export class SplitWalletPayments {
         };
       }
 
-      // Update participant payment status
+      // Get the user's wallet address for the transaction
+      const { walletService } = await import('../WalletService');
+      const userWallet = await walletService.getUserWallet(loserUserId);
+      if (!userWallet) {
+        return {
+          success: false,
+          error: 'Failed to retrieve user wallet address',
+        };
+      }
+
+      // Get the private key - use SplitWalletSecurity for proper degen split support
+      // For degen splits, any participant can access the private key
+      const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
+      const privateKeyResult = await SplitWalletSecurity.getSplitWalletPrivateKey(splitWalletId, loserUserId);
+      if (!privateKeyResult.success || !privateKeyResult.privateKey) {
+        return {
+          success: false,
+          error: privateKeyResult.error || 'Failed to retrieve split wallet private key',
+        };
+      }
+
+      // Create transaction with split wallet private key to send funds to user's wallet
+      const transactionParams = {
+        to: userWallet.address, // Send to user's wallet address
+        amount: totalAmount,
+        currency: wallet.currency,
+        memo: description || `Degen Split loser withdrawal for ${loserUserId}`,
+        userId: wallet.creatorId, // Add userId parameter required by sendUSDCTransaction
+        transactionType: 'split_wallet_withdrawal' as const, // No company fees for split wallet withdrawals
+        fromPrivateKey: privateKeyResult.privateKey, // Use split wallet private key
+        fromAddress: wallet.walletAddress, // Use split wallet address
+      };
+
+      // Execute transaction using split wallet
+      const transactionResult = await this.sendSplitWalletTransaction(transactionParams);
+      
+      if (!transactionResult.success) {
+        return {
+          success: false,
+          error: transactionResult.error || 'Failed to process degen loser withdrawal',
+        };
+      }
+
+      // Update participant payment status only after successful transaction
       const updatedParticipants = wallet.participants.map(p => {
         if (p.userId === loserUserId) {
-          const updatedParticipant = {
+          return {
             ...p,
             amountPaid: totalAmount,
             status: 'paid' as const,
             paidAt: new Date().toISOString(),
+            transactionSignature: transactionResult.transactionSignature,
           };
-          
-          // Only include transactionSignature if it exists
-          if (p.transactionSignature) {
-            updatedParticipant.transactionSignature = p.transactionSignature;
-          }
-          
-          return updatedParticipant;
         }
         return p;
       });
@@ -1377,7 +1552,9 @@ export class SplitWalletPayments {
       logger.info('Degen loser payment processed successfully', {
         splitWalletId,
         loserUserId,
-        totalAmount
+        totalAmount,
+        transactionSignature: transactionResult.transactionSignature,
+        participantStatusUpdated: true
       });
 
       // Trigger balance refresh for the loser
@@ -1393,6 +1570,7 @@ export class SplitWalletPayments {
 
       return {
         success: true,
+        transactionSignature: transactionResult.transactionSignature,
         amount: totalAmount,
         message: 'Degen loser payment processed successfully',
       };

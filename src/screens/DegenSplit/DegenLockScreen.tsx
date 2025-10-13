@@ -395,8 +395,8 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     };
   }, [degenState.splitWallet, degenState.isLocked, degenState.allParticipantsLocked]);
 
-  // Calculate progress - check if participants have paid their full amount
-  const lockedCount = degenState.splitWallet?.participants?.filter((p: any) => p.amountPaid >= p.amountOwed).length || degenState.lockedParticipants.length;
+    // Calculate progress - check if participants have locked their funds (status 'locked' or amountPaid >= amountOwed)
+    const lockedCount = degenState.splitWallet?.participants?.filter((p: any) => p.status === 'locked' || p.amountPaid >= p.amountOwed).length || degenState.lockedParticipants.length;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -530,7 +530,41 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
             </TouchableOpacity>
           ) : degenLogic.isCurrentUserCreator(currentUser, splitData) ? (
             // Creator and locked - show waiting or start spinning
-            degenState.allParticipantsLocked ? (
+            degenState.splitWallet?.status === 'spinning_completed' ? (
+              // Roulette completed - show view results button
+              <TouchableOpacity
+                style={styles.lockButton}
+                onPress={() => {
+                  // Navigate to results screen with the winner information
+                  if (degenState.splitWallet?.degenWinner) {
+                    navigation.navigate('DegenResult', {
+                      billData,
+                      participants,
+                      totalAmount,
+                      selectedParticipant: {
+                        id: degenState.splitWallet.degenWinner.userId,
+                        name: degenState.splitWallet.degenWinner.name,
+                        userId: degenState.splitWallet.degenWinner.userId
+                      },
+                      splitWallet: degenState.splitWallet,
+                      processedBillData,
+                      splitData,
+                    });
+                  }
+                }}
+              >
+                <LinearGradient
+                  colors={[colors.red, colors.red]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.lockButton}
+                >
+                  <Text style={styles.lockButtonText}>
+                    🎯 View Results
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            ) : degenState.allParticipantsLocked ? (
               // All locked - show start spinning button
               <TouchableOpacity
                 style={styles.lockButton}
@@ -560,18 +594,55 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
               </View>
             )
           ) : (
-            // Not creator but locked - show waiting message
-            <View style={[styles.lockButton, styles.lockButtonDisabled]}>
-              <Text style={[styles.lockButtonText, styles.lockButtonTextDisabled]}>
-                {degenState.allParticipantsLocked 
-                  ? 'Waiting for the creator to spin!' 
-                  : (() => {
-                      const remaining = participants.length - lockedCount;
-                      return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
-                    })()
-                }
-              </Text>
-            </View>
+            // Not creator but locked - show waiting message or view results
+            degenState.splitWallet?.status === 'spinning_completed' ? (
+              // Roulette completed - show view results button
+              <TouchableOpacity
+                style={styles.lockButton}
+                onPress={() => {
+                  // Navigate to results screen with the winner information
+                  if (degenState.splitWallet?.degenWinner) {
+                    navigation.navigate('DegenResult', {
+                      billData,
+                      participants,
+                      totalAmount,
+                      selectedParticipant: {
+                        id: degenState.splitWallet.degenWinner.userId,
+                        name: degenState.splitWallet.degenWinner.name,
+                        userId: degenState.splitWallet.degenWinner.userId
+                      },
+                      splitWallet: degenState.splitWallet,
+                      processedBillData,
+                      splitData,
+                    });
+                  }
+                }}
+              >
+                <LinearGradient
+                  colors={[colors.red, colors.red]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.lockButton}
+                >
+                  <Text style={styles.lockButtonText}>
+                    🎯 View Results
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            ) : (
+              // Roulette not completed - show waiting message
+              <View style={[styles.lockButton, styles.lockButtonDisabled]}>
+                <Text style={[styles.lockButtonText, styles.lockButtonTextDisabled]}>
+                  {degenState.allParticipantsLocked 
+                    ? 'Waiting for the creator to spin!' 
+                    : (() => {
+                        const remaining = participants.length - lockedCount;
+                        return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
+                      })()
+                  }
+                </Text>
+              </View>
+            )
           )}
         </View>
       </ScrollView>
