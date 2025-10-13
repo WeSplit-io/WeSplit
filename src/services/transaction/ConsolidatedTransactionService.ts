@@ -70,17 +70,70 @@ class ConsolidatedTransactionService {
    * Send USDC transaction
    */
   async sendUSDCTransaction(params: TransactionParams): Promise<TransactionResult> {
-    const keypair = this.walletManager.getKeypair();
-    if (!keypair) {
+    try {
+      // Ensure we have a userId
+      if (!params.userId) {
+        return {
+          signature: '',
+          txId: '',
+          success: false,
+          error: 'User ID is required for transaction'
+        };
+      }
+
+      // Load the user's wallet
+      const { walletService } = await import('../WalletService');
+      const walletResult = await walletService.ensureUserWallet(params.userId);
+      
+      if (!walletResult.success || !walletResult.wallet) {
+        return {
+          signature: '',
+          txId: '',
+          success: false,
+          error: walletResult.error || 'Failed to load user wallet'
+        };
+      }
+
+      // Create keypair from the wallet
+      const { keypairUtils } = await import('../shared/keypairUtils');
+      const keypairResult = keypairUtils.createKeypairFromSecretKey(walletResult.wallet.secretKey);
+      
+      if (!keypairResult.success || !keypairResult.keypair) {
+        logger.error('Failed to create keypair from wallet', { 
+          success: keypairResult.success,
+          error: keypairResult.error 
+        }, 'ConsolidatedTransactionService');
+        return {
+          signature: '',
+          txId: '',
+          success: false,
+          error: 'Failed to create keypair from wallet'
+        };
+      }
+
+      logger.info('🔑 ConsolidatedTransactionService: Keypair created successfully', {
+        publicKey: keypairResult.keypair.publicKey.toBase58(),
+        userId: params.userId
+      });
+
+      const result = await this.transactionProcessor.sendUSDCTransaction(params, keypairResult.keypair);
+      
+      logger.info('📋 ConsolidatedTransactionService: Transaction result', {
+        success: result.success,
+        signature: result.signature,
+        error: result.error
+      });
+      
+      return result;
+    } catch (error) {
+      logger.error('Failed to send USDC transaction', error, 'ConsolidatedTransactionService');
       return {
         signature: '',
         txId: '',
         success: false,
-        error: 'No wallet connected'
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
-
-    return this.transactionProcessor.sendUSDCTransaction(params, keypair);
   }
 
   /**
@@ -199,14 +252,24 @@ class ConsolidatedTransactionService {
   }
 
   /**
-   * Legacy method for getting user wallet address
-   * @deprecated Use getWalletInfo instead
+   * Get user wallet address by userId
    */
   async getUserWalletAddress(userId: string): Promise<string | null> {
-    logger.warn('Using deprecated getUserWalletAddress method', null, 'ConsolidatedTransactionService');
-    
-    const walletInfo = await this.getWalletInfo();
-    return walletInfo?.address || null;
+    try {
+      // Use the proper WalletService method to get user's wallet address
+      const { walletService } = await import('../WalletService');
+      const result = await walletService.getWalletInfoForUser(userId);
+      
+      if (result.success && result.wallet) {
+        return result.wallet.address;
+      }
+      
+      logger.warn('No wallet found for user', { userId, error: result.error }, 'ConsolidatedTransactionService');
+      return null;
+    } catch (error) {
+      logger.error('Failed to get user wallet address', { userId, error }, 'ConsolidatedTransactionService');
+      return null;
+    }
   }
 
   /**

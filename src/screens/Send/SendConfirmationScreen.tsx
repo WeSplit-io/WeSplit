@@ -234,15 +234,15 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       } else {
         // For friends/internal transfers, use existing service
         const transactionType: TransactionType = isSettlement ? 'settlement' : 'send';
-        transactionResult = await consolidatedTransactionService.sendUsdcTransaction(
-          recipientAddress,
-          amount,
-          currentUser.id.toString(),
-          description || (isSettlement ? 'Settlement payment' : 'Payment'),
-          groupId?.toString(),
-          'medium',
-          transactionType
-        );
+        transactionResult = await consolidatedTransactionService.sendUSDCTransaction({
+          to: recipientAddress,
+          amount: amount,
+          currency: 'USDC',
+          userId: currentUser.id.toString(),
+          memo: description || (isSettlement ? 'Settlement payment' : 'Payment'),
+          priority: 'medium',
+          transactionType: transactionType
+        });
       }
 
       logger.info('Transaction successful', {
@@ -332,13 +332,16 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         
         logger.info('Starting wallet validation checks', null, 'SendConfirmationScreen');
         
-        // Check wallet address
-        const walletAddress = await consolidatedTransactionService.getUserWalletAddress(currentUser.id);
-        logger.debug('Wallet address check result', { walletAddress }, 'SendConfirmationScreen');
+        // Ensure user has a wallet first
+        const { walletService } = await import('../../services/WalletService');
+        const walletResult = await walletService.ensureUserWallet(currentUser.id);
         
-        if (!walletAddress) {
-          throw new Error('No wallet address found for user');
+        if (!walletResult.success || !walletResult.wallet) {
+          throw new Error(walletResult.error || 'Failed to create or access user wallet');
         }
+        
+        const walletAddress = walletResult.wallet.address;
+        logger.debug('Wallet address check result', { walletAddress }, 'SendConfirmationScreen');
         
         // Check balance
         const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
@@ -400,7 +403,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       amount,
       walletLoading,
       walletError,
-      disabled: walletLoading || sending || !hasExistingWallet || !hasSufficientBalance || !hasSufficientSol || !!walletError
+      disabled: walletLoading || sending || !hasExistingWallet || !hasSufficientBalance || !!walletError
     }, 'SendConfirmationScreen');
   }
 
@@ -574,11 +577,20 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
                   if (!currentUser?.id) return;
                   try {
                     setWalletLoading(true);
-                    const walletAddress = await consolidatedTransactionService.getUserWalletAddress(currentUser.id);
+                    
+                    // Ensure user has a wallet first
+                    const { walletService } = await import('../../services/WalletService');
+                    const walletResult = await walletService.ensureUserWallet(currentUser.id);
+                    
+                    if (!walletResult.success || !walletResult.wallet) {
+                      throw new Error(walletResult.error || 'Failed to create or access user wallet');
+                    }
+                    
+                    const walletAddress = walletResult.wallet.address;
                     const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
                     const solCheck = await consolidatedTransactionService.hasSufficientSolForGas(currentUser.id);
                     
-                    setHasExistingWallet(!!walletAddress);
+                    setHasExistingWallet(true);
                     setExistingWalletBalance(balance);
                     setHasSufficientSol(solCheck.hasSufficient);
                     setWalletError(null);
@@ -602,7 +614,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         
         <AppleSlider
           onSlideComplete={handleConfirmSend}
-          disabled={walletLoading || sending || !hasExistingWallet || !hasSufficientBalance || !hasSufficientSol || !!walletError}
+          disabled={walletLoading || sending || !hasExistingWallet || !hasSufficientBalance || !!walletError}
           loading={walletLoading || sending}
           text={walletLoading ? "Loading wallet..." : walletError ? "Wallet Error" : "Sign transaction"}
         />

@@ -7,8 +7,10 @@ import { Keypair } from '@solana/web3.js';
 import { logger } from '../loggingService';
 
 export interface KeypairCreationResult {
-  keypair: Keypair;
-  format: 'base64' | 'json_array';
+  success: boolean;
+  keypair?: Keypair;
+  format?: 'base64' | 'json_array';
+  error?: string;
 }
 
 export class KeypairUtils {
@@ -26,7 +28,7 @@ export class KeypairUtils {
         publicKey: keypair.publicKey.toBase58()
       }, 'KeypairUtils');
       
-      return { keypair, format: 'base64' };
+      return { success: true, keypair, format: 'base64' };
     } catch (base64Error) {
       try {
         // Try JSON array format as fallback
@@ -42,14 +44,20 @@ export class KeypairUtils {
           arrayLength: secretKeyArray.length
         }, 'KeypairUtils');
         
-        return { keypair, format: 'json_array' };
+        return { success: true, keypair, format: 'json_array' };
       } catch (jsonError) {
+        const errorMessage = `Failed to create keypair from secret key. Base64 error: ${base64Error instanceof Error ? base64Error.message : String(base64Error)}, JSON error: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`;
+        
         logger.error('KeypairUtils: Failed to create keypair from secret key', {
           base64Error: base64Error instanceof Error ? base64Error.message : String(base64Error),
-          jsonError: jsonError instanceof Error ? jsonError.message : String(jsonError)
+          jsonError: jsonError instanceof Error ? jsonError.message : String(jsonError),
+          errorMessage
         }, 'KeypairUtils');
         
-        throw new Error(`Failed to create keypair from secret key. Base64 error: ${base64Error instanceof Error ? base64Error.message : String(base64Error)}, JSON error: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`);
+        return { 
+          success: false, 
+          error: errorMessage 
+        };
       }
     }
   }
@@ -91,8 +99,15 @@ export class KeypairUtils {
   static createAndValidateKeypair(secretKey: string, expectedAddress: string): KeypairCreationResult {
     const result = this.createKeypairFromSecretKey(secretKey);
     
+    if (!result.success || !result.keypair) {
+      return result; // Return the error result
+    }
+    
     if (!this.validateKeypairAddress(result.keypair, expectedAddress)) {
-      throw new Error(`Keypair address mismatch. Expected: ${expectedAddress}, Got: ${result.keypair.publicKey.toBase58()}`);
+      return {
+        success: false,
+        error: `Keypair address mismatch. Expected: ${expectedAddress}, Got: ${result.keypair.publicKey.toBase58()}`
+      };
     }
     
     return result;

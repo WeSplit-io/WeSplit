@@ -80,4 +80,26 @@ export class PriceUtils {
     }
     return `$${price.toFixed(2)}`;
   }
+
+  /**
+   * Convert USDC amount to raw units (6 decimals) with proper rounding
+   * This ensures consistent conversion across all services
+   */
+  static convertUsdcToRawUnits(amount: number): number {
+    return Math.floor(amount * 1_000_000 + 0.5);
+  }
+
+  /**
+   * Convert raw USDC units to display amount (6 decimals)
+   */
+  static convertRawUnitsToUsdc(rawUnits: number): number {
+    return rawUnits / 1_000_000;
+  }
+
+  /**
+   * Round USDC amount to 6 decimal places
+   */
+  static roundUsdcAmount(amount: number): number {
+    return Math.round(amount * 1000000) / 1000000;
+  }
 } 

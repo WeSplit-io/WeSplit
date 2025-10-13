@@ -22,7 +22,7 @@ import {
 
 // Import shared constants and utilities
 import { RPC_CONFIG, USDC_CONFIG, PHANTOM_SCHEMES } from './shared/walletConstants';
-import { FeeService } from '../config/feeConfig';
+import { FeeService, TransactionType } from '../config/feeConfig';
 import { transactionUtils } from './shared/transactionUtils';
 import { balanceUtils } from './shared/balanceUtils';
 import { logger } from './loggingService';
@@ -722,7 +722,7 @@ export class SolanaAppKitService {
   }
 
   // Send USDC transaction
-  async sendUsdcTransaction(to: string, amount: number, memo?: string): Promise<string> {
+  async sendUsdcTransaction(to: string, amount: number, memo?: string, transactionType: TransactionType = 'send'): Promise<string> {
     if (!this.keypair && !this.connectedProvider) {
       throw new Error('No wallet connected');
     }
@@ -730,7 +730,14 @@ export class SolanaAppKitService {
     try {
       const fromPublicKey = this.keypair ? this.keypair.publicKey : new PublicKey(to);
       const toPublicKey = new PublicKey(to);
-      const usdcAmount = amount * 1000000; // USDC has 6 decimals
+
+      // Calculate company fee using centralized service
+      const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(amount, transactionType);
+      
+      // Use standardized USDC conversion
+      const { PriceUtils } = await import('../../utils/priceUtils');
+      const recipientAmountRaw = PriceUtils.convertUsdcToRawUnits(recipientAmount);
+      const companyFeeRaw = PriceUtils.convertUsdcToRawUnits(companyFee);
 
       // Get recent blockhash
       const blockhash = await transactionUtils.getLatestBlockhashWithRetry();
@@ -763,7 +770,7 @@ export class SolanaAppKitService {
         // Token account doesn't exist, create it
         transaction.add(
           createAssociatedTokenAccountInstruction(
-            fromPublicKey,
+            feePayerPublicKey, // Fee payer pays for account creation
             toTokenAccount,
             toPublicKey,
             this.usdcMint
@@ -771,24 +778,78 @@ export class SolanaAppKitService {
         );
       }
 
-      // Add transfer instruction
+      // Add transfer instruction for recipient (full amount)
       transaction.add(
         createTransferInstruction(
           fromTokenAccount,
           toTokenAccount,
           fromPublicKey,
-          usdcAmount
+          recipientAmountRaw
         )
       );
+
+      // Add company fee transfer instruction to company wallet
+      if (companyFee > 0) {
+        const { COMPANY_WALLET_CONFIG } = await import('../../config/feeConfig');
+        const companyTokenAccount = await getAssociatedTokenAddress(
+          this.usdcMint,
+          new PublicKey(COMPANY_WALLET_CONFIG.address)
+        );
+
+        transaction.add(
+          createTransferInstruction(
+            fromTokenAccount,
+            companyTokenAccount,
+            fromPublicKey,
+            companyFeeRaw
+          )
+        );
+      }
 
       // Add memo if provided
       if (memo) {
         const memoInstruction = new TransactionInstruction({
-          keys: [{ pubkey: fromPublicKey, isSigner: true, isWritable: true }],
+          keys: [{ pubkey: feePayerPublicKey, isSigner: true, isWritable: true }],
           data: Buffer.from(memo, 'utf8'),
           programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
         });
         transaction.add(memoInstruction);
+      }
+
+      // Prepare signers array
+      const signers: Keypair[] = [];
+      
+      // Add user keypair
+      if (this.keypair) {
+        signers.push(this.keypair);
+      }
+      
+      // Add company wallet keypair for fee payment
+      const { COMPANY_WALLET_CONFIG } = await import('../../config/feeConfig');
+      if (COMPANY_WALLET_CONFIG.secretKey) {
+        try {
+          let companySecretKeyBuffer: Buffer;
+          
+          // Handle different secret key formats
+          if (COMPANY_WALLET_CONFIG.secretKey.includes(',') || COMPANY_WALLET_CONFIG.secretKey.includes('[')) {
+            const cleanKey = COMPANY_WALLET_CONFIG.secretKey.replace(/[\[\]]/g, '');
+            const keyArray = cleanKey.split(',').map(num => parseInt(num.trim(), 10));
+            companySecretKeyBuffer = Buffer.from(keyArray);
+          } else {
+            companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'base64');
+          }
+          
+          // Validate and trim if needed
+          if (companySecretKeyBuffer.length === 65) {
+            companySecretKeyBuffer = companySecretKeyBuffer.slice(0, 64);
+          }
+          
+          const companyKeypair = Keypair.fromSecretKey(companySecretKeyBuffer);
+          signers.push(companyKeypair);
+        } catch (error) {
+          console.error('Failed to load company wallet keypair:', error);
+          throw new Error('Company wallet keypair not available for signing');
+        }
       }
 
       // Sign transaction
@@ -797,14 +858,14 @@ export class SolanaAppKitService {
         await this.connectedProvider.signTransaction(transaction);
       } else if (this.keypair) {
         // For app-generated wallets, sign directly
-        transaction.sign(this.keypair);
+        transaction.sign(...signers);
       }
 
       // Send and confirm transaction
       const signature = await sendAndConfirmTransaction(
         this.connection,
         transaction,
-        this.keypair ? [this.keypair] : [],
+        signers,
         {
           commitment: 'confirmed',
           preflightCommitment: 'confirmed'

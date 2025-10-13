@@ -93,18 +93,18 @@ class InternalTransferService {
         };
       }
 
+      // Calculate company fee using centralized service with transaction type
+      const transactionType = params.transactionType || 'send';
+      const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
+
       // Check balance before proceeding
-      const balanceCheck = await this.checkBalance(params.userId, params.amount, params.currency);
+      const balanceCheck = await this.checkBalance(params.userId, params.amount, params.currency, false, transactionType);
       if (!balanceCheck.hasSufficientBalance) {
         return {
           success: false,
           error: `Insufficient ${params.currency} balance. Required: ${balanceCheck.requiredAmount}, Available: ${balanceCheck.currentBalance}`
         };
       }
-
-      // Calculate company fee using centralized service with transaction type
-      const transactionType = params.transactionType || 'send';
-      const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
 
       // Load wallet using the existing userWalletService
       const { walletService } = await import('../services/WalletService');
@@ -248,7 +248,7 @@ class InternalTransferService {
   /**
    * Check user balance
    */
-  async checkBalance(userId: string, amount: number, currency: 'SOL' | 'USDC', skipCompanyFee: boolean = false): Promise<BalanceCheckResult> {
+  async checkBalance(userId: string, amount: number, currency: 'SOL' | 'USDC', skipCompanyFee: boolean = false, transactionType: TransactionType = 'send'): Promise<BalanceCheckResult> {
     try {
       // Use the existing userWalletService to get balance
       const { walletService } = await import('../services/WalletService');
@@ -258,7 +258,7 @@ class InternalTransferService {
       
       // Calculate total required amount (including company fee unless skipped)
       const requiredAmount = skipCompanyFee ? amount : (() => {
-        const { fee: companyFee } = FeeService.calculateCompanyFee(amount);
+        const { fee: companyFee } = FeeService.calculateCompanyFee(amount, transactionType);
         return amount + companyFee;
       })();
 
@@ -267,6 +267,8 @@ class InternalTransferService {
         currency,
         currentBalance,
         requiredAmount,
+        skipCompanyFee,
+        transactionType,
         hasSufficientBalance: currentBalance >= requiredAmount
       }, 'InternalTransferService');
 
@@ -848,7 +850,8 @@ class InternalTransferService {
       ));
 
       // Check balance before proceeding - skip company fee for split wallet payments
-      const balanceCheck = await this.checkBalance(params.userId, params.amount, params.currency, isSplitWalletPayment);
+      const transactionType = 'send'; // Default to 'send' for address transfers
+      const balanceCheck = await this.checkBalance(params.userId, params.amount, params.currency, isSplitWalletPayment, transactionType);
       if (!balanceCheck.hasSufficientBalance) {
         return {
           success: false,
@@ -859,7 +862,7 @@ class InternalTransferService {
       // Calculate company fee - but skip for split wallet payments
       const { fee: companyFee, totalAmount, recipientAmount } = isSplitWalletPayment 
         ? { fee: 0, totalAmount: params.amount, recipientAmount: params.amount }
-        : FeeService.calculateCompanyFee(params.amount);
+        : FeeService.calculateCompanyFee(params.amount, transactionType);
 
       // Load wallet using the existing userWalletService
       const { walletService } = await import('../services/WalletService');
