@@ -125,7 +125,6 @@ export const styles = StyleSheet.create({
   dateText: {
     color: colors.white,
     ...typography.textStyles.body,
-    paddingBottom: spacing.md,
   },
   calendarIcon: {
     width: spacing.iconSizeSmall,

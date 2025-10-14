@@ -490,7 +490,7 @@ export const styles = StyleSheet.create({
     zIndex: 1000,
   },
   walletRecapModal: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.blackWhite5,
     borderRadius: 20,
     padding: spacing.xl,
     margin: spacing.lg,
@@ -515,7 +515,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   walletInfoCard: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.white5,
     borderRadius: 12,
     padding: spacing.lg,
     marginBottom: spacing.lg,
@@ -548,19 +548,7 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: '600',
   },
-  privateKeyButton: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: spacing.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  privateKeyButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-  },
+
   walletRecapButtons: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -581,7 +569,7 @@ export const styles = StyleSheet.create({
   
   // Private Key Modal Styles
   privateKeyModal: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.blackWhite5,
     borderRadius: 20,
     padding: spacing.xl,
     margin: spacing.lg,
@@ -604,7 +592,7 @@ export const styles = StyleSheet.create({
     lineHeight: 22,
   },
   privateKeyDisplay: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.white5,
     borderRadius: 12,
     padding: spacing.lg,
     marginBottom: spacing.lg,
@@ -649,7 +637,7 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   closePrivateKeyButton: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.white5,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: 12,
@@ -666,7 +654,8 @@ export const styles = StyleSheet.create({
   
   // Split Wallet Section Styles
   splitWalletSection: {
-    marginBottom: spacing.lg,
+    marginVertical: spacing.lg,
+    marginHorizontal: spacing.md,
   },
   splitWalletTitle: {
     color: colors.white,
@@ -677,7 +666,7 @@ export const styles = StyleSheet.create({
   splitWalletCard: {
     backgroundColor: colors.white5,
     borderRadius: 12,
-    padding: spacing.lg,
+    padding: spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -708,7 +697,7 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    marginLeft: spacing.sm,
   },
   privateKeyButtonIcon: {
     width: 20,

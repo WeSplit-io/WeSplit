@@ -7,6 +7,7 @@ export const styles = StyleSheet.create({
   participantsContainer: {
     flex: 1,
     marginBottom: spacing.lg,
+    marginHorizontal: spacing.md,
   },
   participantsScrollView: {
     flex: 1,
@@ -18,14 +19,12 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.white20,
   },
   participantAvatar: {
-    marginRight: spacing.md,
   },
   participantInfo: {
     flex: 1,
+    marginLeft: spacing.sm,
   },
   participantName: {
     color: colors.white,
@@ -48,12 +47,10 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   lockedIndicator: {
-    backgroundColor: colors.green20,
+    backgroundColor: colors.green10,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.green,
   },
   lockedIndicatorText: {
     color: colors.green,
@@ -61,15 +58,13 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   unlockedIndicator: {
-    backgroundColor: colors.orange20,
+    backgroundColor: colors.white10,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.orange,
   },
   unlockedIndicatorText: {
-    color: colors.orange,
+    color: colors.white,
     fontSize: typography.fontSize.xs,
     fontWeight: '600',
   },

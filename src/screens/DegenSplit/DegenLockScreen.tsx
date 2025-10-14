@@ -8,7 +8,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Alert,
   ScrollView,
@@ -16,7 +15,7 @@ import {
   Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenLockStyles';
@@ -474,10 +473,9 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         {/* Split Wallet Section */}
         {(degenState.splitWallet || (splitData?.splitType === 'degen' && splitData)) && (
           <View style={styles.splitWalletSection}>
-            <Text style={styles.splitWalletTitle}>Split Wallet</Text>
             <View style={styles.splitWalletCard}>
               <View style={styles.splitWalletInfo}>
-                <Text style={styles.splitWalletLabel}>Wallet Address</Text>
+                <Text style={styles.splitWalletLabel}>Split Wallet Address</Text>
                 <View style={styles.walletAddressContainer}>
                   <Text style={styles.splitWalletAddress}>
                     {degenState.splitWallet ? degenLogic.formatWalletAddress(degenState.splitWallet.walletAddress) : 'Wallet not created yet'}
@@ -495,7 +493,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
                 onPress={handleShowPrivateKey}
               >
                 <Image
-                  source={require('../../../assets/id-icon-white.png')}
+                  source={require('../../../assets/eye-icon.png')}
                   style={styles.privateKeyButtonIcon}
                 />
                 <Text style={styles.privateKeyButtonText}>View Private Key</Text>
