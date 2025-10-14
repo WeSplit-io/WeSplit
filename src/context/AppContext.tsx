@@ -462,6 +462,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           logger.debug('Fixed users with invalid lastVerifiedAt dates during app initialization', { fixedCount }, 'AppContext');
         }
         
+        // Initialize push notifications
+        const { notificationService } = await import('../services/notificationService');
+        await notificationService.initializePushNotifications();
+        
+        // Set up push notification listeners
+        await setupPushNotificationListeners();
+        
       } catch (error) {
         console.error('Error initializing services:', error);
       }
@@ -469,6 +476,90 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     initializeServices();
   }, [initializeTrackingSafely]);
+
+  // Set up push notification listeners
+  const setupPushNotificationListeners = useCallback(async () => {
+    try {
+      const Notifications = await import('expo-notifications');
+      
+      // Listen for notifications received while app is in foreground
+      const foregroundSubscription = Notifications.addNotificationReceivedListener(notification => {
+        logger.info('Push notification received in foreground', {
+          title: notification.request.content.title,
+          body: notification.request.content.body,
+          data: notification.request.content.data
+        }, 'AppContext');
+        
+        // Refresh notifications when a new one is received
+        if (state.currentUser?.id) {
+          loadNotifications(true);
+        }
+      });
+
+      // Listen for notification responses (when user taps on notification)
+      const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
+        logger.info('Push notification response received', {
+          actionIdentifier: response.actionIdentifier,
+          userText: response.userText,
+          data: response.notification.request.content.data
+        }, 'AppContext');
+        
+        // Handle navigation based on notification data
+        handleNotificationResponse(response);
+      });
+
+      // Store subscriptions for cleanup
+      return () => {
+        foregroundSubscription.remove();
+        responseSubscription.remove();
+      };
+    } catch (error) {
+      logger.error('Failed to setup push notification listeners', error, 'AppContext');
+    }
+  }, [state.currentUser?.id, loadNotifications]);
+
+  // Handle notification response (when user taps notification)
+  const handleNotificationResponse = useCallback(async (response: any) => {
+    try {
+      const data = response.notification.request.content.data;
+      const notificationType = data?.type;
+      
+      logger.info('Handling notification response', {
+        type: notificationType,
+        data: data
+      }, 'AppContext');
+
+      // Create a mock navigation object for notification service
+      const mockNavigation = {
+        navigate: (screen: string, params?: any) => {
+          logger.info('Notification navigation requested', { screen, params }, 'AppContext');
+          // In a real implementation, this would use the actual navigation
+          // For now, we'll log the navigation request
+        }
+      };
+
+      // Use notification service for proper navigation
+      const { notificationService } = await import('../services/notificationService');
+      const notificationData = {
+        id: data?.notificationId || 'unknown',
+        type: notificationType,
+        data: data
+      };
+
+      await notificationService.navigateFromNotification(
+        notificationData,
+        mockNavigation,
+        state.currentUser?.id || ''
+      );
+
+      // Refresh notifications after handling
+      if (state.currentUser?.id) {
+        loadNotifications(true);
+      }
+    } catch (error) {
+      logger.error('Error handling notification response', error, 'AppContext');
+    }
+  }, [state.currentUser?.id, loadNotifications]);
 
   // Add global error handler for stopTracking errors
   useEffect(() => {

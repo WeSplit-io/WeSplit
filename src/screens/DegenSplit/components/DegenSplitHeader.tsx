@@ -13,12 +13,14 @@ interface DegenSplitHeaderProps {
   title?: string;
   onBackPress: () => void;
   showBackButton?: boolean;
+  isRealtimeActive?: boolean;
 }
 
 const DegenSplitHeader: React.FC<DegenSplitHeaderProps> = ({
   title = 'Degen Split',
   onBackPress,
   showBackButton = true,
+  isRealtimeActive = false,
 }) => {
   return (
     <View style={styles.header}>
@@ -33,7 +35,15 @@ const DegenSplitHeader: React.FC<DegenSplitHeaderProps> = ({
         <View style={styles.backButton} />
       )}
       
-      <Text style={styles.headerTitle}>{title}</Text>
+      <View style={styles.headerTitleContainer}>
+        <Text style={styles.headerTitle}>{title}</Text>
+        {isRealtimeActive && (
+          <View style={styles.realtimeIndicator}>
+            <View style={styles.realtimeDot} />
+            <Text style={styles.realtimeText}>Live</Text>
+          </View>
+        )}
+      </View>
       
       <View style={styles.headerSpacer} />
     </View>

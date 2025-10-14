@@ -23,17 +23,8 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
           // For now, we'll use a placeholder - in a real app, you'd get this from context
           const currentUserId = 'current_user_id'; // This should be replaced with actual user ID
           
-          await NotificationCompletionService.completePaymentRequestNotification(
-            notificationId,
-            currentUserId,
-            {
-              amount: amount || 0,
-              currency: 'USDC',
-              recipientId: contact?.id || '',
-              transactionId: transactionId,
-              groupId: groupId
-            }
-          );
+          // Mark notification as read using the notification service
+          await notificationService.markAsRead(notificationId);
           
           logger.info('Notification process completed successfully', null, 'SendSuccessScreen');
         } catch (error) {

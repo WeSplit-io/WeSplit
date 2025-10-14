@@ -54,7 +54,8 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     // Mark as read if not already read
     if (!notification.is_read) {
       try {
-        await UnifiedNotificationService.markNotificationAsRead(notification.id);
+        const { notificationService } = await import('../../services/notificationService');
+        await notificationService.markNotificationAsRead(notification.id);
         loadNotifications(); // Refresh notifications to update read status
       } catch (error) {
         console.error('Error marking notification as read:', error);
@@ -62,7 +63,8 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     }
 
     // Navigate based on notification type
-    NotificationNavigationService.navigateFromNotification(
+    const { notificationService } = await import('../../services/notificationService');
+    await notificationService.navigateFromNotification(
       notification,
       navigation,
       currentUser?.id || ''
@@ -88,15 +90,16 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         [notificationId]: 'pending'
       }));
 
-      // Use the unified navigation service
-      NotificationNavigationService.navigateFromNotification(
+      // Use the notification service for navigation
+      const { notificationService } = await import('../../services/notificationService');
+      await notificationService.navigateFromNotification(
         notification,
         navigation,
         currentUser?.id || ''
       );
 
       // Mark notification as read
-      await UnifiedNotificationService.markNotificationAsRead(notificationId);
+      await notificationService.markNotificationAsRead(notificationId);
 
       // Set action state to completed
       setActionStates(prev => ({

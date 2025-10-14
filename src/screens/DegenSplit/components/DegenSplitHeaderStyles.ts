@@ -30,6 +30,32 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  realtimeIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.green,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: 12,
+    gap: 4,
+  },
+  realtimeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.white,
+  },
+  realtimeText: {
+    color: colors.white,
+    fontSize: typography.fontSize.xs,
+    fontWeight: '600',
+  },
   headerSpacer: {
     width: 40,
   },

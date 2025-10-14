@@ -22,10 +22,11 @@ import { spacing } from '../../theme/spacing';
 import { styles } from './DegenLockStyles';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/loggingService';
+import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splitRealtimeService';
 import { FallbackDataService } from '../../utils/fallbackDataService';
 
 // Import our custom hooks and components
-import { useDegenSplitState, useDegenSplitLogic, useDegenSplitInitialization } from './hooks';
+import { useDegenSplitState, useDegenSplitLogic, useDegenSplitInitialization, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenSplitProgress, DegenSplitParticipants } from './components';
 
 // AppleSlider component adapted from SendConfirmationScreen
@@ -175,7 +176,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   const totalAmount = routeTotalAmount || splitData?.totalAmount || 0;
   const { state } = useApp();
   const { currentUser } = state;
-
+  
   // Initialize our custom hooks
   const degenState = useDegenSplitState(existingSplitWallet);
   const degenLogic = useDegenSplitLogic(degenState, (updates) => {
@@ -196,6 +197,31 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       }
     });
   }, degenLogic);
+
+  // Initialize real-time updates
+  const realtimeState = useDegenSplitRealtime(
+    splitData?.id,
+    degenState.splitWallet?.id,
+    {
+      onParticipantUpdate: (participants) => {
+        console.log('🔍 DegenLockScreen: Real-time participant update:', participants);
+        setParticipants(participants);
+      },
+      onLockStatusUpdate: (lockedParticipants, allLocked) => {
+        console.log('🔍 DegenLockScreen: Real-time lock status update:', { lockedParticipants, allLocked });
+        degenState.setLockedParticipants(lockedParticipants);
+        degenState.setAllParticipantsLocked(allLocked);
+      },
+      onSplitWalletUpdate: (splitWallet) => {
+        console.log('🔍 DegenLockScreen: Real-time wallet update:', splitWallet);
+        degenState.setSplitWallet(splitWallet);
+      },
+      onError: (error) => {
+        console.error('🔍 DegenLockScreen: Real-time error:', error);
+        degenState.setError(error.message);
+      }
+    }
+  );
 
   // Animation refs are initialized in the useDegenSplitState hook
 
@@ -406,6 +432,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       <DegenSplitHeader
         title="Degen Split"
         onBackPress={handleBack}
+        isRealtimeActive={realtimeState.isRealtimeActive}
       />
 
       <ScrollView 

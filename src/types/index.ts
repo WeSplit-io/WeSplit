@@ -86,6 +86,17 @@ export interface Transaction {
   status: 'pending' | 'completed' | 'failed';
   created_at: string;
   updated_at: string;
+  // Additional fields for enhanced transaction tracking
+  group_id?: string | null;
+  company_fee?: number;
+  net_amount?: number;
+  gas_fee?: number;
+  gas_fee_covered_by_company?: boolean;
+  recipient_name?: string;
+  sender_name?: string;
+  transaction_method?: 'app_wallet' | 'external_wallet';
+  app_version?: string;
+  device_info?: string;
 }
 
 // Expense summary by currency
@@ -168,7 +179,7 @@ export interface InviteLinkData {
 export interface Notification {
   id: string; // Firebase document ID
   userId: string; // Firebase user ID
-  type: 'expense_added' | 'payment_reminder' | 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'general' | 'group_invite' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'group_payment_sent' | 'group_payment_received';
+  type: 'payment_reminder' | 'payment_request' | 'general' | 'payment_received' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'split_invite' | 'split_completed' | 'split_winner' | 'split_loser' | 'split_spin_available' | 'split_lock_required' | 'degen_all_locked' | 'degen_ready_to_roll' | 'roulette_result' | 'contact_added';
   title: string;
   message: string;
   data?: any;

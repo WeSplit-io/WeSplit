@@ -128,6 +128,39 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
 
       // Check if result has success property or if it's a successful transaction
       if (result && result.signature) {
+        // Save deposit transaction to database for history
+        if (currentUser?.id) {
+          try {
+            const { firebaseTransactionService } = await import('../../services/firebaseDataService');
+            
+            const transactionData = {
+              type: 'deposit' as const,
+              amount: amount,
+              currency: 'SOL',
+              from_user: externalWalletAddress || 'External Wallet',
+              to_user: currentUser.id.toString(),
+              from_wallet: externalWalletAddress || '',
+              to_wallet: appWalletAddress || '',
+              tx_hash: result.signature,
+              note: 'Deposit from external wallet',
+              status: 'completed' as const,
+              transaction_method: 'external_wallet' as const,
+              recipient_name: currentUser.name || 'You',
+              sender_name: 'External Wallet'
+            };
+            
+            await firebaseTransactionService.createTransaction(transactionData);
+            logger.info('✅ Deposit transaction saved to database', {
+              signature: result.signature,
+              amount: amount,
+              currency: 'SOL'
+            }, 'CryptoTransferScreen');
+          } catch (saveError) {
+            logger.error('❌ Failed to save deposit transaction to database', saveError, 'CryptoTransferScreen');
+            // Don't fail the transaction if database save fails
+          }
+        }
+        
         Alert.alert(
           'Transfer Successful',
           `Successfully transferred ${amount.toFixed(4)} SOL from your external wallet to your app wallet!`,

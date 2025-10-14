@@ -229,7 +229,18 @@ export const firebaseDataTransformers = {
     note: doc.data().note || '',
     status: doc.data().status || 'pending',
     created_at: firebaseDataTransformers.timestampToISO(doc.data().created_at),
-    updated_at: firebaseDataTransformers.timestampToISO(doc.data().updated_at)
+    updated_at: firebaseDataTransformers.timestampToISO(doc.data().updated_at),
+    // Additional fields for enhanced transaction tracking
+    group_id: doc.data().group_id || null,
+    company_fee: doc.data().company_fee || 0,
+    net_amount: doc.data().net_amount || doc.data().amount || 0,
+    gas_fee: doc.data().gas_fee || 0,
+    gas_fee_covered_by_company: doc.data().gas_fee_covered_by_company || false,
+    recipient_name: doc.data().recipient_name || '',
+    sender_name: doc.data().sender_name || '',
+    transaction_method: doc.data().transaction_method || 'app_wallet',
+    app_version: doc.data().app_version || '1.0.0',
+    device_info: doc.data().device_info || 'mobile'
   }),
 
   // Transform Transaction to Firestore data
@@ -245,7 +256,18 @@ export const firebaseDataTransformers = {
     note: transaction.note,
     status: transaction.status,
     created_at: serverTimestamp(),
-    updated_at: serverTimestamp()
+    updated_at: serverTimestamp(),
+    // Additional fields for enhanced transaction tracking
+    group_id: transaction.group_id || null,
+    company_fee: transaction.company_fee || 0,
+    net_amount: transaction.net_amount || transaction.amount,
+    gas_fee: transaction.gas_fee || 0,
+    gas_fee_covered_by_company: transaction.gas_fee_covered_by_company || false,
+    recipient_name: transaction.recipient_name || '',
+    sender_name: transaction.sender_name || '',
+    transaction_method: transaction.transaction_method || 'app_wallet',
+    app_version: transaction.app_version || '1.0.0',
+    device_info: transaction.device_info || 'mobile'
   }),
 
   // Transform Firestore document to Notification
@@ -1730,20 +1752,7 @@ export const firebaseGroupService = {
           invitedByUserName
         }, 'firebaseDataService');
         
-        await notificationService.sendNotification(
-          invitedUserId,
-          'Group Invitation',
-          `${invitedByUserName} has invited you to join the group "${groupName}"`,
-          'group_invite',
-          {
-            groupId,
-            groupName,
-            invitedBy: invitedByUserId,
-            invitedByName: invitedByUserName,
-            inviteLink: inviteData.inviteLink,
-            expiresAt: inviteData.expiresAt
-          }
-        );
+        // Group invitations removed - no longer supported
         
         logger.debug('Notification sent successfully to user', { invitedUserId }, 'firebaseDataService');
         
@@ -1928,23 +1937,7 @@ export const firebaseGroupService = {
       const groupName = groupDoc.exists() ? groupDoc.data().name : 'Group';
       const senderName = senderDoc.exists() ? senderDoc.data().name : 'Unknown';
       
-      // Send notification to recipient
-      await notificationService.sendNotification(
-        recipientId,
-        'Group Payment Request',
-        `${senderName} has requested ${amount} ${currency} in ${groupName}${description ? ` for ${description}` : ''}`,
-        'group_payment_request',
-        {
-          groupId,
-          groupName,
-          senderId,
-          senderName,
-          amount,
-          currency,
-          description,
-          status: 'pending'
-        }
-      );
+      // Group payment requests removed - no longer supported
       
       if (__DEV__) { logger.info('Group payment request notification sent successfully', null, 'firebaseDataService'); }
     } catch (error) {
@@ -1971,20 +1964,7 @@ export const firebaseGroupService = {
       const groupName = groupDoc.exists() ? groupDoc.data().name : 'Group';
       const addedByName = addedByDoc.exists() ? addedByDoc.data().name : 'Unknown';
       
-      // Send notification to added user
-      await notificationService.sendNotification(
-        addedUserId,
-        'Added to Group',
-        `${addedByName} has added you to the group "${groupName}"`,
-        'group_added',
-        {
-          groupId,
-          groupName,
-          addedBy: addedByUserId,
-          addedByName,
-          status: 'active'
-        }
-      );
+      // Group added notifications removed - no longer supported
       
       if (__DEV__) { logger.info('Group added notification sent successfully', null, 'firebaseDataService'); }
     } catch (error) {

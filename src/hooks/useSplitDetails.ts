@@ -4,10 +4,11 @@
  * Updated to fix import issues
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { consolidatedBillAnalysisService } from '../services/consolidatedBillAnalysisService';
 import { SplitStorageService } from '../services/splitStorageService';
+import { splitRealtimeService, SplitRealtimeUpdate } from '../services/splitRealtimeService';
 import { UnifiedBillData } from '../types/unified';
 import { logger } from '../services/loggingService';
 
@@ -34,6 +35,8 @@ interface UseSplitDetailsResult {
   showShareModal: boolean;
   qrData: string | null;
   shareableLink: string | null;
+  isRealtimeActive: boolean;
+  lastRealtimeUpdate: string | null;
   
   // Actions
   refreshData: () => Promise<void>;
@@ -48,6 +51,8 @@ interface UseSplitDetailsResult {
   showShare: () => void;
   hideShare: () => void;
   copyToClipboard: (text: string) => void;
+  startRealtimeUpdates: () => void;
+  stopRealtimeUpdates: () => void;
 }
 
 export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsParams): UseSplitDetailsResult => {
@@ -72,6 +77,11 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
   const [showShareModal, setShowShareModal] = useState(false);
   const [qrData, setQrData] = useState<string | null>(null);
   const [shareableLink, setShareableLink] = useState<string | null>(null);
+  
+  // Real-time update states
+  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
+  const [lastRealtimeUpdate, setLastRealtimeUpdate] = useState<string | null>(null);
+  const realtimeCleanupRef = useRef<(() => void) | null>(null);
 
   // Load split data
   const loadSplitData = useCallback(async () => {
@@ -235,10 +245,130 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
     logger.info('Copy to clipboard', { text }, 'useSplitDetails');
   }, []);
 
+  // Real-time update functions
+  const startRealtimeUpdates = useCallback(async () => {
+    if (!routeParams?.splitId || isRealtimeActive) return;
+    
+    try {
+      logger.info('Starting real-time updates for split', { splitId: routeParams.splitId }, 'useSplitDetails');
+      
+      const cleanup = await splitRealtimeService.startListening(
+        routeParams.splitId,
+        {
+          onSplitUpdate: (update: SplitRealtimeUpdate) => {
+            logger.debug('Real-time split update received', { 
+              splitId: routeParams.splitId,
+              hasChanges: update.hasChanges,
+              participantsCount: update.participants.length
+            }, 'useSplitDetails');
+            
+            if (update.split) {
+              // Update the unified bill data
+              const billData: UnifiedBillData = {
+                id: update.split.id,
+                title: update.split.title,
+                merchant: update.split.merchant?.name || 'Unknown',
+                location: update.split.merchant?.address || '',
+                date: update.split.date,
+                time: new Date(update.split.createdAt).toLocaleTimeString(),
+                currency: update.split.currency,
+                totalAmount: update.split.totalAmount,
+                subtotal: update.split.totalAmount * 0.9, // Estimate
+                tax: update.split.totalAmount * 0.1, // Estimate
+                items: update.split.items || [],
+                participants: update.participants,
+                settings: {
+                  allowPartialPayments: false,
+                  requireAllAccept: false,
+                  autoCalculate: true,
+                  splitMethod: update.split.splitMethod || 'equal',
+                  taxIncluded: false
+                },
+                originalAnalysis: {} as any // Placeholder
+              };
+              
+              setUnifiedBillData(billData);
+              setParticipants(update.participants);
+              setTotalAmount(update.split.totalAmount || 0);
+              setSplitMethod(update.split.splitMethod || 'equal');
+              setLastRealtimeUpdate(update.lastUpdated);
+            }
+          },
+          onParticipantUpdate: (participants) => {
+            logger.debug('Real-time participant update received', { 
+              splitId: routeParams.splitId,
+              participantsCount: participants.length
+            }, 'useSplitDetails');
+            
+            setParticipants(participants);
+          },
+          onError: (error) => {
+            logger.error('Real-time update error', { 
+              splitId: routeParams.splitId,
+              error: error.message 
+            }, 'useSplitDetails');
+            setError(`Real-time update error: ${error.message}`);
+          }
+        }
+      );
+      
+      realtimeCleanupRef.current = cleanup;
+      setIsRealtimeActive(true);
+      
+    } catch (error) {
+      logger.error('Failed to start real-time updates', { 
+        splitId: routeParams.splitId,
+        error: error.message 
+      }, 'useSplitDetails');
+      setError(`Failed to start real-time updates: ${error.message}`);
+    }
+  }, [routeParams?.splitId, isRealtimeActive]);
+
+  const stopRealtimeUpdates = useCallback(() => {
+    if (!isRealtimeActive) return;
+    
+    try {
+      logger.info('Stopping real-time updates for split', { splitId: routeParams?.splitId }, 'useSplitDetails');
+      
+      if (realtimeCleanupRef.current) {
+        realtimeCleanupRef.current();
+        realtimeCleanupRef.current = null;
+      }
+      
+      splitRealtimeService.stopListening(routeParams?.splitId);
+      setIsRealtimeActive(false);
+      setLastRealtimeUpdate(null);
+      
+    } catch (error) {
+      logger.error('Failed to stop real-time updates', { 
+        splitId: routeParams?.splitId,
+        error: error.message 
+      }, 'useSplitDetails');
+    }
+  }, [routeParams?.splitId, isRealtimeActive]);
+
   // Load data on mount
   useEffect(() => {
     loadSplitData();
   }, [loadSplitData]);
+
+  // Start real-time updates when split data is loaded
+  useEffect(() => {
+    if (routeParams?.splitId && !isRealtimeActive) {
+      startRealtimeUpdates().catch(error => {
+        console.error('Failed to start real-time updates:', error);
+      });
+    }
+  }, [routeParams?.splitId, isRealtimeActive, startRealtimeUpdates]);
+
+  // Cleanup real-time updates on unmount
+  useEffect(() => {
+    return () => {
+      if (realtimeCleanupRef.current) {
+        realtimeCleanupRef.current();
+      }
+    };
+  }, []);
 
   return {
     // State
@@ -258,6 +388,8 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
     showShareModal,
     qrData,
     shareableLink,
+    isRealtimeActive,
+    lastRealtimeUpdate,
     
     // Actions
     refreshData,
@@ -271,6 +403,8 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
     hideNFC,
     showShare,
     hideShare,
-    copyToClipboard
+    copyToClipboard,
+    startRealtimeUpdates,
+    stopRealtimeUpdates
   };
 };

@@ -265,16 +265,34 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>From:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.from_user || 'N/A'}
+                        {transaction.sender_name || transaction.from_user || 'N/A'}
                       </Text>
                     </View>
 
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>To:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.to_user || 'N/A'}
+                        {transaction.recipient_name || transaction.to_user || 'N/A'}
                       </Text>
                     </View>
+
+                    {transaction.note && (
+                      <View style={styles.transactionDetailRow}>
+                        <Text style={styles.transactionDetailLabel}>Note:</Text>
+                        <Text style={styles.transactionDetailValue}>
+                          {transaction.note}
+                        </Text>
+                      </View>
+                    )}
+
+                    {transaction.group_id && (
+                      <View style={styles.transactionDetailRow}>
+                        <Text style={styles.transactionDetailLabel}>Group ID:</Text>
+                        <Text style={styles.transactionDetailValue}>
+                          {transaction.group_id}
+                        </Text>
+                      </View>
+                    )}
 
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>Transaction ID:</Text>
@@ -316,32 +334,44 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       </View>
                     )}
 
-                    {/* Fees Section - Show for all transactions for testing */}
-                    {useMemo(() => {
-                      // Determine transaction type based on transaction type
-                      const transactionType: TransactionType = transaction.type === 'withdraw' ? 'withdraw' : 
-                                                             transaction.type === 'deposit' ? 'deposit' : 'send';
-                      const feeCalculation = FeeService.calculateCompanyFee(transaction.amount, transactionType);
-                      const feePercentage = FeeService.getCompanyFeeStructure(transactionType).percentage * 100;
-                      
-                      return (
-                        <>
-                          <View style={styles.transactionDetailRow}>
-                            <Text style={styles.transactionDetailLabel}>Withdrawal fee ({feePercentage}%):</Text>
-                            <Text style={styles.transactionDetailValue}>
-                              {feeCalculation.fee.toFixed(2)} {transaction.currency}
-                            </Text>
-                          </View>
+                    {/* Fees Section - Show actual stored fee data */}
+                    {transaction.company_fee && transaction.company_fee > 0 && (
+                      <>
+                        <View style={styles.transactionDetailRow}>
+                          <Text style={styles.transactionDetailLabel}>Company Fee:</Text>
+                          <Text style={styles.transactionDetailValue}>
+                            {transaction.company_fee.toFixed(2)} {transaction.currency}
+                          </Text>
+                        </View>
 
+                        {transaction.net_amount && transaction.net_amount !== transaction.amount && (
                           <View style={styles.transactionDetailRow}>
-                            <Text style={styles.transactionDetailLabel}>Total sent:</Text>
+                            <Text style={styles.transactionDetailLabel}>Net Amount:</Text>
                             <Text style={styles.transactionDetailValue}>
-                              {feeCalculation.totalAmount.toFixed(2)} {transaction.currency}
+                              {transaction.net_amount.toFixed(2)} {transaction.currency}
                             </Text>
                           </View>
-                        </>
-                      );
-                    }, [transaction.amount, transaction.currency])}
+                        )}
+                      </>
+                    )}
+
+                    {transaction.gas_fee && transaction.gas_fee > 0 && (
+                      <View style={styles.transactionDetailRow}>
+                        <Text style={styles.transactionDetailLabel}>Gas Fee:</Text>
+                        <Text style={styles.transactionDetailValue}>
+                          {transaction.gas_fee.toFixed(6)} SOL
+                        </Text>
+                      </View>
+                    )}
+
+                    {transaction.transaction_method && (
+                      <View style={styles.transactionDetailRow}>
+                        <Text style={styles.transactionDetailLabel}>Method:</Text>
+                        <Text style={styles.transactionDetailValue}>
+                          {transaction.transaction_method === 'app_wallet' ? 'In-App Wallet' : 'External Wallet'}
+                        </Text>
+                      </View>
+                    )}
 
                     {/* Solscan Link - Show for all transactions for testing */}
                     <View style={styles.transactionDetailRow}>

@@ -27,7 +27,7 @@ import { notificationService } from '../../services/notificationService';
 import { useApp } from '../../context/AppContext';
 
 // Import our custom hooks and components
-import { useDegenSplitState, useDegenSplitLogic } from './hooks';
+import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader } from './components';
 
 interface DegenResultScreenProps {
@@ -168,6 +168,27 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       }
     });
   });
+
+  // Initialize real-time updates
+  const realtimeState = useDegenSplitRealtime(
+    splitData?.id,
+    degenState.splitWallet?.id,
+    {
+      onParticipantUpdate: (participants) => {
+        console.log('🔍 DegenResultScreen: Real-time participant update:', participants);
+        // Update participants if needed
+      },
+      onSplitWalletUpdate: (splitWallet) => {
+        console.log('🔍 DegenResultScreen: Real-time wallet update:', splitWallet);
+        degenState.setSplitWallet(splitWallet);
+        setCurrentSplitWallet(splitWallet);
+      },
+      onError: (error) => {
+        console.error('🔍 DegenResultScreen: Real-time error:', error);
+        degenState.setError(error.message);
+      }
+    }
+  );
 
   // Determine if current user is the winner (selectedParticipant is the winner from the roulette)
   const isWinner = currentUser && selectedParticipant && 
@@ -410,6 +431,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       <DegenSplitHeader
         title="Degen Result"
         onBackPress={handleBack}
+        isRealtimeActive={realtimeState.isRealtimeActive}
       />
 
       {/* Main Content */}

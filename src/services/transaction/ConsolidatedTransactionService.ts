@@ -124,6 +124,41 @@ class ConsolidatedTransactionService {
         error: result.error
       });
       
+      // Save transaction to database if successful
+      if (result.success && result.signature) {
+        try {
+          const { firebaseTransactionService } = await import('../firebaseDataService');
+          
+          // Create transaction record for database
+          const transactionData = {
+            type: 'send' as const,
+            amount: params.amount,
+            currency: params.currency,
+            from_user: params.userId,
+            to_user: params.to, // This will be the recipient's user ID or wallet address
+            from_wallet: keypairResult.keypair.publicKey.toBase58(),
+            to_wallet: params.to,
+            tx_hash: result.signature,
+            note: params.memo || 'USDC Transfer',
+            status: 'completed' as const,
+            group_id: params.groupId || null,
+            company_fee: result.companyFee || 0,
+            net_amount: result.netAmount || params.amount
+          };
+          
+          await firebaseTransactionService.createTransaction(transactionData);
+          logger.info('✅ Transaction saved to database', {
+            signature: result.signature,
+            userId: params.userId,
+            amount: params.amount
+          }, 'ConsolidatedTransactionService');
+          
+        } catch (saveError) {
+          logger.error('❌ Failed to save transaction to database', saveError, 'ConsolidatedTransactionService');
+          // Don't fail the transaction if database save fails
+        }
+      }
+      
       return result;
     } catch (error) {
       logger.error('Failed to send USDC transaction', error, 'ConsolidatedTransactionService');

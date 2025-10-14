@@ -13,6 +13,7 @@ import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
 import { logger } from '../../services/loggingService';
+import { notificationService } from '../../services/notificationService';
 
 // --- AppleSlider adapted from WalletManagementScreen ---
 interface AppleSliderProps {
@@ -212,6 +213,15 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       }
 
       setSending(true);
+      
+      // Send payment processing notification
+      await notificationService.sendPaymentProcessingNotification(
+        currentUser.id,
+        'payment_' + Date.now(), // Generate a temporary ID
+        'Payment to ' + (contact?.name || 'External Wallet'),
+        amount,
+        'USDC'
+      );
 
       // Get fee estimate for display
       const feeEstimate = await consolidatedTransactionService.getTransactionFeeEstimate(amount, 'USDC', 'medium');
@@ -269,6 +279,16 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         }
       }
 
+      // Send payment confirmed notification
+      await notificationService.sendPaymentConfirmedNotification(
+        currentUser.id,
+        'payment_' + Date.now(),
+        'Payment to ' + (contact?.name || 'External Wallet'),
+        amount,
+        'USDC',
+        transactionResult.signature || transactionResult.transactionId
+      );
+
       // Navigate to success screen with real transaction data
       navigation.navigate('SendSuccess', {
         contact: destinationType === 'external' ? null : contact,
@@ -288,6 +308,19 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       });
     } catch (error) {
       console.error('Send error:', error);
+      
+      // Send payment failed notification
+      if (currentUser?.id) {
+        await notificationService.sendPaymentFailedNotification(
+          currentUser.id,
+          'payment_' + Date.now(),
+          'Payment to ' + (contact?.name || 'External Wallet'),
+          amount,
+          'USDC',
+          error instanceof Error ? error.message : 'Unknown error'
+        );
+      }
+      
       Alert.alert('Transaction Failed', error instanceof Error ? error.message : 'Failed to send money. Please try again.');
     } finally {
       setSending(false);

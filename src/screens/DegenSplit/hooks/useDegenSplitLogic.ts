@@ -598,7 +598,7 @@ export const useDegenSplitLogic = (
         const winnerName = participants[finalIndex].name;
 
         // Send winner notification
-        await notificationService.sendNotification(
+        await notificationService.sendWinnerNotification(
           winnerId,
           splitWallet.id,
           billName
@@ -615,9 +615,12 @@ export const useDegenSplitLogic = (
             loserIds,
             'split_loser',
             {
+              splitId: splitData?.id,
               splitWalletId: splitWallet.id,
               billName,
               amount: totalAmount,
+              currency: 'USDC',
+              timestamp: new Date().toISOString()
             }
           );
         }

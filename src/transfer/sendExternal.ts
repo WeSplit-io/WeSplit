@@ -131,6 +131,38 @@ class ExternalTransferService {
         // Update last used timestamp for linked wallet
         await this.updateLinkedWalletLastUsed(params.to, params.userId);
         
+        // Save transaction to database for history
+        try {
+          const { firebaseTransactionService } = await import('../services/firebaseDataService');
+          
+          const transactionData = {
+            type: 'withdraw' as const,
+            amount: params.amount,
+            currency: params.currency,
+            from_user: params.userId,
+            to_user: params.to, // External wallet address
+            from_wallet: '', // Will be filled by the service
+            to_wallet: params.to,
+            tx_hash: result.signature!,
+            note: params.memo || 'External wallet transfer',
+            status: 'completed' as const,
+            group_id: null,
+            company_fee: result.companyFee || 0,
+            net_amount: result.netAmount || params.amount
+          };
+          
+          await firebaseTransactionService.createTransaction(transactionData);
+          logger.info('✅ External transfer saved to database', {
+            signature: result.signature,
+            userId: params.userId,
+            amount: params.amount
+          }, 'ExternalTransferService');
+          
+        } catch (saveError) {
+          logger.error('❌ Failed to save external transfer to database', saveError, 'ExternalTransferService');
+          // Don't fail the transaction if database save fails
+        }
+        
         logger.info('External transfer completed successfully', {
           signature: result.signature,
           amount: params.amount,

@@ -7,3 +7,4 @@ export { useDegenSplitState, type DegenSplitState } from './useDegenSplitState';
 export { useDegenSplitLogic, type DegenSplitLogic } from './useDegenSplitLogic';
 export { useDegenSplitInitialization, type DegenSplitInitialization } from './useDegenSplitInitialization';
 export { useDegenSplitErrorHandler, type DegenSplitErrorHandler } from './useDegenSplitErrorHandler';
+export { useDegenSplitRealtime, type DegenSplitRealtimeState, type DegenSplitRealtimeCallbacks } from './useDegenSplitRealtime';

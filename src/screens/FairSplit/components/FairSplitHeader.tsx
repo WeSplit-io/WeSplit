@@ -26,6 +26,7 @@ interface FairSplitHeaderProps {
   totalAmount: number;
   category?: string;
   onBackPress: () => void;
+  isRealtimeActive?: boolean;
 }
 
 const FairSplitHeader: React.FC<FairSplitHeaderProps> = ({
@@ -33,7 +34,8 @@ const FairSplitHeader: React.FC<FairSplitHeaderProps> = ({
   billDate,
   totalAmount,
   category = 'food',
-  onBackPress
+  onBackPress,
+  isRealtimeActive = false
 }) => {
   return (
     <>
@@ -49,7 +51,15 @@ const FairSplitHeader: React.FC<FairSplitHeaderProps> = ({
           />
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>Fair Split</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Fair Split</Text>
+          {isRealtimeActive && (
+            <View style={styles.realtimeIndicator}>
+              <View style={styles.realtimeDot} />
+              <Text style={styles.realtimeText}>Live</Text>
+            </View>
+          )}
+        </View>
         
         <View style={{ width: 40 }} />
       </View>

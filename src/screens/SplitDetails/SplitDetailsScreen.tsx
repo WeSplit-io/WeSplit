@@ -3,7 +3,7 @@
  * Screen for editing bill split details, managing participants, and configuring split methods
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -36,6 +36,7 @@ import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/loggingService';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
+import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splitRealtimeService';
 // Removed SplitWalletService import - wallets are now created only when split type is selected
 import { FallbackDataService } from '../../utils/fallbackDataService';
 import { MockupDataService } from '../../data/mockupData';
@@ -228,6 +229,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const [isJoiningSplit, setIsJoiningSplit] = useState(false);
   const [hasJustJoinedSplit, setHasJustJoinedSplit] = useState(false);
   const [usdcEquivalent, setUsdcEquivalent] = useState<number | null>(null);
+  
+  // Real-time update states
+  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
+  const [lastRealtimeUpdate, setLastRealtimeUpdate] = useState<string | null>(null);
+  const realtimeCleanupRef = useRef<(() => void) | null>(null);
   const [isConvertingCurrency, setIsConvertingCurrency] = useState(false);
 
   // useEffect hooks for data loading and initialization
@@ -412,6 +418,137 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       console.error('Error loading split data:', error);
     }
   };
+
+  // Real-time update functions
+  const startRealtimeUpdates = useCallback(async () => {
+    if (!splitId || isRealtimeActive) {
+      console.log('🔍 Real-time updates not started:', { splitId, isRealtimeActive });
+      return;
+    }
+    
+    try {
+      console.log('🔍 Starting real-time updates for split:', splitId);
+      logger.info('Starting real-time updates for split', { splitId }, 'SplitDetailsScreen');
+      
+      const cleanup = await splitRealtimeService.startListening(
+        splitId,
+        {
+          onSplitUpdate: (update: SplitRealtimeUpdate) => {
+            console.log('🔍 Real-time split update received:', {
+              splitId,
+              hasChanges: update.hasChanges,
+              participantsCount: update.participants.length,
+              splitTitle: update.split?.title
+            });
+            logger.debug('Real-time split update received', { 
+              splitId,
+              hasChanges: update.hasChanges,
+              participantsCount: update.participants.length
+            }, 'SplitDetailsScreen');
+            
+            if (update.split) {
+              // Update the current split data
+              setCurrentSplitData(update.split);
+              setBillName(update.split.title);
+              setTotalAmount(update.split.totalAmount.toString());
+              setSelectedSplitType(update.split.splitType || null);
+              setLastRealtimeUpdate(update.lastUpdated);
+              
+              // Convert currency to USDC if needed
+              if (update.split.currency !== 'USDC') {
+                setIsConvertingCurrency(true);
+                convertFiatToUSDC(update.split.totalAmount, update.split.currency)
+                  .then(usdcAmount => {
+                    setUsdcEquivalent(usdcAmount);
+                  })
+                  .catch(error => {
+                    console.error('Error converting currency:', error);
+                  })
+                  .finally(() => {
+                    setIsConvertingCurrency(false);
+                  });
+              }
+            }
+          },
+          onParticipantUpdate: (participants) => {
+            console.log('🔍 Real-time participant update received:', {
+              splitId,
+              participantsCount: participants.length,
+              participants: participants.map(p => ({ name: p.name, status: p.status }))
+            });
+            logger.debug('Real-time participant update received', { 
+              splitId,
+              participantsCount: participants.length
+            }, 'SplitDetailsScreen');
+            
+            // Update current split data with new participants
+            setCurrentSplitData(prev => prev ? { ...prev, participants } : null);
+          },
+          onError: (error) => {
+            console.error('🔍 Real-time update error:', error);
+            logger.error('Real-time update error', { 
+              splitId,
+              error: error.message 
+            }, 'SplitDetailsScreen');
+          }
+        }
+      );
+      
+      realtimeCleanupRef.current = cleanup;
+      setIsRealtimeActive(true);
+      console.log('🔍 Real-time updates started successfully');
+      
+    } catch (error) {
+      console.error('🔍 Failed to start real-time updates:', error);
+      logger.error('Failed to start real-time updates', { 
+        splitId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, 'SplitDetailsScreen');
+    }
+  }, [splitId, isRealtimeActive]);
+
+  const stopRealtimeUpdates = () => {
+    if (!isRealtimeActive) return;
+    
+    try {
+      logger.info('Stopping real-time updates for split', { splitId }, 'SplitDetailsScreen');
+      
+      if (realtimeCleanupRef.current) {
+        realtimeCleanupRef.current();
+        realtimeCleanupRef.current = null;
+      }
+      
+      if (splitId) {
+        splitRealtimeService.stopListening(splitId);
+      }
+      setIsRealtimeActive(false);
+      setLastRealtimeUpdate(null);
+      
+    } catch (error) {
+      logger.error('Failed to stop real-time updates', { 
+        splitId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, 'SplitDetailsScreen');
+    }
+  };
+
+  // Start real-time updates when split data is loaded
+  useEffect(() => {
+    if (splitId && !isRealtimeActive) {
+      startRealtimeUpdates().catch((error: any) => {
+        console.error('🔍 Failed to start real-time updates:', error);
+      });
+    }
+  }, [splitId, isRealtimeActive, startRealtimeUpdates]);
+
+  // Cleanup real-time updates on unmount
+  useEffect(() => {
+    return () => {
+      if (realtimeCleanupRef.current) {
+        realtimeCleanupRef.current();
+      }
+    };
+  }, []);
 
   // Removed ensureSplitWithWalletExists - wallets should only be created when split type is selected
 
@@ -733,31 +870,9 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     if (!currentUser) return;
     
     try {
-      logger.info('Testing notification creation', { userId: currentUser.id }, 'SplitDetailsScreen');
-      
-      const result = await notificationService.sendNotification(
-        currentUser.id.toString(), // Send to self for testing
-        'Test Split Invitation',
-        'This is a test split invitation notification',
-        'split_invite',
-        {
-          splitId: splitId || 'test_split_123',
-          billName: billName || 'Test Bill',
-          totalAmount: 25.50,
-          currency: 'USDC',
-          invitedBy: currentUser.id.toString(),
-          invitedByName: currentUser.name,
-          participantName: 'Test User',
-          status: 'pending'
-        }
-      );
-      
-      if (result) {
-        Alert.alert('Success', 'Test notification sent successfully! Check your notifications.');
-        logger.info('Test notification sent successfully', null, 'SplitDetailsScreen');
-      } else {
-        Alert.alert('Error', 'Failed to send test notification');
-      }
+      // Test notification removed - use actual split invitation instead
+      logger.info('Test notification functionality removed', { userId: currentUser.id }, 'SplitDetailsScreen');
+      Alert.alert('Info', 'Test notification functionality has been removed. Use actual split invitations instead.');
     } catch (error) {
       console.error('Error sending test notification:', error);
       Alert.alert('Error', 'Failed to send test notification');
@@ -1060,7 +1175,15 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Split the Bill</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Split the Bill</Text>
+          {isRealtimeActive && (
+            <View style={styles.realtimeIndicator}>
+              <View style={styles.realtimeDot} />
+              <Text style={styles.realtimeText}>Live</Text>
+            </View>
+          )}
+        </View>
 
         <TouchableOpacity style={styles.editButton} onPress={handleEditBill}>
           <Image

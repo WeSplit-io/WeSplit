@@ -23,7 +23,7 @@ import { useApp } from '../../context/AppContext';
 import { notificationService } from '../../services/notificationService';
 
 // Import our custom hooks and components
-import { useDegenSplitState, useDegenSplitLogic } from './hooks';
+import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenRoulette } from './components';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -64,6 +64,26 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
       }
     });
   });
+
+  // Initialize real-time updates
+  const realtimeState = useDegenSplitRealtime(
+    splitData?.id,
+    degenState.splitWallet?.id,
+    {
+      onParticipantUpdate: (participants) => {
+        console.log('🔍 DegenSpinScreen: Real-time participant update:', participants);
+        // Update participants if needed
+      },
+      onSplitWalletUpdate: (splitWallet) => {
+        console.log('🔍 DegenSpinScreen: Real-time wallet update:', splitWallet);
+        degenState.setSplitWallet(splitWallet);
+      },
+      onError: (error) => {
+        console.error('🔍 DegenSpinScreen: Real-time error:', error);
+        degenState.setError(error.message);
+      }
+    }
+  );
 
   // Initialize animation refs
   useEffect(() => {
@@ -204,6 +224,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
       <DegenSplitHeader
         title="Degen Split"
         onBackPress={handleBack}
+        isRealtimeActive={realtimeState.isRealtimeActive}
       />
 
       {/* Main Content */}

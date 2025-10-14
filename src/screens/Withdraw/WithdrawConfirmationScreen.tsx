@@ -168,6 +168,40 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
 
       logger.info('Withdrawal transaction successful', { transactionResult }, 'WithdrawConfirmationScreen');
       
+      // Save withdrawal transaction to database for history
+      if (currentUser?.id && transactionResult?.signature) {
+        try {
+          const { firebaseTransactionService } = await import('../../services/firebaseDataService');
+          
+          const transactionData = {
+            type: 'withdraw' as const,
+            amount: amount,
+            currency: 'USDC',
+            from_user: currentUser.id,
+            to_user: externalWalletAddress || walletAddress, // External wallet address
+            from_wallet: appWalletAddress || '',
+            to_wallet: externalWalletAddress || walletAddress,
+            tx_hash: transactionResult.signature,
+            note: description || 'Withdrawal from WeSplit app wallet',
+            status: 'completed' as const,
+            group_id: null,
+            company_fee: safeWithdrawalFee || 0,
+            net_amount: safeTotalWithdraw
+          };
+          
+          await firebaseTransactionService.createTransaction(transactionData);
+          logger.info('✅ Withdrawal transaction saved to database', {
+            signature: transactionResult.signature,
+            userId: currentUser.id,
+            amount: amount
+          }, 'WithdrawConfirmationScreen');
+          
+        } catch (saveError) {
+          logger.error('❌ Failed to save withdrawal transaction to database', saveError, 'WithdrawConfirmationScreen');
+          // Don't fail the withdrawal if database save fails
+        }
+      }
+      
       // Navigate to success screen with transaction data
       navigation.navigate('WithdrawSuccess', {
         amount: safeTotalWithdraw,

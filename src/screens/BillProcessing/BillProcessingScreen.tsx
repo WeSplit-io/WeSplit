@@ -27,6 +27,7 @@ import { BillAnalysisData, BillAnalysisResult, ProcessedBillData } from '../../t
 import { consolidatedBillAnalysisService } from '../../services/consolidatedBillAnalysisService';
 import { useApp } from '../../context/AppContext';
 import { SplitStorageService } from '../../services/splitStorageService';
+import { notificationService } from '../../services/notificationService';
 
 interface RouteParams {
   imageUri: string;
@@ -144,6 +145,20 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
                                 analysisResult.error?.includes('rate limit');
         
         if (isRateLimitError) {
+          // Send notification about AI service being busy
+          if (currentUser?.id) {
+            await notificationService.sendNotification(
+              currentUser.id,
+              'AI Service Busy',
+              'The AI service is currently busy. Please try again later or use manual entry.',
+              'system_warning',
+              {
+                errorType: 'ai_rate_limit',
+                timestamp: new Date().toISOString()
+              }
+            );
+          }
+          
           Alert.alert(
             'AI Service Busy',
             'The AI service is currently busy. Please wait a moment and try again, or use manual entry.',

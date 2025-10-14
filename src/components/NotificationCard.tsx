@@ -13,7 +13,7 @@ import styles from './NotificationCard.styles';
 
 export interface NotificationData {
   id: string;
-  type: 'settlement_request' | 'settlement_notification' | 'funding_notification' | 'payment_request' | 'payment_reminder' | 'general' | 'expense_added' | 'group_invite' | 'split_invite' | 'split_confirmed' | 'payment_received' | 'group_payment_request' | 'group_added' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'group_payment_sent' | 'group_payment_received' | 'split_completed' | 'degen_all_locked' | 'degen_ready_to_roll' | 'roulette_result' | 'contact_added' | 'split_spin_available' | 'split_winner' | 'split_loser' | 'split_lock_required';
+  type: 'payment_request' | 'payment_reminder' | 'general' | 'split_invite' | 'split_confirmed' | 'payment_received' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'split_completed' | 'degen_all_locked' | 'degen_ready_to_roll' | 'roulette_result' | 'contact_added' | 'split_spin_available' | 'split_winner' | 'split_loser' | 'split_lock_required';
   title: string;
   message: string;
   created_at: string;
@@ -26,8 +26,6 @@ export interface NotificationData {
     requester?: string;
     senderAvatar?: string;
     requesterAvatar?: string;
-    groupName?: string;
-    groupId?: string;
     addedBy?: string;
     addedByAvatar?: string;
     inviteLink?: string;

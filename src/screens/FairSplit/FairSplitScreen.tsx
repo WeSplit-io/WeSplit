@@ -27,6 +27,7 @@ import { useApp } from '../../context/AppContext';
 import { AmountCalculationService, Participant } from '../../services/amountCalculationService';
 import { DataSourceService } from '../../services/dataSourceService';
 import { logger } from '../../services/loggingService';
+import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splitRealtimeService';
 import FairSplitHeader from './components/FairSplitHeader';
 import FairSplitProgress from './components/FairSplitProgress';
 import FairSplitParticipants from './components/FairSplitParticipants';
@@ -73,6 +74,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const [inAppWallet, setInAppWallet] = useState<{address: string} | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<{id: string, address: string, type: 'external' | 'in-app', name?: string} | null>(null);
   const [isLoadingWallets, setIsLoadingWallets] = useState(false);
+  
+  // Real-time update states
+  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
+  const [lastRealtimeUpdate, setLastRealtimeUpdate] = useState<string | null>(null);
+  const realtimeCleanupRef = useRef<(() => void) | null>(null);
   
   // Helper function to check if current user is the creator
   const isCurrentUserCreator = () => {
@@ -558,6 +564,108 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     return unsubscribe;
   }, [navigation, currentUser?.id]);
 
+  // Real-time update functions
+  const startRealtimeUpdates = async () => {
+    if (!splitData?.id || isRealtimeActive) return;
+    
+    try {
+      logger.info('Starting real-time updates for FairSplit', { splitId: splitData.id }, 'FairSplitScreen');
+      
+      const cleanup = await splitRealtimeService.startListening(
+        splitData.id,
+        {
+          onSplitUpdate: (update: SplitRealtimeUpdate) => {
+            logger.debug('Real-time split update received in FairSplit', { 
+              splitId: splitData.id,
+              hasChanges: update.hasChanges,
+              participantsCount: update.participants.length
+            }, 'FairSplitScreen');
+            
+            if (update.split) {
+              // Update the split data
+              setLastRealtimeUpdate(update.lastUpdated);
+              
+              // Update participants if they have changed
+              if (update.participants.length !== participants.length) {
+                // Reload split wallet data to get updated participants
+                if (splitWallet?.id) {
+                  loadSplitWalletData();
+                }
+              }
+            }
+          },
+          onParticipantUpdate: (participants) => {
+            logger.debug('Real-time participant update received in FairSplit', { 
+              splitId: splitData.id,
+              participantsCount: participants.length
+            }, 'FairSplitScreen');
+            
+            // Reload split wallet data to get updated participants
+            if (splitWallet?.id) {
+              loadSplitWalletData();
+            }
+          },
+          onError: (error) => {
+            logger.error('Real-time update error in FairSplit', { 
+              splitId: splitData.id,
+              error: error.message 
+            }, 'FairSplitScreen');
+          }
+        }
+      );
+      
+      realtimeCleanupRef.current = cleanup;
+      setIsRealtimeActive(true);
+      
+    } catch (error) {
+      logger.error('Failed to start real-time updates in FairSplit', { 
+        splitId: splitData?.id,
+        error: error.message 
+      }, 'FairSplitScreen');
+    }
+  };
+
+  const stopRealtimeUpdates = () => {
+    if (!isRealtimeActive) return;
+    
+    try {
+      logger.info('Stopping real-time updates for FairSplit', { splitId: splitData?.id }, 'FairSplitScreen');
+      
+      if (realtimeCleanupRef.current) {
+        realtimeCleanupRef.current();
+        realtimeCleanupRef.current = null;
+      }
+      
+      splitRealtimeService.stopListening(splitData?.id);
+      setIsRealtimeActive(false);
+      setLastRealtimeUpdate(null);
+      
+    } catch (error) {
+      logger.error('Failed to stop real-time updates in FairSplit', { 
+        splitId: splitData?.id,
+        error: error.message 
+      }, 'FairSplitScreen');
+    }
+  };
+
+  // Start real-time updates when split data is available
+  useEffect(() => {
+    if (splitData?.id && !isRealtimeActive) {
+      startRealtimeUpdates().catch(error => {
+        console.error('Failed to start real-time updates in FairSplit:', error);
+      });
+    }
+  }, [splitData?.id, isRealtimeActive]);
+
+  // Cleanup real-time updates on unmount
+  useEffect(() => {
+    return () => {
+      if (realtimeCleanupRef.current) {
+        realtimeCleanupRef.current();
+      }
+    };
+  }, []);
+
   // Check if all participants have paid their shares
   const checkPaymentCompletion = async () => {
     if (!splitWallet?.id) return;
@@ -590,12 +698,15 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           try {
             const { notificationService } = await import('../../services/notificationService');
             await notificationService.sendBulkNotifications(
-              wallet.participants.map(p => p.userId),
+              wallet.participants.map((p: any) => p.userId),
               'split_payment_required', // Use existing notification type
               {
+                splitId: splitData?.id,
                 splitWalletId: splitWallet.id,
                 billName: billInfo.name.data,
-                amount: wallet.totalAmount // Use amount field for total amount
+                amount: wallet.totalAmount,
+                currency: 'USDC',
+                timestamp: new Date().toISOString()
               }
             );
           } catch (notificationError) {
@@ -920,16 +1031,19 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   };
 
   const sendPaymentNotifications = async (wallet: SplitWallet) => {
-    const participantIds = wallet.participants.map(p => p.userId);
+    const participantIds = wallet.participants.map((p: any) => p.userId);
     const billName = billInfo.name.data; // Use DataSourceService
 
     await notificationService.sendBulkNotifications(
       participantIds,
       'split_payment_required',
       {
+        splitId: splitData?.id,
         splitWalletId: wallet.id,
         billName,
         amount: totalAmount / participants.length, // Equal split amount
+        currency: 'USDC',
+        timestamp: new Date().toISOString()
       }
     );
   };
@@ -1991,6 +2105,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           totalAmount={totalAmount}
           category={splitData?.category || processedBillData?.category || billData?.category}
           onBackPress={() => navigation.goBack()}
+          isRealtimeActive={isRealtimeActive}
         />
 
         {/* Progress Indicator */}

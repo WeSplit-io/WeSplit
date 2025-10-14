@@ -219,6 +219,10 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
   const getTransactionTitle = async (transaction: Transaction) => {
     switch (transaction.type) {
       case 'send':
+        // Use stored recipient name if available, otherwise try to fetch from database
+        if (transaction.recipient_name) {
+          return `Send to ${transaction.recipient_name}`;
+        }
         try {
           const recipient = await firebaseDataService.user.getCurrentUser(transaction.to_user);
           return `Send to ${recipient.name || 'Unknown'}`;
@@ -226,6 +230,10 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
           return `Send to ${transaction.to_user}`;
         }
       case 'receive':
+        // Use stored sender name if available, otherwise try to fetch from database
+        if (transaction.sender_name) {
+          return `Received from ${transaction.sender_name}`;
+        }
         try {
           const sender = await firebaseDataService.user.getCurrentUser(transaction.from_user);
           return `Received from ${sender.name || 'Unknown'}`;
@@ -244,13 +252,31 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
   const getTransactionSource = (transaction: Transaction) => {
     switch (transaction.type) {
       case 'send':
+        if (transaction.transaction_method === 'external_wallet') {
+          return 'External Wallet Transfer';
+        }
+        if (transaction.group_id) {
+          return 'Group Payment';
+        }
         return transaction.note || 'Payment';
       case 'receive':
+        if (transaction.transaction_method === 'external_wallet') {
+          return 'External Wallet Deposit';
+        }
+        if (transaction.group_id) {
+          return 'Group Payment';
+        }
         return transaction.note || 'Payment received';
       case 'deposit':
+        if (transaction.transaction_method === 'external_wallet') {
+          return 'External Wallet';
+        }
         return 'MoonPay';
       case 'withdraw':
-        return 'Wallet';
+        if (transaction.transaction_method === 'external_wallet') {
+          return 'External Wallet';
+        }
+        return 'App Wallet';
       default:
         return '';
     }
