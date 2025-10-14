@@ -46,12 +46,7 @@ export type NotificationType =
   | 'payment_reminder'
   | 'split_invite'
   | 'group_payment_request'
-  | 'system_notification'
-  | 'degen_all_locked'
-  | 'degen_ready_to_roll'
-  | 'roulette_result'
-  | 'split_lock_required'
-  | 'contact_added';
+  | 'system_notification';
 
 export interface NotificationData {
   id: string;
@@ -74,14 +69,6 @@ class NotificationServiceClass {
   async initializePushNotifications(): Promise<boolean> {
     try {
       if (this.isInitialized) {
-        return true;
-      }
-
-      // Check if running in Expo Go (limited functionality)
-      const isExpoGo = __DEV__ && Platform.OS !== 'web' && !global.Expo?.modules?.expo?.modules?.ExpoModulesCore;
-      if (isExpoGo) {
-        logger.warn('Running in Expo Go - push notifications have limited functionality. Consider using a development build for full notification support.', null, 'NotificationService');
-        this.isInitialized = true;
         return true;
       }
 
@@ -136,33 +123,14 @@ class NotificationServiceClass {
 
       // Send push notification if possible
       if (this.isInitialized) {
-        try {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title,
-              body: message,
-              data: { userId, type, ...data },
-            },
-            trigger: null, // Send immediately
-          });
-          logger.info('Push notification scheduled', { userId, type }, 'NotificationService');
-        } catch (notificationError) {
-          if (notificationError instanceof Error && 
-              (notificationError.message.includes('expo-notifications') || 
-               notificationError.message.includes('Expo Go'))) {
-            logger.warn('Push notification failed due to Expo Go limitations - notification stored in Firestore only', {
-              userId,
-              type,
-              error: notificationError.message
-            }, 'NotificationService');
-          } else {
-            logger.error('Failed to schedule push notification', {
-              userId,
-              type,
-              error: notificationError
-            }, 'NotificationService');
-          }
-        }
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body: message,
+            data: { userId, type, ...data },
+          },
+          trigger: null, // Send immediately
+        });
       }
 
       logger.info('Notification sent successfully', { userId, type, title }, 'NotificationService');
@@ -300,16 +268,6 @@ class NotificationServiceClass {
         return 'Group Payment Request';
       case 'system_notification':
         return 'System Notification';
-      case 'degen_all_locked':
-        return 'All Participants Locked';
-      case 'degen_ready_to_roll':
-        return 'Ready to Roll!';
-      case 'roulette_result':
-        return 'Roulette Result';
-      case 'split_lock_required':
-        return 'Lock Required';
-      case 'contact_added':
-        return 'Contact Added';
       default:
         return 'Notification';
     }
@@ -369,124 +327,6 @@ class NotificationServiceClass {
       `Congratulations! You won the split "${billName}"!`,
       'split_winner',
       { splitWalletId, billName }
-    );
-  }
-
-  /**
-   * Send payment processing notification
-   */
-  async sendPaymentProcessingNotification(
-    userId: string,
-    splitId: string,
-    billName: string,
-    amount: number,
-    currency: string = 'USD'
-  ): Promise<boolean> {
-    return this.sendNotification(
-      userId,
-      'Payment Processing',
-      `Your payment of ${amount} ${currency} for "${billName}" is being processed...`,
-      'general',
-      {
-        splitId,
-        billName,
-        amount,
-        currency,
-        status: 'processing',
-        timestamp: new Date().toISOString()
-      }
-    );
-  }
-
-  /**
-   * Send payment confirmed notification
-   */
-  async sendPaymentConfirmedNotification(
-    userId: string,
-    splitId: string,
-    billName: string,
-    amount: number,
-    currency: string = 'USD',
-    transactionHash?: string
-  ): Promise<boolean> {
-    return this.sendNotification(
-      userId,
-      'Payment Confirmed',
-      `Your payment of ${amount} ${currency} for "${billName}" has been confirmed!`,
-      'payment_received',
-      {
-        splitId,
-        billName,
-        amount,
-        currency,
-        transactionHash,
-        status: 'confirmed',
-        timestamp: new Date().toISOString()
-      }
-    );
-  }
-
-  /**
-   * Send payment failed notification
-   */
-  async sendPaymentFailedNotification(
-    userId: string,
-    splitId: string,
-    billName: string,
-    amount: number,
-    currency: string = 'USD',
-    reason?: string
-  ): Promise<boolean> {
-    return this.sendNotification(
-      userId,
-      'Payment Failed',
-      `Your payment of ${amount} ${currency} for "${billName}" failed${reason ? `: ${reason}` : ''}`,
-      'system_warning',
-      {
-        splitId,
-        billName,
-        amount,
-        currency,
-        reason,
-        status: 'failed',
-        timestamp: new Date().toISOString()
-      }
-    );
-  }
-
-  /**
-   * End payment processing notification (completes the processing state)
-   */
-  async endPaymentProcessingNotification(
-    userId: string,
-    splitId: string,
-    billName: string,
-    amount: number,
-    currency: string = 'USD',
-    status: 'completed' | 'failed' = 'completed',
-    transactionHash?: string,
-    reason?: string
-  ): Promise<boolean> {
-    const title = status === 'completed' ? 'Payment Completed' : 'Payment Failed';
-    const message = status === 'completed' 
-      ? `Your payment of ${amount} ${currency} for "${billName}" has been completed successfully!`
-      : `Your payment of ${amount} ${currency} for "${billName}" failed${reason ? `: ${reason}` : ''}`;
-
-    return this.sendNotification(
-      userId,
-      title,
-      message,
-      status === 'completed' ? 'payment_received' : 'system_warning',
-      {
-        splitId,
-        billName,
-        amount,
-        currency,
-        status,
-        transactionHash,
-        reason,
-        timestamp: new Date().toISOString()
-      }
     );
   }
 }

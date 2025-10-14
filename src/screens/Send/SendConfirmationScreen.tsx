@@ -214,8 +214,8 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
 
       setSending(true);
       
-      // Send payment processing notification
-      await notificationService.sendPaymentProcessingNotification(
+      // Send payment processing notification (non-blocking)
+      notificationService.sendPaymentProcessingNotification(
         currentUser.id,
         'payment_' + Date.now(), // Generate a temporary ID
         'Payment to ' + (contact?.name || 'External Wallet'),
@@ -279,8 +279,8 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         }
       }
 
-      // Send payment confirmed notification
-      await notificationService.sendPaymentConfirmedNotification(
+      // Send payment confirmed notification (non-blocking)
+      notificationService.sendPaymentConfirmedNotification(
         currentUser.id,
         'payment_' + Date.now(),
         'Payment to ' + (contact?.name || 'External Wallet'),
@@ -309,9 +309,9 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     } catch (error) {
       console.error('Send error:', error);
       
-      // Send payment failed notification
+      // Send payment failed notification (non-blocking)
       if (currentUser?.id) {
-        await notificationService.sendPaymentFailedNotification(
+        notificationService.sendPaymentFailedNotification(
           currentUser.id,
           'payment_' + Date.now(),
           'Payment to ' + (contact?.name || 'External Wallet'),
