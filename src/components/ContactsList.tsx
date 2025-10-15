@@ -1,20 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Image, Alert, Linking, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Image, Alert, Linking, Animated, RefreshControl } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from './Icon';
 import { useApp } from '../context/AppContext';
-import { useGroupData } from '../hooks/useGroupData';
 import { firebaseDataService } from '../services/firebaseDataService';
+import { TransactionBasedContactService } from '../services/transactionBasedContactService';
 import { parseWeSplitDeepLink, handleJoinGroupDeepLink, handleAddContactFromProfile } from '../services/deepLinkHandler';
+import { isSolanaPayUri, parseUri, extractRecipientAddress, isValidSolanaAddress } from '@features/qr';
 import { UserContact, User } from '../types';
 import { colors } from '../theme';
 import { styles } from './ContactsList.styles';
 import { logger } from '../services/loggingService';
 import UserAvatar from './UserAvatar';
+import { formatWalletAddress, getWalletAddressStatus } from '../utils/walletUtils';
 
 interface ContactsListProps {
-  groupId?: string;
   onContactSelect: (contact: UserContact) => void;
   onAddContact?: (user: User) => void;
   showAddButton?: boolean;
@@ -33,7 +34,6 @@ interface ContactsListProps {
 }
 
 const ContactsList: React.FC<ContactsListProps> = ({
-  groupId,
   onContactSelect,
   onAddContact,
   showAddButton = false,
@@ -53,12 +53,6 @@ const ContactsList: React.FC<ContactsListProps> = ({
   const { state } = useApp();
   const { currentUser } = state;
 
-  // Use the efficient hook for group data when groupId is provided
-  const {
-    group,
-    loading: groupLoading
-  } = useGroupData(groupId ? Number(groupId) : null);
-
   const [contacts, setContacts] = useState<UserContact[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<UserContact[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +64,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
   const [scanned, setScanned] = useState(false);
   const [isProcessingQR, setIsProcessingQR] = useState(false);
   const [qrInputValue, setQrInputValue] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -78,7 +73,17 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
   useEffect(() => {
     loadContacts();
-  }, [currentUser, group, groupId]);
+  }, [currentUser]);
+
+  // Add refresh functionality
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadContacts(true); // Force refresh
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Camera permissions are now handled by useCameraPermissions hook
 
@@ -159,7 +164,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
     }
   }, [searchQuery, activeTab]);
 
-  const loadContacts = async () => {
+  const loadContacts = async (forceRefresh: boolean = false) => {
     if (!currentUser) {
       logger.warn('No current user found', null, 'ContactsList');
       setLoading(false);
@@ -168,99 +173,25 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
     try {
       setLoading(true);
-      logger.info('Loading contacts for user', { userId: currentUser.id, groupId }, 'ContactsList');
+      logger.info('Loading contacts for user', { userId: currentUser.id, forceRefresh }, 'ContactsList');
 
-      if (groupId && group?.members) {
-        // Use cached group members from useGroupData hook
-        const otherMembers = group.members.filter(member =>
-          String(member.id) !== String(currentUser.id)
-        ).map(member => ({
-          ...member,
-          first_met_at: member.joined_at,
-          mutual_groups_count: 1,
-          isFavorite: false // Default to false for group members
-        }));
-        logger.info('Loaded group members', { count: otherMembers.length }, 'ContactsList');
-        setContacts(otherMembers);
-      } else {
-        // Load contacts from both sources: groups and user's added contacts
-        logger.info('Loading all user contacts', null, 'ContactsList');
+      // Load contacts from transaction and split history
+      logger.info('Loading transaction-based contacts', { userId: currentUser.id, forceRefresh }, 'ContactsList');
 
-        // Get contacts from groups
-        const groupContacts = await firebaseDataService.group.getUserContacts(currentUser.id.toString());
+      const transactionBasedContacts = await TransactionBasedContactService.getTransactionBasedContacts(currentUser.id.toString());
 
-        // Get contacts from user's added contacts
-        const addedContacts = await firebaseDataService.user.getUserContacts(currentUser.id.toString());
+      logger.info('Loaded transaction-based contacts', { 
+        count: transactionBasedContacts.length, 
+        contacts: transactionBasedContacts.map((c: UserContact) => ({
+          name: c.name || 'No name',
+          email: c.email,
+          wallet: c.wallet_address ? formatWalletAddress(c.wallet_address) : 'No wallet',
+          fullWallet: c.wallet_address,
+          mutualSplits: c.mutual_groups_count || 0
+        }))
+      }, 'ContactsList');
 
-        // Combine and deduplicate contacts
-        const contactsMap = new Map<string, UserContact>();
-        const emailMap = new Map<string, UserContact>();
-        const walletMap = new Map<string, UserContact>();
-
-        // Add group contacts first
-        groupContacts.forEach(contact => {
-          const contactId = String(contact.id);
-          contactsMap.set(contactId, contact);
-
-          // Also track by email and wallet for deduplication
-          if (contact.email) {
-            emailMap.set(contact.email.toLowerCase(), contact);
-          }
-          if (contact.wallet_address) {
-            walletMap.set(contact.wallet_address.toLowerCase(), contact);
-          }
-        });
-
-        // Add or update with added contacts
-        addedContacts.forEach(contact => {
-          const contactId = String(contact.id);
-          const contactEmail = contact.email?.toLowerCase();
-          const contactWallet = contact.wallet_address?.toLowerCase();
-
-          // Check for existing contact by ID, email, or wallet
-          const existingById = contactsMap.get(contactId);
-          const existingByEmail = contactEmail ? emailMap.get(contactEmail) : null;
-          const existingByWallet = contactWallet ? walletMap.get(contactWallet) : null;
-
-          if (existingById || existingByEmail || existingByWallet) {
-            // Contact already exists, update favorite status if needed
-            const existing = existingById || existingByEmail || existingByWallet;
-            if (existing) {
-              const existingId = String(existing.id);
-              contactsMap.set(existingId, {
-                ...existing,
-                isFavorite: contact.isFavorite || existing.isFavorite
-              });
-            }
-          } else {
-            // This is a new contact that was manually added
-            contactsMap.set(contactId, contact);
-
-            // Track by email and wallet
-            if (contactEmail) {
-              emailMap.set(contactEmail, contact);
-            }
-            if (contactWallet) {
-              walletMap.set(contactWallet, contact);
-            }
-          }
-        });
-
-        const allContacts = Array.from(contactsMap.values());
-
-        logger.info('Loaded total contacts', { 
-          count: allContacts.length, 
-          contacts: allContacts.map((c: UserContact) => ({
-            name: c.name || 'No name',
-            email: c.email,
-            wallet: c.wallet_address ? formatWalletAddress(c.wallet_address) : 'No wallet',
-            fullWallet: c.wallet_address,
-            source: contactsMap.has(String(c.id)) ? 'combined' : 'unknown'
-          }))
-        }, 'ContactsList');
-
-        setContacts(allContacts);
-      }
+      setContacts(transactionBasedContacts);
     } catch (error) {
       console.error('❌ Error loading contacts:', error);
       setContacts([]);
@@ -335,6 +266,48 @@ const ContactsList: React.FC<ContactsListProps> = ({
     
     try {
       logger.info('Scanned QR code', { data }, 'ContactsList');
+      
+      // Check if it's a Solana Pay URI first
+      if (isSolanaPayUri(data)) {
+        const parsed = parseUri(data);
+        if (parsed.isValid) {
+          // Navigate to Send screen with Solana Pay data
+          if (onNavigateToSend) {
+            onNavigateToSend(parsed.recipient, parsed.label || 'Unknown');
+          } else {
+            Alert.alert(
+              'Solana Pay QR Code',
+              `Send ${parsed.amount ? `${parsed.amount} USDC` : 'USDC'} to ${parsed.recipient.substring(0, 6)}...${parsed.recipient.substring(parsed.recipient.length - 6)}?`,
+              [
+                { text: 'Cancel', onPress: () => resetScanner() },
+                { text: 'Send', onPress: () => resetScanner() }
+              ]
+            );
+          }
+          return;
+        } else {
+          Alert.alert('Invalid QR Code', parsed.error || 'This is not a valid USDC payment request.');
+          return;
+        }
+      }
+      
+      // Check if it's a raw Solana address
+      const recipient = extractRecipientAddress(data);
+      if (recipient && isValidSolanaAddress(recipient)) {
+        if (onNavigateToSend) {
+          onNavigateToSend(recipient, 'Unknown');
+        } else {
+          Alert.alert(
+            'Solana Address QR Code',
+            `Send USDC to ${recipient.substring(0, 6)}...${recipient.substring(recipient.length - 6)}?`,
+            [
+              { text: 'Cancel', onPress: () => resetScanner() },
+              { text: 'Send', onPress: () => resetScanner() }
+            ]
+          );
+        }
+        return;
+      }
       
       // Parse the deep link
       const linkData = parseWeSplitDeepLink(data);
@@ -523,17 +496,30 @@ const ContactsList: React.FC<ContactsListProps> = ({
         <Text style={styles.contactName}>
           {item.name || formatWalletAddress(item.wallet_address)}
         </Text>
-        <Text style={styles.contactEmail}>
-          {item.wallet_address ? formatWalletAddress(item.wallet_address) : item.email}
-          {item.mutual_groups_count > 1 && (
-            <Text style={styles.mutualGroupsText}> • {item.mutual_groups_count} groups</Text>
-          )}
-        </Text>
-        {item.email && item.wallet_address && (
-          <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
-            {item.email}
+        <View style={styles.contactDetails}>
+          <Text style={styles.contactEmail}>
+            {item.wallet_address ? formatWalletAddress(item.wallet_address) : item.email}
+            {item.mutual_groups_count > 0 && (
+              <Text style={styles.mutualGroupsText}> • {item.mutual_groups_count} splits</Text>
+            )}
           </Text>
-        )}
+          {(() => {
+            const walletStatus = getWalletAddressStatus(item.wallet_address);
+            if (walletStatus.status !== 'valid') {
+              return (
+                <Text style={[styles.contactEmail, { color: walletStatus.color, fontSize: 11, marginTop: 2 }]}>
+                  ⚠️ {walletStatus.displayText}
+                </Text>
+              );
+            }
+            return null;
+          })()}
+          {item.email && item.wallet_address && (
+            <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
+              {item.email}
+            </Text>
+          )}
+        </View>
       </View>
       {multiSelect ? (
         <View style={styles.selectIndicator}>
@@ -681,6 +667,14 @@ const ContactsList: React.FC<ContactsListProps> = ({
               contentContainerStyle={styles.scrollViewContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={colors.brandGreen}
+                  colors={[colors.brandGreen]}
+                />
+              }
             >
             {/* All Tab Content */}
             {activeTab === 'All' && (
@@ -759,14 +753,27 @@ const ContactsList: React.FC<ContactsListProps> = ({
                             <Text style={styles.contactName}>
                               {user.name || formatWalletAddress(user.wallet_address)}
                             </Text>
-                            {user.email && user.wallet_address && (
-                              <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
-                                {user.email}
+                            <View style={styles.contactDetails}>
+                              <Text style={styles.contactEmail}>
+                                {user.wallet_address ? formatWalletAddress(user.wallet_address) : user.email}
                               </Text>
-                            )}
-                            <Text style={styles.contactEmail}>
-                              {user.wallet_address ? formatWalletAddress(user.wallet_address) : user.email}
-                            </Text>
+                              {(() => {
+                                const walletStatus = getWalletAddressStatus(user.wallet_address);
+                                if (walletStatus.status !== 'valid') {
+                                  return (
+                                    <Text style={[styles.contactEmail, { color: walletStatus.color, fontSize: 11, marginTop: 2 }]}>
+                                      ⚠️ {walletStatus.displayText}
+                                    </Text>
+                                  );
+                                }
+                                return null;
+                              })()}
+                              {user.email && user.wallet_address && (
+                                <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
+                                  {user.email}
+                                </Text>
+                              )}
+                            </View>
                           </View>
                           {multiSelect ? (
                             <View style={styles.selectIndicator}>
@@ -853,7 +860,25 @@ const ContactsList: React.FC<ContactsListProps> = ({
               <Text style={styles.qrScannerPlaceholderText}>Camera permission denied</Text>
               <TouchableOpacity 
                 style={styles.permissionButton}
-                onPress={requestPermission}
+                onPress={async () => {
+                  try {
+                    const result = await requestPermission();
+                    logger.info('Camera permission requested', { result }, 'ContactsList');
+                    if (!result.granted) {
+                      Alert.alert(
+                        'Camera Permission Required',
+                        'WeSplit needs camera access to scan QR codes. Please enable it in your device settings.',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Open Settings', onPress: () => Linking.openSettings() }
+                        ]
+                      );
+                    }
+                  } catch (error) {
+                    logger.error('Error requesting camera permission', error, 'ContactsList');
+                    Alert.alert('Error', 'Failed to request camera permission. Please try again.');
+                  }
+                }}
               >
                 <Text style={styles.permissionButtonText}>Grant Permission</Text>
               </TouchableOpacity>

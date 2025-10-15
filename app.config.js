@@ -30,9 +30,15 @@ export default {
           "rainbow",
           "uniswap"
         ],
-        NSCameraUsageDescription: "This app uses the camera to take profile pictures.",
-        NSPhotoLibraryUsageDescription: "This app accesses the photo library to let you select profile pictures."
-      }
+        NSCameraUsageDescription: "This app uses the camera to scan QR codes for payments, split invitations, and contact sharing.",
+        NSPhotoLibraryUsageDescription: "This app accesses the photo library to let you select profile pictures.",
+        ITSAppUsesNonExemptEncryption: false
+      },
+      ...(process.env.EAS_BUILD_PROFILE === 'development' ? {
+        entitlements: {
+          // Remove push notifications capability for development builds
+        }
+      } : {})
     },
     scheme: "wesplit",
     android: {
@@ -41,7 +47,9 @@ export default {
         foregroundImage: "./assets/wesplit-logo-new.png",
         backgroundColor: "#061113"
       },
-      jsEngine: "jsc",
+      compileSdkVersion: 34,
+      targetSdkVersion: 34,
+      minSdkVersion: 21,
       permissions: [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -80,7 +88,8 @@ export default {
       "./queries.js",
       "expo-secure-store",
       "expo-router",
-      "expo-notifications",
+      "expo-camera",
+      ...(process.env.EAS_BUILD_PROFILE !== 'development' ? ["expo-notifications"] : []),
       "expo-web-browser"
     ],
     extra: {
@@ -124,6 +133,10 @@ export default {
       EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE: process.env.EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE,
       EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE: process.env.EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE,
       
+    },
+    podfileProperties: {
+      "ios.useFrameworks": "dynamic",
+      "ios.useModularHeaders": true
     }
   }
 }; 

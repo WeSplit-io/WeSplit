@@ -12,6 +12,7 @@ import {
   Alert,
   Dimensions,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
@@ -176,7 +177,28 @@ const ScannerScreen: React.FC<ScannerScreenProps> = ({
     return (
       <View style={styles.container}>
         <Text style={styles.message}>Camera permission is required to scan QR codes</Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
+        <TouchableOpacity 
+          style={styles.button} 
+          onPress={async () => {
+            try {
+              const result = await requestPermission();
+              logger.info('Camera permission requested', { result }, 'ScannerScreen');
+              if (!result.granted) {
+                Alert.alert(
+                  'Camera Permission Required',
+                  'WeSplit needs camera access to scan QR codes. Please enable it in your device settings.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Open Settings', onPress: () => Linking.openSettings() }
+                  ]
+                );
+              }
+            } catch (error) {
+              logger.error('Error requesting camera permission', error, 'ScannerScreen');
+              Alert.alert('Error', 'Failed to request camera permission. Please try again.');
+            }
+          }}
+        >
           <Text style={styles.buttonText}>Grant Permission</Text>
         </TouchableOpacity>
       </View>

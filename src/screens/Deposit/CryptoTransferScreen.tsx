@@ -8,7 +8,7 @@ import Icon from '../../components/Icon';
 import { Clipboard } from 'react-native';
 import styles from './styles';
 import { colors } from '../../theme';
-import { generateTransferLink } from '../../services/deepLinkHandler';
+import { createUsdcRequestUri } from '@features/qr';
 import { logger } from '../../services/loggingService';
 
 interface CryptoTransferParams {

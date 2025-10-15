@@ -1526,7 +1526,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   };
 
   // Handle saving edited amount
-  const handleSaveEditedAmount = () => {
+  const handleSaveEditedAmount = async () => {
     if (!editingParticipant || !editAmount) {
       return;
     }
@@ -1551,12 +1551,48 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       return;
     }
 
-    // Update the participant's amount
-    setParticipants(prev => prev.map(p => 
+    // Update the participant's amount locally first
+    const updatedParticipants = participants.map(p => 
       p.id === editingParticipant.id 
         ? { ...p, amountOwed: newAmount }
         : p
-    ));
+    );
+    setParticipants(updatedParticipants);
+
+    // Persist the changes to the database
+    try {
+      if (splitData?.walletId) {
+        const { SplitWalletManagement } = await import('../../services/split/SplitWalletManagement');
+        const participantsForUpdate = updatedParticipants.map(p => ({
+          userId: p.id,
+          name: p.name,
+          walletAddress: p.walletAddress,
+          amountOwed: p.amountOwed,
+        }));
+        
+        const updateResult = await SplitWalletManagement.updateSplitWalletParticipants(
+          splitData.walletId, 
+          participantsForUpdate
+        );
+        
+        if (!updateResult.success) {
+          console.error('Failed to update participant amounts in database:', updateResult.error);
+          Alert.alert('Error', 'Failed to save changes. Please try again.');
+          // Revert local changes if database update failed
+          setParticipants(participants);
+          return;
+        }
+        
+        // Refresh completion data after successful update
+        await loadCompletionData();
+      }
+    } catch (error) {
+      console.error('Error updating participant amounts:', error);
+      Alert.alert('Error', 'Failed to save changes. Please try again.');
+      // Revert local changes if database update failed
+      setParticipants(participants);
+      return;
+    }
 
     setShowEditModal(false);
     setEditingParticipant(null);
@@ -1590,9 +1626,9 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       return;
     }
 
-    // Check if user has already made any payment (prevent multiple payments)
-    if (userParticipant.status === 'paid' || userParticipant.amountPaid > 0) {
-      Alert.alert('Already Paid', 'You have already made a payment for this split. Each participant can only pay once.');
+    // Check if user has already paid their full share
+    if (userParticipant.status === 'paid' || userParticipant.amountPaid >= userParticipant.amountOwed) {
+      Alert.alert('Already Paid', 'You have already paid your full share for this split');
       return;
     }
 
@@ -1601,11 +1637,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       return;
     }
 
-    // Show payment modal with the user's exact share amount (no partial payments allowed)
+    // Show payment modal with the user's remaining amount
     // Use roundUsdcAmount to fix floating point precision issues
     const { roundUsdcAmount } = await import('../../utils/formatUtils');
-    const exactShareAmount = roundUsdcAmount(userParticipant.amountOwed);
-    setPaymentAmount(exactShareAmount.toString());
+    const remainingAmount = roundUsdcAmount(userParticipant.amountOwed - userParticipant.amountPaid);
+    setPaymentAmount(remainingAmount.toString());
     setShowPaymentModal(true);
   };
 
@@ -2304,14 +2340,28 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 if (isFullyCovered && isCreator) {
                   // Creator can split when 100% covered
                   return (
-              <TouchableOpacity 
-                      style={styles.splitButton} 
-                      onPress={handleSplitFunds}
-                    >
-                      <Text style={styles.splitButtonText}>
-                        Split
-                      </Text>
-                    </TouchableOpacity>
+                    <View style={styles.buttonContainer}>
+                      <TouchableOpacity 
+                        style={styles.splitButton} 
+                        onPress={handleSplitFunds}
+                      >
+                        <Text style={styles.splitButtonText}>
+                          Split
+                        </Text>
+                      </TouchableOpacity>
+                      
+                      {/* DEV BUTTONS - Always show to creators in dev mode */}
+                      {__DEV__ && (
+                        <TouchableOpacity 
+                          style={styles.devButton} 
+                          onPress={handleDevWithdraw}
+                        >
+                          <Text style={styles.devButtonText}>
+                            🚀 DEV: Withdraw Funds
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   );
                 } else if (isFullyCovered && !isCreator) {
                   // Non-creators see waiting message when fully covered
@@ -2323,11 +2373,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                     </View>
                   );
                 } else {
-                  // Check if current user has already made any payment (prevent multiple payments)
+                  // Check if current user has already paid their full share
                   const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
                   const hasUserPaidFully = currentUserParticipant && 
                     (currentUserParticipant.status === 'paid' || 
-                     currentUserParticipant.amountPaid > 0);
+                     currentUserParticipant.amountPaid >= currentUserParticipant.amountOwed);
                   
                   if (hasUserPaidFully) {
                     // User has paid their full share - show waiting message
@@ -2361,7 +2411,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                             styles.payButtonText,
                             isSendingPayment && styles.payButtonTextDisabled
                           ]}>
-                            {isSendingPayment ? 'Sending...' : 'Pay My Share'}
+                            {isSendingPayment ? 'Sending...' : (() => {
+                              const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
+                              if (currentUserParticipant && currentUserParticipant.amountPaid > 0) {
+                                return 'Pay Remaining';
+                              }
+                              return 'Pay My Share';
+                            })()}
                           </Text>
                         </TouchableOpacity>
                       </LinearGradient>
@@ -2467,10 +2523,20 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 autoFocus
               />
               <Text style={styles.modalHelperText}>
-                You owe: {(() => {
+                {(() => {
                   const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
-                  return currentUserParticipant?.amountOwed?.toFixed(2) || '0.00';
-                })()} USDC
+                  if (!currentUserParticipant) return 'You owe: 0.00 USDC';
+                  
+                  const totalOwed = currentUserParticipant.amountOwed || 0;
+                  const amountPaid = currentUserParticipant.amountPaid || 0;
+                  const remaining = totalOwed - amountPaid;
+                  
+                  if (amountPaid > 0) {
+                    return `Total owed: $${totalOwed.toFixed(2)} USDC\nAlready paid: $${amountPaid.toFixed(2)} USDC\nRemaining: $${remaining.toFixed(2)} USDC`;
+                  } else {
+                    return `You owe: $${totalOwed.toFixed(2)} USDC`;
+                  }
+                })()}
               </Text>
             </View>
 

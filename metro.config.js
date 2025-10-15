@@ -32,6 +32,14 @@ config.transformer = {
   unstable_allowRequireContext: true,
 };
 
+// Add watcher configuration to fix validation warnings
+config.watcher = {
+  ...config.watcher,
+  // Remove deprecated options that cause validation warnings
+  // unstable_lazySha1: true, // This is deprecated
+  // unstable_autoSaveCache: { debounceMs: 5000, enabled: true }, // This is deprecated
+};
+
 // Exclude Node.js modules that cause issues
 config.resolver.blockList = [
   // Block all Node.js jose modules

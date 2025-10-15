@@ -41,8 +41,9 @@ export class NotificationUtils {
       const recipientUser = await firebaseDataService.user.getUserByWalletAddress(transactionData.to);
       const recipientUserId = recipientUser ? recipientUser.id.toString() : transactionData.to; // Fallback to address if no user found
       
-      const transaction = {
-        id: transactionData.signature,
+      // Create sender transaction record
+      const senderTransaction = {
+        id: `${transactionData.signature}_sender`,
         type: 'send' as const,
         amount: transactionData.amount,
         currency: transactionData.currency,
@@ -60,13 +61,45 @@ export class NotificationUtils {
         net_amount: transactionData.netAmount
       };
 
-      await firebaseTransactionService.createTransaction(transaction);
-      logger.info('Transaction saved to Firebase', { 
-        signature: transactionData.signature,
+      // Create recipient transaction record (only if recipient is a registered user)
+      const recipientTransaction = {
+        id: `${transactionData.signature}_recipient`,
+        type: 'receive' as const,
+        amount: transactionData.amount,
+        currency: transactionData.currency,
         from_user: transactionData.userId,
         to_user: recipientUserId,
-        to_wallet: transactionData.to
-      }, 'NotificationUtils');
+        from_wallet: '', // Will be filled by the service
+        to_wallet: transactionData.to,
+        tx_hash: transactionData.signature,
+        note: transactionData.memo || `Payment from ${transactionData.userId}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        status: 'completed' as const,
+        group_id: transactionData.groupId || null,
+        company_fee: 0, // Recipient doesn't pay company fees
+        net_amount: transactionData.amount // Recipient gets full amount
+      };
+
+      // Save both transaction records
+      await firebaseTransactionService.createTransaction(senderTransaction);
+      
+      // Only create recipient transaction if recipient is a registered user
+      if (recipientUser) {
+        await firebaseTransactionService.createTransaction(recipientTransaction);
+        logger.info('Both sender and recipient transactions saved to Firebase', { 
+          signature: transactionData.signature,
+          from_user: transactionData.userId,
+          to_user: recipientUserId,
+          to_wallet: transactionData.to
+        }, 'NotificationUtils');
+      } else {
+        logger.info('Sender transaction saved to Firebase (recipient not registered)', { 
+          signature: transactionData.signature,
+          from_user: transactionData.userId,
+          to_wallet: transactionData.to
+        }, 'NotificationUtils');
+      }
 
       // Send notification to recipient
       await this.sendReceivedFundsNotification(transactionData);

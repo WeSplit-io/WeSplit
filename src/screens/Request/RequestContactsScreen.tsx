@@ -10,7 +10,7 @@ import { styles } from './styles';
 import { colors } from '../../theme/colors';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { User } from '../../types';
-import { generateSendLink } from '../../services/deepLinkHandler';
+import { createUsdcRequestUri } from '@features/qr';
 import { logger } from '../../services/loggingService';
 
 const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
@@ -66,12 +66,12 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
     }
   };
 
-  // Generate send QR code for receiving money
-  const sendQRCode = generateSendLink(
-    currentUser?.wallet_address || '',
-    currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
-    currentUser?.email
-  );
+  // Generate Solana Pay URI for receiving money
+  const sendQRCode = createUsdcRequestUri({
+    recipient: currentUser?.wallet_address || '',
+    label: 'WeSplit Payment',
+    message: `Send USDC to ${currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}`
+  });
   const userName = currentUser?.name || currentUser?.email?.split('@')[0] || 'User';
 
 
@@ -145,10 +145,16 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
                 <View style={styles.requestQRCodeContainer}>
                   {currentUser?.wallet_address ? (
                     <QrCodeView
-                      value={sendQRCode}
+                      value={currentUser?.wallet_address || ''}
+                      address={currentUser?.wallet_address || ''}
+                      useSolanaPay={true}
                       size={160}
                       backgroundColor={colors.white}
                       color={colors.black}
+                      label="WeSplit Payment"
+                      message={`Send USDC to ${userName}`}
+                      showAddress={false}
+                      showButtons={false}
                     />
                   ) : (
                     <View style={styles.requestQRCodePlaceholder}>

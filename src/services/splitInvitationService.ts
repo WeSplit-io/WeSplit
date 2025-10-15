@@ -215,6 +215,70 @@ export class SplitInvitationService {
               error: updateResult.error || 'Failed to update participant status',
             };
           }
+
+          // CRITICAL: Also update the splitWallets collection to keep both databases synchronized
+          try {
+            const { SplitWalletQueries } = await import('./split/SplitWalletQueries');
+            const { SplitWalletManagement } = await import('./split/SplitWalletManagement');
+            
+            // Find the split wallet by billId (splitId)
+            const walletResult = await SplitWalletQueries.getSplitWalletByBillId(invitationData.splitId);
+            
+            if (walletResult.success && walletResult.wallet) {
+              // Update the participant in the split wallet
+              const wallet = walletResult.wallet;
+              const updatedWalletParticipants = wallet.participants.map(p => {
+                if (p.userId === userId) {
+                  return {
+                    ...p,
+                    status: 'pending' as const, // Map 'accepted' to 'pending' for split wallet
+                    // Keep existing amountPaid and other fields
+                  };
+                }
+                return p;
+              });
+              
+              // Update the split wallet participants
+              const walletUpdateResult = await SplitWalletManagement.updateSplitWalletParticipants(
+                wallet.id,
+                updatedWalletParticipants.map(p => ({
+                  userId: p.userId,
+                  name: p.name,
+                  walletAddress: p.walletAddress,
+                  amountOwed: p.amountOwed,
+                }))
+              );
+              
+              if (walletUpdateResult.success) {
+                logger.info('Split wallet database synchronized successfully (invitation)', {
+                  splitId: invitationData.splitId,
+                  userId,
+                  splitWalletId: wallet.id,
+                  status: 'accepted -> pending'
+                }, 'SplitInvitationService');
+              } else {
+                logger.error('Failed to synchronize split wallet database (invitation)', {
+                  splitId: invitationData.splitId,
+                  userId,
+                  splitWalletId: wallet.id,
+                  error: walletUpdateResult.error
+                }, 'SplitInvitationService');
+              }
+            } else {
+              logger.warn('Split wallet not found for invitation sync', {
+                splitId: invitationData.splitId,
+                userId,
+                error: walletResult.error
+              }, 'SplitInvitationService');
+            }
+          } catch (syncError) {
+            logger.error('Error synchronizing split wallet database during invitation', {
+              splitId: invitationData.splitId,
+              userId,
+              error: syncError instanceof Error ? syncError.message : String(syncError)
+            }, 'SplitInvitationService');
+            // Don't fail the invitation if sync fails, but log the error
+          }
           
           // Send confirmation notification to the creator
           const { notificationService } = await import('./notificationService');
@@ -279,6 +343,72 @@ export class SplitInvitationService {
           success: false,
           error: addResult.error || 'Failed to join split',
         };
+      }
+
+      // CRITICAL: Also update the splitWallets collection to keep both databases synchronized
+      try {
+        const { SplitWalletQueries } = await import('./split/SplitWalletQueries');
+        const { SplitWalletManagement } = await import('./split/SplitWalletManagement');
+        
+        // Find the split wallet by billId (splitId)
+        const walletResult = await SplitWalletQueries.getSplitWalletByBillId(invitationData.splitId);
+        
+        if (walletResult.success && walletResult.wallet) {
+          // Add the new participant to the split wallet
+          const wallet = walletResult.wallet;
+          const newWalletParticipant = {
+            userId: newParticipant.userId,
+            name: newParticipant.name,
+            walletAddress: newParticipant.walletAddress,
+            amountOwed: newParticipant.amountOwed,
+          };
+          
+          // Get existing participants and add the new one
+          const existingParticipants = wallet.participants.map(p => ({
+            userId: p.userId,
+            name: p.name,
+            walletAddress: p.walletAddress,
+            amountOwed: p.amountOwed,
+          }));
+          
+          const allParticipants = [...existingParticipants, newWalletParticipant];
+          
+          // Update the split wallet participants
+          const walletUpdateResult = await SplitWalletManagement.updateSplitWalletParticipants(
+            wallet.id,
+            allParticipants
+          );
+          
+          if (walletUpdateResult.success) {
+            logger.info('Split wallet database synchronized successfully (new participant)', {
+              splitId: invitationData.splitId,
+              userId,
+              splitWalletId: wallet.id,
+              participantName: newParticipant.name,
+              amountOwed: newParticipant.amountOwed
+            }, 'SplitInvitationService');
+          } else {
+            logger.error('Failed to synchronize split wallet database (new participant)', {
+              splitId: invitationData.splitId,
+              userId,
+              splitWalletId: wallet.id,
+              error: walletUpdateResult.error
+            }, 'SplitInvitationService');
+          }
+        } else {
+          logger.warn('Split wallet not found for new participant sync', {
+            splitId: invitationData.splitId,
+            userId,
+            error: walletResult.error
+          }, 'SplitInvitationService');
+        }
+      } catch (syncError) {
+        logger.error('Error synchronizing split wallet database during new participant invitation', {
+          splitId: invitationData.splitId,
+          userId,
+          error: syncError instanceof Error ? syncError.message : String(syncError)
+        }, 'SplitInvitationService');
+        // Don't fail the invitation if sync fails, but log the error
       }
 
       // 5. Send confirmation notification to the creator

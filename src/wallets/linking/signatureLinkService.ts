@@ -9,7 +9,7 @@ import { WALLET_PROVIDER_REGISTRY, WalletProviderInfo } from '../providers/regis
 import { walletService } from '../../services/WalletService';
 import { startRemoteScenario, transact } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import { SolanaMobileWalletAdapterError, SolanaMobileWalletAdapterErrorCode } from '@solana-mobile/mobile-wallet-adapter-protocol';
-import { logger } from '../services/loggingService';
+import { logger } from '../../services/loggingService';
 
 export interface SignatureChallenge {
   nonce: string;

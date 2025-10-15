@@ -790,7 +790,7 @@ export class SolanaAppKitService {
 
       // Add company fee transfer instruction to company wallet
       if (companyFee > 0) {
-        const { COMPANY_WALLET_CONFIG } = await import('../../config/feeConfig');
+        const { COMPANY_WALLET_CONFIG } = await import('../config/feeConfig');
         const companyTokenAccount = await getAssociatedTokenAddress(
           this.usdcMint,
           new PublicKey(COMPANY_WALLET_CONFIG.address)
@@ -825,7 +825,7 @@ export class SolanaAppKitService {
       }
       
       // Add company wallet keypair for fee payment
-      const { COMPANY_WALLET_CONFIG } = await import('../../config/feeConfig');
+      const { COMPANY_WALLET_CONFIG } = await import('../config/feeConfig');
       if (COMPANY_WALLET_CONFIG.secretKey) {
         try {
           let companySecretKeyBuffer: Buffer;

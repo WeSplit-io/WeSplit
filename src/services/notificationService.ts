@@ -78,7 +78,7 @@ class NotificationServiceClass {
       }
 
       // Check if running in Expo Go (limited functionality)
-      const isExpoGo = __DEV__ && Platform.OS !== 'web' && !global.Expo?.modules?.expo?.modules?.ExpoModulesCore;
+      const isExpoGo = __DEV__ && Platform.OS !== 'web' && !(global as any).Expo?.modules?.expo?.modules?.ExpoModulesCore;
       if (isExpoGo) {
         logger.warn('Running in Expo Go - push notifications have limited functionality. Consider using a development build for full notification support.', null, 'NotificationService');
         this.isInitialized = true;
@@ -113,7 +113,7 @@ class NotificationServiceClass {
   }
 
   /**
-   * Send a notification to a user
+   * Send a notification to a user (non-blocking)
    */
   async sendNotification(
     userId: string,
@@ -122,6 +122,25 @@ class NotificationServiceClass {
     type: NotificationType = 'general',
     data: { [key: string]: any } = {}
   ): Promise<boolean> {
+    // Run notification sending in background to avoid blocking transactions
+    this.sendNotificationAsync(userId, title, message, type, data).catch(error => {
+      logger.error('Background notification failed:', error, 'NotificationService');
+    });
+    
+    // Return immediately to avoid blocking the caller
+    return true;
+  }
+
+  /**
+   * Internal method to send notification asynchronously (non-blocking)
+   */
+  private async sendNotificationAsync(
+    userId: string,
+    title: string,
+    message: string,
+    type: NotificationType = 'general',
+    data: { [key: string]: any } = {}
+  ): Promise<void> {
     try {
       // Store in Firestore
       await addDoc(collection(db, 'notifications'), {
@@ -166,24 +185,39 @@ class NotificationServiceClass {
       }
 
       logger.info('Notification sent successfully', { userId, type, title }, 'NotificationService');
-      return true;
     } catch (error) {
       logger.error('Failed to send notification:', error, 'NotificationService');
-      return false;
     }
   }
 
   /**
-   * Send bulk notifications to multiple users
+   * Send bulk notifications to multiple users (non-blocking)
    */
   async sendBulkNotifications(
     userIds: string[],
     type: NotificationType,
     data?: { [key: string]: any }
   ): Promise<void> {
+    // Run bulk notifications in background to avoid blocking
+    this.sendBulkNotificationsAsync(userIds, type, data).catch(error => {
+      logger.error('Background bulk notifications failed:', error, 'NotificationService');
+    });
+    
+    // Return immediately to avoid blocking the caller
+    logger.info('Bulk notifications queued', { userIds: userIds.length, type }, 'NotificationService');
+  }
+
+  /**
+   * Internal method to send bulk notifications asynchronously (non-blocking)
+   */
+  private async sendBulkNotificationsAsync(
+    userIds: string[],
+    type: NotificationType,
+    data?: { [key: string]: any }
+  ): Promise<void> {
     try {
       const promises = userIds.map(userId =>
-        this.sendNotification(
+        this.sendNotificationAsync(
           userId,
           this.getNotificationTitle(type),
           this.getNotificationMessage(type, data),
@@ -196,7 +230,6 @@ class NotificationServiceClass {
       logger.info('Bulk notifications sent successfully', { userIds: userIds.length, type }, 'NotificationService');
     } catch (error) {
       logger.error('Error sending bulk notifications:', error, 'NotificationService');
-      throw new Error(`Failed to send bulk notifications: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -373,7 +406,7 @@ class NotificationServiceClass {
   }
 
   /**
-   * Send payment processing notification
+   * Send payment processing notification (non-blocking)
    */
   async sendPaymentProcessingNotification(
     userId: string,
@@ -382,7 +415,8 @@ class NotificationServiceClass {
     amount: number,
     currency: string = 'USD'
   ): Promise<boolean> {
-    return this.sendNotification(
+    // Send notification in background to avoid blocking transaction
+    this.sendNotificationAsync(
       userId,
       'Payment Processing',
       `Your payment of ${amount} ${currency} for "${billName}" is being processed...`,
@@ -395,11 +429,15 @@ class NotificationServiceClass {
         status: 'processing',
         timestamp: new Date().toISOString()
       }
-    );
+    ).catch(error => {
+      logger.error('Payment processing notification failed:', error, 'NotificationService');
+    });
+    
+    return true; // Return immediately to avoid blocking
   }
 
   /**
-   * Send payment confirmed notification
+   * Send payment confirmed notification (non-blocking)
    */
   async sendPaymentConfirmedNotification(
     userId: string,
@@ -409,7 +447,8 @@ class NotificationServiceClass {
     currency: string = 'USD',
     transactionHash?: string
   ): Promise<boolean> {
-    return this.sendNotification(
+    // Send notification in background to avoid blocking transaction
+    this.sendNotificationAsync(
       userId,
       'Payment Confirmed',
       `Your payment of ${amount} ${currency} for "${billName}" has been confirmed!`,
@@ -423,11 +462,15 @@ class NotificationServiceClass {
         status: 'confirmed',
         timestamp: new Date().toISOString()
       }
-    );
+    ).catch(error => {
+      logger.error('Payment confirmed notification failed:', error, 'NotificationService');
+    });
+    
+    return true; // Return immediately to avoid blocking
   }
 
   /**
-   * Send payment failed notification
+   * Send payment failed notification (non-blocking)
    */
   async sendPaymentFailedNotification(
     userId: string,
@@ -437,7 +480,8 @@ class NotificationServiceClass {
     currency: string = 'USD',
     reason?: string
   ): Promise<boolean> {
-    return this.sendNotification(
+    // Send notification in background to avoid blocking transaction
+    this.sendNotificationAsync(
       userId,
       'Payment Failed',
       `Your payment of ${amount} ${currency} for "${billName}" failed${reason ? `: ${reason}` : ''}`,
@@ -451,11 +495,15 @@ class NotificationServiceClass {
         status: 'failed',
         timestamp: new Date().toISOString()
       }
-    );
+    ).catch(error => {
+      logger.error('Payment failed notification failed:', error, 'NotificationService');
+    });
+    
+    return true; // Return immediately to avoid blocking
   }
 
   /**
-   * End payment processing notification (completes the processing state)
+   * End payment processing notification (completes the processing state) - non-blocking
    */
   async endPaymentProcessingNotification(
     userId: string,
@@ -472,7 +520,8 @@ class NotificationServiceClass {
       ? `Your payment of ${amount} ${currency} for "${billName}" has been completed successfully!`
       : `Your payment of ${amount} ${currency} for "${billName}" failed${reason ? `: ${reason}` : ''}`;
 
-    return this.sendNotification(
+    // Send notification in background to avoid blocking transaction
+    this.sendNotificationAsync(
       userId,
       title,
       message,
@@ -487,7 +536,11 @@ class NotificationServiceClass {
         reason,
         timestamp: new Date().toISOString()
       }
-    );
+    ).catch(error => {
+      logger.error('End payment processing notification failed:', error, 'NotificationService');
+    });
+    
+    return true; // Return immediately to avoid blocking
   }
 }
 

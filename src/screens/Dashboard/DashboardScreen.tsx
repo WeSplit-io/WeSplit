@@ -35,7 +35,7 @@ import { notificationService } from '../../services/notificationService';
 import { createPaymentRequest, getReceivedPaymentRequests } from '../../services/firebasePaymentRequestService';
 import { walletService, UserWalletBalance } from '../../services/WalletService';
 import { firebaseTransactionService, firebaseDataService } from '../../services/firebaseDataService';
-import { generateProfileLink } from '../../services/deepLinkHandler';
+import { createUsdcRequestUri } from '@features/qr';
 import { SplitStorageService } from '../../services/splitStorageService';
 import { logger } from '../../services/loggingService';
 import { db } from '../../config/firebase';
@@ -1878,12 +1878,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           onBack={() => setShowQRCodeScreen(false)}
           userPseudo={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
           userWallet={currentUser?.wallet_address || ''}
-          qrValue={generateProfileLink(
-            currentUser?.id?.toString() || '',
-            currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
-            currentUser?.email,
-            currentUser?.wallet_address
-          )}
+          qrValue={currentUser?.wallet_address || ''}
         />
       </Modal>
 

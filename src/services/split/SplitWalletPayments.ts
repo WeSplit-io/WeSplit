@@ -581,6 +581,50 @@ export class SplitWalletPayments {
       const docId = wallet.firebaseDocId || splitWalletId;
       await this.updateWalletParticipants(docId, updatedParticipants);
 
+      // CRITICAL: Also update the splits collection to keep both databases synchronized
+      try {
+        const { SplitStorageService } = await import('../splitStorageService');
+        
+        // Find the updated participant data
+        const updatedParticipant = updatedParticipants.find(p => p.userId === participantId);
+        if (updatedParticipant) {
+          // Map split wallet status to split storage status
+          const splitStatus = updatedParticipant.status === 'failed' ? 'pending' : updatedParticipant.status;
+          
+          const splitUpdateResult = await SplitStorageService.updateParticipantStatus(
+            wallet.billId, // Use billId to find the split
+            participantId,
+            splitStatus,
+            updatedParticipant.amountPaid,
+            updatedParticipant.transactionSignature
+          );
+          
+          if (splitUpdateResult.success) {
+            logger.info('Split database synchronized successfully (degen locking)', {
+              splitWalletId,
+              participantId,
+              billId: wallet.billId,
+              amountPaid: updatedParticipant.amountPaid,
+              status: updatedParticipant.status
+            }, 'SplitWalletPayments');
+          } else {
+            logger.error('Failed to synchronize split database (degen locking)', {
+              splitWalletId,
+              participantId,
+              billId: wallet.billId,
+              error: splitUpdateResult.error
+            }, 'SplitWalletPayments');
+          }
+        }
+      } catch (syncError) {
+        logger.error('Error synchronizing split database (degen locking)', {
+          splitWalletId,
+          participantId,
+          error: syncError instanceof Error ? syncError.message : String(syncError)
+        }, 'SplitWalletPayments');
+        // Don't fail the payment if sync fails, but log the error
+      }
+
       // Trigger balance refresh for the participant
       try {
         const { walletService } = await import('../WalletService');
@@ -712,6 +756,50 @@ export class SplitWalletPayments {
         participants: updatedParticipants,
         updatedAt: new Date().toISOString(),
       });
+
+      // CRITICAL: Also update the splits collection to keep both databases synchronized
+      try {
+        const { SplitStorageService } = await import('../splitStorageService');
+        
+        // Find the updated participant data
+        const updatedParticipant = updatedParticipants.find(p => p.userId === participantId);
+        if (updatedParticipant) {
+          // Map split wallet status to split storage status
+          const splitStatus = updatedParticipant.status === 'failed' ? 'pending' : updatedParticipant.status;
+          
+          const splitUpdateResult = await SplitStorageService.updateParticipantStatus(
+            wallet.billId, // Use billId to find the split
+            participantId,
+            splitStatus,
+            updatedParticipant.amountPaid,
+            updatedParticipant.transactionSignature
+          );
+          
+          if (splitUpdateResult.success) {
+            logger.info('Split database synchronized successfully', {
+              splitWalletId,
+              participantId,
+              billId: wallet.billId,
+              amountPaid: updatedParticipant.amountPaid,
+              status: updatedParticipant.status
+            }, 'SplitWalletPayments');
+          } else {
+            logger.error('Failed to synchronize split database', {
+              splitWalletId,
+              participantId,
+              billId: wallet.billId,
+              error: splitUpdateResult.error
+            }, 'SplitWalletPayments');
+          }
+        }
+      } catch (syncError) {
+        logger.error('Error synchronizing split database', {
+          splitWalletId,
+          participantId,
+          error: syncError instanceof Error ? syncError.message : String(syncError)
+        }, 'SplitWalletPayments');
+        // Don't fail the payment if sync fails, but log the error
+      }
 
       logger.debug('Participant payment processed successfully', {
         splitWalletId,
@@ -1650,20 +1738,21 @@ export class SplitWalletPayments {
         };
       }
 
-      // Check if participant has already made any payment (prevent multiple payments)
-      if (participant.status === 'paid' || participant.amountPaid > 0) {
+      // Check if participant has already paid their full share
+      if (participant.status === 'paid' || participant.amountPaid >= participant.amountOwed) {
         return {
           success: false,
-          error: 'Participant has already made a payment for this split. Each participant can only pay once.',
+          error: 'Participant has already paid their full share for this split.',
         };
       }
 
-      // Check if the payment amount matches their exact share (no partial payments allowed)
-      const exactShareAmount = roundUsdcAmount(participant.amountOwed);
-      if (Math.abs(roundedAmount - exactShareAmount) > 0.000001) {
+      // Check if the payment amount would exceed what they owe
+      const remainingAmount = participant.amountOwed - participant.amountPaid;
+      const roundedRemainingAmount = roundUsdcAmount(remainingAmount);
+      if (roundedAmount > roundedRemainingAmount) {
         return {
           success: false,
-          error: `Payment amount (${roundedAmount} USDC) must match your exact share (${exactShareAmount} USDC). No partial payments allowed.`,
+          error: `Payment amount (${roundedAmount} USDC) exceeds remaining amount (${roundedRemainingAmount} USDC). You can pay up to ${roundedRemainingAmount.toFixed(2)} USDC.`,
         };
       }
       
@@ -1672,9 +1761,10 @@ export class SplitWalletPayments {
         participantId,
         amountOwed: participant.amountOwed,
         amountPaid: participant.amountPaid,
-        exactShareAmount,
+        remainingAmount: roundedRemainingAmount,
         paymentAmount: roundedAmount,
-        amountMatches: Math.abs(roundedAmount - exactShareAmount) <= 0.000001
+        isPartialPayment: roundedAmount < participant.amountOwed,
+        willCompletePayment: (participant.amountPaid + roundedAmount) >= participant.amountOwed
       }, 'SplitWalletPayments');
 
       // Get the current on-chain balance before the transaction for verification
