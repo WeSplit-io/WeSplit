@@ -6,13 +6,13 @@ export default {
     slug: "WeSplit",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/wesplit-logo-new.png",
+    icon: "./assets/android-app-icon.png",
     userInterfaceStyle: "light",
     newArchEnabled: false,
     sdkVersion: "54.0.0",
     jsEngine: "hermes",
     splash: {
-      image: "./assets/wesplit-logo-new.png",
+      image: "./assets/android-app-icon.png",
       resizeMode: "contain",
       backgroundColor: "#061113"
     },
@@ -44,7 +44,7 @@ export default {
     android: {
       package: "com.wesplit.app",
       adaptiveIcon: {
-        foregroundImage: "./assets/wesplit-logo-new.png",
+        foregroundImage: "./assets/android-app-icon.png",
         backgroundColor: "#061113"
       },
       compileSdkVersion: 34,
