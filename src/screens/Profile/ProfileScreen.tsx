@@ -352,6 +352,20 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             />
           </TouchableOpacity>
 
+          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('AuthDebug')}>
+            <SafeImage
+              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-help-icon.png?alt=media&token=b8848597-c8ee-415d-b689-22bd31397ad2' }}
+              style={styles.menuIcon}
+              fallbackSource={{ uri: DEFAULT_AVATAR_URL }}
+            />
+            <Text style={styles.menuItemText}>🔧 Auth Debug</Text>
+            <SafeImage
+              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-right.png?alt=media&token=687fb55d-49d9-4604-8597-6a8eed69208c' }}
+              style={styles.chevronIcon}
+              fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            />
+          </TouchableOpacity>
+
           <TouchableOpacity style={[styles.menuItem, { marginBottom: 0 }]} onPress={handleLogout}>
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-logout-icon.png?alt=media&token=5282a042-4105-445a-8ea2-1136245a59c6' }}
