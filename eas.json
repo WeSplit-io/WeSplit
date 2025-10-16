@@ -47,7 +47,7 @@
       },
       "ios": {
         "buildConfiguration": "Release"
-      },
+      }
     }
   },
   "submit": {
