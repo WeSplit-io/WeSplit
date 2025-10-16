@@ -53,6 +53,7 @@
     "testflight": {
       "developmentClient": false,
       "distribution": "store",
+      "autoIncrement": true,
       "ios": {
         "buildConfiguration": "Release",
         "cocoapods": "1.16.2"
@@ -64,6 +65,21 @@
     "internal-testing": {
       "developmentClient": false,
       "distribution": "internal",
+      "ios": {
+        "buildConfiguration": "Release",
+        "cocoapods": "1.16.2"
+      },
+      "env": {
+        "USE_FRAMEWORKS": "dynamic"
+      }
+    },
+    "mass-distribution": {
+      "developmentClient": false,
+      "distribution": "store",
+      "autoIncrement": true,
+      "cache": {
+        "disabled": false
+      },
       "ios": {
         "buildConfiguration": "Release",
         "cocoapods": "1.16.2"

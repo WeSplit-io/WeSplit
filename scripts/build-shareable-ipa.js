@@ -66,13 +66,15 @@ function checkPrerequisites() {
 
 function showBuildOptions() {
   log(`\n${colors.bright}📱 Available build profiles for shareable IPA:${colors.reset}`);
-  log(`${colors.cyan}1. internal-testing${colors.reset} - For internal testing (Ad Hoc distribution)`);
+  log(`${colors.cyan}1. mass-distribution${colors.reset} - For mass distribution via TestFlight (RECOMMENDED)`);
   log(`${colors.cyan}2. testflight${colors.reset} - For TestFlight distribution`);
-  log(`${colors.cyan}3. preview${colors.reset} - For preview builds`);
+  log(`${colors.cyan}3. internal-testing${colors.reset} - For internal testing (Ad Hoc distribution)`);
+  log(`${colors.cyan}4. preview${colors.reset} - For preview builds`);
   
-  log(`\n${colors.yellow}💡 Recommendations:${colors.reset}`);
+  log(`\n${colors.yellow}💡 Recommendations for mass distribution:${colors.reset}`);
+  log(`• Use ${colors.green}mass-distribution${colors.reset} for sharing with many users via TestFlight (like your Android APK)`);
+  log(`• Use ${colors.green}testflight${colors.reset} for standard TestFlight distribution`);
   log(`• Use ${colors.green}internal-testing${colors.reset} for sharing with specific testers via direct IPA installation`);
-  log(`• Use ${colors.green}testflight${colors.reset} for broader testing through Apple's TestFlight platform`);
   log(`• Use ${colors.green}preview${colors.reset} for quick testing builds`);
 }
 
@@ -86,16 +88,23 @@ function buildIPA(profile) {
   log(`\n${colors.green}🎉 IPA build completed!${colors.reset}`);
   log(`${colors.blue}📋 Next steps:${colors.reset}`);
   
-  if (profile === 'internal-testing') {
-    log(`1. Download the IPA from the EAS build page`);
-    log(`2. Share the IPA file with testers`);
-    log(`3. Testers need to install it via Xcode, Apple Configurator, or TestFlight`);
-    log(`4. Make sure testers' device UDIDs are registered in your Apple Developer account`);
+  if (profile === 'mass-distribution') {
+    log(`1. The build will be automatically uploaded to TestFlight`);
+    log(`2. Go to App Store Connect → TestFlight → Internal Testing`);
+    log(`3. Add testers by email (up to 100 internal testers)`);
+    log(`4. Send TestFlight invitations to testers`);
+    log(`5. Testers install via TestFlight app (like your Android APK distribution)`);
+    log(`6. No device UDID registration needed - works on any iOS device`);
   } else if (profile === 'testflight') {
     log(`1. The build will be automatically uploaded to TestFlight`);
     log(`2. Go to App Store Connect to manage testers`);
     log(`3. Add testers and send them TestFlight invitations`);
     log(`4. Testers can install via TestFlight app`);
+  } else if (profile === 'internal-testing') {
+    log(`1. Download the IPA from the EAS build page`);
+    log(`2. Share the IPA file with testers`);
+    log(`3. Testers need to install it via Xcode, Apple Configurator, or TestFlight`);
+    log(`4. Make sure testers' device UDIDs are registered in your Apple Developer account`);
   } else {
     log(`1. Download the IPA from the EAS build page`);
     log(`2. Share with testers for installation`);
@@ -118,7 +127,7 @@ function main() {
     process.exit(1);
   }
 
-  const validProfiles = ['internal-testing', 'testflight', 'preview'];
+  const validProfiles = ['mass-distribution', 'testflight', 'internal-testing', 'preview'];
   if (!validProfiles.includes(profile)) {
     log(`${colors.red}❌ Invalid profile: ${profile}${colors.reset}`);
     log(`${colors.yellow}Valid profiles: ${validProfiles.join(', ')}${colors.reset}`);

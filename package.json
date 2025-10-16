@@ -50,8 +50,9 @@
     "clear:prebuild": "node scripts/clear-prebuild-cache.js",
     "build:production": "node scripts/build-production.js",
     "install:ios:ipa": "node scripts/install-ios-ipa.js",
-    "build:ipa:internal": "node scripts/build-shareable-ipa.js internal-testing",
+    "build:ipa:mass": "node scripts/build-shareable-ipa.js mass-distribution",
     "build:ipa:testflight": "node scripts/build-shareable-ipa.js testflight",
+    "build:ipa:internal": "node scripts/build-shareable-ipa.js internal-testing",
     "build:ipa:preview": "node scripts/build-shareable-ipa.js preview"
   },
   "dependencies": {
