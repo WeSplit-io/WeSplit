@@ -53,7 +53,8 @@
     "build:ipa:mass": "node scripts/build-shareable-ipa.js mass-distribution",
     "build:ipa:testflight": "node scripts/build-shareable-ipa.js testflight",
     "build:ipa:internal": "node scripts/build-shareable-ipa.js internal-testing",
-    "build:ipa:preview": "node scripts/build-shareable-ipa.js preview"
+    "build:ipa:preview": "node scripts/build-shareable-ipa.js preview",
+    "verify:testflight": "node scripts/verify-testflight-setup.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
