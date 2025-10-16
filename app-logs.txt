@@ -1,0 +1,161 @@
+--------- beginning of main
+10-16 11:00:58.484  5102  5131 I ReactNativeJS: '[INFO] Configuration Debug', { extra: 
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:    { eas: { projectId: '2eca5921-d3a4-4104-a70a-67e826a73491' },
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      firebase: 
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:       { apiKey: '${EXPO_PUBLIC_FIREBASE_API_KEY}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:         authDomain: '${EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:         projectId: '${EXPO_PUBLIC_FIREBASE_PROJECT_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:         storageBucket: '${EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:         messagingSenderId: '${EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:         appId: '${EXPO_PUBLIC_FIREBASE_APP_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:         measurementId: '${EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID}' },
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_API_KEY: '${EXPO_PUBLIC_FIREBASE_API_KEY}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: '${EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_PROJECT_ID: '${EXPO_PUBLIC_FIREBASE_PROJECT_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: '${EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '${EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_APP_ID: '${EXPO_PUBLIC_FIREBASE_APP_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID: '${EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_GOOGLE_CLIENT_ID: '${EXPO_PUBLIC_GOOGLE_CLIENT_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_GOOGLE_CLIENT_SECRET: '${EXPO_PUBLIC_GOOGLE_CLIENT_SECRET}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      ANDROID_GOOGLE_CLIENT_ID: '${ANDROID_GOOGLE_CLIENT_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      IOS_GOOGLE_CLIENT_ID: '${IOS_GOOGLE_CLIENT_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_APPLE_CLIENT_ID: '${EXPO_PUBLIC_APPLE_CLIENT_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_APPLE_SERVICE_ID: '${EXPO_PUBLIC_APPLE_SERVICE_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_APPLE_TEAM_ID: '${EXPO_PUBLIC_APPLE_TEAM_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_APPLE_KEY_ID: '${EXPO_PUBLIC_APPLE_KEY_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_TWITTER_CLIENT_ID: '${EXPO_PUBLIC_TWITTER_CLIENT_ID}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_TWITTER_CLIENT_SECRET: '${EXPO_PUBLIC_TWITTER_CLIENT_SECRET}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_HELIUS_API_KEY: '${EXPO_PUBLIC_HELIUS_API_KEY}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_FORCE_MAINNET: 'true',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_DEV_NETWORK: 'mainnet',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE: '${EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_MIN_FEE: '${EXPO_PUBLIC_COMPANY_MIN_FEE}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_MAX_FEE: '${EXPO_PUBLIC_COMPANY_MAX_FEE}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_WALLET_ADDRESS: '${EXPO_PUBLIC_COMPANY_WALLET_ADDRESS}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY: '${EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE: '${EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE: '${EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE}',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:      router: {} },
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:   DEV_NETWORK: 'mainnet',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:   FORCE_MAINNET: 'true',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:   resolvedNetwork: 'mainnet',
+10-16 11:00:58.484  5102  5131 I ReactNativeJS:   heliusApiKey: 'SET' }
+10-16 11:00:58.485  5102  5131 I ReactNativeJS: '[INFO] [WalletService] WalletService initialized', {}
+10-16 11:00:58.515  5102  5131 I ReactNativeJS: '[INFO] [AuthService] AuthService initialized', { hasGoogleClientId: true,
+10-16 11:00:58.515  5102  5131 I ReactNativeJS:   hasTwitterClientId: true,
+10-16 11:00:58.515  5102  5131 I ReactNativeJS:   hasAppleClientId: true,
+10-16 11:00:58.515  5102  5131 I ReactNativeJS:   platform: 'android' }
+10-16 11:00:58.517  5102  5131 I ReactNativeJS: Running "main"
+10-16 11:00:58.518  5102  5131 W ReactNativeJS: The app is running using the Legacy Architecture. The Legacy Architecture is deprecated and will be removed in a future version of React Native. Please consider migrating to the New Architecture. For more information, please see https://reactnative.dev/blog/2024/10/23/the-new-architecture-is-here
+10-16 11:00:58.551  5102  5131 I ReactNativeJS: '[INFO] [SplashScreen] App initialized successfully', ''
+10-16 11:00:58.552  5102  5131 I ReactNativeJS: '[INFO] [WalletLinkingContext] No wallet connected, skipping linked wallets load', ''
+10-16 11:00:58.552  5102  5131 I ReactNativeJS: '[INFO] [WalletContext] Auto-refresh disabled to prevent rate limiting', ''
+10-16 11:00:58.570  5102  5102 I ReactNative: [GESTURE HANDLER] Initialize gesture handler for root view com.facebook.react.ReactRootView{fc4c2df V.E...... .......D 0,0-1344,2992 #b}
+10-16 11:00:58.788  5102  5131 W ReactNativeJS: '[2025-10-16T09:00:58.788Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x5666817b transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:00:58.833  5102  5131 W ReactNativeJS: '[2025-10-16T09:00:58.833Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x5666817c transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:00:59.803  5102  5131 I ReactNativeJS: '[INFO] [NotificationService] Push notifications initialized successfully', ''
+10-16 11:00:59.803  5102  5131 I ReactNativeJS: '[INFO] [SplashScreen] Push notifications initialized successfully', ''
+10-16 11:00:59.870  5102  5131 W ReactNativeJS: '[2025-10-16T09:00:59.870Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x5666817d transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:00.640  5102  5131 I ReactNativeJS: '[INFO] [SplashScreen] User not authenticated, navigating to GetStarted', ''
+10-16 11:01:01.952  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:01.952Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x5666817e transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:04.046  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:04.046Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x5666817f transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:07.534  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:07.534Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x56668180 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:11.110  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:11.110Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x56668181 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:12.342  5102  5131 I ReactNativeJS: '[INFO] [AuthMethodsScreen] Next button pressed', { email: 'vinc.charles06@gmail.com',
+10-16 11:01:12.342  5102  5131 I ReactNativeJS:   loading: false,
+10-16 11:01:12.342  5102  5131 I ReactNativeJS:   socialLoading: null }
+10-16 11:01:12.342  5102  5131 I ReactNativeJS: '[INFO] [AuthMethodsScreen] handleEmailAuth called', { email: 'vinc.charles06@gmail.com' }
+10-16 11:01:12.342  5102  5131 I ReactNativeJS: '[INFO] [AuthMethodsScreen] Starting email authentication process', ''
+10-16 11:01:15.745  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:15.745Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x56668182 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:25.763  5102  5131 I ReactNativeJS: '[INFO] [AuthMethodsScreen] Sending verification code', ''
+10-16 11:01:25.826  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:25.826Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x56668183 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:25.878  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:25.878Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x56668184 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:27.346  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:27.346Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x56668185 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:28.182  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:28.182Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x56668186 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:29.622  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:29.622Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x56668187 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:31.877  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:31.877Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x56668189 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:34.905  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:34.905Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x5666818a transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:41.807  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:41.807Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x5666818b transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:01:48.459  5102  5131 W ReactNativeJS: '[2025-10-16T09:01:48.459Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x5666818c transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:02:13.489  5102  5131 W ReactNativeJS: '[2025-10-16T09:02:13.489Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x5666818d transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:02:25.776  5102  5131 W ReactNativeJS: '⚠️ Verification code send failed or timed out:', [Error: Verification code send timeout]
+10-16 11:02:25.811  5102  5131 I ReactNativeJS: '[INFO] [AuthMethodsScreen] Email authentication process finished, setting loading to false', ''
+10-16 11:02:29.604  5102  5131 W ReactNativeJS: '[2025-10-16T09:02:29.604Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x5666818e transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:03:10.983  5102  5131 W ReactNativeJS: '[2025-10-16T09:03:10.983Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x5666818f transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:04:39.139  5649  5674 I ReactNativeJS: '[INFO] Configuration Debug', { extra: 
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:    { eas: { projectId: '2eca5921-d3a4-4104-a70a-67e826a73491' },
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_API_KEY: '${EXPO_PUBLIC_FIREBASE_API_KEY}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: '${EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_PROJECT_ID: '${EXPO_PUBLIC_FIREBASE_PROJECT_ID}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: '${EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '${EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_APP_ID: '${EXPO_PUBLIC_FIREBASE_APP_ID}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID: '${EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_GOOGLE_CLIENT_ID: '${EXPO_PUBLIC_GOOGLE_CLIENT_ID}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_GOOGLE_CLIENT_SECRET: '${EXPO_PUBLIC_GOOGLE_CLIENT_SECRET}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      ANDROID_GOOGLE_CLIENT_ID: '${ANDROID_GOOGLE_CLIENT_ID}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      IOS_GOOGLE_CLIENT_ID: '${IOS_GOOGLE_CLIENT_ID}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_APPLE_CLIENT_ID: '${EXPO_PUBLIC_APPLE_CLIENT_ID}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_APPLE_SERVICE_ID: '${EXPO_PUBLIC_APPLE_SERVICE_ID}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_APPLE_TEAM_ID: '${EXPO_PUBLIC_APPLE_TEAM_ID}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_APPLE_KEY_ID: '${EXPO_PUBLIC_APPLE_KEY_ID}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_TWITTER_CLIENT_ID: '${EXPO_PUBLIC_TWITTER_CLIENT_ID}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_TWITTER_CLIENT_SECRET: '${EXPO_PUBLIC_TWITTER_CLIENT_SECRET}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_HELIUS_API_KEY: '${EXPO_PUBLIC_HELIUS_API_KEY}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_FORCE_MAINNET: 'true',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_DEV_NETWORK: 'mainnet',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE: '${EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_MIN_FEE: '${EXPO_PUBLIC_COMPANY_MIN_FEE}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_MAX_FEE: '${EXPO_PUBLIC_COMPANY_MAX_FEE}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_WALLET_ADDRESS: '${EXPO_PUBLIC_COMPANY_WALLET_ADDRESS}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY: '${EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE: '${EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE: '${EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE}',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:      router: {} },
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:   DEV_NETWORK: 'mainnet',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:   FORCE_MAINNET: 'true',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:   resolvedNetwork: 'mainnet',
+10-16 11:04:39.139  5649  5674 I ReactNativeJS:   heliusApiKey: 'SET' }
+10-16 11:04:39.140  5649  5674 I ReactNativeJS: '[INFO] [WalletService] WalletService initialized', {}
+10-16 11:04:39.231  5649  5674 I ReactNativeJS: '[INFO] [AuthService] AuthService initialized', { hasGoogleClientId: true,
+10-16 11:04:39.231  5649  5674 I ReactNativeJS:   hasTwitterClientId: true,
+10-16 11:04:39.231  5649  5674 I ReactNativeJS:   hasAppleClientId: true,
+10-16 11:04:39.231  5649  5674 I ReactNativeJS:   platform: 'android' }
+10-16 11:04:39.238  5649  5674 I ReactNativeJS: Running "main"
+10-16 11:04:39.242  5649  5674 W ReactNativeJS: The app is running using the Legacy Architecture. The Legacy Architecture is deprecated and will be removed in a future version of React Native. Please consider migrating to the New Architecture. For more information, please see https://reactnative.dev/blog/2024/10/23/the-new-architecture-is-here
+10-16 11:04:39.323  5649  5674 I ReactNativeJS: '[INFO] [SplashScreen] App initialized successfully', ''
+10-16 11:04:39.349  5649  5674 I ReactNativeJS: '[INFO] [WalletLinkingContext] No wallet connected, skipping linked wallets load', ''
+10-16 11:04:39.349  5649  5674 I ReactNativeJS: '[INFO] [WalletContext] Auto-refresh disabled to prevent rate limiting', ''
+10-16 11:04:39.400  5649  5649 I ReactNative: [GESTURE HANDLER] Initialize gesture handler for root view com.facebook.react.ReactRootView{9770f45 V.E...... .......D 0,0-1344,2992 #b}
+10-16 11:04:40.040  5649  5674 W ReactNativeJS: '[2025-10-16T09:04:40.040Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x3dddcdcc transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:04:40.102  5649  5674 W ReactNativeJS: '[2025-10-16T09:04:40.102Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x3dddcdcd transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:05.293  5649  5674 I ReactNativeJS: '[INFO] [NotificationService] Push notifications initialized successfully', ''
+10-16 11:05:05.310  5649  5674 I ReactNativeJS: '[INFO] [SplashScreen] Push notifications initialized successfully', ''
+10-16 11:05:05.316  5649  5674 I ReactNativeJS: '[INFO] [SplashScreen] User not authenticated, navigating to GetStarted', ''
+10-16 11:05:05.414  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:05.414Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x3dddcdce transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:18.993  5649  5674 I ReactNativeJS: '[INFO] [AuthMethodsScreen] Next button pressed', { email: 'vinc.charles06@gmail.com',
+10-16 11:05:18.993  5649  5674 I ReactNativeJS:   loading: false,
+10-16 11:05:18.993  5649  5674 I ReactNativeJS:   socialLoading: null }
+10-16 11:05:18.993  5649  5674 I ReactNativeJS: '[INFO] [AuthMethodsScreen] handleEmailAuth called', { email: 'vinc.charles06@gmail.com' }
+10-16 11:05:18.993  5649  5674 I ReactNativeJS: '[INFO] [AuthMethodsScreen] Starting email authentication process', ''
+10-16 11:05:19.087  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:19.087Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x3dddcdcf transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:21.863  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:21.863Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x3dddcdd0 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:26.189  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:26.189Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x3dddcdd1 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:29.895  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:29.895Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Listen\' stream 0x3dddcdd2 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:34.011  5649  5674 W ReactNativeJS: ⚠️ Verification check timed out after 5 seconds, proceeding with verification flow
+10-16 11:05:34.011  5649  5674 I ReactNativeJS: '[INFO] [AuthMethodsScreen] Sending verification code', ''
+10-16 11:05:34.071  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:34.070Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcdd3 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:34.124  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:34.124Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcdd4 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:35.544  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:35.544Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcdd5 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:37.145  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:37.145Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcdd6 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:38.474  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:38.474Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcdd7 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:41.524  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:41.523Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcdd9 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:48.263  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:48.263Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcdda transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:05:55.346  5649  5674 W ReactNativeJS: '[2025-10-16T09:05:55.346Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcddb transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:06:03.033  5649  5674 W ReactNativeJS: '[2025-10-16T09:06:03.033Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcddc transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:06:11.817  5649  5674 W ReactNativeJS: '[2025-10-16T09:06:11.817Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcddd transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:06:34.029  5649  5674 W ReactNativeJS: '⚠️ Verification code send failed or timed out:', [Error: Verification code send timeout]
+10-16 11:06:34.058  5649  5674 I ReactNativeJS: '[INFO] [AuthMethodsScreen] Email authentication process finished, setting loading to false', ''
+10-16 11:06:35.932  5649  5674 W ReactNativeJS: '[2025-10-16T09:06:35.932Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcdde transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:06:56.551  5649  5674 W ReactNativeJS: '[2025-10-16T09:06:56.551Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcddf transport errored. Name:', undefined, 'Message:', undefined

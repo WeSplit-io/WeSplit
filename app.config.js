@@ -1,6 +1,6 @@
-import 'dotenv/config';
+require('dotenv/config');
 
-export default {
+module.exports = {
   expo: {
     name: "WeSplit",
     slug: "WeSplit",
