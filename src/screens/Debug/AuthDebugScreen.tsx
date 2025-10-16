@@ -1,58 +1,77 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
+import { auth } from '../../config/firebase';
 import { ProductionAuthService } from '../../services/ProductionAuthService';
 import { logger } from '../../services/loggingService';
 
-export const AuthDebugScreen: React.FC = () => {
-  const [debugInfo, setDebugInfo] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [testResults, setTestResults] = useState<any>({});
+interface EnvironmentStatus {
+  isProduction: boolean;
+  issues: string[];
+  recommendations: string[];
+  environmentStatus: any;
+}
+
+const AuthDebugScreen: React.FC = () => {
+  const [diagnostics, setDiagnostics] = useState<EnvironmentStatus | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [firebaseStatus, setFirebaseStatus] = useState<string>('Unknown');
+
+  const productionAuthService = ProductionAuthService.getInstance();
 
   useEffect(() => {
     runDiagnostics();
+    checkFirebaseStatus();
   }, []);
 
+  const checkFirebaseStatus = async () => {
+    try {
+      if (auth) {
+        setFirebaseStatus('✅ Firebase initialized successfully');
+      } else {
+        setFirebaseStatus('❌ Firebase not initialized');
+      }
+    } catch (error) {
+      setFirebaseStatus('❌ Firebase initialization error');
+      logger.error('Firebase status check failed', error, 'AuthDebugScreen');
+    }
+  };
+
   const runDiagnostics = async () => {
-    setIsLoading(true);
+    setLoading(true);
     try {
-      const authService = ProductionAuthService.getInstance();
-      const diagnosis = await authService.diagnoseAuthIssues();
-      setDebugInfo(diagnosis);
+      const results = await productionAuthService.diagnoseAuthIssues();
+      setDiagnostics(results);
+      logger.info('Auth diagnostics completed', results, 'AuthDebugScreen');
     } catch (error) {
-      console.error('Diagnosis failed:', error);
-      setDebugInfo({ error: error.message });
+      logger.error('Auth diagnostics failed', error, 'AuthDebugScreen');
+      Alert.alert('Diagnostics Error', 'Failed to run authentication diagnostics');
+    } finally {
+      setLoading(false);
     }
-    setIsLoading(false);
   };
 
-  const runTests = async () => {
-    setIsLoading(true);
-    const results: any = {};
-    
-    try {
-      const authService = ProductionAuthService.getInstance();
-      
-      // Test Firebase auth
-      const firebaseTest = await authService.testFirebaseAuth();
-      results.firebase = firebaseTest;
-      
-      // Test OAuth config
-      const oauthTest = await authService.testOAuthConfig();
-      results.oauth = oauthTest;
-      
-      setTestResults(results);
-    } catch (error) {
-      console.error('Tests failed:', error);
-      setTestResults({ error: error.message });
-    }
-    setIsLoading(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([runDiagnostics(), checkFirebaseStatus()]);
+    setRefreshing(false);
   };
 
-  const clearAuthData = async () => {
+  const clearAuthData = () => {
     Alert.alert(
       'Clear Authentication Data',
-      'This will clear all stored authentication data and sign out. Continue?',
+      'This will clear all stored authentication data. You will need to log in again.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -60,100 +79,191 @@ export const AuthDebugScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              const authService = ProductionAuthService.getInstance();
-              const result = await authService.clearAuthData();
+              // Clear AsyncStorage auth data
+              const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+              await AsyncStorage.multiRemove([
+                'userToken',
+                'userData',
+                'authState',
+                'firebaseUser',
+              ]);
               
-              if (result.success) {
-                Alert.alert('Success', 'Authentication data cleared successfully. Please restart the app.');
-              } else {
-                Alert.alert('Error', `Failed to clear data: ${result.error}`);
+              // Sign out from Firebase
+              if (auth.currentUser) {
+                await auth.signOut();
               }
+              
+              Alert.alert('Success', 'Authentication data cleared successfully');
+              logger.info('Authentication data cleared', null, 'AuthDebugScreen');
             } catch (error) {
-              Alert.alert('Error', `Failed to clear data: ${error.message}`);
+              logger.error('Failed to clear auth data', error, 'AuthDebugScreen');
+              Alert.alert('Error', 'Failed to clear authentication data');
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
-  const showRecommendations = () => {
-    const authService = ProductionAuthService.getInstance();
-    const recommendations = authService.getProductionRecommendations();
-    
-    Alert.alert(
-      'Production Recommendations',
-      recommendations.join('\n\n'),
-      [{ text: 'OK' }]
+  const testNetworkConnectivity = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('https://www.google.com', { 
+        method: 'HEAD', 
+        timeout: 5000 
+      });
+      
+      if (response.ok) {
+        Alert.alert('Network Test', '✅ Network connectivity is working');
+      } else {
+        Alert.alert('Network Test', '❌ Network connectivity issues detected');
+      }
+    } catch (error) {
+      Alert.alert('Network Test', '❌ Network connectivity test failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const testFirebaseConnectivity = async () => {
+    setLoading(true);
+    try {
+      const firebaseConfig = Constants.expoConfig?.extra;
+      if (firebaseConfig?.EXPO_PUBLIC_FIREBASE_PROJECT_ID) {
+        const response = await fetch(
+          `https://${firebaseConfig.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.firebaseapp.com`,
+          { method: 'HEAD', timeout: 5000 }
+        );
+        
+        if (response.ok) {
+          Alert.alert('Firebase Test', '✅ Firebase project is accessible');
+        } else {
+          Alert.alert('Firebase Test', '❌ Firebase project is not accessible');
+        }
+      } else {
+        Alert.alert('Firebase Test', '❌ Firebase project ID not configured');
+      }
+    } catch (error) {
+      Alert.alert('Firebase Test', '❌ Firebase connectivity test failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderEnvironmentVariables = () => {
+    const envVars = [
+      'EXPO_PUBLIC_FIREBASE_API_KEY',
+      'EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN',
+      'EXPO_PUBLIC_FIREBASE_PROJECT_ID',
+      'EXPO_PUBLIC_GOOGLE_CLIENT_ID',
+      'ANDROID_GOOGLE_CLIENT_ID',
+      'IOS_GOOGLE_CLIENT_ID',
+      'EXPO_PUBLIC_APPLE_CLIENT_ID',
+    ];
+
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Environment Variables</Text>
+        {envVars.map((varName) => {
+          const value = Constants.expoConfig?.extra?.[varName];
+          const isConfigured = value && value !== 'undefined' && value !== '';
+          
+          return (
+            <View key={varName} style={styles.envVarRow}>
+              <Text style={styles.envVarName}>{varName}</Text>
+              <Text style={[styles.envVarStatus, isConfigured ? styles.success : styles.error]}>
+                {isConfigured ? '✅ Configured' : '❌ Missing'}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const renderIssues = () => {
+    if (!diagnostics?.issues.length) return null;
+
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Issues Found</Text>
+        {diagnostics.issues.map((issue, index) => (
+          <View key={index} style={styles.issueRow}>
+            <Text style={styles.issueText}>❌ {issue}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const renderRecommendations = () => {
+    if (!diagnostics?.recommendations.length) return null;
+
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Recommendations</Text>
+        {diagnostics.recommendations.map((recommendation, index) => (
+          <View key={index} style={styles.recommendationRow}>
+            <Text style={styles.recommendationText}>💡 {recommendation}</Text>
+          </View>
+        ))}
+      </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>🔧 Authentication Debug</Text>
-        <Text style={styles.subtitle}>Production APK Troubleshooting</Text>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <Text style={styles.title}>Authentication Debug</Text>
         
-        <ScrollView style={styles.scrollView}>
-          {debugInfo && (
-            <>
-              <Text style={styles.sectionTitle}>📊 Diagnosis Results:</Text>
-              <View style={styles.debugContainer}>
-                <Text style={styles.debugText}>
-                  {JSON.stringify(debugInfo, null, 2)}
-                </Text>
-              </View>
-            </>
-          )}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Firebase Status</Text>
+          <Text style={styles.statusText}>{firebaseStatus}</Text>
+        </View>
+
+        {renderEnvironmentVariables()}
+        {renderIssues()}
+        {renderRecommendations()}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Actions</Text>
           
-          {Object.keys(testResults).length > 0 && (
-            <>
-              <Text style={styles.sectionTitle}>🧪 Test Results:</Text>
-              <View style={styles.debugContainer}>
-                <Text style={styles.debugText}>
-                  {JSON.stringify(testResults, null, 2)}
-                </Text>
-              </View>
-            </>
-          )}
-        </ScrollView>
-        
-        <View style={styles.buttonContainer}>
           <TouchableOpacity
-            onPress={runDiagnostics}
-            disabled={isLoading}
-            style={[styles.button, styles.primaryButton, isLoading && styles.disabledButton]}
+            style={[styles.actionButton, loading && styles.disabledButton]}
+            onPress={testNetworkConnectivity}
+            disabled={loading}
           >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.buttonText}>🔍 Run Diagnostics</Text>
-            )}
+            <Text style={styles.actionButtonText}>Test Network Connectivity</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
-            onPress={runTests}
-            disabled={isLoading}
-            style={[styles.button, styles.secondaryButton, isLoading && styles.disabledButton]}
+            style={[styles.actionButton, loading && styles.disabledButton]}
+            onPress={testFirebaseConnectivity}
+            disabled={loading}
           >
-            <Text style={styles.buttonText}>🧪 Run Tests</Text>
+            <Text style={styles.actionButtonText}>Test Firebase Connectivity</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
+            style={[styles.actionButton, styles.dangerButton]}
             onPress={clearAuthData}
-            style={[styles.button, styles.dangerButton]}
           >
-            <Text style={styles.buttonText}>🗑️ Clear Data</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            onPress={showRecommendations}
-            style={[styles.button, styles.infoButton]}
-          >
-            <Text style={styles.buttonText}>💡 Recommendations</Text>
+            <Text style={styles.actionButtonText}>Clear Authentication Data</Text>
           </TouchableOpacity>
         </View>
-      </View>
+
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={styles.loadingText}>Running diagnostics...</Text>
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -161,78 +271,108 @@ export const AuthDebugScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: '#ccc',
-    fontSize: 16,
-    marginBottom: 20,
-    textAlign: 'center',
+    backgroundColor: '#f5f5f5',
   },
   scrollView: {
     flex: 1,
+    padding: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 20,
+    textAlign: 'center',
+    color: '#333',
+  },
+  section: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sectionTitle: {
-    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
-    marginTop: 10,
+    marginBottom: 12,
+    color: '#333',
   },
-  debugContainer: {
-    backgroundColor: '#1a1a1a',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
+  statusText: {
+    fontSize: 16,
+    color: '#666',
   },
-  debugText: {
-    color: '#ccc',
-    fontSize: 12,
-    fontFamily: 'monospace',
-  },
-  buttonContainer: {
+  envVarRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    gap: 10,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  button: {
+  envVarName: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  envVarStatus: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  success: {
+    color: '#4CAF50',
+  },
+  error: {
+    color: '#F44336',
+  },
+  issueRow: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  issueText: {
+    fontSize: 14,
+    color: '#F44336',
+  },
+  recommendationRow: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  recommendationText: {
+    fontSize: 14,
+    color: '#FF9800',
+  },
+  actionButton: {
+    backgroundColor: '#007AFF',
     padding: 12,
     borderRadius: 8,
-    minWidth: 100,
+    marginBottom: 8,
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-  },
-  secondaryButton: {
-    backgroundColor: '#FF9500',
   },
   dangerButton: {
-    backgroundColor: '#FF3B30',
-  },
-  infoButton: {
-    backgroundColor: '#5856D6',
+    backgroundColor: '#F44336',
   },
   disabledButton: {
-    opacity: 0.5,
+    backgroundColor: '#ccc',
   },
-  buttonText: {
-    color: '#fff',
+  actionButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
-    fontSize: 12,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
   },
 });
+
+export default AuthDebugScreen;

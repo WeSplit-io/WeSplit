@@ -352,7 +352,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('AuthDebug')}>
+          {/* <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('AuthDebug')}>
             <SafeImage
               source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fprofil-help-icon.png?alt=media&token=b8848597-c8ee-415d-b689-22bd31397ad2' }}
               style={styles.menuIcon}
@@ -364,7 +364,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               style={styles.chevronIcon}
               fallbackSource={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
             />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           <TouchableOpacity style={[styles.menuItem, { marginBottom: 0 }]} onPress={handleLogout}>
             <SafeImage
