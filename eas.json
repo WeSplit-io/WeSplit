@@ -32,6 +32,7 @@
       "cache": {
         "disabled": true
       },
+      "prebuildCommand": "npx expo prebuild --clean --platform android",
       "android": {
         "buildType": "apk"
       }
@@ -42,6 +43,7 @@
       "cache": {
         "disabled": true
       },
+      "prebuildCommand": "npx expo prebuild --clean --platform android",
       "android": {
         "buildType": "apk"
       },
