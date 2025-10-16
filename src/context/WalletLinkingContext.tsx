@@ -45,22 +45,32 @@ export const WalletLinkingProvider: React.FC<WalletLinkingProviderProps> = ({ ch
         return;
       }
 
-      // In a real app, you would load this from secure storage
-      // For now, we'll use a simple approach
-      const connectedWallet = await walletService.getWalletInfo();
-      if (connectedWallet) {
-        const linkedWallet: LinkedWallet = {
-          address: connectedWallet.address,
-          name: connectedWallet.walletName || 'External Wallet',
-          provider: 'Unknown', // We'd need to track this
-          balance: connectedWallet.balance || 0,
-          isConnected: true,
-          linkedAt: new Date()
-        };
-        setLinkedWallets([linkedWallet]);
+      // Get the current user ID from the wallet service
+      const walletInfo = await walletService.getWalletInfo();
+      if (!walletInfo?.userId) {
+        logger.info('No user ID available, skipping linked wallets load', null, 'WalletLinkingContext');
+        return;
       }
+
+      // Load linked wallets from the centralized service
+      const { LinkedWalletService } = await import('../services/LinkedWalletService');
+      const linkedWalletsData = await LinkedWalletService.getLinkedWallets(walletInfo.userId);
+      
+      // Transform the data to match the context interface
+      const transformedWallets: LinkedWallet[] = linkedWalletsData.map(wallet => ({
+        address: wallet.address || '',
+        name: wallet.label,
+        provider: wallet.chain || 'Unknown',
+        balance: wallet.balance || 0,
+        isConnected: wallet.isActive,
+        linkedAt: new Date(wallet.createdAt)
+      }));
+
+      setLinkedWallets(transformedWallets);
+      logger.info('Linked wallets loaded successfully', { count: transformedWallets.length }, 'WalletLinkingContext');
     } catch (error) {
       console.error('Error loading linked wallets:', error);
+      logger.error('Failed to load linked wallets', error, 'WalletLinkingContext');
       // Don't throw the error, just log it and continue
     }
   };

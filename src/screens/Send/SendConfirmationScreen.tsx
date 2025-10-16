@@ -147,7 +147,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   // Determine recipient based on destination type
   const recipient = destinationType === 'external' ? wallet : contact;
   const recipientName = destinationType === 'external' 
-    ? (wallet?.name || `Wallet ${wallet?.address?.substring(0, 6)}...${wallet?.address?.substring(wallet?.address?.length - 6)}`)
+    ? (wallet?.label || `Wallet ${wallet?.address?.substring(0, 6)}...${wallet?.address?.substring(wallet?.address?.length - 6)}`)
     : (contact?.name || 'Unknown');
   const recipientAddress = destinationType === 'external' ? wallet?.address : contact?.wallet_address;
 

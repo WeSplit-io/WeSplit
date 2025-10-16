@@ -1674,8 +1674,8 @@ class WalletService {
    */
   async getLinkedWallets(userId: string): Promise<any[]> {
     try {
-      const linkedWallets = await firebaseDataService.linkedWallet.getLinkedWallets(userId);
-      return linkedWallets || [];
+      const { LinkedWalletService } = await import('../../../services/LinkedWalletService');
+      return await LinkedWalletService.getLinkedWallets(userId);
     } catch (error) {
       logger.error('Failed to get linked wallets', error, 'WalletService');
       return [];
@@ -1684,11 +1684,8 @@ class WalletService {
 
   async getLinkedDestinations(userId: string): Promise<{ externalWallets: any[]; kastCards: any[] }> {
     try {
-      const linkedWallets = await this.getLinkedWallets(userId);
-      const externalWallets = linkedWallets.filter(wallet => wallet.type === 'external');
-      const kastCards = linkedWallets.filter(wallet => wallet.type === 'kast');
-      
-      return { externalWallets, kastCards };
+      const { LinkedWalletService } = await import('../../../services/LinkedWalletService');
+      return await LinkedWalletService.getLinkedDestinations(userId);
     } catch (error) {
       logger.error('Failed to get linked destinations', error, 'WalletService');
       return { externalWallets: [], kastCards: [] };

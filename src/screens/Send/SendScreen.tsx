@@ -13,6 +13,7 @@ import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { logger } from '../../services/loggingService';
+import type { LinkedWallet } from '../../services/LinkedWalletService';
 
 const SendScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId, initialTab } = route.params || {};
@@ -29,8 +30,8 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState<'friends' | 'external'>(initialTab || 'friends');
   const [searchQuery, setSearchQuery] = useState('');
   const [contactsTab, setContactsTab] = useState<'All' | 'Favorite' | 'Search'>('All');
-  const [linkedWallets, setLinkedWallets] = useState<ExternalWallet[]>([]);
-  const [linkedKastCards, setLinkedKastCards] = useState<KastCard[]>([]);
+  const [linkedWallets, setLinkedWallets] = useState<LinkedWallet[]>([]);
+  const [linkedKastCards, setLinkedKastCards] = useState<LinkedWallet[]>([]);
   const [loadingLinkedDestinations, setLoadingLinkedDestinations] = useState(false);
 
   // Load linked destinations
@@ -101,12 +102,12 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     });
   };
 
-  const handleSelectWallet = (destination: ExternalWallet | KastCard) => {
+  const handleSelectWallet = (destination: LinkedWallet) => {
     logger.info('Selected external destination for sending', {
       name: destination.label,
       address: destination.address,
       id: destination.id,
-      type: 'address' in destination ? 'wallet' : 'kast'
+      type: destination.type
     });
     
     navigation.navigate('SendAmount', {

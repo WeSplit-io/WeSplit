@@ -120,9 +120,8 @@ class ExternalWalletLinkingService {
    */
   async getLinkedWallets(userId: string): Promise<LinkedWallet[]> {
     try {
-      // In a real implementation, this would query a database
-      // For now, return empty array
-      return [];
+      const { LinkedWalletService } = await import('../services/LinkedWalletService');
+      return await LinkedWalletService.getLinkedWallets(userId);
     } catch (error) {
       logger.error('Failed to get linked wallets', error, 'ExternalWalletLinkingService');
       return [];

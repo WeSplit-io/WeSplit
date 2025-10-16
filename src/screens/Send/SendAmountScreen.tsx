@@ -159,8 +159,8 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
       };
     } else if (destinationType === 'external' && wallet) {
       return {
-        name: wallet.name,
-        email: formatWalletAddress(wallet.address),
+        name: wallet.label,
+        email: formatWalletAddress(wallet.address || ''),
         avatar: null,
         walletAddress: wallet.address
       };

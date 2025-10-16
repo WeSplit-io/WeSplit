@@ -186,12 +186,25 @@ class ExternalTransferService {
    */
   async isWalletLinked(address: string, userId: string): Promise<boolean> {
     try {
-      // In a real implementation, this would check a database
-      // For now, we'll implement a basic check
+      logger.debug('Checking if wallet is linked', { address, userId }, 'ExternalTransferService');
+      
       const linkedWallets = await this.getLinkedWallets(userId);
-      return linkedWallets.some(wallet => 
-        wallet.address === address && wallet.isActive
+      const isLinked = linkedWallets.some(wallet => 
+        wallet.address === address && 
+        wallet.type === 'external' && 
+        (wallet.isActive !== false) && 
+        (wallet.status === 'active' || !wallet.status)
       );
+      
+      logger.debug('Wallet link status', { 
+        address, 
+        userId, 
+        isLinked, 
+        totalLinkedWallets: linkedWallets.length,
+        matchingWallets: linkedWallets.filter(w => w.address === address).length
+      }, 'ExternalTransferService');
+      
+      return isLinked;
     } catch (error) {
       logger.error('Failed to check if wallet is linked', error, 'ExternalTransferService');
       return false;
@@ -203,9 +216,8 @@ class ExternalTransferService {
    */
   async getLinkedWallets(userId: string): Promise<LinkedWallet[]> {
     try {
-      // In a real implementation, this would query a database
-      // For now, return empty array
-      return [];
+      const { LinkedWalletService } = await import('../services/LinkedWalletService');
+      return await LinkedWalletService.getLinkedWallets(userId);
     } catch (error) {
       logger.error('Failed to get linked wallets', error, 'ExternalTransferService');
       return [];

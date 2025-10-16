@@ -1666,8 +1666,8 @@ class WalletService {
    */
   async getLinkedWallets(userId: string): Promise<any[]> {
     try {
-      const linkedWallets = await firebaseDataService.linkedWallet.getLinkedWallets(userId);
-      return linkedWallets || [];
+      const { LinkedWalletService } = await import('./LinkedWalletService');
+      return await LinkedWalletService.getLinkedWallets(userId);
     } catch (error) {
       logger.error('Failed to get linked wallets', error, 'WalletService');
       return [];
@@ -1676,11 +1676,8 @@ class WalletService {
 
   async getLinkedDestinations(userId: string): Promise<{ externalWallets: any[]; kastCards: any[] }> {
     try {
-      const linkedWallets = await this.getLinkedWallets(userId);
-      const externalWallets = linkedWallets.filter(wallet => wallet.type === 'external');
-      const kastCards = linkedWallets.filter(wallet => wallet.type === 'kast');
-      
-      return { externalWallets, kastCards };
+      const { LinkedWalletService } = await import('./LinkedWalletService');
+      return await LinkedWalletService.getLinkedDestinations(userId);
     } catch (error) {
       logger.error('Failed to get linked destinations', error, 'WalletService');
       return { externalWallets: [], kastCards: [] };
@@ -1689,7 +1686,8 @@ class WalletService {
 
   async addExternalWallet(userId: string, walletData: any): Promise<{ success: boolean; error?: string }> {
     try {
-      const result = await firebaseDataService.linkedWallet.addLinkedWallet(userId, { ...walletData, type: 'external' });
+      const { LinkedWalletService } = await import('./LinkedWalletService');
+      const result = await LinkedWalletService.addLinkedWallet(userId, { ...walletData, type: 'external' });
       return result;
     } catch (error) {
       logger.error('Failed to add external wallet', error, 'WalletService');
@@ -1699,7 +1697,8 @@ class WalletService {
 
   async addKastCard(userId: string, cardData: any): Promise<{ success: boolean; error?: string }> {
     try {
-      const result = await firebaseDataService.linkedWallet.addLinkedWallet(userId, { ...cardData, type: 'kast' });
+      const { LinkedWalletService } = await import('./LinkedWalletService');
+      const result = await LinkedWalletService.addLinkedWallet(userId, { ...cardData, type: 'kast' });
       return result;
     } catch (error) {
       logger.error('Failed to add Kast card', error, 'WalletService');
@@ -1709,7 +1708,8 @@ class WalletService {
 
   async removeExternalWallet(userId: string, walletId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const result = await firebaseDataService.linkedWallet.removeLinkedWallet(userId, walletId);
+      const { LinkedWalletService } = await import('./LinkedWalletService');
+      const result = await LinkedWalletService.removeLinkedWallet(userId, walletId);
       return result;
     } catch (error) {
       logger.error('Failed to remove external wallet', error, 'WalletService');
@@ -1719,7 +1719,8 @@ class WalletService {
 
   async removeKastCard(userId: string, cardId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const result = await firebaseDataService.linkedWallet.removeLinkedWallet(userId, cardId);
+      const { LinkedWalletService } = await import('./LinkedWalletService');
+      const result = await LinkedWalletService.removeLinkedWallet(userId, cardId);
       return result;
     } catch (error) {
       logger.error('Failed to remove Kast card', error, 'WalletService');
