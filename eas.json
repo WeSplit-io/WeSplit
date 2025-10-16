@@ -46,6 +46,10 @@
         "disabled": true
       },
       "prebuildCommand": "npx expo prebuild",
+      "env": {
+        "USE_FRAMEWORKS": "dynamic",
+        "RCT_USE_FRAMEWORKS": "1"
+      },
       "android": {
         "buildType": "apk"
       },
