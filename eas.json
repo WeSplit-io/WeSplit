@@ -34,6 +34,9 @@
       },
       "android": {
         "buildType": "apk"
+      },
+      "ios": {
+        "cocoapods": "1.16.2"
       }
     },
     "production": {
@@ -42,11 +45,13 @@
       "cache": {
         "disabled": true
       },
+      "prebuildCommand": "node scripts/prebuild-hook.js && npx expo prebuild",
       "android": {
         "buildType": "apk"
       },
       "ios": {
-        "buildConfiguration": "Release"
+        "buildConfiguration": "Release",
+        "cocoapods": "1.16.2"
       }
     }
   },
