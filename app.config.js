@@ -11,11 +11,6 @@ module.exports = {
     newArchEnabled: false,
     sdkVersion: "54.0.0",
     jsEngine: "hermes",
-    splash: {
-      image: "./assets/android-app-icon-no-alpha.png",
-      resizeMode: "contain",
-      backgroundColor: "#061113"
-    },
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
