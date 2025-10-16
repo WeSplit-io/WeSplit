@@ -27,7 +27,7 @@ target 'WeSplit' do
   use_modular_headers!
   
   # Use dynamic frameworks to resolve Swift pod integration issues
-  # Framework configuration is handled by app.config.js podfileProperties
+  use_frameworks! :linkage => :dynamic
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
