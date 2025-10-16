@@ -74,7 +74,7 @@ class ProductionBuilder {
     this.log('\n🔨 Step 2: Running Clean Prebuild...', 'bright');
     
     const success = await this.runCommand(
-      'npx expo prebuild --platform android',
+      'npx expo prebuild',
       'Clean prebuild for Android'
     );
 
