@@ -45,7 +45,7 @@
       "cache": {
         "disabled": true
       },
-      "prebuildCommand": "node scripts/prebuild-hook.js && npx expo prebuild",
+      "prebuildCommand": "npx expo prebuild",
       "android": {
         "buildType": "apk"
       },
