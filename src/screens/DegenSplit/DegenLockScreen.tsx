@@ -241,9 +241,9 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     let lockedCount = 0;
     
     if (degenState.splitWallet?.participants) {
-      // Use wallet participants for accurate count - check if they've paid their full amount
+      // Use wallet participants for accurate count - check if they've paid their full amount AND are locked
       lockedCount = degenState.splitWallet.participants.filter((p: any) => 
-        p.amountPaid >= p.amountOwed
+        p.amountPaid >= p.amountOwed && p.status === 'locked'
       ).length;
     } else {
       // Fallback to local state
@@ -421,7 +421,10 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   }, [degenState.splitWallet, degenState.isLocked, degenState.allParticipantsLocked]);
 
     // Calculate progress - check if participants have locked their funds (status 'locked' or amountPaid >= amountOwed)
-    const lockedCount = degenState.splitWallet?.participants?.filter((p: any) => p.status === 'locked' || p.amountPaid >= p.amountOwed).length || degenState.lockedParticipants.length;
+    // Only count participants who have actually sent their share, not just locked status
+    const lockedCount = degenState.splitWallet?.participants?.filter((p: any) => 
+      p.amountPaid >= p.amountOwed && p.status === 'locked'
+    ).length || degenState.lockedParticipants.length;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -502,12 +505,14 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           </View>
         )}
 
-        {/* Lock Progress Circle */}
-        <DegenSplitProgress
-          lockedCount={lockedCount}
-          totalCount={participants.length}
-          circleProgressRef={degenState.circleProgressRef}
-        />
+        {/* Lock Progress Circle - Only show when split wallet exists (split is locked) */}
+        {degenState.splitWallet && (
+          <DegenSplitProgress
+            lockedCount={lockedCount}
+            totalCount={participants.length}
+            circleProgressRef={degenState.circleProgressRef}
+          />
+        )}
 
         {/* Participants List */}
         <DegenSplitParticipants
@@ -532,7 +537,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
                 style={styles.lockButton}
               >
                 <Text style={styles.lockButtonText}>
-                  {degenState.isCreatingWallet ? 'Creating Split...' : 'Lock the Split'}
+                  {degenState.isCreatingWallet ? 'Creating Split...' : 'Continue'}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>

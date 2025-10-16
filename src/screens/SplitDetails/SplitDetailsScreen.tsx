@@ -228,7 +228,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const [isJoiningSplit, setIsJoiningSplit] = useState(false);
   const [hasJustJoinedSplit, setHasJustJoinedSplit] = useState(false);
   const [usdcEquivalent, setUsdcEquivalent] = useState<number | null>(null);
-  
+
   // Real-time update states
   const [isRealtimeActive, setIsRealtimeActive] = useState(false);
   const [lastRealtimeUpdate, setLastRealtimeUpdate] = useState<string | null>(null);
@@ -264,7 +264,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       setBillName(currentSplitData.title);
       setTotalAmount(currentSplitData.totalAmount.toString());
       setSelectedSplitType(currentSplitData.splitType || null);
-      
+
       // No longer managing separate invited users state - all participants are shown in the main list
     }
   }, [currentSplitData]);
@@ -313,7 +313,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       route.params.selectedContacts.forEach((contact: any) => {
         inviteContact(contact);
       });
-      
+
       // Clear the selected contacts from route params to avoid re-processing
       navigation.setParams({ selectedContacts: undefined });
     }
@@ -323,11 +323,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     // Check if split is already active/locked and redirect accordingly
     const checkSplitStateAndRedirect = async () => {
       if (!currentSplitData || !currentSplitData.splitType) return;
-      
+
       // Only redirect if the split is already active/locked and we're not from a notification
       if (currentSplitData.status === 'active' || currentSplitData.status === 'locked') {
         // Split is already active/locked, redirecting to appropriate screen
-        
+
         // Small delay to ensure UI is ready
         setTimeout(() => {
           if (currentSplitData.splitType === 'fair') {
@@ -352,33 +352,33 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         }, 100);
       }
     };
-    
+
     checkSplitStateAndRedirect();
   }, [currentSplitData, navigation, billData, currentProcessedBillData, splitWallet, isFromNotification, notificationId]);
 
   // Async function implementations
   const loadSplitData = async () => {
     if (!splitId) return;
-    
+
     try {
       const result = await SplitStorageService.getSplit(splitId);
       if (result.success && result.split) {
         const splitData = result.split;
-        
+
         // Fetch latest user data for all participants to get current wallet addresses
         const updatedParticipants = await Promise.all(
           splitData.participants.map(async (participant: any) => {
             try {
               const { firebaseDataService } = await import('../../services/firebaseDataService');
               const latestUserData = await firebaseDataService.user.getCurrentUser(participant.userId);
-              
+
               // Debug logging for user data
               console.log(`🔍 User data for ${participant.userId}:`, {
                 name: latestUserData?.name,
                 wallet_address: latestUserData?.wallet_address,
                 originalWalletAddress: participant.walletAddress
               });
-              
+
               // Use latest wallet address if available, otherwise keep existing data
               return {
                 ...participant,
@@ -390,15 +390,15 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             }
           })
         );
-        
+
         // Update split data with refreshed participant information
         const updatedSplitData = {
           ...splitData,
           participants: updatedParticipants
         };
-        
+
         setCurrentSplitData(updatedSplitData);
-        
+
         // Debug logging for split data
         console.log('🔍 Loaded split data:', {
           splitId: splitData.id,
@@ -410,7 +410,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             walletAddress: p.walletAddress
           }))
         });
-        
+
         // No longer managing separate invited users state - all participants are shown in the main list
       }
     } catch (error) {
@@ -424,11 +424,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       console.log('🔍 Real-time updates not started:', { splitId, isRealtimeActive });
       return;
     }
-    
+
     try {
       console.log('🔍 Starting real-time updates for split:', splitId);
       logger.info('Starting real-time updates for split', { splitId }, 'SplitDetailsScreen');
-      
+
       const cleanup = await splitRealtimeService.startListening(
         splitId,
         {
@@ -439,12 +439,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               participantsCount: update.participants.length,
               splitTitle: update.split?.title
             });
-            logger.debug('Real-time split update received', { 
+            logger.debug('Real-time split update received', {
               splitId,
               hasChanges: update.hasChanges,
               participantsCount: update.participants.length
             }, 'SplitDetailsScreen');
-            
+
             if (update.split) {
               // Update the current split data
               setCurrentSplitData(update.split);
@@ -452,7 +452,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               setTotalAmount(update.split.totalAmount.toString());
               setSelectedSplitType(update.split.splitType || null);
               setLastRealtimeUpdate(update.lastUpdated);
-              
+
               // Convert currency to USDC if needed
               if (update.split.currency !== 'USDC') {
                 setIsConvertingCurrency(true);
@@ -475,31 +475,31 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               participantsCount: participants.length,
               participants: participants.map(p => ({ name: p.name, status: p.status }))
             });
-            logger.debug('Real-time participant update received', { 
+            logger.debug('Real-time participant update received', {
               splitId,
               participantsCount: participants.length
             }, 'SplitDetailsScreen');
-            
+
             // Update current split data with new participants
             setCurrentSplitData(prev => prev ? { ...prev, participants } : null);
           },
           onError: (error) => {
             console.error('🔍 Real-time update error:', error);
-            logger.error('Real-time update error', { 
+            logger.error('Real-time update error', {
               splitId,
-              error: error.message 
+              error: error.message
             }, 'SplitDetailsScreen');
           }
         }
       );
-      
+
       realtimeCleanupRef.current = cleanup;
       setIsRealtimeActive(true);
       console.log('🔍 Real-time updates started successfully');
-      
+
     } catch (error) {
       console.error('🔍 Failed to start real-time updates:', error);
-      logger.error('Failed to start real-time updates', { 
+      logger.error('Failed to start real-time updates', {
         splitId,
         error: error instanceof Error ? error.message : 'Unknown error'
       }, 'SplitDetailsScreen');
@@ -508,23 +508,23 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   const stopRealtimeUpdates = () => {
     if (!isRealtimeActive) return;
-    
+
     try {
       logger.info('Stopping real-time updates for split', { splitId }, 'SplitDetailsScreen');
-      
+
       if (realtimeCleanupRef.current) {
         realtimeCleanupRef.current();
         realtimeCleanupRef.current = null;
       }
-      
+
       if (splitId) {
         splitRealtimeService.stopListening(splitId);
       }
       setIsRealtimeActive(false);
       setLastRealtimeUpdate(null);
-      
+
     } catch (error) {
-      logger.error('Failed to stop real-time updates', { 
+      logger.error('Failed to stop real-time updates', {
         splitId,
         error: error instanceof Error ? error.message : 'Unknown error'
       }, 'SplitDetailsScreen');
@@ -553,12 +553,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   const convertCurrencyToUSDC = async () => {
     if (!totalAmount) return;
-    
+
     try {
       setIsConvertingCurrency(true);
       const amount = parseFloat(totalAmount);
       const currency = splitData?.currency || processedBillData?.currency || billData?.currency || 'USD';
-      
+
       if (currency !== 'USD') {
         const usdcAmount = await convertFiatToUSDC(amount, currency);
         setUsdcEquivalent(usdcAmount);
@@ -578,7 +578,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     const amountToUse = totalAmount || currentSplitData?.totalAmount || '0';
     const creatorName = currentUser?.name || currentUser?.email?.split('@')[0] || 'User';
     const creatorId = currentUser?.id?.toString() || '';
-    
+
     if (splitIdToUse) {
       // Create split invitation data
       const invitationData = {
@@ -595,7 +595,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         invitationCode: `ws_inv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
         timestamp: new Date().toISOString()
       };
-      
+
       // Generate shareable link
       const shareableLink = SplitInvitationService.generateShareableLink(invitationData);
       setQrCodeData(shareableLink);
@@ -610,7 +610,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   const handleJoinSplitFromNotification = async () => {
     if (!splitId || !currentUser) return;
-    
+
     try {
       setIsJoiningSplit(true);
       const result = await SplitInvitationService.joinSplit({
@@ -637,7 +637,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   const handleSplitInvitation = async () => {
     if (!splitInvitationData) return;
-    
+
     try {
       const invitationData = JSON.parse(splitInvitationData);
       if (invitationData.splitId) {
@@ -654,7 +654,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   const checkExistingSplit = async () => {
     if (!currentUser || hasAttemptedProcessing) return;
-    
+
     try {
       setHasAttemptedProcessing(true);
       // Check if user already has an active split
@@ -673,10 +673,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   const inviteContact = async (contact: any) => {
     if (!contact || !currentUser || !splitId) return;
-    
+
     try {
       setIsInvitingUsers(true);
-      
+
       // Check if contact is already a participant
       const isAlreadyParticipant = participants.some((p: any) => (p.userId || p.id) === (contact.id || contact.userId));
       if (isAlreadyParticipant) {
@@ -711,7 +711,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       };
 
       const addParticipantResult = await SplitStorageService.addParticipant(splitId, participantData);
-      
+
       if (!addParticipantResult.success) {
         console.error('Failed to add participant to split:', addParticipantResult.error);
         Alert.alert('Error', 'Failed to add participant to split. Please try again.');
@@ -725,7 +725,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       if (currentSplitData?.walletId) {
         try {
           const { SplitWalletManagement } = await import('../../services/split/SplitWalletManagement');
-          
+
           // Get current split data to get all participants
           const updatedSplitResult = await SplitStorageService.getSplit(splitId);
           if (updatedSplitResult.success && updatedSplitResult.split) {
@@ -754,7 +754,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         splitId: splitId,
         billName: billName
       }, 'SplitDetailsScreen');
-      
+
       const notificationResult = await notificationService.sendNotification(
         contact.id || contact.userId,
         'Split Invitation',
@@ -779,7 +779,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           invitedUserName: contact.name,
           billName
         }, 'SplitDetailsScreen');
-        
+
         Alert.alert(
           'Invitation Sent!',
           `${contact.name} has been invited to the split and will receive a notification.`
@@ -790,7 +790,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           invitedUserId: contact.id || contact.userId,
           invitedUserName: contact.name
         }, 'SplitDetailsScreen');
-        
+
         Alert.alert(
           'Participant Added',
           `${contact.name} has been added to the split, but the notification may not have been sent.`
@@ -845,12 +845,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const areAllParticipantsAccepted = () => {
     const participants = currentSplitData?.participants || [];
     if (participants.length === 0) return true;
-    
+
     // Check if all participants have 'accepted' status
-    const acceptedParticipants = participants.filter((participant: any) => 
+    const acceptedParticipants = participants.filter((participant: any) =>
       participant.status === 'accepted'
     );
-    
+
     return acceptedParticipants.length === participants.length;
   };
 
@@ -866,7 +866,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   const handleAddFromContacts = () => {
     // Close the current modal
     hideAddFriendsModal();
-    
+
     // Navigate to contacts screen for adding participants
     navigation.navigate('Contacts', {
       action: 'split',
@@ -881,7 +881,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // Test function to manually create a notification (for debugging)
   const testNotification = async () => {
     if (!currentUser) return;
-    
+
     try {
       // Test notification removed - use actual split invitation instead
       logger.info('Test notification functionality removed', { userId: currentUser.id }, 'SplitDetailsScreen');
@@ -912,14 +912,14 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   const handleContinue = async () => {
     if (!selectedSplitType) return;
-    
+
     try {
       // Continue with selected split type
       hideSplitModal();
-      
+
       // Create or update the split with the selected type
       const splitIdToUse = createdSplitId || currentSplitData?.id || splitId;
-      
+
       if (splitIdToUse) {
         // Update existing split with split type
         const updatedSplitData = {
@@ -927,12 +927,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           splitType: selectedSplitType,
           status: 'pending' as const // Keep as pending until wallet is created
         };
-        
+
         const updateResult = await SplitStorageService.updateSplit(splitIdToUse, updatedSplitData);
-        
+
         if (updateResult.success) {
           // Split updated with type
-          
+
           // Navigate to the appropriate screen based on split type
           if (selectedSplitType === 'fair') {
             navigation.navigate('FairSplit', {
@@ -976,13 +976,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
-        
+
         const createResult = await SplitStorageService.createSplit(newSplitData);
-        
+
         if (createResult.success && createResult.split) {
           // New split created with type
           setCreatedSplitId(createResult.split.id);
-          
+
           // Navigate to the appropriate screen based on split type
           if (selectedSplitType === 'fair') {
             navigation.navigate('FairSplit', {
@@ -1092,7 +1092,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     if (!qrCodeData) {
       generateQRCodeData();
     }
-    
+
     setShowAddFriendsModalState(true);
     Animated.parallel([
       Animated.timing(addFriendsModalTranslateY, {
@@ -1261,7 +1261,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 {(() => {
                   const currency = splitData?.currency || processedBillData?.currency || billData?.currency || 'USD';
                   const amount = parseFloat(totalAmount);
-                  
+
                   // Show original currency first, then USDC equivalent
                   return (
                     <>
@@ -1339,8 +1339,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               <View style={styles.participantInfo}>
                 <Text style={styles.participantName}>{participant.name}</Text>
                 <Text style={styles.participantWallet}>
-                  {participant.walletAddress ? 
-                    formatWalletAddress(participant.walletAddress) : 
+                  {participant.walletAddress ?
+                    formatWalletAddress(participant.walletAddress) :
                     'No wallet address'
                   }
                 </Text>
@@ -1357,6 +1357,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               </View>
             </View>
           ))}
+
+          <TouchableOpacity style={styles.addButtonLong} onPress={handleAddContacts}>
+            <Text style={styles.addButtonTextLong}>+ Add more friends</Text>
+          </TouchableOpacity>
 
         </View>
 
@@ -1384,10 +1388,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               ]}>
                 {(() => {
                   const allAccepted = areAllParticipantsAccepted();
-                  
+
                   // Count users who need to accept
                   const participants = currentSplitData?.participants || [];
-                  const acceptedParticipants = participants.filter((participant: any) => 
+                  const acceptedParticipants = participants.filter((participant: any) =>
                     participant.status === 'accepted'
                   );
                   const usersNeedingAcceptance = participants.length - acceptedParticipants.length;
@@ -1421,7 +1425,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               activeOpacity={1}
               onPress={handleCloseModal}
             />
-            
+
             <PanGestureHandler
               onGestureEvent={handleSplitModalGestureEvent}
               onHandlerStateChange={handleSplitModalStateChange}
@@ -1437,74 +1441,74 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 {/* Modal Handle */}
                 <View style={styles.modalHandle} />
 
-            {/* Modal Content */}
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Choose your splitting style</Text>
-              <Text style={styles.modalSubtitle}>
-                Pick how you want to settle the bill with friends.
-              </Text>
-
-              {/* Split Type Options */}
-              <View style={styles.splitOptionsContainer}>
-                {/* Fair Split Option */}
-                <TouchableOpacity
-                  style={[
-                    styles.splitOption,
-                    selectedSplitType === 'fair' && styles.splitOptionSelected
-                  ]}
-                  onPress={() => handleSplitTypeSelection('fair')}
-                >
-                  <Image
-                    source={require('../../../assets/fair-split-icon.png')}
-                    style={styles.splitOptionIconImage}
-                  />
-                  <Text style={styles.splitOptionTitle}>Fair Split</Text>
-                  <Text style={styles.splitOptionDescription}>Split the bill equally among all participants</Text>
-                </TouchableOpacity>
-
-                {/* Degen Split Option */}
-                <TouchableOpacity
-                  style={[
-                    styles.splitOption,
-                    selectedSplitType === 'degen' && styles.splitOptionSelected
-                  ]}
-                  onPress={() => handleSplitTypeSelection('degen')}
-                >
-                  <Image
-                    source={require('../../../assets/degen-split-icon.png')}
-                    style={styles.splitOptionIconImage}
-                  />
-                  <Text style={styles.splitOptionTitle}>Degen Split</Text>
-                  <Text style={styles.splitOptionDescription}>Winner takes all - high risk, high reward</Text>
-                  <View style={styles.riskyModeLabel}>
-                    <Text style={styles.riskyModeIcon}>🔥</Text>
-                    <Text style={styles.riskyModeText}>Risky</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-
-              {/* Continue Button */}
-              <TouchableOpacity
-                style={[
-                  styles.continueButton,
-                  !selectedSplitType && styles.continueButtonDisabled
-                ]}
-                onPress={handleContinue}
-                disabled={!selectedSplitType}
-              >
-                <LinearGradient
-                  colors={selectedSplitType ? [colors.green, colors.greenLight] : [colors.surface, colors.surface]}
-                  style={styles.continueButtonGradient}
-                >
-                  <Text style={[
-                    styles.continueButtonText,
-                    !selectedSplitType && styles.continueButtonTextDisabled
-                  ]}>
-                    Continue
+                {/* Modal Content */}
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>Choose your splitting style</Text>
+                  <Text style={styles.modalSubtitle}>
+                    Pick how you want to settle the bill with friends.
                   </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
+
+                  {/* Split Type Options */}
+                  <View style={styles.splitOptionsContainer}>
+                    {/* Fair Split Option */}
+                    <TouchableOpacity
+                      style={[
+                        styles.splitOption,
+                        selectedSplitType === 'fair' && styles.splitOptionSelected
+                      ]}
+                      onPress={() => handleSplitTypeSelection('fair')}
+                    >
+                      <Image
+                        source={require('../../../assets/fair-split-icon.png')}
+                        style={styles.splitOptionIconImage}
+                      />
+                      <Text style={styles.splitOptionTitle}>Fair Split</Text>
+                      <Text style={styles.splitOptionDescription}>Split the bill equally among all participants</Text>
+                    </TouchableOpacity>
+
+                    {/* Degen Split Option */}
+                    <TouchableOpacity
+                      style={[
+                        styles.splitOption,
+                        selectedSplitType === 'degen' && styles.splitOptionSelected
+                      ]}
+                      onPress={() => handleSplitTypeSelection('degen')}
+                    >
+                      <Image
+                        source={require('../../../assets/degen-split-icon.png')}
+                        style={styles.splitOptionIconImage}
+                      />
+                      <Text style={styles.splitOptionTitle}>Degen Split</Text>
+                      <Text style={styles.splitOptionDescription}>Winner takes all - high risk, high reward</Text>
+                      <View style={styles.riskyModeLabel}>
+                        <Text style={styles.riskyModeIcon}>🔥</Text>
+                        <Text style={styles.riskyModeText}>Risky</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Continue Button */}
+                  <TouchableOpacity
+                    style={[
+                      styles.continueButton,
+                      !selectedSplitType && styles.continueButtonDisabled
+                    ]}
+                    onPress={handleContinue}
+                    disabled={!selectedSplitType}
+                  >
+                    <LinearGradient
+                      colors={selectedSplitType ? [colors.green, colors.greenLight] : [colors.surface, colors.surface]}
+                      style={styles.continueButtonGradient}
+                    >
+                      <Text style={[
+                        styles.continueButtonText,
+                        !selectedSplitType && styles.continueButtonTextDisabled
+                      ]}>
+                        Continue
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
               </Animated.View>
             </PanGestureHandler>
           </View>
@@ -1526,7 +1530,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               activeOpacity={1}
               onPress={handleCloseAddFriendsModal}
             />
-            
+
             <PanGestureHandler
               onGestureEvent={handleAddFriendsModalGestureEvent}
               onHandlerStateChange={handleAddFriendsModalStateChange}
@@ -1541,13 +1545,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               >
                 <View style={styles.dragHandle} />
                 <Text style={styles.addFriendsModalTitle}>Add Friends</Text>
-                
+
                 <View style={styles.qrCodeSection}>
                   <View style={styles.qrCodeContainer}>
                     {qrCodeData && qrCodeData.length > 0 ? (
                       <QrCodeView
                         value={qrCodeData}
-                        size={200}
+                        size={250}
                         backgroundColor="white"
                         color="black"
                         showAddress={false}
@@ -1560,23 +1564,25 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                       </View>
                     )}
                   </View>
-                  <View style={styles.splitContext}>
-                    <Image
-                      source={require('../../../assets/split-icon.png')}
-                      style={styles.splitContextIconImage}
-                    />
-                    <Text style={styles.splitContextText}>Scan to join split</Text>
-                  </View>
+                 
                 </View>
-                
+
                 <View style={styles.addFriendsModalButtons}>
                   <TouchableOpacity style={styles.shareLinkButton} onPress={handleLinkShare}>
                     <Text style={styles.shareLinkButtonText}>Share Link</Text>
                   </TouchableOpacity>
+                  
                   <TouchableOpacity style={styles.doneButton} onPress={handleAddFromContacts}>
-                    <Text style={styles.doneButtonText}>Add from Contacts</Text>
-          </TouchableOpacity>
-        </View>
+                    <LinearGradient
+                      colors={[colors.green, colors.greenLight]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.doneButtonGradient}
+                    >
+                      <Text style={styles.doneButtonText}>Add from Contacts</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
               </Animated.View>
             </PanGestureHandler>
           </View>

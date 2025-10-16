@@ -12,7 +12,6 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     backgroundColor: colors.black,
   },
@@ -360,7 +359,7 @@ export const styles = StyleSheet.create({
   },
   confirmButton: {
     borderRadius: 16,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     alignItems: 'center',
     marginHorizontal: spacing.sm,
   },
@@ -391,7 +390,7 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   createWalletButtonText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
   },
@@ -528,7 +527,7 @@ export const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   modalCancelButtonText: {
     color: colors.white80,
@@ -544,7 +543,6 @@ export const styles = StyleSheet.create({
   },
   modalSaveButtonTouchable: {
     width: '100%',
-    paddingVertical: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -566,12 +564,11 @@ export const styles = StyleSheet.create({
   splitButton: {
     backgroundColor: colors.green,
     borderRadius: 12,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
     alignItems: 'center',
-    marginHorizontal: spacing.sm,
   },
   splitButtonText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.lg,
     fontWeight: '700',
   },
@@ -815,18 +812,37 @@ export const styles = StyleSheet.create({
     borderRadius: 999,
     padding: 2,
     marginBottom: spacing.lg,
+    backgroundColor: colors.blackWhite5,
   },
   appleSliderContainer: {
     backgroundColor: colors.blackWhite5,
     borderRadius: 999,
     height: 60,
     overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: colors.green,
+
+  },
+  appleSliderFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    height: '100%',
+    borderRadius: 999,
+    overflow: 'hidden',
+    
+  },
+  appleSliderFillGradient: {
+    flex: 1,
+    borderRadius: 999,
   },
   appleSliderTrack: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
+    
   },
   appleSliderText: {
     fontSize: typography.fontSize.md,
@@ -837,8 +853,8 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     left: 2,
     top: 2,
-    width: 56,
-    height: 56,
+    width: 54,
+    height: 54,
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
@@ -851,7 +867,7 @@ export const styles = StyleSheet.create({
   appleSliderThumbIcon: {
     width: 16,
     height: 16,
-    tintColor: colors.white,
+    tintColor: colors.black,
   },
   
   // Wallet Recap Modal Styles
@@ -981,7 +997,7 @@ export const styles = StyleSheet.create({
     lineHeight: 22,
   },
   privateKeyDisplay: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.white5,
     borderRadius: 12,
     padding: spacing.lg,
     marginBottom: spacing.lg,
@@ -996,7 +1012,8 @@ export const styles = StyleSheet.create({
   privateKeyWarning: {
     backgroundColor: 'rgba(255, 193, 7, 0.1)',
     borderRadius: 8,
-    padding: spacing.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
     marginBottom: spacing.xl,
     borderLeftWidth: 4,
     borderLeftColor: '#ffc107',
@@ -1047,19 +1064,19 @@ export const styles = StyleSheet.create({
   },
   copyPrivateKeyButton: {
     backgroundColor: colors.green,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: 12,
     flex: 1,
     alignItems: 'center',
   },
   copyPrivateKeyButtonText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
   },
   closePrivateKeyButton: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.white10,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: 12,

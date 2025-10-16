@@ -104,7 +104,6 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.white10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
   },
   avatarText: {
     color: colors.white70,
@@ -113,6 +112,7 @@ export const styles = StyleSheet.create({
   },
   contactInfo: {
     flex: 1,
+    marginLeft: spacing.md,
   },
   contactName: {
     color: colors.textLight,

@@ -486,12 +486,12 @@ export const useDegenSplitLogic = (
         }
         
         const totalParticipants = participants.length;
-        // For degen split, check if participants have locked their funds (status 'locked' or amountPaid >= amountOwed)
-        const lockedCount = wallet.participants.filter((p: any) => p.status === 'locked' || p.amountPaid >= p.amountOwed).length;
+        // For degen split, check if participants have locked their funds (status 'locked' AND amountPaid >= amountOwed)
+        const lockedCount = wallet.participants.filter((p: any) => p.status === 'locked' && p.amountPaid >= p.amountOwed).length;
         
         // Update locked participants list for UI
         const lockedParticipantIds = wallet.participants
-          .filter((p: any) => p.status === 'locked' || p.amountPaid >= p.amountOwed)
+          .filter((p: any) => p.status === 'locked' && p.amountPaid >= p.amountOwed)
           .map((p: any) => p.userId);
         
         setState({ 

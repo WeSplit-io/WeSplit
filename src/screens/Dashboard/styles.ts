@@ -67,7 +67,6 @@ export const styles = StyleSheet.create({
     width: spacing.profileImageSize,
     height: spacing.profileImageSize,
     borderRadius: spacing.profileImageSize / 2,
-    marginRight: spacing.itemSpacing,
     backgroundColor: colors.white10,
   },
   
@@ -436,7 +435,6 @@ export const styles = StyleSheet.create({
     height: 40,
     borderRadius: 30,
     backgroundColor: colors.white10,
-    marginRight: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -446,6 +444,7 @@ export const styles = StyleSheet.create({
   requestContent: {
     flex: 1,
     marginRight: spacing.md,
+    marginLeft: spacing.md,
   },
   
   // Request sender name
@@ -803,7 +802,6 @@ export const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: colors.white10,
-    marginRight: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -820,6 +818,7 @@ export const styles = StyleSheet.create({
   transactionContent: {
     flex: 1,
     marginRight: spacing.md,
+    marginLeft: spacing.md,
   },
   
   // Request sender name

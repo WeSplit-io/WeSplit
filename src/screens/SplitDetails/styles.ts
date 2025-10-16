@@ -300,6 +300,18 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     backgroundColor: colors.black,
   },
+  addButtonLong: {
+    backgroundColor: colors.white10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  addButtonTextLong: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+  },
   splitButton: {
     borderRadius: spacing.md,
     overflow: 'hidden',
@@ -496,8 +508,8 @@ export const styles = StyleSheet.create({
 
   },
   qrCodePlaceholder: {
-    width: 220,
-    height: 220,
+    width: 250,
+    height: 250,
     backgroundColor: colors.white,
     borderRadius: spacing.md,
     justifyContent: 'center',
@@ -544,7 +556,8 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 'auto',
-    gap: spacing.xs,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   shareLinkButton: {
     flex: 1,
@@ -561,13 +574,15 @@ export const styles = StyleSheet.create({
   },
   doneButton: {
     flex: 1,
-    backgroundColor: colors.green,
     borderRadius: spacing.md,
+    overflow: 'hidden',
+  },
+  doneButtonGradient: {
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
   doneButtonText: {
-    color: colors.white,
+    color: colors.black,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
   },

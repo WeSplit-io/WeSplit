@@ -17,7 +17,7 @@ import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
-import { colors } from '../../theme';
+import { colors, spacing } from '../../theme';
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
 import AuthGuard from '../../components/AuthGuard';
 import NavBar from '../../components/NavBar';
@@ -1480,7 +1480,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               displayName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
               style={styles.profileImage}
             />
-            <View>
+            <View style={{ marginLeft: spacing.md }}>
               <Text style={styles.welcomeText}>Welcome back,</Text>
               <Text style={styles.userName}>
                 {currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}!

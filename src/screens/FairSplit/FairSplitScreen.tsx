@@ -10,12 +10,15 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  SafeAreaView,
   StatusBar,
   TextInput,
   ActivityIndicator,
   Image,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -63,6 +66,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   // Error state management
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Apple slider states
+  const [sliderWidth, setSliderWidth] = useState(0);
+  const slideAnimation = useRef(new Animated.Value(2)).current; // Start at left position (2px)
+  const fillAnimation = useRef(new Animated.Value(0)).current; // Fill animation (0 to 1)
+  const [isSliding, setIsSliding] = useState(false);
   
   // Wallet recap modal state
   const [showWalletRecapModal, setShowWalletRecapModal] = useState(false);
@@ -134,6 +143,79 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const calculateTotalPaid = (walletParticipants: any[]) => walletParticipants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
   const hasInvalidAmounts = () => participants.some(p => !p.amountOwed || p.amountOwed <= 0);
   const hasZeroAmounts = () => participants.some(p => p.amountOwed === 0);
+
+  // Apple slider logic
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => !isSigning && !isSliding,
+    onMoveShouldSetPanResponder: () => !isSigning && !isSliding,
+    onPanResponderGrant: () => {
+      setIsSliding(true);
+    },
+    onPanResponderMove: (evt, gestureState) => {
+      if (!isSigning) {
+        const newX = Math.max(2, Math.min(sliderWidth - 58, gestureState.dx + 2));
+        slideAnimation.setValue(newX);
+        
+        // Update fill animation based on slide progress
+        const progress = Math.max(0, Math.min(1, gestureState.dx / (sliderWidth * 0.7)));
+        fillAnimation.setValue(progress);
+      }
+    },
+    onPanResponderRelease: (evt, gestureState) => {
+      setIsSliding(false);
+      
+      if (!isSigning) {
+        const threshold = sliderWidth * 0.7; // 70% of slider width to trigger action
+        
+        if (gestureState.dx >= threshold) {
+          // Slide completed - trigger transfer
+          Animated.parallel([
+            Animated.timing(slideAnimation, {
+              toValue: sliderWidth - 58,
+              duration: 200,
+              useNativeDriver: false,
+            }),
+            Animated.timing(fillAnimation, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: false,
+            })
+          ]).start(() => {
+            handleSignatureStep();
+            // Reset slider after a delay
+            setTimeout(() => {
+              Animated.parallel([
+                Animated.timing(slideAnimation, {
+                  toValue: 2,
+                  duration: 300,
+                  useNativeDriver: false,
+                }),
+                Animated.timing(fillAnimation, {
+                  toValue: 0,
+                  duration: 300,
+                  useNativeDriver: false,
+                })
+              ]).start();
+            }, 1000);
+          });
+        } else {
+          // Slide not far enough - return to start
+          Animated.parallel([
+            Animated.timing(slideAnimation, {
+              toValue: 2,
+              duration: 300,
+              useNativeDriver: false,
+            }),
+            Animated.timing(fillAnimation, {
+              toValue: 0,
+              duration: 300,
+              useNativeDriver: false,
+            })
+          ]).start();
+        }
+      }
+    },
+  });
 
   // Use ref to prevent infinite loops
   const isInitializingRef = useRef(false);
@@ -2144,12 +2226,14 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           isRealtimeActive={isRealtimeActive}
         />
 
-        {/* Progress Indicator */}
-        <FairSplitProgress
-          completionData={completionData}
-          totalAmount={totalAmount}
-          isLoading={isLoadingCompletionData}
-        />
+        {/* Progress Indicator - Only show when split is confirmed */}
+        {isSplitConfirmed && (
+          <FairSplitProgress
+            completionData={completionData}
+            totalAmount={totalAmount}
+            isLoading={isLoadingCompletionData}
+          />
+        )}
 
         {/* Split Wallet Section - Show when wallet exists */}
         {splitWallet && (
@@ -2285,17 +2369,23 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       <View style={styles.bottomContainer}>
         {!splitWallet ? (
             <TouchableOpacity 
-              style={styles.createWalletButton} 
               onPress={handleCreateSplitWallet}
               disabled={isCreatingWallet}
             >
-              {isCreatingWallet ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={styles.createWalletButtonText}>
-                  Create Split Wallet
-                </Text>
-              )}
+              <LinearGradient
+                colors={[colors.green, colors.greenBlue]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.createWalletButton}
+              >
+                {isCreatingWallet ? (
+                  <ActivityIndicator color={colors.black} />
+                ) : (
+                  <Text style={styles.createWalletButtonText}>
+                    Continue
+                  </Text>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
         ) : (
           <View style={styles.actionButtonsContainer}>
@@ -2342,12 +2432,18 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   return (
                     <View style={styles.buttonContainer}>
                       <TouchableOpacity 
-                        style={styles.splitButton} 
                         onPress={handleSplitFunds}
                       >
-                        <Text style={styles.splitButtonText}>
-                          Split
-                        </Text>
+                        <LinearGradient
+                          colors={[colors.green, '#00D4AA']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.splitButton}
+                        >
+                          <Text style={styles.splitButtonText}>
+                            Withdraw Funds
+                          </Text>
+                        </LinearGradient>
                       </TouchableOpacity>
                       
                       {/* DEV BUTTONS - Always show to creators in dev mode */}
@@ -2706,7 +2802,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 )}
                 
                 {/* Transfer Visualization */}
-                <View style={styles.transferVisualization}>
+                {/*<View style={styles.transferVisualization}>
                   <View style={styles.transferIcon}>
                     <Text style={styles.transferIconText}>💳</Text>
                 </View>
@@ -2718,25 +2814,59 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                       {selectedTransferMethod === 'external-wallet' ? '🏦' : '💳'}
                     </Text>
                   </View>
-                </View>
+                </View>*/}
 
-              <TouchableOpacity 
-                style={[
-                    styles.transferButton,
-                    isSigning && styles.transferButtonDisabled
-                  ]}
-                  onPress={handleSignatureStep}
-                  disabled={isSigning}
-                >
-                  <View style={styles.transferButtonContent}>
-                    <View style={styles.transferButtonIcon}>
-                      <Text style={styles.transferButtonIconText}>→</Text>
-                    </View>
-                    <Text style={styles.transferButtonText}>
-                      {isSigning ? 'Transferring...' : 'Transfer Funds'}
-                </Text>
+              <View
+                style={styles.appleSliderGradientBorder}
+                onLayout={(event) => {
+                  const { width } = event.nativeEvent.layout;
+                  setSliderWidth(width);
+                }}
+              >
+                <View style={styles.appleSliderContainer}>
+                  {/* Background fill animation */}
+                  <Animated.View
+                    style={[
+                      styles.appleSliderFill,
+                      {
+                        width: fillAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, sliderWidth - 4], // 4px for border
+                          extrapolate: 'clamp',
+                        }),
+                      }
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={[colors.green, colors.greenBlue]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.appleSliderFillGradient}
+                    />
+                  </Animated.View>
+                  
+                  <View style={styles.appleSliderTrack}>
+                    <Text style={[styles.appleSliderText, { color: colors.white70 }]}>
+                      {isSigning ? 'Transferring...' : 'Slide to Transfer Funds'}
+                    </Text>
                   </View>
-              </TouchableOpacity>
+                  
+                  <Animated.View
+                    style={[
+                      styles.appleSliderThumb,
+                      {
+                        left: slideAnimation,
+                        backgroundColor: isSigning ? colors.textSecondary : colors.green,
+                      }
+                    ]}
+                    {...panResponder.panHandlers}
+                  >
+                    <Text style={[styles.appleSliderThumbIcon, { fontSize: 16, color: colors.white }]}>
+                      →
+                    </Text>
+                  </Animated.View>
+                </View>
+              </View>
 
                 <TouchableOpacity 
                   style={styles.modalCancelButton}
@@ -2824,17 +2954,24 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             </View>
             
             <View style={styles.privateKeyButtons}>
-              <TouchableOpacity 
-                style={styles.copyPrivateKeyButton}
-                onPress={handleCopyPrivateKey}
-              >
-                <Text style={styles.copyPrivateKeyButtonText}>Copy Key</Text>
-              </TouchableOpacity>
+             
               <TouchableOpacity 
                 style={styles.closePrivateKeyButton}
                 onPress={handleClosePrivateKeyModal}
               >
                 <Text style={styles.closePrivateKeyButtonText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={handleCopyPrivateKey}
+              >
+                <LinearGradient
+                  colors={[colors.green, colors.greenBlue]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.copyPrivateKeyButton}
+                >
+                  <Text style={styles.copyPrivateKeyButtonText}>Copy Key</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>

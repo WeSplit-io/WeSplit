@@ -488,6 +488,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
+    padding: spacing.md,
   },
   walletRecapModal: {
     backgroundColor: colors.blackWhite5,
