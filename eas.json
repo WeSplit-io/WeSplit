@@ -29,6 +29,9 @@
     "preview": {
       "developmentClient": false,
       "distribution": "internal",
+      "cache": {
+        "disabled": true
+      },
       "android": {
         "buildType": "apk"
       }
@@ -36,6 +39,9 @@
     "production": {
       "autoIncrement": true,
       "distribution": "store",
+      "cache": {
+        "disabled": true
+      },
       "android": {
         "buildType": "apk"
       },
