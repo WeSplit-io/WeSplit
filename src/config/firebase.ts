@@ -68,6 +68,11 @@ const getEnvVar = (key: string): string => {
     return (Constants.manifest as any).extra[`EXPO_PUBLIC_${key}`];
   }
   
+  // Additional fallback: try to get from firebase config object
+  if (Constants.expoConfig?.extra?.firebase?.[key.toLowerCase().replace('FIREBASE_', '')]) {
+    return Constants.expoConfig.extra.firebase[key.toLowerCase().replace('FIREBASE_', '')];
+  }
+  
   return '';
 };
 
@@ -78,6 +83,21 @@ const projectId = getEnvVar('FIREBASE_PROJECT_ID') || "wesplit-35186";
 const storageBucket = getEnvVar('FIREBASE_STORAGE_BUCKET') || "wesplit-35186.appspot.com";
 const messagingSenderId = getEnvVar('FIREBASE_MESSAGING_SENDER_ID');
 const appId = getEnvVar('FIREBASE_APP_ID');
+
+// Debug logging for production builds
+console.log('🔥 Firebase Config - Environment Variables Debug:', {
+  apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'MISSING',
+  authDomain,
+  projectId,
+  storageBucket,
+  messagingSenderId: messagingSenderId ? `${messagingSenderId.substring(0, 10)}...` : 'MISSING',
+  appId: appId ? `${appId.substring(0, 10)}...` : 'MISSING',
+  hasApiKey: !!apiKey,
+  hasMessagingSenderId: !!messagingSenderId,
+  hasAppId: !!appId,
+  processEnvKeys: Object.keys(process.env).filter(key => key.includes('FIREBASE')),
+  expoConfigExtra: Constants.expoConfig?.extra ? Object.keys(Constants.expoConfig.extra).filter(key => key.includes('FIREBASE')) : 'NO_EXTRA_CONFIG'
+});
 
 // Validate required environment variables
 if (!apiKey) {
