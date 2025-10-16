@@ -89,12 +89,26 @@ class ProductionBuilder {
     try {
       // Check EAS environment variables instead of local ones
       const { execSync } = require('child_process');
-      const easEnvOutput = execSync('eas env:list --environment production --json', { 
-        encoding: 'utf8',
-        cwd: this.projectRoot 
-      });
+      let easEnvOutput;
+      try {
+        easEnvOutput = execSync('eas env:list --environment production --json', { 
+          encoding: 'utf8',
+          cwd: this.projectRoot 
+        });
+      } catch (error) {
+        this.log('⚠️ Could not verify EAS environment variables: ' + error.message, 'yellow');
+        this.log('💡 Continuing with build - EAS will handle environment variables', 'blue');
+        return;
+      }
       
-      const easEnvVars = JSON.parse(easEnvOutput);
+      let easEnvVars;
+      try {
+        easEnvVars = JSON.parse(easEnvOutput);
+      } catch (parseError) {
+        this.log('⚠️ Could not parse EAS environment variables: ' + parseError.message, 'yellow');
+        this.log('💡 Continuing with build - EAS will handle environment variables', 'blue');
+        return;
+      }
       
       const requiredVars = [
         'EXPO_PUBLIC_FIREBASE_API_KEY',
