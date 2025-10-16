@@ -9,6 +9,10 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "ios": {
+        "buildConfiguration": "Debug",
+        "simulator": true
       }
     },
     "development-simple": {
@@ -16,6 +20,10 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "ios": {
+        "buildConfiguration": "Debug",
+        "simulator": true
       }
     },
     "development-fixed": {
@@ -24,6 +32,44 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
+      },
+      "ios": {
+        "buildConfiguration": "Debug",
+        "simulator": true
+      }
+    },
+    "ios-simulator": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "ios": {
+        "buildConfiguration": "Debug",
+        "simulator": true,
+        "cocoapods": "1.16.2"
+      },
+      "env": {
+        "USE_FRAMEWORKS": "static"
+      }
+    },
+    "testflight": {
+      "developmentClient": false,
+      "distribution": "store",
+      "ios": {
+        "buildConfiguration": "Release",
+        "cocoapods": "1.16.2"
+      },
+      "env": {
+        "USE_FRAMEWORKS": "dynamic"
+      }
+    },
+    "internal-testing": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "ios": {
+        "buildConfiguration": "Release",
+        "cocoapods": "1.16.2"
+      },
+      "env": {
+        "USE_FRAMEWORKS": "dynamic"
       }
     },
     "preview": {
@@ -36,7 +82,9 @@
         "buildType": "apk"
       },
       "ios": {
-        "cocoapods": "1.16.2"
+        "cocoapods": "1.16.2",
+        "buildConfiguration": "Debug",
+        "simulator": true
       }
     },
     "production": {

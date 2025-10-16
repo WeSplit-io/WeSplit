@@ -49,7 +49,10 @@
     "test:firebase:functions": "node scripts/test-firebase-functions.js",
     "clear:prebuild": "node scripts/clear-prebuild-cache.js",
     "build:production": "node scripts/build-production.js",
-    "install:ios:ipa": "node scripts/install-ios-ipa.js"
+    "install:ios:ipa": "node scripts/install-ios-ipa.js",
+    "build:ipa:internal": "node scripts/build-shareable-ipa.js internal-testing",
+    "build:ipa:testflight": "node scripts/build-shareable-ipa.js testflight",
+    "build:ipa:preview": "node scripts/build-shareable-ipa.js preview"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
