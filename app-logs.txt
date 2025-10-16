@@ -159,3 +159,7 @@
 10-16 11:06:34.058  5649  5674 I ReactNativeJS: '[INFO] [AuthMethodsScreen] Email authentication process finished, setting loading to false', ''
 10-16 11:06:35.932  5649  5674 W ReactNativeJS: '[2025-10-16T09:06:35.932Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcdde transport errored. Name:', undefined, 'Message:', undefined
 10-16 11:06:56.551  5649  5674 W ReactNativeJS: '[2025-10-16T09:06:56.551Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcddf transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:08:06.199  5649  5674 W ReactNativeJS: '[2025-10-16T09:08:06.199Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcde0 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:09:10.603  5649  5674 W ReactNativeJS: '[2025-10-16T09:09:10.603Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcde1 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:09:55.223  5649  5674 W ReactNativeJS: '[2025-10-16T09:09:55.223Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcde2 transport errored. Name:', undefined, 'Message:', undefined
+10-16 11:11:16.007  5649  5674 W ReactNativeJS: '[2025-10-16T09:11:16.007Z]  @firebase/firestore:', 'Firestore (11.10.0): WebChannelConnection', 'RPC \'Write\' stream 0x3dddcde3 transport errored. Name:', undefined, 'Message:', undefined
