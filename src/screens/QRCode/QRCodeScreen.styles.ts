@@ -46,6 +46,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
+    backgroundColor: 'transparent',
   },
 
   // My Code Tab Styles
@@ -96,23 +97,19 @@ export const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   cameraFrame: {
     width: SCREEN_WIDTH - spacing.lg * 2,
     height: SCREEN_HEIGHT * 0.5,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   scanArea: {
-    width: '100%',
-    height: '100%',
-    borderWidth: 2,
-    borderColor: colors.white,
-    borderStyle: 'dashed',
-    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.darkCard,
+    backgroundColor: 'transparent',
   },
   cameraPlaceholder: {
     alignItems: 'center',
@@ -137,16 +134,33 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  cameraContainer: {
+    flex: 1,
+    position: 'relative',
+  },
   camera: {
     flex: 1,
     width: '100%',
     height: '100%',
+  },
+  scanOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    pointerEvents: 'none', // Allow touches to pass through to camera
   },
   scanFrame: {
     width: 250,
     height: 250,
     position: 'relative',
     alignSelf: 'center',
+    backgroundColor: 'transparent',
+    pointerEvents: 'none',
   },
   scanCorner: {
     position: 'absolute',
@@ -195,6 +209,10 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.xl,
     paddingHorizontal: spacing.lg,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.sm,
+    pointerEvents: 'none',
   },
 
   // Toggle Styles

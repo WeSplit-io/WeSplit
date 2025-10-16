@@ -136,7 +136,7 @@ class AuthService {
             code: result.params.code,
             redirectUri,
             extraParams: {
-              code_verifier: request.codeVerifier,
+              code_verifier: request.codeVerifier || '',
             },
           },
           {
@@ -208,7 +208,7 @@ class AuthService {
             code: result.params.code,
             redirectUri,
             extraParams: {
-              code_verifier: request.codeVerifier,
+              code_verifier: request.codeVerifier || '',
             },
           },
           {
@@ -280,7 +280,7 @@ class AuthService {
             code: result.params.code,
             redirectUri,
             extraParams: {
-              code_verifier: request.codeVerifier,
+              code_verifier: request.codeVerifier || '',
             },
           },
           {

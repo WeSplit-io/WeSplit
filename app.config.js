@@ -1,18 +1,18 @@
-import 'dotenv/config';
+require('dotenv/config');
 
-export default {
+module.exports = {
   expo: {
     name: "WeSplit",
     slug: "WeSplit",
-    version: "1.0.0",
+    version: "1.0.1",
     orientation: "portrait",
-    icon: "./assets/wesplit-logo-new.png",
+    icon: "./assets/android-app-icon-no-alpha.png",
     userInterfaceStyle: "light",
     newArchEnabled: false,
     sdkVersion: "54.0.0",
     jsEngine: "hermes",
     splash: {
-      image: "./assets/wesplit-logo-new.png",
+      image: "./assets/android-app-icon-no-alpha.png",
       resizeMode: "contain",
       backgroundColor: "#061113"
     },
@@ -30,18 +30,26 @@ export default {
           "rainbow",
           "uniswap"
         ],
-        NSCameraUsageDescription: "This app uses the camera to take profile pictures.",
-        NSPhotoLibraryUsageDescription: "This app accesses the photo library to let you select profile pictures."
-      }
+        NSCameraUsageDescription: "This app uses the camera to scan QR codes for payments, split invitations, and contact sharing.",
+        NSPhotoLibraryUsageDescription: "This app accesses the photo library to let you select profile pictures.",
+        ITSAppUsesNonExemptEncryption: false
+      },
+      ...(process.env.EAS_BUILD_PROFILE === 'development' ? {
+        entitlements: {
+          // Remove push notifications capability for development builds
+        }
+      } : {})
     },
     scheme: "wesplit",
     android: {
       package: "com.wesplit.app",
       adaptiveIcon: {
-        foregroundImage: "./assets/wesplit-logo-new.png",
+        foregroundImage: "./assets/android-app-icon-no-alpha.png",
         backgroundColor: "#061113"
       },
-      jsEngine: "jsc",
+      compileSdkVersion: 34,
+      targetSdkVersion: 34,
+      minSdkVersion: 21,
       permissions: [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -80,17 +88,32 @@ export default {
       "./queries.js",
       "expo-secure-store",
       "expo-router",
-      "expo-notifications",
+      "expo-camera",
+      ...(process.env.EAS_BUILD_PROFILE !== 'development' ? ["expo-notifications"] : []),
       "expo-web-browser"
     ],
     extra: {
       eas: {
         projectId: "2eca5921-d3a4-4104-a70a-67e826a73491"
       },
-      // Firebase configuration from environment variables
+      // Firebase configuration object for easy access
+      firebase: {
+        apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+        authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+        measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
+      },
+      // Firebase configuration from environment variables (for backward compatibility)
       EXPO_PUBLIC_FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
       EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
       EXPO_PUBLIC_FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      EXPO_PUBLIC_FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+      EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
       
       // Social Authentication configuration
       EXPO_PUBLIC_GOOGLE_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
@@ -103,10 +126,6 @@ export default {
       EXPO_PUBLIC_APPLE_KEY_ID: process.env.EXPO_PUBLIC_APPLE_KEY_ID,
       EXPO_PUBLIC_TWITTER_CLIENT_ID: process.env.EXPO_PUBLIC_TWITTER_CLIENT_ID,
       EXPO_PUBLIC_TWITTER_CLIENT_SECRET: process.env.EXPO_PUBLIC_TWITTER_CLIENT_SECRET,
-      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-      EXPO_PUBLIC_FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-      EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
       
       // Solana Configuration
       EXPO_PUBLIC_HELIUS_API_KEY: process.env.EXPO_PUBLIC_HELIUS_API_KEY,
@@ -124,6 +143,10 @@ export default {
       EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE: process.env.EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE,
       EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE: process.env.EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE,
       
+    },
+    podfileProperties: {
+      "ios.useFrameworks": "dynamic",
+      "ios.useModularHeaders": true
     }
   }
 }; 

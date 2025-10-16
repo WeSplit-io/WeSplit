@@ -55,6 +55,37 @@ export class SplitWalletCleanup {
       const docId = wallet.firebaseDocId || splitWalletId;
       await updateDoc(doc(db, 'splitWallets', docId), updatedWalletData);
 
+      // CRITICAL: Also update the splits collection to keep both databases synchronized
+      try {
+        const { SplitStorageService } = await import('../splitStorageService');
+        
+        const splitUpdateResult = await SplitStorageService.updateSplitByBillId(wallet.billId, {
+          status: 'cancelled',
+          updatedAt: new Date().toISOString(),
+        });
+        
+        if (splitUpdateResult.success) {
+          logger.info('Split database synchronized successfully (cancellation)', {
+            splitWalletId,
+            billId: wallet.billId,
+            status: 'cancelled'
+          }, 'SplitWalletCleanup');
+        } else {
+          logger.error('Failed to synchronize split database (cancellation)', {
+            splitWalletId,
+            billId: wallet.billId,
+            error: splitUpdateResult.error
+          }, 'SplitWalletCleanup');
+        }
+      } catch (syncError) {
+        logger.error('Error synchronizing split database during cancellation', {
+          splitWalletId,
+          billId: wallet.billId,
+          error: syncError instanceof Error ? syncError.message : String(syncError)
+        }, 'SplitWalletCleanup');
+        // Don't fail the cancellation if sync fails, but log the error
+      }
+
       const updatedWallet: SplitWallet = {
         ...wallet,
         ...updatedWalletData,
@@ -135,6 +166,38 @@ export class SplitWalletCleanup {
         completedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
+
+      // CRITICAL: Also update the splits collection to keep both databases synchronized
+      try {
+        const { SplitStorageService } = await import('../splitStorageService');
+        
+        const splitUpdateResult = await SplitStorageService.updateSplitByBillId(wallet.billId, {
+          status: 'completed',
+          completedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        
+        if (splitUpdateResult.success) {
+          logger.info('Split database synchronized successfully (withdrawal)', {
+            splitWalletId,
+            billId: wallet.billId,
+            status: 'completed'
+          }, 'SplitWalletCleanup');
+        } else {
+          logger.error('Failed to synchronize split database (withdrawal)', {
+            splitWalletId,
+            billId: wallet.billId,
+            error: splitUpdateResult.error
+          }, 'SplitWalletCleanup');
+        }
+      } catch (syncError) {
+        logger.error('Error synchronizing split database during withdrawal', {
+          splitWalletId,
+          billId: wallet.billId,
+          error: syncError instanceof Error ? syncError.message : String(syncError)
+        }, 'SplitWalletCleanup');
+        // Don't fail the withdrawal if sync fails, but log the error
+      }
 
       const updatedWallet: SplitWallet = {
         ...wallet,
@@ -222,6 +285,33 @@ export class SplitWalletCleanup {
       const docId = wallet.firebaseDocId || splitWalletId;
       await deleteDoc(doc(db, 'splitWallets', docId));
 
+      // CRITICAL: Also delete the corresponding split from splits collection
+      try {
+        const { SplitStorageService } = await import('../splitStorageService');
+        
+        const splitDeleteResult = await SplitStorageService.deleteSplit(wallet.billId);
+        
+        if (splitDeleteResult.success) {
+          logger.info('Split database synchronized successfully (burn cleanup)', {
+            splitWalletId,
+            billId: wallet.billId,
+            action: 'deleted'
+          }, 'SplitWalletCleanup');
+        } else {
+          logger.error('Failed to synchronize split database (burn cleanup)', {
+            splitWalletId,
+            billId: wallet.billId,
+            error: splitDeleteResult.error
+          }, 'SplitWalletCleanup');
+        }
+      } catch (syncError) {
+        logger.error('Error synchronizing split database during burn cleanup', {
+          splitWalletId,
+          billId: wallet.billId,
+          error: syncError instanceof Error ? syncError.message : String(syncError)
+        }, 'SplitWalletCleanup');
+        // Don't fail the burn if sync fails, but log the error
+      }
 
       logger.info('Split wallet burned and cleaned up', {
         splitWalletId,

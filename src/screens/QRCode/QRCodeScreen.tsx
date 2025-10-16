@@ -7,6 +7,7 @@ import {
   StatusBar,
   Image,
   Alert,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -14,10 +15,8 @@ import { QrCodeView } from '@features/qr';
 import Icon from '../../components/Icon';
 import { styles } from './QRCodeScreen.styles';
 import { colors } from '../../theme';
-import { parseUri, extractRecipientAddress, isSolanaPayUri } from '@features/qr/solanaPay';
-import { isValidSolanaAddress } from '@libs/validation';
-import { QRCodeService } from '../../services/qrCodeService';
-import { SplitInvitationService } from '../../services/splitInvitationService';
+import { parseUri, isSolanaPayUri, extractRecipientAddress, isValidSolanaAddress, createUsdcRequestUri } from '@features/qr';
+import { parseWeSplitDeepLink } from '../../services/deepLinkHandler';
 import { logger } from '../../services/loggingService';
 
 // Fonction pour hacher l'adresse du wallet
@@ -55,6 +54,15 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
   const scanThrottleMs = 1500; // 1.5 seconds throttle
 
   const hasPermission = permission?.granted;
+  
+  // Debug camera permission state
+  React.useEffect(() => {
+    logger.info('Camera permission state changed', {
+      permission: permission?.granted,
+      canAskAgain: permission?.canAskAgain,
+      status: permission?.status
+    }, 'QRCodeScreen');
+  }, [permission]);
 
   const resetScanner = () => {
     setScanned(false);
@@ -81,47 +89,104 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
     logger.info('QR Code scanned', { data }, 'QRCodeScreen');
     
     try {
-      // Check if it's a split invitation QR code
-      const qrData = QRCodeService.parseQRCode(data);
-      if (qrData && qrData.type === 'split_invitation') {
-        if (QRCodeService.validateSplitInvitationQR(qrData)) {
-          const splitData = qrData.data;
-          
-          // Convert QR data to split invitation data format
-          const invitationData = {
-            type: 'split_invitation' as const,
-            splitId: splitData.splitId,
-            billName: splitData.billName,
-            totalAmount: splitData.totalAmount,
-            currency: splitData.currency,
-            creatorId: splitData.creatorId,
-            creatorName: splitData.creatorName,
-            timestamp: qrData.timestamp,
-          };
-          
-          // Generate shareable link from invitation data
-          const shareableLink = SplitInvitationService.generateShareableLink(invitationData);
-          
-          // Navigate to SplitDetails screen with the invitation data
-          if (navigation) {
-            navigation.navigate('SplitDetails', {
-              shareableLink: shareableLink,
-              splitInvitationData: JSON.stringify(invitationData)
-            });
-          } else {
-            Alert.alert(
-              'Split Invitation Found',
-              `Bill: ${splitData.billName}\nAmount: ${splitData.totalAmount} ${splitData.currency}\nCreator: ${splitData.creatorName}`,
-              [
-                { text: 'OK', onPress: () => resetScanner() }
-              ]
-            );
+      // Check if it's a WeSplit deep link
+      if (data.startsWith('wesplit://')) {
+        const linkData = parseWeSplitDeepLink(data);
+        if (linkData) {
+          switch (linkData.action) {
+            case 'join-split':
+              // Navigate to SplitDetails screen with the invitation data
+              if (navigation) {
+                navigation.navigate('SplitDetails', {
+                  shareableLink: data,
+                  splitInvitationData: linkData.splitInvitationData
+                });
+              } else {
+                Alert.alert(
+                  'Split Invitation Found',
+                  'Join this split to participate in the bill sharing.',
+                  [
+                    { text: 'OK', onPress: () => resetScanner() }
+                  ]
+                );
+              }
+              return;
+              
+            case 'profile':
+              // Navigate to contacts or show add contact option
+              if (navigation) {
+                navigation.navigate('Contacts', {
+                  addContactFromQR: linkData
+                });
+              } else {
+                Alert.alert(
+                  'Profile QR Code',
+                  `Add ${linkData.userName} as a contact?`,
+                  [
+                    { text: 'Cancel', onPress: () => resetScanner() },
+                    { text: 'Add Contact', onPress: () => resetScanner() }
+                  ]
+                );
+              }
+              return;
+              
+            case 'send':
+              // Navigate to Send screen with recipient
+              if (navigation) {
+                navigation.navigate('Send', {
+                  recipientWalletAddress: linkData.recipientWalletAddress,
+                  recipientName: linkData.userName,
+                  recipientEmail: linkData.userEmail
+                });
+              } else {
+                Alert.alert(
+                  'Send Money QR Code',
+                  `Send money to ${linkData.userName}?`,
+                  [
+                    { text: 'Cancel', onPress: () => resetScanner() },
+                    { text: 'Send', onPress: () => resetScanner() }
+                  ]
+                );
+              }
+              return;
+              
+            case 'transfer':
+              // Navigate to CryptoTransfer screen
+              if (navigation) {
+                navigation.navigate('CryptoTransfer', {
+                  targetWallet: {
+                    address: linkData.recipientWalletAddress,
+                    name: linkData.userName || 'App Wallet',
+                    type: 'personal'
+                  },
+                  prefillAmount: linkData.transferAmount ? parseFloat(linkData.transferAmount) : undefined
+                });
+              } else {
+                Alert.alert(
+                  'Transfer QR Code',
+                  `Transfer to ${linkData.userName}?`,
+                  [
+                    { text: 'Cancel', onPress: () => resetScanner() },
+                    { text: 'Transfer', onPress: () => resetScanner() }
+                  ]
+                );
+              }
+              return;
+              
+            default:
+              Alert.alert(
+                'Unsupported QR Code',
+                'This WeSplit QR code is not supported in this version.',
+                [
+                  { text: 'OK', onPress: () => resetScanner() }
+                ]
+              );
+              return;
           }
-          return;
         } else {
           Alert.alert(
-            'Invalid Split Invitation',
-            'This QR code contains an invalid split invitation',
+            'Invalid QR Code',
+            'This QR code is not a valid WeSplit link.',
             [
               { text: 'OK', onPress: () => resetScanner() }
             ]
@@ -222,7 +287,9 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
 
         <View style={styles.qrCodeWrapper}>
           <QrCodeView
-            value={qrValue}
+            value={userWallet}
+            address={userWallet}
+            useSolanaPay={true}
             size={270}
             backgroundColor="transparent"
             color={colors.black}
@@ -230,6 +297,8 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
             showButtons={false}
             subtext=""
             qrContainerBackgroundColor="transparent"
+            label="WeSplit"
+            message={`Send USDC to ${userPseudo}`}
           />
         </View>
 
@@ -249,7 +318,25 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
                   <Text style={styles.cameraPlaceholderText}>Camera Permission Required</Text>
                   <TouchableOpacity 
                     style={styles.permissionButton}
-                    onPress={requestPermission}
+                    onPress={async () => {
+                      try {
+                        const result = await requestPermission();
+                        logger.info('Camera permission requested', { result }, 'QRCodeScreen');
+                        if (!result.granted) {
+                          Alert.alert(
+                            'Camera Permission Required',
+                            'WeSplit needs camera access to scan QR codes. Please enable it in your device settings.',
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              { text: 'Open Settings', onPress: () => Linking.openSettings() }
+                            ]
+                          );
+                        }
+                      } catch (error) {
+                        logger.error('Error requesting camera permission', error, 'QRCodeScreen');
+                        Alert.alert('Error', 'Failed to request camera permission. Please try again.');
+                      }
+                    }}
                   >
                     <Text style={styles.permissionButtonText}>Grant Permission</Text>
                   </TouchableOpacity>
@@ -263,28 +350,39 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
 
     return (
       <View style={styles.tabContent}>
-        <View style={styles.scanContainer}>
-          <View style={styles.cameraFrame}>
-            <CameraView
-              style={styles.camera}
-              facing="back"
-              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-              barcodeScannerSettings={{
-                barcodeTypes: ['qr'],
-              }}
-            >
-              <View style={styles.scanArea}>
-                <View style={styles.scanFrame}>
-                  <View style={styles.scanCorner} />
-                  <View style={[styles.scanCorner, styles.scanCornerTopRight]} />
-                  <View style={[styles.scanCorner, styles.scanCornerBottomLeft]} />
-                  <View style={[styles.scanCorner, styles.scanCornerBottomRight]} />
-                </View>
-                <Text style={styles.scanInstruction}>
-                  Position the QR code within the frame
-                </Text>
-              </View>
-            </CameraView>
+        <View style={styles.cameraContainer}>
+          <CameraView
+            style={styles.camera}
+            facing="back"
+            onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+            barcodeScannerSettings={{
+              barcodeTypes: ['qr'],
+            }}
+            onCameraReady={() => {
+              logger.info('Camera ready for QR scanning', null, 'QRCodeScreen');
+            }}
+            onMountError={(error) => {
+              logger.error('Camera mount error', error, 'QRCodeScreen');
+              Alert.alert(
+                'Camera Error',
+                'Failed to initialize camera. Please check your device settings and try again.',
+                [
+                  { text: 'OK', onPress: () => resetScanner() }
+                ]
+              );
+            }}
+          />
+          {/* Minimal overlay with just scan frame */}
+          <View style={styles.scanOverlay}>
+            <View style={styles.scanFrame}>
+              <View style={styles.scanCorner} />
+              <View style={[styles.scanCorner, styles.scanCornerTopRight]} />
+              <View style={[styles.scanCorner, styles.scanCornerBottomLeft]} />
+              <View style={[styles.scanCorner, styles.scanCornerBottomRight]} />
+            </View>
+            <Text style={styles.scanInstruction}>
+              Position the QR code within the frame
+            </Text>
           </View>
         </View>
       </View>

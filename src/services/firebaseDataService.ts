@@ -517,6 +517,8 @@ export const firebaseUserService = {
     
     await updateDoc(userRef, updateData);
     
+    // Note: Group synchronization removed - using transaction-based contact system instead
+    
     // Return updated user
     const updatedDoc = await getDoc(userRef);
     return firebaseDataTransformers.firestoreToUser(updatedDoc);
@@ -645,7 +647,9 @@ export const firebaseUserService = {
       if (__DEV__) { console.error('🔥 getUserByWalletAddress: Error finding user by wallet address:', error); }
       return null;
     }
-  }
+  },
+
+  // Note: syncUserInfoToGroupMembers removed - using transaction-based contact system instead
 };
 
 // Group services
@@ -1359,70 +1363,7 @@ export const firebaseGroupService = {
     return await firebaseGroupService.removeMemberFromGroup(groupId, userId);
   },
 
-  getUserContacts: async (userId: string, forceRefresh: boolean = false): Promise<UserContact[]> => {
-    try {
-      // Get all groups where the user is a member
-      const groupMembersRef = collection(db, 'groupMembers');
-      const userGroupsQuery = query(groupMembersRef, where('user_id', '==', userId));
-      const userGroupsDocs = await getDocs(userGroupsQuery);
-      
-      const groupIds = userGroupsDocs.docs.map(doc => doc.data().group_id);
-      
-      if (groupIds.length === 0) {
-        return [];
-      }
-      
-      // Get all members from these groups (excluding the current user)
-      const allMembersQuery = query(
-        groupMembersRef,
-        where('group_id', 'in', groupIds),
-        where('user_id', '!=', userId)
-      );
-      const allMembersDocs = await getDocs(allMembersQuery);
-      
-      // Create a map to deduplicate contacts
-      const contactsMap = new Map<string, UserContact>();
-      
-      allMembersDocs.docs.forEach(doc => {
-        const memberData = doc.data();
-        const contactId = memberData.user_id;
-        
-        if (!contactsMap.has(contactId)) {
-          contactsMap.set(contactId, {
-            id: contactId,
-            name: memberData.name || '',
-            email: memberData.email || '',
-            wallet_address: memberData.wallet_address || '',
-            wallet_public_key: memberData.wallet_public_key || '',
-            created_at: firebaseDataTransformers.timestampToISO(memberData.created_at),
-            joined_at: firebaseDataTransformers.timestampToISO(memberData.joined_at),
-            first_met_at: firebaseDataTransformers.timestampToISO(memberData.joined_at),
-            avatar: memberData.avatar || '',
-            mutual_groups_count: 1
-          });
-         } else {
-           // Increment mutual groups count
-           const existing = contactsMap.get(contactId)!;
-           existing.mutual_groups_count = (existing.mutual_groups_count || 0) + 1;
-         }
-      });
-      
-      const contacts = Array.from(contactsMap.values());
-      
-      // Debug logging for avatar data
-      if (__DEV__) {
-        logger.debug('Loaded contacts with avatar data', {
-          contactsCount: contacts.length,
-          contactsWithAvatars: contacts.filter(c => !!c.avatar).length
-        }, 'firebaseDataService');
-      }
-      
-      return contacts;
-    } catch (error) {
-      if (__DEV__) { console.error('🔥 Error getting user contacts:', error); }
-      return [];
-    }
-  },
+  // Note: Group-based getUserContacts removed - using TransactionBasedContactService instead
 
   // Search users by username/name
   searchUsersByUsername: async (searchTerm: string, excludeUserId?: string): Promise<User[]> => {
@@ -2190,8 +2131,14 @@ export const firebaseTransactionService = {
         })
       ];
       
+      // Remove duplicate transactions (in case both old and new format exist)
+      const uniqueTransactions = allTransactions.filter((transaction, index, self) => {
+        // Keep only the first occurrence of each transaction hash
+        return index === self.findIndex(t => t.tx_hash === transaction.tx_hash);
+      });
+      
       // Sort by created_at descending
-      const sortedTransactions = allTransactions.sort((a, b) => 
+      const sortedTransactions = uniqueTransactions.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       

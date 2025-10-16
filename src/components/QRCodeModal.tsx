@@ -9,7 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
-import { QrCodeView } from '@features/qr';
+import { QrCodeView, createUsdcRequestUri } from '@features/qr';
 import Icon from './Icon';
 import { styles } from './QRCodeModal.styles';
 import { colors } from '../theme';
@@ -165,6 +165,12 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
                       size={200}
                       backgroundColor={colors.white}
                       color={colors.black}
+                      useSolanaPay={qrValue && !qrValue.startsWith('wesplit://')}
+                      address={rawAddress}
+                      label="WeSplit"
+                      message={isGroup ? 'Group invite link' : 'Send USDC'}
+                      showAddress={false}
+                      showButtons={false}
                     />
                   </View>
                 </View>

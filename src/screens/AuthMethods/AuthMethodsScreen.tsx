@@ -253,67 +253,48 @@ const AuthMethodsScreen: React.FC = () => {
             let firebaseUser = auth.currentUser;
 
             if (!firebaseUser || firebaseUser.email !== sanitizedEmail) {
-              // Try to get user by email from Firebase Auth
-              try {
-                // For existing users, we need to handle this differently
-                // Since we can't sign in without knowing the password, we'll create a new Firebase Auth user
-                // with a secure temporary password and update the Firestore document
-                const temporaryPassword = `WeSplit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-                try {
-                  // Try to create a new Firebase Auth user
-                  firebaseUser = await firebaseAuth.createUserWithEmail(sanitizedEmail, temporaryPassword);
-                  if (__DEV__) { logger.info('Created new Firebase Auth user for existing Firestore user', null, 'AuthMethodsScreen'); }
-                } catch (createError: any) {
-                  if (createError.code === 'auth/email-already-in-use') {
-                    // User already exists in Firebase Auth, we need to handle this
-                    // For now, we'll use the existing user data and skip Firebase Auth
-                    if (__DEV__) { console.warn('⚠️ User exists in Firebase Auth but we can\'t sign in without password (this is normal)'); }
-
-                    // Check if existing user should skip onboarding
-                    const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
-
-                    // Use the Firestore user data directly
-                    const transformedUser = {
-                      id: userData.id,
-                      name: userData.name,
-                      email: userData.email,
-                      wallet_address: userData.wallet_address || '',
-                      wallet_public_key: userData.wallet_public_key || '',
-                      created_at: userData.created_at,
-                      avatar: userData.avatar || '',
-                      hasCompletedOnboarding: shouldSkipOnboarding
-                    };
-
-                    // Update the global app context with the authenticated user
-                    authenticateUser(transformedUser, 'email');
-
-                    // Check if user needs to create a profile (has no name/pseudo)
-                    const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
-                    
-                    if (needsProfile) {
-                      logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'AuthMethodsScreen');
-                      navigation.reset({
-                        index: 0,
-                        routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
-                      });
-                    } else {
-                      // User has a profile, go directly to Dashboard
-                      logger.info('User has profile, navigating to Dashboard', null, 'AuthMethodsScreen');
-                      navigation.reset({
-                        index: 0,
-                        routes: [{ name: 'Dashboard' }],
-                      });
-                    }
-                    return;
-                  } else {
-                    throw createError;
-                  }
-                }
-              } catch (authError: any) {
-                console.error('Firebase Auth error:', authError);
-                throw new Error('Failed to authenticate user');
+              // For existing users in Firestore, we don't need to create a new Firebase Auth user
+              // We can authenticate them directly using their Firestore data
+              if (__DEV__) { 
+                logger.info('Existing user found in Firestore, authenticating directly without Firebase Auth', null, 'AuthMethodsScreen'); 
               }
+
+              // Check if existing user should skip onboarding
+              const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
+
+              // Use the Firestore user data directly
+              const transformedUser = {
+                id: userData.id,
+                name: userData.name,
+                email: userData.email,
+                wallet_address: userData.wallet_address || '',
+                wallet_public_key: userData.wallet_public_key || '',
+                created_at: userData.created_at,
+                avatar: userData.avatar || '',
+                hasCompletedOnboarding: shouldSkipOnboarding
+              };
+
+              // Update the global app context with the authenticated user
+              authenticateUser(transformedUser, 'email');
+
+              // Check if user needs to create a profile (has no name/pseudo)
+              const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+              
+              if (needsProfile) {
+                logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'AuthMethodsScreen');
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'CreateProfile', params: { email: transformedUser.email } }],
+                });
+              } else {
+                // User has a profile, go directly to Dashboard
+                logger.info('User has profile, navigating to Dashboard', null, 'AuthMethodsScreen');
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'Dashboard' }],
+                });
+              }
+              return;
             }
 
             // Update the user's last login timestamp
@@ -355,12 +336,13 @@ const AuthMethodsScreen: React.FC = () => {
               });
             }
           } else {
-            // User doesn't exist in Firestore, create new user
-            if (__DEV__) { logger.info('Creating new user since not found in Firestore', null, 'AuthMethodsScreen'); }
-
-            const temporaryPassword = `WeSplit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            const userCredential = await firebaseAuth.createUserWithEmail(email, temporaryPassword);
-            await handleAuthenticatedUser(userCredential);
+            // User doesn't exist in Firestore, they need to go through verification
+            if (__DEV__) { logger.info('User not found in Firestore, proceeding with verification flow', null, 'AuthMethodsScreen'); }
+            
+            // Don't create Firebase Auth user here - let the verification flow handle it
+            // Navigate to verification screen
+            navigation.navigate('Verification', { email: sanitizedEmail });
+            return;
           }
         } catch (error: any) {
           console.error('Error handling existing user:', error);

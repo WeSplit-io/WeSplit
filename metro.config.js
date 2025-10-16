@@ -32,6 +32,9 @@ config.transformer = {
   unstable_allowRequireContext: true,
 };
 
+// Watcher configuration removed to avoid validation warnings
+// The default watcher configuration is sufficient
+
 // Exclude Node.js modules that cause issues
 config.resolver.blockList = [
   // Block all Node.js jose modules

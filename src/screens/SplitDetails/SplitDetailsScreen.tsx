@@ -29,7 +29,6 @@ import { styles } from './styles';
 import { ProcessedBillData } from '../../services/consolidatedBillAnalysisService';
 import { BillAnalysisResult } from '../../types/unified';
 import { consolidatedBillAnalysisService } from '../../services/consolidatedBillAnalysisService';
-import { SplitInvitationService } from '../../services/splitInvitationService';
 import { convertFiatToUSDC, formatCurrencyAmount } from '../../services/fiatCurrencyService';
 import { NFCSplitService } from '../../services/nfcService';
 import { useApp } from '../../context/AppContext';
@@ -40,10 +39,10 @@ import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splitR
 // Removed SplitWalletService import - wallets are now created only when split type is selected
 import { FallbackDataService } from '../../utils/fallbackDataService';
 import { MockupDataService } from '../../data/mockupData';
-import { QRCodeService } from '../../services/qrCodeService';
+import { SplitInvitationService } from '../../services/splitInvitationService';
 import { notificationService } from '../../services/notificationService';
 import UserAvatar from '../../components/UserAvatar';
-import QRCode from 'react-native-qrcode-svg';
+import { QrCodeView } from '@features/qr';
 import {
   SplitDetailsNavigationParams,
   SplitDataConverter,
@@ -577,21 +576,35 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     const splitIdToUse = createdSplitId || currentSplitData?.id || splitId;
     const titleToUse = billName || currentSplitData?.title || 'Split';
     const amountToUse = totalAmount || currentSplitData?.totalAmount || '0';
+    const creatorName = currentUser?.name || currentUser?.email?.split('@')[0] || 'User';
+    const creatorId = currentUser?.id?.toString() || '';
     
     if (splitIdToUse) {
-      const qrData = JSON.stringify({
-        type: 'split_invitation',
+      // Create split invitation data
+      const invitationData = {
+        type: 'split_invitation' as const,
         splitId: splitIdToUse,
-        title: titleToUse,
-        amount: amountToUse
-      });
-      setQrCodeData(qrData);
+        billName: titleToUse,
+        totalAmount: parseFloat(amountToUse.toString()),
+        currency: 'USDC',
+        creatorId: creatorId,
+        creatorName: creatorName,
+        participantCount: currentSplitData?.participants?.length || 1,
+        splitType: currentSplitData?.splitType || 'fair',
+        walletAddress: currentUser?.wallet_address || '',
+        invitationCode: `ws_inv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Generate shareable link
+      const shareableLink = SplitInvitationService.generateShareableLink(invitationData);
+      setQrCodeData(shareableLink);
     } else {
       // Set a fallback QR code data if no split ID is available
-      setQrCodeData(JSON.stringify({
+      setQrCodeData('wesplit://join-split?data=' + encodeURIComponent(JSON.stringify({
         type: 'split_invitation',
         message: 'Join this split'
-      }));
+      })));
     }
   };
 
@@ -1532,11 +1545,14 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 <View style={styles.qrCodeSection}>
                   <View style={styles.qrCodeContainer}>
                     {qrCodeData && qrCodeData.length > 0 ? (
-                      <QRCode
+                      <QrCodeView
                         value={qrCodeData}
                         size={200}
-                        color="black"
                         backgroundColor="white"
+                        color="black"
+                        showAddress={false}
+                        showButtons={false}
+                        caption="Scan to join this split"
                       />
                     ) : (
                       <View style={styles.qrCodePlaceholder}>

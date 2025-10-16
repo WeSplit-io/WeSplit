@@ -127,15 +127,20 @@ class ConsolidatedTransactionService {
       // Save transaction to database if successful
       if (result.success && result.signature) {
         try {
-          const { firebaseTransactionService } = await import('../firebaseDataService');
+          const { firebaseTransactionService, firebaseDataService } = await import('../firebaseDataService');
           
-          // Create transaction record for database
-          const transactionData = {
+          // Find recipient user by wallet address to get their user ID
+          const recipientUser = await firebaseDataService.user.getUserByWalletAddress(params.to);
+          const recipientUserId = recipientUser ? recipientUser.id.toString() : params.to;
+          
+          // Create sender transaction record
+          const senderTransactionData = {
+            id: `${result.signature}_sender`,
             type: 'send' as const,
             amount: params.amount,
             currency: params.currency,
             from_user: params.userId,
-            to_user: params.to, // This will be the recipient's user ID or wallet address
+            to_user: recipientUserId,
             from_wallet: keypairResult.keypair.publicKey.toBase58(),
             to_wallet: params.to,
             tx_hash: result.signature,
@@ -146,12 +151,43 @@ class ConsolidatedTransactionService {
             net_amount: result.netAmount || params.amount
           };
           
-          await firebaseTransactionService.createTransaction(transactionData);
-          logger.info('✅ Transaction saved to database', {
-            signature: result.signature,
-            userId: params.userId,
-            amount: params.amount
-          }, 'ConsolidatedTransactionService');
+          // Create recipient transaction record (only if recipient is a registered user)
+          const recipientTransactionData = {
+            id: `${result.signature}_recipient`,
+            type: 'receive' as const,
+            amount: params.amount,
+            currency: params.currency,
+            from_user: params.userId,
+            to_user: recipientUserId,
+            from_wallet: keypairResult.keypair.publicKey.toBase58(),
+            to_wallet: params.to,
+            tx_hash: result.signature,
+            note: params.memo || 'USDC Transfer',
+            status: 'completed' as const,
+            group_id: params.groupId || null,
+            company_fee: 0, // Recipient doesn't pay company fees
+            net_amount: params.amount // Recipient gets full amount
+          };
+          
+          // Save both transaction records
+          await firebaseTransactionService.createTransaction(senderTransactionData);
+          
+          // Only create recipient transaction if recipient is a registered user
+          if (recipientUser) {
+            await firebaseTransactionService.createTransaction(recipientTransactionData);
+            logger.info('✅ Both sender and recipient transactions saved to database', {
+              signature: result.signature,
+              userId: params.userId,
+              recipientUserId: recipientUserId,
+              amount: params.amount
+            }, 'ConsolidatedTransactionService');
+          } else {
+            logger.info('✅ Sender transaction saved to database (recipient not registered)', {
+              signature: result.signature,
+              userId: params.userId,
+              amount: params.amount
+            }, 'ConsolidatedTransactionService');
+          }
           
         } catch (saveError) {
           logger.error('❌ Failed to save transaction to database', saveError, 'ConsolidatedTransactionService');

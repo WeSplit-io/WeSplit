@@ -83,7 +83,7 @@ export const useFairSplitLogic = (
     state.setEditAmount(amount);
   }, [state]);
 
-  const handleEditConfirm = useCallback(() => {
+  const handleEditConfirm = useCallback(async () => {
     if (state.editingParticipant && state.editAmount) {
       const newAmount = parseFloat(state.editAmount);
       if (!isNaN(newAmount) && newAmount > 0) {
@@ -93,12 +93,43 @@ export const useFairSplitLogic = (
             : p
         );
         setParticipants(updatedParticipants);
+        
+        // Persist the changes to the database
+        try {
+          if (splitData?.walletId) {
+            const { SplitWalletManagement } = await import('../../../services/split/SplitWalletManagement');
+            const participantsForUpdate = updatedParticipants.map(p => ({
+              userId: p.id,
+              name: p.name,
+              walletAddress: p.walletAddress,
+              amountOwed: p.amountOwed,
+            }));
+            
+            const updateResult = await SplitWalletManagement.updateSplitWalletParticipants(
+              splitData.walletId, 
+              participantsForUpdate
+            );
+            
+            if (!updateResult.success) {
+              console.error('Failed to update participant amounts in database:', updateResult.error);
+              // Revert local changes if database update failed
+              setParticipants(participants);
+            } else {
+              // Refresh completion data after successful update
+              // Note: This will be handled by the parent component
+            }
+          }
+        } catch (error) {
+          console.error('Error updating participant amounts:', error);
+          // Revert local changes if database update failed
+          setParticipants(participants);
+        }
       }
     }
     state.setShowEditModal(false);
     state.setEditingParticipant(null);
     state.setEditAmount('');
-  }, [state, participants, setParticipants]);
+  }, [state, participants, setParticipants, splitData]);
 
   const handleEditCancel = useCallback(() => {
     state.setShowEditModal(false);

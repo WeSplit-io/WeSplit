@@ -30,7 +30,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
 import { QRCodeScreen } from '../QRCode';
-import { generateProfileLink } from '../../services/deepLinkHandler';
+import { createUsdcRequestUri } from '@features/qr';
 import { logger } from '../../services/loggingService';
 
 const WalletManagementScreen: React.FC = () => {
@@ -940,12 +940,7 @@ const WalletManagementScreen: React.FC = () => {
           onBack={() => setShowQRCodeScreen(false)}
           userPseudo={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
           userWallet={currentUser?.wallet_address || ''}
-          qrValue={generateProfileLink(
-            currentUser?.id?.toString() || '',
-            currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
-            currentUser?.email,
-            currentUser?.wallet_address
-          )}
+          qrValue={currentUser?.wallet_address || ''}
         />
       </Modal>
     </SafeAreaView>

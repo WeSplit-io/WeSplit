@@ -172,6 +172,40 @@ export class SplitWalletManagement {
       const docId = currentWallet.firebaseDocId || splitWalletId;
       await updateDoc(doc(db, 'splitWallets', docId), updatedWalletData);
 
+      // CRITICAL: Also update the splits collection to keep both databases synchronized
+      try {
+        const { SplitStorageService } = await import('../splitStorageService');
+        
+        const splitUpdateResult = await SplitStorageService.updateSplitByBillId(currentWallet.billId, {
+          totalAmount: roundedAmount,
+          currency,
+          updatedAt: new Date().toISOString(),
+        });
+        
+        if (splitUpdateResult.success) {
+          logger.info('Split database synchronized successfully (amount update)', {
+            splitWalletId,
+            billId: currentWallet.billId,
+            oldAmount: currentWallet.totalAmount,
+            newAmount: roundedAmount,
+            currency
+          }, 'SplitWalletManagement');
+        } else {
+          logger.error('Failed to synchronize split database (amount update)', {
+            splitWalletId,
+            billId: currentWallet.billId,
+            error: splitUpdateResult.error
+          }, 'SplitWalletManagement');
+        }
+      } catch (syncError) {
+        logger.error('Error synchronizing split database during amount update', {
+          splitWalletId,
+          billId: currentWallet.billId,
+          error: syncError instanceof Error ? syncError.message : String(syncError)
+        }, 'SplitWalletManagement');
+        // Don't fail the update if sync fails, but log the error
+      }
+
       const updatedWallet: SplitWallet = {
         ...currentWallet,
         ...updatedWalletData,
@@ -235,6 +269,43 @@ export class SplitWalletManagement {
       const docId = currentWallet.firebaseDocId || splitWalletId;
       await updateDoc(doc(db, 'splitWallets', docId), updateData);
 
+      // CRITICAL: Also update the splits collection to keep both databases synchronized
+      try {
+        const { SplitStorageService } = await import('../splitStorageService');
+        
+        // Only sync relevant fields to splits collection
+        const splitUpdates: Partial<Split> = {};
+        if (updates.status) splitUpdates.status = updates.status;
+        if (updates.totalAmount) splitUpdates.totalAmount = updates.totalAmount;
+        if (updates.currency) splitUpdates.currency = updates.currency;
+        if (updates.updatedAt) splitUpdates.updatedAt = updates.updatedAt;
+        
+        if (Object.keys(splitUpdates).length > 0) {
+          const splitUpdateResult = await SplitStorageService.updateSplitByBillId(currentWallet.billId, splitUpdates);
+          
+          if (splitUpdateResult.success) {
+            logger.info('Split database synchronized successfully (wallet update)', {
+              splitWalletId,
+              billId: currentWallet.billId,
+              updatedFields: Object.keys(splitUpdates)
+            }, 'SplitWalletManagement');
+          } else {
+            logger.error('Failed to synchronize split database (wallet update)', {
+              splitWalletId,
+              billId: currentWallet.billId,
+              error: splitUpdateResult.error
+            }, 'SplitWalletManagement');
+          }
+        }
+      } catch (syncError) {
+        logger.error('Error synchronizing split database during wallet update', {
+          splitWalletId,
+          billId: currentWallet.billId,
+          error: syncError instanceof Error ? syncError.message : String(syncError)
+        }, 'SplitWalletManagement');
+        // Don't fail the update if sync fails, but log the error
+      }
+
       const updatedWallet: SplitWallet = {
         ...currentWallet,
         ...updateData,
@@ -297,6 +368,50 @@ export class SplitWalletManagement {
       // Update in Firebase
       const docId = currentWallet.firebaseDocId || splitWalletId;
       await updateDoc(doc(db, 'splitWallets', docId), updatedWalletData);
+
+      // CRITICAL: Also update the splits collection to keep both databases synchronized
+      try {
+        const { SplitStorageService } = await import('../splitStorageService');
+        
+        // Update each participant in the splits collection
+        for (const participant of updatedParticipants) {
+          // Map split wallet status to split storage status
+          const splitStatus = participant.status === 'failed' ? 'pending' : participant.status;
+          
+          const splitUpdateResult = await SplitStorageService.updateParticipantStatus(
+            currentWallet.billId, // Use billId to find the split
+            participant.userId,
+            splitStatus,
+            participant.amountPaid,
+            participant.transactionSignature
+          );
+          
+          if (splitUpdateResult.success) {
+            logger.info('Split database synchronized for participant', {
+              splitWalletId,
+              participantId: participant.userId,
+              billId: currentWallet.billId,
+              amountOwed: participant.amountOwed,
+              amountPaid: participant.amountPaid,
+              status: participant.status
+            }, 'SplitWalletManagement');
+          } else {
+            logger.error('Failed to synchronize split database for participant', {
+              splitWalletId,
+              participantId: participant.userId,
+              billId: currentWallet.billId,
+              error: splitUpdateResult.error
+            }, 'SplitWalletManagement');
+          }
+        }
+      } catch (syncError) {
+        logger.error('Error synchronizing split database during participant update', {
+          splitWalletId,
+          billId: currentWallet.billId,
+          error: syncError instanceof Error ? syncError.message : String(syncError)
+        }, 'SplitWalletManagement');
+        // Don't fail the update if sync fails, but log the error
+      }
 
       const updatedWallet: SplitWallet = {
         ...currentWallet,

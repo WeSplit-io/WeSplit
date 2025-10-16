@@ -327,6 +327,48 @@ export class SplitStorageService {
         updatedAt: new Date().toISOString(),
       });
 
+      // CRITICAL: Also update the splitWallets collection to keep both databases synchronized
+      try {
+        const { SplitWalletQueries } = await import('./split/SplitWalletQueries');
+        const { SplitWalletManagement } = await import('./split/SplitWalletManagement');
+        
+        // Find the split wallet by billId (splitId)
+        const walletResult = await SplitWalletQueries.getSplitWalletByBillId(splitId);
+        
+        if (walletResult.success && walletResult.wallet) {
+          // Update the split wallet with the wallet information
+          const walletUpdateResult = await SplitWalletManagement.updateSplitWallet(walletResult.wallet.id, {
+            walletAddress,
+            updatedAt: new Date().toISOString(),
+          });
+          
+          if (walletUpdateResult.success) {
+            logger.info('Split wallet database synchronized successfully (wallet info update)', {
+              splitId,
+              splitWalletId: walletResult.wallet.id,
+              walletAddress
+            }, 'SplitStorageService');
+          } else {
+            logger.error('Failed to synchronize split wallet database (wallet info update)', {
+              splitId,
+              splitWalletId: walletResult.wallet.id,
+              error: walletUpdateResult.error
+            }, 'SplitStorageService');
+          }
+        } else {
+          logger.warn('Split wallet not found for wallet info sync', {
+            splitId,
+            error: walletResult.error
+          }, 'SplitStorageService');
+        }
+      } catch (syncError) {
+        logger.error('Error synchronizing split wallet database during wallet info update', {
+          splitId,
+          error: syncError instanceof Error ? syncError.message : String(syncError)
+        }, 'SplitStorageService');
+        // Don't fail the update if sync fails, but log the error
+      }
+
       // Get the updated split
       const updatedSplitDoc = await getDoc(splitRef);
       if (updatedSplitDoc.exists()) {
@@ -575,6 +617,49 @@ export class SplitStorageService {
       const docId = split.firebaseDocId || splitId;
 
       await deleteDoc(doc(db, this.COLLECTION_NAME, docId));
+
+      // CRITICAL: Also delete the corresponding split wallet from splitWallets collection
+      try {
+        const { SplitWalletQueries } = await import('./split/SplitWalletQueries');
+        const { SplitWalletCleanup } = await import('./split/SplitWalletCleanup');
+        
+        // Find the split wallet by billId (splitId)
+        const walletResult = await SplitWalletQueries.getSplitWalletByBillId(splitId);
+        
+        if (walletResult.success && walletResult.wallet) {
+          // Delete the split wallet
+          const walletDeleteResult = await SplitWalletCleanup.burnSplitWalletAndCleanup(
+            walletResult.wallet.id,
+            walletResult.wallet.creatorId,
+            'Split deleted - cleaning up associated wallet'
+          );
+          
+          if (walletDeleteResult.success) {
+            logger.info('Split wallet database synchronized successfully (split deletion)', {
+              splitId,
+              splitWalletId: walletResult.wallet.id,
+              action: 'deleted'
+            }, 'SplitStorageService');
+          } else {
+            logger.error('Failed to synchronize split wallet database (split deletion)', {
+              splitId,
+              splitWalletId: walletResult.wallet.id,
+              error: walletDeleteResult.error
+            }, 'SplitStorageService');
+          }
+        } else {
+          logger.warn('Split wallet not found for split deletion sync', {
+            splitId,
+            error: walletResult.error
+          }, 'SplitStorageService');
+        }
+      } catch (syncError) {
+        logger.error('Error synchronizing split wallet database during split deletion', {
+          splitId,
+          error: syncError instanceof Error ? syncError.message : String(syncError)
+        }, 'SplitStorageService');
+        // Don't fail the deletion if sync fails, but log the error
+      }
 
       logger.info('Split deleted successfully', null, 'splitStorageService');
 

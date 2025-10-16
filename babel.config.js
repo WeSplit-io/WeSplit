@@ -11,7 +11,7 @@
     ],
     plugins: [
       [
-        'module-resolver',
+        'babel-plugin-module-resolver',
         {
           extensions: ['.js', '.jsx', '.ts', '.tsx'],
           alias: {
