@@ -175,11 +175,55 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (isLoading || !validateForm()) {
       return;
     }
 
+    // For KAST cards, validate the card before saving
+    if (destinationType === 'kast') {
+      try {
+        const { ExternalCardService } = await import('../services/ExternalCardService');
+        
+        // Validate card identifier
+        const validation = await ExternalCardService.validateKastCard(identifier.trim());
+        if (!validation.isValid) {
+          setErrors({ identifier: validation.error || 'Invalid card identifier' });
+          return;
+        }
+
+        // Get full card information
+        const cardInfo = await ExternalCardService.getCardInfo(identifier.trim());
+        if (!cardInfo.success || !cardInfo.card) {
+          setErrors({ identifier: 'Failed to retrieve card information' });
+          return;
+        }
+
+        // Create destination with full card information
+        const destination = {
+          type: destinationType,
+          name: name.trim(),
+          identifier: identifier.trim(),
+          cardType: cardInfo.card.cardType,
+          status: cardInfo.card.status,
+          balance: cardInfo.card.balance,
+          currency: cardInfo.card.currency,
+          expirationDate: cardInfo.card.expirationDate,
+          cardholderName: cardInfo.card.cardholderName,
+        };
+
+        onSaved(destination);
+        // Reset form after successful save
+        resetForm();
+        return;
+      } catch (error) {
+        console.error('Error validating KAST card:', error);
+        setErrors({ identifier: 'Failed to validate card. Please try again.' });
+        return;
+      }
+    }
+
+    // For regular wallets, use existing logic
     const destination = {
       type: destinationType,
       name: name.trim(),

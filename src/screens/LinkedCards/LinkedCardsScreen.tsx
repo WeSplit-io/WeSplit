@@ -30,6 +30,36 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
     }
   }, [currentUser?.id]);
 
+  // Refresh card information periodically
+  useEffect(() => {
+    if (kastCards.length > 0) {
+      const interval = setInterval(async () => {
+        try {
+          const { ExternalCardService } = await import('../../services/ExternalCardService');
+          
+          // Refresh each card's information
+          for (const card of kastCards) {
+            if (card.identifier) {
+              const refreshResult = await ExternalCardService.refreshCardInfo(card.id);
+              if (refreshResult.success && refreshResult.card) {
+                // Update card information in state
+                setKastCards(prev => prev.map(c => 
+                  c.id === card.id 
+                    ? { ...c, ...refreshResult.card, updatedAt: new Date().toISOString() }
+                    : c
+                ));
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error refreshing card information:', error);
+        }
+      }, 30000); // Refresh every 30 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [kastCards]);
+
   const loadLinkedDestinations = async () => {
     if (!currentUser?.id) {
       setIsLoading(false);
@@ -89,19 +119,34 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           Alert.alert('Error', result.error || 'Failed to add external wallet');
         }
       } else if (destination.type === 'kast') {
-        // Add KAST card using walletService
+        // Add KAST card using walletService with full card information
         const result = await walletService.addKastCard(
           currentUser.id.toString(),
           {
             label: destination.name,
-            identifier: destination.identifier
+            identifier: destination.identifier,
+            cardType: destination.cardType,
+            status: destination.status,
+            balance: destination.balance,
+            currency: destination.currency,
+            expirationDate: destination.expirationDate,
+            cardholderName: destination.cardholderName
           }
         );
         
         if (result.success) {
-          const newCard = { id: Date.now().toString(), type: 'kast', ...destination };
+          const newCard = { 
+            id: Date.now().toString(), 
+            type: 'kast', 
+            ...destination,
+            isActive: destination.status === 'active'
+          };
           setKastCards(prev => [...prev, newCard]);
-          logger.info('KAST card added successfully', null, 'LinkedCardsScreen');
+          logger.info('KAST card added successfully', { 
+            cardId: newCard.id,
+            status: newCard.status,
+            balance: newCard.balance 
+          }, 'LinkedCardsScreen');
           Alert.alert('Success', `KAST card "${newCard.label}" has been linked successfully!`);
         } else {
           Alert.alert('Error', result.error || 'Failed to add KAST card');

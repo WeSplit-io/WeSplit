@@ -1707,41 +1707,95 @@ export class SplitWalletPayments {
         };
       }
 
-      // Get the user's wallet address for the transaction
-      const { walletService } = await import('../WalletService');
-      const userWallet = await walletService.getUserWallet(loserUserId);
-      if (!userWallet) {
-        return {
-          success: false,
-          error: 'Failed to retrieve user wallet address',
+      // Handle different payment methods
+      let transactionResult: any;
+      
+      if (paymentMethod === 'kast-card') {
+        // Handle KAST card payment
+        const { walletService } = await import('../WalletService');
+        const { ExternalCardPaymentService } = await import('../ExternalCardPaymentService');
+        
+        // Get user's linked KAST cards
+        const linkedData = await walletService.getLinkedDestinations(loserUserId);
+        const kastCards = linkedData.kastCards;
+        
+        if (kastCards.length === 0) {
+          return {
+            success: false,
+            error: 'No KAST cards linked. Please link a card first.',
+          };
+        }
+        
+        // Use the first active card
+        const activeCard = kastCards.find(card => card.status === 'active');
+        if (!activeCard) {
+          return {
+            success: false,
+            error: 'No active KAST cards found. Please activate a card first.',
+          };
+        }
+        
+        // Process payment to card
+        transactionResult = await ExternalCardPaymentService.processCardPayment({
+          cardId: activeCard.id,
+          amount: totalAmount,
+          currency: wallet.currency,
+          description: description || 'Degen Split payment',
+          userId: loserUserId
+        });
+        
+        if (!transactionResult.success) {
+          return {
+            success: false,
+            error: transactionResult.error || 'Failed to process KAST card payment',
+          };
+        }
+        
+        // For KAST card payments, we don't need blockchain transaction
+        // The payment is processed through the external card system
+        transactionResult = {
+          success: true,
+          transactionSignature: transactionResult.transactionId,
+          amount: totalAmount
         };
-      }
+        
+      } else {
+        // Handle in-app wallet payment (existing logic)
+        const { walletService } = await import('../WalletService');
+        const userWallet = await walletService.getUserWallet(loserUserId);
+        if (!userWallet) {
+          return {
+            success: false,
+            error: 'Failed to retrieve user wallet address',
+          };
+        }
 
-      // Get the private key - use SplitWalletSecurity for proper degen split support
-      // For degen splits, any participant can access the private key
-      const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
-      const privateKeyResult = await SplitWalletSecurity.getSplitWalletPrivateKey(splitWalletId, loserUserId);
-      if (!privateKeyResult.success || !privateKeyResult.privateKey) {
-        return {
-          success: false,
-          error: privateKeyResult.error || 'Failed to retrieve split wallet private key',
+        // Get the private key - use SplitWalletSecurity for proper degen split support
+        // For degen splits, any participant can access the private key
+        const { SplitWalletSecurity } = await import('./SplitWalletSecurity');
+        const privateKeyResult = await SplitWalletSecurity.getSplitWalletPrivateKey(splitWalletId, loserUserId);
+        if (!privateKeyResult.success || !privateKeyResult.privateKey) {
+          return {
+            success: false,
+            error: privateKeyResult.error || 'Failed to retrieve split wallet private key',
+          };
+        }
+
+        // Create transaction with split wallet private key to send funds to user's wallet
+        const transactionParams = {
+          to: userWallet.address, // Send to user's wallet address
+          amount: totalAmount,
+          currency: wallet.currency,
+          memo: description || `Degen Split loser withdrawal for ${loserUserId}`,
+          userId: wallet.creatorId, // Add userId parameter required by sendUSDCTransaction
+          transactionType: 'split_wallet_withdrawal' as const, // No company fees for split wallet withdrawals
+          fromPrivateKey: privateKeyResult.privateKey, // Use split wallet private key
+          fromAddress: wallet.walletAddress, // Use split wallet address
         };
+
+        // Execute transaction using split wallet
+        transactionResult = await this.sendSplitWalletTransaction(transactionParams);
       }
-
-      // Create transaction with split wallet private key to send funds to user's wallet
-      const transactionParams = {
-        to: userWallet.address, // Send to user's wallet address
-        amount: totalAmount,
-        currency: wallet.currency,
-        memo: description || `Degen Split loser withdrawal for ${loserUserId}`,
-        userId: wallet.creatorId, // Add userId parameter required by sendUSDCTransaction
-        transactionType: 'split_wallet_withdrawal' as const, // No company fees for split wallet withdrawals
-        fromPrivateKey: privateKeyResult.privateKey, // Use split wallet private key
-        fromAddress: wallet.walletAddress, // Use split wallet address
-      };
-
-      // Execute transaction using split wallet
-      const transactionResult = await this.sendSplitWalletTransaction(transactionParams);
       
       if (!transactionResult.success) {
         return {
