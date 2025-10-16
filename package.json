@@ -48,7 +48,8 @@
     "setup:eas:env": "node scripts/setup-eas-env.js",
     "test:firebase:functions": "node scripts/test-firebase-functions.js",
     "clear:prebuild": "node scripts/clear-prebuild-cache.js",
-    "build:production": "node scripts/build-production.js"
+    "build:production": "node scripts/build-production.js",
+    "install:ios:ipa": "node scripts/install-ios-ipa.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
