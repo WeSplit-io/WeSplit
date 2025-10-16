@@ -201,10 +201,24 @@ export class SplitWalletQueries {
 
       // Update wallet in Firebase
       const docId = wallet.firebaseDocId || splitWalletId;
-      await updateDoc(doc(db, 'splitWallets', docId), {
-        participants: updatedParticipants,
+      
+      // Clean participants data to remove undefined values
+      const cleanedParticipants = updatedParticipants.map(p => ({
+        ...p,
+        // Convert undefined to null for Firebase compatibility
+        transactionSignature: p.transactionSignature || null,
+        paidAt: p.paidAt || null,
+      }));
+      
+      const updateData = {
+        participants: cleanedParticipants,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      
+      // Remove any undefined values from the update data
+      const cleanedUpdateData = this.removeUndefinedValues(updateData);
+      
+      await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
 
       const updatedWallet: SplitWallet = {
         ...wallet,
@@ -431,5 +445,30 @@ export class SplitWalletQueries {
         error: error instanceof Error ? error.message : 'Unknown error occurred',
       };
     }
+  }
+  
+  /**
+   * Remove undefined values from an object (Firebase doesn't allow undefined values)
+   */
+  private static removeUndefinedValues(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return null;
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.removeUndefinedValues(item));
+    }
+    
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = this.removeUndefinedValues(value);
+        }
+      }
+      return cleaned;
+    }
+    
+    return obj;
   }
 }

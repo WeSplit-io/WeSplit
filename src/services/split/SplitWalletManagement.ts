@@ -59,8 +59,8 @@ export async function fixSplitWalletDataConsistency(splitWalletId: string): Prom
             ...p,
             amountPaid: 0,
             status: 'pending' as const,
-            transactionSignature: undefined,
-            paidAt: undefined
+            transactionSignature: null, // Use null instead of undefined for Firebase compatibility
+            paidAt: null // Use null instead of undefined for Firebase compatibility
           };
         }
         
@@ -77,18 +77,33 @@ export async function fixSplitWalletDataConsistency(splitWalletId: string): Prom
         return {
           ...p,
           amountPaid: finalAmountPaid,
-          status: isFullyPaid ? 'paid' as const : 'pending' as const,
-          transactionSignature: isFullyPaid ? p.transactionSignature : undefined,
-          paidAt: isFullyPaid ? p.paidAt : undefined
+          status: isFullyPaid ? 'locked' as const : 'pending' as const, // For degen splits, fully paid means 'locked', not 'paid'
+          // Convert undefined to null for Firebase compatibility
+          transactionSignature: isFullyPaid ? p.transactionSignature : null,
+          paidAt: isFullyPaid ? p.paidAt : null
         };
       });
 
       // Update wallet in Firebase
       const docId = wallet.firebaseDocId || splitWalletId;
-      await updateDoc(doc(db, 'splitWallets', docId), {
-        participants: updatedParticipants,
+      
+      // Clean participants data to remove undefined values
+      const cleanedParticipants = updatedParticipants.map(p => ({
+        ...p,
+        // Convert undefined to null for Firebase compatibility
+        transactionSignature: p.transactionSignature || null,
+        paidAt: p.paidAt || null,
+      }));
+      
+      const updateData = {
+        participants: cleanedParticipants,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      
+      // Remove any undefined values from the update data
+      const cleanedUpdateData = this.removeUndefinedValues(updateData);
+      
+      await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
 
       return { success: true, fixed: true };
     }
@@ -124,10 +139,24 @@ export async function fixSplitWalletPrecision(splitWalletId: string): Promise<{ 
 
     // Update wallet in Firebase
     const docId = wallet.firebaseDocId || splitWalletId;
-    await updateDoc(doc(db, 'splitWallets', docId), {
-      participants: updatedParticipants,
+    
+    // Clean participants data to remove undefined values
+    const cleanedParticipants = updatedParticipants.map(p => ({
+      ...p,
+      // Convert undefined to null for Firebase compatibility
+      transactionSignature: p.transactionSignature || null,
+      paidAt: p.paidAt || null,
+    }));
+    
+    const updateData = {
+      participants: cleanedParticipants,
       updatedAt: new Date().toISOString(),
-    });
+    };
+    
+    // Remove any undefined values from the update data
+    const cleanedUpdateData = this.removeUndefinedValues(updateData);
+    
+    await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
 
     return { success: true };
   } catch (error) {
@@ -170,7 +199,11 @@ export class SplitWalletManagement {
 
       // Update in Firebase
       const docId = currentWallet.firebaseDocId || splitWalletId;
-      await updateDoc(doc(db, 'splitWallets', docId), updatedWalletData);
+      
+      // Remove any undefined values from the update data
+      const cleanedUpdateData = this.removeUndefinedValues(updatedWalletData);
+      
+      await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
 
       // CRITICAL: Also update the splits collection to keep both databases synchronized
       try {
@@ -267,7 +300,11 @@ export class SplitWalletManagement {
 
       // Update in Firebase
       const docId = currentWallet.firebaseDocId || splitWalletId;
-      await updateDoc(doc(db, 'splitWallets', docId), updateData);
+      
+      // Remove any undefined values from the update data
+      const cleanedUpdateData = this.removeUndefinedValues(updateData);
+      
+      await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
 
       // CRITICAL: Also update the splits collection to keep both databases synchronized
       try {
@@ -367,42 +404,34 @@ export class SplitWalletManagement {
 
       // Update in Firebase
       const docId = currentWallet.firebaseDocId || splitWalletId;
-      await updateDoc(doc(db, 'splitWallets', docId), updatedWalletData);
+      
+      // Remove any undefined values from the update data
+      const cleanedUpdateData = this.removeUndefinedValues(updatedWalletData);
+      
+      await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
 
       // CRITICAL: Also update the splits collection to keep both databases synchronized
       try {
-        const { SplitStorageService } = await import('../splitStorageService');
+        const { SplitDataSynchronizer } = await import('./SplitDataSynchronizer');
         
-        // Update each participant in the splits collection
-        for (const participant of updatedParticipants) {
-          // Map split wallet status to split storage status
-          const splitStatus = participant.status === 'failed' ? 'pending' : participant.status;
-          
-          const splitUpdateResult = await SplitStorageService.updateParticipantStatus(
-            currentWallet.billId, // Use billId to find the split
-            participant.userId,
-            splitStatus,
-            participant.amountPaid,
-            participant.transactionSignature
-          );
-          
-          if (splitUpdateResult.success) {
-            logger.info('Split database synchronized for participant', {
-              splitWalletId,
-              participantId: participant.userId,
-              billId: currentWallet.billId,
-              amountOwed: participant.amountOwed,
-              amountPaid: participant.amountPaid,
-              status: participant.status
-            }, 'SplitWalletManagement');
-          } else {
-            logger.error('Failed to synchronize split database for participant', {
-              splitWalletId,
-              participantId: participant.userId,
-              billId: currentWallet.billId,
-              error: splitUpdateResult.error
-            }, 'SplitWalletManagement');
-          }
+        const syncResult = await SplitDataSynchronizer.syncAllParticipantsFromSplitWalletToSplitStorage(
+          currentWallet.billId, // Use billId to find the split
+          updatedParticipants
+        );
+        
+        if (syncResult.success) {
+          logger.info('Split database synchronized for all participants', {
+            splitWalletId,
+            billId: currentWallet.billId,
+            synchronizedCount: syncResult.synchronizedCount,
+            totalParticipants: updatedParticipants.length
+          }, 'SplitWalletManagement');
+        } else {
+          logger.error('Failed to synchronize split database for participants', {
+            splitWalletId,
+            billId: currentWallet.billId,
+            error: syncResult.error
+          }, 'SplitWalletManagement');
         }
       } catch (syncError) {
         logger.error('Error synchronizing split database during participant update', {
@@ -473,7 +502,11 @@ export class SplitWalletManagement {
 
       // Update in Firebase
       const docId = currentWallet.firebaseDocId || splitWalletId;
-      await updateDoc(doc(db, 'splitWallets', docId), updatedWalletData);
+      
+      // Remove any undefined values from the update data
+      const cleanedUpdateData = this.removeUndefinedValues(updatedWalletData);
+      
+      await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
 
       const updatedWallet: SplitWallet = {
         ...currentWallet,
@@ -679,9 +712,48 @@ export class SplitWalletManagement {
   private static async updateWalletParticipants(docId: string, participants: SplitWalletParticipant[]): Promise<void> {
     const { doc, updateDoc } = await import('firebase/firestore');
     const { db } = await import('../../config/firebase');
-    await updateDoc(doc(db, 'splitWallets', docId), {
-      participants,
+    
+    // Clean participants data to remove undefined values
+    const cleanedParticipants = participants.map(p => ({
+      ...p,
+      // Convert undefined to null for Firebase compatibility
+      transactionSignature: p.transactionSignature || null,
+      paidAt: p.paidAt || null,
+    }));
+    
+    const updateData = {
+      participants: cleanedParticipants,
       updatedAt: new Date().toISOString(),
-    });
+    };
+    
+    // Remove any undefined values from the update data
+    const cleanedUpdateData = this.removeUndefinedValues(updateData);
+    
+    await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
+  }
+  
+  /**
+   * Remove undefined values from an object (Firebase doesn't allow undefined values)
+   */
+  private static removeUndefinedValues(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return null;
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.removeUndefinedValues(item));
+    }
+    
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = this.removeUndefinedValues(value);
+        }
+      }
+      return cleaned;
+    }
+    
+    return obj;
   }
 }

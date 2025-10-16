@@ -285,4 +285,23 @@ export class SplitWalletService {
     await loadModules();
     return SplitWalletCleanup.burnSplitWalletAndCleanup(splitWalletId, creatorId, reason);
   }
+
+  // Security methods
+  static async getFairSplitPrivateKey(splitWalletId: string, creatorId: string) {
+    await loadModules();
+    return SplitWalletSecurity.getFairSplitPrivateKey(splitWalletId, creatorId);
+  }
+
+  static async hasFairSplitPrivateKey(splitWalletId: string, creatorId: string) {
+    await loadModules();
+    return SplitWalletSecurity.hasFairSplitPrivateKey(splitWalletId, creatorId);
+  }
+
+  static async isSplitWalletCreator(splitWalletId: string, userId: string) {
+    await loadModules();
+    return SplitWalletSecurity.isSplitWalletCreator(splitWalletId, userId);
+  }
 }
+
+// Export the new synchronizer
+export { SplitDataSynchronizer } from './SplitDataSynchronizer';

@@ -1022,7 +1022,10 @@ class WalletService {
   public async storeSecureData(key: string, data: any): Promise<void> {
     try {
       const jsonData = JSON.stringify(data);
-      await SecureStore.setItemAsync(key, jsonData);
+      await SecureStore.setItemAsync(key, jsonData, {
+        requireAuthentication: false,
+        keychainService: 'WeSplitWalletData'
+      });
       logger.info('Secure data stored successfully', { key }, 'WalletService');
     } catch (error) {
       logger.error('Failed to store secure data', error, 'WalletService');
@@ -1032,7 +1035,10 @@ class WalletService {
 
   public async getSecureData(key: string): Promise<any> {
     try {
-      const jsonData = await SecureStore.getItemAsync(key);
+      const jsonData = await SecureStore.getItemAsync(key, {
+        requireAuthentication: false,
+        keychainService: 'WeSplitWalletData'
+      });
       if (!jsonData) {
         return null;
       }

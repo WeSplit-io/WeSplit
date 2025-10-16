@@ -32,8 +32,11 @@ export class SplitWalletSecurity {
       // Create a unique key for this Fair split wallet and creator combination
       const storageKey = `${this.FAIR_SPLIT_PRIVATE_KEY_PREFIX}${splitWalletId}_${creatorId}`;
       
-      // Store the private key securely
-      await SecureStore.setItemAsync(storageKey, privateKey);
+      // Store the private key securely without biometric authentication popup
+      await SecureStore.setItemAsync(storageKey, privateKey, {
+        requireAuthentication: false,
+        keychainService: 'WeSplitSplitWalletKeys'
+      });
 
       logger.info('Fair split wallet private key stored securely', {
         splitWalletId,
@@ -74,8 +77,11 @@ export class SplitWalletSecurity {
       // Create a unique key for this split wallet and creator combination
       const storageKey = `${this.PRIVATE_KEY_PREFIX}${splitWalletId}_${creatorId}`;
       
-      // Store the private key securely
-      await SecureStore.setItemAsync(storageKey, privateKey);
+      // Store the private key securely without biometric authentication popup
+      await SecureStore.setItemAsync(storageKey, privateKey, {
+        requireAuthentication: false,
+        keychainService: 'WeSplitSplitWalletKeys'
+      });
 
 
       logger.info('Split wallet private key stored securely', {
@@ -97,6 +103,77 @@ export class SplitWalletSecurity {
   }
 
   /**
+   * Verify if a user is the creator of a split wallet
+   */
+  static async isSplitWalletCreator(
+    splitWalletId: string, 
+    userId: string
+  ): Promise<{ success: boolean; isCreator: boolean; error?: string }> {
+    try {
+      const { SplitWalletQueries } = await import('./SplitWalletQueries');
+      const walletResult = await SplitWalletQueries.getSplitWallet(splitWalletId);
+      
+      if (!walletResult.success || !walletResult.wallet) {
+        return {
+          success: false,
+          isCreator: false,
+          error: 'Split wallet not found'
+        };
+      }
+      
+      const isCreator = walletResult.wallet.creatorId === userId;
+      
+      logger.debug('Creator verification result', {
+        splitWalletId,
+        userId,
+        creatorId: walletResult.wallet.creatorId,
+        isCreator
+      }, 'SplitWalletSecurity');
+      
+      return {
+        success: true,
+        isCreator
+      };
+    } catch (error) {
+      logger.error('Failed to verify split wallet creator', error, 'SplitWalletSecurity');
+      return {
+        success: false,
+        isCreator: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Check if Fair split private key exists for creator
+   */
+  static async hasFairSplitPrivateKey(
+    splitWalletId: string, 
+    creatorId: string
+  ): Promise<{ success: boolean; hasKey: boolean; error?: string }> {
+    try {
+      const storageKey = `${this.FAIR_SPLIT_PRIVATE_KEY_PREFIX}${splitWalletId}_${creatorId}`;
+      
+      const privateKey = await SecureStore.getItemAsync(storageKey, {
+        requireAuthentication: false,
+        keychainService: 'WeSplitSplitWalletKeys'
+      });
+      
+      return {
+        success: true,
+        hasKey: !!privateKey,
+      };
+    } catch (error) {
+      logger.error('Failed to check Fair split private key existence', error, 'SplitWalletSecurity');
+      return {
+        success: false,
+        hasKey: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
    * Check if local private key exists for split wallet
    */
   static async hasLocalPrivateKey(
@@ -108,7 +185,10 @@ export class SplitWalletSecurity {
       const storageKey = `${this.PRIVATE_KEY_PREFIX}${splitWalletId}_${creatorId}`;
       
       // Check if the key exists
-      const privateKey = await SecureStore.getItemAsync(storageKey);
+      const privateKey = await SecureStore.getItemAsync(storageKey, {
+        requireAuthentication: false,
+        keychainService: 'WeSplitSplitWalletKeys'
+      });
       const hasKey = !!privateKey;
 
 
@@ -123,6 +203,84 @@ export class SplitWalletSecurity {
       return {
         success: false,
         hasKey: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Get Fair split wallet private key from local storage (creator-only access)
+   * SECURITY: Only the creator can access the private key for fair splits
+   */
+  static async getFairSplitPrivateKey(
+    splitWalletId: string, 
+    creatorId: string
+  ): Promise<{ success: boolean; privateKey?: string; error?: string }> {
+    try {
+      logger.debug('Retrieving Fair split private key from local storage', {
+        splitWalletId,
+        creatorId
+      }, 'SplitWalletSecurity');
+
+      const storageKey = `${this.FAIR_SPLIT_PRIVATE_KEY_PREFIX}${splitWalletId}_${creatorId}`;
+      
+      // Retrieve the private key from secure storage
+      let privateKey;
+      try {
+        privateKey = await SecureStore.getItemAsync(storageKey, {
+          requireAuthentication: false,
+          keychainService: 'WeSplitSplitWalletKeys'
+        });
+        
+        logger.debug('Fair split private key retrieval result', {
+          splitWalletId,
+          creatorId,
+          storageKey,
+          hasPrivateKey: !!privateKey,
+          privateKeyLength: privateKey?.length || 0
+        }, 'SplitWalletSecurity');
+      } catch (secureStoreError) {
+        logger.error('SecureStore.getItemAsync failed for Fair split', {
+          splitWalletId,
+          creatorId,
+          storageKey,
+          error: secureStoreError instanceof Error ? secureStoreError.message : String(secureStoreError)
+        }, 'SplitWalletSecurity');
+        
+        return {
+          success: false,
+          error: `Failed to access secure storage: ${secureStoreError instanceof Error ? secureStoreError.message : 'Unknown error'}`,
+        };
+      }
+      
+      if (!privateKey) {
+        logger.warn('Fair split private key not found in secure storage', {
+          splitWalletId,
+          creatorId,
+          storageKey
+        }, 'SplitWalletSecurity');
+        
+        return {
+          success: false,
+          error: `Private key not found for Fair split wallet ${splitWalletId}. Only the creator can access this private key.`,
+        };
+      }
+
+      logger.info('Fair split private key retrieved successfully', {
+        splitWalletId,
+        creatorId
+      }, 'SplitWalletSecurity');
+
+      return { 
+        success: true, 
+        privateKey 
+      };
+
+    } catch (error) {
+      console.error('🔍 SplitWalletSecurity: Error retrieving Fair split private key:', error);
+      logger.error('Failed to retrieve Fair split private key', error, 'SplitWalletSecurity');
+      return {
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
       };
     }
@@ -146,16 +304,35 @@ export class SplitWalletSecurity {
       const { db } = await import('../../config/firebase');
       const { doc, getDoc } = await import('firebase/firestore');
       
-      const privateKeyDocRef = doc(db, 'splitWalletPrivateKeys', splitWalletId);
-      const privateKeyDoc = await getDoc(privateKeyDocRef);
+      // Enhanced error handling for Firebase getDoc operation
+      let privateKeyDoc;
+      try {
+        const privateKeyDocRef = doc(db, 'splitWalletPrivateKeys', splitWalletId);
+        privateKeyDoc = await getDoc(privateKeyDocRef);
+        
+        logger.debug('Firebase private key document check result', {
+          splitWalletId,
+          exists: privateKeyDoc.exists(),
+          hasData: !!privateKeyDoc.data(),
+          docId: privateKeyDocRef.id
+        }, 'SplitWalletSecurity');
+      } catch (firebaseError) {
+        logger.error('Firebase getDoc operation failed', {
+          splitWalletId,
+          requesterId,
+          error: firebaseError instanceof Error ? firebaseError.message : String(firebaseError),
+          errorCode: (firebaseError as any)?.code,
+          errorDetails: (firebaseError as any)?.details
+        }, 'SplitWalletSecurity');
+        
+        // Continue to local storage fallback instead of failing completely
+        logger.info('Falling back to local storage due to Firebase error', {
+          splitWalletId,
+          requesterId
+        }, 'SplitWalletSecurity');
+      }
       
-      logger.debug('Firebase private key document check result', {
-        splitWalletId,
-        exists: privateKeyDoc.exists(),
-        hasData: !!privateKeyDoc.data()
-      }, 'SplitWalletSecurity');
-      
-      if (privateKeyDoc.exists()) {
+      if (privateKeyDoc && privateKeyDoc.exists()) {
         const privateKeyData = privateKeyDoc.data();
         
         // Verify the requester is a participant in this Degen Split
@@ -186,11 +363,27 @@ export class SplitWalletSecurity {
         }
       }
       
-      // If not found in Firebase, this might be an old Degen Split wallet or a regular split
-      logger.warn('Private key not found in Firebase for Degen Split wallet', {
+      // If not found in Firebase, this might be a Fair split wallet or an old Degen Split wallet
+      logger.info('Private key not found in Firebase, checking for Fair split wallet', {
         splitWalletId,
         requesterId,
-        message: 'This might be an old Degen Split wallet created before Firebase storage was implemented'
+        message: 'This might be a Fair split wallet or an old Degen Split wallet'
+      }, 'SplitWalletSecurity');
+      
+      // First, try to get it as a Fair split private key (creator-only access)
+      const fairSplitResult = await this.getFairSplitPrivateKey(splitWalletId, requesterId);
+      if (fairSplitResult.success) {
+        logger.info('Private key retrieved as Fair split wallet', {
+          splitWalletId,
+          requesterId
+        }, 'SplitWalletSecurity');
+        return fairSplitResult;
+      }
+      
+      // If not a Fair split, try the old Degen Split format
+      logger.debug('Not a Fair split, trying old Degen Split format', {
+        splitWalletId,
+        requesterId
       }, 'SplitWalletSecurity');
       
       const storageKey = `${this.PRIVATE_KEY_PREFIX}${splitWalletId}_${requesterId}`;
@@ -201,16 +394,34 @@ export class SplitWalletSecurity {
         storageKey
       }, 'SplitWalletSecurity');
       
-      // Retrieve the private key from secure storage
-      const privateKey = await SecureStore.getItemAsync(storageKey);
-      
-      logger.debug('Private key retrieval result', {
-        splitWalletId,
-        requesterId,
-        storageKey,
-        hasPrivateKey: !!privateKey,
-        privateKeyLength: privateKey?.length || 0
-      }, 'SplitWalletSecurity');
+      // Retrieve the private key from secure storage with enhanced error handling
+      let privateKey;
+      try {
+        privateKey = await SecureStore.getItemAsync(storageKey, {
+          requireAuthentication: false,
+          keychainService: 'WeSplitSplitWalletKeys'
+        });
+        
+        logger.debug('Private key retrieval result', {
+          splitWalletId,
+          requesterId,
+          storageKey,
+          hasPrivateKey: !!privateKey,
+          privateKeyLength: privateKey?.length || 0
+        }, 'SplitWalletSecurity');
+      } catch (secureStoreError) {
+        logger.error('SecureStore.getItemAsync failed', {
+          splitWalletId,
+          requesterId,
+          storageKey,
+          error: secureStoreError instanceof Error ? secureStoreError.message : String(secureStoreError)
+        }, 'SplitWalletSecurity');
+        
+        return {
+          success: false,
+          error: `Failed to access secure storage: ${secureStoreError instanceof Error ? secureStoreError.message : 'Unknown error'}`,
+        };
+      }
       
       if (!privateKey) {
         logger.warn('Private key not found in secure storage', {
@@ -227,14 +438,24 @@ export class SplitWalletSecurity {
         
         for (const altKey of alternativeKeys) {
           if (altKey !== storageKey) {
-            logger.debug('Trying alternative storage key', { altKey }, 'SplitWalletSecurity');
-            const altPrivateKey = await SecureStore.getItemAsync(altKey);
-            if (altPrivateKey) {
-              logger.info('Found private key with alternative storage key', { altKey }, 'SplitWalletSecurity');
-              return {
-                success: true,
-                privateKey: altPrivateKey
-              };
+            try {
+              logger.debug('Trying alternative storage key', { altKey }, 'SplitWalletSecurity');
+              const altPrivateKey = await SecureStore.getItemAsync(altKey, {
+                requireAuthentication: false,
+                keychainService: 'WeSplitSplitWalletKeys'
+              });
+              if (altPrivateKey) {
+                logger.info('Found private key with alternative storage key', { altKey }, 'SplitWalletSecurity');
+                return {
+                  success: true,
+                  privateKey: altPrivateKey
+                };
+              }
+            } catch (altError) {
+              logger.warn('Failed to check alternative storage key', {
+                altKey,
+                error: altError instanceof Error ? altError.message : String(altError)
+              }, 'SplitWalletSecurity');
             }
           }
         }
@@ -297,13 +518,35 @@ export class SplitWalletSecurity {
       
       const privateKeyDocRef = doc(db, 'splitWalletPrivateKeys', splitWalletId);
       
-      await setDoc(privateKeyDocRef, {
-        splitWalletId,
-        privateKey,
-        participants: participants.map(p => ({ userId: p.userId, name: p.name })),
-        createdAt: new Date().toISOString(),
-        splitType: 'degen'
-      });
+      try {
+        await setDoc(privateKeyDocRef, {
+          splitWalletId,
+          privateKey,
+          participants: participants.map(p => ({ userId: p.userId, name: p.name })),
+          createdAt: new Date().toISOString(),
+          splitType: 'degen'
+        });
+        
+        logger.info('Successfully stored private key in Firebase for Degen Split', {
+          splitWalletId,
+          participantsCount: participants.length,
+          collectionName: 'splitWalletPrivateKeys'
+        }, 'SplitWalletSecurity');
+      } catch (firebaseError) {
+        logger.error('Failed to store private key in Firebase for Degen Split', {
+          splitWalletId,
+          participantsCount: participants.length,
+          error: firebaseError instanceof Error ? firebaseError.message : String(firebaseError),
+          errorCode: (firebaseError as any)?.code,
+          errorDetails: (firebaseError as any)?.details
+        }, 'SplitWalletSecurity');
+        
+        // Don't fail the entire operation, but log the error
+        // The private key will still be stored locally as a fallback
+        logger.warn('Continuing with local storage fallback for Degen Split private key', {
+          splitWalletId
+        }, 'SplitWalletSecurity');
+      }
 
       logger.info('Private key stored in Firebase for all Degen Split participants', {
         splitWalletId,

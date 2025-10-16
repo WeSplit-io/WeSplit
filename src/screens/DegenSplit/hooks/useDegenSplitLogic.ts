@@ -152,7 +152,7 @@ export const useDegenSplitLogic = (
       
       return newWallet;
     } catch (error) {
-      handleError(error, 'create split wallet');
+      handleError(error, 'create split wallet', false); // Don't show popup
       setState({ isCreatingWallet: false });
       return null;
     }
@@ -228,12 +228,14 @@ export const useDegenSplitLogic = (
     if (state.isLocked || state.isLocking || state.isLoadingWallet) return false;
     
     if (!currentUser?.id) {
-      Alert.alert('Error', 'User not authenticated');
+      // Log error but don't show popup
+      console.error('User not authenticated');
       return false;
     }
 
     if (!participants || !Array.isArray(participants) || participants.length === 0) {
-      Alert.alert('Error', 'No participants found. Please try again.');
+      // Log error but don't show popup
+      console.error('No participants found');
       return false;
     }
 
@@ -245,11 +247,8 @@ export const useDegenSplitLogic = (
       const userBalance = balanceResult?.usdcBalance || 0;
       
       if (userBalance < totalAmount) {
-        Alert.alert(
-          'Insufficient Funds',
-          `You need ${totalAmount} USDC to lock your share, but your current balance is ${userBalance} USDC. Please add more funds to your wallet.`,
-          [{ text: 'OK', style: 'cancel' }]
-        );
+        // Log error but don't show popup
+        console.error(`Insufficient funds: need ${totalAmount} USDC, have ${userBalance} USDC`);
         return false;
       }
       
@@ -259,15 +258,9 @@ export const useDegenSplitLogic = (
       
     } catch (error) {
       console.error('Error checking user balance:', error);
-      Alert.alert(
-        'Balance Check Failed',
-        'Unable to verify your balance. You can still attempt to lock your share, but the transaction may fail if you have insufficient funds.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Continue Anyway', onPress: () => setState({ showLockModal: true }) }
-        ]
-      );
-      return false;
+      // Log error but don't show popup - continue anyway
+      setState({ showLockModal: true });
+      return true;
     }
   }, [state.isLocked, state.isLocking, state.isLoadingWallet, setState]);
 
@@ -312,7 +305,8 @@ export const useDegenSplitLogic = (
         );
         
         if (!syncResult.success) {
-          Alert.alert('Error', 'Failed to sync participants. Please try again.');
+          // Log error but don't show popup
+          console.error('Failed to sync participants:', syncResult.error);
           setState({ isCreatingWallet: false });
           return false;
         }
@@ -358,7 +352,7 @@ export const useDegenSplitLogic = (
       setState({ isCreatingWallet: false });
       return true;
     } catch (error) {
-      handleError(error, 'lock the split');
+      handleError(error, 'lock the split', false); // Don't show popup
       setState({ isCreatingWallet: false });
       return false;
     }

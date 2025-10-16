@@ -36,41 +36,50 @@ import Constants from 'expo-constants';
 import { initializeFirebaseAuth } from './firebasePersistence';
 import { logger } from '../services/loggingService';
 
-// Get environment variables from Expo Constants
+// Get environment variables from Expo Constants with enhanced production support
 const getEnvVar = (key: string): string => {
   // Try to get from process.env first (for development)
   if (process.env[key]) {
-    return process.env[key]!;
+    return process.env[key]!.trim();
   }
   
   // Try to get from process.env with EXPO_PUBLIC_ prefix
   if (process.env[`EXPO_PUBLIC_${key}`]) {
-    return process.env[`EXPO_PUBLIC_${key}`]!;
+    return process.env[`EXPO_PUBLIC_${key}`]!.trim();
   }
   
   // Try to get from Expo Constants
   if (Constants.expoConfig?.extra?.[key]) {
-    return Constants.expoConfig.extra[key];
+    return String(Constants.expoConfig.extra[key]).trim();
   }
   
   // Try to get from Expo Constants with EXPO_PUBLIC_ prefix
   if (Constants.expoConfig?.extra?.[`EXPO_PUBLIC_${key}`]) {
-    return Constants.expoConfig.extra[`EXPO_PUBLIC_${key}`];
+    return String(Constants.expoConfig.extra[`EXPO_PUBLIC_${key}`]).trim();
   }
   
   // Try to get from Constants.manifest (older Expo versions)
   if ((Constants.manifest as any)?.extra?.[key]) {
-    return (Constants.manifest as any).extra[key];
+    return String((Constants.manifest as any).extra[key]).trim();
   }
   
   // Try to get from Constants.manifest with EXPO_PUBLIC_ prefix
   if ((Constants.manifest as any)?.extra?.[`EXPO_PUBLIC_${key}`]) {
-    return (Constants.manifest as any).extra[`EXPO_PUBLIC_${key}`];
+    return String((Constants.manifest as any).extra[`EXPO_PUBLIC_${key}`]).trim();
   }
   
   // Additional fallback: try to get from firebase config object
   if (Constants.expoConfig?.extra?.firebase?.[key.toLowerCase().replace('FIREBASE_', '')]) {
-    return Constants.expoConfig.extra.firebase[key.toLowerCase().replace('FIREBASE_', '')];
+    return String(Constants.expoConfig.extra.firebase[key.toLowerCase().replace('FIREBASE_', '')]).trim();
+  }
+  
+  // Production fallback: try to get from app.config.js or app.json
+  if (Constants.expoConfig?.extra?.env?.[key]) {
+    return String(Constants.expoConfig.extra.env[key]).trim();
+  }
+  
+  if (Constants.expoConfig?.extra?.env?.[`EXPO_PUBLIC_${key}`]) {
+    return String(Constants.expoConfig.extra.env[`EXPO_PUBLIC_${key}`]).trim();
   }
   
   return '';
@@ -84,8 +93,8 @@ const storageBucket = getEnvVar('FIREBASE_STORAGE_BUCKET') || "wesplit-35186.app
 const messagingSenderId = getEnvVar('FIREBASE_MESSAGING_SENDER_ID');
 const appId = getEnvVar('FIREBASE_APP_ID');
 
-// Debug logging for production builds
-console.log('🔥 Firebase Config - Environment Variables Debug:', {
+// Enhanced debug logging for production builds
+const debugInfo = {
   apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'MISSING',
   authDomain,
   projectId,
@@ -96,8 +105,19 @@ console.log('🔥 Firebase Config - Environment Variables Debug:', {
   hasMessagingSenderId: !!messagingSenderId,
   hasAppId: !!appId,
   processEnvKeys: Object.keys(process.env).filter(key => key.includes('FIREBASE')),
-  expoConfigExtra: Constants.expoConfig?.extra ? Object.keys(Constants.expoConfig.extra).filter(key => key.includes('FIREBASE')) : 'NO_EXTRA_CONFIG'
-});
+  expoConfigExtra: Constants.expoConfig?.extra ? Object.keys(Constants.expoConfig.extra).filter(key => key.includes('FIREBASE')) : 'NO_EXTRA_CONFIG',
+  environment: process.env.NODE_ENV || 'unknown',
+  isProduction: process.env.NODE_ENV === 'production',
+  expoConfigExists: !!Constants.expoConfig,
+  manifestExists: !!Constants.manifest,
+  allProcessEnvKeys: Object.keys(process.env).filter(key => key.includes('EXPO_PUBLIC')),
+  firebaseConfigKeys: Constants.expoConfig?.extra?.firebase ? Object.keys(Constants.expoConfig.extra.firebase) : 'NO_FIREBASE_CONFIG'
+};
+
+console.log('🔥 Firebase Config - Environment Variables Debug:', debugInfo);
+
+// Log to logger service for production debugging
+logger.info('Firebase Configuration Debug', debugInfo, 'firebase');
 
 // Validate required environment variables
 if (!apiKey) {

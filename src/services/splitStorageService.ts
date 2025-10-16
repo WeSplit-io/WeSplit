@@ -84,7 +84,32 @@ export interface SplitListResult {
 }
 
 export class SplitStorageService {
-  private static readonly COLLECTION_NAME = 'splits';
+  private static readonly COLLECTION_NAME = 'splits'
+
+  /**
+   * Remove undefined values from an object to prevent Firebase errors
+   */
+  private static removeUndefinedValues(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.removeUndefinedValues(item));
+    }
+    
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = this.removeUndefinedValues(value);
+        }
+      }
+      return cleaned;
+    }
+    
+    return obj;
+  };
 
   /**
    * Create a new split in the database
@@ -418,7 +443,10 @@ export class SplitStorageService {
         updatedAt: new Date().toISOString(),
       };
 
-      await updateDoc(doc(db, this.COLLECTION_NAME, docId), updateData);
+      // Remove undefined values to prevent Firebase errors
+      const cleanedUpdateData = this.removeUndefinedValues(updateData);
+
+      await updateDoc(doc(db, this.COLLECTION_NAME, docId), cleanedUpdateData);
 
       const updatedSplit: Split = {
         ...split,
@@ -461,7 +489,10 @@ export class SplitStorageService {
         updatedAt: new Date().toISOString(),
       };
 
-      await updateDoc(doc(db, this.COLLECTION_NAME, docId), updateData);
+      // Remove undefined values to prevent Firebase errors
+      const cleanedUpdateData = this.removeUndefinedValues(updateData);
+
+      await updateDoc(doc(db, this.COLLECTION_NAME, docId), cleanedUpdateData);
 
       const updatedSplit: Split = {
         ...split,

@@ -312,7 +312,8 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
 
   // Validate required data
   if (!participants || !Array.isArray(participants) || participants.length === 0) {
-    Alert.alert('Error', 'Invalid participants data. Please try again.');
+    // Log error but don't show popup
+    console.error('Invalid participants data');
     navigation.goBack();
     return null;
   }
@@ -332,8 +333,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   const handleLockTheSplit = async () => {
     const success = await degenLogic.handleLockTheSplit(splitData, currentUser, totalAmount, participants);
     if (success) {
-      // Show success message and update UI
-      Alert.alert('Success', 'Split wallet created and shared with participants!');
+      // Success handled by the logic - no popup needed
     }
   };
 

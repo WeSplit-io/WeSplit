@@ -219,24 +219,34 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
     if (!existingUserQuery.empty) {
       // User already exists, update the existing document
       userDoc = existingUserQuery.docs[0];
+      const existingUserData = userDoc.data();
+      
       await userDoc.ref.update({
         lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
         lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
         emailVerified: true,
-        // Update Firebase Auth UID if it's different
+        // Update Firebase Auth UID if it's different (for consistency)
         id: firebaseUser.uid,
+        firebase_uid: firebaseUser.uid,
         // Update any missing fields
-        name: userDoc.data().name || firebaseUser.displayName || '',
-        avatar: userDoc.data().avatar || firebaseUser.photoURL || ''
+        name: existingUserData.name || firebaseUser.displayName || '',
+        avatar: existingUserData.avatar || firebaseUser.photoURL || '',
+        // Ensure email-based identification
+        primary_email: sanitizedEmail,
+        // Migration tracking
+        migration_completed: admin.firestore.FieldValue.serverTimestamp(),
+        migration_version: '1.0'
       });
       
-      console.log(`Updated existing user document for ${sanitizedEmail}`);
+      console.log(`Updated existing user document for ${sanitizedEmail} with UID ${firebaseUser.uid}`);
     } else {
       // Create new user document with Firebase Auth UID
       userDoc = db.collection('users').doc(firebaseUser.uid);
       await userDoc.set({
         id: firebaseUser.uid,
+        firebase_uid: firebaseUser.uid,
         email: firebaseUser.email,
+        primary_email: sanitizedEmail, // Primary email for identification
         name: firebaseUser.displayName || '',
         wallet_address: '',
         wallet_public_key: '',
@@ -244,8 +254,15 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
         avatar: firebaseUser.photoURL || '',
         emailVerified: true,
         lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(), // Track when user last verified
-        hasCompletedOnboarding: false // Track onboarding completion
+        lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        hasCompletedOnboarding: false,
+        // Wallet management tracking
+        wallet_status: 'no_wallet',
+        wallet_type: 'app-generated',
+        wallet_migration_status: 'none',
+        // Migration tracking
+        migration_completed: admin.firestore.FieldValue.serverTimestamp(),
+        migration_version: '1.0'
       });
       
       console.log(`Created new user document for ${sanitizedEmail}`);

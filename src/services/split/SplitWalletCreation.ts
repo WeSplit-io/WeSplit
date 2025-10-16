@@ -416,11 +416,13 @@ export class SplitWalletCreation {
           ...p,
           amountPaid: 0,
           status: 'pending' as const,
-          transactionSignature: undefined,
-          paidAt: undefined,
+          // Remove undefined fields - Firebase doesn't allow undefined values
+          transactionSignature: null,
+          paidAt: null,
         })),
         updatedAt: new Date().toISOString(),
-        completedAt: undefined,
+        // Remove undefined fields - Firebase doesn't allow undefined values
+        completedAt: null,
       };
 
       // Update in Firebase

@@ -26,6 +26,7 @@ import { logger } from './loggingService';
 import { getEnvVar, getPlatformGoogleClientId, getOAuthRedirectUri } from '../utils/environmentUtils';
 import { firebaseDataService } from './firebaseDataService';
 import { walletService } from './WalletService';
+import { UserMigrationService } from './UserMigrationService';
 import Constants from 'expo-constants';
 
 // Environment variable helper
@@ -496,84 +497,78 @@ class AuthService {
   }
 
   /**
-   * Create or update user data in Firestore
+   * Create or update user data in Firestore using email-based identification
    */
   private async createOrUpdateUserData(user: User, isNewUser: boolean): Promise<void> {
     try {
+      // Use UserMigrationService to ensure consistent user identification
+      const consistentUser = await UserMigrationService.ensureUserConsistency(user);
+      
+      logger.info('✅ User consistency ensured', {
+        userId: consistentUser.id,
+        email: consistentUser.email.substring(0, 5) + '...',
+        isNewUser
+      }, 'AuthService');
+      
       if (isNewUser) {
-        // Create new user with wallet
-        const userData = {
-          name: user.displayName || user.email?.split('@')[0] || 'User',
-          email: user.email || '',
-          hasCompletedOnboarding: false,
-          wallet_address: '',
-          avatar: user.photoURL || ''
-        };
-
         // Create wallet for new user
-        const walletResult = await walletService.createWallet(user.uid);
+        const walletResult = await walletService.createWallet(consistentUser.id);
         if (walletResult.success && walletResult.wallet) {
-          userData.wallet_address = walletResult.wallet.address;
-        }
-
-        await firebaseDataService.user.createUserIfNotExists(userData);
-        
-        logger.info('✅ New user created with wallet', {
-          userId: user.uid,
-          walletAddress: userData.wallet_address
-        }, 'AuthService');
-      } else {
-        // Handle existing user - check if they have wallet on device
-        const existingUser = await firebaseDataService.user.getCurrentUser(user.uid);
-        const hasWalletOnDevice = await walletService.hasWalletOnDevice(user.uid);
-        
-        if (existingUser && hasWalletOnDevice) {
-          // User exists in database and has wallet on device - normal case
-          await firebaseDataService.user.updateUser(user.uid, {
-            name: user.displayName || user.email?.split('@')[0] || existingUser.name,
-            email: user.email || existingUser.email,
-            avatar: user.photoURL || existingUser.avatar
+          await firebaseDataService.user.updateUser(consistentUser.id, {
+            wallet_address: walletResult.wallet.address,
+            wallet_public_key: walletResult.wallet.publicKey,
+            wallet_status: 'healthy',
+            wallet_created_at: new Date().toISOString(),
+            wallet_has_private_key: true,
+            wallet_type: 'app-generated'
           });
           
-          logger.info('✅ Existing user data updated (wallet preserved)', {
-            userId: user.uid,
-            existingWalletAddress: existingUser.wallet_address
+          logger.info('✅ New user wallet created', {
+            userId: consistentUser.id,
+            walletAddress: walletResult.wallet.address
           }, 'AuthService');
-        } else if (existingUser && !hasWalletOnDevice) {
+        }
+      } else {
+        // Handle existing user - check if they have wallet on device
+        const hasWalletOnDevice = await walletService.hasWalletOnDevice(consistentUser.id);
+        
+        if (hasWalletOnDevice) {
+          // User has wallet on device - normal case
+          logger.info('✅ Existing user with wallet on device', {
+            userId: consistentUser.id,
+            existingWalletAddress: consistentUser.wallet_address
+          }, 'AuthService');
+        } else if (consistentUser.wallet_address) {
           // User exists in database but no wallet on device (app reinstalled)
           logger.warn('⚠️ User exists in database but no wallet on device - attempting wallet recovery', { 
-            userId: user.uid,
-            databaseWalletAddress: existingUser.wallet_address 
+            userId: consistentUser.id,
+            databaseWalletAddress: consistentUser.wallet_address 
           }, 'AuthService');
           
           // Try to recover wallet using existing wallet address from database
-          const walletResult = await walletService.recoverWalletFromAddress(user.uid, existingUser.wallet_address);
+          const walletResult = await walletService.recoverWalletFromAddress(consistentUser.id, consistentUser.wallet_address);
           if (walletResult.success) {
-            logger.info('✅ Wallet recovered successfully', { userId: user.uid }, 'AuthService');
-            
-            // Update user data with recovered wallet info
-            await firebaseDataService.user.updateUser(user.uid, {
-              name: user.displayName || user.email?.split('@')[0] || existingUser.name,
-              email: user.email || existingUser.email,
-              avatar: user.photoURL || existingUser.avatar
-            });
+            logger.info('✅ Wallet recovered successfully', { userId: consistentUser.id }, 'AuthService');
           } else {
             logger.error('❌ Failed to recover wallet, user will need to restore from seed phrase', { 
-              userId: user.uid,
+              userId: consistentUser.id,
               error: walletResult.error 
             }, 'AuthService');
-            
-            // Even if recovery failed, update user data but don't create new wallet
-            await firebaseDataService.user.updateUser(user.uid, {
-              name: user.displayName || user.email?.split('@')[0] || existingUser.name,
-              email: user.email || existingUser.email,
-              avatar: user.photoURL || existingUser.avatar
-            });
           }
         } else {
-          // Fallback: user not found in database, treat as new
-          logger.warn('⚠️ User not found in database, creating new user', { userId: user.uid }, 'AuthService');
-          await this.createOrUpdateUserData(user, true);
+          // User has no wallet - create one
+          logger.info('Creating wallet for existing user without wallet', { userId: consistentUser.id }, 'AuthService');
+          const walletResult = await walletService.createWallet(consistentUser.id);
+          if (walletResult.success && walletResult.wallet) {
+            await firebaseDataService.user.updateUser(consistentUser.id, {
+              wallet_address: walletResult.wallet.address,
+              wallet_public_key: walletResult.wallet.publicKey,
+              wallet_status: 'healthy',
+              wallet_created_at: new Date().toISOString(),
+              wallet_has_private_key: true,
+              wallet_type: 'app-generated'
+            });
+          }
         }
       }
     } catch (error) {

@@ -5,7 +5,7 @@ export interface User {
   email: string;
   wallet_address: string;
   wallet_public_key?: string;
-  wallet_secret_key?: string;
+  // ❌ REMOVED: wallet_secret_key - Private keys should NEVER be stored in database
   created_at: string;
   avatar?: string; // For UI purposes, can be generated or uploaded
   hasCompletedOnboarding?: boolean; // Track if user has completed onboarding flow
@@ -15,10 +15,17 @@ export interface User {
   wallet_created_at?: string;
   wallet_last_fixed_at?: string;
   wallet_fix_attempts?: number;
-  wallet_has_private_key?: boolean;
+  wallet_has_private_key?: boolean; // Boolean flag only - actual private key stored on device
   wallet_has_seed_phrase?: boolean;
   wallet_type?: 'app-generated' | 'external' | 'migrated';
   wallet_migration_status?: 'none' | 'in_progress' | 'completed' | 'failed';
+  
+  // Migration and consistency tracking
+  firebase_uid?: string; // Track Firebase UID for consistency
+  primary_email?: string; // Primary email for identification
+  email_verified?: boolean;
+  migration_completed?: string; // Timestamp when migration was completed
+  migration_version?: string; // Migration version
 }
 
 // Group member is essentially a User but with group-specific metadata

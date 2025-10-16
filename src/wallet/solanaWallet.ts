@@ -569,8 +569,8 @@ class SolanaWalletService {
     try {
       if (wallet.secretKey) {
         await SecureStore.setItemAsync('wallet_private_key', wallet.secretKey, {
-          requireAuthentication: true,
-          authenticationPrompt: 'Access your wallet private key'
+          requireAuthentication: false,
+          keychainService: 'WeSplitWalletData'
         });
       }
     } catch (error) {
@@ -585,8 +585,8 @@ class SolanaWalletService {
   private async storeMnemonicSecurely(mnemonic: string): Promise<void> {
     try {
       await SecureStore.setItemAsync('wallet_mnemonic', mnemonic, {
-        requireAuthentication: true,
-        authenticationPrompt: 'Access your wallet mnemonic'
+        requireAuthentication: false,
+        keychainService: 'WeSplitWalletData'
       });
     } catch (error) {
       logger.error('Failed to store mnemonic securely', error, 'SolanaWalletService');
@@ -600,8 +600,8 @@ class SolanaWalletService {
   private async getStoredPrivateKey(): Promise<string | null> {
     try {
       return await SecureStore.getItemAsync('wallet_private_key', {
-        requireAuthentication: true,
-        authenticationPrompt: 'Access your wallet private key'
+        requireAuthentication: false,
+        keychainService: 'WeSplitWalletData'
       });
     } catch (error) {
       logger.error('Failed to get stored private key', error, 'SolanaWalletService');
@@ -615,8 +615,8 @@ class SolanaWalletService {
   private async getStoredMnemonic(): Promise<string | null> {
     try {
       return await SecureStore.getItemAsync('wallet_mnemonic', {
-        requireAuthentication: true,
-        authenticationPrompt: 'Access your wallet mnemonic'
+        requireAuthentication: false,
+        keychainService: 'WeSplitWalletData'
       });
     } catch (error) {
       logger.error('Failed to get stored mnemonic', error, 'SolanaWalletService');

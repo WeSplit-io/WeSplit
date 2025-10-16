@@ -28,6 +28,9 @@ target 'WeSplit' do
   
   # Use dynamic frameworks to resolve Swift pod integration issues
   use_frameworks! :linkage => :dynamic
+  
+  # Enable modular headers for all pods to fix Firebase Swift integration
+  use_modular_headers!
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
@@ -68,6 +71,15 @@ target 'WeSplit' do
       target.build_configurations.each do |config|
         config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
         config.build_settings['DEFINES_MODULE'] = 'YES'
+        
+        # Fix Firebase Swift integration issues
+        if target.name == 'GoogleUtilities'
+          config.build_settings['DEFINES_MODULE'] = 'YES'
+        end
+        
+        if target.name.start_with?('Firebase')
+          config.build_settings['DEFINES_MODULE'] = 'YES'
+        end
       end
     end
   end
