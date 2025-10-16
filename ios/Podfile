@@ -23,6 +23,10 @@ prepare_react_native_project!
 target 'WeSplit' do
   use_expo_modules!
   use_modular_headers!
+  
+  # Specific modular headers for Firebase pods
+  pod 'FirebaseCoreInternal', :modular_headers => true
+  pod 'GoogleUtilities', :modular_headers => true
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
