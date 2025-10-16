@@ -15,9 +15,19 @@ const getEnvVar = (key: string): string => {
     return process.env[key]!;
   }
   
+  // Try to get from process.env with EXPO_PUBLIC_ prefix
+  if (process.env[`EXPO_PUBLIC_${key}`]) {
+    return process.env[`EXPO_PUBLIC_${key}`]!;
+  }
+  
   // Try to get from Expo Constants
   if (Constants.expoConfig?.extra?.[key]) {
     return Constants.expoConfig.extra[key];
+  }
+  
+  // Try to get from Expo Constants with EXPO_PUBLIC_ prefix
+  if (Constants.expoConfig?.extra?.[`EXPO_PUBLIC_${key}`]) {
+    return Constants.expoConfig.extra[`EXPO_PUBLIC_${key}`];
   }
   
   // Try to get from Constants.manifest (older Expo versions)
@@ -25,16 +35,37 @@ const getEnvVar = (key: string): string => {
     return (Constants.manifest as any).extra[key];
   }
   
+  // Try to get from Constants.manifest with EXPO_PUBLIC_ prefix
+  if ((Constants.manifest as any)?.extra?.[`EXPO_PUBLIC_${key}`]) {
+    return (Constants.manifest as any).extra[`EXPO_PUBLIC_${key}`];
+  }
+  
   return '';
 };
 
 // Get Firebase configuration values
-const apiKey = getEnvVar('EXPO_PUBLIC_FIREBASE_API_KEY');
-const authDomain = getEnvVar('EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN') || "wesplit-35186.firebaseapp.com";
-const projectId = getEnvVar('EXPO_PUBLIC_FIREBASE_PROJECT_ID') || "wesplit-35186";
-const storageBucket = getEnvVar('EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET') || "wesplit-35186.appspot.com";
-const messagingSenderId = getEnvVar('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID');
-const appId = getEnvVar('EXPO_PUBLIC_FIREBASE_APP_ID');
+const apiKey = getEnvVar('FIREBASE_API_KEY');
+const authDomain = getEnvVar('FIREBASE_AUTH_DOMAIN') || "wesplit-35186.firebaseapp.com";
+const projectId = getEnvVar('FIREBASE_PROJECT_ID') || "wesplit-35186";
+const storageBucket = getEnvVar('FIREBASE_STORAGE_BUCKET') || "wesplit-35186.appspot.com";
+const messagingSenderId = getEnvVar('FIREBASE_MESSAGING_SENDER_ID');
+const appId = getEnvVar('FIREBASE_APP_ID');
+
+// Validate required environment variables
+if (!apiKey) {
+  console.error('EXPO_PUBLIC_FIREBASE_API_KEY is missing. Please check your .env file and app.json configuration.');
+  throw new Error('EXPO_PUBLIC_FIREBASE_API_KEY is required. Please add it to your .env file or app.json extra section.');
+}
+
+if (!messagingSenderId) {
+  console.error('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID is missing. Please check your .env file and app.json configuration.');
+  throw new Error('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID is required. Please add it to your .env file or app.json extra section.');
+}
+
+if (!appId) {
+  console.error('EXPO_PUBLIC_FIREBASE_APP_ID is missing. Please check your .env file and app.json configuration.');
+  throw new Error('EXPO_PUBLIC_FIREBASE_APP_ID is required. Please add it to your .env file or app.json extra section.');
+}
 
 // Firebase configuration
 const firebaseConfig = {

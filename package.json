@@ -45,7 +45,8 @@
     "test:production:requirements": "node scripts/test-production-requirements.js",
     "test:production:simulate": "node scripts/simulate-production.js",
     "test:production:all": "node scripts/test-all-production.js",
-    "setup:eas:env": "node scripts/setup-eas-env.js"
+    "setup:eas:env": "node scripts/setup-eas-env.js",
+    "test:firebase:functions": "node scripts/test-firebase-functions.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
