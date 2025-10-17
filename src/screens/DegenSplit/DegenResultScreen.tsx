@@ -550,8 +550,16 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
 
       {/* Claim Modal */}
       {degenState.showClaimModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => degenState.setShowClaimModal(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalContainer}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
             <View style={styles.modalHandle} />
             <View style={styles.modalContent}>
               <View style={styles.modalIconContainer}>
@@ -600,8 +608,8 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
                 />
               )}
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       )}
 
       {/* Payment Options Modal */}

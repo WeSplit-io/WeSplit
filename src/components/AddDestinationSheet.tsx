@@ -325,122 +325,131 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
               <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardAvoidingView}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                enabled={true}
               >
-                {/* Handle bar for slide down */}
-                <View style={styles.grabHandle} />
+                <ScrollView 
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ flexGrow: 1, paddingBottom: spacing.xl }}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  {/* Handle bar for slide down */}
+                  <View style={styles.grabHandle} />
 
-                {/* Header */}
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Add Wallet or Card</Text>
-                </View>
+                  {/* Header */}
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>Add Wallet or Card</Text>
+                  </View>
 
-                {/* Segmented Control */}
-                <View style={styles.segmentedControl}>
-                  <TouchableOpacity
-                    style={[
-                      styles.segment,
-                      destinationType === 'wallet' && styles.segmentActive
-                    ]}
-                    onPress={() => setDestinationType('wallet')}
-                  >
-                    <Text style={[
-                      styles.segmentText,
-                      destinationType === 'wallet' && styles.segmentTextActive
-                    ]}>
-                      Wallet
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.segment,
-                      destinationType === 'kast' && styles.segmentActive
-                    ]}
-                    onPress={() => setDestinationType('kast')}
-                  >
-                    <Text style={[
-                      styles.segmentText,
-                      destinationType === 'kast' && styles.segmentTextActive
-                    ]}>
-                      Kast Card
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                  {/* Segmented Control */}
+                  <View style={styles.segmentedControl}>
+                    <TouchableOpacity
+                      style={[
+                        styles.segment,
+                        destinationType === 'wallet' && styles.segmentActive
+                      ]}
+                      onPress={() => setDestinationType('wallet')}
+                    >
+                      <Text style={[
+                        styles.segmentText,
+                        destinationType === 'wallet' && styles.segmentTextActive
+                      ]}>
+                        Wallet
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.segment,
+                        destinationType === 'kast' && styles.segmentActive
+                      ]}
+                      onPress={() => setDestinationType('kast')}
+                    >
+                      <Text style={[
+                        styles.segmentText,
+                        destinationType === 'kast' && styles.segmentTextActive
+                      ]}>
+                        Kast Card
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
-                {/* Form Content */}
-                <View style={styles.formContent}>
-                  {destinationType === 'wallet' ? (
-                    <View>
-                      <Text style={styles.inputLabel}>Wallet Address</Text>
-                      <TextInput
-                        style={styles.inputField}
-                        value={address}
-                        onChangeText={setAddress}
-                        placeholder="Enter wallet address"
-                        placeholderTextColor={colors.textSecondary}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                      {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
+                  {/* Form Content */}
+                  <View style={styles.formContent}>
+                    {destinationType === 'wallet' ? (
+                      <View>
+                        <Text style={styles.inputLabel}>Wallet Address</Text>
+                        <TextInput
+                          style={styles.inputField}
+                          value={address}
+                          onChangeText={setAddress}
+                          placeholder="Enter wallet address"
+                          placeholderTextColor={colors.textSecondary}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                        />
+                        {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
 
-                      <Text style={styles.inputLabel}>Name</Text>
-                      <TextInput
-                        style={styles.inputField}
-                        value={name}
-                        onChangeText={setName}
-                        placeholder="e.g., Cold Wallet, Treasury"
-                        placeholderTextColor={colors.textSecondary}
-                        autoCapitalize="words"
-                        autoCorrect={false}
-                      />
-                      {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-                    </View>
-                  ) : (
-                    <View>
-                      <Text style={styles.inputLabel}>Card Address</Text>
-                      <TextInput
-                        style={styles.inputField}
-                        value={identifier}
-                        onChangeText={setIdentifier}
-                        placeholder="Enter card address"
-                        placeholderTextColor={colors.textSecondary}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                      {errors.identifier && <Text style={styles.errorText}>{errors.identifier}</Text>}
+                        <Text style={styles.inputLabel}>Name</Text>
+                        <TextInput
+                          style={styles.inputField}
+                          value={name}
+                          onChangeText={setName}
+                          placeholder="e.g., Cold Wallet, Treasury"
+                          placeholderTextColor={colors.textSecondary}
+                          autoCapitalize="words"
+                          autoCorrect={false}
+                        />
+                        {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+                      </View>
+                    ) : (
+                      <View>
+                        <Text style={styles.inputLabel}>Card Address</Text>
+                        <TextInput
+                          style={styles.inputField}
+                          value={identifier}
+                          onChangeText={setIdentifier}
+                          placeholder="Enter card address"
+                          placeholderTextColor={colors.textSecondary}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                        />
+                        {errors.identifier && <Text style={styles.errorText}>{errors.identifier}</Text>}
 
-                      <Text style={styles.inputLabel}>Name</Text>
-                      <TextInput
-                        style={styles.inputField}
-                        value={name}
-                        onChangeText={setName}
-                        placeholder="e.g., Team Card, Marketing"
-                        placeholderTextColor={colors.textSecondary}
-                        autoCapitalize="words"
-                        autoCorrect={false}
-                      />
-                      {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-                    </View>
-                  )}
-                </View>
+                        <Text style={styles.inputLabel}>Name</Text>
+                        <TextInput
+                          style={styles.inputField}
+                          value={name}
+                          onChangeText={setName}
+                          placeholder="e.g., Team Card, Marketing"
+                          placeholderTextColor={colors.textSecondary}
+                          autoCapitalize="words"
+                          autoCorrect={false}
+                        />
+                        {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+                      </View>
+                    )}
+                  </View>
 
-                {/* Actions */}
-                <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={[
-                      styles.saveButton,
-                      !isFormValid() && styles.saveButtonDisabled
-                    ]}
-                    onPress={handleSave}
-                    disabled={!isFormValid()}
-                  >
-                    <Text style={[
-                      styles.saveButtonText,
-                      !isFormValid() && styles.saveButtonTextDisabled
-                    ]}>
-                      {isLoading ? 'Saving...' : 'Save'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                  {/* Actions */}
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity
+                      style={[
+                        styles.saveButton,
+                        !isFormValid() && styles.saveButtonDisabled
+                      ]}
+                      onPress={handleSave}
+                      disabled={!isFormValid()}
+                    >
+                      <Text style={[
+                        styles.saveButtonText,
+                        !isFormValid() && styles.saveButtonTextDisabled
+                      ]}>
+                        {isLoading ? 'Saving...' : 'Save'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
               </KeyboardAvoidingView>
             </Animated.View>
           </PanGestureHandler>

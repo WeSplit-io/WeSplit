@@ -528,6 +528,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   modalCancelButtonText: {
     color: colors.white80,
@@ -564,8 +565,13 @@ export const styles = StyleSheet.create({
   splitButton: {
     backgroundColor: colors.green,
     borderRadius: 12,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  splitButtonGradient: {
     paddingVertical: spacing.md,
     alignItems: 'center',
+    width: '100%',
   },
   splitButtonText: {
     color: colors.black,

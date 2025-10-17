@@ -630,7 +630,7 @@ const AuthMethodsScreen: React.FC = () => {
 
         <View style={styles.contentContainer}>
           {/* Social Login Buttons */}
-          <View style={styles.socialSection}>
+          {/*<View style={styles.socialSection}>
             <TouchableOpacity
               style={[
                 styles.socialButtonLight, 
@@ -672,11 +672,11 @@ const AuthMethodsScreen: React.FC = () => {
                 {socialLoading === 'apple' ? getSocialLoadingText('apple') : 'Continue with Apple'}
               </Text>
             </TouchableOpacity>
-          </View>
+          </View>*/}
 
 
           {/* Separator */}
-          <View style={styles.separator}>
+          {/*<View style={styles.separator}>
             <View style={styles.separatorLine} />
             <Text style={styles.separatorText}>or</Text>
             <View style={styles.separatorLine} />

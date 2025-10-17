@@ -21,6 +21,13 @@ export const styles = StyleSheet.create({
   keyboardAvoidingView: {
     flex: 1,
   },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: spacing.xl,
+  },
   modalHeader: {
     alignItems: 'center',
     marginBottom: spacing.lg,
