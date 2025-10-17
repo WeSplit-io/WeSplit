@@ -112,7 +112,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     
     navigation.navigate('SendAmount', {
       destinationType: 'external',
-      destination: destination,
+      wallet: destination, // Pass as 'wallet' parameter to match SendAmountScreen expectations
       groupId,
     });
   };

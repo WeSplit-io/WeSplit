@@ -33,9 +33,14 @@ const KastAccountLinkingScreen: React.FC<KastAccountLinkingScreenProps> = ({ nav
   const [isValidating, setIsValidating] = useState(false);
 
   const validateKastAddress = (address: string): boolean => {
-    // Basic Solana address validation (44 characters, base58)
-    const solanaAddressRegex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-    return solanaAddressRegex.test(address);
+    // Use proper Solana address validation
+    try {
+      const { PublicKey } = require('@solana/web3.js');
+      new PublicKey(address);
+      return true;
+    } catch (error) {
+      return false;
+    }
   };
 
   const handleContinue = async () => {

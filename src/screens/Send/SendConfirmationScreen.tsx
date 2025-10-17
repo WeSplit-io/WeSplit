@@ -255,6 +255,11 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         });
       }
 
+      // Check if transaction actually succeeded
+      if (!transactionResult.success) {
+        throw new Error(transactionResult.error || 'Transaction failed');
+      }
+
       logger.info('Transaction successful', {
         signature: transactionResult.signature || transactionResult.transactionId,
         txId: transactionResult.txId || transactionResult.transactionId,

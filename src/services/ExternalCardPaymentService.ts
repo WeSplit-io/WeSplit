@@ -51,24 +51,60 @@ export class ExternalCardPaymentService {
         };
       }
 
-      // TODO: Replace with actual KAST card payment API call
-      // For now, simulate payment processing
-      const mockTransactionId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Simulate payment processing delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Get the KAST card wallet address for USDC transfer
+      const cardInfo = await ExternalCardService.getCardInfo(params.cardId);
+      if (!cardInfo.success || !cardInfo.card) {
+        return {
+          success: false,
+          error: 'KAST card not found or invalid'
+        };
+      }
 
-      logger.info('Card payment processed successfully', {
+      const kastWalletAddress = cardInfo.card.identifier; // This should be the Solana wallet address
+      
+      logger.info('Processing KAST card payment via external wallet transfer', {
         cardId: params.cardId,
+        kastWalletAddress,
         amount: params.amount,
-        transactionId: mockTransactionId
+        currency: params.currency
+      }, 'ExternalCardPaymentService');
+
+      // Use the external wallet transfer service for KAST card payments
+      const { externalTransferService } = await import('../transfer/sendExternal');
+      const transferResult = await externalTransferService.sendExternalTransfer({
+        to: kastWalletAddress,
+        amount: params.amount,
+        currency: 'USDC', // KAST cards receive USDC
+        memo: params.description || 'KAST card payment',
+        userId: params.userId,
+        priority: 'medium'
+      });
+
+      if (!transferResult.success) {
+        logger.error('KAST card payment failed', {
+          cardId: params.cardId,
+          kastWalletAddress,
+          error: transferResult.error
+        }, 'ExternalCardPaymentService');
+        
+        return {
+          success: false,
+          error: transferResult.error || 'Failed to process KAST card payment'
+        };
+      }
+
+      logger.info('KAST card payment processed successfully', {
+        cardId: params.cardId,
+        kastWalletAddress,
+        amount: params.amount,
+        transactionSignature: transferResult.signature
       }, 'ExternalCardPaymentService');
 
       return {
         success: true,
-        transactionId: mockTransactionId,
+        transactionId: transferResult.signature,
         amount: params.amount,
-        message: `Payment of ${params.amount} ${params.currency} processed successfully`
+        message: `Payment of ${params.amount} ${params.currency} sent to KAST card successfully`
       };
 
     } catch (error) {
@@ -112,31 +148,38 @@ export class ExternalCardPaymentService {
         };
       }
 
-      // Check card balance
-      const balanceResult = await ExternalCardService.getCardBalance(card.identifier);
-      if (!balanceResult.success) {
+      // For KAST card payments, we're sending USDC TO the card, not FROM the card
+      // So we need to validate that the card has a valid wallet address
+      if (!card.identifier) {
         return {
           success: false,
           canPay: false,
-          error: 'Failed to retrieve card balance'
+          error: 'KAST card does not have a valid wallet address'
         };
       }
 
-      const balance = balanceResult.balance || 0;
-      const canPay = balance >= amount;
+      // Validate that the identifier is a valid Solana address
+      const { validateSolanaAddress } = await import('../utils/sendUtils');
+      const addressValidation = validateSolanaAddress(card.identifier);
+      if (!addressValidation.isValid) {
+        return {
+          success: false,
+          canPay: false,
+          error: `Invalid KAST card wallet address: ${addressValidation.error}`
+        };
+      }
 
-      logger.info('Card payment validation completed', {
+      logger.info('KAST card payment validation completed', {
         cardId,
         amount,
-        balance,
-        canPay,
-        cardStatus: card.status
+        kastWalletAddress: card.identifier,
+        cardStatus: card.status,
+        canPay: true // KAST cards can always receive payments if they have valid addresses
       }, 'ExternalCardPaymentService');
 
       return {
         success: true,
-        canPay,
-        error: canPay ? undefined : `Insufficient card balance. Required: ${amount}, Available: ${balance}`
+        canPay: true // KAST cards can receive payments if they have valid wallet addresses
       };
 
     } catch (error) {

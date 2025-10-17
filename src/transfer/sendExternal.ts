@@ -11,7 +11,8 @@ import {
   TransactionInstruction,
   sendAndConfirmTransaction,
   LAMPORTS_PER_SOL,
-  ComputeBudgetProgram
+  ComputeBudgetProgram,
+  Keypair
 } from '@solana/web3.js';
 import { 
   getAssociatedTokenAddress, 
@@ -85,14 +86,12 @@ class ExternalTransferService {
         };
       }
 
-      // Check if wallet is linked and verified
-      const isLinked = await this.isWalletLinked(params.to, params.userId);
-      if (!isLinked) {
-        return {
-          success: false,
-          error: 'Recipient wallet is not linked or verified'
-        };
-      }
+      // Note: External transfers can send to any valid Solana address
+      // Wallet linking is optional for security/verification but not required
+      logger.info('External transfer to any valid Solana address', {
+        recipientAddress: params.to,
+        userId: params.userId
+      }, 'ExternalTransferService');
 
       // Check balance before proceeding
       const balanceCheck = await this.checkBalance(params.userId, params.amount, params.currency);
@@ -107,14 +106,51 @@ class ExternalTransferService {
       const transactionType = params.transactionType || 'withdraw';
       const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
 
-      // Load wallet
-      const walletLoaded = await solanaWalletService.loadWallet();
-      if (!walletLoaded) {
+      // Ensure user's wallet is loaded
+      const { walletService } = await import('../services/WalletService');
+      logger.info('Ensuring app wallet is loaded', { userId: params.userId }, 'ExternalTransferService');
+      const walletResult = await walletService.ensureUserWallet(params.userId);
+      if (!walletResult.success) {
+        logger.error('Failed to ensure app wallet', { 
+          userId: params.userId, 
+          error: walletResult.error 
+        }, 'ExternalTransferService');
         return {
           success: false,
-          error: 'Wallet not loaded'
+          error: walletResult.error || 'Failed to load user wallet'
         };
       }
+      logger.info('App wallet ensured successfully', { 
+        userId: params.userId, 
+        walletAddress: walletResult.wallet?.address 
+      }, 'ExternalTransferService');
+
+      // Load the wallet for transaction signing
+      logger.info('Loading wallet for transaction signing', { userId: params.userId }, 'ExternalTransferService');
+      const expectedWalletAddress = walletResult.wallet?.address;
+      if (!expectedWalletAddress) {
+        logger.error('No wallet address available for loading', { userId: params.userId }, 'ExternalTransferService');
+        return {
+          success: false,
+          error: 'No wallet address available for transaction signing'
+        };
+      }
+      
+      const solanaWalletLoaded = await solanaWalletService.loadWallet(params.userId, expectedWalletAddress);
+      if (!solanaWalletLoaded) {
+        logger.error('Failed to load wallet for transaction signing', { 
+          userId: params.userId, 
+          expectedAddress: expectedWalletAddress 
+        }, 'ExternalTransferService');
+        return {
+          success: false,
+          error: 'Failed to load wallet for transaction signing'
+        };
+      }
+      logger.info('Wallet loaded successfully for transaction signing', { 
+        userId: params.userId, 
+        walletAddress: expectedWalletAddress 
+      }, 'ExternalTransferService');
 
       // Build and send transaction - WeSplit only supports USDC transfers
       let result: ExternalTransferResult;
@@ -173,7 +209,18 @@ class ExternalTransferService {
 
       return result;
     } catch (error) {
-      logger.error('External transfer failed', error, 'ExternalTransferService');
+      logger.error('External transfer failed', {
+        error: error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        errorName: error instanceof Error ? error.name : undefined,
+        params: {
+          to: params.to,
+          amount: params.amount,
+          currency: params.currency,
+          userId: params.userId
+        }
+      }, 'ExternalTransferService');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -250,12 +297,22 @@ class ExternalTransferService {
     shortfall?: number;
   }> {
     try {
-      const balance = await solanaWalletService.getBalance();
-      const currentBalance = balance.usdc; // WeSplit only supports USDC
+      // Use the user's wallet balance instead of the currently loaded wallet
+      const { walletService } = await import('../services/WalletService');
+      const balance = await walletService.getUserWalletBalance(userId);
+      const currentBalance = balance?.usdcBalance || 0; // WeSplit only supports USDC
       
       // Calculate total required amount (including company fee)
       const { fee: companyFee } = FeeService.calculateCompanyFee(amount);
       const requiredAmount = amount + companyFee;
+
+      logger.info('Balance check completed', {
+        userId,
+        currency,
+        currentBalance,
+        requiredAmount,
+        hasSufficientBalance: currentBalance >= requiredAmount
+      }, 'ExternalTransferService');
 
       return {
         hasSufficientBalance: currentBalance >= requiredAmount,
@@ -301,24 +358,51 @@ class ExternalTransferService {
     companyFee: number
   ): Promise<ExternalTransferResult> {
     try {
+      logger.info('Starting USDC transfer', {
+        recipientAmount,
+        companyFee,
+        to: params.to
+      }, 'ExternalTransferService');
+
       const fromPublicKey = new PublicKey(solanaWalletService.getPublicKey()!);
       const toPublicKey = new PublicKey(params.to);
       const usdcMint = new PublicKey(getConfig().blockchain.usdcMintAddress);
 
-      // Use centralized fee payer logic - Company pays SOL gas fees
+      logger.info('Public keys created', {
+        from: fromPublicKey.toBase58(),
+        to: toPublicKey.toBase58(),
+        usdcMint: usdcMint.toBase58()
+      }, 'ExternalTransferService');
+
+      // Company wallet configuration will be validated by FeeService.getFeePayerPublicKey
+
+      // Use centralized fee payer logic - Company pays SOL gas fees (same as internal transfers)
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
+      logger.info('Using company wallet as fee payer', { 
+        feePayerAddress: feePayerPublicKey.toBase58() 
+      }, 'ExternalTransferService');
 
       // Get token accounts
+      logger.info('Getting token accounts', {}, 'ExternalTransferService');
       const fromTokenAccount = await getAssociatedTokenAddress(usdcMint, fromPublicKey);
       const toTokenAccount = await getAssociatedTokenAddress(usdcMint, toPublicKey);
+
+      logger.info('Token accounts derived', {
+        fromTokenAccount: fromTokenAccount.toBase58(),
+        toTokenAccount: toTokenAccount.toBase58()
+      }, 'ExternalTransferService');
 
       // Check if recipient has USDC token account, create if needed
       try {
         await getAccount(this.connection, toTokenAccount);
+        logger.info('Recipient USDC token account exists', { toTokenAccount: toTokenAccount.toBase58() }, 'ExternalTransferService');
       } catch (error) {
         // Token account doesn't exist, we need to create it
         // This would require additional instructions, but for now we'll assume it exists
-        logger.warn('Recipient USDC token account does not exist', { toTokenAccount: toTokenAccount.toBase58() }, 'ExternalTransferService');
+        logger.warn('Recipient USDC token account does not exist', { 
+          toTokenAccount: toTokenAccount.toBase58(),
+          error: error instanceof Error ? error.message : String(error)
+        }, 'ExternalTransferService');
       }
 
       // Get recent blockhash
@@ -341,7 +425,7 @@ class ExternalTransferService {
       }
 
       // Add USDC transfer instruction for recipient (full amount)
-      const transferAmount = Math.floor(recipientAmount * Math.pow(10, 6)); // USDC has 6 decimals
+      const transferAmount = Math.floor(recipientAmount * Math.pow(10, 6) + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
       transaction.add(
         createTransferInstruction(
           fromTokenAccount,
@@ -353,19 +437,40 @@ class ExternalTransferService {
         )
       );
 
-      // Add company fee transfer instruction to admin wallet
+      // Add company fee transfer instruction to admin wallet (required - same as internal transfers)
       if (companyFee > 0) {
-        const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6)); // USDC has 6 decimals
+        const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6) + 0.5); // USDC has 6 decimals, add 0.5 for proper rounding
         
-        // Get company wallet's USDC token account
-        const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, companyPublicKey);
+        // Import company wallet config locally to ensure it's loaded
+        const { COMPANY_WALLET_CONFIG: localCompanyConfig } = await import('../config/feeConfig');
+        
+        // Debug company wallet config
+        logger.info('Company wallet config debug', {
+          hasCompanyWalletConfig: !!localCompanyConfig,
+          companyWalletAddress: localCompanyConfig?.address,
+          companyWalletConfigKeys: localCompanyConfig ? Object.keys(localCompanyConfig) : 'undefined'
+        }, 'ExternalTransferService');
+        
+        if (!localCompanyConfig || !localCompanyConfig.address) {
+          logger.error('Company wallet config is undefined or missing address', {
+            hasConfig: !!localCompanyConfig,
+            hasAddress: !!localCompanyConfig?.address
+          }, 'ExternalTransferService');
+          return {
+            success: false,
+            error: 'Company wallet configuration is not properly loaded'
+          };
+        }
+        
+        // Get company wallet's USDC token account - following internal transfer pattern
+        const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(localCompanyConfig.address));
         
         logger.info('Adding company fee transfer instruction', { 
           companyFeeAmount, 
           companyFee,
           fromTokenAccount: fromTokenAccount.toBase58(),
           companyTokenAccount: companyTokenAccount.toBase58(),
-          companyWalletAddress: companyPublicKey.toBase58()
+          companyWalletAddress: localCompanyConfig.address
         }, 'ExternalTransferService');
         
         transaction.add(
@@ -391,16 +496,138 @@ class ExternalTransferService {
         );
       }
 
+      // Prepare signers array
+      const signers: Keypair[] = [];
+      
+      // Get wallet keypair for signing (same as internal transfers)
+      const walletInfo = await solanaWalletService.getWalletInfo();
+      if (!walletInfo || !walletInfo.secretKey) {
+        logger.error('Wallet keypair not available for signing', {}, 'ExternalTransferService');
+        return {
+          success: false,
+          error: 'User wallet keypair not available for transaction signing'
+        };
+      }
+
+      const secretKeyBuffer = Buffer.from(walletInfo.secretKey, 'base64');
+      const userKeypair = Keypair.fromSecretKey(secretKeyBuffer);
+      
+      signers.push(userKeypair);
+      logger.info('User keypair added to signers', { 
+        userAddress: userKeypair.publicKey.toBase58() 
+      }, 'ExternalTransferService');
+
+      // Add company wallet keypair for fee payment (required - same as internal transfers)
+      const { COMPANY_WALLET_CONFIG } = await import('../config/feeConfig');
+      logger.info('Company wallet configuration check', {
+        companyWalletRequired: true,
+        hasCompanySecretKey: !!COMPANY_WALLET_CONFIG.secretKey,
+        companyWalletAddress: COMPANY_WALLET_CONFIG.address,
+        feePayerAddress: feePayerPublicKey.toBase58()
+      }, 'ExternalTransferService');
+
+      if (COMPANY_WALLET_CONFIG.secretKey) {
+        try {
+          logger.info('Processing company wallet secret key', {
+            secretKeyLength: COMPANY_WALLET_CONFIG.secretKey.length,
+            secretKeyPreview: COMPANY_WALLET_CONFIG.secretKey.substring(0, 20) + '...',
+            hasCommas: COMPANY_WALLET_CONFIG.secretKey.includes(','),
+            hasBrackets: COMPANY_WALLET_CONFIG.secretKey.includes('[') || COMPANY_WALLET_CONFIG.secretKey.includes(']'),
+            secretKeyFormat: COMPANY_WALLET_CONFIG.secretKey.includes(',') ? 'comma-separated' : 'base64'
+          }, 'ExternalTransferService');
+
+          let companySecretKeyBuffer: Buffer;
+          
+          // Handle different secret key formats
+          if (COMPANY_WALLET_CONFIG.secretKey.includes(',') || COMPANY_WALLET_CONFIG.secretKey.includes('[')) {
+            logger.info('Processing comma-separated secret key format', {}, 'ExternalTransferService');
+            const cleanKey = COMPANY_WALLET_CONFIG.secretKey.replace(/[\[\]]/g, '');
+            const keyArray = cleanKey.split(',').map(num => parseInt(num.trim(), 10));
+            
+            logger.info('Secret key array processing', {
+              cleanKeyLength: cleanKey.length,
+              keyArrayLength: keyArray.length,
+              firstFewNumbers: keyArray.slice(0, 5),
+              lastFewNumbers: keyArray.slice(-5)
+            }, 'ExternalTransferService');
+            
+            companySecretKeyBuffer = Buffer.from(keyArray);
+          } else {
+            logger.info('Processing base64 secret key format', {}, 'ExternalTransferService');
+            companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'base64');
+          }
+          
+          // Validate and trim if needed
+          logger.info('Secret key buffer validation', {
+            bufferLength: companySecretKeyBuffer.length,
+            expectedLength: 64,
+            isValidLength: companySecretKeyBuffer.length === 64 || companySecretKeyBuffer.length === 65
+          }, 'ExternalTransferService');
+          
+          if (companySecretKeyBuffer.length === 65) {
+            companySecretKeyBuffer = companySecretKeyBuffer.slice(0, 64);
+            logger.info('Trimmed 65-byte keypair to 64-byte secret key', {
+              originalLength: 65,
+              trimmedLength: companySecretKeyBuffer.length
+            }, 'ExternalTransferService');
+          } else if (companySecretKeyBuffer.length !== 64) {
+            throw new Error(`Invalid secret key length: ${companySecretKeyBuffer.length} bytes (expected 64 or 65)`);
+          }
+          
+          const companyKeypair = Keypair.fromSecretKey(companySecretKeyBuffer);
+          
+          logger.info('Company keypair created successfully', {
+            companyWalletAddress: COMPANY_WALLET_CONFIG.address,
+            companyKeypairAddress: companyKeypair.publicKey.toBase58(),
+            addressesMatch: companyKeypair.publicKey.toBase58() === COMPANY_WALLET_CONFIG.address
+          }, 'ExternalTransferService');
+          
+          signers.push(companyKeypair);
+          logger.info('Company keypair added to signers', { 
+            companyAddress: companyKeypair.publicKey.toBase58(),
+            totalSigners: signers.length
+          }, 'ExternalTransferService');
+        } catch (error) {
+          logger.error('Failed to load company wallet keypair', { error }, 'ExternalTransferService');
+          return {
+            success: false,
+            error: 'Company wallet keypair not available for signing'
+          };
+        }
+      } else {
+        logger.error('Company wallet secret key is required for SOL fee coverage', {}, 'ExternalTransferService');
+        return {
+          success: false,
+          error: 'Company wallet secret key is required for SOL fee coverage. Please contact support.'
+        };
+      }
+
       // Sign and send transaction
+      logger.info('Sending USDC transfer transaction', {
+        from: fromPublicKey.toBase58(),
+        to: toPublicKey.toBase58(),
+        amount: recipientAmount,
+        companyFee,
+        totalAmount: params.amount,
+        signersCount: signers.length
+      }, 'ExternalTransferService');
+
       const signature = await sendAndConfirmTransaction(
         this.connection,
         transaction,
-        [], // Signers will be handled by the wallet service
+        signers, // Use proper signers array
         {
           commitment: getConfig().blockchain.commitment,
           preflightCommitment: getConfig().blockchain.commitment
         }
       );
+
+      logger.info('USDC transfer transaction confirmed', {
+        signature,
+        amount: recipientAmount,
+        companyFee,
+        netAmount: recipientAmount
+      }, 'ExternalTransferService');
 
       return {
         success: true,
@@ -411,7 +638,18 @@ class ExternalTransferService {
         blockchainFee: this.estimateBlockchainFee(transaction)
       };
     } catch (error) {
-      logger.error('USDC transfer failed', error, 'ExternalTransferService');
+      logger.error('USDC transfer failed', {
+        error: error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        errorName: error instanceof Error ? error.name : undefined,
+        params: {
+          to: params.to,
+          amount: params.amount,
+          recipientAmount,
+          companyFee
+        }
+      }, 'ExternalTransferService');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'USDC transfer failed'

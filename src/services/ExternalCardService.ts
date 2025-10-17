@@ -5,6 +5,7 @@
 
 import { logger } from './loggingService';
 import { firebaseDataService } from './firebaseDataService';
+import { validateSolanaAddress } from '../utils/sendUtils';
 
 export interface CardValidationResult {
   isValid: boolean;
@@ -53,35 +54,26 @@ export interface CardData {
 
 export class ExternalCardService {
   /**
-   * Validate KAST card identifier
-   * This would typically call an external API to validate the card
+   * Validate KAST card wallet address
+   * KAST cards should use proper Solana wallet addresses for blockchain transactions
    */
-  static async validateKastCard(identifier: string): Promise<CardValidationResult> {
+  static async validateKastCard(walletAddress: string): Promise<CardValidationResult> {
     try {
-      logger.info('Validating KAST card', { identifier }, 'ExternalCardService');
+      logger.info('Validating KAST card wallet address', { walletAddress }, 'ExternalCardService');
 
-      // Basic validation - check format
-      if (!identifier || identifier.length < 8) {
+      // Validate as proper Solana wallet address
+      const addressValidation = validateSolanaAddress(walletAddress);
+      if (!addressValidation.isValid) {
         return {
           isValid: false,
-          error: 'Invalid card identifier format'
-        };
-      }
-
-      // TODO: Replace with actual KAST card API validation
-      // For now, simulate validation
-      const isValidFormat = /^[A-Z0-9]{8,20}$/.test(identifier);
-      if (!isValidFormat) {
-        return {
-          isValid: false,
-          error: 'Card identifier must be 8-20 alphanumeric characters'
+          error: addressValidation.error || 'Please enter a valid Solana wallet address for your KAST card'
         };
       }
 
       // Simulate API call to validate card
       // In production, this would call the actual KAST card API
       const mockCardInfo: CardInfo = {
-        identifier,
+        identifier: walletAddress, // Use wallet address as identifier
         cardType: 'debit',
         status: 'active',
         balance: 1000.00, // Mock balance
@@ -90,7 +82,7 @@ export class ExternalCardService {
         cardholderName: 'Card Holder'
       };
 
-      logger.info('KAST card validation successful', { identifier }, 'ExternalCardService');
+      logger.info('KAST card validation successful', { walletAddress }, 'ExternalCardService');
 
       return {
         isValid: true,
@@ -109,14 +101,14 @@ export class ExternalCardService {
   /**
    * Get card information from external system
    */
-  static async getCardInfo(identifier: string): Promise<CardInfoResult> {
+  static async getCardInfo(walletAddress: string): Promise<CardInfoResult> {
     try {
-      logger.info('Getting card information', { identifier }, 'ExternalCardService');
+      logger.info('Getting card information', { walletAddress }, 'ExternalCardService');
 
       // TODO: Replace with actual KAST card API call
       // For now, simulate API call
       const mockCardInfo: CardInfo = {
-        identifier,
+        identifier: walletAddress, // Use wallet address as identifier
         cardType: 'debit',
         status: 'active',
         balance: 1000.00,
@@ -125,7 +117,7 @@ export class ExternalCardService {
         cardholderName: 'Card Holder'
       };
 
-      logger.info('Card information retrieved successfully', { identifier }, 'ExternalCardService');
+      logger.info('Card information retrieved successfully', { walletAddress }, 'ExternalCardService');
 
       return {
         success: true,

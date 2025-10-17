@@ -124,7 +124,8 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           currentUser.id.toString(),
           {
             label: destination.name,
-            identifier: destination.identifier,
+            address: destination.address, // Use address field for consistency
+            identifier: destination.identifier, // Keep for backward compatibility
             cardType: destination.cardType,
             status: destination.status,
             balance: destination.balance,

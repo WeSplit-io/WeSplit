@@ -58,7 +58,8 @@ export class LinkedWalletService {
         userId: wallet.userId,
         type: wallet.type || 'external',
         label: wallet.label || 'Unknown',
-        address: wallet.address,
+        // For KAST cards, use identifier as address if address is not present
+        address: wallet.address || wallet.identifier,
         identifier: wallet.identifier,
         chain: wallet.chain || 'solana',
         cardType: wallet.cardType,

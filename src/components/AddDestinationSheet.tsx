@@ -16,7 +16,7 @@ import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-g
 import { colors } from '../theme';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
-import { validateAddress, validateKastIdentifier } from '../utils/sendUtils';
+import { validateAddress, validateKastWalletAddress } from '../utils/sendUtils';
 import { styles } from './AddDestinationSheetStyles';
 
 interface AddDestinationSheetProps {
@@ -38,7 +38,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   const [address, setAddress] = useState('');
   const [name, setName] = useState('');
   const [chain, setChain] = useState('solana');
-  const [identifier, setIdentifier] = useState('');
+  const [kastAddress, setKastAddress] = useState('');
   const [errors, setErrors] = useState<{[key: string]: string}>({});
 
   // Animation refs
@@ -114,7 +114,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     setAddress('');
     setName('');
     setChain('solana');
-    setIdentifier('');
+    setKastAddress('');
     setErrors({});
     setDestinationType('wallet'); // Reset to default type
   };
@@ -123,7 +123,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   useEffect(() => {
     // Clear the fields that are not relevant to the current type
     if (destinationType === 'wallet') {
-      setIdentifier('');
+      setKastAddress('');
     } else {
       setAddress('');
       setChain('solana');
@@ -154,9 +154,9 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
         }
       }
     } else if (destinationType === 'kast') {
-      const identifierValidation = validateKastIdentifier(identifier);
-      if (!identifierValidation.isValid) {
-        newErrors.identifier = identifierValidation.error || 'Please enter a valid card identifier';
+      const addressValidation = validateKastWalletAddress(kastAddress);
+      if (!addressValidation.isValid) {
+        newErrors.kastAddress = addressValidation.error || 'Please enter a valid KAST card wallet address';
       }
     }
 
@@ -171,7 +171,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     if (destinationType === 'wallet') {
       return address.trim().length > 0;
     } else {
-      return identifier.trim().length > 0;
+      return kastAddress.trim().length > 0;
     }
   };
 
@@ -180,30 +180,32 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
       return;
     }
 
-    // For KAST cards, validate the card before saving
+    // For KAST cards, validate the wallet address and get card information
     if (destinationType === 'kast') {
       try {
         const { ExternalCardService } = await import('../services/ExternalCardService');
         
-        // Validate card identifier
-        const validation = await ExternalCardService.validateKastCard(identifier.trim());
+        // Validate KAST card wallet address
+        const validation = await ExternalCardService.validateKastCard(kastAddress.trim());
         if (!validation.isValid) {
-          setErrors({ identifier: validation.error || 'Invalid card identifier' });
+          setErrors({ kastAddress: validation.error || 'Invalid KAST card wallet address' });
           return;
         }
 
         // Get full card information
-        const cardInfo = await ExternalCardService.getCardInfo(identifier.trim());
+        const cardInfo = await ExternalCardService.getCardInfo(kastAddress.trim());
         if (!cardInfo.success || !cardInfo.card) {
-          setErrors({ identifier: 'Failed to retrieve card information' });
+          setErrors({ kastAddress: 'Failed to retrieve card information' });
           return;
         }
 
         // Create destination with full card information
+        // Use 'address' field for consistency with external wallets
         const destination = {
           type: destinationType,
           name: name.trim(),
-          identifier: identifier.trim(),
+          address: kastAddress.trim(), // Use 'address' field for consistency
+          identifier: kastAddress.trim(), // Keep identifier for backward compatibility
           cardType: cardInfo.card.cardType,
           status: cardInfo.card.status,
           balance: cardInfo.card.balance,
@@ -218,7 +220,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
         return;
       } catch (error) {
         console.error('Error validating KAST card:', error);
-        setErrors({ identifier: 'Failed to validate card. Please try again.' });
+        setErrors({ kastAddress: 'Failed to validate card. Please try again.' });
         return;
       }
     }
@@ -227,10 +229,8 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     const destination = {
       type: destinationType,
       name: name.trim(),
-      ...(destinationType === 'wallet' 
-        ? { address: address.trim(), chain }
-        : { identifier: identifier.trim() }
-      )
+      address: address.trim(),
+      chain
     };
 
     onSaved(destination);
@@ -268,17 +268,17 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
 
   const renderKastForm = () => (
     <View style={styles.formSection}>
-      <Text style={styles.inputLabel}>Card Address</Text>
+      <Text style={styles.inputLabel}>KAST Wallet Address</Text>
       <TextInput
         style={styles.inputField}
-        value={identifier}
-        onChangeText={setIdentifier}
-        placeholder="Enter card address"
+        value={kastAddress}
+        onChangeText={setKastAddress}
+        placeholder="Enter KAST card wallet address"
         placeholderTextColor={colors.textSecondary}
         autoCapitalize="none"
         autoCorrect={false}
       />
-      {errors.identifier && <Text style={styles.errorText}>{errors.identifier}</Text>}
+      {errors.kastAddress && <Text style={styles.errorText}>{errors.kastAddress}</Text>}
 
       <Text style={styles.inputLabel}>Name</Text>
       <TextInput
@@ -390,31 +390,31 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
                         />
                         {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
 
-                        <Text style={styles.inputLabel}>Name</Text>
-                        <TextInput
-                          style={styles.inputField}
-                          value={name}
-                          onChangeText={setName}
-                          placeholder="e.g., Cold Wallet, Treasury"
-                          placeholderTextColor={colors.textSecondary}
-                          autoCapitalize="words"
-                          autoCorrect={false}
-                        />
-                        {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-                      </View>
-                    ) : (
-                      <View>
-                        <Text style={styles.inputLabel}>Card Address</Text>
-                        <TextInput
-                          style={styles.inputField}
-                          value={identifier}
-                          onChangeText={setIdentifier}
-                          placeholder="Enter card address"
-                          placeholderTextColor={colors.textSecondary}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                        />
-                        {errors.identifier && <Text style={styles.errorText}>{errors.identifier}</Text>}
+                      <Text style={styles.inputLabel}>Name</Text>
+                      <TextInput
+                        style={styles.inputField}
+                        value={name}
+                        onChangeText={setName}
+                        placeholder="e.g., Cold Wallet, Treasury"
+                        placeholderTextColor={colors.textSecondary}
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                      />
+                      {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+                    </View>
+                  ) : (
+                    <View>
+                      <Text style={styles.inputLabel}>KAST Card Address</Text>
+                      <TextInput
+                        style={styles.inputField}
+                        value={kastAddress}
+                        onChangeText={setKastAddress}
+                        placeholder="Enter KAST card wallet address"
+                        placeholderTextColor={colors.textSecondary}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      {errors.kastAddress && <Text style={styles.errorText}>{errors.kastAddress}</Text>}
 
                         <Text style={styles.inputLabel}>Name</Text>
                         <TextInput

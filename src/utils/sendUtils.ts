@@ -206,43 +206,28 @@ export const validateAmount = (amount: string): {
 };
 
 /**
- * Validate KAST card identifier
+ * Validate KAST card wallet address
+ * KAST cards should use proper Solana wallet addresses for blockchain transactions
  */
-export const validateKastIdentifier = (identifier: string): {
+export const validateKastWalletAddress = (address: string): {
   isValid: boolean;
   error?: string;
 } => {
-  if (!identifier || identifier.trim() === '') {
+  if (!address || address.trim() === '') {
     return {
       isValid: false,
-      error: 'Card identifier is required'
+      error: 'KAST card wallet address is required'
     };
   }
 
-  const trimmed = identifier.trim();
+  const trimmed = address.trim();
 
-  // Check minimum length
-  if (trimmed.length < 4) {
+  // Use the same validation as external wallets - proper Solana address validation
+  const addressValidation = validateSolanaAddress(trimmed);
+  if (!addressValidation.isValid) {
     return {
       isValid: false,
-      error: 'Card identifier must be at least 4 characters'
-    };
-  }
-
-  // Check maximum length
-  if (trimmed.length > 50) {
-    return {
-      isValid: false,
-      error: 'Card identifier is too long'
-    };
-  }
-
-  // Check if it contains only alphanumeric characters and common separators
-  const validPattern = /^[a-zA-Z0-9\s\-_]+$/;
-  if (!validPattern.test(trimmed)) {
-    return {
-      isValid: false,
-      error: 'Card identifier contains invalid characters'
+      error: addressValidation.error || 'Please enter a valid Solana wallet address for your KAST card'
     };
   }
 
@@ -252,23 +237,33 @@ export const validateKastIdentifier = (identifier: string): {
 };
 
 /**
- * Format KAST card identifier for display
+ * DEPRECATED: Use validateKastWalletAddress instead
+ * This function is kept for backward compatibility but should not be used for new implementations
+ */
+export const validateKastIdentifier = (identifier: string): {
+  isValid: boolean;
+  error?: string;
+} => {
+  // For backward compatibility, treat as wallet address
+  return validateKastWalletAddress(identifier);
+};
+
+/**
+ * Format KAST card wallet address for display
+ * Uses the same formatting as external wallet addresses
+ */
+export const formatKastWalletAddress = (address: string): string => {
+  if (!address) return '';
+  
+  // Use the same formatting as external wallet addresses
+  return formatWalletAddress(address);
+};
+
+/**
+ * DEPRECATED: Use formatKastWalletAddress instead
+ * This function is kept for backward compatibility
  */
 export const formatKastIdentifier = (identifier: string): string => {
-  if (!identifier) return '';
-  
-  const trimmed = identifier.trim();
-  
-  // If it's already in the format "•••• 1234", return as is
-  if (trimmed.includes('••••')) {
-    return trimmed;
-  }
-  
-  // If it's longer than 4 characters, show last 4 with mask
-  if (trimmed.length > 4) {
-    return `•••• ${trimmed.slice(-4)}`;
-  }
-  
-  // If it's 4 characters or less, show as is
-  return trimmed;
+  // For backward compatibility, treat as wallet address
+  return formatKastWalletAddress(identifier);
 };

@@ -51,7 +51,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
         hasAvatar: !!contact.avatar
       } : null,
       wallet: wallet ? {
-        name: wallet.name,
+        name: wallet.label, // Use 'label' field for consistency
         address: wallet.address,
         id: wallet.id
       } : null
