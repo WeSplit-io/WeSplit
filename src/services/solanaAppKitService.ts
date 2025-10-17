@@ -23,7 +23,7 @@ import {
 // Import shared constants and utilities
 import { RPC_CONFIG, USDC_CONFIG, PHANTOM_SCHEMES } from './shared/walletConstants';
 import { FeeService, TransactionType } from '../config/feeConfig';
-import { transactionUtils } from './shared/transactionUtils';
+import { optimizedTransactionUtils } from './shared/transactionUtilsOptimized';
 import { balanceUtils } from './shared/balanceUtils';
 import { logger } from './loggingService';
 
@@ -703,7 +703,7 @@ export class SolanaAppKitService {
     }
 
     try {
-      const signature = await transactionUtils.getConnection().requestAirdrop(
+      const signature = await (await optimizedTransactionUtils.getConnection()).requestAirdrop(
         this.keypair.publicKey,
         amount * LAMPORTS_PER_SOL
       );

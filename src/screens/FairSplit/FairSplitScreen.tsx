@@ -511,9 +511,20 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const billId = processedBillData?.id || splitData?.billId || `split_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const authoritativePrice = priceManagementService.getBillPrice(billId);
   
-  // Use DataSourceService for consistent data access
+  // Use DataSourceService for consistent data access with validation
   const billInfo = DataSourceService.getBillInfo(splitData, processedBillData, billData);
   const totalAmount = billInfo.amount.data;
+  
+  // Validate data consistency and log warnings if needed
+  if (__DEV__ && billInfo.isFallback) {
+    logger.warn('FairSplit: Using fallback data for bill info', {
+      splitData: splitData?.totalAmount,
+      processedBillData: processedBillData?.totalAmount,
+      billData: billData?.totalAmount,
+      finalAmount: totalAmount,
+      source: billInfo.source
+    }, 'FairSplitScreen');
+  }
   
   // Set authoritative price when component loads
   useEffect(() => {
@@ -730,12 +741,17 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     }
   };
 
-  // Start real-time updates when split data is available
+  // Start real-time updates when split data is available (with throttling)
   useEffect(() => {
     if (splitData?.id && !isRealtimeActive) {
-      startRealtimeUpdates().catch(error => {
-        console.error('Failed to start real-time updates in FairSplit:', error);
-      });
+      // Add a small delay to prevent excessive real-time updates
+      const timeoutId = setTimeout(() => {
+        startRealtimeUpdates().catch(error => {
+          console.error('Failed to start real-time updates in FairSplit:', error);
+        });
+      }, 1000); // 1 second delay
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [splitData?.id, isRealtimeActive]);
 
@@ -748,7 +764,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     };
   }, []);
 
-  // Check if all participants have paid their shares
+  // Check if all participants have paid their shares (with throttling to prevent excessive calls)
   const checkPaymentCompletion = async () => {
     if (!splitWallet?.id) return;
 
@@ -760,7 +776,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       const allParticipantsPaid = wallet.participants.every(p => p.status === 'paid');
 
       // Only proceed if all participants have paid AND the wallet is not already completed
-      if (allParticipantsPaid && wallet.participants.length > 0 && wallet.status !== 'completed') {
+      // Add additional validation to prevent duplicate completion attempts
+      if (allParticipantsPaid && wallet.participants.length > 0 && wallet.status !== 'completed' && !isSplitConfirmed) {
         
         // Get merchant address if available
         const merchantAddress = processedBillData?.merchant?.address || billData?.merchant?.address;
@@ -785,7 +802,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               {
                 splitId: splitData?.id,
                 splitWalletId: splitWallet.id,
-                billName: billInfo.name.data,
+                billName: billInfo.name.data || 'Split Payment',
                 amount: wallet.totalAmount,
                 currency: 'USDC',
                 timestamp: new Date().toISOString()
@@ -1114,7 +1131,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
   const sendPaymentNotifications = async (wallet: SplitWallet) => {
     const participantIds = wallet.participants.map((p: any) => p.userId);
-    const billName = billInfo.name.data; // Use DataSourceService
+    const billName = billInfo.name.data || 'Split Payment'; // Use DataSourceService with fallback
 
     await notificationService.sendBulkNotifications(
       participantIds,
@@ -1584,8 +1601,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         // Wait for all notifications to be sent
         await Promise.all(notificationPromises);
         
-        // Show wallet recap modal after successful wallet creation
-        setShowWalletRecapModal(true);
+        // Wallet created successfully - no popup needed
+        // setShowWalletRecapModal(true); // Removed popup - wallet created silently
       } else {
         Alert.alert('Error', updateResult.error || 'Failed to confirm split');
       }
@@ -2426,6 +2443,37 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               (() => {
                 const isFullyCovered = (completionData?.completionPercentage || 0) >= 100;
                 const isCreator = isCurrentUserCreator();
+                const isSingleParticipant = participants.length === 1;
+                
+                // Special case: Single participant who is the creator can always proceed
+                if (isSingleParticipant && isCreator) {
+                  const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
+                  const hasUserPaidFully = currentUserParticipant && 
+                    (currentUserParticipant.status === 'paid' || 
+                     currentUserParticipant.amountPaid >= currentUserParticipant.amountOwed);
+                  
+                  if (hasUserPaidFully) {
+                    return (
+                      <View style={styles.buttonContainer}>
+                        <TouchableOpacity 
+                          onPress={handleSplitFunds}
+                          style={styles.splitButton}
+                        >
+                          <LinearGradient
+                            colors={[colors.green, colors.greenBlue]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.splitButtonGradient}
+                          >
+                            <Text style={styles.splitButtonText}>
+                              🚀 Transfer Funds to Your Wallet
+                            </Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  }
+                }
                 
                 if (isFullyCovered && isCreator) {
                   // Creator can split when 100% covered

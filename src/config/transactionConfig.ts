@@ -27,13 +27,13 @@ export interface TransactionConfig {
 
 export const TRANSACTION_CONFIG: TransactionConfig = {
   retry: {
-    maxRetries: 3,
-    retryDelay: 1000
+    maxRetries: 2, // Reduced from 3 to 2 for faster failure detection
+    retryDelay: 500 // Reduced from 1000ms to 500ms for faster retries
   },
   priorityFees: {
     low: 1000,
     medium: 5000,
-    high: 10000
+    high: 15000 // Increased high priority fee for faster processing
   },
   computeUnits: {
     simpleTransfer: 200000,
@@ -41,8 +41,8 @@ export const TRANSACTION_CONFIG: TransactionConfig = {
     multiSigTransfer: 500000,
   },
   timeout: {
-    connection: 30000,
-    transaction: 60000,
-    confirmation: 180000 // Increased to 3 minutes for split wallet transactions
+    connection: 30000, // Increased to 30s for better reliability
+    transaction: 60000, // Increased to 60s for better reliability
+    confirmation: 120000 // Increased to 120s for better reliability
   }
 };

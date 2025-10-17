@@ -127,12 +127,16 @@ export const useDegenSplitLogic = (
         currentUser.id.toString(),
         totalAmount,
         'USDC',
-        participants.map(p => ({
-          userId: p.userId || p.id,
-          name: p.name,
-          walletAddress: p.walletAddress,
-          amountOwed: totalAmount, // Each participant needs to lock the full amount for degen split
-        }))
+        participants.map(p => {
+          // Import roundUsdcAmount to fix precision issues - same as fair split
+          const { roundUsdcAmount } = require('../../../utils/formatUtils');
+          return {
+            userId: p.userId || p.id,
+            name: p.name,
+            walletAddress: p.walletAddress,
+            amountOwed: roundUsdcAmount(totalAmount), // Each participant needs to lock the full amount for degen split
+          };
+        })
       );
       
       if (!walletResult.success || !walletResult.wallet) {
@@ -143,7 +147,7 @@ export const useDegenSplitLogic = (
       setState({ 
         splitWallet: newWallet, 
         isCreatingWallet: false,
-        showWalletRecapModal: true 
+        showWalletRecapModal: false // Removed popup - wallet created silently
       });
       
       logger.info('Split wallet created successfully for degen split', { 
@@ -187,6 +191,33 @@ export const useDegenSplitLogic = (
         if (walletResult.success && walletResult.wallet) {
           const wallet = walletResult.wallet;
           setState({ splitWallet: wallet, isLoadingWallet: false });
+          
+          // Verify split wallet balance against blockchain data
+          try {
+            const balanceVerification = await SplitWalletService.verifySplitWalletBalance(walletIdToLoad);
+            if (balanceVerification.success) {
+              logger.info('Split wallet balance verification', {
+                splitWalletId: walletIdToLoad,
+                onChainBalance: balanceVerification.onChainBalance,
+                databaseBalance: balanceVerification.databaseBalance,
+                isConsistent: balanceVerification.isConsistent
+              });
+              
+              if (!balanceVerification.isConsistent) {
+                logger.warn('Split wallet balance inconsistency detected', {
+                  splitWalletId: walletIdToLoad,
+                  onChainBalance: balanceVerification.onChainBalance,
+                  databaseBalance: balanceVerification.databaseBalance,
+                  difference: Math.abs((balanceVerification.onChainBalance || 0) - (balanceVerification.databaseBalance || 0))
+                });
+              }
+            }
+          } catch (balanceError) {
+            logger.warn('Could not verify split wallet balance', {
+              splitWalletId: walletIdToLoad,
+              error: balanceError instanceof Error ? balanceError.message : String(balanceError)
+            });
+          }
           
           // Check if current user has already locked their funds
           if (currentUser?.id) {
@@ -292,12 +323,16 @@ export const useDegenSplitLogic = (
       if (splitParticipantIds.length !== walletParticipantIds.length || 
           !splitParticipantIds.every(id => walletParticipantIds.includes(id))) {
         const { SplitWalletService } = await import('../../../services/split');
-        const participantsForUpdate = participants.map(p => ({
-          userId: p.userId || p.id,
-          name: p.name,
-          walletAddress: p.walletAddress,
-          amountOwed: totalAmount, // Each participant owes the FULL bill amount in degen split
-        }));
+        const participantsForUpdate = participants.map(p => {
+          // Import roundUsdcAmount to fix precision issues - same as fair split
+          const { roundUsdcAmount } = require('../../../utils/formatUtils');
+          return {
+            userId: p.userId || p.id,
+            name: p.name,
+            walletAddress: p.walletAddress,
+            amountOwed: roundUsdcAmount(totalAmount), // Each participant owes the FULL bill amount in degen split
+          };
+        });
         
         const syncResult = await SplitWalletService.updateSplitWalletParticipants(
           walletToUse.id,
@@ -409,7 +444,7 @@ export const useDegenSplitLogic = (
         .filter(p => (p.userId || p.id) !== currentUser.id.toString())
         .map(p => p.userId || p.id);
       
-      const billName = splitData?.title || 'Degen Split';
+      const billName = splitData?.title || billData?.title || processedBillData?.title || 'Degen Split';
 
       if (otherParticipantIds.length > 0) {
         await notificationService.sendBulkNotifications(
@@ -417,8 +452,11 @@ export const useDegenSplitLogic = (
           'split_lock_required',
           {
             splitWalletId: walletToUse.id,
+            splitId: splitData?.id,
             billName,
             amount: totalAmount, // Full bill amount
+            currency: 'USDC',
+            timestamp: new Date().toISOString()
           }
         );
       }
@@ -463,14 +501,18 @@ export const useDegenSplitLogic = (
         
         if (needsSync) {
           logger.info('Syncing participants between split data and wallet', null, 'DegenSplitLogic');
-          const participantsForUpdate = participants.map(p => ({
-            userId: p.userId || p.id,
-            name: p.name,
-            walletAddress: p.walletAddress,
-            amountOwed: splitWallet.totalAmount,
-            amountPaid: 0,
-            status: 'pending' as const
-          }));
+          const participantsForUpdate = participants.map(p => {
+            // Import roundUsdcAmount to fix precision issues - same as fair split
+            const { roundUsdcAmount } = require('../../../utils/formatUtils');
+            return {
+              userId: p.userId || p.id,
+              name: p.name,
+              walletAddress: p.walletAddress,
+              amountOwed: roundUsdcAmount(splitWallet.totalAmount),
+              amountPaid: 0,
+              status: 'pending' as const
+            };
+          });
           
           const syncResult = await SplitWalletService.updateSplitWalletParticipants(
             wallet.id,
@@ -587,7 +629,7 @@ export const useDegenSplitLogic = (
       // Send notifications to all participants about the roulette result
       try {
         const { notificationService } = await import('../../../services/notificationService');
-        const billName = splitData?.title || billData?.title || 'Degen Split';
+        const billName = splitData?.title || billData?.title || processedBillData?.title || 'Degen Split';
         const winnerId = participants[finalIndex].userId || participants[finalIndex].id;
         const winnerName = participants[finalIndex].name;
 
@@ -614,6 +656,8 @@ export const useDegenSplitLogic = (
               billName,
               amount: totalAmount,
               currency: 'USDC',
+              winnerId,
+              winnerName,
               timestamp: new Date().toISOString()
             }
           );

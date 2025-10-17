@@ -26,8 +26,9 @@ import { getConfig } from '../config/unified';
 import { FeeService, COMPANY_WALLET_CONFIG, TransactionType } from '../config/feeConfig';
 import { solanaWalletService } from '../wallet/solanaWallet';
 import { logger } from '../services/loggingService';
-import { transactionUtils } from '../services/shared/transactionUtils';
+import { optimizedTransactionUtils } from '../services/shared/transactionUtilsOptimized';
 import { notificationUtils } from '../services/shared/notificationUtils';
+import { TRANSACTION_CONFIG } from '../config/transactionConfig';
 
 export interface InternalTransferParams {
   to: string;
@@ -366,7 +367,7 @@ class InternalTransferService {
       // Check if recipient has USDC token account, create if needed
       let needsTokenAccountCreation = false;
       try {
-        await getAccount(transactionUtils.getConnection(), toTokenAccount);
+        await getAccount((await optimizedTransactionUtils.getConnection()), toTokenAccount);
         logger.info('Recipient USDC token account exists', { toTokenAccount: toTokenAccount.toBase58() }, 'InternalTransferService');
       } catch (error) {
         // Token account doesn't exist, we need to create it
@@ -633,7 +634,7 @@ class InternalTransferService {
       let signature: string;
       try {
         logger.info('Attempting to sign and send transaction', {
-          connectionEndpoint: transactionUtils.getConnection().rpcEndpoint,
+          connectionEndpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint,
           commitment: getConfig().blockchain.commitment,
           priority: params.priority || 'medium'
         }, 'InternalTransferService');
@@ -758,7 +759,7 @@ class InternalTransferService {
     error?: string;
   }> {
     try {
-      const status = await transactionUtils.getConnection().getSignatureStatus(signature, {
+      const status = await (await optimizedTransactionUtils.getConnection()).getSignatureStatus(signature, {
         searchTransactionHistory: true
       });
 
@@ -785,15 +786,15 @@ class InternalTransferService {
       logger.warn('Failed to get transaction status, trying next RPC endpoint', { 
         signature,
         error: error instanceof Error ? error.message : 'Unknown error',
-        endpoint: transactionUtils.getConnection().rpcEndpoint
+        endpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint
       }, 'InternalTransferService');
       
       // Switch to next RPC endpoint if available
-      if (transactionUtils.getConnection()) {
+      if ((await optimizedTransactionUtils.getConnection())) {
         await transactionUtils.switchToNextEndpoint();
         // Retry once with new endpoint
         try {
-          const retryStatus = await transactionUtils.getConnection().getSignatureStatus(signature, {
+          const retryStatus = await (await optimizedTransactionUtils.getConnection()).getSignatureStatus(signature, {
             searchTransactionHistory: true
           });
           
@@ -947,7 +948,7 @@ class InternalTransferService {
 
         // Check if sender has USDC token account
         try {
-          const senderAccount = await getAccount(transactionUtils.getConnection(), fromTokenAccount);
+          const senderAccount = await getAccount((await optimizedTransactionUtils.getConnection()), fromTokenAccount);
           logger.debug('Sender USDC token account exists', {
             address: fromTokenAccount.toBase58(),
             balance: senderAccount.amount.toString(),
@@ -968,7 +969,7 @@ class InternalTransferService {
 
         // Check if recipient has USDC token account, create if not
         try {
-          await getAccount(transactionUtils.getConnection(), toTokenAccount);
+          await getAccount((await optimizedTransactionUtils.getConnection()), toTokenAccount);
           logger.debug('Recipient USDC token account exists', null, 'sendInternal');
         } catch (error) {
           logger.debug('Creating USDC token account for recipient', null, 'sendInternal');
@@ -1068,7 +1069,7 @@ class InternalTransferService {
       if (!hasTokenAccountCreation) {
         try {
           logger.debug('Simulating transaction before sending', null, 'sendInternal');
-          const simulationResult = await transactionUtils.getConnection().simulateTransaction(transaction);
+          const simulationResult = await (await optimizedTransactionUtils.getConnection()).simulateTransaction(transaction);
           
           if (simulationResult.value.err) {
             console.error('❌ Transaction simulation failed:', simulationResult.value.err);
@@ -1176,7 +1177,7 @@ class InternalTransferService {
               // Transaction is already signed above with fresh blockhash
               
               // Send transaction first (faster response)
-              signature = await transactionUtils.getConnection().sendRawTransaction(transaction.serialize(), {
+              signature = await (await optimizedTransactionUtils.getConnection()).sendRawTransaction(transaction.serialize(), {
                 skipPreflight: false,
                 preflightCommitment: 'confirmed',
                 maxRetries: 0, // We handle retries ourselves
@@ -1184,10 +1185,11 @@ class InternalTransferService {
               
               logger.info('Transaction sent with signature, waiting for confirmation', { signature }, 'sendInternal');
               
-              // Confirm transaction with timeout
-              const confirmPromise = transactionUtils.getConnection().confirmTransaction(signature, 'confirmed');
+              // Confirm transaction with timeout using centralized configuration
+              const confirmPromise = (await optimizedTransactionUtils.getConnection()).confirmTransaction(signature, 'confirmed');
               const confirmTimeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => reject(new Error('Transaction confirmation timeout after 15 seconds')), 15000);
+                const timeout = TRANSACTION_CONFIG.timeout.confirmation;
+                setTimeout(() => reject(new Error(`Transaction confirmation timeout after ${timeout/1000} seconds`)), timeout);
               });
               
               await Promise.race([confirmPromise, confirmTimeoutPromise]);

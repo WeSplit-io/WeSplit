@@ -3,9 +3,8 @@
  * Centralizes balance calculation and formatting logic
  */
 
-import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
-import { transactionUtils } from './transactionUtils';
+// Lazy imports to reduce memory usage
+import { optimizedTransactionUtils } from './transactionUtilsOptimized';
 import { logger } from '../loggingService';
 
 export interface BalanceInfo {
@@ -25,9 +24,17 @@ export class BalanceUtils {
   /**
    * Get SOL balance for a wallet address
    */
-  static async getSolBalance(publicKey: PublicKey): Promise<number> {
+  static async getSolBalance(publicKey: any): Promise<number> {
     try {
-      const balance = await transactionUtils.getConnection().getBalance(publicKey);
+      const { memoryManager } = await import('./memoryManager');
+      const { PublicKey } = await memoryManager.loadModule('solana-web3');
+      
+      // Ensure publicKey is a PublicKey instance
+      const pubKey = publicKey instanceof PublicKey ? publicKey : new PublicKey(publicKey);
+      
+      const connection = await optimizedTransactionUtils.getConnection();
+      const balance = await connection.getBalance(pubKey);
+      const { LAMPORTS_PER_SOL } = await memoryManager.loadModule('solana-web3');
       const solBalance = balance / LAMPORTS_PER_SOL;
       
       // Add debugging for very small balances
@@ -62,8 +69,9 @@ export class BalanceUtils {
         
         // Try to switch to next RPC endpoint
         try {
-          await transactionUtils.switchToNextEndpoint();
-          const balance = await transactionUtils.getConnection().getBalance(publicKey);
+          await optimizedTransactionUtils.switchToNextEndpoint();
+          const connection = await optimizedTransactionUtils.getConnection();
+          const balance = await connection.getBalance(publicKey);
           const solBalance = balance / LAMPORTS_PER_SOL;
           
           logger.info('BalanceUtils: Successfully retrieved balance using fallback endpoint', {
@@ -92,9 +100,17 @@ export class BalanceUtils {
    * Get USDC balance for a wallet address
    * Returns 0 if token account doesn't exist (normal for new wallets)
    */
-  static async getUsdcBalance(publicKey: PublicKey, usdcMint: PublicKey): Promise<UsdcBalanceResult> {
+  static async getUsdcBalance(publicKey: any, usdcMint: any): Promise<UsdcBalanceResult> {
     try {
-      const usdcTokenAccount = await getAssociatedTokenAddress(usdcMint, publicKey);
+      const { memoryManager } = await import('./memoryManager');
+      const { PublicKey } = await memoryManager.loadModule('solana-web3');
+      const { getAssociatedTokenAddress, getAccount } = await memoryManager.loadModule('solana-spl-token');
+      
+      // Ensure parameters are PublicKey instances
+      const pubKey = publicKey instanceof PublicKey ? publicKey : new PublicKey(publicKey);
+      const mintKey = usdcMint instanceof PublicKey ? usdcMint : new PublicKey(usdcMint);
+      
+      const usdcTokenAccount = await getAssociatedTokenAddress(mintKey, pubKey);
       
       logger.debug('BalanceUtils: USDC token account derivation', {
         publicKey: publicKey.toBase58(),
@@ -102,7 +118,8 @@ export class BalanceUtils {
         usdcTokenAccount: usdcTokenAccount.toBase58()
       }, 'BalanceUtils');
       
-      const accountInfo = await getAccount(transactionUtils.getConnection(), usdcTokenAccount);
+      const connection = await optimizedTransactionUtils.getConnection();
+      const accountInfo = await getAccount(connection, usdcTokenAccount);
       
       logger.debug('BalanceUtils: USDC balance retrieved successfully', {
         publicKey: publicKey.toBase58(),
@@ -129,8 +146,9 @@ export class BalanceUtils {
         
         // Try to switch to next RPC endpoint
         try {
-          await transactionUtils.switchToNextEndpoint();
-          const accountInfo = await getAccount(transactionUtils.getConnection(), usdcTokenAccount);
+          await optimizedTransactionUtils.switchToNextEndpoint();
+          const connection = await optimizedTransactionUtils.getConnection();
+          const accountInfo = await getAccount(connection, usdcTokenAccount);
           
           logger.info('BalanceUtils: Successfully retrieved USDC balance using fallback endpoint', {
             publicKey: publicKey.toBase58(),

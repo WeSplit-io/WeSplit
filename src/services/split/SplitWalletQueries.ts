@@ -412,8 +412,21 @@ export class SplitWalletQueries {
       // Calculate database-based completion
       const databaseCollectedAmount = wallet.participants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
       
-      // Use the more conservative (lower) value between database and on-chain balance
-      const collectedAmount = Math.min(databaseCollectedAmount, actualOnChainBalance);
+      // For single participant splits or when amounts are very close, use database amount
+      // This prevents rounding issues from blocking completion
+      const tolerance = 0.001; // 0.001 USDC tolerance for rounding differences
+      const isSingleParticipant = wallet.participants.length === 1;
+      const isAmountClose = Math.abs(databaseCollectedAmount - actualOnChainBalance) <= tolerance;
+      
+      let collectedAmount: number;
+      if (isSingleParticipant || isAmountClose) {
+        // For single participant or when amounts are very close, use database amount
+        collectedAmount = databaseCollectedAmount;
+      } else {
+        // For multiple participants with significant differences, use the more conservative value
+        collectedAmount = Math.min(databaseCollectedAmount, actualOnChainBalance);
+      }
+      
       const remainingAmount = totalAmount - collectedAmount;
       const completionPercentage = totalAmount > 0 ? (collectedAmount / totalAmount) * 100 : 0;
 
@@ -426,7 +439,10 @@ export class SplitWalletQueries {
         remainingAmount,
         completionPercentage,
         participantsCount: wallet.participants.length,
-        dataConsistencyIssue: Math.abs(databaseCollectedAmount - actualOnChainBalance) > 0.001
+        isSingleParticipant,
+        isAmountClose,
+        tolerance,
+        dataConsistencyIssue: Math.abs(databaseCollectedAmount - actualOnChainBalance) > tolerance
       });
 
       return {

@@ -18,8 +18,9 @@ import { BalanceUtils } from '../shared/balanceUtils';
 // Helper function to verify transaction on blockchain
 async function verifyTransactionOnBlockchain(transactionSignature: string): Promise<boolean> {
   try {
-    const { Connection } = await import('@solana/web3.js');
-    const { getConfig } = await import('../../config/unified');
+    const { memoryManager } = await import('../shared/memoryManager');
+    const { Connection } = await memoryManager.loadModule('solana-web3');
+    const { getConfig } = await memoryManager.loadModule('unified-config');
     const connection = new Connection(getConfig().blockchain.rpcUrl);
     
     // Get transaction status
@@ -66,10 +67,11 @@ async function executeSplitWalletTransaction(
       memo
     }, 'SplitWalletPayments');
 
-    // Import required modules
-    const { Connection, PublicKey, Keypair, Transaction, SystemProgram, LAMPORTS_PER_SOL } = await import('@solana/web3.js');
-    const { createTransferInstruction, getAssociatedTokenAddress, TOKEN_PROGRAM_ID } = await import('@solana/spl-token');
-    const { getConfig } = await import('../../config/unified');
+    // Import required modules using memory manager
+    const { memoryManager } = await import('../shared/memoryManager');
+    const { Connection, PublicKey, Keypair, Transaction, SystemProgram, LAMPORTS_PER_SOL } = await memoryManager.loadModule('solana-web3');
+    const { createTransferInstruction, getAssociatedTokenAddress, TOKEN_PROGRAM_ID, createAssociatedTokenAccountInstruction, getAccount } = await memoryManager.loadModule('solana-spl-token');
+    const { getConfig } = await memoryManager.loadModule('unified-config');
     const { transactionUtils } = await import('../shared/transactionUtils');
 
     // Create connection
@@ -209,13 +211,28 @@ async function executeSplitWalletTransaction(
       }
     }
 
-    // Check if recipient token account exists
-    const toTokenAccountInfo = await connection.getAccountInfo(toTokenAccount);
-    if (!toTokenAccountInfo) {
-      return {
-        success: false,
-        error: 'Recipient does not have a USDC token account'
-      };
+    // Check if recipient has USDC token account, create if needed
+    let createTokenAccountInstruction: any = null;
+    try {
+      await getAccount(connection, toTokenAccount);
+      logger.info('Recipient USDC token account exists', { 
+        toTokenAccount: toTokenAccount.toBase58(),
+        toAddress: toAddress 
+      }, 'SplitWalletPayments');
+    } catch (error) {
+      // Token account doesn't exist, create it
+      logger.info('Creating USDC token account for recipient', { 
+        toTokenAccount: toTokenAccount.toBase58(),
+        toAddress: toAddress,
+        feePayer: feePayerPublicKey.toBase58()
+      }, 'SplitWalletPayments');
+      
+      createTokenAccountInstruction = createAssociatedTokenAccountInstruction(
+        feePayerPublicKey, // payer - use company wallet to pay for token account creation
+        toTokenAccount, // associated token account
+        toPublicKey, // owner
+        usdcMint // mint
+      );
     }
 
     // Verify the from token account has sufficient balance
@@ -223,7 +240,7 @@ async function executeSplitWalletTransaction(
     if (!fromTokenAccountInfo.value) {
       return {
         success: false,
-        error: 'Split wallet token account not found or has no balance'
+        error: `User token account not found or has no balance. Address: ${fromAddress}`
       };
     }
 
@@ -234,12 +251,12 @@ async function executeSplitWalletTransaction(
     if (!fromAccountInfo) {
       return {
         success: false,
-        error: 'Split wallet token account does not exist on blockchain'
+        error: `User token account does not exist on blockchain. Address: ${fromAddress}`
       };
     }
 
     // CRITICAL: Check for any pending transactions that might affect this account
-    logger.info('Checking for pending transactions on split wallet', {
+    logger.info('Checking for pending transactions on user wallet', {
       fromAddress: fromAddress,
       fromTokenAccount: fromTokenAccount.toBase58()
     }, 'SplitWalletPayments');
@@ -290,7 +307,8 @@ async function executeSplitWalletTransaction(
     // Cross-verify balance using multiple methods
     let crossVerifiedBalance = availableBalance;
     try {
-      const { getAccount } = await import('@solana/spl-token');
+      const { memoryManager } = await import('../shared/memoryManager');
+      const { getAccount } = await memoryManager.loadModule('solana-spl-token');
       const accountData = await getAccount(connection, fromTokenAccount);
       const crossVerifiedBalanceRaw = Number(accountData.amount) / 1_000_000;
       
@@ -325,7 +343,7 @@ async function executeSplitWalletTransaction(
     if (crossVerifiedBalance < amount) {
       return {
         success: false,
-        error: `Insufficient balance in split wallet. Available: ${crossVerifiedBalance} USDC, Requested: ${amount} USDC`
+        error: `Insufficient balance in user wallet. Available: ${crossVerifiedBalance} USDC, Requested: ${amount} USDC`
       };
     }
 
@@ -346,14 +364,35 @@ async function executeSplitWalletTransaction(
       amountInSmallestUnit: amountInSmallestUnit
     }, 'SplitWalletPayments');
 
-    // Get recent blockhash
-    const { blockhash } = await connection.getLatestBlockhash('confirmed');
+    // Get recent blockhash with retry logic (memory optimized)
+    const { optimizedTransactionUtils } = await import('../shared/transactionUtilsOptimized');
+    const blockhash = await optimizedTransactionUtils.getLatestBlockhashWithRetry('confirmed');
 
     // Create transaction with proper fee payer setup - matching TransactionProcessor pattern
     const transaction = new Transaction({
       recentBlockhash: blockhash,
       feePayer: feePayerPublicKey // Use company wallet as fee payer for SOL fees
     });
+
+    // Add create token account instruction if needed (from earlier check)
+    if (createTokenAccountInstruction) {
+      // Check if company wallet has enough SOL for token account creation
+      const companySolBalance = await connection.getBalance(feePayerPublicKey);
+      const rentExemptionAmount = 2039280; // Approximate rent for token account
+      
+      if (companySolBalance < rentExemptionAmount) {
+        return {
+          success: false,
+          error: `Company wallet has insufficient SOL for token account creation. Required: ${rentExemptionAmount / LAMPORTS_PER_SOL} SOL, Available: ${companySolBalance / LAMPORTS_PER_SOL} SOL`
+        };
+      }
+      
+      transaction.add(createTokenAccountInstruction);
+      logger.info('Added token account creation instruction', { 
+        toTokenAccount: toTokenAccount.toBase58(),
+        rentExemption: rentExemptionAmount / LAMPORTS_PER_SOL
+      }, 'SplitWalletPayments');
+    }
 
     // Add transfer instruction
     transaction.add(
@@ -379,7 +418,8 @@ async function executeSplitWalletTransaction(
 
     // Add memo instruction if provided
     if (memo) {
-      const { TransactionInstruction, PublicKey } = await import('@solana/web3.js');
+      const { memoryManager } = await import('../shared/memoryManager');
+      const { TransactionInstruction, PublicKey } = await memoryManager.loadModule('solana-web3');
       transaction.add(
         new TransactionInstruction({
           keys: [],
@@ -404,7 +444,7 @@ async function executeSplitWalletTransaction(
       if (finalBalance < transferAmount) {
         return {
           success: false,
-          error: `Balance changed during transaction construction. Final balance: ${finalBalance} USDC, Transfer amount: ${transferAmount} USDC`
+          error: `User balance changed during transaction construction. Final balance: ${finalBalance} USDC, Transfer amount: ${transferAmount} USDC`
         };
       }
     } catch (error) {
@@ -419,14 +459,15 @@ async function executeSplitWalletTransaction(
       fromTokenAccount: fromTokenAccount.toBase58(),
       toTokenAccount: toTokenAccount.toBase58(),
       feePayer: feePayerPublicKey.toBase58(),
-      splitWalletAddress: fromPublicKey.toBase58()
+      userWalletAddress: fromPublicKey.toBase58(),
+      splitWalletAddress: toPublicKey.toBase58()
     }, 'SplitWalletPayments');
 
     // Prepare signers array - matching TransactionProcessor pattern
-    const signers: typeof Keypair.prototype[] = [keypair]; // Split wallet keypair for the transfer
+    const signers: typeof Keypair.prototype[] = [keypair]; // User keypair for the transfer
     
     logger.info('Preparing signers array', {
-      splitWalletSigner: keypair.publicKey.toBase58(),
+      userWalletSigner: keypair.publicKey.toBase58(),
       signersCount: signers.length
     }, 'SplitWalletPayments');
     
@@ -451,10 +492,8 @@ async function executeSplitWalletTransaction(
     
     let signature: string;
     try {
-      signature = await connection.sendTransaction(transaction, signers, {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
-      });
+      // Use the optimized transaction utils retry logic for sending
+      signature = await optimizedTransactionUtils.sendTransactionWithRetry(transaction as any, signers, 'high');
       
       logger.info('✅ Transaction sent successfully', {
         signature,
@@ -475,12 +514,46 @@ async function executeSplitWalletTransaction(
       amount
     }, 'SplitWalletPayments');
 
-    // Wait for confirmation
-    const confirmed = await transactionUtils.confirmTransactionWithTimeout(signature);
+    // Wait for confirmation with extended timeout for winner payouts
+    const confirmed = await optimizedTransactionUtils.confirmTransactionWithTimeout(signature, 120000); // 2 minutes for winner payouts
     
     if (!confirmed) {
       logger.warn('Split wallet transaction confirmation timed out', { signature }, 'SplitWalletPayments');
-      // Still return success since the transaction was sent
+      
+      // For winner payouts, we need to be more careful about confirmation
+      // Try alternative confirmation method before giving up
+      try {
+        const { memoryManager } = await import('../shared/memoryManager');
+        const { Connection } = await memoryManager.loadModule('solana-web3');
+        const { getConfig } = await memoryManager.loadModule('unified-config');
+        const connection = new Connection(getConfig().blockchain.rpcUrl);
+        
+        // Check if transaction exists in history
+        const signatureStatus = await connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+        if (signatureStatus.value && !signatureStatus.value.err) {
+          logger.info('✅ Transaction confirmed via alternative method', {
+            signature,
+            confirmationStatus: signatureStatus.value.confirmationStatus
+          }, 'SplitWalletPayments');
+          
+          return {
+            success: true,
+            signature
+          };
+        }
+      } catch (altError) {
+        logger.warn('Alternative confirmation method also failed', {
+          signature,
+          error: altError instanceof Error ? altError.message : String(altError)
+        }, 'SplitWalletPayments');
+      }
+      
+      // If we can't confirm the transaction, return failure
+      return {
+        success: false,
+        error: `Transaction confirmation timed out. Please check the transaction status manually: ${signature}`,
+        signature
+      };
     }
 
     return {
@@ -499,7 +572,84 @@ async function executeSplitWalletTransaction(
 
 export class SplitWalletPayments {
   /**
+   * Verify split wallet balance against blockchain data
+   * Ensures the displayed balance is real blockchain data
+   * Works for both fair split and degen split wallets
+   */
+  static async verifySplitWalletBalance(splitWalletId: string): Promise<{
+    success: boolean;
+    onChainBalance?: number;
+    databaseBalance?: number;
+    isConsistent?: boolean;
+    error?: string;
+  }> {
+    try {
+      logger.info('Verifying split wallet balance against blockchain', { splitWalletId }, 'SplitWalletPayments');
+      
+      // Get split wallet data
+      const walletResult = await this.getSplitWallet(splitWalletId);
+      if (!walletResult.success || !walletResult.wallet) {
+        return {
+          success: false,
+          error: 'Split wallet not found'
+        };
+      }
+      
+      const wallet = walletResult.wallet;
+      
+      // Get actual on-chain balance
+      const { consolidatedTransactionService } = await import('../consolidatedTransactionService');
+      const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
+      
+      if (!balanceResult.success) {
+        return {
+          success: false,
+          error: 'Failed to retrieve on-chain balance'
+        };
+      }
+      
+      const onChainBalance = balanceResult.balance;
+      
+      // Calculate database balance from participants
+      const databaseBalance = wallet.participants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+      
+      // Check consistency
+      const tolerance = 0.001; // 0.001 USDC tolerance
+      const isConsistent = Math.abs(onChainBalance - databaseBalance) <= tolerance;
+      
+      logger.info('Split wallet balance verification', {
+        splitWalletId,
+        walletAddress: wallet.walletAddress,
+        onChainBalance,
+        databaseBalance,
+        difference: Math.abs(onChainBalance - databaseBalance),
+        isConsistent,
+        tolerance
+      }, 'SplitWalletPayments');
+      
+      return {
+        success: true,
+        onChainBalance,
+        databaseBalance,
+        isConsistent
+      };
+      
+    } catch (error) {
+      logger.error('Failed to verify split wallet balance', {
+        splitWalletId,
+        error: error instanceof Error ? error.message : String(error)
+      }, 'SplitWalletPayments');
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  /**
    * Process degen split fund locking (participants lock funds but status remains 'locked', not 'paid')
+   * Optimized for faster transaction processing
    */
   static async processDegenFundLocking(
     splitWalletId: string,
@@ -507,12 +657,13 @@ export class SplitWalletPayments {
     amount: number,
     transactionSignature?: string
   ): Promise<PaymentResult> {
+    const startTime = Date.now();
     try {
-      logger.debug('Processing degen split fund locking', {
+      logger.info('Processing degen split fund locking', {
         splitWalletId,
         participantId,
         amount,
-        transactionSignature
+        hasTransactionSignature: !!transactionSignature
       });
 
       // Get split wallet with enhanced error handling
@@ -576,27 +727,42 @@ export class SplitWalletPayments {
           // Get user's wallet for the transaction
           const { walletService } = await import('../WalletService');
           const userWallet = await walletService.getUserWallet(participantId);
-          if (!userWallet) {
+          if (!userWallet || !userWallet.secretKey) {
             return {
               success: false,
-              error: 'Failed to retrieve user wallet for transaction',
+              error: 'Failed to retrieve user wallet or secret key for transaction',
             };
           }
 
-          // Execute transaction from user's wallet to split wallet
-          const transactionParams = {
-            to: wallet.walletAddress, // Split wallet address
+          logger.info('🚀 Executing degen split fund locking transaction directly', {
+            fromAddress: userWallet.address,
+            toAddress: wallet.walletAddress,
             amount: roundedAmount,
-            currency: 'USDC' as const,
-            memo: `Degen Split fund locking - ${wallet.id}`,
-            userId: participantId,
-            transactionType: 'send' as const,
-          };
+            splitWalletId,
+            participantId
+          }, 'SplitWalletPayments');
 
-          // Use the consolidated transaction service to execute the transaction
-          const transactionResult = await consolidatedTransactionService.sendUSDCTransaction(transactionParams);
+          // Execute transaction directly using the same method as fair splits
+          // This bypasses the TransactionProcessor blockhash issues
+          const transactionResult = await executeSplitWalletTransaction(
+            userWallet.address,
+            userWallet.secretKey,
+            wallet.walletAddress,
+            roundedAmount,
+            'USDC',
+            `Degen Split fund locking - ${wallet.id}`
+          );
           
           if (!transactionResult.success) {
+            logger.error('Failed to execute degen split fund locking transaction', {
+              splitWalletId,
+              participantId,
+              amount: roundedAmount,
+              error: transactionResult.error,
+              fromWallet: userWallet.address,
+              toWallet: wallet.walletAddress
+            }, 'SplitWalletPayments');
+            
             return {
               success: false,
               error: transactionResult.error || 'Failed to execute transaction to split wallet',
@@ -605,13 +771,78 @@ export class SplitWalletPayments {
 
           actualTransactionSignature = transactionResult.signature;
           
+          // Verify the transaction was actually executed on blockchain
+          logger.info('Verifying degen split fund locking transaction on blockchain', {
+            transactionSignature: actualTransactionSignature,
+            splitWalletId,
+            participantId,
+            amount: roundedAmount
+          }, 'SplitWalletPayments');
+          
+          try {
+            // Wait a moment for transaction to be confirmed
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Verify transaction status on blockchain
+            if (actualTransactionSignature) {
+              const isConfirmed = await verifyTransactionOnBlockchain(actualTransactionSignature);
+            
+              if (!isConfirmed) {
+                logger.warn('Degen split fund locking transaction not confirmed on blockchain', {
+                  transactionSignature: actualTransactionSignature,
+                  splitWalletId,
+                  participantId
+                }, 'SplitWalletPayments');
+                
+                // Don't fail the operation, but log the warning
+                // The transaction might still be pending
+              } else {
+                logger.info('✅ Degen split fund locking transaction confirmed on blockchain', {
+                  transactionSignature: actualTransactionSignature,
+                  splitWalletId,
+                  participantId,
+                  amount: roundedAmount
+                }, 'SplitWalletPayments');
+              }
+            }
+            
+            // Verify the split wallet balance increased
+            try {
+              const { consolidatedTransactionService } = await import('../consolidatedTransactionService');
+              const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
+              
+              if (balanceResult.success) {
+                logger.info('Split wallet balance after fund locking', {
+                  splitWalletId,
+                  walletAddress: wallet.walletAddress,
+                  balance: balanceResult.balance,
+                  expectedIncrease: roundedAmount
+                }, 'SplitWalletPayments');
+              }
+            } catch (balanceError) {
+              logger.warn('Could not verify split wallet balance after transaction', {
+                error: balanceError instanceof Error ? balanceError.message : String(balanceError),
+                splitWalletId
+              }, 'SplitWalletPayments');
+            }
+            
+          } catch (verificationError) {
+            logger.warn('Transaction verification failed, but continuing', {
+              error: verificationError instanceof Error ? verificationError.message : String(verificationError),
+              transactionSignature: actualTransactionSignature,
+              splitWalletId
+            }, 'SplitWalletPayments');
+          }
+          
+          const transactionTime = Date.now() - startTime;
           logger.info('Transaction executed successfully for degen split fund locking', {
             splitWalletId,
             participantId,
             amount: roundedAmount,
             transactionSignature: actualTransactionSignature,
             fromWallet: userWallet.address,
-            toWallet: wallet.walletAddress
+            toWallet: wallet.walletAddress,
+            transactionTimeMs: transactionTime
           }, 'SplitWalletPayments');
 
         } catch (transactionError) {
@@ -787,25 +1018,170 @@ export class SplitWalletPayments {
         };
       }
 
-      // Update participant payment status
+      // CRITICAL: Execute actual transaction to transfer funds from user's wallet to split wallet
+      // This is the same logic as degen split to ensure funds are actually received
+      let actualTransactionSignature: string | undefined = transactionSignature;
+      
+      if (!actualTransactionSignature) {
+        try {
+          // Get user's wallet for the transaction
+          const { walletService } = await import('../WalletService');
+          const userWallet = await walletService.getUserWallet(participantId);
+          if (!userWallet || !userWallet.secretKey) {
+            return {
+              success: false,
+              error: 'Failed to retrieve user wallet or secret key for transaction',
+            };
+          }
+
+          logger.info('🚀 Executing fair split participant payment transaction directly', {
+            fromAddress: userWallet.address,
+            toAddress: wallet.walletAddress,
+            amount: roundedAmount,
+            splitWalletId,
+            participantId
+          }, 'SplitWalletPayments');
+
+          // Execute transaction directly using the same method as degen splits
+          const transactionResult = await executeSplitWalletTransaction(
+            userWallet.address,
+            userWallet.secretKey,
+            wallet.walletAddress,
+            roundedAmount,
+            'USDC',
+            `Fair Split participant payment - ${wallet.id}`
+          );
+          
+          if (!transactionResult.success) {
+            logger.error('Failed to execute fair split participant payment transaction', {
+              splitWalletId,
+              participantId,
+              amount: roundedAmount,
+              error: transactionResult.error,
+              fromWallet: userWallet.address,
+              toWallet: wallet.walletAddress
+            }, 'SplitWalletPayments');
+            
+            return {
+              success: false,
+              error: transactionResult.error || 'Failed to execute transaction to split wallet',
+            };
+          }
+
+          actualTransactionSignature = transactionResult.signature;
+          
+          // Verify the transaction was actually executed on blockchain
+          logger.info('Verifying fair split participant payment transaction on blockchain', {
+            transactionSignature: actualTransactionSignature,
+            splitWalletId,
+            participantId,
+            amount: roundedAmount
+          }, 'SplitWalletPayments');
+          
+          try {
+            // Wait a moment for transaction to be confirmed
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Verify transaction status on blockchain
+            if (actualTransactionSignature) {
+              const isConfirmed = await verifyTransactionOnBlockchain(actualTransactionSignature);
+              
+              if (!isConfirmed) {
+                logger.warn('Fair split participant payment transaction not confirmed on blockchain', {
+                  transactionSignature: actualTransactionSignature,
+                  splitWalletId,
+                  participantId
+                }, 'SplitWalletPayments');
+                
+                // Don't fail the operation, but log the warning
+                // The transaction might still be pending
+              } else {
+                logger.info('✅ Fair split participant payment transaction confirmed on blockchain', {
+                  transactionSignature: actualTransactionSignature,
+                  splitWalletId,
+                  participantId,
+                  amount: roundedAmount
+                }, 'SplitWalletPayments');
+              }
+            }
+            
+            // Verify the split wallet balance increased
+            try {
+              const { consolidatedTransactionService } = await import('../consolidatedTransactionService');
+              const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
+              
+              if (balanceResult.success) {
+                logger.info('Split wallet balance after participant payment', {
+                  splitWalletId,
+                  walletAddress: wallet.walletAddress,
+                  balance: balanceResult.balance,
+                  expectedIncrease: roundedAmount
+                }, 'SplitWalletPayments');
+              }
+            } catch (balanceError) {
+              logger.warn('Could not verify split wallet balance after transaction', {
+                error: balanceError instanceof Error ? balanceError.message : String(balanceError),
+                splitWalletId
+              }, 'SplitWalletPayments');
+            }
+            
+          } catch (verificationError) {
+            logger.warn('Transaction verification failed, but continuing', {
+              error: verificationError instanceof Error ? verificationError.message : String(verificationError),
+              transactionSignature: actualTransactionSignature,
+              splitWalletId
+            }, 'SplitWalletPayments');
+          }
+          
+        } catch (error) {
+          logger.error('Failed to execute fair split participant payment transaction', {
+            splitWalletId,
+            participantId,
+            amount: roundedAmount,
+            error: error instanceof Error ? error.message : String(error)
+          }, 'SplitWalletPayments');
+          
+          return {
+            success: false,
+            error: 'Failed to execute transaction to split wallet',
+          };
+        }
+      }
+
+      // Update participant payment status with improved consistency
       const updatedParticipants = wallet.participants.map(p => {
         if (p.userId === participantId) {
-          const newAmountPaid = p.amountPaid + roundedAmount;
+          const currentAmountPaid = p.amountPaid || 0;
+          const newAmountPaid = currentAmountPaid + roundedAmount;
           const isFullyPaid = newAmountPaid >= p.amountOwed;
+          
+          // Ensure we don't exceed the amount owed
+          const finalAmountPaid = Math.min(newAmountPaid, p.amountOwed);
           
           const updatedParticipant = {
             ...p,
-            amountPaid: newAmountPaid,
+            amountPaid: finalAmountPaid,
             status: isFullyPaid ? 'paid' as const : 'pending' as const,
             paidAt: isFullyPaid ? new Date().toISOString() : p.paidAt,
           };
           
-          // Only set transactionSignature if it's not undefined
-          if (transactionSignature) {
-            updatedParticipant.transactionSignature = transactionSignature;
+          // Set the actual transaction signature from the executed transaction
+          if (actualTransactionSignature) {
+            updatedParticipant.transactionSignature = actualTransactionSignature;
           } else if (p.transactionSignature) {
             updatedParticipant.transactionSignature = p.transactionSignature;
           }
+          
+          logger.info('Updated participant payment status after successful transaction', {
+            splitWalletId,
+            participantId,
+            previousAmountPaid: currentAmountPaid,
+            newAmountPaid: finalAmountPaid,
+            amountOwed: p.amountOwed,
+            isFullyPaid,
+            status: updatedParticipant.status,
+            transactionSignature: actualTransactionSignature
+          }, 'SplitWalletPayments');
           
           return updatedParticipant;
         }
@@ -1600,28 +1976,49 @@ export class SplitWalletPayments {
       const transactionResult = await this.sendSplitWalletTransaction(transactionParams);
       
       if (!transactionResult.success) {
+        logger.error('❌ Winner payout transaction failed', {
+          splitWalletId,
+          winnerUserId,
+          error: transactionResult.error,
+          signature: transactionResult.signature
+        }, 'SplitWalletPayments');
+        
         return {
           success: false,
           error: transactionResult.error || 'Failed to process degen winner payout',
         };
       }
 
-      // Update participant status to 'paid' to prevent multiple claims
-      const updatedParticipants = wallet.participants.map(p => {
-        if (p.userId === winnerUserId) {
-          return {
-            ...p,
-            status: 'paid' as const,
-            paidAt: new Date().toISOString(),
-            transactionSignature: transactionResult.transactionSignature,
-          };
-        }
-        return p;
-      });
+      // Only update participant status to 'paid' if transaction was successful
+      // This prevents marking as 'paid' when transaction confirmation times out
+      if (transactionResult.transactionSignature) {
+        const updatedParticipants = wallet.participants.map(p => {
+          if (p.userId === winnerUserId) {
+            return {
+              ...p,
+              status: 'paid' as const,
+              paidAt: new Date().toISOString(),
+              transactionSignature: transactionResult.transactionSignature,
+            };
+          }
+          return p;
+        });
 
-      // Update the split wallet with the new participant status
-      const docId = wallet.firebaseDocId || splitWalletId;
-      await this.updateWalletParticipants(docId, updatedParticipants);
+        // Update the split wallet with the new participant status
+        const docId = wallet.firebaseDocId || splitWalletId;
+        await this.updateWalletParticipants(docId, updatedParticipants);
+        
+        logger.info('✅ Winner participant status updated to paid', {
+          splitWalletId,
+          winnerUserId,
+          transactionSignature: transactionResult.transactionSignature
+        }, 'SplitWalletPayments');
+      } else {
+        logger.warn('⚠️ Winner payout transaction succeeded but no signature returned', {
+          splitWalletId,
+          winnerUserId
+        }, 'SplitWalletPayments');
+      }
 
       logger.info('Degen winner payout processed successfully', {
         splitWalletId,
@@ -1978,7 +2375,7 @@ export class SplitWalletPayments {
         }, 'SplitWalletPayments');
       }
 
-      // Execute the actual blockchain transaction
+      // Execute the actual blockchain transaction using direct method (same as processParticipantPayment)
       console.log('🔥🔥🔥 EXECUTING BLOCKCHAIN TRANSACTION for split wallet payment 🔥🔥🔥');
       logger.info('🔥 EXECUTING BLOCKCHAIN TRANSACTION for split wallet payment', {
         fromUserId: participantId,
@@ -1988,16 +2385,33 @@ export class SplitWalletPayments {
         preTransactionBalance
       });
 
-      const { consolidatedTransactionService } = await import('../transaction');
-      const transactionResult = await consolidatedTransactionService.sendUSDCTransaction({
-        to: wallet.walletAddress,
+      // Get user's wallet for the transaction
+      const { walletService } = await import('../WalletService');
+      const userWallet = await walletService.getUserWallet(participantId);
+      if (!userWallet || !userWallet.secretKey) {
+        return {
+          success: false,
+          error: 'Failed to retrieve user wallet or secret key for transaction',
+        };
+      }
+
+      logger.info('🚀 Executing fair split participant payment transaction directly', {
+        fromAddress: userWallet.address,
+        toAddress: wallet.walletAddress,
         amount: roundedAmount,
-        currency: 'USDC',
-        userId: participantId,
-        memo: `Split payment for bill ${wallet.billId}`,
-        priority: 'medium',
-        transactionType: 'send' // Split wallet payments are regular sends
-      });
+        splitWalletId,
+        participantId
+      }, 'SplitWalletPayments');
+
+      // Execute transaction directly using the same method as processParticipantPayment
+      const transactionResult = await executeSplitWalletTransaction(
+        userWallet.address,
+        userWallet.secretKey,
+        wallet.walletAddress,
+        roundedAmount,
+        'USDC',
+        `Fair Split participant payment - ${wallet.id}`
+      );
 
       if (!transactionResult.success) {
         logger.error('Blockchain transaction failed for split wallet payment', {
@@ -2019,187 +2433,14 @@ export class SplitWalletPayments {
         amount: roundedAmount
       });
 
-      // CRITICAL: Verify transaction is actually confirmed on-chain before updating database
+      // executeSplitWalletTransaction already handles confirmation, so we can proceed with database update
       if (transactionResult.signature) {
-        logger.info('🔍 Verifying transaction confirmation on blockchain', {
+        logger.info('✅ Transaction executed successfully, proceeding with database update', {
           signature: transactionResult.signature,
           participantId,
-          splitWalletId
+          splitWalletId,
+          amount: roundedAmount
         }, 'SplitWalletPayments');
-        
-        try {
-          // Wait a moment for transaction to be confirmed
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          
-          // Verify transaction status on blockchain with more lenient approach
-          const { Connection, PublicKey } = await import('@solana/web3.js');
-          const { getConfig } = await import('../../config/unified');
-          const connection = new Connection(getConfig().blockchain.rpcUrl);
-          
-          const signature = transactionResult.signature;
-          
-          // Try multiple confirmation methods
-          let isConfirmed = false;
-          let confirmationStatus = null;
-          
-          try {
-            // Method 1: Check signature status
-            const status = await connection.getSignatureStatus(signature, { searchTransactionHistory: true });
-            if (status.value && !status.value.err) {
-              isConfirmed = true;
-              confirmationStatus = status.value.confirmationStatus;
-              logger.info('✅ Transaction confirmed via signature status', {
-                signature,
-                confirmationStatus,
-                participantId,
-                splitWalletId
-              }, 'SplitWalletPayments');
-            }
-          } catch (statusError) {
-            logger.warn('⚠️ Signature status check failed, trying alternative method', {
-              error: statusError instanceof Error ? statusError.message : String(statusError),
-              signature
-            }, 'SplitWalletPayments');
-          }
-          
-          // Method 2: If signature status fails, check if transaction exists in history
-          if (!isConfirmed) {
-            try {
-              const transaction = await connection.getTransaction(signature, {
-                commitment: 'confirmed',
-                maxSupportedTransactionVersion: 0
-              });
-              
-              if (transaction && !transaction.meta?.err) {
-                isConfirmed = true;
-                confirmationStatus = 'confirmed';
-                logger.info('✅ Transaction confirmed via transaction history', {
-                  signature,
-                  participantId,
-                  splitWalletId
-                }, 'SplitWalletPayments');
-              }
-            } catch (historyError) {
-              logger.warn('⚠️ Transaction history check failed', {
-                error: historyError instanceof Error ? historyError.message : String(historyError),
-                signature
-              }, 'SplitWalletPayments');
-            }
-          }
-          
-          // Method 3: If both methods fail, check balance change as final verification
-          if (!isConfirmed) {
-            logger.warn('⚠️ Standard confirmation methods failed, checking balance change', {
-              signature,
-              participantId,
-              splitWalletId
-            }, 'SplitWalletPayments');
-            
-            // Check if the split wallet balance increased (indicating successful transaction)
-            const { BalanceUtils } = await import('../shared/balanceUtils');
-            const splitWalletPublicKey = new PublicKey(wallet.walletAddress);
-            const usdcMint = new PublicKey(getConfig().blockchain.usdcMintAddress);
-            
-            const balanceResult = await BalanceUtils.getUsdcBalance(splitWalletPublicKey, usdcMint);
-            
-            // Calculate expected balance: current on-chain balance should equal the sum of all participant payments
-            const currentOnChainBalance = balanceResult.balance;
-            
-            // Use pre-transaction balance to verify the exact increase
-            const expectedBalanceAfterPayment = preTransactionBalance + roundedAmount;
-            
-            logger.info('🔍 Balance verification details', {
-              signature,
-              participantId,
-              splitWalletId,
-              preTransactionBalance,
-              currentOnChainBalance,
-              newPayment: roundedAmount,
-              expectedBalanceAfterPayment,
-              actualIncrease: currentOnChainBalance - preTransactionBalance,
-              expectedIncrease: roundedAmount,
-              difference: Math.abs(currentOnChainBalance - expectedBalanceAfterPayment),
-              accountExists: balanceResult.accountExists
-            }, 'SplitWalletPayments');
-            
-            // Special case: If this was a new token account creation
-            // The transaction logs show "Adding create token account instruction" which means
-            // the transaction included token account creation
-            if (preTransactionBalance === 0 && currentOnChainBalance === 0) {
-              logger.warn('⚠️ New token account scenario detected - transaction included token account creation', {
-                signature,
-                participantId,
-                splitWalletId,
-                note: 'Transaction included token account creation, this is normal for first payment to new split wallet'
-              }, 'SplitWalletPayments');
-              
-              // For new token accounts, we'll be more lenient and consider the transaction successful
-              // if it was sent successfully and included token account creation
-              // The transaction was sent successfully and included the necessary instructions
-              isConfirmed = true;
-              confirmationStatus = 'new_token_account_creation';
-              logger.info('✅ Transaction confirmed via new token account creation detection', {
-                signature,
-                participantId,
-                splitWalletId,
-                note: 'New token account was created as part of transaction, marking as successful'
-              }, 'SplitWalletPayments');
-            }
-            // Only confirm if the on-chain balance increased by exactly the expected amount
-            else if (Math.abs(currentOnChainBalance - expectedBalanceAfterPayment) < 0.001) {
-              isConfirmed = true;
-              confirmationStatus = 'balance_verified';
-              logger.info('✅ Transaction confirmed via balance verification', {
-                signature,
-                participantId,
-                splitWalletId,
-                preTransactionBalance,
-                currentOnChainBalance,
-                expectedBalanceAfterPayment,
-                actualIncrease: currentOnChainBalance - preTransactionBalance,
-                expectedIncrease: roundedAmount
-              }, 'SplitWalletPayments');
-            } else {
-              logger.warn('⚠️ Balance verification failed - on-chain balance did not increase by expected amount', {
-                signature,
-                participantId,
-                splitWalletId,
-                preTransactionBalance,
-                currentOnChainBalance,
-                expectedBalanceAfterPayment,
-                actualIncrease: currentOnChainBalance - preTransactionBalance,
-                expectedIncrease: roundedAmount,
-                difference: Math.abs(currentOnChainBalance - expectedBalanceAfterPayment),
-                accountExists: balanceResult.accountExists
-              }, 'SplitWalletPayments');
-            }
-          }
-          
-          // If still not confirmed, this is a real failure - don't proceed with database update
-          if (!isConfirmed) {
-            logger.error('❌ Transaction could not be confirmed via any method - this indicates a real failure', {
-              signature,
-              participantId,
-              splitWalletId
-            }, 'SplitWalletPayments');
-            
-            return {
-              success: false,
-              error: `Transaction could not be confirmed on the blockchain. The transaction may have failed or is still pending. Please check the transaction on Solana Explorer: ${signature}`,
-            };
-          }
-          
-        } catch (error) {
-          logger.error('❌ Error verifying transaction confirmation', {
-            error: error instanceof Error ? error.message : String(error),
-            signature: transactionResult.signature,
-            participantId,
-            splitWalletId
-          }, 'SplitWalletPayments');
-          
-          // Proceed with database update since transaction was sent successfully
-          logger.warn('⚠️ Proceeding with database update despite verification error', null, 'SplitWalletPayments');
-        }
       }
 
       // Now update the database with the successful payment
@@ -2220,8 +2461,9 @@ export class SplitWalletPayments {
    */
   private static async getSplitWallet(splitWalletId: string): Promise<SplitWalletResult> {
     try {
-      const { getDoc, doc, getDocs, query, where, collection } = await import('firebase/firestore');
-      const { db } = await import('../../config/firebase');
+      const { memoryManager } = await import('../shared/memoryManager');
+      const { getDoc, doc, getDocs, query, where, collection } = await memoryManager.loadModule('firebase-firestore');
+      const { db } = await memoryManager.loadModule('firebase-config');
       
       logger.debug('Attempting to retrieve split wallet', {
         splitWalletId,
@@ -2564,8 +2806,9 @@ export class SplitWalletPayments {
   }
 
   private static async updateWalletParticipants(docId: string, participants: SplitWalletParticipant[]): Promise<void> {
-    const { doc, updateDoc } = await import('firebase/firestore');
-    const { db } = await import('../../config/firebase');
+    const { memoryManager } = await import('../shared/memoryManager');
+    const { doc, updateDoc } = await memoryManager.loadModule('firebase-firestore');
+    const { db } = await memoryManager.loadModule('firebase-config');
     
     // Clean participants data to remove undefined values
     const cleanedParticipants = participants.map(p => ({

@@ -185,6 +185,11 @@ export class SplitWalletService {
     return SplitWalletPayments.processDegenFundLocking(splitWalletId, participantId, amount, transactionSignature);
   }
 
+  static async verifySplitWalletBalance(splitWalletId: string) {
+    await loadModules();
+    return SplitWalletPayments.verifySplitWalletBalance(splitWalletId);
+  }
+
   // Security methods
   static async storeSplitWalletPrivateKey(splitWalletId: string, creatorId: string, privateKey: string) {
     await loadModules();

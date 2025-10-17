@@ -78,15 +78,23 @@ export class SplitRealtimeService {
         splitRef,
         (snapshot: DocumentSnapshot<DocumentData>) => {
           try {
-            console.log('🔍 SplitRealtimeService: Snapshot received for split:', splitId, 'exists:', snapshot.exists());
+            // Reduce logging to prevent excessive console output
+            if (__DEV__) {
+              console.log('🔍 SplitRealtimeService: Snapshot received for split:', splitId, 'exists:', snapshot.exists());
+            }
+            
             if (snapshot.exists()) {
               const splitData = snapshot.data() as Split;
-              console.log('🔍 SplitRealtimeService: Split data:', {
-                id: splitId,
-                title: splitData.title,
-                participantsCount: splitData.participants?.length || 0,
-                status: splitData.status
-              });
+              
+              // Only log significant changes to reduce noise
+              if (__DEV__) {
+                console.log('🔍 SplitRealtimeService: Split data:', {
+                  id: splitId,
+                  title: splitData.title,
+                  participantsCount: splitData.participants?.length || 0,
+                  status: splitData.status
+                });
+              }
               
               // Ensure the split has an ID
               const split: Split = {
@@ -104,7 +112,11 @@ export class SplitRealtimeService {
                 lastUpdated: new Date().toISOString()
               };
 
-              console.log('🔍 SplitRealtimeService: Calling onSplitUpdate callback');
+              // Only log significant updates to reduce noise
+              if (__DEV__) {
+                console.log('🔍 SplitRealtimeService: Calling onSplitUpdate callback');
+              }
+              
               logger.debug('Split real-time update received', {
                 splitId,
                 participantsCount: participants.length,

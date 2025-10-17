@@ -4,25 +4,45 @@
  * Used by both consolidatedTransactionService and internalTransferService
  */
 
-import { 
-  Connection, 
-  Transaction, 
-  Keypair,
-  PublicKey
-} from '@solana/web3.js';
-import { getConfig } from '../../config/unified';
-import { TRANSACTION_CONFIG } from '../../config/transactionConfig';
-import { logger } from '../loggingService';
+// Lazy imports to reduce memory usage and avoid circular dependencies
+let Connection: any;
+let Transaction: any;
+let Keypair: any;
+let PublicKey: any;
+let getConfig: any;
+let TRANSACTION_CONFIG: any;
+let logger: any;
+
+// Lazy loading function to import modules only when needed
+async function loadDependencies() {
+  if (!Connection) {
+    const solanaWeb3 = await import('@solana/web3.js');
+    Connection = solanaWeb3.Connection;
+    Transaction = solanaWeb3.Transaction;
+    Keypair = solanaWeb3.Keypair;
+    PublicKey = solanaWeb3.PublicKey;
+    
+    const configModule = await import('../../config/unified');
+    getConfig = configModule.getConfig;
+    
+    const transactionConfigModule = await import('../../config/transactionConfig');
+    TRANSACTION_CONFIG = transactionConfigModule.TRANSACTION_CONFIG;
+    
+    const loggerModule = await import('../loggingService');
+    logger = loggerModule.logger;
+  }
+}
 
 export class TransactionUtils {
   private static instance: TransactionUtils;
-  private connection: Connection;
+  private connection: any;
   private rpcEndpoints: string[];
   private currentEndpointIndex: number = 0;
+  private dependenciesLoaded: boolean = false;
 
   private constructor() {
-    this.rpcEndpoints = getConfig().blockchain.rpcEndpoints || [getConfig().blockchain.rpcUrl];
-    this.connection = this.createOptimizedConnection();
+    // Initialize with empty arrays, will be populated when dependencies are loaded
+    this.rpcEndpoints = [];
   }
 
   public static getInstance(): TransactionUtils {
@@ -30,6 +50,15 @@ export class TransactionUtils {
       TransactionUtils.instance = new TransactionUtils();
     }
     return TransactionUtils.instance;
+  }
+
+  private async ensureDependenciesLoaded(): Promise<void> {
+    if (!this.dependenciesLoaded) {
+      await loadDependencies();
+      this.rpcEndpoints = getConfig().blockchain.rpcEndpoints || [getConfig().blockchain.rpcUrl];
+      this.connection = this.createOptimizedConnection();
+      this.dependenciesLoaded = true;
+    }
   }
 
   private createOptimizedConnection(): Connection {
@@ -45,10 +74,19 @@ export class TransactionUtils {
         'User-Agent': 'WeSplit/1.0',
         'Connection': 'keep-alive',
       },
-      // Connection pooling with React Native compatible timeout
+      // Enhanced connection pooling with better timeout handling
       fetch: (url, options) => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TRANSACTION_CONFIG.timeout.connection);
+        // Use a more generous timeout for blockhash requests (30 seconds)
+        const timeoutDuration = url.toString().includes('getLatestBlockhash') ? 30000 : TRANSACTION_CONFIG.timeout.connection;
+        const timeoutId = setTimeout(() => {
+          logger.warn('Request timeout, aborting', { 
+            url: url.toString(), 
+            timeout: timeoutDuration,
+            endpoint: currentEndpoint 
+          }, 'TransactionUtils');
+          controller.abort();
+        }, timeoutDuration);
         
         return fetch(url, {
           ...options,
@@ -60,7 +98,8 @@ export class TransactionUtils {
     });
   }
 
-  public getConnection(): Connection {
+  public async getConnection(): Promise<any> {
+    await this.ensureDependenciesLoaded();
     return this.connection;
   }
 
@@ -74,37 +113,87 @@ export class TransactionUtils {
    * Get latest blockhash with retry logic and RPC failover
    */
   public async getLatestBlockhashWithRetry(commitment: 'confirmed' | 'finalized' = 'confirmed'): Promise<string> {
-    const maxRetries = 3;
+    await this.ensureDependenciesLoaded();
+    const maxRetries = 5; // Increased from 3 to 5 for better reliability
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
+        logger.info(`Getting blockhash attempt ${attempt + 1}/${maxRetries}`, { 
+          endpoint: this.rpcEndpoints[this.currentEndpointIndex],
+          commitment 
+        }, 'TransactionUtils');
+        
         const { blockhash } = await this.connection.getLatestBlockhash(commitment);
+        
+        logger.info('Successfully retrieved blockhash', { 
+          blockhash: blockhash.slice(0, 8) + '...',
+          attempt: attempt + 1,
+          endpoint: this.rpcEndpoints[this.currentEndpointIndex]
+        }, 'TransactionUtils');
+        
         return blockhash;
       } catch (error) {
         lastError = error as Error;
-        logger.warn(`Failed to get blockhash on attempt ${attempt + 1}/${maxRetries}`, { error: lastError.message }, 'TransactionUtils');
+        const errorMessage = lastError.message;
+        
+        logger.warn(`Failed to get blockhash on attempt ${attempt + 1}/${maxRetries}`, { 
+          error: errorMessage,
+          endpoint: this.rpcEndpoints[this.currentEndpointIndex],
+          attempt: attempt + 1
+        }, 'TransactionUtils');
         
         // Check if it's a network error that might benefit from RPC failover
-        if (error instanceof Error && (
-          error.message.includes('fetch') || 
-          error.message.includes('network') || 
-          error.message.includes('timeout') ||
-          error.message.includes('ECONNREFUSED') ||
-          error.message.includes('ENOTFOUND') ||
-          error.message.includes('AbortSignal') ||
-          error.message.includes('aborted')
-        )) {
-          logger.info('Switching RPC endpoint due to network error', {}, 'TransactionUtils');
+        const isNetworkError = error instanceof Error && (
+          errorMessage.includes('fetch') || 
+          errorMessage.includes('network') || 
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('ECONNREFUSED') ||
+          errorMessage.includes('ENOTFOUND') ||
+          errorMessage.includes('AbortSignal') ||
+          errorMessage.includes('aborted') ||
+          errorMessage.includes('AbortError') ||
+          errorMessage.includes('Failed to fetch')
+        );
+        
+        if (isNetworkError) {
+          logger.info('Switching RPC endpoint due to network error', { 
+            currentEndpoint: this.rpcEndpoints[this.currentEndpointIndex],
+            error: errorMessage
+          }, 'TransactionUtils');
           await this.switchToNextEndpoint();
         }
 
-        // Wait before retry (exponential backoff)
+        // Wait before retry (exponential backoff with jitter)
         if (attempt < maxRetries - 1) {
-          const delay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
-          logger.info(`Waiting ${delay}ms before retry`, {}, 'TransactionUtils');
+          const baseDelay = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s, 8s
+          const jitter = Math.random() * 1000; // Add up to 1s of jitter
+          const delay = baseDelay + jitter;
+          
+          logger.info(`Waiting ${Math.round(delay)}ms before retry`, { 
+            baseDelay,
+            jitter: Math.round(jitter),
+            attempt: attempt + 1
+          }, 'TransactionUtils');
+          
           await new Promise(resolve => setTimeout(resolve, delay));
         }
+      }
+    }
+
+    // If all attempts failed, try one more time with a different commitment level
+    if (commitment === 'confirmed') {
+      logger.warn('All confirmed blockhash attempts failed, trying with finalized commitment', {}, 'TransactionUtils');
+      try {
+        const { blockhash } = await this.connection.getLatestBlockhash('finalized');
+        logger.info('Successfully retrieved blockhash with finalized commitment', { 
+          blockhash: blockhash.slice(0, 8) + '...'
+        }, 'TransactionUtils');
+        return blockhash;
+      } catch (finalError) {
+        logger.error('Final blockhash attempt with finalized commitment also failed', { 
+          error: finalError instanceof Error ? finalError.message : String(finalError)
+        }, 'TransactionUtils');
       }
     }
 
@@ -115,10 +204,11 @@ export class TransactionUtils {
    * Send transaction with retry logic and RPC failover
    */
   public async sendTransactionWithRetry(
-    transaction: Transaction, 
-    signers: Keypair[], 
+    transaction: any, 
+    signers: any[], 
     priority: 'low' | 'medium' | 'high' = 'medium'
   ): Promise<string> {
+    await this.ensureDependenciesLoaded();
     const maxRetries = TRANSACTION_CONFIG.retry.maxRetries;
     let lastError: Error | null = null;
 
@@ -172,10 +262,12 @@ export class TransactionUtils {
   /**
    * Confirm transaction with timeout and retry logic
    */
-  public async confirmTransactionWithTimeout(signature: string): Promise<boolean> {
-    const timeout = TRANSACTION_CONFIG.timeout.confirmation;
+  public async confirmTransactionWithTimeout(signature: string, customTimeout?: number): Promise<boolean> {
+    await this.ensureDependenciesLoaded();
+    const timeout = customTimeout || TRANSACTION_CONFIG.timeout.confirmation;
     
     try {
+      // Try multiple confirmation methods for better reliability
       const confirmationPromise = this.connection.confirmTransaction(signature, 'confirmed');
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error(`Transaction was not confirmed in ${timeout/1000} seconds. It is unknown if it succeeded or failed. Check signature ${signature} using the Solana Explorer or CLI tools.`)), timeout);
@@ -187,8 +279,39 @@ export class TransactionUtils {
         throw new Error(`Transaction failed: ${result.value.err.toString()}`);
       }
 
+      // Additional verification using signature status
+      try {
+        const signatureStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+        if (signatureStatus.value && !signatureStatus.value.err) {
+          logger.info('Transaction confirmed via signature status', { 
+            signature, 
+            confirmationStatus: signatureStatus.value.confirmationStatus 
+          }, 'TransactionUtils');
+          return true;
+        }
+      } catch (statusError) {
+        logger.warn('Signature status check failed, but transaction may still be confirmed', { 
+          signature, 
+          error: statusError instanceof Error ? statusError.message : String(statusError)
+        }, 'TransactionUtils');
+      }
+
       return true;
     } catch (error) {
+      // Try alternative confirmation method before giving up
+      try {
+        const signatureStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+        if (signatureStatus.value && !signatureStatus.value.err) {
+          logger.info('Transaction confirmed via alternative signature status check', { 
+            signature, 
+            confirmationStatus: signatureStatus.value.confirmationStatus 
+          }, 'TransactionUtils');
+          return true;
+        }
+      } catch (statusError) {
+        // Ignore status check errors, we'll return false below
+      }
+
       logger.warn('Transaction confirmation failed or timed out', { 
         signature, 
         error: error instanceof Error ? error.message : String(error)

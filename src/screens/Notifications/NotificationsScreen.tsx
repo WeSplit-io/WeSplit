@@ -1149,16 +1149,45 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           // Handle split lock required notification
           const splitWalletId = notification.data?.splitWalletId;
           const billName = notification.data?.billName;
+          const splitId = notification.data?.splitId;
           
-          if (splitWalletId) {
-            // Navigate to degen lock screen
-            navigation.navigate('DegenLock', {
-              splitWalletId,
-              billName,
-              isFromNotification: true,
-              notificationId: notificationId,
-            });
-            showToast('Opening degen split...');
+          if (splitWalletId || splitId) {
+            try {
+              // Load full split data from database to ensure we have all required data
+              const { SplitStorageService } = await import('../../services/splitStorageService');
+              const splitResult = await SplitStorageService.getSplit(splitId);
+              
+              if (splitResult.success && splitResult.split) {
+                const split = splitResult.split;
+                
+                // Navigate to degen lock screen with full data
+                navigation.navigate('DegenLock', {
+                  splitData: split,
+                  isFromNotification: true,
+                  notificationId: notificationId,
+                });
+                showToast('Opening degen split...');
+              } else {
+                // Fallback navigation with available data
+                navigation.navigate('DegenLock', {
+                  splitWalletId,
+                  billName,
+                  isFromNotification: true,
+                  notificationId: notificationId,
+                });
+                showToast('Opening degen split...');
+              }
+            } catch (error) {
+              console.error('Error loading split data for lock required notification:', error);
+              // Fallback navigation
+              navigation.navigate('DegenLock', {
+                splitWalletId,
+                billName,
+                isFromNotification: true,
+                notificationId: notificationId,
+              });
+              showToast('Opening degen split...');
+            }
           }
           
           // Mark as read and delete
@@ -1192,16 +1221,45 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           // Handle split spin available notification
           const splitWalletId = notification.data?.splitWalletId;
           const billName = notification.data?.billName;
+          const splitId = notification.data?.splitId;
           
-          if (splitWalletId) {
-            // Navigate to SplitDetails first, which will handle the correct navigation
-            navigation.navigate('SplitDetails', {
-              splitWalletId,
-              billName,
-              isFromNotification: true,
-              notificationId: notificationId,
-            });
-            showToast('Opening split details...');
+          if (splitWalletId || splitId) {
+            try {
+              // Load full split data from database to ensure we have all required data
+              const { SplitStorageService } = await import('../../services/splitStorageService');
+              const splitResult = await SplitStorageService.getSplit(splitId);
+              
+              if (splitResult.success && splitResult.split) {
+                const split = splitResult.split;
+                
+                // Navigate to DegenSpin screen with full data
+                navigation.navigate('DegenSpin', {
+                  splitData: split,
+                  isFromNotification: true,
+                  notificationId: notificationId,
+                });
+                showToast('Opening degen spin...');
+              } else {
+                // Fallback navigation with available data
+                navigation.navigate('SplitDetails', {
+                  splitWalletId,
+                  billName,
+                  isFromNotification: true,
+                  notificationId: notificationId,
+                });
+                showToast('Opening split details...');
+              }
+            } catch (error) {
+              console.error('Error loading split data for spin available notification:', error);
+              // Fallback navigation
+              navigation.navigate('SplitDetails', {
+                splitWalletId,
+                billName,
+                isFromNotification: true,
+                notificationId: notificationId,
+              });
+              showToast('Opening split details...');
+            }
           }
           
           // Mark as read and delete

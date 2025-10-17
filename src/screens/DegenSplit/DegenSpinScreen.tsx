@@ -51,7 +51,16 @@ interface Participant {
 }
 
 const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) => {
-  const { billData, participants, totalAmount, splitWallet, processedBillData, splitData } = route.params;
+  const { 
+    billData, 
+    participants, 
+    totalAmount, 
+    splitWallet, 
+    processedBillData, 
+    splitData,
+    isFromNotification,
+    notificationId
+  } = route.params;
 
   // Initialize our custom hooks
   const degenState = useDegenSplitState(splitWallet);
@@ -142,8 +151,13 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
   // Effects
   useEffect(() => {
     const sendSpinNotifications = async () => {
+      // Only send notifications if not coming from a notification
+      if (isFromNotification) {
+        return;
+      }
+
       const participantIds = participants.map((p: any) => p.userId || p.id).filter((id: any) => id);
-      const billName = splitData?.title || billData?.title || 'Degen Split';
+      const billName = splitData?.title || billData?.title || processedBillData?.title || 'Degen Split';
 
       if (participantIds.length === 0) {
         return;
@@ -154,7 +168,11 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
         'split_spin_available',
         {
           splitWalletId: splitWallet.id,
+          splitId: splitData?.id,
           billName,
+          amount: totalAmount,
+          currency: 'USDC',
+          timestamp: new Date().toISOString()
         }
       );
 
@@ -162,7 +180,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
     };
 
     sendSpinNotifications();
-  }, [participants, splitData?.title, billData?.title, splitWallet.id]);
+  }, [participants, splitData?.title, billData?.title, processedBillData?.title, splitWallet.id, isFromNotification, totalAmount]);
 
   // Data processing
   const MIN_CARDS_FOR_CAROUSEL = 20; // Increased for better infinite effect
@@ -248,8 +266,23 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
                 style={styles.billSummaryIconImage}
               />
             </View>
-            <Text style={styles.billSummaryTitle}>Restaurant Night</Text>
-            <Text style={styles.billSummaryDate}>10 Mar 2025</Text>
+            <Text style={styles.billSummaryTitle}>
+              {splitData?.title || billData?.title || processedBillData?.title || 'Degen Split'}
+            </Text>
+            <Text style={styles.billSummaryDate}>
+              {splitData?.createdAt ? 
+                new Date(splitData.createdAt).toLocaleDateString('en-GB', { 
+                  day: '2-digit', 
+                  month: 'short', 
+                  year: 'numeric' 
+                }) : 
+                new Date().toLocaleDateString('en-GB', { 
+                  day: '2-digit', 
+                  month: 'short', 
+                  year: 'numeric' 
+                })
+              }
+            </Text>
           </View>
           <View style={styles.billTotalRow}>
             <Text style={styles.billTotalLabel}>Total Bill</Text>

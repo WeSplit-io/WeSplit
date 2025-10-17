@@ -201,6 +201,9 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   // Check if the current user has already claimed/paid their funds
   const currentUserParticipant = currentSplitWallet?.participants.find((p: any) => p.userId === currentUser?.id.toString());
   const hasAlreadyClaimed = currentUserParticipant?.status === 'paid';
+  const hasValidTransaction = currentUserParticipant?.transactionSignature && 
+    !currentUserParticipant.transactionSignature.includes('timeout') &&
+    !currentUserParticipant.transactionSignature.includes('failed');
   
   // Debug logging
   React.useEffect(() => {
@@ -566,10 +569,27 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
               
               {hasAlreadyClaimed ? (
                 <View style={styles.claimedStatusContainer}>
-                  <Text style={styles.claimedStatusText}>✅ Funds Claimed Successfully</Text>
-                  <Text style={styles.claimedStatusSubtext}>
-                    Transaction: {currentUserParticipant?.transactionSignature?.slice(0, 8)}...
-                  </Text>
+                  {hasValidTransaction ? (
+                    <>
+                      <Text style={styles.claimedStatusText}>✅ Funds Claimed Successfully</Text>
+                      <Text style={styles.claimedStatusSubtext}>
+                        Transaction: {currentUserParticipant?.transactionSignature?.slice(0, 8)}...
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.claimedStatusText}>⚠️ Claim Failed or Timed Out</Text>
+                      <Text style={styles.claimedStatusSubtext}>
+                        Your previous claim attempt failed. You can try again.
+                      </Text>
+                      <AppleSlider
+                        onSlideComplete={handleClaimFunds}
+                        disabled={degenState.isProcessing}
+                        loading={degenState.isProcessing}
+                        text="Retry Claim"
+                      />
+                    </>
+                  )}
                 </View>
               ) : (
                 <AppleSlider

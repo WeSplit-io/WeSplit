@@ -383,6 +383,16 @@ class NotificationServiceClass {
         return `You have a group payment request for ${data?.amount || 'funds'}`;
       case 'system_notification':
         return data?.message || 'System notification';
+      case 'degen_all_locked':
+        return `All participants have locked their funds for "${data?.billName || 'Degen Split'}". Ready to spin!`;
+      case 'degen_ready_to_roll':
+        return `The degen split "${data?.billName || 'Split'}" is ready to roll!`;
+      case 'roulette_result':
+        return `The roulette for "${data?.billName || 'Split'}" has been spun!`;
+      case 'split_lock_required':
+        return `You need to lock your funds for "${data?.billName || 'Degen Split'}" to participate.`;
+      case 'contact_added':
+        return `${data?.addedByName || 'Someone'} added you as a contact.`;
       default:
         return 'You have a new notification';
     }
