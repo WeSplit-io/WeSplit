@@ -114,7 +114,7 @@
         "USE_FRAMEWORKS": "dynamic"
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       },
       "ios": {
         "buildConfiguration": "Release",

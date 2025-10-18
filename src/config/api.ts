@@ -73,12 +73,24 @@ const POSSIBLE_BACKEND_URLS =
 
 let API_BASE_URL = POSSIBLE_BACKEND_URLS[0]; // Start with Android emulator URL
 
+// Create iOS-compatible timeout signal
+function createTimeoutSignal(timeoutMs: number): AbortSignal | undefined {
+  if (AbortSignal.timeout) {
+    return AbortSignal.timeout(timeoutMs);
+  }
+  
+  // Fallback for iOS devices without AbortSignal.timeout
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), timeoutMs);
+  return controller.signal;
+}
+
 // Helper function to test backend connectivity
 async function testBackendConnection(url: string): Promise<boolean> {
   try {
     const response = await fetch(`${url}/api/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined,
+      signal: createTimeoutSignal(3000),
     });
     return response.ok;
   } catch (error) {
@@ -140,7 +152,7 @@ export async function apiRequest<T>(
               ...options.headers,
             },
             ...options,
-            signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined, // 10 second timeout
+            signal: createTimeoutSignal(10000), // 10 second timeout - iOS compatible
           });
 
         // Handle rate limiting specifically

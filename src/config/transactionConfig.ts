@@ -1,7 +1,9 @@
 /**
  * Transaction Configuration
- * Centralized transaction settings for Solana operations
+ * Centralized transaction settings for Solana operations with iOS-specific optimizations
  */
+
+import { getNetworkConfig } from './networkConfig';
 
 export interface TransactionConfig {
   retry: {
@@ -25,10 +27,13 @@ export interface TransactionConfig {
   };
 }
 
+// Get platform-specific network configuration
+const networkConfig = getNetworkConfig();
+
 export const TRANSACTION_CONFIG: TransactionConfig = {
   retry: {
-    maxRetries: 2, // Reduced from 3 to 2 for faster failure detection
-    retryDelay: 500 // Reduced from 1000ms to 500ms for faster retries
+    maxRetries: networkConfig.retries.maxRetries, // Platform-specific retry count
+    retryDelay: networkConfig.retries.retryDelay // Platform-specific retry delay
   },
   priorityFees: {
     low: 1000,
@@ -41,8 +46,8 @@ export const TRANSACTION_CONFIG: TransactionConfig = {
     multiSigTransfer: 500000,
   },
   timeout: {
-    connection: 30000, // Increased to 30s for better reliability
-    transaction: 60000, // Increased to 60s for better reliability
-    confirmation: 120000 // Increased to 120s for better reliability
+    connection: networkConfig.timeout.connection, // Platform-specific connection timeout
+    transaction: 60000, // Keep transaction timeout consistent
+    confirmation: 120000 // Keep confirmation timeout consistent
   }
 };

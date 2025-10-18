@@ -113,6 +113,17 @@ class NotificationServiceClass {
   }
 
   /**
+   * Create timeout wrapper for notification operations
+   */
+  private createTimeoutWrapper<T>(promise: Promise<T>, timeoutMs: number, operationName: string): Promise<T> {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`${operationName} timeout after ${timeoutMs/1000} seconds`)), timeoutMs);
+    });
+    
+    return Promise.race([promise, timeoutPromise]);
+  }
+
+  /**
    * Send a notification to a user (non-blocking)
    */
   async sendNotification(
@@ -191,20 +202,22 @@ class NotificationServiceClass {
   }
 
   /**
-   * Send bulk notifications to multiple users (non-blocking)
+   * Send bulk notifications to multiple users with timeout
    */
   async sendBulkNotifications(
     userIds: string[],
     type: NotificationType,
-    data?: { [key: string]: any }
+    data?: { [key: string]: any },
+    timeoutMs: number = 12000
   ): Promise<void> {
-    // Run bulk notifications in background to avoid blocking
-    this.sendBulkNotificationsAsync(userIds, type, data).catch(error => {
-      logger.error('Background bulk notifications failed:', error, 'NotificationService');
-    });
-    
-    // Return immediately to avoid blocking the caller
-    logger.info('Bulk notifications queued', { userIds: userIds.length, type }, 'NotificationService');
+    try {
+      const bulkNotificationPromise = this.sendBulkNotificationsAsync(userIds, type, data);
+      await this.createTimeoutWrapper(bulkNotificationPromise, timeoutMs, 'Send bulk notifications');
+      logger.info('Bulk notifications sent successfully', { userIds: userIds.length, type }, 'NotificationService');
+    } catch (error) {
+      logger.error('Failed to send bulk notifications:', error, 'NotificationService');
+      // Don't throw - allow the operation to continue
+    }
   }
 
   /**
@@ -399,20 +412,29 @@ class NotificationServiceClass {
   }
 
   /**
-   * Send winner notification (for DegenSplit)
+   * Send winner notification (for DegenSplit) with timeout
    */
   async sendWinnerNotification(
     winnerId: string,
     splitWalletId: string,
-    billName: string
+    billName: string,
+    timeoutMs: number = 10000
   ): Promise<boolean> {
-    return this.sendNotification(
-      winnerId,
-      'You Won!',
-      `Congratulations! You won the split "${billName}"!`,
-      'split_winner',
-      { splitWalletId, billName }
-    );
+    try {
+      const notificationPromise = this.sendNotificationAsync(
+        winnerId,
+        '🎉 You Won!',
+        `Congratulations! You won the degen split for "${billName}"!`,
+        'split_winner',
+        { splitWalletId, billName }
+      );
+      
+      await this.createTimeoutWrapper(notificationPromise, timeoutMs, 'Send winner notification');
+      return true;
+    } catch (error) {
+      logger.error('Failed to send winner notification:', error, 'NotificationService');
+      return false;
+    }
   }
 
   /**
