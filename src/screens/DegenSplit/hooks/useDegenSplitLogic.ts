@@ -570,13 +570,13 @@ export const useDegenSplitLogic = (
   };
 
   // Roulette operations
-  const handleStartSpinning = useCallback(async (
+  const handleStartSpinning = useCallback((
     participants: any[],
     splitWallet: SplitWallet,
     splitData: any,
     billData: any,
     totalAmount: number
-  ): Promise<void> => {
+  ): void => {
     if (state.isSpinning || state.hasSpun) return;
 
     setState({ isSpinning: true });
@@ -592,8 +592,8 @@ export const useDegenSplitLogic = (
       state.cardScaleRef.current.setValue(1);
     }
 
-    // Animate the spin sequence
-    const { Animated } = await import('react-native');
+    // Animate the spin sequence - NON-BLOCKING
+    const { Animated } = require('react-native');
     Animated.sequence([
       // Scale down during spin
       Animated.timing(state.cardScaleRef.current, {
@@ -613,79 +613,87 @@ export const useDegenSplitLogic = (
         duration: 200,
         useNativeDriver: true,
       }),
-    ]).start(async () => {
+    ]).start(() => {
+      // IMMEDIATELY update UI state - no blocking operations
       setState({ 
         selectedIndex: finalIndex,
         isSpinning: false,
         hasSpun: true
       });
 
-      // Execute post-animation operations asynchronously (non-blocking)
-      setImmediate(async () => {
-        // Save the winner information to the split wallet with timeout
-        try {
-          const { SplitWalletService } = await import('../../../services/split');
-          const saveWinnerPromise = SplitWalletService.updateSplitWallet(splitWallet.id, {
-            degenWinner: {
-              userId: participants[finalIndex].userId || participants[finalIndex].id,
-              name: participants[finalIndex].name,
-              selectedAt: new Date().toISOString()
-            },
-            status: 'spinning_completed'
-          });
-          
-          await createTimeoutWrapper(saveWinnerPromise, 15000, 'Save winner to database');
-          console.log('✅ Winner information saved successfully');
-        } catch (error) {
-          console.error('❌ Failed to save winner information:', error);
-          // Don't block UI - log error and continue
-        }
-
-        // Send notifications to all participants about the roulette result with timeout
-        try {
-          const { notificationService } = await import('../../../services/notificationService');
-          const billName = splitData?.title || billData?.title || processedBillData?.title || 'Degen Split';
-          const winnerId = participants[finalIndex].userId || participants[finalIndex].id;
-          const winnerName = participants[finalIndex].name;
-
-          // Send winner notification with timeout
-          const winnerNotificationPromise = notificationService.sendWinnerNotification(
-            winnerId,
-            splitWallet.id,
-            billName
-          );
-          await createTimeoutWrapper(winnerNotificationPromise, 10000, 'Send winner notification');
-
-          // Send loser notifications to all other participants with timeout
-          const loserIds = participants
-            .filter(p => (p.userId || p.id) !== winnerId)
-            .map(p => p.userId || p.id)
-            .filter(id => id);
-
-          if (loserIds.length > 0) {
-            const loserNotificationPromise = notificationService.sendBulkNotifications(
-              loserIds,
-              'split_loser',
-              {
-                splitId: splitData?.id,
-                splitWalletId: splitWallet.id,
-                billName,
-                amount: totalAmount,
-                currency: 'USDC',
-                winnerId,
-                winnerName,
-                timestamp: new Date().toISOString()
-              }
-            );
-            await createTimeoutWrapper(loserNotificationPromise, 12000, 'Send loser notifications');
+      // Execute post-animation operations in background - COMPLETELY NON-BLOCKING
+      // Use setTimeout to ensure UI is not blocked
+      setTimeout(() => {
+        // Save the winner information to the split wallet - NON-BLOCKING
+        (async () => {
+          try {
+            const { SplitWalletService } = await import('../../../services/split');
+            const saveWinnerPromise = SplitWalletService.updateSplitWallet(splitWallet.id, {
+              degenWinner: {
+                userId: participants[finalIndex].userId || participants[finalIndex].id,
+                name: participants[finalIndex].name,
+                selectedAt: new Date().toISOString()
+              },
+              status: 'spinning_completed'
+            });
+            
+            // Use shorter timeout and don't await - fire and forget
+            createTimeoutWrapper(saveWinnerPromise, 5000, 'Save winner to database')
+              .then(() => console.log('✅ Winner information saved successfully'))
+              .catch(error => console.error('❌ Failed to save winner information:', error));
+          } catch (error) {
+            console.error('❌ Failed to save winner information:', error);
           }
-          
-          console.log('✅ Roulette result notifications sent successfully');
-        } catch (error) {
-          console.error('❌ Failed to send roulette result notifications:', error);
-          // Don't block UI - log error and continue
-        }
-      });
+        })();
+
+        // Send notifications - NON-BLOCKING
+        (async () => {
+          try {
+            const { notificationService } = await import('../../../services/notificationService');
+            const billName = splitData?.title || billData?.title || processedBillData?.title || 'Degen Split';
+            const winnerId = participants[finalIndex].userId || participants[finalIndex].id;
+            const winnerName = participants[finalIndex].name;
+
+            // Send winner notification - fire and forget
+            const winnerNotificationPromise = notificationService.sendWinnerNotification(
+              winnerId,
+              splitWallet.id,
+              billName
+            );
+            createTimeoutWrapper(winnerNotificationPromise, 5000, 'Send winner notification')
+              .then(() => console.log('✅ Winner notification sent'))
+              .catch(error => console.error('❌ Failed to send winner notification:', error));
+
+            // Send loser notifications - fire and forget
+            const loserIds = participants
+              .filter(p => (p.userId || p.id) !== winnerId)
+              .map(p => p.userId || p.id)
+              .filter(id => id);
+
+            if (loserIds.length > 0) {
+              const loserNotificationPromise = notificationService.sendBulkNotifications(
+                loserIds,
+                'split_loser',
+                {
+                  splitId: splitData?.id,
+                  splitWalletId: splitWallet.id,
+                  billName,
+                  amount: totalAmount,
+                  currency: 'USDC',
+                  winnerId,
+                  winnerName,
+                  timestamp: new Date().toISOString()
+                }
+              );
+              createTimeoutWrapper(loserNotificationPromise, 5000, 'Send loser notifications')
+                .then(() => console.log('✅ Loser notifications sent'))
+                .catch(error => console.error('❌ Failed to send loser notifications:', error));
+            }
+          } catch (error) {
+            console.error('❌ Failed to send roulette result notifications:', error);
+          }
+        })();
+      }, 100); // Small delay to ensure UI state is updated first
     });
   }, [state.isSpinning, state.hasSpun, state.spinAnimationRef, state.cardScaleRef, setState]);
 

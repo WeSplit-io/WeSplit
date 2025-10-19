@@ -74,18 +74,24 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
     });
   });
 
-  // Initialize real-time updates
+  // Initialize real-time updates - REDUCED INTERFERENCE DURING SPINNING
   const realtimeState = useDegenSplitRealtime(
     splitData?.id,
     degenState.splitWallet?.id,
     {
       onParticipantUpdate: (participants) => {
-        console.log('🔍 DegenSpinScreen: Real-time participant update:', participants);
-        // Update participants if needed
+        // Only update if not spinning to avoid interference
+        if (!degenState.isSpinning) {
+          console.log('🔍 DegenSpinScreen: Real-time participant update:', participants);
+          // Update participants if needed
+        }
       },
       onSplitWalletUpdate: (splitWallet) => {
-        console.log('🔍 DegenSpinScreen: Real-time wallet update:', splitWallet);
-        degenState.setSplitWallet(splitWallet);
+        // Only update if not spinning to avoid interference
+        if (!degenState.isSpinning) {
+          console.log('🔍 DegenSpinScreen: Real-time wallet update:', splitWallet);
+          degenState.setSplitWallet(splitWallet);
+        }
       },
       onError: (error) => {
         console.error('🔍 DegenSpinScreen: Real-time error:', error);
@@ -206,10 +212,11 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
   });
 
   // Event handlers
-  const handleStartSpinning = async () => {
+  const handleStartSpinning = () => {
     if (degenState.isSpinning || degenState.hasSpun) return;
 
-    await degenLogic.handleStartSpinning(
+    // Start spinning - NON-BLOCKING
+    degenLogic.handleStartSpinning(
       baseParticipantCards,
       splitWallet,
       splitData,
@@ -217,7 +224,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
       totalAmount
     );
 
-    // Navigate to result screen after delay
+    // Navigate to result screen after delay - NON-BLOCKING
     setTimeout(() => {
       navigation.navigate('DegenResult', {
         billData,

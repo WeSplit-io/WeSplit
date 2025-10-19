@@ -198,20 +198,78 @@ export class OptimizedTransactionUtils {
         // Sign the transaction
         transaction.sign(...signers);
 
+        // Log transaction details before sending
+        console.log(`📋 Transaction details:`, {
+          instructionCount: transaction.instructions.length,
+          recentBlockhash: transaction.recentBlockhash,
+          feePayer: transaction.feePayer?.toBase58(),
+          signersCount: signers.length,
+          signerAddresses: signers.map(s => s.publicKey.toBase58())
+        });
+
         if (!this.connection) {
           this.connection = await this.createConnection();
         }
 
-        // Send transaction
-        const signature = await this.connection.sendRawTransaction(transaction.serialize(), {
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-          maxRetries: 0,
-        });
+        // Log which RPC endpoint we're using
+        const currentEndpoint = this.rpcEndpoints[this.currentEndpointIndex];
+        console.log(`🌐 Using RPC endpoint: ${currentEndpoint}`);
 
+        // Send transaction
+        console.log(`🚀 Attempting to send transaction to blockchain...`);
+        const serializedTransaction = transaction.serialize();
+        console.log(`📦 Serialized transaction size: ${serializedTransaction.length} bytes`);
+        
+        let signature: string;
+        try {
+          signature = await this.connection.sendRawTransaction(serializedTransaction, {
+            skipPreflight: false,
+            preflightCommitment: 'confirmed',
+            maxRetries: 0,
+          });
+        } catch (sendError) {
+          console.log(`❌ sendRawTransaction failed:`, {
+            error: sendError instanceof Error ? sendError.message : String(sendError),
+            stack: sendError instanceof Error ? sendError.stack : undefined
+          });
+          throw sendError;
+        }
+
+        // CRITICAL: Verify the signature is valid
+        if (!signature || signature.length < 80) {
+          throw new Error(`Invalid signature returned from sendRawTransaction: ${signature}`);
+        }
+
+        console.log(`✅ Transaction sent successfully with signature: ${signature}`);
+        
+        // CRITICAL: Immediately verify the transaction exists on blockchain
+        try {
+          console.log(`🔍 Verifying transaction exists on blockchain using endpoint: ${currentEndpoint}...`);
+          const signatureStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+          
+          if (signatureStatus.value) {
+            console.log(`✅ Transaction found on blockchain:`, {
+              signature,
+              confirmationStatus: signatureStatus.value.confirmationStatus,
+              err: signatureStatus.value.err
+            });
+          } else {
+            console.log(`⚠️ Transaction signature returned but not found on blockchain: ${signature}`);
+            // Don't fail immediately, but log the warning
+          }
+        } catch (verifyError) {
+          console.log(`⚠️ Could not verify transaction on blockchain:`, verifyError instanceof Error ? verifyError.message : String(verifyError));
+        }
+        
         return signature;
       } catch (error) {
         lastError = error as Error;
+        
+        console.log(`❌ Transaction send attempt ${attempt + 1} failed:`, {
+          error: error instanceof Error ? error.message : String(error),
+          attempt: attempt + 1,
+          maxRetries
+        });
         
         // Check if it's a network error that might benefit from RPC failover
         const isNetworkError = error instanceof Error && (
@@ -226,12 +284,14 @@ export class OptimizedTransactionUtils {
         );
         
         if (isNetworkError) {
+          console.log(`🔄 Network error detected, switching to next RPC endpoint`);
           await this.switchToNextEndpoint();
         }
 
         // Wait before retry
         if (attempt < maxRetries - 1) {
           const delay = TRANSACTION_CONFIG.retry.retryDelay * Math.pow(2, attempt);
+          console.log(`⏳ Waiting ${delay}ms before retry attempt ${attempt + 2}`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
@@ -253,41 +313,76 @@ export class OptimizedTransactionUtils {
         this.connection = await this.createConnection();
       }
 
-      // Try multiple confirmation methods for better reliability
+      // Use a more aggressive confirmation strategy with shorter timeouts
+      const shortTimeout = Math.min(timeout, 30000); // Max 30 seconds for initial confirmation
+      
+      // Try confirmation with shorter timeout first
       const confirmationPromise = this.connection.confirmTransaction(signature, 'confirmed');
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error(`Transaction was not confirmed in ${timeout/1000} seconds`)), timeout);
+      const shortTimeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error(`Initial confirmation timeout after ${shortTimeout/1000} seconds`)), shortTimeout);
       });
 
-      const result = await Promise.race([confirmationPromise, timeoutPromise]);
-      
-      if (result.value?.err) {
-        throw new Error(`Transaction failed: ${result.value.err.toString()}`);
-      }
-
-      // Additional verification using signature status
       try {
-        const signatureStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
-        if (signatureStatus.value && !signatureStatus.value.err) {
-          return true;
+        const result = await Promise.race([confirmationPromise, shortTimeoutPromise]);
+        
+        if (result.value?.err) {
+          throw new Error(`Transaction failed: ${result.value.err.toString()}`);
         }
-      } catch (statusError) {
-        // Ignore status check errors
-      }
 
-      return true;
+        // Additional verification using signature status
+        try {
+          const signatureStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+          if (signatureStatus.value && !signatureStatus.value.err) {
+            return true;
+          }
+        } catch (statusError) {
+          // Ignore status check errors
+        }
+
+        return true;
+      } catch (shortTimeoutError) {
+        // If short timeout fails, try alternative confirmation method immediately
+        console.log(`Initial confirmation timed out, trying alternative method for signature: ${signature}`);
+        
+        // Try alternative confirmation method with remaining time
+        const remainingTime = timeout - shortTimeout;
+        if (remainingTime > 5000) { // Only if we have at least 5 seconds left
+          const alternativePromise = this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+          const alternativeTimeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error(`Alternative confirmation timeout after ${remainingTime/1000} seconds`)), remainingTime);
+          });
+
+          try {
+            const signatureStatus = await Promise.race([alternativePromise, alternativeTimeoutPromise]);
+            if (signatureStatus.value && !signatureStatus.value.err) {
+              return true;
+            }
+          } catch (altError) {
+            console.log(`Alternative confirmation also failed: ${altError instanceof Error ? altError.message : String(altError)}`);
+          }
+        }
+        
+        throw shortTimeoutError;
+      }
     } catch (error) {
-      // Try alternative confirmation method before giving up
+      // Final fallback: try one more time with getSignatureStatus
       try {
         if (!this.connection) {
           this.connection = await this.createConnection();
         }
-        const signatureStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+        
+        // Quick final check with a short timeout
+        const finalCheckPromise = this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+        const finalTimeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Final confirmation check timeout')), 5000);
+        });
+
+        const signatureStatus = await Promise.race([finalCheckPromise, finalTimeoutPromise]);
         if (signatureStatus.value && !signatureStatus.value.err) {
           return true;
         }
-      } catch (statusError) {
-        // Ignore status check errors
+      } catch (finalError) {
+        console.log(`Final confirmation check failed: ${finalError instanceof Error ? finalError.message : String(finalError)}`);
       }
 
       return false;
