@@ -26,6 +26,7 @@ import { consolidatedBillAnalysisService, ManualBillInput } from '../../services
 import { ManualSplitCreationService } from '../../services/manualSplitCreationService';
 import { BillAnalysisData } from '../../types/billAnalysis';
 import { convertFiatToUSDC } from '../../services/fiatCurrencyService';
+import { parseAmount } from '../../libs/format/amount';
 import { styles } from './styles';
 import { logger } from '../../services/loggingService';
 
@@ -110,11 +111,12 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
   // Convert amount to USDC when amount or currency changes
   useEffect(() => {
     const convertAmount = async () => {
-      if (amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0) {
+      const numeric = amount ? parseAmount(amount) : 0;
+      if (numeric > 0) {
         setIsConverting(true);
         try {
           const usdcAmount = await convertFiatToUSDC(
-            parseFloat(amount),
+            numeric,
             selectedCurrency.code
           );
           setConvertedAmount(usdcAmount);
@@ -140,7 +142,8 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       errors.name = 'Please enter a bill name';
     }
 
-    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+    const numeric = amount ? parseAmount(amount) : 0;
+    if (!amount || isNaN(numeric) || numeric <= 0) {
       errors.amount = 'Please enter a valid amount';
     }
 
@@ -214,7 +217,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
     try {
       logger.info('Starting bill creation process', {
         billName: billName.trim(),
-        originalAmount: parseFloat(amount),
+        originalAmount: amount ? parseAmount(amount) : 0,
         originalCurrency: selectedCurrency.code,
         convertedAmount: convertedAmount,
         category: selectedCategory,

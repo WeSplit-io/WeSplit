@@ -697,6 +697,14 @@ export const useDegenSplitLogic = (
     });
   }, [state.isSpinning, state.hasSpun, state.spinAnimationRef, state.cardScaleRef, setState]);
 
+  // OPTIMIZED: Centralized claim validation function
+  const canUserClaimFunds = useCallback((currentUser: any, splitWallet: SplitWallet): boolean => {
+    if (!currentUser || !splitWallet) return false;
+    
+    const participant = splitWallet.participants.find((p: any) => p.userId === currentUser.id.toString());
+    return participant && participant.status !== 'paid';
+  }, []);
+
   // Result operations
   const handleClaimFunds = useCallback(async (
     currentUser: any,
@@ -706,6 +714,17 @@ export const useDegenSplitLogic = (
     setState({ showClaimModal: false, isProcessing: true });
     
     try {
+      // OPTIMIZED: Use centralized validation
+      if (!canUserClaimFunds(currentUser, splitWallet)) {
+        Alert.alert(
+          'Already Claimed', 
+          'You have already claimed your funds from this split.',
+          [{ text: 'OK' }]
+        );
+        setState({ isProcessing: false });
+        return false;
+      }
+      
       const { SplitWalletService } = await import('../../../services/split');
       const result = await SplitWalletService.processDegenWinnerPayout(
         splitWallet.id,
@@ -729,10 +748,29 @@ export const useDegenSplitLogic = (
             [{ text: 'OK' }]
           );
         }
+        
+        // OPTIMIZED: Real-time updates will handle UI refresh automatically
+        // No need for manual refresh - the real-time listener will update the UI
+        
         setState({ isProcessing: false });
         return true;
       } else {
-        Alert.alert('Error', result.error || 'Failed to claim winner payout. Please try again.');
+        // OPTIMIZED: Simplified error handling - real-time updates will handle success detection
+        if (result.signature && result.error?.includes('confirmation timed out')) {
+          // Transaction was sent but confirmation timed out
+          console.log('🔍 Transaction sent but confirmation timed out, real-time updates will handle success detection', {
+            signature: result.signature,
+            splitWalletId: splitWallet.id
+          });
+          
+          Alert.alert(
+            '⏳ Transaction Processing', 
+            'Your transaction has been sent to the blockchain. Real-time updates will notify you when it completes.',
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert('Error', result.error || 'Failed to claim winner payout. Please try again.');
+        }
         setState({ isProcessing: false });
         return false;
       }
@@ -833,6 +871,7 @@ export const useDegenSplitLogic = (
     // Result operations
     handleClaimFunds,
     handleExternalPayment,
+    canUserClaimFunds, // OPTIMIZED: Expose centralized validation function
     
     // Private key operations
     handleShowPrivateKey,

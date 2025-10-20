@@ -14,6 +14,7 @@ interface Connection {
 interface Transaction {
   recentBlockhash: string | undefined;
   feePayer: any;
+  instructions: any[];
   add(instruction: any): void;
   sign(...signers: any[]): void;
   serialize(): Buffer;
@@ -143,7 +144,12 @@ export class OptimizedTransactionUtils {
           errorMessage.includes('AbortSignal') ||
           errorMessage.includes('aborted') ||
           errorMessage.includes('AbortError') ||
-          errorMessage.includes('Failed to fetch')
+          errorMessage.includes('Failed to fetch') ||
+          // Treat RPC auth/permission errors as failover triggers
+          errorMessage.includes('403') ||
+          errorMessage.includes('-32052') ||
+          errorMessage.toLowerCase().includes('api key is not allowed') ||
+          errorMessage.toLowerCase().includes('not allowed to access blockchain')
         );
         
         if (isNetworkError) {
@@ -179,7 +185,8 @@ export class OptimizedTransactionUtils {
   public async sendTransactionWithRetry(
     transaction: Transaction, 
     signers: any[], 
-    priority: 'low' | 'medium' | 'high' = 'medium'
+    priority: 'low' | 'medium' | 'high' = 'medium',
+    disableRebroadcast: boolean = false
   ): Promise<string> {
     await this.initialize();
     
@@ -245,8 +252,32 @@ export class OptimizedTransactionUtils {
         // CRITICAL: Immediately verify the transaction exists on blockchain
         try {
           console.log(`🔍 Verifying transaction exists on blockchain using endpoint: ${currentEndpoint}...`);
-          const signatureStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
-          
+          let signatureStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+
+          if (!signatureStatus.value && !disableRebroadcast) {
+            // Propagation assist: rebroadcast to next RPC endpoint if signature not visible yet
+            try {
+              console.log(`🔁 Rebroadcasting transaction to next RPC endpoint to improve propagation...`);
+              await this.switchToNextEndpoint();
+              const rebroadcastEndpoint = this.rpcEndpoints[this.currentEndpointIndex];
+              if (!this.connection) {
+                this.connection = await this.createConnection();
+              }
+              await this.connection.sendRawTransaction(serializedTransaction, {
+                skipPreflight: true,
+                preflightCommitment: 'confirmed',
+                maxRetries: 0,
+              });
+              console.log(`📡 Rebroadcast attempted via ${rebroadcastEndpoint}`);
+              // Check again on the new endpoint
+              signatureStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+            } catch (rebroadcastError) {
+              console.log(`⚠️ Rebroadcast failed:`, rebroadcastError instanceof Error ? rebroadcastError.message : String(rebroadcastError));
+            }
+          } else if (!signatureStatus.value && disableRebroadcast) {
+            console.log(`🚫 Rebroadcast disabled - skipping propagation assist`);
+          }
+
           if (signatureStatus.value) {
             console.log(`✅ Transaction found on blockchain:`, {
               signature,
@@ -254,8 +285,8 @@ export class OptimizedTransactionUtils {
               err: signatureStatus.value.err
             });
           } else {
-            console.log(`⚠️ Transaction signature returned but not found on blockchain: ${signature}`);
-            // Don't fail immediately, but log the warning
+            console.log(`⚠️ Transaction signature returned but not found on blockchain after verification attempts: ${signature}`);
+            // Don't fail immediately; confirmation loop will handle further polling
           }
         } catch (verifyError) {
           console.log(`⚠️ Could not verify transaction on blockchain:`, verifyError instanceof Error ? verifyError.message : String(verifyError));
@@ -272,15 +303,21 @@ export class OptimizedTransactionUtils {
         });
         
         // Check if it's a network error that might benefit from RPC failover
-        const isNetworkError = error instanceof Error && (
-          error.message.includes('fetch') || 
-          error.message.includes('network') || 
-          error.message.includes('timeout') ||
-          error.message.includes('ECONNREFUSED') ||
-          error.message.includes('ENOTFOUND') ||
-          error.message.includes('AbortSignal') ||
-          error.message.includes('aborted') ||
-          error.message.includes('AbortError')
+        const em = error instanceof Error ? error.message : String(error);
+        const isNetworkError = (
+          em.includes('fetch') || 
+          em.includes('network') || 
+          em.includes('timeout') ||
+          em.includes('ECONNREFUSED') ||
+          em.includes('ENOTFOUND') ||
+          em.includes('AbortSignal') ||
+          em.includes('aborted') ||
+          em.includes('AbortError') ||
+          // Treat RPC auth/permission errors as failover triggers
+          em.includes('403') ||
+          em.includes('-32052') ||
+          em.toLowerCase().includes('api key is not allowed') ||
+          em.toLowerCase().includes('not allowed to access blockchain')
         );
         
         if (isNetworkError) {
@@ -313,8 +350,22 @@ export class OptimizedTransactionUtils {
         this.connection = await this.createConnection();
       }
 
-      // Use a more aggressive confirmation strategy with shorter timeouts
-      const shortTimeout = Math.min(timeout, 30000); // Max 30 seconds for initial confirmation
+      // Fast-path: try quick HTTP status polling first to avoid WS flakiness
+      try {
+        const quickStart = Date.now();
+        while (Date.now() - quickStart < 5000) { // 5s quick poll
+          const quickStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+          if (quickStatus.value && !quickStatus.value.err) {
+            return true;
+          }
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (_) {
+        // ignore and continue to main flow
+      }
+
+      // Use a more resilient confirmation strategy with a longer initial window
+      const shortTimeout = Math.min(timeout, 60000); // Up to 60 seconds for initial confirmation
       
       // Try confirmation with shorter timeout first
       const confirmationPromise = this.connection.confirmTransaction(signature, 'confirmed');
@@ -344,22 +395,32 @@ export class OptimizedTransactionUtils {
         // If short timeout fails, try alternative confirmation method immediately
         console.log(`Initial confirmation timed out, trying alternative method for signature: ${signature}`);
         
-        // Try alternative confirmation method with remaining time
-        const remainingTime = timeout - shortTimeout;
-        if (remainingTime > 5000) { // Only if we have at least 5 seconds left
-          const alternativePromise = this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
-          const alternativeTimeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error(`Alternative confirmation timeout after ${remainingTime/1000} seconds`)), remainingTime);
-          });
-
+        // Try alternative confirmation method with polling for the remaining time
+        const remainingTime = Math.max(0, timeout - shortTimeout);
+        const pollIntervalMs = 3000; // poll every 3s
+        const deadline = Date.now() + remainingTime;
+        let pollCount = 0;
+        while (Date.now() < deadline) {
           try {
-            const signatureStatus = await Promise.race([alternativePromise, alternativeTimeoutPromise]);
+            const signatureStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
             if (signatureStatus.value && !signatureStatus.value.err) {
               return true;
             }
-          } catch (altError) {
-            console.log(`Alternative confirmation also failed: ${altError instanceof Error ? altError.message : String(altError)}`);
+          } catch (_) {
+            // ignore and continue polling
           }
+
+          // Periodically rotate RPC endpoint to improve visibility
+          pollCount += 1;
+          if (pollCount % 3 === 0) {
+            try {
+              await this.switchToNextEndpoint();
+            } catch (_) {}
+          }
+
+          const sleepMs = Math.min(pollIntervalMs, Math.max(0, deadline - Date.now()));
+          if (sleepMs <= 0) break;
+          await new Promise(resolve => setTimeout(resolve, sleepMs));
         }
         
         throw shortTimeoutError;

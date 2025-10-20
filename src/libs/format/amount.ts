@@ -39,8 +39,53 @@ function formatCompactNumber(value: number): string {
  * Parse amount string to number
  */
 export function parseAmount(amountString: string): number {
-  const cleaned = amountString.replace(/[^0-9.-]/g, '');
-  const parsed = parseFloat(cleaned);
+  if (amountString == null) {
+    return 0;
+  }
+
+  const input = String(amountString).trim();
+  if (input === '') {
+    return 0;
+  }
+
+  // Keep only digits, separators and sign for analysis
+  const sanitized = input.replace(/[^0-9.,-]/g, '');
+
+  // Identify separators
+  const hasDot = sanitized.indexOf('.') !== -1;
+  const hasComma = sanitized.indexOf(',') !== -1;
+
+  let normalized = sanitized;
+
+  if (hasDot && hasComma) {
+    // Assume the last occurring separator is the decimal separator
+    const lastDot = sanitized.lastIndexOf('.');
+    const lastComma = sanitized.lastIndexOf(',');
+    const decimalSep = lastDot > lastComma ? '.' : ',';
+    const groupSep = decimalSep === '.' ? ',' : '.';
+
+    // Remove all grouping separators
+    normalized = sanitized.split(groupSep).join('');
+    // Replace decimal separator with '.'
+    if (decimalSep === ',') {
+      normalized = normalized.replace(/,/g, '.');
+    }
+  } else if (hasComma && !hasDot) {
+    // Treat comma as decimal separator
+    normalized = sanitized.replace(/,/g, '.');
+  } else {
+    // Either dot-decimal or integer, leave as-is (but remove stray commas)
+    normalized = sanitized.replace(/,/g, '');
+  }
+
+  // Handle multiple minus signs or misplaced minus
+  const isNegative = /^-/.test(normalized);
+  normalized = normalized.replace(/-/g, '');
+  if (isNegative) {
+    normalized = '-' + normalized;
+  }
+
+  const parsed = parseFloat(normalized);
   return isNaN(parsed) ? 0 : parsed;
 }
 

@@ -1779,6 +1779,14 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     if (!selectedWallet || !splitWallet || !currentUser) return;
     
     setIsSigning(true);
+    
+    // Temporarily disable real-time updates during withdrawal to prevent interference
+    const wasRealtimeActive = isRealtimeActive;
+    if (wasRealtimeActive) {
+      logger.info('Temporarily disabling real-time updates during withdrawal', { splitWalletId: splitWallet.id }, 'FairSplitScreen');
+      stopRealtimeUpdates(); // Actually stop the Firebase listener
+    }
+    
     try {
       logger.info('Processing transfer to selected wallet', {
         selectedWallet,
@@ -2049,8 +2057,50 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         } else {
         console.error('❌ FairSplitScreen: Transfer failed:', transferResult.error);
         
-        // Check if this is a synchronization issue that can be repaired
-        if (transferResult.error?.includes('Transaction synchronization issue detected')) {
+        // Check if this is a timeout issue - transaction might have succeeded
+        if (transferResult.error?.includes('Transaction confirmation timed out') || 
+            transferResult.error?.includes('confirmation failed')) {
+          
+          // Check if we have a transaction signature - if so, the transaction likely succeeded
+          if (transferResult.transactionSignature) {
+            logger.info('Fair split transaction timed out but has signature - likely succeeded', {
+              transactionSignature: transferResult.transactionSignature,
+              splitWalletId: splitWallet.id
+            }, 'FairSplitScreen');
+            
+            Alert.alert(
+              'Transaction Processing',
+              'Your transaction was sent successfully but is still being confirmed on the blockchain. This is normal and can take a few moments.\n\nYou can check the transaction status manually or wait for it to complete automatically.',
+              [
+                {
+                  text: 'Check Transaction',
+                  onPress: () => {
+                    // Open transaction in explorer
+                    const explorerUrl = `https://solscan.io/tx/${transferResult.transactionSignature}`;
+                    // You might want to use Linking.openURL(explorerUrl) here
+                    console.log('Transaction URL:', explorerUrl);
+                  }
+                },
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    // Close modals and reset state
+                    setShowSignatureStep(false);
+                    setShowSplitModal(false);
+                    setSelectedTransferMethod(null);
+                    setSelectedWallet(null);
+                    
+                    // Navigate back to splits list - this will trigger a refresh
+                    navigation.navigate('SplitsList');
+                  }
+                }
+              ]
+            );
+          } else {
+            // No signature means the transaction definitely failed
+            Alert.alert('Transfer Failed', 'The transaction could not be sent. Please try again.');
+          }
+        } else if (transferResult.error?.includes('Transaction synchronization issue detected')) {
           Alert.alert(
             'Synchronization Issue Detected',
             'We detected that participants are marked as paid but the funds aren\'t actually in the split wallet. This can happen due to transaction delays or failures.\n\nWould you like to repair the split wallet data? This will reset participant payment status so they can retry their payments.',
@@ -2072,6 +2122,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       handleError(error, 'complete transfer');
     } finally {
       setIsSigning(false);
+      
+      // Re-enable real-time updates after withdrawal is complete
+      if (wasRealtimeActive) {
+        logger.info('Re-enabling real-time updates after withdrawal', { splitWalletId: splitWallet.id }, 'FairSplitScreen');
+        // Restart real-time updates (this will set isRealtimeActive to true)
+        startRealtimeUpdates();
+      }
     }
   };
 

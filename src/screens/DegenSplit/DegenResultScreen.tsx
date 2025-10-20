@@ -3,7 +3,7 @@
  * Uses modular hooks and components for better maintainability
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -176,7 +176,43 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     {
       onParticipantUpdate: (participants) => {
         console.log('🔍 DegenResultScreen: Real-time participant update:', participants);
-        // Update participants if needed
+        
+        // Check if current user's status changed to 'paid' and exit loading state
+        if (currentUser && degenState.isProcessing) {
+          const currentUserParticipant = participants.find(
+            (p: any) => p.userId === currentUser.id.toString()
+          );
+          
+          if (currentUserParticipant?.status === 'paid') {
+            console.log('✅ Real-time update: User status changed to paid, exiting loading state');
+            
+            // OPTIMIZED: Only show success message if we were actually processing
+            // This prevents duplicate alerts when the user navigates back to the screen
+            const wasProcessing = degenState.isProcessing;
+            degenState.setIsProcessing(false);
+            
+            if (wasProcessing) {
+              if (isWinner) {
+                Alert.alert(
+                  '🎉 Winner Payout Complete!', 
+                  `Congratulations! You've received the full amount of ${totalAmount} USDC from the degen split. Your locked funds have been returned to you.`,
+                  [{ text: 'OK' }]
+                );
+              } else {
+                Alert.alert(
+                  '✅ Payment Confirmed!', 
+                  `Your locked funds (${totalAmount} USDC) have been successfully withdrawn from the split wallet to your in-app wallet.`,
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => navigation.navigate('SplitsList')
+                    }
+                  ]
+                );
+              }
+            }
+          }
+        }
       },
       onSplitWalletUpdate: (splitWallet) => {
         console.log('🔍 DegenResultScreen: Real-time wallet update:', splitWallet);
@@ -198,12 +234,35 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   // State to track current split wallet data
   const [currentSplitWallet, setCurrentSplitWallet] = React.useState<SplitWallet | null>(null);
 
-  // Check if the current user has already claimed/paid their funds
+  // OPTIMIZED: Efficient state reset with proper dependency management
+  React.useEffect(() => {
+    if (currentSplitWallet && currentUser?.id) {
+      const currentUserParticipant = currentSplitWallet.participants.find((p: any) => p.userId === currentUser.id.toString());
+      
+      // Only update state if there's actually a change needed
+      if (currentUserParticipant?.status === 'paid' && degenState.isProcessing) {
+        degenState.setIsProcessing(false);
+      } else if (!currentUserParticipant && degenState.isProcessing) {
+        // Reset processing state if user is not found in participants
+        degenState.setIsProcessing(false);
+      }
+    }
+  }, [currentSplitWallet?.participants, currentUser?.id, degenState.isProcessing]);
+
+  // OPTIMIZED: Centralized claim validation
   const currentUserParticipant = currentSplitWallet?.participants.find((p: any) => p.userId === currentUser?.id.toString());
   const hasAlreadyClaimed = currentUserParticipant?.status === 'paid';
   const hasValidTransaction = currentUserParticipant?.transactionSignature && 
     !currentUserParticipant.transactionSignature.includes('timeout') &&
     !currentUserParticipant.transactionSignature.includes('failed');
+  
+  // Centralized function to check if user can claim funds
+  const canUserClaimFunds = useCallback(() => {
+    if (!currentUser || !currentSplitWallet) return false;
+    
+    const participant = currentSplitWallet.participants.find((p: any) => p.userId === currentUser.id.toString());
+    return participant && participant.status !== 'paid';
+  }, [currentUser, currentSplitWallet]);
   
   // Debug logging
   React.useEffect(() => {
@@ -224,25 +283,8 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     }
   }, [currentSplitWallet, currentUser, currentUserParticipant, hasAlreadyClaimed]);
 
-  // Load split wallet data to show current status
-  React.useEffect(() => {
-    const loadSplitWalletData = async () => {
-      if (!splitWallet) return;
-
-      try {
-        const result = await SplitWalletService.getSplitWallet(splitWallet.id);
-        if (result.success && result.wallet) {
-          // Update the split wallet data to show current status
-          setCurrentSplitWallet(result.wallet);
-          console.log('Split wallet data loaded:', result.wallet);
-        }
-      } catch (error) {
-        console.error('Error loading split wallet data:', error);
-      }
-    };
-
-    loadSplitWalletData();
-  }, [splitWallet]);
+  // OPTIMIZED: Real-time updates will handle data loading automatically
+  // No need for manual data loading - this causes conflicts with real-time updates
 
   // Event handlers
   const handleBack = () => {
@@ -328,6 +370,17 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   const handleInAppPayment = async () => {
     degenState.setIsProcessing(true);
     try {
+      // OPTIMIZED: Use centralized validation
+      if (!canUserClaimFunds()) {
+        Alert.alert(
+          'Already Processed', 
+          'Your payment has already been processed for this split.',
+          [{ text: 'OK' }]
+        );
+        degenState.setIsProcessing(false);
+        return;
+      }
+      
       // NEW Degen Logic: Loser receives funds from split wallet to their in-app wallet
       const { SplitWalletService } = await import('../../services/split');
       const result = await SplitWalletService.processDegenLoserPayment(
@@ -364,7 +417,22 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           );
         }
       } else {
-        Alert.alert('Payment Failed', result.error || 'Failed to complete payment. Please try again.');
+        // OPTIMIZED: Simplified error handling - real-time updates will handle success detection
+        if (result.signature && result.error?.includes('confirmation timed out')) {
+          // Transaction was sent but confirmation timed out
+          console.log('🔍 Loser payment sent but confirmation timed out, real-time updates will handle success detection', {
+            signature: result.signature,
+            splitWalletId: splitWallet.id
+          });
+          
+          Alert.alert(
+            '⏳ Payment Processing', 
+            'Your payment has been sent to the blockchain. Real-time updates will notify you when it completes.',
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert('Payment Failed', result.error || 'Failed to complete payment. Please try again.');
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to complete payment. Please try again.');

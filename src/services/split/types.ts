@@ -34,6 +34,9 @@ export interface SplitWalletParticipant {
   amountPaid: number;
   status: 'pending' | 'locked' | 'paid' | 'failed';
   transactionSignature?: string;
+  pendingSignature?: string;
+  pendingSince?: string;
+  pendingAmount?: number;
   paidAt?: string;
 }
 
@@ -49,4 +52,5 @@ export interface PaymentResult {
   amount?: number;
   error?: string;
   message?: string;
+  signature?: string; // alias used in some call sites
 }

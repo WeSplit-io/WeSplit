@@ -81,8 +81,13 @@ export const useDegenSplitRealtime = (
                 callbacks.onLockStatusUpdate(lockedParticipants, allLocked);
               }
 
-              // If we have a split wallet ID, also update the wallet data
-              if (splitWalletId && callbacks.onSplitWalletUpdate) {
+              // OPTIMIZED: Only fetch wallet data if participants have meaningful status changes
+              const hasMeaningfulStatusChanges = update.participants.some(p => 
+                p.status === 'paid' || p.status === 'locked' || p.status === 'accepted'
+              );
+              
+              // Also check if we have a split wallet ID and the callback exists
+              if (splitWalletId && callbacks.onSplitWalletUpdate && hasMeaningfulStatusChanges) {
                 try {
                   const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
                   if (walletResult.success && walletResult.wallet) {

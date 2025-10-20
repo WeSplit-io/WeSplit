@@ -176,7 +176,9 @@ export const validateAmount = (amount: string): {
     };
   }
 
-  const numericValue = parseFloat(amount);
+  // Use tolerant parser for locales (accepts comma decimals)
+  const { parseAmount } = require('../libs/format/amount');
+  const numericValue = parseAmount(amount);
   
   if (isNaN(numericValue)) {
     return {
