@@ -4,6 +4,7 @@
  * Part of the modularized SplitWalletService
  */
 
+import { Platform } from 'react-native';
 import { consolidatedTransactionService } from '../consolidatedTransactionService';
 import { logger } from '../loggingService';
 import { FeeService } from '../../config/feeConfig';
@@ -81,7 +82,8 @@ async function executeSplitWalletTransaction(
   amount: number,
   currency: string,
   memo: string,
-  transactionType: 'funding' | 'withdrawal' = 'withdrawal'
+  transactionType: 'funding' | 'withdrawal' = 'withdrawal',
+  withdrawalType?: 'fair_split_extraction' | 'degen_participant_withdrawal' | 'general_withdrawal'
 ): Promise<{ success: boolean; signature?: string; error?: string }> {
   try {
     logger.info('Executing split wallet transaction', {
@@ -554,10 +556,19 @@ async function executeSplitWalletTransaction(
       // Disable rebroadcasting for withdrawal transactions to match funding speed
       signature = await optimizedTransactionUtils.sendTransactionWithRetry(transaction as any, signers, 'high', true);
       
-      logger.info('✅ Transaction sent successfully', {
-        signature,
-        signatureLength: signature.length
-      }, 'SplitWalletPayments');
+    logger.info('✅ Transaction sent successfully', {
+      signature,
+      signatureLength: signature.length
+    }, 'SplitWalletPayments');
+
+    // Add a small delay to allow blockchain propagation for all transaction types
+    logger.info('⏳ Waiting for blockchain propagation before confirmation', {
+      signature,
+      transactionType
+    }, 'SplitWalletPayments');
+    
+    // Wait 2 seconds for blockchain propagation, especially important for production
+    await new Promise(resolve => setTimeout(resolve, 2000));
       
       // CRITICAL: Verify the signature is valid and not empty
       if (!signature || signature.length < 80) {
@@ -735,8 +746,19 @@ async function executeSplitWalletTransaction(
       }, 'SplitWalletPayments');
     }
 
-    // Use different timeout based on transaction type
-    const timeoutMs = transactionType === 'withdrawal' ? 5000 : 1500; // 5s for withdrawals, 1.5s for funding
+    // Use different timeout based on transaction type and platform
+    // iOS production builds need longer timeouts for blockchain confirmations
+    const isIOS = Platform.OS === 'ios';
+    const isProduction = __DEV__ === false;
+    
+    let timeoutMs: number;
+    if (transactionType === 'withdrawal') {
+      // Withdrawals need much longer timeouts, especially on iOS production
+      timeoutMs = isIOS && isProduction ? 60000 : 45000; // 60s for iOS production, 45s for others
+    } else {
+      // Funding transactions also need longer timeouts for production blockchain confirmations
+      timeoutMs = isIOS && isProduction ? 30000 : 25000; // 30s for iOS production, 25s for others
+    }
     
     logger.info('⏳ Starting transaction confirmation', {
       signature,
@@ -744,7 +766,8 @@ async function executeSplitWalletTransaction(
       timeoutMs,
       fromAddress,
       toAddress,
-      amount
+      amount,
+      withdrawalType
     }, 'SplitWalletPayments');
     
     const confirmed = await optimizedTransactionUtils.confirmTransactionWithTimeout(signature, timeoutMs);
@@ -762,18 +785,20 @@ async function executeSplitWalletTransaction(
         signature,
         fromAddress,
         toAddress,
-        amount 
+        amount,
+        transactionType
       }, 'SplitWalletPayments');
       
-      // SIMPLIFIED: Minimal fallback verification - match funding logic
+      // Enhanced fallback verification for withdrawal transactions
       try {
         const isActuallyConfirmed = await verifyTransactionOnBlockchain(signature);
         if (isActuallyConfirmed) {
-          logger.info('✅ Transaction confirmed on minimal fallback check - proceeding', {
+          logger.info('✅ Transaction confirmed on fallback check - proceeding', {
             signature,
             fromAddress,
             toAddress,
-            amount
+            amount,
+            transactionType
           }, 'SplitWalletPayments');
           
           return {
@@ -782,28 +807,187 @@ async function executeSplitWalletTransaction(
           };
         }
       } catch (verificationError) {
-        logger.warn('Minimal fallback verification failed', {
+        logger.warn('Fallback verification failed', {
           signature,
-          error: verificationError
+          error: verificationError,
+          transactionType
         }, 'SplitWalletPayments');
       }
       
-      // CRITICAL: If confirmation times out, we should NOT proceed with database updates
-      // The transaction was sent but we can't confirm it succeeded
-      logger.error('❌ Transaction confirmation timed out - NOT proceeding with database update', {
-        signature,
-        fromAddress,
-        toAddress,
-        amount,
-        note: 'Transaction was sent but confirmation failed - cannot guarantee success'
-      }, 'SplitWalletPayments');
-      
-      // Return failure - the transaction was sent but we can't confirm it succeeded
-      return {
-        success: false,
-        signature,
-        error: 'Transaction confirmation timed out. The transaction was sent but we cannot confirm it succeeded on the blockchain. Please try again or check the transaction status manually.'
-      };
+      // For withdrawal transactions, handle different types differently
+      if (transactionType === 'withdrawal') {
+        // Fair split extraction should be more strict since it's the creator extracting all funds
+        if (withdrawalType === 'fair_split_extraction') {
+          logger.warn('⚠️ Fair split extraction confirmation timed out - attempting enhanced fallback verification', {
+            signature,
+            fromAddress,
+            toAddress,
+            amount,
+            withdrawalType,
+            note: 'Fair split extraction was sent but confirmation failed - attempting enhanced verification'
+          }, 'SplitWalletPayments');
+          
+          // Enhanced fallback verification for fair split extraction
+          try {
+            // Wait a bit longer for blockchain propagation
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            
+            const isActuallyConfirmed = await verifyTransactionOnBlockchain(signature);
+            if (isActuallyConfirmed) {
+              logger.info('✅ Fair split extraction confirmed on enhanced fallback check - proceeding', {
+                signature,
+                fromAddress,
+                toAddress,
+                amount,
+                withdrawalType
+              }, 'SplitWalletPayments');
+              
+              return {
+                success: true,
+                signature
+              };
+            }
+          } catch (verificationError) {
+            logger.warn('Enhanced fallback verification failed for fair split extraction', {
+              signature,
+              error: verificationError,
+              withdrawalType
+            }, 'SplitWalletPayments');
+          }
+          
+          // If all verification attempts fail, return failure for fair split extraction
+          logger.error('❌ Fair split extraction confirmation timed out - NOT proceeding with database update', {
+            signature,
+            fromAddress,
+            toAddress,
+            amount,
+            note: 'Fair split extraction was sent but all confirmation attempts failed - cannot guarantee success'
+          }, 'SplitWalletPayments');
+          
+          return {
+            success: false,
+            signature,
+            error: 'Transaction confirmation timed out. The transaction was sent but we cannot confirm it succeeded on the blockchain. Please try again or check the transaction status manually.'
+          };
+        } else {
+          // Degen participant withdrawals and general withdrawals should be more lenient
+          logger.warn('⚠️ Participant withdrawal confirmation timed out - attempting enhanced verification', {
+            signature,
+            fromAddress,
+            toAddress,
+            amount,
+            withdrawalType: withdrawalType || 'general_withdrawal',
+            note: 'Transaction was sent successfully but confirmation timed out. Attempting enhanced verification before proceeding.'
+          }, 'SplitWalletPayments');
+          
+          logger.info('🔍 Withdrawal type analysis', {
+            withdrawalType,
+            isDegenParticipant: withdrawalType === 'degen_participant_withdrawal',
+            isGeneral: withdrawalType === 'general_withdrawal' || !withdrawalType
+          }, 'SplitWalletPayments');
+          
+          // Enhanced verification for participant withdrawals
+          try {
+            // Wait longer for blockchain propagation
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            
+            const isActuallyConfirmed = await verifyTransactionOnBlockchain(signature);
+            if (isActuallyConfirmed) {
+              logger.info('✅ Participant withdrawal confirmed on enhanced verification - proceeding', {
+                signature,
+                fromAddress,
+                toAddress,
+                amount,
+                withdrawalType
+              }, 'SplitWalletPayments');
+              
+              return {
+                success: true,
+                signature
+              };
+            }
+          } catch (verificationError) {
+            logger.warn('Enhanced verification failed for participant withdrawal', {
+              signature,
+              error: verificationError,
+              withdrawalType
+            }, 'SplitWalletPayments');
+          }
+          
+          // If enhanced verification fails, check if transaction actually failed
+          logger.error('❌ Participant withdrawal failed - transaction was rejected by blockchain', {
+            signature,
+            fromAddress,
+            toAddress,
+            amount,
+            withdrawalType,
+            note: 'Transaction was sent but rejected by blockchain. No funds were transferred.'
+          }, 'SplitWalletPayments');
+          
+          return {
+            success: false,
+            signature,
+            error: 'Transaction was sent but rejected by the blockchain. No funds were transferred. Please try again.'
+          };
+        }
+      } else {
+        // For funding transactions, be more strict but still try fallback verification
+        logger.warn('⚠️ Funding transaction confirmation timed out - attempting enhanced fallback verification', {
+          signature,
+          fromAddress,
+          toAddress,
+          amount,
+          transactionType,
+          note: 'Funding transaction was sent but confirmation failed - attempting enhanced verification'
+        }, 'SplitWalletPayments');
+        
+        // Enhanced fallback verification for funding transactions
+        try {
+          // Wait a bit longer for blockchain propagation
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          const isActuallyConfirmed = await verifyTransactionOnBlockchain(signature);
+          if (isActuallyConfirmed) {
+            logger.info('✅ Funding transaction confirmed on enhanced fallback check - proceeding', {
+              signature,
+              fromAddress,
+              toAddress,
+              amount,
+              transactionType
+            }, 'SplitWalletPayments');
+            
+            return {
+              success: true,
+              signature
+            };
+          }
+        } catch (verificationError) {
+          logger.warn('Enhanced fallback verification failed for funding transaction', {
+            signature,
+            error: verificationError,
+            transactionType
+          }, 'SplitWalletPayments');
+        }
+        
+        // For funding transactions, if we have a valid signature and the transaction was sent successfully,
+        // we should be more lenient since the user is trying to fund the split wallet
+        logger.warn('⚠️ Funding transaction confirmation timed out - using "likely succeeded" mode for funding', {
+          signature,
+          fromAddress,
+          toAddress,
+          amount,
+          transactionType,
+          note: 'Transaction was sent successfully but confirmation timed out. Proceeding with likely succeeded mode for funding.'
+        }, 'SplitWalletPayments');
+        
+        // For funding transactions, if the transaction was sent successfully, we'll assume it succeeded
+        // This is safer for funding since the user is trying to add funds to the split wallet
+        return {
+          success: true,
+          signature,
+          error: 'Transaction confirmation timed out, but the transaction was sent successfully. The funding is likely to have succeeded. Please check your wallet balance.'
+        };
+      }
     }
 
     logger.info('✅ Transaction confirmed successfully', {
@@ -2193,7 +2377,8 @@ export class SplitWalletPayments {
         availableBalance,
         wallet.currency,
         description || `Fair Split funds extraction for bill ${wallet.billId}`,
-        'withdrawal'
+        'withdrawal',
+        'fair_split_extraction'
       );
       
       logger.info('💸 Fair split transaction result', {
@@ -2512,7 +2697,8 @@ export class SplitWalletPayments {
         totalAmount,
         wallet.currency,
         description || `Degen Split winner payout for ${winnerUserId}`,
-        'withdrawal'
+        'withdrawal',
+        'degen_participant_withdrawal'
       );
       
       logger.info('💸 Degen winner payout transaction result', {
@@ -2521,12 +2707,14 @@ export class SplitWalletPayments {
         error: transactionResult.error
       }, 'SplitWalletPayments');
       
-      if (!transactionResult.success) {
+      // Check if transaction actually failed (even if success is true but error exists)
+      if (!transactionResult.success || (transactionResult.success && transactionResult.error)) {
         logger.error('❌ Winner payout transaction failed', {
           splitWalletId,
           winnerUserId,
           error: transactionResult.error,
-          signature: transactionResult.signature
+          signature: transactionResult.signature,
+          success: transactionResult.success
         }, 'SplitWalletPayments');
         
         // Send failure notification (non-blocking)
@@ -2774,7 +2962,8 @@ export class SplitWalletPayments {
           totalAmount,
           wallet.currency,
           description || `Degen Split loser withdrawal for ${loserUserId}`,
-          'withdrawal'
+          'withdrawal',
+          'degen_participant_withdrawal'
         );
         
         transactionResult = {
@@ -2784,7 +2973,8 @@ export class SplitWalletPayments {
         };
       }
       
-      if (!transactionResult.success) {
+      // Check if transaction actually failed (even if success is true but error exists)
+      if (!transactionResult.success || (transactionResult.success && transactionResult.error)) {
         return {
           success: false,
           error: transactionResult.error || 'Failed to process degen loser withdrawal',

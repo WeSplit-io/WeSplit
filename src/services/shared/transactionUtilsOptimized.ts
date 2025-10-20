@@ -3,6 +3,8 @@
  * Reduces heap usage by using lazy imports and minimal memory footprint
  */
 
+import { Platform } from 'react-native';
+
 // Minimal interface definitions to avoid heavy imports
 interface Connection {
   getLatestBlockhash(commitment: string): Promise<{ blockhash: string }>;
@@ -365,7 +367,11 @@ export class OptimizedTransactionUtils {
       }
 
       // Use a more resilient confirmation strategy with a longer initial window
-      const shortTimeout = Math.min(timeout, 60000); // Up to 60 seconds for initial confirmation
+      // iOS production builds need longer timeouts for blockchain confirmations
+      const isIOS = Platform.OS === 'ios';
+      const isProduction = __DEV__ === false;
+      const maxTimeout = isIOS && isProduction ? 120000 : 90000; // 120s for iOS production, 90s for others
+      const shortTimeout = Math.min(timeout, maxTimeout);
       
       // Try confirmation with shorter timeout first
       const confirmationPromise = this.connection.confirmTransaction(signature, 'confirmed');

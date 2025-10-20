@@ -31,10 +31,10 @@ export function getNetworkConfig(): NetworkConfig {
   
   return {
     timeout: {
-      api: isIOS ? 15000 : 10000, // Longer timeout for iOS
-      database: isIOS ? 20000 : 15000, // Longer database timeout for iOS
-      notifications: isIOS ? 12000 : 8000, // Longer notification timeout for iOS
-      connection: isIOS ? 30000 : 20000, // Longer connection timeout for iOS
+      api: isIOS ? 20000 : 10000, // Longer timeout for iOS (increased from 15s to 20s)
+      database: isIOS ? 25000 : 15000, // Longer database timeout for iOS (increased from 20s to 25s)
+      notifications: isIOS ? 15000 : 8000, // Longer notification timeout for iOS (increased from 12s to 15s)
+      connection: isIOS ? 45000 : 20000, // Longer connection timeout for iOS (increased from 30s to 45s)
     },
     retries: {
       maxRetries: isIOS ? 2 : 3, // Fewer retries for iOS to fail faster

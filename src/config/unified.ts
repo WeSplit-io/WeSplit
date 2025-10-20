@@ -137,18 +137,20 @@ export function getUnifiedConfig(): UnifiedConfig {
                 `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`,
                 'https://api.mainnet-beta.solana.com',
                 'https://solana-api.projectserum.com',
-                'https://rpc.ankr.com/solana'
+                'https://rpc.ankr.com/solana',
+                'https://solana-mainnet.g.alchemy.com/v2/demo'
               ]
             : [
                 'https://api.mainnet-beta.solana.com',
                 'https://solana-api.projectserum.com',
                 'https://rpc.ankr.com/solana',
-                'https://mainnet.helius-rpc.com'
+                'https://mainnet.helius-rpc.com',
+                'https://solana-mainnet.g.alchemy.com/v2/demo'
               ],
           usdcMintAddress: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
           commitment: 'confirmed' as const,
-          timeout: 15000,
-          retries: 3,
+          timeout: isProduction ? 25000 : 15000, // Longer timeout for production builds
+          retries: isProduction ? 4 : 3, // More retries for production builds
         };
       case 'testnet':
         return {
