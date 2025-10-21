@@ -124,9 +124,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const getTransactionTitle = (transaction: Transaction) => {
     switch (transaction.type) {
       case 'send':
-        return `Send to ${transaction.to_user}`;
+        return `Send to ${transaction.to_user || 'Unknown'}`;
       case 'receive':
-        return `Received from ${transaction.from_user}`;
+        return `Received from ${transaction.from_user || 'Unknown'}`;
       case 'deposit':
         return 'Top Up Wallet';
       case 'withdraw':
@@ -137,7 +137,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   };
 
   const getTransactionAmount = (transaction: Transaction) => {
-    const amount = transaction.amount;
+    const amount = transaction.amount || 0;
     const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
     
     return {
@@ -171,7 +171,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   };
 
   // Check if this is a group transaction
-  const isGroupTransaction = transaction.id.startsWith('group_');
+  const isGroupTransaction = transaction.id && transaction.id.startsWith('group_');
   const groupId = isGroupTransaction ? transaction.id.replace('group_', '') : null;
 
   // Navigate to group details
@@ -238,27 +238,26 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 nestedScrollEnabled={true}
                 scrollEventThrottle={16}
               >
-               
                   {/* Transaction Details */}
                   <View style={styles.transactionDetailsContainer}>
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>Amount:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.amount.toFixed(2)} {transaction.currency}
+                        {transaction.amount ? transaction.amount.toFixed(2) : '0.00'} {transaction.currency || 'USDC'}
                       </Text>
                     </View>
 
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>Date:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {formatDate(transaction.created_at)}
+                        {transaction.created_at ? formatDate(transaction.created_at) : 'N/A'}
                       </Text>
                     </View>
 
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>Type:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                        {transaction.type ? transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1) : 'N/A'}
                       </Text>
                     </View>
 
@@ -297,14 +296,14 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>Transaction ID:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.id}
+                        {transaction.id || 'N/A'}
                       </Text>
                     </View>
 
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>Status:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                        {transaction.status ? transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1) : 'N/A'}
                       </Text>
                     </View>
 
@@ -322,7 +321,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     {/* Group Navigation Button - Only show for group transactions */}
                     {isGroupTransaction && navigation && (
                       <View style={styles.transactionDetailRow}>
-                        <Text style={styles.transactionDetailLabel}></Text>
+                        <View style={{ flex: 1 }} />
                         <TouchableOpacity 
                           style={styles.groupNavigationButton}
                           onPress={navigateToGroup}
@@ -340,7 +339,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                         <View style={styles.transactionDetailRow}>
                           <Text style={styles.transactionDetailLabel}>Company Fee:</Text>
                           <Text style={styles.transactionDetailValue}>
-                            {transaction.company_fee.toFixed(2)} {transaction.currency}
+                            {transaction.company_fee ? transaction.company_fee.toFixed(2) : '0.00'} {transaction.currency || 'USDC'}
                           </Text>
                         </View>
 
@@ -348,7 +347,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                           <View style={styles.transactionDetailRow}>
                             <Text style={styles.transactionDetailLabel}>Net Amount:</Text>
                             <Text style={styles.transactionDetailValue}>
-                              {transaction.net_amount.toFixed(2)} {transaction.currency}
+                              {transaction.net_amount ? transaction.net_amount.toFixed(2) : '0.00'} {transaction.currency || 'USDC'}
                             </Text>
                           </View>
                         )}
@@ -359,7 +358,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       <View style={styles.transactionDetailRow}>
                         <Text style={styles.transactionDetailLabel}>Gas Fee:</Text>
                         <Text style={styles.transactionDetailValue}>
-                          {transaction.gas_fee.toFixed(6)} SOL
+                          {transaction.gas_fee ? transaction.gas_fee.toFixed(6) : '0.000000'} SOL
                         </Text>
                       </View>
                     )}
@@ -375,7 +374,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
                     {/* Solscan Link - Show for all transactions for testing */}
                     <View style={styles.transactionDetailRow}>
-                      <Text style={styles.transactionDetailLabel}></Text>
+                      <View style={{ flex: 1 }} />
                       <TouchableOpacity onPress={openSolscan}>
                         <Text style={styles.transactionDetailValueLink}>
                           View on Solscan

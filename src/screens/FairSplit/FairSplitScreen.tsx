@@ -2655,17 +2655,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                         </LinearGradient>
                       </TouchableOpacity>
                       
-                      {/* DEV BUTTONS - Always show to creators in dev mode */}
-                      {__DEV__ && (
-                        <TouchableOpacity 
-                          style={styles.devButton} 
-                          onPress={handleDevWithdraw}
-                        >
-                          <Text style={styles.devButtonText}>
-                            🚀 DEV: Withdraw Funds
-                          </Text>
-                        </TouchableOpacity>
-                      )}
                     </View>
                   );
                 } else if (isFullyCovered && !isCreator) {

@@ -38,9 +38,9 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
   const getTransactionTitle = () => {
     switch (transaction.type) {
       case 'send':
-        return `Send to ${transaction.to_user}`;
+        return `Send to ${transaction.to_user || 'Unknown'}`;
       case 'receive':
-        return `Received from ${transaction.from_user}`;
+        return `Received from ${transaction.from_user || 'Unknown'}`;
       case 'deposit':
         return 'Deposit';
       case 'withdraw':
@@ -66,7 +66,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
   };
 
   const getTransactionAmount = () => {
-    const amount = transaction.amount;
+    const amount = transaction.amount || 0;
     const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
     
     return {
@@ -75,11 +75,11 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
     };
   };
 
-  const transactionTime = new Date(transaction.created_at).toLocaleTimeString('en-US', {
+  const transactionTime = transaction.created_at ? new Date(transaction.created_at).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true
-  });
+  }) : 'N/A';
 
   const { amount, color } = getTransactionAmount();
 
