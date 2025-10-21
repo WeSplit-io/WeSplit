@@ -11,22 +11,12 @@ import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
 import { logger } from '../../services/loggingService';
-import { 
-  validatePaymentAmount, 
-  validateContactForRequest, 
-  validateUserForRequest,
-  handlePaymentRequestError,
-  logPaymentRequestAttempt,
-  logPaymentRequestSuccess,
-  isAmountValid,
-  createRequestSuccessNavigationData
-} from '../../utils/requestUtils';
 
 const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, groupId } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState('0');
   const [showAddNote, setShowAddNote] = useState(false);
   const [note, setNote] = useState('');
   const [noteInputWidth, setNoteInputWidth] = useState(60);
@@ -54,88 +44,86 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
   }, [note, maxNoteInputWidth]);
 
   const handleAmountChange = (value: string) => {
-    // Allow numbers, decimal point, and comma (for decimal separator)
-    const cleaned = value.replace(/[^0-9.,]/g, '');
-
-    // Convert comma to period for consistency (comma as decimal separator)
-    const normalized = cleaned.replace(',', '.');
+    // Only allow numbers and decimal point
+    const cleaned = value.replace(/[^0-9.]/g, '');
 
     // Prevent multiple decimal points
-    const parts = normalized.split('.');
+    const parts = cleaned.split('.');
     if (parts.length > 2) return;
 
     // Limit decimal places to 2
     if (parts.length === 2 && parts[1].length > 2) return;
 
-    setAmount(normalized);
+    setAmount(cleaned || '0');
   };
 
   const handleContinue = async () => {
-    // Validate amount
-    const amountValidation = validatePaymentAmount(amount);
-    if (!amountValidation.isValid) {
-      Alert.alert('Error', amountValidation.error || 'Please enter a valid amount');
+    const numAmount = parseFloat(amount);
+    if (!numAmount || numAmount <= 0) {
+      Alert.alert('Error', 'Please enter a valid amount');
       return;
     }
 
-    // Validate contact
-    const contactValidation = validateContactForRequest(contact);
-    if (!contactValidation.isValid) {
-      Alert.alert('Error', contactValidation.error || 'Contact information is missing');
-      return;
-    }
-
-    // Validate user
-    const userValidation = validateUserForRequest(currentUser);
-    if (!userValidation.isValid) {
-      Alert.alert('Error', userValidation.error || 'User not authenticated');
+    if (!contact) {
+      Alert.alert('Error', 'Contact information is missing');
       return;
     }
 
     try {
-      logPaymentRequestAttempt(
-        currentUser.id,
-        contact.id,
-        amountValidation.numAmount!,
-        note.trim(),
-        groupId,
-        'RequestAmountScreen'
-      );
+      logger.info('Creating payment request', {
+        senderId: currentUser?.id,
+        recipientId: contact.id,
+        amount: numAmount,
+        description: note.trim(),
+        groupId
+      });
 
       // Create the payment request using Firebase service
       const paymentRequest = await createPaymentRequest(
-        currentUser.id,
+        currentUser?.id || '',
         contact.id,
-        amountValidation.numAmount!,
+        numAmount,
         'USDC',
         note.trim(),
         groupId
       );
 
-      logPaymentRequestSuccess(paymentRequest, 'RequestAmountScreen');
+      logger.info('Payment request created successfully', { paymentRequest }, 'RequestAmountScreen');
 
       // Navigate to success screen with the actual request data
-      navigation.navigate('RequestSuccess', createRequestSuccessNavigationData(
-        contact,
-        amountValidation.numAmount!,
-        note.trim(),
-        paymentRequest.id,
-        paymentRequest,
-        groupId
-      ));
+    navigation.navigate('RequestSuccess', {
+      contact,
+      amount: numAmount,
+      description: note.trim(),
+      groupId,
+        requestId: paymentRequest.id,
+        paymentRequest
+      });
     } catch (error) {
-      handlePaymentRequestError(error, 'RequestAmount');
+      console.error('❌ RequestAmount: Error creating payment request:', error);
+      
+      // More detailed error logging
+      if (error instanceof Error) {
+        console.error('❌ RequestAmount: Error details:', {
+          message: error.message,
+          stack: error.stack
+        });
+      }
+      
+      Alert.alert(
+        'Error', 
+        `Failed to create payment request: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   };
 
-  const amountValid = isAmountValid(amount);
-
-  // Temporary fallback for formatWalletAddress
-  const formatWalletAddressLocal = (address: string): string => {
+  const formatWalletAddress = (address: string) => {
     if (!address) return '';
     if (address.length <= 8) return address;
     return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
   };
+
+  const isAmountValid = parseFloat(amount) > 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -162,11 +150,11 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
           backgroundColor={colors.surface}
         />
         <Text style={styles.requestRecipientName}>
-          {contact?.name || formatWalletAddressLocal(contact?.wallet_address || '')}
+          {contact?.name || formatWalletAddress(contact?.wallet_address || '')}
         </Text>
         <Text style={styles.requestRecipientEmail}>
           {contact?.wallet_address
-            ? formatWalletAddressLocal(contact.wallet_address)
+            ? formatWalletAddress(contact.wallet_address)
             : contact?.email || ''}
         </Text>
       </View>
@@ -192,7 +180,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
                 onChangeText={handleAmountChange}
                 placeholder="0"
                 placeholderTextColor={colors.textSecondary}
-                keyboardType="decimal-pad"
+                keyboardType="numeric"
                 autoFocus={true}
                 textAlign="center"
                 selectionColor={colors.brandGreen}

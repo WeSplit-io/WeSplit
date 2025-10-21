@@ -5,7 +5,7 @@
  */
 
 import { Platform } from 'react-native';
-import { consolidatedTransactionService } from '../transaction';
+import { consolidatedTransactionService } from '../consolidatedTransactionService';
 import { logger } from '../loggingService';
 import { FeeService } from '../../config/feeConfig';
 import { roundUsdcAmount } from '../../utils/currencyUtils';

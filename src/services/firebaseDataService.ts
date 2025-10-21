@@ -1433,105 +1433,69 @@ export const firebaseGroupService = {
   // Search users by username/name
   searchUsersByUsername: async (searchTerm: string, excludeUserId?: string): Promise<User[]> => {
     try {
-      if (__DEV__) { logger.debug('Searching users by username', { searchTerm, excludeUserId }, 'firebaseDataService'); }
+      if (__DEV__) { logger.debug('Searching users by username', { searchTerm }, 'firebaseDataService'); }
       
-      // Test Firebase connection
-      if (!db) {
-        throw new Error('Firebase database connection not available');
-      }
+      const usersRef = collection(db, 'users');
       
-      // Simple test - try to access the collection first
-      let allDocs;
-      try {
-        const usersRef = collection(db, 'users');
-        if (__DEV__) { logger.debug('Created users collection reference', null, 'firebaseDataService'); }
-        
-        // Get all users and filter client-side for better search results
-        // This is more reliable than Firestore range queries for partial matches
-        const allUsersQuery = query(usersRef, limit(100)); // Limit to prevent performance issues
-        if (__DEV__) { logger.debug('Created query, about to execute getDocs', null, 'firebaseDataService'); }
-        allDocs = await getDocs(allUsersQuery);
-      } catch (firebaseError) {
-        logger.error('Firebase operation failed', {
-          error: firebaseError instanceof Error ? {
-            message: firebaseError.message,
-            stack: firebaseError.stack,
-            name: firebaseError.name
-          } : firebaseError,
-          searchTerm,
-          excludeUserId
-        }, 'firebaseDataService');
-        throw firebaseError;
-      }
-      
-      if (__DEV__) { logger.debug('Retrieved user documents', { count: allDocs.docs.length }, 'firebaseDataService'); }
+      // Get all users and filter client-side for better search results
+      // This is more reliable than Firestore range queries for partial matches
+      const allUsersQuery = query(usersRef, limit(100)); // Limit to prevent performance issues
+      const allDocs = await getDocs(allUsersQuery);
       
       const searchTermLower = searchTerm.toLowerCase().trim();
       const uniqueUsers = new Map<string, any>();
       
-      allDocs.forEach((doc, index) => {
-        try {
-          const userData = doc.data();
-          const userId = doc.id;
-          
-          // Skip excluded user
-          if (excludeUserId && userId === excludeUserId) {
-            return;
+      allDocs.forEach(doc => {
+        const userData = doc.data();
+        const userId = doc.id;
+        
+        // Skip excluded user
+        if (excludeUserId && userId === excludeUserId) {
+          return;
+        }
+        
+        // Skip users that don't have essential data (likely deleted or incomplete)
+        if (!userData.email || !userData.name) {
+          if (__DEV__) { 
+            logger.debug('Skipping user with incomplete data', { 
+              userId: userId.substring(0, 8) + '...',
+              hasEmail: !!userData.email,
+              hasName: !!userData.name
+            }, 'firebaseDataService'); 
           }
-          
-          // Skip users that don't have essential data (likely deleted or incomplete)
-          if (!userData.email || !userData.name) {
-            if (__DEV__) { 
-              logger.debug('Skipping user with incomplete data', { 
-                userId: userId.substring(0, 8) + '...',
-                hasEmail: !!userData.email,
-                hasName: !!userData.name
-              }, 'firebaseDataService'); 
-            }
-            return;
+          return;
+        }
+        
+        // Skip deleted or suspended users
+        if (userData.status === 'deleted' || userData.status === 'suspended') {
+          if (__DEV__) { 
+            logger.debug('Skipping user with inactive status', { 
+              userId: userId.substring(0, 8) + '...',
+              status: userData.status
+            }, 'firebaseDataService'); 
           }
-          
-          // Skip deleted or suspended users
-          if (userData.status === 'deleted' || userData.status === 'suspended') {
-            if (__DEV__) { 
-              logger.debug('Skipping user with inactive status', { 
-                userId: userId.substring(0, 8) + '...',
-                status: userData.status
-              }, 'firebaseDataService'); 
-            }
-            return;
-          }
-          
-          const userName = (userData.name || '').toLowerCase();
-          const userEmail = (userData.email || '').toLowerCase();
-          const userWallet = (userData.wallet_address || '').toLowerCase();
-          
-          // Check if search term matches name, email, or wallet address
-          const matchesName = userName.includes(searchTermLower);
-          const matchesEmail = userEmail.includes(searchTermLower);
-          const matchesWallet = userWallet.includes(searchTermLower);
-          
-          if (matchesName || matchesEmail || matchesWallet) {
-            uniqueUsers.set(userId, {
-              id: userId,
-              name: userData.name || '',
-              email: userData.email || '',
-              wallet_address: userData.wallet_address || '',
-              wallet_public_key: userData.wallet_public_key || '',
-              created_at: firebaseDataTransformers.timestampToISO(userData.created_at),
-              avatar: userData.avatar || ''
-            });
-          }
-        } catch (docError) {
-          logger.error('Error processing user document', {
-            error: docError instanceof Error ? {
-              message: docError.message,
-              stack: docError.stack,
-              name: docError.name
-            } : docError,
-            docIndex: index,
-            docId: doc.id
-          }, 'firebaseDataService');
+          return;
+        }
+        
+        const userName = (userData.name || '').toLowerCase();
+        const userEmail = (userData.email || '').toLowerCase();
+        const userWallet = (userData.wallet_address || '').toLowerCase();
+        
+        // Check if search term matches name, email, or wallet address
+        const matchesName = userName.includes(searchTermLower);
+        const matchesEmail = userEmail.includes(searchTermLower);
+        const matchesWallet = userWallet.includes(searchTermLower);
+        
+        if (matchesName || matchesEmail || matchesWallet) {
+          uniqueUsers.set(userId, {
+            id: userId,
+            name: userData.name || '',
+            email: userData.email || '',
+            wallet_address: userData.wallet_address || '',
+            wallet_public_key: userData.wallet_public_key || '',
+            created_at: firebaseDataTransformers.timestampToISO(userData.created_at),
+            avatar: userData.avatar || ''
+          });
         }
       });
       
@@ -1567,15 +1531,7 @@ export const firebaseGroupService = {
       
       return limitedResults;
     } catch (error) {
-      logger.error('Error searching users by username', {
-        error: error instanceof Error ? {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
-        } : error,
-        searchTerm,
-        excludeUserId
-      }, 'firebaseDataService');
+      if (__DEV__) { console.error('🔥 Error searching users:', error); }
       return [];
     }
   },
@@ -2473,7 +2429,48 @@ export const firebaseTransactionService = {
   }
 };
 
+// Notification services
 // Notification services moved to NotificationService.ts
+export const firebaseNotificationService = {
+  getUserNotifications: async (userId: string): Promise<Notification[]> => {
+    try {
+      const notificationsRef = collection(db, 'notifications');
+      const notificationsQuery = query(
+        notificationsRef,
+        where('userId', '==', userId),
+        orderBy('created_at', 'desc')
+      );
+      const notificationsDocs = await getDocs(notificationsQuery);
+      
+      return notificationsDocs.docs.map(doc => firebaseDataTransformers.firestoreToNotification(doc));
+    } catch (error) {
+      if (__DEV__) { console.error('🔥 Error getting user notifications:', error); }
+      return [];
+    }
+  },
+
+  createNotification: async (notificationData: Omit<Notification, 'id' | 'created_at'>): Promise<Notification> => {
+    const notificationRef = await addDoc(collection(db, 'notifications'), firebaseDataTransformers.notificationToFirestore(notificationData));
+    
+    return {
+      ...notificationData,
+      id: notificationRef.id,
+      created_at: new Date().toISOString()
+    } as Notification;
+  },
+
+  markNotificationAsRead: async (notificationId: string): Promise<void> => {
+    const notificationRef = doc(db, 'notifications', notificationId);
+    await updateDoc(notificationRef, {
+      is_read: true,
+      updated_at: serverTimestamp()
+    });
+  },
+    
+  deleteNotification: async (notificationId: string): Promise<void> => {
+    await deleteDoc(doc(db, 'notifications', notificationId));
+  }
+};
 
 // Balance calculation
 const calculateUserBalance = (expenses: Expense[], members: GroupMember[], userId: string | number): number => {
@@ -2654,7 +2651,7 @@ export const firebaseSettlementService = {
       // 1. Calculate settlements
       // 2. Create settlement records in Firestore
       // 3. Update expense statuses
-      // 4. Send notifications using notificationService
+      // 4. Send notifications using firebaseNotificationService
       
       return {
         message: 'Settlement processed successfully',
@@ -3135,10 +3132,9 @@ export const firebaseDataService = {
   group: firebaseGroupService,
   expense: firebaseExpenseService,
   transaction: firebaseTransactionService,
+  notification: firebaseNotificationService,
   settlement: firebaseSettlementService,
   multiSig: firebaseMultiSigService,
   linkedWallet: firebaseLinkedWalletService,
-  transformers: firebaseDataTransformers,
-  // Direct access to search method
-  searchUsersByUsername: firebaseGroupService.searchUsersByUsername
+  transformers: firebaseDataTransformers
 }; 

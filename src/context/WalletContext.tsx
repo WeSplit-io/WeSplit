@@ -8,7 +8,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { walletService, WalletInfo as ConsolidatedWalletInfo } from '../services/WalletService';
-import { consolidatedTransactionService } from '../services/transaction';
+import { consolidatedTransactionService } from '../services/consolidatedTransactionService';
 import { solanaWalletService } from '../wallet/solanaWallet';
 import { logger } from '../services/loggingService';
 

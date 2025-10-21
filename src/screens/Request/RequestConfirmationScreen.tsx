@@ -10,14 +10,6 @@ import { createPaymentRequest } from '../../services/firebasePaymentRequestServi
 import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
-import { 
-  validateContactForRequest, 
-  validateUserForRequest,
-  handlePaymentRequestError,
-  logPaymentRequestAttempt,
-  logPaymentRequestSuccess,
-  createRequestSuccessNavigationData
-} from '../../utils/requestUtils';
 
 const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, amount, description, groupId } = route.params || {};
@@ -26,32 +18,19 @@ const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const [requesting, setRequesting] = useState(false);
 
   const handleConfirmRequest = async () => {
-    // Validate user
-    const userValidation = validateUserForRequest(currentUser);
-    if (!userValidation.isValid) {
-      Alert.alert('Error', userValidation.error || 'User not authenticated');
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User not authenticated');
       return;
     }
 
-    // Validate contact
-    const contactValidation = validateContactForRequest(contact);
-    if (!contactValidation.isValid) {
-      Alert.alert('Error', contactValidation.error || 'Contact information is missing');
+    if (!contact?.id) {
+      Alert.alert('Error', 'Contact information is missing');
       return;
     }
 
     setRequesting(true);
     
     try {
-      logPaymentRequestAttempt(
-        currentUser.id,
-        contact.id,
-        amount,
-        description || '',
-        groupId,
-        'RequestConfirmationScreen'
-      );
-
       // Create payment request using Firebase service
       const createdRequest = await createPaymentRequest(
         currentUser.id,
@@ -62,19 +41,18 @@ const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         groupId
       );
       
-      logPaymentRequestSuccess(createdRequest, 'RequestConfirmationScreen');
-      
       // Navigate to success screen with real request data
-      navigation.navigate('RequestSuccess', createRequestSuccessNavigationData(
+      navigation.navigate('RequestSuccess', {
         contact,
         amount,
-        description || '',
-        createdRequest.id,
+        description,
+        groupId,
+        requestId: createdRequest.id,
         createdRequest,
-        groupId
-      ));
+      });
     } catch (error) {
-      handlePaymentRequestError(error, 'RequestConfirmation');
+      console.error('Request error:', error);
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to send request. Please try again.');
     } finally {
       setRequesting(false);
     }

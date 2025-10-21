@@ -181,64 +181,13 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
 
       <View style={[styles.content, (isSplitMode || isRequestMode) && styles.contentWithButton]}>
         {isRequestMode && requestActiveTab === 'Show QR code' ? (
-          <View style={styles.qrCodeContainer}>
-            <Text style={styles.qrCodeTitle}>Show this QR code to your friend</Text>
-            
-            <View style={styles.qrCodeContent}>
-              <View style={styles.qrCodeWrapper}>
-                <View style={styles.qrCodeBox}>
-                  {currentUser?.wallet_address && currentUser.wallet_address.length > 0 ? (
-                    (() => {
-                      try {
-                        const qrValue = createUsdcRequestUri({ 
-                          recipient: currentUser.wallet_address, 
-                          label: 'WeSplit Payment',
-                          message: `Send USDC to ${currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}`
-                        });
-                        return (
-                          <QrCodeView
-                            value={qrValue}
-                            size={160}
-                            backgroundColor={colors.white}
-                            color={colors.black}
-                            showAddress={false}
-                            showButtons={false}
-                          />
-                        );
-                      } catch (error) {
-                        console.error('Error creating QR code:', error);
-                        return (
-                          <View style={styles.qrCodePlaceholder}>
-                            <Text style={styles.qrCodePlaceholderText}>Error creating QR code</Text>
-                          </View>
-                        );
-                      }
-                    })()
-                  ) : (
-                    <View style={styles.qrCodePlaceholder}>
-                      <Text style={styles.qrCodePlaceholderText}>No wallet address</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-              
-              <View style={styles.qrCodeUserInfo}>
-                <Text style={styles.qrCodeUserName}>
-                  {currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
-                </Text>
-                <Text style={styles.qrCodeUserWallet}>
-                  {currentUser?.wallet_address && currentUser.wallet_address.length > 12
-                    ? `${currentUser.wallet_address.substring(0, 6)}...${currentUser.wallet_address.substring(currentUser.wallet_address.length - 6)}`
-                    : currentUser?.wallet_address || 'No wallet connected'
-                  }
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.qrCodeDoneButton} onPress={() => navigation.goBack()}>
-              <Text style={styles.qrCodeDoneButtonText}>Done</Text>
-            </TouchableOpacity>
-          </View>
+          <QrCodeView
+            value={createUsdcRequestUri({ 
+              recipient: address || '', 
+              label: currentUser?.name || 'User' 
+            })}
+            size={300}
+          />
         ) : (
           <ContactsList
             onContactSelect={handleSelectContact}

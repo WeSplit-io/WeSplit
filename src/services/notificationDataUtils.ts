@@ -4,12 +4,33 @@
  */
 
 import { logger } from './loggingService';
-import { NotificationData } from '../types/standardized';
 
-export interface StandardizedNotificationData extends NotificationData {
-  // Legacy compatibility fields
+export interface StandardizedNotificationData {
+  // Core request data
+  requestId?: string;
+  expenseId?: string;
+  splitId?: string;
+  
+  // User identification (multiple field names for compatibility)
+  senderId: string;
+  senderName: string;
   requester: string;
   sender: string;
+  
+  // Payment data
+  amount: number;
+  currency: string;
+  description?: string;
+  
+  // Group context
+  groupId?: string;
+  groupName?: string;
+  
+  // Status
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  
+  // Additional context
+  [key: string]: any;
 }
 
 /**

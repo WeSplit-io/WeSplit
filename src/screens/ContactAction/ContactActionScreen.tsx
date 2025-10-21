@@ -11,16 +11,6 @@ import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
 import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
 import { logger } from '../../services/loggingService';
-import { 
-  validatePaymentAmount, 
-  validateContactForRequest, 
-  validateUserForRequest,
-  handlePaymentRequestError,
-  logPaymentRequestAttempt,
-  logPaymentRequestSuccess,
-  isAmountValid,
-  createRequestSuccessNavigationData
-} from '../../utils/requestUtils';
 
 interface ContactActionScreenProps {
   navigation: any;
@@ -44,7 +34,7 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
     });
   }, [selectedContact]);
   const [activeAction, setActiveAction] = useState<'send' | 'request'>('send');
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState('0');
   const [showAddNote, setShowAddNote] = useState(false);
   const [note, setNote] = useState('');
   const [noteInputWidth, setNoteInputWidth] = useState(60);
@@ -66,34 +56,28 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
   };
 
   const handleAmountChange = (value: string) => {
-    // Allow numbers, decimal point, and comma (for decimal separator)
-    const cleaned = value.replace(/[^0-9.,]/g, '');
-
-    // Convert comma to period for consistency (comma as decimal separator)
-    const normalized = cleaned.replace(',', '.');
+    // Only allow numbers and decimal point
+    const cleaned = value.replace(/[^0-9.]/g, '');
 
     // Prevent multiple decimal points
-    const parts = normalized.split('.');
+    const parts = cleaned.split('.');
     if (parts.length > 2) return;
 
     // Limit decimal places to 2
     if (parts.length === 2 && parts[1].length > 2) return;
 
-    setAmount(normalized);
+    setAmount(cleaned || '0');
   };
 
   const handleContinue = async () => {
-    // Validate amount
-    const amountValidation = validatePaymentAmount(amount);
-    if (!amountValidation.isValid) {
-      Alert.alert('Invalid Amount', amountValidation.error || 'Please enter a valid amount greater than 0');
+    const numAmount = parseFloat(amount);
+    if (!numAmount || numAmount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
       return;
     }
 
-    // Validate contact
-    const contactValidation = validateContactForRequest(selectedContact);
-    if (!contactValidation.isValid) {
-      Alert.alert('Error', contactValidation.error || 'Contact information is missing');
+    if (!selectedContact) {
+      Alert.alert('Error', 'Contact information is missing');
       return;
     }
 
@@ -102,64 +86,73 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
       navigation.navigate('SendConfirmation', {
         destinationType: 'friend',
         contact: selectedContact,
-        amount: amountValidation.numAmount!,
+        amount: numAmount,
         description: note.trim(),
         isSettlement: false,
       });
     } else {
       // Handle request directly here
-      const userValidation = validateUserForRequest(currentUser);
-      if (!userValidation.isValid) {
-        Alert.alert('Error', userValidation.error || 'User not authenticated');
+      if (!currentUser?.id) {
+        Alert.alert('Error', 'User not authenticated');
         return;
       }
 
       setProcessing(true);
       try {
-        logPaymentRequestAttempt(
-          currentUser.id,
-          selectedContact.id,
-          amountValidation.numAmount!,
-          note.trim(),
-          undefined,
-          'ContactActionScreen'
-        );
+        logger.info('Creating payment request', {
+          senderId: currentUser.id,
+          recipientId: selectedContact.id,
+          amount: numAmount,
+          description: note.trim(),
+        });
 
         // Create the payment request using Firebase service
         const paymentRequest = await createPaymentRequest(
           currentUser.id,
           selectedContact.id,
-          amountValidation.numAmount!,
+          numAmount,
           'USDC',
           note.trim()
         );
 
-        logPaymentRequestSuccess(paymentRequest, 'ContactActionScreen');
+        logger.info('Payment request created successfully', { paymentRequest }, 'ContactActionScreen');
 
         // Navigate to success screen with the actual request data
-        navigation.navigate('RequestSuccess', createRequestSuccessNavigationData(
-          selectedContact,
-          amountValidation.numAmount!,
-          note.trim(),
-          paymentRequest.id,
-          paymentRequest
-        ));
+        navigation.navigate('RequestSuccess', {
+          contact: selectedContact,
+          amount: numAmount,
+          description: note.trim(),
+          requestId: paymentRequest.id,
+          paymentRequest,
+        });
       } catch (error) {
-        handlePaymentRequestError(error, 'ContactAction');
+        console.error('❌ ContactAction: Error creating payment request:', error);
+        
+        // More detailed error logging
+        if (error instanceof Error) {
+          console.error('❌ ContactAction: Error details:', {
+            message: error.message,
+            stack: error.stack
+          });
+        }
+        
+        Alert.alert(
+          'Error', 
+          `Failed to create payment request: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       } finally {
         setProcessing(false);
       }
     }
   };
 
-  const amountValid = isAmountValid(amount);
-
-  // Temporary fallback for formatWalletAddress
-  const formatWalletAddressLocal = (address: string): string => {
+  const formatWalletAddress = (address: string) => {
     if (!address) return '';
     if (address.length <= 8) return address;
     return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
   };
+
+  const isAmountValid = parseFloat(amount) > 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -222,11 +215,11 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
           />
         </View>
         <Text style={styles.recipientName}>
-          {selectedContact?.name || formatWalletAddressLocal(selectedContact?.wallet_address || '')}
+          {selectedContact?.name || formatWalletAddress(selectedContact?.wallet_address || '')}
         </Text>
         <Text style={styles.recipientEmail}>
           {selectedContact?.wallet_address
-            ? formatWalletAddressLocal(selectedContact.wallet_address)
+            ? formatWalletAddress(selectedContact.wallet_address)
             : selectedContact?.email || ''}
         </Text>
       </View>
@@ -252,7 +245,7 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
                 onChangeText={handleAmountChange}
                 placeholder="0"
                 placeholderTextColor={colors.textSecondary}
-                keyboardType="decimal-pad"
+                keyboardType="numeric"
                 autoFocus={true}
                 textAlign="center"
                 selectionColor={colors.brandGreen}

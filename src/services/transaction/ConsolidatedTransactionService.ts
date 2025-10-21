@@ -6,8 +6,8 @@
 
 import { TransactionWalletManager } from './TransactionWalletManager';
 import { TransactionProcessor } from './TransactionProcessor';
+import { PaymentRequestManager } from './PaymentRequestManager';
 import { BalanceManager } from './BalanceManager';
-import { firebasePaymentRequestService } from '../firebasePaymentRequestService';
 import { logger } from '../loggingService';
 import { 
   TransactionParams, 
@@ -24,11 +24,13 @@ class ConsolidatedTransactionService {
   private static instance: ConsolidatedTransactionService;
   private walletManager: TransactionWalletManager;
   private transactionProcessor: TransactionProcessor;
+  private paymentRequestManager: PaymentRequestManager;
   private balanceManager: BalanceManager;
 
   private constructor() {
     this.walletManager = new TransactionWalletManager();
     this.transactionProcessor = new TransactionProcessor();
+    this.paymentRequestManager = new PaymentRequestManager();
     this.balanceManager = new BalanceManager();
   }
 
@@ -225,27 +227,14 @@ class ConsolidatedTransactionService {
     description?: string,
     groupId?: string
   ): Promise<PaymentRequestResult> {
-    try {
-      const paymentRequest = await firebasePaymentRequestService.createPaymentRequest(
-        senderId,
-        recipientId,
-        amount,
-        currency,
-        description,
-        groupId
-      );
-      
-      return {
-        success: true,
-        requestId: paymentRequest.id
-      };
-    } catch (error) {
-      logger.error('Failed to create payment request', error, 'ConsolidatedTransactionService');
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      };
-    }
+    return this.paymentRequestManager.createPaymentRequest(
+      senderId,
+      recipientId,
+      amount,
+      currency,
+      description,
+      groupId
+    );
   }
 
   /**
@@ -256,42 +245,14 @@ class ConsolidatedTransactionService {
     transactionId: string,
     status: 'completed' | 'failed' | 'cancelled' = 'completed'
   ): Promise<PaymentRequestResult> {
-    try {
-      // Update payment request status in Firebase
-      const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
-      const { db } = await import('../../config/firebase');
-      
-      const requestRef = doc(db, 'paymentRequests', requestId);
-      await updateDoc(requestRef, {
-        status,
-        transactionId,
-        updated_at: serverTimestamp(),
-      });
-
-      return {
-        success: true,
-        requestId,
-        transactionId
-      };
-    } catch (error) {
-      logger.error('Failed to process payment request', error, 'ConsolidatedTransactionService');
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      };
-    }
+    return this.paymentRequestManager.processPaymentRequest(requestId, transactionId, status);
   }
 
   /**
    * Get payment requests for a user
    */
   async getPaymentRequests(userId: string): Promise<PaymentRequest[]> {
-    try {
-      return await firebasePaymentRequestService.getReceivedPaymentRequests(userId);
-    } catch (error) {
-      logger.error('Failed to get payment requests', error, 'ConsolidatedTransactionService');
-      return [];
-    }
+    return this.paymentRequestManager.getPaymentRequests(userId);
   }
 
   // ===== BALANCE METHODS =====
