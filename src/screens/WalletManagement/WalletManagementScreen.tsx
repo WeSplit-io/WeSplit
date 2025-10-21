@@ -834,7 +834,7 @@ const WalletManagementScreen: React.FC = () => {
                   style={styles.actionButtonIconNoTint}
                 />
               </View>
-              <Text style={styles.actionButtonText}>Linked Wallets</Text>
+              <Text style={styles.actionButtonText}>Link Wallet</Text>
             </TouchableOpacity>
           </View>
         </View>

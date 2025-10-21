@@ -57,6 +57,12 @@ const AuthMethodsScreen: React.FC = () => {
   const [hasCheckedMonthlyVerification, setHasCheckedMonthlyVerification] = useState(false);
   const [hasHandledAuthState, setHasHandledAuthState] = useState(false);
 
+  // Email validation function
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email.trim());
+  };
+
   // Check if user is already authenticated
   useEffect(() => {
     if (hasHandledAuthState) {
@@ -703,17 +709,17 @@ const AuthMethodsScreen: React.FC = () => {
           </View>
           {/* Next Button */}
           <TouchableOpacity
-            style={[styles.nextButton, (!email || loading || socialLoading !== null) && styles.nextButtonDisabled]}
+            style={[styles.nextButton, (!email || !isValidEmail(email) || loading || socialLoading !== null) && styles.nextButtonDisabled]}
             onPress={() => {
               logger.info('Next button pressed', { email, loading, socialLoading }, 'AuthMethodsScreen');
               handleEmailAuth();
             }}
-            disabled={!email || loading || socialLoading !== null}
+            disabled={!email || !isValidEmail(email) || loading || socialLoading !== null}
           >
             {loading ? (
               <ActivityIndicator color={colors.black} />
             ) : (
-              (!email || loading || socialLoading !== null) ? (
+              (!email || !isValidEmail(email) || loading || socialLoading !== null) ? (
                 <Text style={[styles.nextButtonText, styles.nextButtonTextDisabled]}>Next</Text>
               ) : (
                 <LinearGradient

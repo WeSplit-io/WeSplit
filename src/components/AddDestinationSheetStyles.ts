@@ -15,8 +15,8 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
-    maxHeight: '90%',
-    minHeight: 500,
+    minHeight: 400,
+    flex: 1,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -27,6 +27,7 @@ export const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingBottom: spacing.xl,
+    minHeight: '100%',
   },
   modalHeader: {
     alignItems: 'center',

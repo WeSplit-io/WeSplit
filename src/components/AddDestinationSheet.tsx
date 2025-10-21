@@ -10,7 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
-  Dimensions
+  Dimensions,
+  Keyboard
 } from 'react-native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import { colors } from '../theme';
@@ -40,6 +41,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   const [chain, setChain] = useState('solana');
   const [kastAddress, setKastAddress] = useState('');
   const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Animation refs
   const translateY = useRef(new Animated.Value(0)).current;
@@ -88,6 +90,28 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
       }
     }
   };
+
+  // Keyboard listeners
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   // Animate in when modal becomes visible and reset form
   useEffect(() => {
@@ -319,6 +343,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
                 styles.modalContent,
                 {
                   transform: [{ translateY }],
+                  maxHeight: keyboardHeight > 0 ? '90%' : '60%',
                 },
               ]}
             >
@@ -329,8 +354,8 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
                 enabled={true}
               >
                 <ScrollView 
-                  style={{ flex: 1 }}
-                  contentContainerStyle={{ flexGrow: 1, paddingBottom: spacing.xl }}
+                  style={styles.scrollContainer}
+                  contentContainerStyle={styles.scrollContent}
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}
                 >
