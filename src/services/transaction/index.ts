@@ -6,7 +6,6 @@
 export { consolidatedTransactionService } from './ConsolidatedTransactionService';
 export { TransactionWalletManager } from './TransactionWalletManager';
 export { TransactionProcessor } from './TransactionProcessor';
-export { PaymentRequestManager } from './PaymentRequestManager';
 export { BalanceManager } from './BalanceManager';
 
 export type {

@@ -5,7 +5,7 @@
 
 import { firebaseDataService } from './firebaseDataService';
 import { logger } from './loggingService';
-import { User, UserContact } from '../types';
+import { User, UserContact, Transaction } from '../types';
 
 export interface UserSearchResult extends User {
   isAlreadyContact: boolean;
@@ -24,6 +24,38 @@ export interface UserSearchOptions {
 
 export class UserSearchService {
   /**
+   * Test Firebase connectivity
+   */
+  static async testFirebaseConnection(): Promise<boolean> {
+    try {
+      logger.debug('Testing Firebase connection', null, 'UserSearchService');
+      // Try to access the firebaseDataService
+      if (!firebaseDataService) {
+        logger.error('firebaseDataService is not available', null, 'UserSearchService');
+        return false;
+      }
+      
+      // Try to access the searchUsersByUsername method
+      if (typeof firebaseDataService.searchUsersByUsername !== 'function') {
+        logger.error('searchUsersByUsername method is not available', null, 'UserSearchService');
+        return false;
+      }
+      
+      logger.debug('Firebase connection test passed', null, 'UserSearchService');
+      return true;
+    } catch (error) {
+      logger.error('Firebase connection test failed', {
+        error: error instanceof Error ? {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        } : error
+      }, 'UserSearchService');
+      return false;
+    }
+  }
+
+  /**
    * Search users with advanced filtering and relationship context
    */
   static async searchUsers(
@@ -38,6 +70,12 @@ export class UserSearchService {
         options 
       }, 'UserSearchService');
 
+      // Test Firebase connectivity first
+      const isFirebaseConnected = await this.testFirebaseConnection();
+      if (!isFirebaseConnected) {
+        throw new Error('Firebase connection test failed');
+      }
+
       const {
         limit = 20,
         includeDeleted = false,
@@ -47,28 +85,72 @@ export class UserSearchService {
       } = options;
 
       // Get basic search results
-      const searchResults = await firebaseDataService.searchUsersByUsername(
-        searchTerm,
-        currentUserId
-      );
+      logger.debug('About to call searchUsersByUsername', { searchTerm, currentUserId }, 'UserSearchService');
+      let searchResults: User[] = [];
+      try {
+        searchResults = await firebaseDataService.searchUsersByUsername(
+          searchTerm,
+          currentUserId
+        );
+        logger.debug('searchUsersByUsername completed', { resultCount: searchResults.length }, 'UserSearchService');
+      } catch (searchError) {
+        logger.error('searchUsersByUsername failed', {
+          error: searchError instanceof Error ? {
+            message: searchError.message,
+            stack: searchError.stack,
+            name: searchError.name
+          } : searchError,
+          searchTerm,
+          currentUserId
+        }, 'UserSearchService');
+        throw searchError;
+      }
 
       // Get current user's contacts for relationship context
-      const userContacts = await firebaseDataService.user.getUserContacts(currentUserId);
+      logger.debug('About to get user contacts', { currentUserId }, 'UserSearchService');
+      let userContacts: UserContact[] = [];
+      try {
+        userContacts = await firebaseDataService.user.getUserContacts(currentUserId);
+        logger.debug('User contacts retrieved', { contactCount: userContacts.length }, 'UserSearchService');
+      } catch (contactsError) {
+        logger.error('getUserContacts failed', {
+          error: contactsError instanceof Error ? {
+            message: contactsError.message,
+            stack: contactsError.stack,
+            name: contactsError.name
+          } : contactsError,
+          currentUserId
+        }, 'UserSearchService');
+        // Continue with empty contacts rather than failing the entire search
+      }
       const contactIds = new Set(userContacts.map(contact => contact.id));
 
       // Get transaction history for relationship context
-      const transactionHistory = await firebaseDataService.transaction.getUserTransactionHistory(currentUserId);
+      logger.debug('About to get user transactions', { currentUserId }, 'UserSearchService');
+      let transactions: Transaction[] = [];
+      try {
+        transactions = await firebaseDataService.transaction.getUserTransactions(currentUserId);
+        logger.debug('User transactions retrieved', { transactionCount: transactions.length }, 'UserSearchService');
+      } catch (transactionsError) {
+        logger.error('getUserTransactions failed', {
+          error: transactionsError instanceof Error ? {
+            message: transactionsError.message,
+            stack: transactionsError.stack,
+            name: transactionsError.name
+          } : transactionsError,
+          currentUserId
+        }, 'UserSearchService');
+        // Continue with empty transactions rather than failing the entire search
+      }
       const transactionPartnerIds = new Set<string>();
       
-      if (transactionHistory.success) {
-        transactionHistory.transactions.forEach(transaction => {
-          if (transaction.from_user === currentUserId) {
-            transactionPartnerIds.add(transaction.to_user);
-          } else if (transaction.to_user === currentUserId) {
-            transactionPartnerIds.add(transaction.from_user);
-          }
-        });
-      }
+      transactions.forEach(transaction => {
+        if (transaction.from_user === currentUserId) {
+          transactionPartnerIds.add(transaction.to_user);
+        } else if (transaction.to_user === currentUserId) {
+          transactionPartnerIds.add(transaction.from_user);
+        }
+      });
 
       // Enrich search results with relationship context
       const enrichedResults: UserSearchResult[] = searchResults
@@ -141,7 +223,16 @@ export class UserSearchService {
 
       return limitedResults;
     } catch (error) {
-      logger.error('Failed to search users', error, 'UserSearchService');
+      logger.error('Failed to search users', {
+        error: error instanceof Error ? {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        } : error,
+        searchTerm,
+        currentUserId,
+        options
+      }, 'UserSearchService');
       return [];
     }
   }
@@ -175,31 +266,29 @@ export class UserSearchService {
 
       // Get transaction partners
       if (includeTransactionPartners) {
-        const transactionHistory = await firebaseDataService.transaction.getUserTransactionHistory(currentUserId);
-        if (transactionHistory.success) {
-          const partnerIds = new Set<string>();
-          transactionHistory.transactions.forEach(transaction => {
-            if (transaction.from_user === currentUserId) {
-              partnerIds.add(transaction.to_user);
-            } else if (transaction.to_user === currentUserId) {
-              partnerIds.add(transaction.from_user);
-            }
-          });
+        const transactions = await firebaseDataService.transaction.getUserTransactions(currentUserId);
+        const partnerIds = new Set<string>();
+        transactions.forEach(transaction => {
+          if (transaction.from_user === currentUserId) {
+            partnerIds.add(transaction.to_user);
+          } else if (transaction.to_user === currentUserId) {
+            partnerIds.add(transaction.from_user);
+          }
+        });
 
-          // Get user details for transaction partners
-          for (const partnerId of Array.from(partnerIds).slice(0, 5)) {
-            try {
-              const user = await firebaseDataService.user.getCurrentUser(partnerId);
-              if (user && user.status !== 'deleted' && user.status !== 'suspended') {
-                suggestions.push({
-                  ...user,
-                  isAlreadyContact: false,
-                  relationshipType: 'transaction_partner'
-                });
-              }
-            } catch (error) {
-              logger.warn('Failed to get user details for suggestion', { partnerId, error }, 'UserSearchService');
+        // Get user details for transaction partners
+        for (const partnerId of Array.from(partnerIds).slice(0, 5)) {
+          try {
+            const user = await firebaseDataService.user.getCurrentUser(partnerId);
+            if (user && user.status !== 'deleted' && user.status !== 'suspended') {
+              suggestions.push({
+                ...user,
+                isAlreadyContact: false,
+                relationshipType: 'transaction_partner'
+              });
             }
+          } catch (error) {
+            logger.warn('Failed to get user details for suggestion', { partnerId, error }, 'UserSearchService');
           }
         }
       }
@@ -228,7 +317,15 @@ export class UserSearchService {
 
       return uniqueSuggestions;
     } catch (error) {
-      logger.error('Failed to get user suggestions', error, 'UserSearchService');
+      logger.error('Failed to get user suggestions', {
+        error: error instanceof Error ? {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        } : error,
+        currentUserId,
+        options
+      }, 'UserSearchService');
       return [];
     }
   }
@@ -243,7 +340,14 @@ export class UserSearchService {
       logger.warn('getRecentUsers not implemented yet', null, 'UserSearchService');
       return [];
     } catch (error) {
-      logger.error('Failed to get recent users', error, 'UserSearchService');
+      logger.error('Failed to get recent users', {
+        error: error instanceof Error ? {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        } : error,
+        limit
+      }, 'UserSearchService');
       return [];
     }
   }
@@ -289,7 +393,15 @@ export class UserSearchService {
 
       return enrichedResults;
     } catch (error) {
-      logger.error('Failed to search users by wallet address', error, 'UserSearchService');
+      logger.error('Failed to search users by wallet address', {
+        error: error instanceof Error ? {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        } : error,
+        walletAddress: walletAddress.substring(0, 8) + '...',
+        currentUserId
+      }, 'UserSearchService');
       return [];
     }
   }
@@ -315,7 +427,15 @@ export class UserSearchService {
         relationshipType: isAlreadyContact ? 'contact' : 'none'
       };
     } catch (error) {
-      logger.error('Failed to get user profile', { userId, error }, 'UserSearchService');
+      logger.error('Failed to get user profile', { 
+        userId, 
+        currentUserId,
+        error: error instanceof Error ? {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        } : error
+      }, 'UserSearchService');
       return null;
     }
   }

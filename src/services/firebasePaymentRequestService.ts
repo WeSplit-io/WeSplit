@@ -22,21 +22,10 @@ import { db } from '../config/firebase';
 import { notificationService } from './notificationService';
 import { logger } from './loggingService';
 import { createPaymentRequestNotificationData, validateNotificationData } from './notificationDataUtils';
+import { StandardizedPaymentRequest } from '../types/standardized';
 
-export interface PaymentRequest {
-  id: string;
-  senderId: string;
-  recipientId: string;
-  amount: number;
-  currency: string;
-  description?: string;
-  groupId?: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
-  created_at: string;
-  updated_at: string;
-  senderName?: string;
-  recipientName?: string;
-}
+// Legacy interface for backward compatibility
+export interface PaymentRequest extends StandardizedPaymentRequest {}
 
 // Data transformation utilities
 const paymentRequestTransformers = {

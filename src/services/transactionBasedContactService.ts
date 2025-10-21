@@ -31,11 +31,20 @@ export interface TransactionContact {
 
 export class TransactionBasedContactService {
   private static transactionHistoryService = new TransactionHistoryService();
+  private static userCache = new Map<string, any>(); // Simple cache for user data
+
+  /**
+   * Clear the user cache (useful for testing or when user data changes)
+   */
+  static clearCache(): void {
+    this.userCache.clear();
+  }
 
   /**
    * Get all contacts based on transaction and split history
    */
   static async getTransactionBasedContacts(userId: string): Promise<UserContact[]> {
+    const startTime = Date.now();
     try {
       logger.info('Loading transaction-based contacts', { userId }, 'TransactionBasedContactService');
 
@@ -45,6 +54,15 @@ export class TransactionBasedContactService {
         this.getContactsFromSplits(userId),
         this.getManualContacts(userId)
       ]);
+      
+      const fetchTime = Date.now() - startTime;
+      logger.info('Contact fetching completed', { 
+        userId, 
+        fetchTimeMs: fetchTime,
+        transactionContacts: transactionContacts.length,
+        splitContacts: splitContacts.length,
+        manualContacts: manualContacts.length
+      }, 'TransactionBasedContactService');
 
       // Merge and deduplicate contacts
       const contactsMap = new Map<string, UserContact>();
@@ -118,7 +136,7 @@ export class TransactionBasedContactService {
   private static async getContactsFromTransactions(userId: string): Promise<UserContact[]> {
     try {
       const transactionHistory = await this.transactionHistoryService.getUserTransactionHistory(userId, {
-        limit: 100 // Get recent transactions
+        limit: 20 // Get recent transactions (reduced for performance)
       });
 
       if (!transactionHistory.success) {
@@ -149,9 +167,16 @@ export class TransactionBasedContactService {
 
         const contactId = String(contactUserId);
         
-        // Validate that the contact user still exists
+        // Validate that the contact user still exists (with caching)
         try {
-          const userDoc = await firebaseDataService.user.getCurrentUser(contactId);
+          let userDoc = this.userCache.get(contactId);
+          if (!userDoc) {
+            userDoc = await firebaseDataService.user.getCurrentUser(contactId);
+            if (userDoc) {
+              this.userCache.set(contactId, userDoc);
+            }
+          }
+          
           if (!userDoc) {
             logger.warn('Transaction contact references non-existent user, skipping', { 
               contactId, 
@@ -248,9 +273,16 @@ export class TransactionBasedContactService {
 
           const contactId = String(participant.userId);
           
-          // Validate that the contact user still exists
+          // Validate that the contact user still exists (with caching)
           try {
-            const userDoc = await firebaseDataService.user.getCurrentUser(contactId);
+            let userDoc = this.userCache.get(contactId);
+            if (!userDoc) {
+              userDoc = await firebaseDataService.user.getCurrentUser(contactId);
+              if (userDoc) {
+                this.userCache.set(contactId, userDoc);
+              }
+            }
+            
             if (!userDoc) {
               logger.warn('Split contact references non-existent user, skipping', { 
                 contactId, 

@@ -5,7 +5,7 @@ import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { SubscriptionService, SubscriptionPlan, UserSubscription, PaymentMethod } from '../../services/subscriptionService';
-import { consolidatedTransactionService } from '../../services/consolidatedTransactionService';
+import { consolidatedTransactionService } from '../../services/transaction';
 import styles from './styles';
 
 interface PremiumScreenProps {

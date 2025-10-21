@@ -4,7 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { consolidatedTransactionService, TransactionParams, TransactionResult } from '../services/consolidatedTransactionService';
+import { consolidatedTransactionService, TransactionParams, TransactionResult } from '../services/transaction';
 import { Keypair } from '@solana/web3.js';
 import { walletService } from '../services/WalletService';
 import { logger } from '../services/loggingService';

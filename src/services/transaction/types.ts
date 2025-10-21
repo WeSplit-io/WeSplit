@@ -5,6 +5,14 @@
 
 import { TransactionResult as UnifiedTransactionResult } from '../../types/unified';
 import { TransactionType } from '../../config/feeConfig';
+import { 
+  StandardizedPaymentRequest, 
+  PaymentRequestResult as StandardizedPaymentRequestResult,
+  StandardizedWalletInfo,
+  WalletBalance as StandardizedWalletBalance,
+  UsdcBalanceResult as StandardizedUsdcBalanceResult,
+  GasCheckResult as StandardizedGasCheckResult
+} from '../../types/standardized';
 
 export interface TransactionParams {
   to: string;
@@ -21,44 +29,20 @@ export interface TransactionResult extends UnifiedTransactionResult {
   netAmount?: number;
 }
 
-export interface PaymentRequest {
-  id: string;
-  senderId: string;
-  recipientId: string;
-  amount: number;
-  currency: string;
-  description?: string;
-  groupId?: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
-  created_at: string;
-  updated_at: string;
-}
+// Legacy interfaces for backward compatibility
+export interface PaymentRequest extends StandardizedPaymentRequest {}
+export interface PaymentRequestResult extends StandardizedPaymentRequestResult {}
+export interface WalletInfo extends StandardizedWalletInfo {}
+export interface WalletBalance extends StandardizedWalletBalance {}
+export interface UsdcBalanceResult extends StandardizedUsdcBalanceResult {}
+export interface GasCheckResult extends StandardizedGasCheckResult {}
 
-export interface PaymentRequestResult {
-  success: boolean;
-  requestId?: string;
-  transactionId?: string;
-  error?: string;
-}
-
-export interface WalletInfo {
-  address: string;
-  publicKey: string;
-}
-
-export interface WalletBalance {
-  usdc: number;
-  sol: number;
-}
-
-export interface UsdcBalanceResult {
-  success: boolean;
-  balance: number;
-  error?: string;
-}
-
-export interface GasCheckResult {
-  hasSufficient: boolean;
-  currentSol: number;
-  requiredSol: number;
-}
+// Re-export standardized types
+export type {
+  StandardizedPaymentRequest,
+  StandardizedPaymentRequestResult,
+  StandardizedWalletInfo,
+  StandardizedWalletBalance,
+  StandardizedUsdcBalanceResult,
+  StandardizedGasCheckResult
+};
