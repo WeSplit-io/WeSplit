@@ -28,7 +28,7 @@ class LoggingService {
     }
 
     const sanitized = { ...data };
-    
+
     for (const key of this.sensitiveKeys) {
       if (sanitized[key]) {
         sanitized[key] = '[REDACTED]';
@@ -87,4 +87,5 @@ class LoggingService {
   }
 }
 
-export const logger = new LoggingService(); 
+export const logger = new LoggingService();
+export default logger;

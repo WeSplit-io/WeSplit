@@ -7,9 +7,9 @@ module.exports = {
     '<rootDir>/dist/',
   ],
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|expo|@expo|@solana|@noble)/)',
+    'node_modules/(?!(react-native|@react-native|expo|@expo|@solana|@noble|@scure|ed25519-hd-key)/)',
   ],
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@app/(.*)$': '<rootDir>/src/app/$1',
     '^@components/(.*)$': '<rootDir>/src/components/$1',
     '^@features/(.*)$': '<rootDir>/src/features/$1',
@@ -17,6 +17,7 @@ module.exports = {
     '^@config/(.*)$': '<rootDir>/src/config/$1',
     '^@theme/(.*)$': '<rootDir>/src/theme/$1',
     '^@storage/(.*)$': '<rootDir>/src/storage/$1',
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

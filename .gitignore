@@ -177,3 +177,30 @@ receipt_extract/
 .DS_Store?
 
 scripts/
+
+# Security and audit files
+security-report.json
+.secrets.baseline
+*.security.log
+
+# Bundle analysis
+bundle-report.json
+bundle-analysis.html
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Performance reports
+.lighthouseci/
+lighthouse-report.html
+
+# Duplicate detection
+duplicate-report.json
+
+# Dead code analysis
+deadcode-report.json
+
+# Pipeline testing
+pipeline-test-report.json
+.secrets
