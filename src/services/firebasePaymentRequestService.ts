@@ -21,6 +21,7 @@ import {
 import { db } from '../config/firebase';
 import { notificationService } from './notificationService';
 import { logger } from './loggingService';
+import { createPaymentRequestNotificationData, validateNotificationData } from './notificationDataUtils';
 
 export interface PaymentRequest {
   id: string;
@@ -111,22 +112,56 @@ export async function createPaymentRequest(
     const paymentRequest = paymentRequestTransformers.firestoreToPaymentRequest(requestDoc);
     
     // Send notification to recipient
-    await notificationService.sendNotification(
-      recipientId,
-      'Payment Request',
-      `${senderName} has requested ${amount} ${currency}${description ? ` for ${description}` : ''}`,
-      'payment_request',
-      {
-        requestId: paymentRequest.id,
-        senderId: String(senderId),
-        senderName,
-        amount,
-        currency,
-        description,
-        groupId: groupId ? String(groupId) : '',
-        status: 'pending'
+    try {
+      // Validate recipient exists before sending notification
+      const recipientDoc = await getDoc(doc(db, 'users', String(recipientId)));
+      if (!recipientDoc.exists()) {
+        logger.warn('Recipient user not found, skipping notification', { recipientId }, 'firebasePaymentRequestService');
+      } else {
+        // Create standardized notification data
+        const notificationData = createPaymentRequestNotificationData(
+          String(senderId),
+          senderName,
+          String(recipientId),
+          amount,
+          currency,
+          description,
+          groupId ? String(groupId) : undefined,
+          paymentRequest.id
+        );
+
+        // Validate notification data
+        const validation = validateNotificationData(notificationData, 'payment_request');
+        if (!validation.isValid) {
+          logger.error('Invalid notification data for payment request', { 
+            errors: validation.errors,
+            notificationData 
+          }, 'firebasePaymentRequestService');
+          throw new Error(`Invalid notification data: ${validation.errors.join(', ')}`);
+        }
+
+        await notificationService.sendNotification(
+          String(recipientId),
+          'Payment Request',
+          `${senderName} has requested ${amount} ${currency}${description ? ` for ${description}` : ''}`,
+          'payment_request',
+          notificationData
+        );
+        logger.info('Payment request notification sent successfully', { 
+          recipientId: String(recipientId), 
+          senderId: String(senderId),
+          amount,
+          currency 
+        }, 'firebasePaymentRequestService');
       }
-    );
+    } catch (notificationError) {
+      logger.error('Failed to send payment request notification', { 
+        error: notificationError, 
+        recipientId: String(recipientId),
+        senderId: String(senderId)
+      }, 'firebasePaymentRequestService');
+      // Don't throw - payment request was created successfully, notification failure shouldn't break the flow
+    }
     
     if (__DEV__) { logger.info('Payment request created successfully', { paymentRequest }, 'firebasePaymentRequestService'); }
     

@@ -7,7 +7,7 @@ import NavBar from '../../components/NavBar';
 import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
+import { useContactActions } from '../../hooks';
 import { walletService } from '../../services/WalletService';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
@@ -25,6 +25,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     appWalletConnected,
     ensureAppWallet 
   } = useWallet();
+  const { addContact } = useContactActions();
   
   
   const [activeTab, setActiveTab] = useState<'friends' | 'external'>(initialTab || 'friends');
@@ -118,22 +119,13 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const handleAddContact = async (user: User) => {
-    if (!currentUser?.id) return;
+    const result = await addContact(user);
     
-    try {
-      await firebaseDataService.user.addContact(currentUser.id.toString(), {
-        name: user.name,
-        email: user.email,
-        wallet_address: user.wallet_address,
-        wallet_public_key: user.wallet_public_key,
-        avatar: user.avatar || '',
-        mutual_groups_count: 0,
-        isFavorite: false
-      });
-      
+    if (result.success) {
       logger.info('Contact added successfully', { userName: user.name }, 'SendScreen');
-    } catch (error) {
-      console.error('❌ Error adding contact:', error);
+    } else {
+      logger.error('Failed to add contact', { error: result.error }, 'SendScreen');
+      Alert.alert('Error', result.error || 'Failed to add contact');
     }
   };
 

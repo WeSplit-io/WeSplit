@@ -27,16 +27,13 @@ import { QRCodeScreen } from '../QRCode';
 import TransactionModal from '../../components/TransactionModal';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import { useGroupList } from '../../hooks/useGroupData';
-import { GroupWithDetails, Expense, GroupMember, Transaction } from '../../types';
+import { Transaction } from '../../types';
 import { formatCryptoAmount } from '../../utils/cryptoUtils';
-import { getTotalSpendingInUSDC } from '../../services/priceService';
 import { notificationService } from '../../services/notificationService';
 import { createPaymentRequest, getReceivedPaymentRequests } from '../../services/firebasePaymentRequestService';
 import { walletService, UserWalletBalance } from '../../services/WalletService';
 import { firebaseTransactionService, firebaseDataService } from '../../services/firebaseDataService';
 import { createUsdcRequestUri } from '@features/qr';
-import { SplitStorageService } from '../../services/splitStorageService';
 import { logger } from '../../services/loggingService';
 import { db } from '../../config/firebase';
 import { getDoc, doc } from 'firebase/firestore';
@@ -98,59 +95,26 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     getAppWalletBalance
   } = useWallet();
 
-  // Use efficient group list hook
-  const {
-    groups: originalGroups,
-    loading: groupsLoading,
-    refreshing,
-    refresh: refreshGroups
-  } = useGroupList();
-
-  // Use only dynamic groups from context
-  const groups = originalGroups;
-
-  // Load groups when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      const loadGroups = async () => {
-        try {
-          if (currentUser?.id) {
-            await refreshGroups(); // Use the refresh function from useGroupList
-          }
-        } catch (err) {
-          // Keep error logging for debugging
-          console.error('❌ Dashboard: Error loading groups:', err);
-        }
-      };
-
-      loadGroups();
-    }, [currentUser?.id, refreshGroups])
-  );
+  // Removed group-related logic
 
   const [priceLoading, setPriceLoading] = useState(false);
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
-  const [groupAmountsInUSD, setGroupAmountsInUSD] = useState<Record<string | number, number>>({});
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [userCreatedWalletBalance, setUserCreatedWalletBalance] = useState<UserWalletBalance | null>(null);
   const [loadingUserWallet, setLoadingUserWallet] = useState(false);
   const [connectingWallet, setConnectingWallet] = useState(false);
   const [walletSelectorVisible, setWalletSelectorVisible] = useState(false);
   const [showQRCodeScreen, setShowQRCodeScreen] = useState(false);
-  const [groupSummaries, setGroupSummaries] = useState<Record<string, { totalAmount: number; memberCount: number; expenseCount: number; hasData: boolean }>>({});
   const [transactionModalVisible, setTransactionModalVisible] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [realTransactions, setRealTransactions] = useState<Transaction[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
-  const [groupTransactions, setGroupTransactions] = useState<any[]>([]);
-  const [loadingGroupTransactions, setLoadingGroupTransactions] = useState(false);
   const [loadingPaymentRequests, setLoadingPaymentRequests] = useState(false);
   const [initialRequestsLoaded, setInitialRequestsLoaded] = useState(false);
   const [refreshBalance, setRefreshBalance] = useState<number | null>(null); // Local refresh balance
   const [balanceLoaded, setBalanceLoaded] = useState(false); // Track if balance has been loaded
   const [walletUnrecoverable, setWalletUnrecoverable] = useState(false); // Track if wallet is unrecoverable
-  const [loadingSplits, setLoadingSplits] = useState(false);
   const [consecutiveFailures, setConsecutiveFailures] = useState(0); // Track consecutive failures for circuit breaker
-  const [recentSplits, setRecentSplits] = useState<any[]>([]);
 
   // Function to hash wallet address for display
   const hashWalletAddress = (address: string): string => {
@@ -202,58 +166,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     }
   };
 
-  // Memoized balance calculations to avoid expensive recalculations
-  const userBalances = useMemo(() => {
-    if (!currentUser?.id || groups.length === 0) {
-      return {
-        totalOwed: 0,
-        totalOwes: 0,
-        netBalance: 0,
-        balanceByCurrency: {}
-      };
-    }
-
-    // For now, return simplified balance based on available summary data
-    // Note: Full balance calculation will be implemented when group details are available
-    const userId = Number(currentUser.id);
-    let totalSpentUSDC = 0;
-    const balanceByCurrency: Record<string, number> = {};
-
-    groups.forEach(group => {
-      try {
-        // Use expenses_by_currency data that's actually available from the backend
-        if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency)) {
-          group.expenses_by_currency.forEach(expenseByCurrency => {
-            const currency = expenseByCurrency.currency || 'SOL';
-            const totalAmount = expenseByCurrency.total_amount || 0;
-
-            if (totalAmount > 0) {
-              // For dashboard display, show total spending across all groups
-              // Use simple fallback rates for now since we have proper price service
-              const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
-              const usdcAmount = totalAmount * rate;
-              totalSpentUSDC += usdcAmount;
-
-              if (!balanceByCurrency[currency]) {
-                balanceByCurrency[currency] = 0;
-              }
-              balanceByCurrency[currency] += totalAmount;
-            }
-          });
-        }
-      } catch (error) {
-        console.error(`Error calculating balance for group ${group.id}:`, error);
-      }
-    });
-
-    return {
-      totalOwed: 0, // Will be calculated when individual group details are loaded
-      totalOwes: 0, // Will be calculated when individual group details are loaded  
-      netBalance: 0, // Simplified for now - shows total spending instead
-      totalSpent: totalSpentUSDC,
-      balanceByCurrency
-    };
-  }, [groups, currentUser?.id]);
+  // Removed group-related balance calculations
 
   // Load notification count from context notifications
   useEffect(() => {
@@ -453,78 +366,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     }
   }, [currentUser?.id, isAuthenticated, balanceLoaded, loadUserCreatedWalletBalance]); // Use balanceLoaded to prevent infinite loops
 
-  // Convert group amounts to USD for display with proper currency handling
-  const convertGroupAmountsToUSD = useCallback(async (groups: GroupWithDetails[]) => {
-    try {
-      const usdAmounts: Record<string | number, number> = {};
-
-      for (const group of groups) {
-        try {
-          let totalUSD = 0;
-
-          // Dynamic groups only – no test pool overrides
-
-          // Check if we have expenses_by_currency data
-          if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency) && group.expenses_by_currency.length > 0) {
-            const expenses = group.expenses_by_currency.map(expense => ({
-              amount: expense.total_amount || 0,
-              currency: expense.currency || 'SOL'
-            }));
-
-            // Filter out zero amounts
-            const validExpenses = expenses.filter(exp => exp.amount > 0);
-
-            if (validExpenses.length > 0) {
-              try {
-                totalUSD = await getTotalSpendingInUSDC(validExpenses);
-              } catch (error) {
-                // Keep error logging for debugging
-                console.error(`Price service failed for group ${group.id}:`, error);
-
-                // Enhanced fallback with better rate handling
-                for (const expense of validExpenses) {
-                  const currency = (expense.currency || 'SOL').toUpperCase();
-
-                  let rate = 1;
-                  switch (currency) {
-                    case 'SOL':
-                      rate = 200;
-                      break;
-                    case 'USDC':
-                    case 'USDT':
-                      rate = 1;
-                      break;
-                    case 'BTC':
-                      rate = 50000;
-                      break;
-                    default:
-                      // Keep warning for unknown currencies
-                      console.warn(`Unknown currency: ${currency}, using rate 100`);
-                      rate = 100;
-                  }
-
-                  totalUSD += expense.amount * rate;
-                }
-              }
-            }
-          }
-
-          usdAmounts[group.id] = totalUSD;
-
-        } catch (error) {
-          // Keep error logging for debugging
-          console.error(`Error processing group ${group.id}:`, error);
-          usdAmounts[group.id] = 0;
-        }
-      }
-
-      setGroupAmountsInUSD(usdAmounts);
-
-    } catch (error) {
-      // Keep error logging for debugging
-      console.error('Error converting group amounts to USD:', error);
-    }
-  }, []);
+  // Removed group amount conversion logic
 
   // Load payment requests and notifications from context
   const loadPaymentRequests = useCallback(async () => {
@@ -553,10 +395,9 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       const actualPaymentRequests = await getReceivedPaymentRequests(currentUser.id, 10);
       logger.debug('Firebase payment requests loaded', { count: actualPaymentRequests.length }, 'DashboardScreen');
 
-      // Also include notifications of type 'payment_request', 'settlement_request' and 'payment_reminder'
+      // Also include notifications of type 'payment_request' and 'payment_reminder'
       const notificationRequests = notifications ? notifications.filter(n =>
         n.type === 'payment_request' ||
-        n.type === 'settlement_request' ||
         n.type === 'payment_reminder'
       ) : [];
       logger.debug('Notification requests loaded', { count: notificationRequests.length }, 'DashboardScreen');
@@ -648,6 +489,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                 const profile = await firebaseDataService.user.getCurrentUser(id);
                 return { id, avatar: profile?.avatar || '' };
               } catch (e) {
+                console.error('Error fetching user profile:', e);
                 return { id, avatar: '' };
               }
             })
@@ -701,7 +543,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           });
         }
       } catch (e) {
-        logger.warn('Could not enrich sender avatars', { error: e.message }, 'DashboardScreen');
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        logger.warn('Could not enrich sender avatars', { error: errorMessage }, 'DashboardScreen');
       }
 
       logger.info('Payment requests loaded successfully', { count: allRequests.length }, 'DashboardScreen');
@@ -727,8 +570,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       if (notifications) {
         const requests = notifications
           .filter(n =>
-            (n.type === 'settlement_request' ||
-              n.type === 'payment_reminder' ||
+            (n.type === 'payment_reminder' ||
               n.type === 'payment_request') &&
             (n.data?.amount || 0) > 0 // Filter out $0 requests
           )
@@ -745,129 +587,11 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   }, [notifications, currentUser?.id]);
 
 
-  // Improved group summary for dashboard display
-  const getGroupSummary = useCallback((group: GroupWithDetails) => {
-    // Dynamic groups only – no special casing
-    try {
-      let totalAmount = 0;
-      let memberCount = 0;
-      let expenseCount = 0;
+  // Removed group summary logic
 
-      // Use cached summary if available
-      const cachedSummary = groupSummaries[group.id];
-      if (cachedSummary) {
-        return cachedSummary;
-      }
+  // Removed group summaries update logic
 
-      // Calculate total amount from expenses_by_currency
-      if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency) && group.expenses_by_currency.length > 0) {
-        totalAmount = group.expenses_by_currency.reduce((sum, expense) => {
-          return sum + (expense.total_amount || 0);
-        }, 0);
-      }
-
-      // Get member count from group data
-      memberCount = group.member_count || group.members?.length || 0;
-
-      // Get expense count from group data
-      expenseCount = group.expense_count || group.expenses?.length || 0;
-
-      // Check if group has any meaningful data
-      const hasData = totalAmount > 0 || memberCount > 0 || expenseCount > 0;
-
-
-
-      return {
-        totalAmount,
-        memberCount,
-        expenseCount,
-        hasData
-      };
-    } catch (error) {
-      // Keep error logging for debugging
-      console.error(`Error getting group summary for ${group.id}:`, error);
-      return {
-        totalAmount: 0,
-        memberCount: 0,
-        expenseCount: 0,
-        hasData: false
-      };
-    }
-  }, [groupSummaries]);
-
-  // Async function to update group summaries with individual expenses
-  const updateGroupSummaries = useCallback(async (groups: GroupWithDetails[]) => {
-    try {
-      const newSummaries: Record<string, { totalAmount: number; memberCount: number; expenseCount: number; hasData: boolean }> = {};
-
-      for (const group of groups) {
-        let totalAmount = 0;
-        let memberCount = group.member_count || group.members?.length || 0;
-        let expenseCount = group.expense_count || group.expenses?.length || 0;
-
-        // Calculate total amount from expenses_by_currency
-        if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency) && group.expenses_by_currency.length > 0) {
-          totalAmount = group.expenses_by_currency.reduce((sum, expense) => {
-            return sum + (expense.total_amount || 0);
-          }, 0);
-        } else {
-          // If expenses_by_currency is empty, fetch individual expenses
-          try {
-            const { firebaseDataService } = await import('../../services/firebaseDataService');
-            const individualExpenses = await firebaseDataService.expense.getGroupExpenses(group.id.toString());
-
-            if (individualExpenses.length > 0) {
-              // Calculate total from individual expenses
-              const currencyTotals: Record<string, number> = {};
-
-              individualExpenses.forEach(expense => {
-                const currency = expense.currency || 'SOL';
-                const amount = expense.amount || 0;
-
-                if (!currencyTotals[currency]) {
-                  currencyTotals[currency] = 0;
-                }
-                currencyTotals[currency] += amount;
-              });
-
-              // Convert to USD for display
-              totalAmount = Object.entries(currencyTotals).reduce((sum, [currency, total]) => {
-                const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);
-                return sum + (total * rate);
-              }, 0);
-
-
-            }
-          } catch (error) {
-            // Keep error logging for debugging
-            console.error(`Error fetching individual expenses for group ${group.id}:`, error);
-          }
-        }
-
-        const hasData = totalAmount > 0 || memberCount > 0 || expenseCount > 0;
-
-        newSummaries[group.id] = {
-          totalAmount,
-          memberCount,
-          expenseCount,
-          hasData
-        };
-      }
-
-      setGroupSummaries(newSummaries);
-    } catch (error) {
-      // Keep error logging for debugging
-      console.error('Error updating group summaries:', error);
-    }
-  }, []);
-
-  // Convert amounts when groups change (similar to GroupsList)
-  useEffect(() => {
-    if (groups.length > 0) {
-      convertGroupAmountsToUSD(groups);
-      updateGroupSummaries(groups);
-    }
-  }, [groups.length]); // Only depend on groups length to prevent unnecessary recalculations
+  // Removed group-related effects
 
   // Load real transactions from Firebase
   const loadRealTransactions = useCallback(async () => {
@@ -935,20 +659,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           console.error('Error initializing app wallet:', error);
         });
 
-        // Always ensure groups are loaded when returning to dashboard
-        // This handles the case where user logs out and comes back
-        if (groups.length === 0 && !groupsLoading) {
-          refreshGroups().then(() => {
-            // Only load transactions here, payment requests will be loaded by the notifications effect
-            loadRealTransactions(); // Load real transactions
-          });
-        } else {
-          // Just load transactions if groups are already cached
-          // Payment requests will be loaded by the notifications effect
-          loadRealTransactions(); // Load real transactions
-        }
+        // Load transactions when returning to dashboard
+        loadRealTransactions();
       }
-    }, [isAuthenticated, currentUser?.id, groups.length, balanceLoaded, loadingUserWallet, loadUserCreatedWalletBalance]) // Simplified dependencies to prevent unnecessary re-runs
+    }, [isAuthenticated, currentUser?.id, balanceLoaded, loadingUserWallet, loadUserCreatedWalletBalance]) // Simplified dependencies to prevent unnecessary re-runs
   );
 
   // Handle refreshBalance parameter from navigation
@@ -984,7 +698,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     }
   }, [isAuthenticated, currentUser?.id, loadNotifications]); // Remove loadPaymentRequests from dependencies to prevent infinite loops
 
-  // Note: Group loading is now handled by useGroupList hook to prevent infinite loops
+  // Removed group loading logic
 
 
   const onRefresh = async () => {
@@ -1045,7 +759,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       }
 
       await Promise.all([
-        refreshGroups(),
         refreshNotifications(),
         loadRealTransactions(),
       ]);
@@ -1126,285 +839,13 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     };
   };
 
-  // Load all individual expenses from all groups and create transaction list
-  const loadAllGroupExpenses = useCallback(async () => {
-    if (groups.length === 0) {
-      setGroupTransactions([]);
-      setLoadingGroupTransactions(false);
-      return;
-    }
+  // Removed group expenses loading logic
 
-    setLoadingGroupTransactions(true);
-    const allExpenses: any[] = [];
+  // Removed group transactions effect
 
-    try {
-      const { firebaseDataService } = await import('../../services/firebaseDataService');
+  // Removed recent splits loading logic
 
-      // Fetch all expenses from all groups
-      for (const group of groups) {
-        try {
-          const groupExpenses = await firebaseDataService.expense.getGroupExpenses(group.id.toString());
-
-          // Add group info to each expense
-          const expensesWithGroupInfo = groupExpenses.map(expense => ({
-            ...expense,
-            groupName: group.name,
-            groupId: group.id,
-            groupCategory: group.category,
-            groupColor: group.color
-          }));
-
-          allExpenses.push(...expensesWithGroupInfo);
-        } catch (error) {
-          console.error(`Error fetching expenses for group ${group.id}:`, error);
-        }
-      }
-
-      // Sort all expenses by creation date (newest first)
-      allExpenses.sort((a, b) => {
-        const dateA = new Date(a.created_at || 0).getTime();
-        const dateB = new Date(b.created_at || 0).getTime();
-        return dateB - dateA;
-      });
-
-      // Convert expenses to transaction components (limit to first 2 for dashboard, with preview of 3rd)
-      const transactionComponents = await Promise.all(allExpenses.slice(0, 2).map(async (expense) => {
-        const expenseTime = new Date(expense.created_at).toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        });
-
-        // Get the actual user name who paid this expense
-        let payerName = 'Member';
-        if (String(expense.paid_by) === String(currentUser?.id)) {
-          payerName = 'You';
-        } else if (expense.paid_by_name) {
-          payerName = expense.paid_by_name;
-        } else {
-          // Try to get user name from group members or contacts
-          try {
-            const { firebaseDataService } = await import('../../services/firebaseDataService');
-            const groupMembers = await firebaseDataService.group.getGroupMembers(expense.groupId.toString());
-            const payerMember = groupMembers.find(member => String(member.id) === String(expense.paid_by));
-            if (payerMember) {
-              payerName = payerMember.name || payerMember.email?.split('@')[0] || 'Member';
-            }
-          } catch (error) {
-            console.error(`Error fetching payer details for expense ${expense.id}:`, error);
-          }
-        }
-
-        // Determine if current user paid this expense
-        const isCurrentUserPaid = String(expense.paid_by) === String(currentUser?.id);
-        const transactionType = isCurrentUserPaid ? 'send' : 'receive';
-
-        // Use "add an expense" for group expenses, "paid" for actual payments
-        const actionText = 'added an expense in';
-        const transactionTitle = isCurrentUserPaid
-          ? `You ${actionText} ${expense.description || 'expense'}`
-          : `${payerName} ${actionText} ${expense.description || 'expense'}`;
-
-        const transactionNote = `${expense.groupName} • ${expense.currency || 'USDC'}`;
-
-        return (
-          <TouchableOpacity
-            key={`${expense.groupId}_${expense.id}`}
-            style={styles.requestItemNew}
-            onPress={() => {
-              // Open transaction modal for expense details
-              const mockTransaction: Transaction = {
-                id: expense.id || `${expense.groupId}_${expense.id}`,
-                type: transactionType,
-                amount: expense.amount || 0,
-                currency: expense.currency || 'USDC',
-                from_user: isCurrentUserPaid ? (currentUser?.name || currentUser?.email?.split('@')[0] || 'You') : (expense.paid_by_name || 'Member'),
-                to_user: expense.groupName || 'Group',
-                from_wallet: isCurrentUserPaid ? (currentUser?.wallet_address || '') : '',
-                to_wallet: expense.groupName || 'Group',
-                tx_hash: `expense_${expense.id}_${Date.now()}`,
-                note: expense.description || 'Group expense',
-                created_at: expense.created_at || new Date().toISOString(),
-                updated_at: expense.updated_at || expense.created_at || new Date().toISOString(),
-                status: 'completed',
-                group_id: expense.groupId || null,
-                company_fee: 0,
-                net_amount: expense.amount || 0,
-                gas_fee: 0,
-                gas_fee_covered_by_company: false,
-                recipient_name: expense.groupName || 'Group',
-                sender_name: isCurrentUserPaid ? (currentUser?.name || currentUser?.email?.split('@')[0] || 'You') : (expense.paid_by_name || 'Member'),
-                transaction_method: 'app_wallet',
-                app_version: '1.0.0',
-                device_info: 'mobile'
-              };
-              setSelectedTransaction(mockTransaction);
-              setTransactionModalVisible(true);
-            }}
-          >
-            <View style={styles.transactionAvatarNew}>
-              <Image
-                source={
-                  transactionType === 'send'
-                    ? { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' }
-                    : { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' }
-                }
-                style={styles.transactionAvatar}
-              />
-            </View>
-            <View style={styles.requestContent}>
-              <Text style={styles.requestMessageWithAmount}>
-                <Text style={styles.requestSenderName}>{transactionTitle}</Text>
-                <Text style={styles.requestAmountGreen}>
-                  {(expense.amount || 0).toFixed(2)} {expense.currency || 'USDC'}
-                </Text>
-              </Text>
-              <Text style={styles.requestSource}>
-                {transactionNote} • {expenseTime}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        );
-      }));
-
-      // Add preview of 3rd transaction if available
-      if (allExpenses.length > 2) {
-        const thirdExpense = allExpenses[2];
-        const expenseTime = new Date(thirdExpense.created_at).toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        });
-
-        // Get the actual user name who paid this expense
-        let payerName = 'Member';
-        if (String(thirdExpense.paid_by) === String(currentUser?.id)) {
-          payerName = 'You';
-        } else if (thirdExpense.paid_by_name) {
-          payerName = thirdExpense.paid_by_name;
-        } else {
-          // Try to get user name from group members or contacts
-          try {
-            const { firebaseDataService } = await import('../../services/firebaseDataService');
-            const groupMembers = await firebaseDataService.group.getGroupMembers(thirdExpense.groupId.toString());
-            const payerMember = groupMembers.find(member => String(member.id) === String(thirdExpense.paid_by));
-            if (payerMember) {
-              payerName = payerMember.name || payerMember.email?.split('@')[0] || 'Member';
-            }
-          } catch (error) {
-            console.error(`Error fetching payer details for expense ${thirdExpense.id}:`, error);
-          }
-        }
-
-        // Determine if current user paid this expense
-        const isCurrentUserPaid = String(thirdExpense.paid_by) === String(currentUser?.id);
-        const transactionType = isCurrentUserPaid ? 'send' : 'receive';
-
-        // Use "add an expense" for group expenses, "paid" for actual payments
-        const actionText = 'add an expense';
-        const transactionTitle = isCurrentUserPaid
-          ? `You ${actionText} ${thirdExpense.description || 'expense'}`
-          : `${payerName} ${actionText} ${thirdExpense.description || 'expense'}`;
-
-        const transactionNote = `${thirdExpense.groupName} • ${thirdExpense.currency || 'USDC'}`;
-
-        const previewComponent = (
-          <TouchableOpacity
-            key={`preview_${thirdExpense.groupId}_${thirdExpense.id}`}
-            style={[styles.requestItemNew, styles.requestPreviewItem]}
-            onPress={() => navigation.navigate('TransactionHistory')}
-          >
-            <View style={styles.transactionAvatarNew}>
-              <Image
-                source={
-                  transactionType === 'send'
-                    ? { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' }
-                    : { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' }
-                }
-                style={styles.transactionAvatar}
-              />
-            </View>
-            <View style={[styles.requestContent, styles.requestPreviewContent]}>
-              <Text style={styles.requestMessageWithAmount}>
-                <Text style={styles.requestSenderName}>{transactionTitle}</Text>
-                <Text style={styles.requestAmountGreen}>
-                  {(thirdExpense.amount || 0).toFixed(2)} {thirdExpense.currency || 'USDC'}
-                </Text>
-              </Text>
-              <Text style={styles.requestSource}>
-                {transactionNote} • {expenseTime}
-              </Text>
-            </View>
-            <View style={styles.requestPreviewOverlay}>
-              <Text style={styles.requestPreviewText}>+{allExpenses.length - 2} more</Text>
-            </View>
-          </TouchableOpacity>
-        );
-
-        transactionComponents.push(previewComponent);
-      }
-
-      setGroupTransactions(transactionComponents);
-    } catch (error) {
-      console.error('Error loading all group expenses:', error);
-      setGroupTransactions([]);
-    } finally {
-      setLoadingGroupTransactions(false);
-    }
-  }, [groups, currentUser?.id]);
-
-  // Load group transactions when groups change
-  useEffect(() => {
-    loadAllGroupExpenses();
-  }, [loadAllGroupExpenses]);
-
-  // Load recent splits
-  const loadRecentSplits = useCallback(async () => {
-    if (!currentUser?.id) {
-      return;
-    }
-
-    setLoadingSplits(true);
-    try {
-      logger.info('Loading recent splits for user', { userId: currentUser.id }, 'DashboardScreen');
-      
-      const result = await SplitStorageService.getUserSplits(currentUser.id.toString());
-      
-      if (result.success && result.splits) {
-        // Get the 3 most recent splits
-        const recentSplits = result.splits.slice(0, 3);
-        
-        logger.info('Loaded recent splits', {
-          count: recentSplits.length,
-          splits: recentSplits.map((s: any) => ({
-            id: s.id,
-            title: s.title,
-            status: s.status,
-            totalAmount: s.totalAmount,
-            date: s.date,
-            createdAt: s.createdAt,
-            participantsCount: s.participants.length
-          }))
-        });
-        setRecentSplits(recentSplits);
-      } else {
-        logger.error('Failed to load splits', { error: result.error }, 'DashboardScreen');
-        setRecentSplits([]);
-      }
-    } catch (error) {
-      console.error('🔍 Dashboard: Error loading recent splits:', error);
-      setRecentSplits([]);
-    } finally {
-      setLoadingSplits(false);
-    }
-  }, [currentUser?.id]);
-
-  // Load recent splits when component mounts or user changes
-  useEffect(() => {
-    if (currentUser?.id && isAuthenticated) {
-      loadRecentSplits();
-    }
-  }, [currentUser?.id, isAuthenticated]);
+  // Removed recent splits effect
 
   // Render real transaction from Firebase
   const renderRealTransaction = (transaction: Transaction) => {
@@ -1459,16 +900,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     return <AuthGuard navigation={navigation}>{null}</AuthGuard>;
   }
 
-  if (groupsLoading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingCenter}>
-          <ActivityIndicator size="large" color={GREEN} />
-          <Text style={styles.loadingText}>Loading your groups...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // Removed groups loading state
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1478,7 +910,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={false}
             onRefresh={onRefresh}
             tintColor={GREEN}
             colors={[GREEN]}
@@ -1642,7 +1074,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => navigation.navigate('RequestContacts')}
+              onPress={() => navigation.navigate('Contacts', { action: 'request' })}
             >
               <View style={styles.actionButtonCircle}>
                 <Image

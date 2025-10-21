@@ -9,11 +9,13 @@ import {
   doc, 
   getDocs, 
   deleteDoc, 
+  updateDoc,
   query, 
   where, 
   writeBatch,
   orderBy,
-  limit
+  limit,
+  getDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { logger } from './loggingService';
@@ -207,12 +209,31 @@ export class AccountDeletionService {
         let q;
         
         if (isDirectId) {
-          // Direct document deletion by ID
-          const docRef = doc(db, collectionName, userId);
-          const docSnap = await getDocs(query(collection(db, collectionName), where('__name__', '==', userId)));
-          if (!docSnap.empty) {
-            await deleteDoc(docRef);
-            totalDeleted++;
+          // For user documents, mark as deleted instead of completely removing
+          if (collectionName === 'users') {
+            const docRef = doc(db, collectionName, userId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+              await updateDoc(docRef, {
+                status: 'deleted',
+                deleted_at: new Date().toISOString(),
+                // Clear sensitive data but keep the document
+                wallet_address: '',
+                wallet_public_key: '',
+                name: 'Deleted User',
+                email: `deleted_${userId}@deleted.local`
+              });
+              totalDeleted++;
+              logger.info('Marked user as deleted', { userId }, 'AccountDeletionService');
+            }
+          } else {
+            // For other collections, delete normally
+            const docRef = doc(db, collectionName, userId);
+            const docSnap = await getDocs(query(collection(db, collectionName), where('__name__', '==', userId)));
+            if (!docSnap.empty) {
+              await deleteDoc(docRef);
+              totalDeleted++;
+            }
           }
           hasMore = false;
         } else if (isArrayField) {

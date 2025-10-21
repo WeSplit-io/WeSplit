@@ -4,9 +4,9 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from './Icon';
 import { useApp } from '../context/AppContext';
-import { firebaseDataService } from '../services/firebaseDataService';
-import { TransactionBasedContactService } from '../services/transactionBasedContactService';
+import { useContacts, useContactActions } from '../hooks';
 import { parseWeSplitDeepLink, handleJoinGroupDeepLink, handleAddContactFromProfile } from '../services/deepLinkHandler';
+import { UserSearchService, UserSearchResult } from '../services/userSearchService';
 import { isSolanaPayUri, parseUri, extractRecipientAddress, isValidSolanaAddress } from '@features/qr';
 import { UserContact, User } from '../types';
 import { colors } from '../theme';
@@ -53,10 +53,12 @@ const ContactsList: React.FC<ContactsListProps> = ({
   const { state } = useApp();
   const { currentUser } = state;
 
-  const [contacts, setContacts] = useState<UserContact[]>([]);
+  // Use the new hooks for contact management
+  const { contacts, loading, refreshContacts } = useContacts();
+  const { addContact, isUserAlreadyContact } = useContactActions();
+
   const [filteredContacts, setFilteredContacts] = useState<UserContact[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isAddingContact, setIsAddingContact] = useState<number | null>(null);
   const [mode, setMode] = useState<'list' | 'qr'>('list');
@@ -71,15 +73,11 @@ const ContactsList: React.FC<ContactsListProps> = ({
   const slideAnim = useRef(new Animated.Value(0)).current;
   const [isAnimating, setIsAnimating] = useState(false);
 
-  useEffect(() => {
-    loadContacts();
-  }, [currentUser]);
-
   // Add refresh functionality
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await loadContacts(true); // Force refresh
+      await refreshContacts(); // Use the hook's refresh method
     } finally {
       setRefreshing(false);
     }
@@ -121,21 +119,62 @@ const ContactsList: React.FC<ContactsListProps> = ({
     setFilteredContacts(filtered);
   }, [searchQuery, contacts, activeTab]);
 
-  // Handle user search
+  // Handle user search with enhanced functionality
   const handleUserSearch = async (query: string) => {
     if (!query.trim() || query.length < 2) {
       setSearchResults([]);
       return;
     }
 
+    if (!currentUser?.id) {
+      logger.warn('No current user for search', null, 'ContactsList');
+      return;
+    }
+
     try {
-      logger.info('Starting user search for', { query }, 'ContactsList');
+      logger.info('Starting enhanced user search for', { query }, 'ContactsList');
       setIsSearching(true);
-      const results = await firebaseDataService.group.searchUsersByUsername(
-        query.trim(),
-        currentUser?.id ? String(currentUser.id) : undefined
-      );
-      logger.info('Search results received', { count: results.length, results: results.map(r => ({ name: r.name, email: r.email })) }, 'ContactsList');
+      
+      let results: UserSearchResult[] = [];
+      
+      // Check if query looks like a wallet address (starts with specific prefixes)
+      const isWalletAddress = query.trim().match(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/) || 
+                             query.trim().startsWith('solana:') ||
+                             query.trim().startsWith('sol:');
+      
+      if (isWalletAddress) {
+        // Search by wallet address
+        logger.info('Searching by wallet address', { query: query.substring(0, 8) + '...' }, 'ContactsList');
+        results = await UserSearchService.searchUsersByWalletAddress(
+          query.trim(),
+          String(currentUser.id)
+        );
+      } else {
+        // Regular text search
+        results = await UserSearchService.searchUsers(
+          query.trim(),
+          String(currentUser.id),
+          {
+            limit: 20,
+            includeDeleted: false,
+            includeSuspended: false,
+            sortBy: 'relevance',
+            relationshipFilter: 'all'
+          }
+        );
+      }
+      
+      logger.info('Enhanced search results received', { 
+        count: results.length, 
+        searchType: isWalletAddress ? 'wallet' : 'text',
+        results: results.map(r => ({ 
+          name: r.name, 
+          email: r.email,
+          isAlreadyContact: r.isAlreadyContact,
+          relationshipType: r.relationshipType
+        })) 
+      }, 'ContactsList');
+      
       setSearchResults(results);
     } catch (error) {
       console.error('❌ Error searching users:', error);
@@ -164,53 +203,13 @@ const ContactsList: React.FC<ContactsListProps> = ({
     }
   }, [searchQuery, activeTab]);
 
-  const loadContacts = async (forceRefresh: boolean = false) => {
-    if (!currentUser) {
-      logger.warn('No current user found', null, 'ContactsList');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      logger.info('Loading contacts for user', { userId: currentUser.id, forceRefresh }, 'ContactsList');
-
-      // Load contacts from transaction and split history
-      logger.info('Loading transaction-based contacts', { userId: currentUser.id, forceRefresh }, 'ContactsList');
-
-      const transactionBasedContacts = await TransactionBasedContactService.getTransactionBasedContacts(currentUser.id.toString());
-
-      logger.info('Loaded transaction-based contacts', { 
-        count: transactionBasedContacts.length, 
-        contacts: transactionBasedContacts.map((c: UserContact) => ({
-          name: c.name || 'No name',
-          email: c.email,
-          wallet: c.wallet_address ? formatWalletAddress(c.wallet_address) : 'No wallet',
-          fullWallet: c.wallet_address,
-          mutualSplits: c.mutual_groups_count || 0
-        }))
-      }, 'ContactsList');
-
-      setContacts(transactionBasedContacts);
-    } catch (error) {
-      console.error('❌ Error loading contacts:', error);
-      setContacts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Contact loading is now handled by the useContacts hook
 
   const handleAddContact = async (user: User) => {
-    if (!currentUser?.id || !onAddContact) return;
+    if (!currentUser?.id) return;
 
-    // Check if contact already exists
-    const existingContact = contacts.find(contact =>
-      String(contact.id) === String(user.id) ||
-      contact.email === user.email ||
-      contact.wallet_address === user.wallet_address
-    );
-
-    if (existingContact) {
+    // Check if contact already exists using the hook
+    if (isUserAlreadyContact(user, contacts)) {
       logger.warn('Contact already exists', { name: user.name }, 'ContactsList');
       return;
     }
@@ -218,15 +217,26 @@ const ContactsList: React.FC<ContactsListProps> = ({
     setIsAddingContact(Number(user.id));
 
     try {
-      // Call the parent's onAddContact function
-      await onAddContact(user);
+      // Use the hook's addContact method
+      const result = await addContact(user);
 
-      // Refresh contacts list
-      await loadContacts();
+      if (result.success) {
+        // Refresh contacts list
+        await refreshContacts();
+        
+        // Call parent's onAddContact if provided (for backward compatibility)
+        if (onAddContact) {
+          await onAddContact(user);
+        }
 
-      logger.info('Contact added successfully', { userName: user.name }, 'ContactsList');
+        logger.info('Contact added successfully', { userName: user.name }, 'ContactsList');
+      } else {
+        logger.error('Failed to add contact', { error: result.error }, 'ContactsList');
+        Alert.alert('Error', result.error || 'Failed to add contact');
+      }
     } catch (error) {
       console.error('❌ Error adding contact:', error);
+      Alert.alert('Error', 'Failed to add contact');
     } finally {
       setIsAddingContact(null);
     }
@@ -249,13 +259,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
     return `${address.substring(0, 4)}...${address.substring(address.length - 4)}`;
   };
 
-  const isUserAlreadyContact = (user: User) => {
-    return contacts.some(contact =>
-      String(contact.id) === String(user.id) ||
-      contact.email === user.email ||
-      contact.wallet_address === user.wallet_address
-    );
-  };
+  // isUserAlreadyContact is now provided by the useContactActions hook
 
   // Handle QR code scanning
   const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
@@ -332,7 +336,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
             if (result.success) {
               Alert.alert('Success', 'Contact added successfully!');
               // Refresh contacts list
-              await loadContacts();
+              await refreshContacts();
             } else {
               Alert.alert('Error', result.message || 'Failed to add contact.');
             }
@@ -354,7 +358,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
               Alert.alert('Success', `Successfully joined group: ${result.groupName || 'Unknown Group'}`);
               // Refresh contacts list if we're in a group context
               if (groupId) {
-                await loadContacts();
+                await refreshContacts();
               }
             } else {
               Alert.alert('Error', result.message || 'Failed to join group.');
@@ -644,7 +648,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
               <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsearch-icon-white50.png?alt=media&token=d90fd15d-40f6-4fe0-8990-c38881dc1e8a' }} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
-                placeholder={activeTab === 'Search' ? "Search users by username or email" : placeholder}
+                placeholder={activeTab === 'Search' ? "Search users by name, email, or wallet address" : placeholder}
                 placeholderTextColor={colors.textSecondary}
                 value={searchQuery}
                 onChangeText={onSearchQueryChange}
@@ -710,12 +714,14 @@ const ContactsList: React.FC<ContactsListProps> = ({
                   <View style={styles.sectionContainer}>
                     <Text style={styles.sectionTitle}>Search Results</Text>
                     {searchResults.map((user) => {
-                      // Debug logging for search result user data
-                      logger.debug('Search result user', {
+                      // Debug logging for enhanced search result user data
+                      logger.debug('Enhanced search result user', {
                         id: user.id,
                         name: user.name,
                         avatar: user.avatar,
-                        hasAvatar: !!user.avatar
+                        hasAvatar: !!user.avatar,
+                        isAlreadyContact: user.isAlreadyContact,
+                        relationshipType: user.relationshipType
                       });
 
                       const userAsContact: UserContact = {
@@ -733,7 +739,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                       };
 
                       const isSelected = multiSelect && selectedContacts.some(c => c.id === user.id);
-                      const isAlreadyContact = isUserAlreadyContact(user);
+                      const isAlreadyContact = user.isAlreadyContact;
 
                       return (
                         <TouchableOpacity
@@ -771,6 +777,14 @@ const ContactsList: React.FC<ContactsListProps> = ({
                               {user.email && user.wallet_address && (
                                 <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
                                   {user.email}
+                                </Text>
+                              )}
+                              {/* Show relationship context */}
+                              {user.relationshipType && user.relationshipType !== 'none' && (
+                                <Text style={[styles.contactEmail, { fontSize: 11, marginTop: 2, color: colors.brandGreen }]}>
+                                  {user.relationshipType === 'contact' ? '✓ Already a contact' :
+                                   user.relationshipType === 'transaction_partner' ? '💸 Transaction partner' :
+                                   user.relationshipType === 'split_participant' ? '👥 Split participant' : ''}
                                 </Text>
                               )}
                             </View>
@@ -828,7 +842,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                   <View style={styles.emptyContainer}>
                     <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsearch-empty-state.png?alt=media&token=9da88073-11df-4b69-bfd8-21ec369f51c4' }} style={styles.searchIconEmpty} />
 
-                    <Text style={styles.emptyText}>Search users by username or email to add them to your contacts</Text>
+                    <Text style={styles.emptyText}>Search users by name, email, or wallet address to add them to your contacts</Text>
                   </View>
                 )}
               </>

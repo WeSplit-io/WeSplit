@@ -5,10 +5,10 @@ import { Image } from 'react-native';
 import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
+import { useContactActions } from '../../hooks';
 import { QrCodeView } from '@features/qr';
 import { styles } from './styles';
 import { colors } from '../../theme/colors';
-import { firebaseDataService } from '../../services/firebaseDataService';
 import { User } from '../../types';
 import { createUsdcRequestUri } from '@features/qr';
 import { logger } from '../../services/loggingService';
@@ -18,6 +18,7 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
   const { state } = useApp();
   const { address } = useWallet();
   const { currentUser } = state;
+  const { addContact } = useContactActions();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'Contacts' | 'Show QR code'>('Contacts');
@@ -33,23 +34,13 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Handle adding contact
   const handleAddContact = async (user: User) => {
-    if (!currentUser?.id) return;
+    const result = await addContact(user);
     
-    try {
-      // Add the user to contacts
-      await firebaseDataService.user.addContact(currentUser.id.toString(), {
-        name: user.name,
-        email: user.email,
-        wallet_address: user.wallet_address,
-        wallet_public_key: user.wallet_public_key,
-        avatar: user.avatar || '',
-        mutual_groups_count: 0,
-        isFavorite: false
-      });
-      
+    if (result.success) {
       logger.info('Contact added successfully', { userName: user.name }, 'RequestContactsScreen');
-    } catch (error) {
-      console.error('❌ Error adding contact:', error);
+    } else {
+      logger.error('Failed to add contact', { error: result.error }, 'RequestContactsScreen');
+      console.error('❌ Error adding contact:', result.error);
     }
   };
 

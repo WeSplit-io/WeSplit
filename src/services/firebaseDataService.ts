@@ -42,6 +42,7 @@ import {
 import { db } from '../config/firebase';
 import { notificationService } from './notificationService';
 import { logger } from './loggingService';
+import { createPaymentRequestNotificationData, validateNotificationData } from './notificationDataUtils';
 
 // Data transformation utilities
 export const firebaseDataTransformers = {
@@ -535,26 +536,90 @@ export const firebaseUserService = {
       );
       const contactsDocs = await getDocs(contactsQuery);
       
-      const contacts = contactsDocs.docs.map(doc => {
+      const contacts: UserContact[] = [];
+      const orphanedContactIds: string[] = [];
+      
+      // Process each contact and validate user existence
+      for (const doc of contactsDocs.docs) {
         const data = doc.data();
-        return {
-          id: doc.id,
-          name: data.name || '',
-          email: data.email || '',
-          wallet_address: data.wallet_address || '',
-          wallet_public_key: data.wallet_public_key || '',
-          created_at: firebaseDataTransformers.timestampToISO(data.created_at),
-          joined_at: firebaseDataTransformers.timestampToISO(data.joined_at),
-          avatar: data.avatar || '',
-          first_met_at: firebaseDataTransformers.timestampToISO(data.first_met_at),
-          mutual_groups_count: data.mutual_groups_count || 0,
-          isFavorite: data.isFavorite || false
-        } as UserContact;
-      });
+        const contactId = doc.id;
+        
+        // Validate that the referenced user still exists
+        try {
+          const userDoc = await getDoc(doc(db, 'users', contactId));
+          if (!userDoc.exists()) {
+            logger.warn('Contact references non-existent user, skipping', { 
+              contactId, 
+              contactName: data.name,
+              userId 
+            }, 'firebaseDataService');
+            orphanedContactIds.push(contactId);
+            continue;
+          }
+          
+          const userData = userDoc.data();
+          
+          // Skip deleted users
+          if (userData.status === 'deleted' || userData.status === 'suspended') {
+            logger.warn('Contact references deleted/suspended user, skipping', { 
+              contactId, 
+              contactName: data.name,
+              userStatus: userData.status,
+              userId 
+            }, 'firebaseDataService');
+            orphanedContactIds.push(contactId);
+            continue;
+          }
+          
+          // Skip users with incomplete data
+          if (!userData.email || !userData.name) {
+            logger.warn('Contact references user with incomplete data, skipping', { 
+              contactId, 
+              contactName: data.name,
+              hasEmail: !!userData.email,
+              hasName: !!userData.name,
+              userId 
+            }, 'firebaseDataService');
+            orphanedContactIds.push(contactId);
+            continue;
+          }
+          
+          // Create valid contact
+          contacts.push({
+            id: contactId,
+            name: userData.name || data.name || '',
+            email: userData.email || data.email || '',
+            wallet_address: userData.wallet_address || data.wallet_address || '',
+            wallet_public_key: userData.wallet_public_key || data.wallet_public_key || '',
+            created_at: firebaseDataTransformers.timestampToISO(userData.created_at || data.created_at),
+            joined_at: firebaseDataTransformers.timestampToISO(data.joined_at),
+            avatar: userData.avatar || data.avatar || '',
+            first_met_at: firebaseDataTransformers.timestampToISO(data.first_met_at),
+            mutual_groups_count: data.mutual_groups_count || 0,
+            isFavorite: data.isFavorite || false
+          } as UserContact);
+          
+        } catch (error) {
+          logger.error('Error validating contact user', { 
+            contactId, 
+            error, 
+            userId 
+          }, 'firebaseDataService');
+          orphanedContactIds.push(contactId);
+        }
+      }
+      
+      // Clean up orphaned contacts in background (don't wait for completion)
+      if (orphanedContactIds.length > 0) {
+        this.cleanupOrphanedContacts(orphanedContactIds, userId).catch(error => {
+          logger.error('Failed to cleanup orphaned contacts', { error, orphanedContactIds }, 'firebaseDataService');
+        });
+      }
 
       // Debug logging for avatar data
       logger.debug('Loaded user contacts with avatar data', { 
         contactCount: contacts.length,
+        orphanedCount: orphanedContactIds.length,
         contacts: contacts.map(c => ({
           id: c.id,
           name: c.name,
@@ -1389,6 +1454,29 @@ export const firebaseGroupService = {
           return;
         }
         
+        // Skip users that don't have essential data (likely deleted or incomplete)
+        if (!userData.email || !userData.name) {
+          if (__DEV__) { 
+            logger.debug('Skipping user with incomplete data', { 
+              userId: userId.substring(0, 8) + '...',
+              hasEmail: !!userData.email,
+              hasName: !!userData.name
+            }, 'firebaseDataService'); 
+          }
+          return;
+        }
+        
+        // Skip deleted or suspended users
+        if (userData.status === 'deleted' || userData.status === 'suspended') {
+          if (__DEV__) { 
+            logger.debug('Skipping user with inactive status', { 
+              userId: userId.substring(0, 8) + '...',
+              status: userData.status
+            }, 'firebaseDataService'); 
+          }
+          return;
+        }
+        
         const userName = (userData.name || '').toLowerCase();
         const userEmail = (userData.email || '').toLowerCase();
         const userWallet = (userData.wallet_address || '').toLowerCase();
@@ -1445,6 +1533,98 @@ export const firebaseGroupService = {
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error searching users:', error); }
       return [];
+    }
+  },
+
+  // Utility function to clean up orphaned user data
+  cleanupDeletedUsers: async (): Promise<{ cleaned: number; errors: number }> => {
+    try {
+      logger.info('Starting cleanup of deleted users', null, 'firebaseDataService');
+      
+      const usersRef = collection(db, 'users');
+      const allUsersQuery = query(usersRef, limit(100));
+      const allDocs = await getDocs(allUsersQuery);
+      
+      let cleaned = 0;
+      let errors = 0;
+      
+      for (const doc of allDocs.docs) {
+        const userData = doc.data();
+        
+        // Check if user has incomplete data (likely deleted)
+        if (!userData.email || !userData.name || 
+            userData.email.includes('deleted_') || 
+            userData.name === 'Deleted User') {
+          
+          try {
+            await updateDoc(doc.ref, {
+              status: 'deleted',
+              deleted_at: new Date().toISOString(),
+              wallet_address: '',
+              wallet_public_key: '',
+              name: 'Deleted User',
+              email: `deleted_${doc.id}@deleted.local`
+            });
+            cleaned++;
+            logger.info('Cleaned up deleted user', { userId: doc.id }, 'firebaseDataService');
+          } catch (error) {
+            errors++;
+            logger.error('Failed to clean up user', { userId: doc.id, error }, 'firebaseDataService');
+          }
+        }
+      }
+      
+      logger.info('Cleanup completed', { cleaned, errors }, 'firebaseDataService');
+      return { cleaned, errors };
+    } catch (error) {
+      logger.error('Failed to cleanup deleted users', error, 'firebaseDataService');
+      return { cleaned: 0, errors: 1 };
+    }
+  },
+
+  // Utility function to clean up orphaned contact references
+  cleanupOrphanedContacts: async (orphanedContactIds: string[], userId: string): Promise<{ cleaned: number; errors: number }> => {
+    try {
+      logger.info('Starting cleanup of orphaned contacts', { 
+        orphanedCount: orphanedContactIds.length, 
+        userId 
+      }, 'firebaseDataService');
+      
+      let cleaned = 0;
+      let errors = 0;
+      
+      for (const contactId of orphanedContactIds) {
+        try {
+          // Remove the orphaned contact reference
+          const contactRef = doc(db, 'contacts', contactId);
+          await deleteDoc(contactRef);
+          cleaned++;
+          logger.info('Removed orphaned contact reference', { 
+            contactId, 
+            userId 
+          }, 'firebaseDataService');
+        } catch (error) {
+          errors++;
+          logger.error('Failed to remove orphaned contact', { 
+            contactId, 
+            userId, 
+            error 
+          }, 'firebaseDataService');
+        }
+      }
+      
+      logger.info('Orphaned contacts cleanup completed', { 
+        cleaned, 
+        errors, 
+        userId 
+      }, 'firebaseDataService');
+      return { cleaned, errors };
+    } catch (error) {
+      logger.error('Failed to cleanup orphaned contacts', { 
+        error, 
+        userId 
+      }, 'firebaseDataService');
+      return { cleaned: 0, errors: 1 };
     }
   },
 
@@ -1993,23 +2173,54 @@ export const firebaseExpenseService = {
                 }
                 
                 // Send payment request notification
-                await notificationService.sendNotification(
-                  memberId,
-                  'Payment Request',
-                  `${payerName} has added an expense of ${expenseData.amount} ${expenseData.currency} in ${groupName}. You owe ${amountPerPerson.toFixed(4)} ${expenseData.currency}.`,
-                  'payment_request',
-                  {
-                    expenseId: expense.id,
-                    groupId: expenseData.group_id || expenseData.groupId,
-                    groupName: groupName,
-                    payerId: expenseData.paid_by,
-                    payerName: payerName,
-                    amount: amountPerPerson,
-                    currency: expenseData.currency,
-                    description: expenseData.description,
-                    status: 'pending'
+                try {
+                  // Create standardized notification data
+                  const notificationData = createPaymentRequestNotificationData(
+                    expenseData.paid_by,
+                    payerName,
+                    memberId,
+                    amountPerPerson,
+                    expenseData.currency,
+                    expenseData.description,
+                    expenseData.group_id || expenseData.groupId,
+                    undefined, // No requestId for expenses
+                    expense.id // Use expenseId instead
+                  );
+
+                  // Add group-specific data
+                  notificationData.groupName = groupName;
+
+                  // Validate notification data
+                  const validation = validateNotificationData(notificationData, 'payment_request');
+                  if (!validation.isValid) {
+                    logger.error('Invalid notification data for expense payment request', { 
+                      errors: validation.errors,
+                      notificationData 
+                    }, 'firebaseDataService');
+                    throw new Error(`Invalid notification data: ${validation.errors.join(', ')}`);
                   }
-                );
+
+                  await notificationService.sendNotification(
+                    memberId,
+                    'Payment Request',
+                    `${payerName} has added an expense of ${expenseData.amount} ${expenseData.currency} in ${groupName}. You owe ${amountPerPerson.toFixed(4)} ${expenseData.currency}.`,
+                    'payment_request',
+                    notificationData
+                  );
+                  logger.info('Expense payment request notification sent successfully', { 
+                    memberId, 
+                    payerId: expenseData.paid_by,
+                    amount: amountPerPerson,
+                    currency: expenseData.currency 
+                  }, 'firebaseDataService');
+                } catch (notificationError) {
+                  logger.error('Failed to send expense payment request notification', { 
+                    error: notificationError, 
+                    memberId,
+                    payerId: expenseData.paid_by
+                  }, 'firebaseDataService');
+                  // Don't throw - expense was created successfully, notification failure shouldn't break the flow
+                }
                 
               } else {
                 if (__DEV__) { logger.warn('Member not found', { memberId }, 'firebaseDataService'); }

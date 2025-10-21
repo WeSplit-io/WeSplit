@@ -798,7 +798,7 @@ const WalletManagementScreen: React.FC = () => {
 
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => navigation.navigate('RequestContacts')}
+              onPress={() => navigation.navigate('Contacts', { action: 'request' })}
             >
               <View style={styles.actionButtonCircle}>
                 <Image

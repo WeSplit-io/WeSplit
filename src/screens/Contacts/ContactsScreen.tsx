@@ -5,12 +5,15 @@ import { Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import NavBar from '../../components/NavBar';
 import ContactsList from '../../components/ContactsList';
+import { QrCodeView } from '@features/qr';
 import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
+import { useWallet } from '../../context/WalletContext';
+import { useContactActions } from '../../hooks';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
 import { logger } from '../../services/loggingService';
+import { createUsdcRequestUri } from '@features/qr';
 
 interface ContactsScreenProps {
   navigation: any;
@@ -18,19 +21,31 @@ interface ContactsScreenProps {
 }
 
 const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) => {
-  const { action, onContactSelect, splitId, splitName, returnRoute, currentSplitData } = route.params || {};
+  const { action, onContactSelect, splitId, splitName, returnRoute, currentSplitData, groupId } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
+  const { address } = useWallet();
+  const { addContact } = useContactActions();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'All' | 'Favorite' | 'Search'>('All');
   const [selectedContacts, setSelectedContacts] = useState<UserContact[]>([]);
   const [isInviting, setIsInviting] = useState(false);
+  
+  // For request mode - add QR code tab
+  const [requestActiveTab, setRequestActiveTab] = useState<'Contacts' | 'Show QR code'>('Contacts');
+  const [contactsActiveTab, setContactsActiveTab] = useState<'All' | 'Favorite' | 'Search'>('All');
 
   const handleSelectContact = (contact: UserContact) => {
     if (action === 'send' && onContactSelect) {
       // If we're in send mode, call the callback
       onContactSelect(contact);
+    } else if (action === 'request') {
+      // Navigate to RequestAmount screen
+      navigation.navigate('RequestAmount', {
+        contact: contact,
+        groupId,
+      });
     } else if (action === 'split') {
       // If we're in split mode, toggle contact selection for multiple selection
       setSelectedContacts(prev => {
@@ -65,23 +80,13 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
   };
 
   const handleAddContact = async (user: User) => {
-    if (!currentUser?.id) return;
+    const result = await addContact(user);
     
-    try {
-      // Add the user to contacts
-      await firebaseDataService.user.addContact(currentUser.id.toString(), {
-        name: user.name,
-        email: user.email,
-        wallet_address: user.wallet_address,
-        wallet_public_key: user.wallet_public_key,
-        avatar: user.avatar || '',
-        mutual_groups_count: 0,
-        isFavorite: false
-      });
-      
+    if (result.success) {
       logger.info('Contact added successfully', { name: user.name }, 'ContactsScreen');
-    } catch (error) {
-      console.error('❌ Error adding contact:', error);
+    } else {
+      logger.error('Failed to add contact', { error: result.error }, 'ContactsScreen');
+      console.error('❌ Error adding contact:', result.error);
     }
   };
 
@@ -92,9 +97,23 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
     }
   };
 
+  // For request mode
+  const handleRequestTabChange = (tab: 'Contacts' | 'Show QR code') => {
+    setRequestActiveTab(tab);
+  };
+
+  const handleContactsTabChange = (tab: 'All' | 'Favorite' | 'Search') => {
+    setContactsActiveTab(tab);
+    if (tab !== 'Search') {
+      setSearchQuery('');
+    }
+  };
+
   const getHeaderTitle = () => {
     if (action === 'send') {
       return 'Select Contact';
+    } else if (action === 'request') {
+      return 'Request Money';
     } else if (action === 'split') {
       return 'Add to Split';
     }
@@ -102,12 +121,13 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
   };
 
   const isSplitMode = action === 'split';
+  const isRequestMode = action === 'request';
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        {isSplitMode ? (
+        {(isSplitMode || isRequestMode) ? (
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Image
               source={require('../../../assets/chevron-left.png')}
@@ -121,22 +141,70 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
         <View style={styles.placeholder} />
       </View>
 
-      <View style={[styles.content, isSplitMode && styles.contentWithButton]}>
-        <ContactsList
-          onContactSelect={handleSelectContact}
-          onAddContact={handleAddContact}
-          showAddButton={isSplitMode}
-          showSearch={true}
-          showTabs={true}
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          searchQuery={searchQuery}
-          onSearchQueryChange={setSearchQuery}
-          placeholder="Search contacts"
-          hideToggleBar={true}
-          selectedContacts={isSplitMode ? selectedContacts : undefined}
-          multiSelect={isSplitMode}
-        />
+      {/* Request Mode Tabs */}
+      {isRequestMode && (
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity style={styles.tab} onPress={() => handleRequestTabChange('Contacts')}>
+            {requestActiveTab === 'Contacts' ? (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.tabActive}
+              >
+                <Text style={[styles.tabText, styles.tabTextActive]}>Contacts</Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.tab}>
+                <Text style={styles.tabText}>Contacts</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tab} onPress={() => handleRequestTabChange('Show QR code')}>
+            {requestActiveTab === 'Show QR code' ? (
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.tabActive}
+              >
+                <Text style={[styles.tabText, styles.tabTextActive]}>Show QR code</Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.tab}>
+                <Text style={styles.tabText}>Show QR code</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={[styles.content, (isSplitMode || isRequestMode) && styles.contentWithButton]}>
+        {isRequestMode && requestActiveTab === 'Show QR code' ? (
+          <QrCodeView
+            value={createUsdcRequestUri({ 
+              recipient: address || '', 
+              label: currentUser?.name || 'User' 
+            })}
+            size={300}
+          />
+        ) : (
+          <ContactsList
+            onContactSelect={handleSelectContact}
+            onAddContact={handleAddContact}
+            showAddButton={isSplitMode}
+            showSearch={true}
+            showTabs={!isRequestMode}
+            activeTab={isRequestMode ? contactsActiveTab : activeTab}
+            onTabChange={isRequestMode ? handleContactsTabChange : handleTabChange}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            placeholder="Search contacts"
+            hideToggleBar={true}
+            selectedContacts={isSplitMode ? selectedContacts : undefined}
+            multiSelect={isSplitMode}
+          />
+        )}
       </View>
 
       {isSplitMode && (

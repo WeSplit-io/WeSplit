@@ -9,6 +9,7 @@ export interface User {
   created_at: string;
   avatar?: string; // For UI purposes, can be generated or uploaded
   hasCompletedOnboarding?: boolean; // Track if user has completed onboarding flow
+  status?: 'active' | 'deleted' | 'suspended'; // User account status
   
   // Wallet management tracking
   wallet_status?: 'healthy' | 'needs_fix' | 'no_wallet' | 'fixing' | 'error';

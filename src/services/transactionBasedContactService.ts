@@ -127,7 +127,8 @@ export class TransactionBasedContactService {
 
       const contactsMap = new Map<string, UserContact>();
 
-      transactionHistory.transactions.forEach(transaction => {
+      // Process transactions and validate user existence
+      for (const transaction of transactionHistory.transactions) {
         let contactUserId: string;
         let contactWalletAddress: string;
         let contactName: string;
@@ -144,9 +145,54 @@ export class TransactionBasedContactService {
           contactName = transaction.sender_name;
         }
 
-        if (!contactUserId || !contactWalletAddress) return;
+        if (!contactUserId || !contactWalletAddress) continue;
 
         const contactId = String(contactUserId);
+        
+        // Validate that the contact user still exists
+        try {
+          const userDoc = await firebaseDataService.user.getCurrentUser(contactId);
+          if (!userDoc) {
+            logger.warn('Transaction contact references non-existent user, skipping', { 
+              contactId, 
+              contactName,
+              userId 
+            }, 'TransactionBasedContactService');
+            continue;
+          }
+          
+          // Skip deleted users
+          if (userDoc.status === 'deleted' || userDoc.status === 'suspended') {
+            logger.warn('Transaction contact references deleted/suspended user, skipping', { 
+              contactId, 
+              contactName,
+              userStatus: userDoc.status,
+              userId 
+            }, 'TransactionBasedContactService');
+            continue;
+          }
+          
+          // Skip users with incomplete data
+          if (!userDoc.email || !userDoc.name) {
+            logger.warn('Transaction contact references user with incomplete data, skipping', { 
+              contactId, 
+              contactName,
+              hasEmail: !!userDoc.email,
+              hasName: !!userDoc.name,
+              userId 
+            }, 'TransactionBasedContactService');
+            continue;
+          }
+          
+        } catch (error) {
+          logger.error('Error validating transaction contact user', { 
+            contactId, 
+            error, 
+            userId 
+          }, 'TransactionBasedContactService');
+          continue;
+        }
+
         const existing = contactsMap.get(contactId);
 
         if (existing) {
@@ -173,7 +219,7 @@ export class TransactionBasedContactService {
             isFavorite: false
           });
         }
-      });
+      }
 
       return Array.from(contactsMap.values());
     } catch (error) {
@@ -195,11 +241,61 @@ export class TransactionBasedContactService {
 
       const contactsMap = new Map<string, UserContact>();
 
-      userSplits.splits.forEach(split => {
-        split.participants.forEach(participant => {
-          if (participant.userId === userId) return; // Skip self
+      // Process splits and validate user existence
+      for (const split of userSplits.splits) {
+        for (const participant of split.participants) {
+          if (participant.userId === userId) continue; // Skip self
 
           const contactId = String(participant.userId);
+          
+          // Validate that the contact user still exists
+          try {
+            const userDoc = await firebaseDataService.user.getCurrentUser(contactId);
+            if (!userDoc) {
+              logger.warn('Split contact references non-existent user, skipping', { 
+                contactId, 
+                participantName: participant.name,
+                splitId: split.id,
+                userId 
+              }, 'TransactionBasedContactService');
+              continue;
+            }
+            
+            // Skip deleted users
+            if (userDoc.status === 'deleted' || userDoc.status === 'suspended') {
+              logger.warn('Split contact references deleted/suspended user, skipping', { 
+                contactId, 
+                participantName: participant.name,
+                userStatus: userDoc.status,
+                splitId: split.id,
+                userId 
+              }, 'TransactionBasedContactService');
+              continue;
+            }
+            
+            // Skip users with incomplete data
+            if (!userDoc.email || !userDoc.name) {
+              logger.warn('Split contact references user with incomplete data, skipping', { 
+                contactId, 
+                participantName: participant.name,
+                hasEmail: !!userDoc.email,
+                hasName: !!userDoc.name,
+                splitId: split.id,
+                userId 
+              }, 'TransactionBasedContactService');
+              continue;
+            }
+            
+          } catch (error) {
+            logger.error('Error validating split contact user', { 
+              contactId, 
+              error, 
+              splitId: split.id,
+              userId 
+            }, 'TransactionBasedContactService');
+            continue;
+          }
+
           const existing = contactsMap.get(contactId);
 
           if (existing) {
@@ -225,8 +321,8 @@ export class TransactionBasedContactService {
               isFavorite: false
             });
           }
-        });
-      });
+        }
+      }
 
       return Array.from(contactsMap.values());
     } catch (error) {

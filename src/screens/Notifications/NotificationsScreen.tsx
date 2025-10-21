@@ -18,6 +18,7 @@ import { useApp } from '../../context/AppContext';
 import { notificationService, NotificationData } from '../../services/notificationService';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { logger } from '../../services/loggingService';
+import { standardizeNotificationData, logNotificationData } from '../../services/notificationDataUtils';
 import styles from './styles';
 import { colors } from '../../theme/colors';
 import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
@@ -374,23 +375,22 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           }
 
           // Handle regular payment requests (non-split)
-          const requesterId = notificationData?.senderId || notificationData?.requester || notificationData?.sender;
-          const amount = notification.data?.amount;
-          const currency = notification.data?.currency || 'USDC';
-          const groupId = notification.data?.groupId;
-
-          logger.debug('Regular payment request notification data', {
-            requesterId,
-            amount,
-            currency,
-            groupId,
-            fullData: notification.data
-          });
-
-          if (!requesterId) {
-            showToast('Error: Missing requester information', 'error');
+          // Standardize notification data for consistent handling
+          const standardizedData = standardizeNotificationData(notification.data, notification.type);
+          
+          if (!standardizedData) {
+            logger.error('Failed to standardize payment request notification data', { 
+              notificationId: notification.id,
+              notificationData: notification.data 
+            }, 'NotificationsScreen');
+            showToast('Error: Invalid notification data', 'error');
             return;
           }
+
+          // Log notification data for debugging
+          logNotificationData(standardizedData, 'Regular payment request handling', notification.type);
+
+          const { senderId: requesterId, amount, currency, groupId, requestId, expenseId } = standardizedData;
 
           // Fetch the user data to get wallet address and other details
           const contact = await fetchUserData(requesterId);
@@ -417,7 +417,11 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               prefilledAmount: amount,
               prefilledNote: `Payment request from ${contact.name}`,
               fromNotification: true,
-              notificationId: notificationId
+              notificationId: notificationId,
+              // Pass additional context data for better tracking
+              requestId: requestId,
+              expenseId: expenseId,
+              originalNotificationData: notification.data
             });
             
             // Mark notification as in progress but don't delete it yet
@@ -806,10 +810,22 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
         } else if (notification.type === 'group_payment_request') {
           // Handle group payment request notification
-          const requesterId = notification.data?.sender || notification.data?.requester;
-          const amount = notification.data?.amount;
-          const currency = notification.data?.currency;
-          const groupId = notification.data?.groupId;
+          // Standardize notification data for consistent handling
+          const standardizedData = standardizeNotificationData(notification.data, notification.type);
+          
+          if (!standardizedData) {
+            logger.error('Failed to standardize group payment request notification data', { 
+              notificationId: notification.id,
+              notificationData: notification.data 
+            }, 'NotificationsScreen');
+            showToast('Error: Invalid notification data', 'error');
+            return;
+          }
+
+          // Log notification data for debugging
+          logNotificationData(standardizedData, 'Group payment request handling', notification.type);
+
+          const { senderId: requesterId, amount, currency, groupId, requestId, expenseId } = standardizedData;
           
           if (requesterId && amount && currency) {
             // Fetch the user data to get wallet address and other details
@@ -831,7 +847,11 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               prefilledAmount: amount,
               prefilledNote: `Payment request from ${contact.name}`,
               fromNotification: true,
-              notificationId: notificationId
+              notificationId: notificationId,
+              // Pass additional context data for better tracking
+              requestId: requestId,
+              expenseId: expenseId,
+              originalNotificationData: notification.data
             });
             
             // Mark notification as in progress but don't delete it yet
@@ -850,6 +870,16 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               duration: 300,
               useNativeDriver: true,
             }).start();
+          } else {
+            logger.error('Missing required data in group payment request notification', { 
+              notificationId: notification.id,
+              requesterId,
+              amount,
+              currency,
+              notificationData: notification.data 
+            }, 'NotificationsScreen');
+            showToast('Error: Invalid payment request data', 'error');
+            return;
           }
 
         } else if (notification.type === 'group_added') {

@@ -445,4 +445,29 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     marginLeft: spacing.sm,
   },
+  
+  // ContactSelector specific styles
+  selectedContactRow: {
+    backgroundColor: colors.white10,
+    borderRadius: 12,
+  },
+  checkboxContainer: {
+    marginRight: spacing.sm,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.white50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxSelected: {
+    backgroundColor: colors.brandGreen,
+    borderColor: colors.brandGreen,
+  },
+  statusContainer: {
+    padding: spacing.xs,
+  },
 }); 
