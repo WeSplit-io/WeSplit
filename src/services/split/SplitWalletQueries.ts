@@ -373,6 +373,44 @@ export class SplitWalletQueries {
   }
 
   /**
+   * Get participant payment status
+   */
+  static async getParticipantPaymentStatus(splitWalletId: string, participantId: string): Promise<{
+    success: boolean;
+    participant?: SplitWalletParticipant;
+    error?: string;
+  }> {
+    try {
+      const walletResult = await this.getSplitWallet(splitWalletId);
+      if (!walletResult.success || !walletResult.wallet) {
+        return {
+          success: false,
+          error: walletResult.error || 'Split wallet not found'
+        };
+      }
+
+      const participant = walletResult.wallet.participants.find(p => p.userId === participantId);
+      if (!participant) {
+        return {
+          success: false,
+          error: 'Participant not found in split wallet'
+        };
+      }
+
+      return {
+        success: true,
+        participant
+      };
+    } catch (error) {
+      logger.error('Failed to get participant payment status', error, 'SplitWalletQueries');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
    * Get split wallet completion status
    */
   static async getSplitWalletCompletion(splitWalletId: string): Promise<{

@@ -190,6 +190,11 @@ export class SplitWalletService {
     return SplitWalletPayments.verifySplitWalletBalance(splitWalletId);
   }
 
+  static async reconcilePendingTransactions(splitWalletId: string) {
+    await loadModules();
+    return SplitWalletPayments.reconcilePendingTransactions(splitWalletId);
+  }
+
   // Security methods
   static async storeSplitWalletPrivateKey(splitWalletId: string, creatorId: string, privateKey: string) {
     await loadModules();
@@ -273,6 +278,11 @@ export class SplitWalletService {
   static async getSplitWalletCompletion(splitWalletId: string) {
     await loadModules();
     return SplitWalletQueries.getSplitWalletCompletion(splitWalletId);
+  }
+
+  static async getParticipantPaymentStatus(splitWalletId: string, participantId: string) {
+    await loadModules();
+    return SplitWalletQueries.getParticipantPaymentStatus(splitWalletId, participantId);
   }
 
   // Cleanup methods

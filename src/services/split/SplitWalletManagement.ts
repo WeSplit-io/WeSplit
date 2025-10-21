@@ -10,6 +10,31 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
 /**
+ * Remove undefined values from an object (Firebase doesn't allow undefined values)
+ */
+function removeUndefinedValues(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedValues(item));
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = removeUndefinedValues(value);
+      }
+    }
+    return cleaned;
+  }
+  
+  return obj;
+}
+
+/**
  * Fix data consistency issues in split wallets
  * Checks if participants marked as "paid" actually have funds on-chain
  */
@@ -64,6 +89,37 @@ export async function fixSplitWalletDataConsistency(splitWalletId: string): Prom
           };
         }
         
+        // If on-chain balance is greater than expected (participants marked as unpaid but funds exist)
+        if (onChainBalance > expectedBalance + tolerance) {
+          // This is the case we're dealing with - funds exist but participants are marked as unpaid
+          // For single participant splits, mark them as fully paid
+          if (wallet.participants.length === 1) {
+            const participant = wallet.participants[0];
+            return {
+              ...participant,
+              amountPaid: roundUsdcAmount(onChainBalance),
+              status: 'paid' as const, // For fair splits, fully paid means 'paid'
+              transactionSignature: participant.transactionSignature || null,
+              paidAt: participant.paidAt || new Date().toISOString()
+            };
+          }
+          
+          // For multiple participants, we need to determine who actually paid
+          // This is more complex and would require transaction verification
+          // For now, we'll use a proportional approach
+          const ratio = onChainBalance / expectedBalance;
+          const adjustedAmountPaid = p.amountPaid * ratio;
+          const isFullyPaid = adjustedAmountPaid >= p.amountOwed;
+          
+          return {
+            ...p,
+            amountPaid: roundUsdcAmount(adjustedAmountPaid),
+            status: isFullyPaid ? 'paid' as const : 'pending' as const,
+            transactionSignature: p.transactionSignature || null,
+            paidAt: isFullyPaid ? (p.paidAt || new Date().toISOString()) : null
+          };
+        }
+        
         // If on-chain balance is less than expected, we need to determine which participants actually paid
         // For now, we'll use a proportional approach, but this could be improved with transaction verification
         const ratio = onChainBalance / expectedBalance;
@@ -77,7 +133,7 @@ export async function fixSplitWalletDataConsistency(splitWalletId: string): Prom
         return {
           ...p,
           amountPaid: finalAmountPaid,
-          status: isFullyPaid ? 'locked' as const : 'pending' as const, // For degen splits, fully paid means 'locked', not 'paid'
+          status: isFullyPaid ? 'paid' as const : 'pending' as const, // For fair splits, fully paid means 'paid'
           // Convert undefined to null for Firebase compatibility
           transactionSignature: isFullyPaid ? p.transactionSignature : null,
           paidAt: isFullyPaid ? p.paidAt : null
@@ -101,7 +157,7 @@ export async function fixSplitWalletDataConsistency(splitWalletId: string): Prom
       };
       
       // Remove any undefined values from the update data
-      const cleanedUpdateData = this.removeUndefinedValues(updateData);
+      const cleanedUpdateData = removeUndefinedValues(updateData);
       
       await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
 

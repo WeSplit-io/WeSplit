@@ -713,7 +713,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     } catch (error) {
       logger.error('Failed to start real-time updates in FairSplit', { 
         splitId: splitData?.id,
-        error: error.message 
+        error: error instanceof Error ? error.message : String(error)
       }, 'FairSplitScreen');
     }
   };
@@ -736,7 +736,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     } catch (error) {
       logger.error('Failed to stop real-time updates in FairSplit', { 
         splitId: splitData?.id,
-        error: error.message 
+        error: error instanceof Error ? error.message : String(error)
       }, 'FairSplitScreen');
     }
   };
@@ -773,7 +773,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       if (!result.success || !result.wallet) return;
 
       const wallet = result.wallet;
-      const allParticipantsPaid = wallet.participants.every(p => p.status === 'paid');
+      const allParticipantsPaid = wallet.participants.every((p: any) => p.status === 'paid');
 
       // Only proceed if all participants have paid AND the wallet is not already completed
       // Add additional validation to prevent duplicate completion attempts
@@ -1736,12 +1736,62 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       return;
     }
 
-    // Show payment modal with the user's remaining amount
-    // Use roundUsdcAmount to fix floating point precision issues
-    const { roundUsdcAmount } = await import('../../utils/formatUtils');
-    const remainingAmount = roundUsdcAmount(userParticipant.amountOwed - userParticipant.amountPaid);
-    setPaymentAmount(remainingAmount.toString());
-    setShowPaymentModal(true);
+    // Check user's USDC balance before showing payment modal
+    try {
+      const { walletService } = await import('../../services/WalletService');
+      const userWallet = await walletService.getUserWallet(currentUser.id.toString());
+      if (userWallet) {
+        const { BalanceUtils } = await import('../../services/shared/balanceUtils');
+        const { PublicKey } = await import('@solana/web3.js');
+        const { getConfig } = await import('../../config/unified');
+        
+        const userPublicKey = new PublicKey(userWallet.address);
+        const usdcMint = new PublicKey(getConfig().blockchain.usdcMintAddress);
+        
+        const balanceResult = await BalanceUtils.getUsdcBalance(userPublicKey, usdcMint);
+        const userUsdcBalance = balanceResult.balance;
+        
+        // Use roundUsdcAmount to fix floating point precision issues
+        const { roundUsdcAmount } = await import('../../utils/formatUtils');
+        const remainingAmount = roundUsdcAmount(userParticipant.amountOwed - userParticipant.amountPaid);
+        
+        logger.info('User balance check before payment', {
+          userUsdcBalance,
+          remainingAmount,
+          userAddress: userWallet.address
+        }, 'FairSplitScreen');
+        
+        if (userUsdcBalance < remainingAmount) {
+          Alert.alert(
+            'Insufficient Balance',
+            `You have ${userUsdcBalance.toFixed(6)} USDC but need ${remainingAmount.toFixed(6)} USDC to make this payment.\n\nPlease add USDC to your wallet first.`,
+            [
+              { text: 'OK', style: 'default' }
+            ]
+          );
+          return;
+        }
+        
+        setPaymentAmount(remainingAmount.toString());
+        setShowPaymentModal(true);
+      } else {
+        // Fallback if balance check fails
+        const { roundUsdcAmount } = await import('../../utils/formatUtils');
+        const remainingAmount = roundUsdcAmount(userParticipant.amountOwed - userParticipant.amountPaid);
+        setPaymentAmount(remainingAmount.toString());
+        setShowPaymentModal(true);
+      }
+    } catch (error) {
+      logger.warn('Could not check user balance, proceeding with payment modal', {
+        error: error instanceof Error ? error.message : String(error)
+      }, 'FairSplitScreen');
+      
+      // Fallback if balance check fails
+      const { roundUsdcAmount } = await import('../../utils/formatUtils');
+      const remainingAmount = roundUsdcAmount(userParticipant.amountOwed - userParticipant.amountPaid);
+      setPaymentAmount(remainingAmount.toString());
+      setShowPaymentModal(true);
+    }
   };
 
   // Handle split funds action
@@ -1835,7 +1885,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         totalPaid,
         tolerance,
         difference: Math.abs(totalPaid - splitWallet.totalAmount),
-        participants: splitWallet.participants.map(p => ({
+        participants: splitWallet.participants.map((p: any) => ({
           name: p.name,
           amountOwed: p.amountOwed,
           amountPaid: p.amountPaid,
@@ -1843,7 +1893,44 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         }))
       });
       
-      if (totalPaid < (splitWallet.totalAmount - tolerance)) {
+      // If no funds collected but we expect funds, try to refresh data first
+      if (totalPaid === 0 && splitWallet.totalAmount > 0) {
+        logger.warn('No funds collected detected, attempting data refresh', {
+          splitWalletId: splitWallet.id,
+          totalAmount: splitWallet.totalAmount
+        }, 'FairSplitScreen');
+        
+        // Force refresh split wallet data
+        await loadSplitWalletData();
+        
+        // Re-check after refresh
+        const refreshedWallet = await SplitWalletService.getSplitWallet(splitWallet.id);
+        if (refreshedWallet.success && refreshedWallet.wallet) {
+          const refreshedTotalPaid = calculateTotalPaid(refreshedWallet.wallet.participants);
+          logger.info('Fund collection check after refresh', {
+            totalAmount: refreshedWallet.wallet.totalAmount,
+            totalPaid: refreshedTotalPaid,
+            participants: refreshedWallet.wallet.participants.map((p: any) => ({
+              name: p.name,
+              amountOwed: p.amountOwed,
+              amountPaid: p.amountPaid,
+              status: p.status
+            }))
+          }, 'FairSplitScreen');
+          
+          if (refreshedTotalPaid >= (refreshedWallet.wallet.totalAmount - tolerance)) {
+            // Update local state with refreshed data
+            setSplitWallet(refreshedWallet.wallet);
+            // Continue with withdrawal using refreshed data
+          } else {
+            Alert.alert(
+              'Insufficient Funds', 
+              `Not all participants have paid their shares. Required: ${refreshedWallet.wallet.totalAmount} USDC, Collected: ${refreshedTotalPaid} USDC. Please ensure all participants have paid before withdrawing funds.`
+            );
+            return;
+          }
+        }
+      } else if (totalPaid < (splitWallet.totalAmount - tolerance)) {
         console.error('❌ FairSplitScreen: Insufficient funds collected:', {
           required: splitWallet.totalAmount,
           collected: totalPaid,
@@ -2170,6 +2257,35 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       setIsSendingPayment(true);
       setShowPaymentModal(false);
       
+      // Ensure user has a wallet before attempting payment
+      const { walletService } = await import('../../services/WalletService');
+      const userWallet = await walletService.getUserWallet(currentUser.id.toString());
+      if (!userWallet || !userWallet.secretKey) {
+        Alert.alert(
+          'Wallet Required',
+          'You need to set up a wallet before making payments. Would you like to create one now?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Create Wallet', 
+              onPress: async () => {
+                try {
+                  const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
+                  if (walletResult.success) {
+                    Alert.alert('Wallet Created', 'Your wallet has been created successfully. You can now make payments.');
+                  } else {
+                    Alert.alert('Error', walletResult.error || 'Failed to create wallet');
+                  }
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to create wallet. Please try again.');
+                }
+              }
+            }
+          ]
+        );
+        return;
+      }
+      
       // Process payment using SplitWalletService
       const { SplitWalletService } = await import('../../services/split');
       const result = await SplitWalletService.payParticipantShare(
@@ -2184,31 +2300,19 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           transactionSignature: result.transactionSignature
         });
         
-        // Reload split wallet to get latest data
-        const walletResult = await SplitWalletService.getSplitWallet(splitWallet.id);
-        if (walletResult.success && walletResult.wallet) {
-          setSplitWallet(walletResult.wallet);
-          
-          // Update participants with the latest split wallet data
-          const updatedParticipants = participants.map((p: any) => {
-            const walletParticipant = walletResult.wallet.participants.find((wp: any) => wp.userId === p.id);
-            if (walletParticipant) {
-              return {
-                ...p,
-                amountPaid: walletParticipant.amountPaid,
-                status: walletParticipant.status === 'paid' ? 'confirmed' as const : p.status
-              };
-            }
-            return p;
-          });
-          setParticipants(updatedParticipants);
-        }
+        // Force reload split wallet data to ensure we have the latest participant status
+        await loadSplitWalletData();
         
         // Update completion data immediately
         await loadCompletionData();
         
-        // Also reload split wallet data to get the latest state
-        await loadSplitWalletData();
+        // Log the updated participant status for debugging
+        logger.info('Payment confirmed - participant status updated', {
+          splitWalletId: splitWallet.id,
+          participantId: currentUser.id.toString(),
+          amountPaid: amount,
+          transactionSignature: result.transactionSignature
+        }, 'FairSplitScreen');
         
         Alert.alert(
           'Payment Successful!',
