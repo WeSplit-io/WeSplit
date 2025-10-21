@@ -1969,7 +1969,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       });
       
       try {
-        const { consolidatedTransactionService } = await import('../../services/transaction/ConsolidatedTransactionService');
+        const { consolidatedTransactionService } = await import('../../services/consolidatedTransactionService');
         const balanceResult = await consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress);
         
         if (balanceResult.success) {
