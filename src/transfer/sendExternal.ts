@@ -602,8 +602,8 @@ class ExternalTransferService {
         };
       }
 
-      // Sign and send transaction
-      logger.info('Sending USDC transfer transaction', {
+      // Sign and send transaction with enhanced confirmation (matching split logic)
+      logger.info('Sending enhanced USDC transfer transaction', {
         from: fromPublicKey.toBase58(),
         to: toPublicKey.toBase58(),
         amount: recipientAmount,
@@ -618,9 +618,23 @@ class ExternalTransferService {
         signers, // Use proper signers array
         {
           commitment: getConfig().blockchain.commitment,
-          preflightCommitment: getConfig().blockchain.commitment
+          preflightCommitment: getConfig().blockchain.commitment,
+          maxRetries: 15 // Enhanced confirmation attempts (matching split logic)
         }
       );
+
+      // Enhanced verification (matching split logic)
+      const verificationResult = await this.verifyTransactionOnBlockchain(signature);
+      if (!verificationResult.success) {
+        logger.error('External transfer verification failed', {
+          signature,
+          error: verificationResult.error
+        }, 'ExternalTransferService');
+        return {
+          success: false,
+          error: verificationResult.error || 'Transaction verification failed'
+        };
+      }
 
       logger.info('USDC transfer transaction confirmed', {
         signature,
@@ -710,6 +724,93 @@ class ExternalTransferService {
     const feePerComputeUnit = 0.000001; // 1 micro-lamport per compute unit
     
     return (signatureCount * 5000 + computeUnits * feePerComputeUnit) / LAMPORTS_PER_SOL;
+  }
+
+  /**
+   * Enhanced transaction verification (matching split logic)
+   */
+  private async verifyTransactionOnBlockchain(signature: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      logger.info('Verifying external transfer transaction on blockchain', {
+        signature
+      }, 'ExternalTransferService');
+
+      // Enhanced verification with multiple attempts (matching split logic)
+      const maxAttempts = 10;
+      const delayMs = 1000; // 1 second delay between attempts
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const status = await this.connection.getSignatureStatus(signature, {
+            searchTransactionHistory: true
+          });
+
+          if (status.value) {
+            if (status.value.err) {
+              logger.error('External transfer failed on blockchain', {
+                signature,
+                error: status.value.err,
+                attempt
+              }, 'ExternalTransferService');
+              return {
+                success: false,
+                error: `Transaction failed: ${status.value.err.toString()}`
+              };
+            }
+
+            const confirmations = status.value.confirmations || 0;
+            if (confirmations > 0) {
+              logger.info('External transfer confirmed on blockchain', {
+                signature,
+                confirmations,
+                attempt
+              }, 'ExternalTransferService');
+              return { success: true };
+            }
+          }
+
+          if (attempt < maxAttempts) {
+            logger.info('External transfer not yet confirmed, retrying', {
+              signature,
+              attempt,
+              maxAttempts
+            }, 'ExternalTransferService');
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+        } catch (error) {
+          logger.warn('External transfer verification attempt failed', {
+            signature,
+            attempt,
+            error: error instanceof Error ? error.message : String(error)
+          }, 'ExternalTransferService');
+          
+          if (attempt < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+        }
+      }
+
+      // If we reach here, all verification attempts failed
+      logger.warn('External transfer verification timeout', {
+        signature,
+        maxAttempts
+      }, 'ExternalTransferService');
+
+      // For external transfers, be strict about verification
+      return {
+        success: false,
+        error: 'Transaction verification timeout - transaction may have failed'
+      };
+    } catch (error) {
+      logger.error('External transfer verification failed', {
+        signature,
+        error: error instanceof Error ? error.message : String(error)
+      }, 'ExternalTransferService');
+      return {
+        success: false,
+        error: 'Transaction verification failed'
+      };
+    }
   }
 
   /**

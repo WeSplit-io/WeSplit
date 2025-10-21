@@ -422,17 +422,27 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
     return {
       id: `group_${groupId}_expense_${expense.id}`,
       type: 'send' as const,
-      amount: expense.amount,
-      currency: expense.currency,
+      amount: expense.amount || 0,
+      currency: expense.currency || 'USDC',
       from_user: paidByName,
       to_user: 'Group Members',
       from_wallet: paidByUser?.wallet_address || '',
       to_wallet: '',
-      tx_hash: expense.id?.toString() || '',
+      tx_hash: expense.id?.toString() || `expense_${expense.id}_${Date.now()}`,
       status: 'completed' as const,
       created_at: expense.created_at || new Date().toISOString(),
-      updated_at: expense.updated_at || new Date().toISOString(),
-      note: expense.description || ''
+      updated_at: expense.updated_at || expense.created_at || new Date().toISOString(),
+      note: expense.description || 'Group expense',
+      group_id: groupId || null,
+      company_fee: 0,
+      net_amount: expense.amount || 0,
+      gas_fee: 0,
+      gas_fee_covered_by_company: false,
+      recipient_name: 'Group Members',
+      sender_name: paidByName,
+      transaction_method: 'app_wallet',
+      app_version: '1.0.0',
+      device_info: 'mobile'
     };
   }, [realMembers, groupId]);
 

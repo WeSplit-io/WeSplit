@@ -616,7 +616,11 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
                   </Text>
                 );
               }
-              return part;
+              return (
+                <Text key={index} style={styles.message}>
+                  {part}
+                </Text>
+              );
             })}
           </Text>
           <Text style={styles.dateTime}>

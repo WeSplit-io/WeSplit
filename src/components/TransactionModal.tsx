@@ -147,15 +147,21 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'N/A';
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      return 'N/A';
+    }
   };
 
   const formatShortAddress = (address: string) => {
@@ -163,16 +169,49 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
   };
 
+  // Safety check to ensure transaction has required properties
+  if (!transaction.type || transaction.amount === undefined || transaction.amount === null) {
+    logger.warn('Transaction missing required properties', { transaction });
+    return null;
+  }
+
+  // Create a clean, safe transaction object with all required properties
+  const safeTransaction = {
+    id: String(transaction.id || 'unknown'),
+    type: String(transaction.type || 'send'),
+    amount: Number(transaction.amount || 0),
+    currency: String(transaction.currency || 'USDC'),
+    from_user: String(transaction.from_user || 'Unknown'),
+    to_user: String(transaction.to_user || 'Unknown'),
+    from_wallet: String(transaction.from_wallet || ''),
+    to_wallet: String(transaction.to_wallet || ''),
+    tx_hash: String(transaction.tx_hash || ''),
+    note: String(transaction.note || ''),
+    status: String(transaction.status || 'completed'),
+    created_at: String(transaction.created_at || new Date().toISOString()),
+    updated_at: String(transaction.updated_at || new Date().toISOString()),
+    group_id: transaction.group_id ? String(transaction.group_id) : null,
+    company_fee: Number(transaction.company_fee || 0),
+    net_amount: Number(transaction.net_amount || transaction.amount || 0),
+    gas_fee: Number(transaction.gas_fee || 0),
+    gas_fee_covered_by_company: Boolean(transaction.gas_fee_covered_by_company || false),
+    recipient_name: String(transaction.recipient_name || transaction.to_user || 'Unknown'),
+    sender_name: String(transaction.sender_name || transaction.from_user || 'Unknown'),
+    transaction_method: String(transaction.transaction_method || 'app_wallet'),
+    app_version: String(transaction.app_version || '1.0.0'),
+    device_info: String(transaction.device_info || 'mobile')
+  };
+
   const openSolscan = () => {
-    if (transaction.tx_hash) {
-      const solscanUrl = `https://solscan.io/tx/${transaction.tx_hash}`;
+    if (safeTransaction.tx_hash) {
+      const solscanUrl = `https://solscan.io/tx/${safeTransaction.tx_hash}`;
       Linking.openURL(solscanUrl);
     }
   };
 
   // Check if this is a group transaction
-  const isGroupTransaction = transaction.id && transaction.id.startsWith('group_');
-  const groupId = isGroupTransaction ? transaction.id.replace('group_', '') : null;
+  const isGroupTransaction = safeTransaction.id && safeTransaction.id.startsWith('group_');
+  const groupId = isGroupTransaction ? safeTransaction.id.replace('group_', '') : null;
 
   // Navigate to group details
   const navigateToGroup = () => {
@@ -182,19 +221,22 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   };
 
-  const { amount, color } = getTransactionAmount(transaction);
+  // const { amount, color } = getTransactionAmount(transactionToUse); // Not currently used
 
   // Debug logs
   logger.debug('Transaction Modal Debug', {
-    type: transaction.type,
-    amount: transaction.amount,
-    currency: transaction.currency,
-    from_wallet: transaction.from_wallet,
-    to_wallet: transaction.to_wallet,
-    tx_hash: transaction.tx_hash,
-    note: transaction.note,
+    type: safeTransaction.type,
+    amount: safeTransaction.amount,
+    currency: safeTransaction.currency,
+    from_wallet: safeTransaction.from_wallet,
+    to_wallet: safeTransaction.to_wallet,
+    tx_hash: safeTransaction.tx_hash,
+    note: safeTransaction.note,
     isGroupTransaction,
-    groupId
+    groupId,
+    created_at: safeTransaction.created_at,
+    from_user: safeTransaction.from_user,
+    to_user: safeTransaction.to_user
   });
 
   return (
@@ -243,52 +285,52 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>Amount:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.amount ? transaction.amount.toFixed(2) : '0.00'} {transaction.currency || 'USDC'}
+                        {safeTransaction.amount.toFixed(2)} {safeTransaction.currency}
                       </Text>
                     </View>
 
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>Date:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.created_at ? formatDate(transaction.created_at) : 'N/A'}
+                        {formatDate(safeTransaction.created_at)}
                       </Text>
                     </View>
 
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>Type:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.type ? transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1) : 'N/A'}
+                        {safeTransaction.type.charAt(0).toUpperCase() + safeTransaction.type.slice(1)}
                       </Text>
                     </View>
 
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>From:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.sender_name || transaction.from_user || 'N/A'}
+                        {safeTransaction.sender_name}
                       </Text>
                     </View>
 
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>To:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.recipient_name || transaction.to_user || 'N/A'}
+                        {safeTransaction.recipient_name}
                       </Text>
                     </View>
 
-                    {transaction.note && (
+                    {safeTransaction.note.trim() && (
                       <View style={styles.transactionDetailRow}>
                         <Text style={styles.transactionDetailLabel}>Note:</Text>
                         <Text style={styles.transactionDetailValue}>
-                          {transaction.note}
+                          {safeTransaction.note}
                         </Text>
                       </View>
                     )}
 
-                    {transaction.group_id && (
+                    {safeTransaction.group_id && (
                       <View style={styles.transactionDetailRow}>
                         <Text style={styles.transactionDetailLabel}>Group ID:</Text>
                         <Text style={styles.transactionDetailValue}>
-                          {transaction.group_id}
+                          {safeTransaction.group_id}
                         </Text>
                       </View>
                     )}
@@ -296,23 +338,23 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>Transaction ID:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.id || 'N/A'}
+                        {safeTransaction.id}
                       </Text>
                     </View>
 
                     <View style={styles.transactionDetailRow}>
                       <Text style={styles.transactionDetailLabel}>Status:</Text>
                       <Text style={styles.transactionDetailValue}>
-                        {transaction.status ? transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1) : 'N/A'}
+                        {safeTransaction.status.charAt(0).toUpperCase() + safeTransaction.status.slice(1)}
                       </Text>
                     </View>
 
-                    {transaction.tx_hash && (
+                    {safeTransaction.tx_hash && (
                       <View style={styles.transactionDetailRow}>
                         <Text style={styles.transactionDetailLabel}>On-chain ID:</Text>
                         <TouchableOpacity onPress={openSolscan}>
                           <Text style={styles.transactionDetailValueLink}>
-                            {formatShortAddress(transaction.tx_hash)}
+                            {formatShortAddress(safeTransaction.tx_hash)}
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -334,40 +376,40 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     )}
 
                     {/* Fees Section - Show actual stored fee data */}
-                    {transaction.company_fee && transaction.company_fee > 0 && (
+                    {safeTransaction.company_fee > 0 && (
                       <>
                         <View style={styles.transactionDetailRow}>
                           <Text style={styles.transactionDetailLabel}>Company Fee:</Text>
                           <Text style={styles.transactionDetailValue}>
-                            {transaction.company_fee ? transaction.company_fee.toFixed(2) : '0.00'} {transaction.currency || 'USDC'}
+                            {safeTransaction.company_fee.toFixed(2)} {safeTransaction.currency}
                           </Text>
                         </View>
 
-                        {transaction.net_amount && transaction.net_amount !== transaction.amount && (
+                        {safeTransaction.net_amount !== safeTransaction.amount && (
                           <View style={styles.transactionDetailRow}>
                             <Text style={styles.transactionDetailLabel}>Net Amount:</Text>
                             <Text style={styles.transactionDetailValue}>
-                              {transaction.net_amount ? transaction.net_amount.toFixed(2) : '0.00'} {transaction.currency || 'USDC'}
+                              {safeTransaction.net_amount.toFixed(2)} {safeTransaction.currency}
                             </Text>
                           </View>
                         )}
                       </>
                     )}
 
-                    {transaction.gas_fee && transaction.gas_fee > 0 && (
+                    {safeTransaction.gas_fee > 0 && (
                       <View style={styles.transactionDetailRow}>
                         <Text style={styles.transactionDetailLabel}>Gas Fee:</Text>
                         <Text style={styles.transactionDetailValue}>
-                          {transaction.gas_fee ? transaction.gas_fee.toFixed(6) : '0.000000'} SOL
+                          {safeTransaction.gas_fee.toFixed(6)} SOL
                         </Text>
                       </View>
                     )}
 
-                    {transaction.transaction_method && (
+                    {safeTransaction.transaction_method && (
                       <View style={styles.transactionDetailRow}>
                         <Text style={styles.transactionDetailLabel}>Method:</Text>
                         <Text style={styles.transactionDetailValue}>
-                          {transaction.transaction_method === 'app_wallet' ? 'In-App Wallet' : 'External Wallet'}
+                          {safeTransaction.transaction_method === 'app_wallet' ? 'In-App Wallet' : 'External Wallet'}
                         </Text>
                       </View>
                     )}

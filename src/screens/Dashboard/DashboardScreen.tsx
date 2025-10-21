@@ -1076,11 +1076,13 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   };
 
   const getTransactionTitle = (transaction: Transaction) => {
+    if (!transaction || !transaction.type) return 'Transaction';
+    
     switch (transaction.type) {
       case 'send':
-        return `Send to ${transaction.to_user}`;
+        return `Send to ${transaction.to_user || 'Unknown'}`;
       case 'receive':
-        return `Received from ${transaction.from_user}`;
+        return `Received from ${transaction.from_user || 'Unknown'}`;
       case 'deposit':
         return 'Deposit';
       case 'withdraw':
@@ -1091,6 +1093,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   };
 
   const getTransactionSource = (transaction: Transaction) => {
+    if (!transaction || !transaction.type) return 'Unknown';
+    
     switch (transaction.type) {
       case 'send':
         return transaction.note || 'Payment';
@@ -1101,11 +1105,18 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       case 'withdraw':
         return 'Wallet';
       default:
-        return '';
+        return 'Unknown';
     }
   };
 
   const getTransactionAmount = (transaction: Transaction) => {
+    if (!transaction || transaction.amount === undefined || transaction.amount === null) {
+      return {
+        amount: '0.00',
+        color: colors.textLight
+      };
+    }
+    
     const amount = transaction.amount;
     const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
 
@@ -1208,14 +1219,24 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                 amount: expense.amount || 0,
                 currency: expense.currency || 'USDC',
                 from_user: isCurrentUserPaid ? (currentUser?.name || currentUser?.email?.split('@')[0] || 'You') : (expense.paid_by_name || 'Member'),
-                to_user: expense.groupName,
+                to_user: expense.groupName || 'Group',
                 from_wallet: isCurrentUserPaid ? (currentUser?.wallet_address || '') : '',
-                to_wallet: expense.groupName,
+                to_wallet: expense.groupName || 'Group',
                 tx_hash: `expense_${expense.id}_${Date.now()}`,
                 note: expense.description || 'Group expense',
-                created_at: expense.created_at,
-                updated_at: expense.updated_at || expense.created_at,
-                status: 'completed'
+                created_at: expense.created_at || new Date().toISOString(),
+                updated_at: expense.updated_at || expense.created_at || new Date().toISOString(),
+                status: 'completed',
+                group_id: expense.groupId || null,
+                company_fee: 0,
+                net_amount: expense.amount || 0,
+                gas_fee: 0,
+                gas_fee_covered_by_company: false,
+                recipient_name: expense.groupName || 'Group',
+                sender_name: isCurrentUserPaid ? (currentUser?.name || currentUser?.email?.split('@')[0] || 'You') : (expense.paid_by_name || 'Member'),
+                transaction_method: 'app_wallet',
+                app_version: '1.0.0',
+                device_info: 'mobile'
               };
               setSelectedTransaction(mockTransaction);
               setTransactionModalVisible(true);
@@ -1234,7 +1255,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             <View style={styles.requestContent}>
               <Text style={styles.requestMessageWithAmount}>
                 <Text style={styles.requestSenderName}>{transactionTitle}</Text>
-                {' '}
                 <Text style={styles.requestAmountGreen}>
                   {(expense.amount || 0).toFixed(2)} {expense.currency || 'USDC'}
                 </Text>
@@ -1307,7 +1327,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             <View style={[styles.requestContent, styles.requestPreviewContent]}>
               <Text style={styles.requestMessageWithAmount}>
                 <Text style={styles.requestSenderName}>{transactionTitle}</Text>
-                {' '}
                 <Text style={styles.requestAmountGreen}>
                   {(thirdExpense.amount || 0).toFixed(2)} {thirdExpense.currency || 'USDC'}
                 </Text>
@@ -1421,8 +1440,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         <View style={styles.transactionContent}>
           <Text style={styles.transactionMessageWithAmount}>
             <Text style={styles.transactionSenderName}>{getTransactionTitle(transaction)}</Text>
-            {' '}
-            
           </Text>
           <Text style={styles.transactionSource}>
             {getTransactionSource(transaction)} • {transactionTime}
@@ -1704,7 +1721,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                       />
                       <View style={styles.requestContent}>
                         <Text style={styles.requestMessageWithAmount}>
-                          <Text style={styles.requestSenderName}>{senderName}</Text> requested a payment of{' '}
+                          <Text style={styles.requestSenderName}>{senderName}</Text>
+                          <Text> requested a payment of </Text>
                           <Text style={styles.requestAmountGreen}>
                             {amount.toFixed(1)} USDC
                           </Text>
@@ -1813,7 +1831,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                     <Text style={styles.requestMessageWithAmount}>
                       <Text style={styles.requestSenderName}>
                         {paymentRequests[2].data?.senderName || 'Unknown User'}
-                      </Text> requested a payment of{' '}
+                      </Text>
+                      <Text> requested a payment of </Text>
                       <Text style={styles.requestAmountGreen}>
                         {(paymentRequests[2].data?.amount || 0).toFixed(1)} USDC
                       </Text>

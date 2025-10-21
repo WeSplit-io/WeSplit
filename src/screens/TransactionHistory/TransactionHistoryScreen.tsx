@@ -283,6 +283,13 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const getTransactionAmount = (transaction: Transaction) => {
+    if (!transaction || transaction.amount === undefined || transaction.amount === null) {
+      return {
+        amount: '0.00',
+        color: colors.textLight
+      };
+    }
+    
     const amount = transaction.amount;
     const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
     
@@ -471,17 +478,27 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
             const mockTransaction: Transaction = {
               id: transaction.id,
               type: transaction.type,
-              amount: transaction.amount,
-              currency: transaction.currency,
+              amount: transaction.amount || 0,
+              currency: transaction.currency || 'USDC',
               from_user: currentUser?.id?.toString() || '',
-              to_user: transaction.originalGroup?.name || '',
+              to_user: transaction.originalGroup?.name || 'Group',
               from_wallet: currentUser?.wallet_address || '',
-              to_wallet: transaction.originalGroup?.name || '',
+              to_wallet: transaction.originalGroup?.name || 'Group',
               tx_hash: `group_${transaction.originalGroup?.id}_${Date.now()}`,
-              note: transaction.source,
+              note: transaction.source || 'Group transaction',
               created_at: transaction.originalGroup?.updated_at || transaction.originalGroup?.created_at || new Date().toISOString(),
               updated_at: transaction.originalGroup?.updated_at || transaction.originalGroup?.created_at || new Date().toISOString(),
-              status: 'completed'
+              status: 'completed',
+              group_id: transaction.originalGroup?.id || null,
+              company_fee: 0,
+              net_amount: transaction.amount || 0,
+              gas_fee: 0,
+              gas_fee_covered_by_company: false,
+              recipient_name: transaction.originalGroup?.name || 'Group',
+              sender_name: currentUser?.name || currentUser?.email?.split('@')[0] || 'User',
+              transaction_method: 'app_wallet',
+              app_version: '1.0.0',
+              device_info: 'mobile'
             };
             setSelectedTransaction(mockTransaction);
             setModalVisible(true);
@@ -506,10 +523,10 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
         </View>
         <View style={styles.transactionContent}>
           <Text style={styles.transactionTitle}>
-            {transaction.title}
+            {transaction.title || 'Transaction'}
           </Text>
           <Text style={styles.transactionSource}>
-            {transaction.source} • {transaction.time}
+            {transaction.source || 'Unknown'} • {transaction.time || 'N/A'}
           </Text>
         </View>
         <View style={styles.transactionAmountContainer}>

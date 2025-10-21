@@ -229,15 +229,46 @@ export class TransactionProcessor {
           signers,
           priority as 'low' | 'medium' | 'high'
         );
+        
+        logger.info('Transaction sent successfully', {
+          signature,
+          transactionType,
+          priority
+        }, 'TransactionProcessor');
       } catch (sendError) {
+        logger.error('Transaction send failed', {
+          error: sendError instanceof Error ? sendError.message : String(sendError),
+          transactionType,
+          priority
+        }, 'TransactionProcessor');
         throw sendError;
       }
       
-      // Always confirm transactions, but with shorter timeout for high priority
+      // Enhanced confirmation and verification (matching split logic)
       const confirmationTimeout = priority === 'high' ? 30000 : TRANSACTION_CONFIG.timeout.confirmation; // 30s for high priority, 60s for others
       const confirmed = await transactionUtils.confirmTransactionWithTimeout(signature, confirmationTimeout);
+      
       if (!confirmed) {
-        logger.warn('Transaction confirmation timed out, but transaction was sent', { signature }, 'TransactionProcessor');
+        logger.warn('Transaction confirmation timed out, attempting enhanced verification', { signature }, 'TransactionProcessor');
+        
+        // Enhanced verification with multiple attempts (matching split logic)
+        const verificationResult = await this.verifyTransactionOnBlockchain(signature, transactionType);
+        if (!verificationResult.success) {
+          logger.error('Enhanced verification failed', { 
+            signature, 
+            error: verificationResult.error 
+          }, 'TransactionProcessor');
+          return {
+            signature: '',
+            txId: '',
+            success: false,
+            error: verificationResult.error || 'Transaction verification failed'
+          };
+        }
+        
+        logger.info('Enhanced verification succeeded after timeout', { signature }, 'TransactionProcessor');
+      } else {
+        logger.info('Transaction confirmed successfully', { signature }, 'TransactionProcessor');
       }
 
       return {
@@ -255,6 +286,107 @@ export class TransactionProcessor {
         txId: '',
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Enhanced transaction verification (matching split logic)
+   */
+  private async verifyTransactionOnBlockchain(
+    signature: string, 
+    transactionType: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      logger.info('Verifying transaction on blockchain', {
+        signature,
+        transactionType
+      }, 'TransactionProcessor');
+
+      // Enhanced verification with multiple attempts (matching split logic)
+      const maxAttempts = 10;
+      const delayMs = 1000; // 1 second delay between attempts
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const status = await this.connection.getSignatureStatus(signature, {
+            searchTransactionHistory: true
+          });
+
+          if (status.value) {
+            if (status.value.err) {
+              logger.error('Transaction failed on blockchain', {
+                signature,
+                error: status.value.err,
+                attempt
+              }, 'TransactionProcessor');
+              return {
+                success: false,
+                error: `Transaction failed: ${status.value.err.toString()}`
+              };
+            }
+
+            const confirmations = status.value.confirmations || 0;
+            if (confirmations > 0) {
+              logger.info('Transaction confirmed on blockchain', {
+                signature,
+                confirmations,
+                attempt
+              }, 'TransactionProcessor');
+              return { success: true };
+            }
+          }
+
+          if (attempt < maxAttempts) {
+            logger.info('Transaction not yet confirmed, retrying', {
+              signature,
+              attempt,
+              maxAttempts
+            }, 'TransactionProcessor');
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+        } catch (error) {
+          logger.warn('Verification attempt failed', {
+            signature,
+            attempt,
+            error: error instanceof Error ? error.message : String(error)
+          }, 'TransactionProcessor');
+          
+          if (attempt < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+        }
+      }
+
+      // If we reach here, all verification attempts failed
+      logger.warn('Transaction verification timeout', {
+        signature,
+        maxAttempts
+      }, 'TransactionProcessor');
+
+      // Different handling based on transaction type (matching split logic)
+      if (transactionType === 'send' || transactionType === 'settlement') {
+        // For send transactions, be strict about verification
+        return {
+          success: false,
+          error: 'Transaction verification timeout - transaction may have failed'
+        };
+      } else {
+        // For other transaction types, assume likely succeeded
+        logger.info('Transaction likely succeeded despite verification timeout', {
+          signature,
+          transactionType
+        }, 'TransactionProcessor');
+        return { success: true };
+      }
+    } catch (error) {
+      logger.error('Transaction verification failed', {
+        signature,
+        error: error instanceof Error ? error.message : String(error)
+      }, 'TransactionProcessor');
+      return {
+        success: false,
+        error: 'Transaction verification failed'
       };
     }
   }
@@ -286,3 +418,5 @@ export class TransactionProcessor {
     }
   }
 }
+
+
