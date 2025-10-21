@@ -9,6 +9,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import NavigationWrapper from './src/components/NavigationWrapper';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { logger } from './src/services/loggingService';
+import { View, StatusBar } from 'react-native';
+import { colors } from './src/theme';
 
 // Import Firebase configuration
 import './src/config/firebase';
@@ -83,13 +85,15 @@ const queryClient = new QueryClient();
 export default function App() {
 
   return (
-    <ErrorBoundary>
-      <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
-          <WalletProvider>
-            <AppProvider>
-                <WalletLinkingProvider>
-                  <NavigationWrapper>
+    <View style={{ flex: 1, backgroundColor: colors.darkBackground }}>
+      <StatusBar backgroundColor={colors.darkBackground} barStyle="light-content" />
+      <ErrorBoundary>
+        <SafeAreaProvider>
+          <QueryClientProvider client={queryClient}>
+            <WalletProvider>
+              <AppProvider>
+                  <WalletLinkingProvider>
+                    <NavigationWrapper>
               <Stack.Navigator 
                 initialRouteName="Splash"
                 screenOptions={{
@@ -97,7 +101,6 @@ export default function App() {
                   cardStyle: {
                     backgroundColor: '#061113',
                   },
-                  animationEnabled: true,
                   gestureEnabled: true,
                   animationTypeForReplace: 'push',
                   transitionSpec: {
@@ -107,14 +110,12 @@ export default function App() {
                         stiffness: 1500,
                         damping: 600,
                         mass: 2,
-                        useNativeDriver: true,
                       },
                     },
                     close: {
                       animation: 'timing',
                       config: {
                         duration: 150,
-                        useNativeDriver: true,
                       },
                     },
                   },
@@ -203,13 +204,14 @@ export default function App() {
                 {/* <Stack.Screen name="AuthDebug" component={AuthDebugScreen} /> */}
                 <Stack.Screen name="SettleUpModal" component={SettleUpModal} />
               </Stack.Navigator>
-                  </NavigationWrapper>
-                </WalletLinkingProvider>
-              </AppProvider>
-            </WalletProvider>
-          </QueryClientProvider>
-        </SafeAreaProvider>
-      </ErrorBoundary>
+                    </NavigationWrapper>
+                  </WalletLinkingProvider>
+                </AppProvider>
+              </WalletProvider>
+            </QueryClientProvider>
+          </SafeAreaProvider>
+        </ErrorBoundary>
+      </View>
   );
 }
 

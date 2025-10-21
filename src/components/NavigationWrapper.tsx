@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
-import { Linking } from 'react-native';
+import { Linking, View } from 'react-native';
 import { setupDeepLinkListeners } from '../services/deepLinkHandler';
 import { useApp } from '../context/AppContext';
 import { logger } from '../services/loggingService';
+import { colors } from '../theme';
 
 interface NavigationWrapperProps {
   children: React.ReactNode;
@@ -15,6 +16,7 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
   const { currentUser } = state;
   const deepLinkSetupRef = useRef<boolean>(false);
   const currentUserIdRef = useRef<string | null>(null);
+  const [isNavigationReady, setIsNavigationReady] = useState(false);
 
   useEffect(() => {
     // Only set up deep link listeners if:
@@ -65,7 +67,24 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
   }, []);
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer 
+      ref={navigationRef}
+      onReady={() => {
+        setIsNavigationReady(true);
+        logger.debug('Navigation container is ready', null, 'NavigationWrapper');
+      }}
+      theme={{
+        dark: true,
+        colors: {
+          primary: colors.green,
+          background: colors.darkBackground,
+          card: colors.darkBackground,
+          text: colors.textLight,
+          border: colors.border,
+          notification: colors.green,
+        },
+      }}
+    >
       {children}
     </NavigationContainer>
   );

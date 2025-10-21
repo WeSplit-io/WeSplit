@@ -23,9 +23,31 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
   const [isAppInitialized, setIsAppInitialized] = useState(false);
 
   useEffect(() => {
+    // Start animations immediately to prevent white screen
+    const startAnimations = () => {
+      logger.debug('Starting splash screen animations', null, 'SplashScreen');
+
+      // Logo fade in
+      Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }).start();
+
+      // Progress bar animation
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: false,
+      }).start();
+    };
+
     // Initialize app and start animations
     const initializeApp = async () => {
       try {
+        // Start animations immediately
+        startAnimations();
+
         // Initialize push notifications in background
         const notificationPromise = import('../../services/notificationService')
           .then(({ notificationService }) => notificationService.initializePushNotifications())
@@ -52,29 +74,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
       }
     };
 
-    // Start animations
-    const startAnimations = () => {
-      logger.debug('Starting splash screen animations', null, 'SplashScreen');
-
-      // Logo fade in
-      Animated.timing(logoOpacity, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }).start(() => {
-      });
-
-      // Progress bar animation
-      Animated.timing(progress, {
-        toValue: 1,
-        duration: 2000,
-        useNativeDriver: false,
-      }).start(() => {
-      });
-    };
-
     initializeApp();
-    startAnimations();
   }, []);
 
   useEffect(() => {
