@@ -4,42 +4,32 @@ import { colors, spacing, typography } from '../../theme';
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.darkBackground,
+    backgroundColor: colors.black,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.darkBackground,
-    minHeight: 60,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
+    backgroundColor: colors.black,
   },
   backButton: {
-    padding: spacing.sm,
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: spacing.radiusSm,
-    flexShrink: 0,
+    padding: 8,
   },
   backIcon: {
-    width: 20,
-    height: 20,
+    width: 24,
+    height: 24,
     tintColor: colors.white,
   },
   headerTitle: {
-    fontSize: typography.fontSize.lg,
+    fontSize: 20,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
-    textAlign: 'center',
-    flex: 1,
   },
   placeholder: {
     width: 40,
-    height: 40,
   },
   content: {
     flex: 1,
@@ -65,43 +55,32 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textLight,
   },
-  tabContainer: {
+  tabsContainer: {
     flexDirection: 'row',
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.lg,
-    borderBottomWidth: 1,
-    borderColor: colors.white50,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   tab: {
     flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    marginBottom: -1,
   },
-  activeTab: {
-    // Gradient indicator is rendered in component
+  tabActive: {
+    backgroundColor: colors.brandGreen,
   },
   tabText: {
+    fontSize: 14,
+    fontWeight: '500',
     color: colors.textSecondary,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.regular,
   },
-  activeTabText: {
-    color: colors.white,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  tabIndicatorContainer: {
-    height: 2,
-    width: '100%',
-    marginTop: 10,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  tabIndicatorPlaceholder: {
-    height: 2,
-    width: '100%',
-    marginTop: 6,
-    borderRadius: 2,
-    backgroundColor: 'transparent',
+  tabTextActive: {
+    color: colors.darkBackground,
   },
   loadingContainer: {
     flex: 1,
@@ -210,74 +189,5 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
   },
   inviteButtonTextDisabled: {
-  },
-  // QR Code styles
-  qrCodeContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  qrCodeTitle: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-  },
-  qrCodeContent: {
-    alignItems: 'center',
-  },
-  qrCodeWrapper: {
-    backgroundColor: colors.white,
-    borderRadius: spacing.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  qrCodeBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qrCodePlaceholder: {
-    width: 160,
-    height: 160,
-    backgroundColor: colors.darkBackground,
-    borderRadius: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  qrCodePlaceholderText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    textAlign: 'center',
-  },
-  qrCodeUserInfo: {
-    alignItems: 'center',
-  },
-  qrCodeUserName: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    marginBottom: spacing.xs,
-  },
-  qrCodeUserWallet: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    textAlign: 'center',
-  },
-  qrCodeDoneButton: {
-    backgroundColor: colors.brandGreen,
-    borderRadius: spacing.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    alignItems: 'center',
-    marginTop: spacing.xl,
-  },
-  qrCodeDoneButtonText: {
-    color: colors.darkBackground,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
   },
 }); 

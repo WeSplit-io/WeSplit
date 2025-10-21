@@ -97,16 +97,16 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
     }
   };
 
+  // For request mode
+  const handleRequestTabChange = (tab: 'Contacts' | 'Show QR code') => {
+    setRequestActiveTab(tab);
+  };
+
   const handleContactsTabChange = (tab: 'All' | 'Favorite' | 'Search') => {
     setContactsActiveTab(tab);
     if (tab !== 'Search') {
       setSearchQuery('');
     }
-  };
-
-  // For request mode
-  const handleRequestTabChange = (tab: 'Contacts' | 'Show QR code') => {
-    setRequestActiveTab(tab);
   };
 
   const getHeaderTitle = () => {
@@ -143,45 +143,37 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
 
       {/* Request Mode Tabs */}
       {isRequestMode && (
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, requestActiveTab === 'Contacts' && styles.activeTab]}
-            onPress={() => handleRequestTabChange('Contacts')}
-          >
-            <Text style={[styles.tabText, requestActiveTab === 'Contacts' && styles.activeTabText]}>
-              Contacts
-            </Text>
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity style={styles.tab} onPress={() => handleRequestTabChange('Contacts')}>
             {requestActiveTab === 'Contacts' ? (
-              <View style={styles.tabIndicatorContainer}>
-                <LinearGradient
-                  colors={[colors.gradientStart, colors.gradientEnd]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={{ height: 2, width: '100%' }}
-                />
-              </View>
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.tabActive}
+              >
+                <Text style={[styles.tabText, styles.tabTextActive]}>Contacts</Text>
+              </LinearGradient>
             ) : (
-              <View style={styles.tabIndicatorPlaceholder} />
+              <View style={styles.tab}>
+                <Text style={styles.tabText}>Contacts</Text>
+              </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, requestActiveTab === 'Show QR code' && styles.activeTab]}
-            onPress={() => handleRequestTabChange('Show QR code')}
-          >
-            <Text style={[styles.tabText, requestActiveTab === 'Show QR code' && styles.activeTabText]}>
-              Show QR code
-            </Text>
+          <TouchableOpacity style={styles.tab} onPress={() => handleRequestTabChange('Show QR code')}>
             {requestActiveTab === 'Show QR code' ? (
-              <View style={styles.tabIndicatorContainer}>
-                <LinearGradient
-                  colors={[colors.gradientStart, colors.gradientEnd]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={{ height: 2, width: '100%' }}
-                />
-              </View>
+              <LinearGradient
+                colors={[colors.gradientStart, colors.gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.tabActive}
+              >
+                <Text style={[styles.tabText, styles.tabTextActive]}>Show QR code</Text>
+              </LinearGradient>
             ) : (
-              <View style={styles.tabIndicatorPlaceholder} />
+              <View style={styles.tab}>
+                <Text style={styles.tabText}>Show QR code</Text>
+              </View>
             )}
           </TouchableOpacity>
         </View>
@@ -253,7 +245,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
             onAddContact={handleAddContact}
             showAddButton={isSplitMode}
             showSearch={true}
-            showTabs={true}
+            showTabs={!isRequestMode}
             activeTab={isRequestMode ? contactsActiveTab : activeTab}
             onTabChange={isRequestMode ? handleContactsTabChange : handleTabChange}
             searchQuery={searchQuery}
