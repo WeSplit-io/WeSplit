@@ -41,7 +41,7 @@ function removeUndefinedValues(obj: any): any {
 export async function fixSplitWalletDataConsistency(splitWalletId: string): Promise<{ success: boolean; error?: string; fixed?: boolean }> {
   try {
     const { SplitWalletQueries } = await import('./SplitWalletQueries');
-    const { consolidatedTransactionService } = await import('../consolidatedTransactionService');
+    const { consolidatedTransactionService } = await import('../transaction/ConsolidatedTransactionService');
     const walletResult = await SplitWalletQueries.getSplitWallet(splitWalletId);
     
     if (!walletResult.success || !walletResult.wallet) {
