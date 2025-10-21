@@ -548,7 +548,7 @@ export class SplitWalletCleanup {
   }
 
   private static async sendTransaction(params: any): Promise<{ success: boolean; error?: string; transactionSignature?: string }> {
-    const { consolidatedTransactionService } = await import('../consolidatedTransactionService');
+    const { consolidatedTransactionService } = await import('../transaction/ConsolidatedTransactionService');
     return consolidatedTransactionService.sendTransaction(params);
   }
   

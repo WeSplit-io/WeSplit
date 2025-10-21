@@ -438,7 +438,7 @@ export class SplitWalletQueries {
       // Get actual on-chain balance to verify against database values
       let actualOnChainBalance = 0;
       try {
-        const { consolidatedTransactionService } = await import('../consolidatedTransactionService');
+        const { consolidatedTransactionService } = await import('../transaction/ConsolidatedTransactionService');
         const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
         if (balanceResult.success) {
           actualOnChainBalance = balanceResult.balance;
