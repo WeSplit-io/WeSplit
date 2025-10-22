@@ -10,9 +10,9 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { useApp } from '../../context/AppContext';
-import { walletService } from '../../services/WalletService';
+import { walletService } from '../../services/wallet';
 import { colors, spacing, typography } from '../../theme';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 interface FundTransferScreenProps {

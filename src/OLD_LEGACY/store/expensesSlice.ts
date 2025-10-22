@@ -6,8 +6,8 @@
 import { StateCreator } from 'zustand';
 import { Expense } from '../../types';
 import { ExpensesState, ExpensesActions, AppStore } from '../types';
-import { firebaseDataService } from '../../services/firebaseDataService';
-import { logger } from '../../services/loggingService';
+import { firebaseDataService } from '../../services/data';
+import { logger } from '../../services/core';
 
 export const createExpensesSlice: StateCreator<
   AppStore,

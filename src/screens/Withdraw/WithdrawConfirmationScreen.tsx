@@ -6,8 +6,8 @@ import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { colors } from '../../theme';
 import { styles } from './styles';
-import { FeeService } from '../../config/feeConfig';
-import { logger } from '../../services/loggingService';
+import { FeeService } from '../../config/constants/feeConfig';
+import { logger } from '../../services/core';
 
 // --- AppleSlider adapted from SendConfirmationScreen ---
 interface AppleSliderProps {
@@ -171,7 +171,7 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       // Save withdrawal transaction to database for history
       if (currentUser?.id && transactionResult?.signature) {
         try {
-          const { firebaseTransactionService } = await import('../../services/firebaseDataService');
+          const { firebaseTransactionService } = await import('../../services/data');
           
           const transactionData = {
             type: 'withdraw' as const,

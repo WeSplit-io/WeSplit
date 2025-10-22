@@ -4,8 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from './styles';
 import { colors } from '../../theme';
 import { useApp } from '../../context/AppContext';
-import { auth } from '../../config/firebase';
-import { logger } from '../../services/loggingService';
+import { auth } from '../../config/firebase/firebase';
+import { logger } from '../../services/core';
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
@@ -49,11 +49,13 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
         startAnimations();
 
         // Initialize push notifications in background
-        const notificationPromise = import('../../services/notificationService')
-          .then(({ notificationService }) => notificationService.initializePushNotifications())
+        const notificationPromise = import('../../services/notifications')
+          .then(({ notificationService }) => notificationService.instance.initializePushNotifications())
           .then((initialized) => {
             if (initialized) {
-              logger.info('Push notifications initialized successfully', null, 'SplashScreen');
+              if (__DEV__) {
+                logger.info('Push notifications initialized successfully', null, 'SplashScreen');
+              }
             } else {
               logger.warn('Push notifications initialization failed - permissions may be denied', null, 'SplashScreen');
             }
@@ -122,7 +124,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
           }
         } else {
           // User is not authenticated, go through onboarding
-          logger.info('User not authenticated, navigating to GetStarted', null, 'SplashScreen');
+          if (__DEV__) {
+            logger.info('User not authenticated, navigating to GetStarted', null, 'SplashScreen');
+          }
           navigation.replace('GetStarted');
         }
       } catch (error) {

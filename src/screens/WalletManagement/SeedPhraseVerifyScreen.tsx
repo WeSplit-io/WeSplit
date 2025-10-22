@@ -13,7 +13,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
+import { firebaseDataService } from '../../services/data';
 import { Container } from '../../components/shared';
 
 // Temporary inline styles to fix the import issue

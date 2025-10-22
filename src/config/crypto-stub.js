@@ -7,10 +7,14 @@
 const crypto = {
   randomBytes: (size) => {
     // Use React Native's crypto implementation if available
-    if (typeof global !== 'undefined' && global.crypto && global.crypto.getRandomValues) {
-      const array = new Uint8Array(size);
-      global.crypto.getRandomValues(array);
-      return array;
+    try {
+      if (typeof global !== 'undefined' && global.crypto && global.crypto.getRandomValues) {
+        const array = new Uint8Array(size);
+        global.crypto.getRandomValues(array);
+        return array;
+      }
+    } catch (error) {
+      // Fallback if global.crypto access fails
     }
     
     // Fallback to Math.random (not cryptographically secure, but works for development)

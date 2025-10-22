@@ -26,23 +26,22 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { styles } from './styles';
-import { ProcessedBillData } from '../../services/consolidatedBillAnalysisService';
+import { ProcessedBillData } from '../../services/billing';
 import { BillAnalysisResult } from '../../types/unified';
-import { consolidatedBillAnalysisService } from '../../services/consolidatedBillAnalysisService';
-import { convertFiatToUSDC, formatCurrencyAmount } from '../../services/fiatCurrencyService';
-import { NFCSplitService } from '../../services/nfcService';
+import { consolidatedBillAnalysisService } from '../../services/billing';
+import { convertFiatToUSDC, formatCurrencyAmount } from '../../services/core';
+import { NFCSplitService } from '../../services/core';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/loggingService';
-import { firebaseDataService } from '../../services/firebaseDataService';
-import { SplitStorageService, Split } from '../../services/splitStorageService';
-import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splitRealtimeService';
+import { logger } from '../../services/core';
+import { firebaseDataService } from '../../services/data';
+import { splitStorageService, Split, SplitStorageService, splitInvitationService, SplitInvitationService } from '../../services/splits';
+import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';
 // Removed SplitWalletService import - wallets are now created only when split type is selected
-import { FallbackDataService } from '../../utils/fallbackDataService';
-import { MockupDataService } from '../../data/mockupData';
-import { SplitInvitationService } from '../../services/splitInvitationService';
-import { notificationService } from '../../services/notificationService';
+import { FallbackDataService } from '../../services/data';
+import { MockupDataService } from '../../services/data/mockupData';
+import { notificationService } from '../../services/notifications';
 import UserAvatar from '../../components/UserAvatar';
-import { QrCodeView } from '@features/qr';
+import QrCodeView from '../../services/core/QrCodeView';
 import {
   SplitDetailsNavigationParams,
   SplitDataConverter,
@@ -370,7 +369,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         const updatedParticipants = await Promise.all(
           splitData.participants.map(async (participant: any) => {
             try {
-              const { firebaseDataService } = await import('../../services/firebaseDataService');
+              const { firebaseDataService } = await import('../../services/data');
               const latestUserData = await firebaseDataService.user.getCurrentUser(participant.userId);
 
               // Debug logging for user data
@@ -688,7 +687,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       // Fetch the latest user data to get current wallet address
       let latestWalletAddress = contact.walletAddress || contact.wallet_address || '';
       try {
-        const { firebaseDataService } = await import('../../services/firebaseDataService');
+        const { firebaseDataService } = await import('../../services/data');
         const latestUserData = await firebaseDataService.user.getCurrentUser(contact.id || contact.userId);
         if (latestUserData?.wallet_address) {
           latestWalletAddress = latestUserData.wallet_address;
@@ -1246,13 +1245,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                       if (billData?.date) {
                         return billData.date;
                       }
-                      const { MockupDataService } = require('../../data/mockupData');
+                      const { MockupDataService } = require('../../services/data');
                       return MockupDataService.getBillDate();
                     })()}
                   </Text>
                 </View>
 
-              </View>
+              </View>rrr
 
             </View>
 

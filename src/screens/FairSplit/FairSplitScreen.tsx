@@ -24,13 +24,13 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
 import { SplitWalletService, SplitWallet } from '../../services/split';
-import { notificationService } from '../../services/notificationService';
-import { priceManagementService } from '../../services/priceManagementService';
+import { notificationService } from '../../services/notifications';
+import { priceManagementService } from '../../services/core';
 import { useApp } from '../../context/AppContext';
-import { AmountCalculationService, Participant } from '../../services/amountCalculationService';
-import { DataSourceService } from '../../services/dataSourceService';
-import { logger } from '../../services/loggingService';
-import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splitRealtimeService';
+import { AmountCalculationService, Participant } from '../../services/core';
+import { DataSourceService } from '../../services/core';
+import { logger } from '../../services/core';
+import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';
 import FairSplitHeader from './components/FairSplitHeader';
 import FairSplitProgress from './components/FairSplitProgress';
 import FairSplitParticipants from './components/FairSplitParticipants';
@@ -238,7 +238,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         // Always load fresh data from database to ensure we have the latest participant information
         if (splitData.id) {
           try {
-            const { SplitStorageService } = await import('../../services/splitStorageService');
+            const { SplitStorageService } = await import('../../services/splits');
             const result = await SplitStorageService.getSplit(splitData.id);
             if (result.success && result.split) {
               // Update the split data with full information
@@ -262,7 +262,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               const participantsWithLatestData = await Promise.all(
                 fullSplitData.participants.map(async (p: any) => {
                   try {
-                    const { firebaseDataService } = await import('../../services/firebaseDataService');
+                    const { firebaseDataService } = await import('../../services/data');
                     const latestUserData = await firebaseDataService.user.getCurrentUser(p.userId);
                     
                     return {
@@ -796,7 +796,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           
           // Send completion notifications (only if not already sent)
           try {
-            const { notificationService } = await import('../../services/notificationService');
+            const { notificationService } = await import('../../services/notifications');
             await notificationService.sendBulkNotifications(
               wallet.participants.map((p: any) => p.userId),
               'split_payment_required', // Use existing notification type
@@ -862,7 +862,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     
     try {
       // First validate the data
-      const { SplitDataValidationService } = await import('../../services/splitDataValidationService');
+      const { SplitDataValidationService } = await import('../../services/core');
       const validationResult = SplitDataValidationService.validateSplitWallet(splitWallet);
       
       if (!validationResult.isValid) {
@@ -930,7 +930,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         
         const updatedParticipants = result.wallet.participants.map((p: any) => {
           // Import roundUsdcAmount to fix precision issues
-          const { roundUsdcAmount } = require('../../utils/formatUtils');
+          const { roundUsdcAmount } = require('../../utils/format');
           const roundedAmountOwed = p.amountOwed > 0 ? roundUsdcAmount(p.amountOwed) : roundUsdcAmount(amountPerPerson);
           
           return {
@@ -1222,7 +1222,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     setIsLoadingWallets(true);
     try {
       const { collection, getDocs, doc, getDoc } = await import('firebase/firestore');
-      const { db } = await import('../../config/firebase');
+      const { db } = await import('../../config/firebase/firebase');
       
       // Load external wallets from subcollection
       const externalWalletsRef = collection(db, 'users', currentUser.id, 'externalWallets');
@@ -1503,7 +1503,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       }
       
       // Update the split in the database with the confirmed repartition
-      const { SplitStorageService } = await import('../../services/splitStorageService');
+      const { SplitStorageService } = await import('../../services/splits');
       const updateResult = await SplitStorageService.updateSplit(splitData!.id, {
         status: 'active',
         splitMethod: splitMethod, // Store the locked split method
@@ -1526,7 +1526,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         setIsSplitConfirmed(true);
         
         // Send notifications to all participants (except the creator)
-        const { notificationService } = await import('../../services/notificationService');
+        const { notificationService } = await import('../../services/notifications');
         const notificationPromises = participants
           .filter(p => p.id !== currentUser?.id.toString()) // Don't notify the creator
           .map(async (participant) => {
@@ -1739,7 +1739,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
     // Check user's USDC balance before showing payment modal
     try {
-      const { walletService } = await import('../../services/WalletService');
+      const { walletService } = await import('../../services/wallet');
       const userWallet = await walletService.getUserWallet(currentUser.id.toString());
       if (userWallet) {
         const { BalanceUtils } = await import('../../services/shared/balanceUtils');
@@ -1753,7 +1753,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         const userUsdcBalance = balanceResult.balance;
         
         // Use roundUsdcAmount to fix floating point precision issues
-        const { roundUsdcAmount } = await import('../../utils/formatUtils');
+        const { roundUsdcAmount } = await import('../../utils/format');
         const remainingAmount = roundUsdcAmount(userParticipant.amountOwed - userParticipant.amountPaid);
         
         logger.info('User balance check before payment', {
@@ -1777,7 +1777,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         setShowPaymentModal(true);
       } else {
         // Fallback if balance check fails
-        const { roundUsdcAmount } = await import('../../utils/formatUtils');
+        const { roundUsdcAmount } = await import('../../utils/format');
         const remainingAmount = roundUsdcAmount(userParticipant.amountOwed - userParticipant.amountPaid);
         setPaymentAmount(remainingAmount.toString());
         setShowPaymentModal(true);
@@ -1788,7 +1788,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       }, 'FairSplitScreen');
       
       // Fallback if balance check fails
-      const { roundUsdcAmount } = await import('../../utils/formatUtils');
+      const { roundUsdcAmount } = await import('../../utils/format');
       const remainingAmount = roundUsdcAmount(userParticipant.amountOwed - userParticipant.amountPaid);
       setPaymentAmount(remainingAmount.toString());
       setShowPaymentModal(true);
@@ -2247,7 +2247,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
     const remainingAmount = userParticipant.amountOwed - userParticipant.amountPaid;
     // Use roundUsdcAmount to fix floating point precision issues
-    const { roundUsdcAmount } = await import('../../utils/formatUtils');
+    const { roundUsdcAmount } = await import('../../utils/format');
     const roundedRemainingAmount = roundUsdcAmount(remainingAmount);
     if (amount > roundedRemainingAmount) {
       Alert.alert('Amount Too High', `You can only pay up to ${roundedRemainingAmount.toFixed(2)} USDC`);
@@ -2259,7 +2259,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       setShowPaymentModal(false);
       
       // Ensure user has a wallet before attempting payment
-      const { walletService } = await import('../../services/WalletService');
+      const { walletService } = await import('../../services/wallet');
       const userWallet = await walletService.getUserWallet(currentUser.id.toString());
       if (!userWallet || !userWallet.secretKey) {
         Alert.alert(

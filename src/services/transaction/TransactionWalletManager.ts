@@ -4,7 +4,7 @@
  */
 
 import { Keypair } from '@solana/web3.js';
-import { logger } from '../loggingService';
+import { logger } from '../core';
 import { keypairUtils } from '../shared/keypairUtils';
 
 export class TransactionWalletManager {
@@ -18,7 +18,7 @@ export class TransactionWalletManager {
       logger.debug('Loading wallet from secure storage', null, 'TransactionWalletManager');
       
       // Use the existing solanaWalletService to load the wallet securely
-      const { solanaWalletService } = await import('../../wallet/solanaWallet');
+      const { solanaWalletService } = await import('../../wallet/solanaWallet.deprecated');
       const walletLoaded = await solanaWalletService.loadWallet();
       
       if (walletLoaded) {

@@ -5,7 +5,7 @@
 
 import { useCallback } from 'react';
 import { Alert } from 'react-native';
-import { logger } from '../../../services/loggingService';
+import { logger } from '../../../services/core';
 
 export interface DegenSplitErrorHandler {
   handleError: (error: any, context: string, showAlert?: boolean) => void;

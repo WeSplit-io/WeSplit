@@ -9,7 +9,7 @@ import NavBar from '../../components/NavBar';
 import { useApp } from '../../context/AppContext';
 import { useGroupList } from '../../hooks/useGroupData';
 import { getTotalSpendingInUSDC } from '../../services/priceService';
-import { firebaseDataService } from '../../services/firebaseDataService';
+import { firebaseDataService } from '../../services/data';
 import { GroupWithDetails, Expense } from '../../types';
 import { styles } from './styles';
 import { colors } from '../../theme';

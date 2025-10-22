@@ -6,8 +6,8 @@
 import { StateCreator } from 'zustand';
 import { Notification } from '../../types';
 import { NotificationsState, NotificationsActions, AppStore } from '../types';
-import { notificationService } from '../../services/notificationService';
-import { logger } from '../../services/loggingService';
+import { notificationService } from '../../services/notifications';
+import { logger } from '../../services/core';
 
 export const createNotificationsSlice: StateCreator<
   AppStore,
@@ -189,7 +189,7 @@ export const createNotificationsSlice: StateCreator<
     }));
 
     try {
-      const notifications = await notificationService.getUserNotifications(currentUser.id.toString());
+      const notifications = await notificationService.instance.getUserNotifications(currentUser.id.toString());
       
       set((state) => ({
         notifications: {

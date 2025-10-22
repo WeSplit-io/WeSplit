@@ -19,7 +19,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 
 // Import our custom hooks
 import { useFairSplitState } from './hooks/useFairSplitState';

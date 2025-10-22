@@ -22,11 +22,11 @@ import {
 } from '@solana/spl-token';
 import { USDC_CONFIG } from '../shared/walletConstants';
 import { getConfig } from '../../config/unified';
-import { TRANSACTION_CONFIG } from '../../config/transactionConfig';
-import { FeeService } from '../../config/feeConfig';
+import { TRANSACTION_CONFIG } from '../../config/constants/transactionConfig';  
+import { FeeService } from '../../config/constants/feeConfig';
 import { TransactionUtils } from '../shared/transactionUtils';
 import { optimizedTransactionUtils } from '../shared/transactionUtilsOptimized';
-import { logger } from '../loggingService';
+import { logger } from '../core';
 import { TransactionParams, TransactionResult } from './types';
 
 export class TransactionProcessor {
@@ -195,7 +195,7 @@ export class TransactionProcessor {
       const signers: Keypair[] = [keypair];
       
       // Add company wallet keypair for fee payment
-      const { COMPANY_WALLET_CONFIG } = await import('../../config/feeConfig');
+      const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
       
       if (COMPANY_WALLET_CONFIG.secretKey) {
         try {

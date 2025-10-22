@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,34 +9,27 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
-  StyleSheet,
   Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { styles, BG_COLOR, GREEN, GRAY } from './styles';
+import { styles, BG_COLOR, GREEN } from './styles';
 import { colors, spacing } from '../../theme';
-import { DEFAULT_AVATAR_URL } from '../../config/constants';
-import AuthGuard from '../../components/AuthGuard';
+import { AuthGuard } from '../../components/auth';
 import NavBar from '../../components/NavBar';
 import UserAvatar from '../../components/UserAvatar';
-import WalletSelectorModal from '../../components/WalletSelectorModal';
+import { WalletSelectorModal } from '../../components/wallet';
 import { Container } from '../../components/shared';
 import { QRCodeScreen } from '../QRCode';
-import TransactionModal from '../../components/TransactionModal';
+import { TransactionModal } from '../../components/transactions';
 import { useApp } from '../../context/AppContext';
-import { useWallet } from '../../context/WalletContext';
 import { Transaction } from '../../types';
-import { formatCryptoAmount } from '../../utils/cryptoUtils';
-import { notificationService } from '../../services/notificationService';
-import { createPaymentRequest, getReceivedPaymentRequests } from '../../services/firebasePaymentRequestService';
-import { walletService, UserWalletBalance } from '../../services/WalletService';
-import { firebaseDataService } from '../../services/firebaseDataService';
-import { createUsdcRequestUri } from '@features/qr';
-import { logger } from '../../services/loggingService';
-import { db } from '../../config/firebase';
+import { getReceivedPaymentRequests } from '../../services/payments/firebasePaymentRequestService';
+import { walletService, UserWalletBalance } from '../../services/wallet';
+import { firebaseDataService } from '../../services/data';
+import { logger } from '../../services/core';
+import { db } from '../../config/firebase/firebase';
 import { getDoc, doc } from 'firebase/firestore';
 
 // Avatar component wrapper for backward compatibility
@@ -87,35 +80,29 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       avatar: ''
     };
   };
-  const {
-    // App wallet state and actions
-    appWalletAddress,
-    appWalletBalance,
-    appWalletConnected,
-    ensureAppWallet,
-    getAppWalletBalance
-  } = useWallet();
+  // Removed WalletContext usage to prevent infinite loading issues
+  // Using simplified wallet service directly instead
 
   // Removed group-related logic
 
-  const [priceLoading, setPriceLoading] = useState(false);
+  // UI State
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [userCreatedWalletBalance, setUserCreatedWalletBalance] = useState<UserWalletBalance | null>(null);
-  const [loadingUserWallet, setLoadingUserWallet] = useState(false);
-  const [connectingWallet, setConnectingWallet] = useState(false);
   const [walletSelectorVisible, setWalletSelectorVisible] = useState(false);
   const [showQRCodeScreen, setShowQRCodeScreen] = useState(false);
   const [transactionModalVisible, setTransactionModalVisible] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [realTransactions, setRealTransactions] = useState<Transaction[]>([]);
+  
+  // Loading States
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [loadingPaymentRequests, setLoadingPaymentRequests] = useState(false);
   const [initialRequestsLoaded, setInitialRequestsLoaded] = useState(false);
-  const [refreshBalance, setRefreshBalance] = useState<number | null>(null); // Local refresh balance
-  const [balanceLoaded, setBalanceLoaded] = useState(false); // Track if balance has been loaded
-  const [walletUnrecoverable, setWalletUnrecoverable] = useState(false); // Track if wallet is unrecoverable
-  const [consecutiveFailures, setConsecutiveFailures] = useState(0); // Track consecutive failures for circuit breaker
+  
+  // Local wallet state (fallback when WalletContext fails)
+  const [localAppWalletBalance, setLocalAppWalletBalance] = useState<number | null>(null);
+  const [localAppWalletAddress, setLocalAppWalletAddress] = useState<string | null>(null);
+  const [localAppWalletConnected, setLocalAppWalletConnected] = useState(false);
 
   // Function to hash wallet address for display
   const hashWalletAddress = (address: string): string => {
@@ -172,250 +159,93 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // Load notification count from context notifications
   useEffect(() => {
     if (notifications) {
-      const unreadCount = notifications.filter(n => !n.is_read).length;
+      const unreadCount = notifications.filter(n => !n.read).length;
       setUnreadNotifications(unreadCount);
     }
   }, [notifications]);
 
-  // Load user's created wallet balance with auto-retry until successful
-  const loadUserCreatedWalletBalance = useCallback(async (retryCount = 0) => {
-    if (!currentUser?.id || loadingUserWallet) {
-      return;
-    }
-
+  // Simplified balance loading using the new wallet service
+  const loadWalletBalance = useCallback(async () => {
+    if (!currentUser?.id) return;
+    
     try {
-      setLoadingUserWallet(true);
-      logger.debug('Loading user wallet balance', { attempt: retryCount + 1 }, 'DashboardScreen');
-
-      // First ensure the user has a wallet
-      const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
-
+      logger.debug('Loading wallet balance with simplified service', null, 'DashboardScreen');
+      
+      // Ensure the user has a wallet (recover or create)
+      const walletResult = await walletService.ensureUserWallet(currentUser.id.toString(), currentUser.wallet_address);
+      
       if (walletResult.success && walletResult.wallet) {
-        // Update user's wallet information in app context if it's different
+        // Update user's wallet information if it's different
         if (currentUser.wallet_address !== walletResult.wallet.address) {
           try {
-            await updateUser({
+            const updateData: any = {
               wallet_address: walletResult.wallet.address,
               wallet_public_key: walletResult.wallet.publicKey
-            });
+            };
+            
+            // Only include defined fields to avoid Firebase errors
+            const cleanUpdateData = Object.fromEntries(
+              Object.entries(updateData).filter(([_, value]) => value !== undefined && value !== null)
+            );
+            
+            await updateUser(cleanUpdateData);
           } catch (updateError) {
-            // Keep error logging for debugging
-            console.error('Failed to update user wallet info in app context:', updateError);
+            logger.warn('Failed to update user wallet info', updateError, 'DashboardScreen');
           }
         }
-
-        // Now get the balance
+        
+        // Get the balance
         const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
-
-        // Check if we got a valid balance
-        if (balance && balance.totalUSD !== undefined && balance.totalUSD !== null) {
+        if (balance && balance.totalUSD !== undefined) {
           logger.debug('Balance loaded successfully', { totalUSD: balance.totalUSD }, 'DashboardScreen');
-          setUserCreatedWalletBalance(balance);
-          setBalanceLoaded(true);
-          setConsecutiveFailures(0); // Reset failure counter on success
-        } else {
-          // Balance is invalid, retry
-          throw new Error('Invalid balance received');
+          // Update the local state
+          setLocalAppWalletBalance(balance.totalUSD);
+          setLocalAppWalletAddress(walletResult.wallet.address);
+          setLocalAppWalletConnected(true);
         }
       } else {
-        // Keep error logging for debugging
-        console.error('Failed to ensure wallet for dashboard:', walletResult.error);
-        throw new Error(walletResult.error || 'Failed to ensure wallet');
+        logger.error('Failed to ensure wallet', walletResult.error, 'DashboardScreen');
       }
     } catch (error) {
-      // Keep error logging for debugging
-      console.error('Error loading user created wallet balance:', error);
-
-      // Check if this is a critical error that should stop retry - don't retry for these
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('User not found') ||
-        errorMessage.includes('User document not found') ||
-        errorMessage.includes('Failed to ensure wallet') ||
-        errorMessage.includes('timestamp.toDate is not a function') ||
-        errorMessage.includes('toDate is not a function') ||
-        errorMessage.includes('Wallet is already working') ||
-        errorMessage.includes('Wallet is marked as unrecoverable') ||
-        errorMessage.includes('unrecoverable') ||
-        errorMessage.includes('FIRESTORE') && errorMessage.includes('INTERNAL ASSERTION FAILED')) {
-        logger.error('Critical error detected, stopping retry loop', { errorMessage }, 'DashboardScreen');
-        
-        // Handle Firebase assertion failures more gracefully
-        if (errorMessage.includes('FIRESTORE') && errorMessage.includes('INTERNAL ASSERTION FAILED')) {
-          console.warn(' Dashboard: Firebase assertion failure detected, showing fallback UI');
-          // Set a fallback balance to prevent infinite loading
-          setUserCreatedWalletBalance({
-            solBalance: 0,
-            usdcBalance: 0,
-            totalUSD: 0,
-            address: currentUser?.wallet_address || '',
-            isConnected: false
-          });
-        } else {
-          setUserCreatedWalletBalance(null);
-        }
-        setBalanceLoaded(true);
-
-        // Check if this is an unrecoverable wallet error
-        if (errorMessage.includes('unrecoverable')) {
-          setWalletUnrecoverable(true);
-          // Show user-friendly alert for unrecoverable wallet
-          Alert.alert(
-            'Wallet Recovery Failed',
-            'Your wallet cannot be recovered with the current seed phrase. You can create a new wallet, but any funds in the old wallet will be lost unless you can recover the private key.\n\nWould you like to create a new wallet?',
-            [
-              {
-                text: 'Cancel',
-                style: 'cancel',
-                onPress: () => {
-                  // User chose to cancel, keep the unrecoverable state
-                  logger.debug('User chose not to create new wallet', null, 'DashboardScreen');
-                }
-              },
-              {
-                text: 'Create New Wallet',
-                onPress: async () => {
-                  try {
-                    logger.debug('User chose to create new wallet', null, 'DashboardScreen');
-                    // Call the new wallet creation method
-                    const newWalletResult = await walletService.ensureUserWallet(currentUser.id.toString());
-
-                    if (newWalletResult.success && newWalletResult.wallet) {
-                      // Update user context with new wallet
-                      await updateUser({
-                        wallet_address: newWalletResult.wallet.address,
-                        wallet_public_key: newWalletResult.wallet.publicKey
-                      });
-
-                      // Reset states and reload balance
-                      setWalletUnrecoverable(false);
-                      setBalanceLoaded(false);
-                      loadUserCreatedWalletBalance(0);
-
-                      Alert.alert(
-                        'New Wallet Created',
-                        `Your new wallet has been created successfully!\n\nAddress: ${newWalletResult.wallet.address}\n\nPlease save your seed phrase securely.`,
-                        [{ text: 'OK' }]
-                      );
-                    } else {
-                      Alert.alert(
-                        'Error',
-                        `Failed to create new wallet: ${newWalletResult.error}`,
-                        [{ text: 'OK' }]
-                      );
-                    }
-                  } catch (error) {
-                    console.error('Error creating new wallet:', error);
-                    Alert.alert(
-                      'Error',
-                      'Failed to create new wallet. Please try again or contact support.',
-                      [{ text: 'OK' }]
-                    );
-                  }
-                }
-              }
-            ]
-          );
-        }
-
-        return;
-      }
-
-      // Circuit breaker: if we have too many consecutive failures, stop retrying
-      if (consecutiveFailures >= 3) {
-        console.error('❌ Dashboard: Circuit breaker triggered - too many consecutive failures');
-        setUserCreatedWalletBalance(null);
-        setBalanceLoaded(true);
-        return;
-      }
-
-      // Auto-retry logic - but only for certain errors, not for User not found
-      if (retryCount < 2) { // Reduced from 4 to 2 retries
-        const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Reduced max delay to 3 seconds
-        logger.debug('Auto-retrying balance load', { delay, attempt: retryCount + 1, maxAttempts: 3 }, 'DashboardScreen');
-        setConsecutiveFailures(prev => prev + 1);
-        setTimeout(() => {
-          loadUserCreatedWalletBalance(retryCount + 1);
-        }, delay);
-        return;
-      } else {
-        // Max retries reached, give up
-        console.error('❌ Dashboard: Max retries reached for balance loading');
-        setConsecutiveFailures(prev => prev + 1);
-        setUserCreatedWalletBalance(null);
-        setBalanceLoaded(true);
-      }
-    } finally {
-      setLoadingUserWallet(false);
+      logger.error('Error loading wallet balance', error, 'DashboardScreen');
     }
-  }, [currentUser?.id, currentUser?.wallet_address, updateUser, loadingUserWallet, consecutiveFailures]);
+  }, [currentUser?.id, currentUser?.wallet_address, updateUser]);
 
-  // Reset balance loaded flag and unrecoverable state when user changes
+  // Load wallet balance when user changes
   useEffect(() => {
-    setBalanceLoaded(false);
-    setWalletUnrecoverable(false);
-    setConsecutiveFailures(0); // Reset failure counter when user changes
-  }, [currentUser?.id]);
-
-  // Note: Periodic balance refresh is now handled by WalletProvider to avoid duplicate calls
-
-  // Consolidated effect to load user wallet balance - only run when necessary
-  useEffect(() => {
-    // Only load balance when user is authenticated and we have a user ID and haven't loaded yet
-    if (currentUser?.id && isAuthenticated && !loadingUserWallet && !balanceLoaded) {
-      logger.debug('Initial balance load triggered', null, 'DashboardScreen');
-      loadUserCreatedWalletBalance();
+    if (currentUser?.id && isAuthenticated) {
+      loadWalletBalance();
     }
-  }, [currentUser?.id, isAuthenticated, balanceLoaded, loadUserCreatedWalletBalance]); // Use balanceLoaded to prevent infinite loops
+  }, [currentUser?.id, isAuthenticated, loadWalletBalance]);
 
   // Removed group amount conversion logic
 
-  // Load payment requests and notifications from context
+  // Load payment requests
   const loadPaymentRequests = useCallback(async () => {
-    if (!currentUser?.id) {return;}
-
-    // Prevent duplicate calls
-    if (loadingPaymentRequests) {return;}
-
-    // Wait for notifications to be available
-    if (!notifications) {
-      logger.debug('Waiting for notifications to load', null, 'DashboardScreen');
-      return;
-    }
-
-    // If we already have requests and this isn't a refresh, skip loading
-    if (initialRequestsLoaded && paymentRequests.length > 0 && notifications.length === 0) {
-      logger.debug('Skipping payment requests load - already loaded and no new notifications', null, 'DashboardScreen');
-      return;
-    }
+    if (!currentUser?.id || loadingPaymentRequests) return;
 
     setLoadingPaymentRequests(true);
-
     try {
       logger.debug('Loading payment requests', null, 'DashboardScreen');
-      // Get actual payment requests from Firebase
-      const actualPaymentRequests = await getReceivedPaymentRequests(currentUser.id, 10);
-      logger.debug('Firebase payment requests loaded', { count: actualPaymentRequests.length }, 'DashboardScreen');
+      
+      // Get payment requests from Firebase
+      const firebaseRequests = await getReceivedPaymentRequests(currentUser.id, 10);
+      
+      // Get notification requests
+      const notificationRequests = notifications?.filter(n =>
+        n.type === 'payment_request' &&
+        (n.data?.amount || 0) > 0
+      ) || [];
 
-      // Also include notifications of type 'payment_request' and 'payment_reminder'
-      const notificationRequests = notifications ? notifications.filter(n =>
-        n.type === 'payment_request' ||
-        n.type === 'payment_reminder'
-      ) : [];
-      logger.debug('Notification requests loaded', { count: notificationRequests.length }, 'DashboardScreen');
-
-      // Create a map to track processed requests to avoid duplicates
-      const processedRequestIds = new Set<string>();
-      const processedNotificationIds = new Set<string>();
+      // Combine and deduplicate requests
+      const processedIds = new Set<string>();
       const allRequests: any[] = [];
 
-      // First, add actual payment requests from Firebase
-      actualPaymentRequests
-        .filter(req => req.amount > 0) // Filter out $0 requests
+      // Add Firebase requests first
+      firebaseRequests
+        .filter(req => req.amount > 0)
         .forEach(req => {
-          const requestId = req.id;
-          processedRequestIds.add(requestId);
-          logger.debug('Added Firebase request', { requestId, senderName: req.senderName, amount: req.amount }, 'DashboardScreen');
-
+          processedIds.add(req.id);
           allRequests.push({
             id: req.id,
             type: 'payment_request' as const,
@@ -435,45 +265,22 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           });
         });
 
-      // Then, add notification requests that don't have corresponding Firebase payment requests
+      // Add notification requests that don't duplicate Firebase requests
       notificationRequests
         .filter(n => {
-          // Filter out notifications with $0 amounts
-          const amount = n.data?.amount || 0;
-          if (amount <= 0) {return false;}
-
-          // Check if this notification corresponds to a Firebase payment request
           const requestId = n.data?.requestId;
-          if (requestId && processedRequestIds.has(requestId)) {
-            logger.debug('Skipping duplicate notification', { requestId, senderName: n.data?.senderName, amount }, 'DashboardScreen');
-            return false; // Skip this notification as we already have the Firebase request
-          }
-
-          // Also check if we've already processed this notification ID
-          const notificationId = String(n.id);
-          if (processedNotificationIds.has(notificationId)) {
-            logger.debug('Skipping duplicate notification ID', { notificationId, senderName: n.data?.senderName, amount }, 'DashboardScreen');
-            return false;
-          }
-
-          // Add to processed set to prevent duplicates within notifications
-          processedNotificationIds.add(notificationId);
-          logger.debug('Added notification request', { id: n.id, senderName: n.data?.senderName, amount }, 'DashboardScreen');
-          return true;
+          return !requestId || !processedIds.has(requestId);
         })
-        .forEach(n => {
-          allRequests.push(n);
-        });
+        .forEach(n => allRequests.push(n));
 
       // Sort by creation date (latest first)
       allRequests.sort((a, b) => {
         const dateA = new Date(a.created_at).getTime();
         const dateB = new Date(b.created_at).getTime();
-        return dateB - dateA; // Latest first
+        return dateB - dateA;
       });
 
-      
-      // Enrich requests with sender avatars if missing
+      // Enrich with sender avatars
       try {
         const senderIds = Array.from(new Set(
           allRequests
@@ -489,7 +296,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                 const profile = await firebaseDataService.user.getCurrentUser(id);
                 return { id, avatar: profile?.avatar || '' };
               } catch (e) {
-                console.error('Error fetching user profile:', e);
                 return { id, avatar: '' };
               }
             })
@@ -499,7 +305,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           profiles.forEach(p => { idToAvatar[p.id] = p.avatar; });
 
           allRequests.forEach(r => {
-            if (!r.data) {r.data = {};}
+            if (!r.data) r.data = {};
             const sid = r.data.senderId ? String(r.data.senderId) : undefined;
             const existing = r.data.senderAvatar && r.data.senderAvatar.trim() !== '';
             if (!existing && sid && idToAvatar[sid]) {
@@ -507,51 +313,36 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             }
           });
         }
-
-        // Removed group member avatar fallback logic
       } catch (e) {
-        const errorMessage = e instanceof Error ? e.message : String(e);
-        logger.warn('Could not enrich sender avatars', { error: errorMessage }, 'DashboardScreen');
+        logger.warn('Could not enrich sender avatars', { error: e }, 'DashboardScreen');
       }
 
-      logger.info('Payment requests loaded successfully', { count: allRequests.length }, 'DashboardScreen');
-      logger.debug('Final requests', { 
-        requests: allRequests.map(r => ({
-          id: r.id,
-          sender: r.data?.senderName || r.data?.fromUser,
-          amount: r.data?.amount,
-          type: r.type
-        }))
-      }, 'DashboardScreen');
       setPaymentRequests(allRequests);
-
-      // Mark as initially loaded if this is the first successful load
       if (!initialRequestsLoaded) {
         setInitialRequestsLoaded(true);
-        logger.info('Initial payment requests loaded', null, 'DashboardScreen');
       }
+      
+      logger.info('Payment requests loaded successfully', { count: allRequests.length }, 'DashboardScreen');
     } catch (error) {
-      // Keep error logging for debugging
-      console.error('Error loading payment requests:', error);
+      logger.error('Error loading payment requests', error, 'DashboardScreen');
       // Fallback to notifications only
       if (notifications) {
         const requests = notifications
           .filter(n =>
-            (n.type === 'payment_reminder' ||
-              n.type === 'payment_request') &&
-            (n.data?.amount || 0) > 0 // Filter out $0 requests
+            n.type === 'payment_request' &&
+            (n.data?.amount || 0) > 0
           )
           .sort((a, b) => {
             const dateA = new Date(a.created_at).getTime();
             const dateB = new Date(b.created_at).getTime();
-            return dateB - dateA; // Latest first
+            return dateB - dateA;
           });
         setPaymentRequests(requests);
       }
     } finally {
       setLoadingPaymentRequests(false);
     }
-  }, [notifications, currentUser?.id]);
+  }, [currentUser?.id, notifications, loadingPaymentRequests, initialRequestsLoaded]);
 
 
   // Removed group summary logic
@@ -560,180 +351,68 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Removed group-related effects
 
-  // Load real transactions from Firebase
-  const loadRealTransactions = useCallback(async () => {
-    if (!currentUser?.id) {return;}
+  // Load transactions
+  const loadTransactions = useCallback(async () => {
+    if (!currentUser?.id) return;
 
     try {
       setLoadingTransactions(true);
-
       const userTransactions = await firebaseDataService.transaction.getTransactions(currentUser.id.toString());
-
       setRealTransactions(userTransactions);
     } catch (error) {
-      // Keep error logging for debugging
-      console.error('🔥 Dashboard: Error loading real transactions:', error);
+      logger.error('Error loading transactions', error, 'DashboardScreen');
     } finally {
       setLoadingTransactions(false);
     }
   }, [currentUser?.id]);
 
-  // Load real transactions when component mounts or comes into focus
-  useEffect(() => {
-    if (isAuthenticated && currentUser?.id) {
-      loadRealTransactions();
-    }
-  }, [isAuthenticated, currentUser?.id, loadRealTransactions]); // Add loadRealTransactions dependency
-
-  // Monitor balance changes and show notifications for new transactions
-  useEffect(() => {
-    if (userCreatedWalletBalance) {
-      // This effect will trigger when the balance changes
-      logger.info('Balance updated', { totalUSD: userCreatedWalletBalance.totalUSD }, 'DashboardScreen');
-    }
-  }, [userCreatedWalletBalance?.totalUSD]); // Removed forceUpdate dependency to prevent excessive re-renders
-
-
-  // Load data when component mounts or comes into focus - FIXED: Remove problematic dependencies
+  // Load data when component comes into focus
   useFocusEffect(
     React.useCallback(() => {
       if (isAuthenticated && currentUser?.id) {
-        // Load balance immediately and independently of app wallet
-        if (!balanceLoaded && !loadingUserWallet) {
-          logger.debug('Focus effect - loading balance immediately', null, 'DashboardScreen');
-          loadUserCreatedWalletBalance();
-        }
-
-        // Initialize app wallet for the user (in parallel, not blocking balance)
-        ensureAppWallet(currentUser.id.toString()).then(async () => {
-          // Get app wallet balance
-          await getAppWalletBalance(currentUser.id.toString());
-
-          // Update user's wallet information if it's different
-          if (appWalletAddress && currentUser.wallet_address !== appWalletAddress) {
-            try {
-              await updateUser({
-                wallet_address: appWalletAddress,
-                wallet_public_key: appWalletAddress // For app wallet, use address as public key
-              });
-            } catch (updateError) {
-              // Keep error logging for debugging
-              console.error('Failed to update user app wallet info in focus effect:', updateError);
-            }
-          }
-        }).catch(error => {
-          // Keep error logging for debugging
-          console.error('Error initializing app wallet:', error);
-        });
-
-        // Load transactions when returning to dashboard
-        loadRealTransactions();
+        // Only load data once to prevent infinite loops
+        loadWalletBalance();
+        loadTransactions();
+        loadPaymentRequests();
       }
-    }, [isAuthenticated, currentUser?.id, balanceLoaded, loadingUserWallet, loadUserCreatedWalletBalance]) // Simplified dependencies to prevent unnecessary re-runs
+    }, [isAuthenticated, currentUser?.id]) // Removed function dependencies to prevent infinite loops
   );
 
   // Handle refreshBalance parameter from navigation
   useEffect(() => {
     if (route?.params?.refreshBalance && currentUser?.id) {
-      // Clear the refreshBalance parameter to prevent infinite loops
       navigation.setParams({ refreshBalance: undefined });
-      
-      // Clear configuration cache to ensure latest network settings are used
-      try {
-        const { clearConfigCache } = require('../../config/unified');
-        clearConfigCache();
-        logger.info('Configuration cache cleared for balance refresh', null, 'DashboardScreen');
-      } catch (error) {
-        logger.warn('Failed to clear configuration cache', { error }, 'DashboardScreen');
-      }
-      
-      // Force refresh the balance
-      loadUserCreatedWalletBalance();
+      loadWalletBalance();
       logger.info('Balance refresh triggered from navigation parameter', null, 'DashboardScreen');
     }
-  }, [route?.params?.refreshBalance, currentUser?.id, navigation, loadUserCreatedWalletBalance]);
+  }, [route?.params?.refreshBalance, currentUser?.id, navigation, loadWalletBalance]);
 
   // Load notifications when dashboard loads
   useEffect(() => {
     if (isAuthenticated && currentUser?.id) {
-      loadNotifications().then(() => {
-        // Add a small delay to ensure notifications are fully processed
-        setTimeout(() => {
-          loadPaymentRequests();
-        }, 500);
-      });
+      loadNotifications();
     }
-  }, [isAuthenticated, currentUser?.id, loadNotifications]); // Remove loadPaymentRequests from dependencies to prevent infinite loops
+  }, [isAuthenticated, currentUser?.id, loadNotifications]);
 
   // Removed group loading logic
 
 
   const onRefresh = async () => {
-    if (!isAuthenticated || !currentUser?.id) {return;}
+    if (!isAuthenticated || !currentUser?.id) return;
 
     try {
       logger.info('Manual refresh triggered', null, 'DashboardScreen');
-      setBalanceLoaded(false); // Reset balance loaded flag to allow refresh
-
-      // Clear configuration cache to ensure latest network settings are used
-      try {
-        const { clearConfigCache } = require('../../config/unified');
-        clearConfigCache();
-        logger.info('Configuration cache cleared during manual refresh', null, 'DashboardScreen');
-      } catch (error) {
-        logger.warn('Failed to clear configuration cache during refresh', { error }, 'DashboardScreen');
-      }
-
-      // Ensure wallet exists and refresh balance
-      const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
-
-      // Update user's wallet information if it changed
-      if (walletResult.success && walletResult.wallet && currentUser.wallet_address !== walletResult.wallet.address) {
-        try {
-          await updateUser({
-            wallet_address: walletResult.wallet.address,
-            wallet_public_key: walletResult.wallet.publicKey
-          });
-        } catch (updateError) {
-          console.error('Failed to update user wallet info in refresh:', updateError);
-        }
-      }
-
-      // Refresh the wallet balance directly
-      if (walletResult.success && walletResult.wallet) {
-        logger.info('Refreshing wallet balance', null, 'DashboardScreen');
-
-        try {
-          setLoadingUserWallet(true);
-
-          // Get the balance directly from the service
-          const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
-
-          if (balance) {
-            logger.info('New balance detected', { totalUSD: balance.totalUSD ?? 0, currency: 'USD' }, 'DashboardScreen');
-
-            // Simple state update without complex setTimeout logic
-            setUserCreatedWalletBalance(balance);
-            setRefreshBalance(balance.totalUSD ?? 0);
-          } else {
-            console.error('❌ Dashboard: Failed to get wallet balance');
-          }
-        } catch (error) {
-          console.error('❌ Dashboard: Error getting wallet balance:', error);
-        } finally {
-          setLoadingUserWallet(false);
-        }
-      }
-
+      
       await Promise.all([
+        loadWalletBalance(),
         refreshNotifications(),
-        loadRealTransactions(),
+        loadTransactions(),
+        loadPaymentRequests()
       ]);
 
       logger.info('Refresh completed successfully', null, 'DashboardScreen');
-
     } catch (error) {
-      console.error('❌ Dashboard: Error during refresh:', error);
+      logger.error('Error during refresh', error, 'DashboardScreen');
     }
   };
 
@@ -950,38 +629,21 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             </View>
           </View>
 
-          {priceLoading ? (
-            <View style={styles.priceLoadingContainer}>
-              <ActivityIndicator size="small" color={BG_COLOR} />
-              <Text style={styles.priceLoadingText}>
-                {loadingUserWallet ? 'Loading your app wallet...' : 'Loading balance...'}
+          <View style={styles.balanceContainer}>
+            <View style={{ flex: 1, alignItems: 'flex-start' }}>
+              <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
+                $ {(localAppWalletBalance || 0).toFixed(2)}
               </Text>
             </View>
-          ) : (
-            <View style={styles.balanceContainer}>
-              {/* App Wallet Balance Display */}
-              <View style={{ flex: 1, alignItems: 'flex-start' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  {/*<Image
-                    source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fusdc-logo-black.png?alt=media&token=2b33d108-f3aa-471d-b7fe-6166c53c1d56' }}
-                    style={styles.balanceUsdcLogo}
-                  />*/}
-                  <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
-                    $ {(refreshBalance !== null ? (refreshBalance ?? 0) : (appWalletBalance || userCreatedWalletBalance?.totalUSD || 0)).toFixed(2)}
-                  </Text>
-                </View>
-
-              </View>
-            </View>
-          )}
+          </View>
 
           {/* Wallet Address with Copy Button */}
           <TouchableOpacity
             style={styles.walletAddressContainer}
-            onPress={() => copyWalletAddress(appWalletAddress || currentUser?.wallet_address || '')}
+            onPress={() => copyWalletAddress(localAppWalletAddress || currentUser?.wallet_address || '')}
           >
             <Text style={styles.balanceLimitText}>
-              {hashWalletAddress(appWalletAddress || currentUser?.wallet_address || '')}
+              {hashWalletAddress(localAppWalletAddress || currentUser?.wallet_address || '')}
             </Text>
             <Image
               source={require('../../../assets/copy-icon.png')}
@@ -1292,8 +954,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         <QRCodeScreen
           onBack={() => setShowQRCodeScreen(false)}
           userPseudo={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
-          userWallet={currentUser?.wallet_address || ''}
-          qrValue={currentUser?.wallet_address || ''}
+          userWallet={localAppWalletAddress || currentUser?.wallet_address || ''}
+          qrValue={localAppWalletAddress || currentUser?.wallet_address || ''}
         />
       </Modal>
 

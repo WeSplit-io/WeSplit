@@ -5,8 +5,8 @@
 
 import { StateCreator } from 'zustand';
 import { MultiSignState, MultiSignActions, AppStore } from '../types';
-import { MultiSignStateService } from '../../services/multiSignStateService';
-import { logger } from '../../services/loggingService';
+import { multiSignStateService } from '../../services/core';
+import { logger } from '../../services/core';
 
 export const createMultiSignSlice: StateCreator<
   AppStore,

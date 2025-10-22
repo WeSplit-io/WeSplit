@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { GroupWithDetails, Expense, GroupMember } from '../types';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 
 // Custom hook for group data management with caching and automatic refetching
 export const useGroupData = (groupId: number | null) => {

@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, Share, Image, TextInput, ScrollView } from 'react-native';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
-import { QrCodeView } from '@features/qr';
+import QrCodeView from '../../services/core/QrCodeView';
 import Icon from '../../components/Icon';
 import { Clipboard } from 'react-native';
 import styles from './styles';
 import { colors } from '../../theme';
-import { createUsdcRequestUri } from '@features/qr';
-import { logger } from '../../services/loggingService';
+import { createUsdcRequestUri } from '../../services/core/solanaPay';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 interface CryptoTransferParams {
@@ -131,7 +131,7 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
         // Save deposit transaction to database for history
         if (currentUser?.id) {
           try {
-            const { firebaseTransactionService } = await import('../../services/firebaseDataService');
+            const { firebaseTransactionService } = await import('../../services/data');
             
             const transactionData = {
               type: 'deposit' as const,

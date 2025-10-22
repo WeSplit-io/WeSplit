@@ -13,10 +13,10 @@ import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
 import { useWallet } from '../../context/WalletContext';
-import { walletService } from '../../services/WalletService';
-import { firebaseDataService } from '../../services/firebaseDataService';
+import { walletService } from '../../services/wallet';
+import { firebaseDataService } from '../../services/data';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 const SeedPhraseViewScreen: React.FC = () => {

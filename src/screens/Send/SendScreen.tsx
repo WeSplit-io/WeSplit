@@ -7,12 +7,12 @@ import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { useContactActions } from '../../hooks';
-import { walletService } from '../../services/WalletService';
+import { walletService } from '../../services/wallet';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
-import { logger } from '../../services/loggingService';
-import type { LinkedWallet } from '../../services/LinkedWalletService';
+import { logger } from '../../services/core';
+import type { LinkedWallet } from '../../services/wallet/LinkedWalletService';
 import { Container } from '../../components/shared';
 
 const SendScreen: React.FC<any> = ({ navigation, route }) => {

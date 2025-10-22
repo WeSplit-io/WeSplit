@@ -7,8 +7,8 @@ import UserAvatar from '../../components/UserAvatar';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
-import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
-import { logger } from '../../services/loggingService';
+import { createPaymentRequest } from '../../services/payments';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 interface ContactActionScreenProps {

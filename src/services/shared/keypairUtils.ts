@@ -4,7 +4,7 @@
  */
 
 import { Keypair } from '@solana/web3.js';
-import { logger } from '../loggingService';
+import { logger } from '../core';
 
 export interface KeypairCreationResult {
   success: boolean;

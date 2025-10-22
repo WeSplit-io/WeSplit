@@ -19,17 +19,17 @@ import { colors } from '../../theme';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { firebaseAuth, firestoreService, auth } from '../../config/firebase';
+import { firebaseAuth, firestoreService, auth } from '../../config/firebase/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../config/firebase';
-import { walletService } from '../../services/WalletService';
-import { authService } from '../../services/AuthService';
-import { firebaseDataService } from '../../services/firebaseDataService';
-import { sendVerificationCode } from '../../services/firebaseFunctionsService';
-import { logOAuthConfiguration } from '../../utils/oauthTest';
-import { logger } from '../../services/loggingService';
-import { testEnvironmentVariables } from '../../utils/envTest';
-import { logOAuthDebugInfo } from '../../utils/oauthDebugger';
+import { db } from '../../config/firebase/firebase';
+import { walletService } from '../../services/wallet';
+import { authService } from '../../services/auth';
+import { firebaseDataService } from '../../services/data';
+import { sendVerificationCode } from '../../services/data';
+import { logOAuthConfiguration } from '../../utils/core';
+import { logger } from '../../services/core';
+import { testEnvironmentVariables } from '../../utils/core';
+import { logOAuthDebugInfo } from '../../utils/core';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
@@ -217,7 +217,7 @@ const AuthMethodsScreen: React.FC = () => {
       logger.info('Starting email authentication process', null, 'AuthMethodsScreen');
       
       // Import firestore service
-      const { firestoreService } = await import('../../config/firebase');
+      const { firestoreService } = await import('../../config/firebase/firebase');
 
       // Check if user has verified within 30 days (with shorter timeout to prevent hanging)
       let hasVerifiedRecently = false;

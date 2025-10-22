@@ -23,7 +23,7 @@ import { spacing } from '../../theme/spacing';
 import { styles } from './DegenResultStyles';
 import { SplitWalletService } from '../../services/split';
 import { SplitWallet } from '../../services/split/types';
-import { notificationService } from '../../services/notificationService';
+import { notificationService } from '../../services/notifications';
 import { useApp } from '../../context/AppContext';
 
 // Import our custom hooks and components

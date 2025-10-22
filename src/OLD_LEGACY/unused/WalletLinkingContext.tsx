@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { walletService } from '../services/WalletService';
+import { walletService } from '../services/wallet';
 import { Alert } from 'react-native';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 
 export interface LinkedWallet {
   address: string;

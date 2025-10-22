@@ -7,9 +7,9 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
 import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
-import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
-import { logger } from '../../services/loggingService';
+import { firebaseDataService } from '../../services/data';
+import { createPaymentRequest } from '../../services/payments';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {

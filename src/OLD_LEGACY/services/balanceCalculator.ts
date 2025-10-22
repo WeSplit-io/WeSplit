@@ -6,7 +6,7 @@
 
 import { GroupWithDetails, Balance, Expense, GroupMember } from '../types';
 import { convertToUSDC } from '../services/priceService';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 
 export interface BalanceCalculationOptions {
   normalizeToUSDC?: boolean;

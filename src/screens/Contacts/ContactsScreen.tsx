@@ -4,15 +4,15 @@ import { Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import NavBar from '../../components/NavBar';
 import ContactsList from '../../components/ContactsList';
-import { QrCodeView } from '@features/qr';
+import QrCodeView, { QrCodeViewProps } from '../../services/core/QrCodeView';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { useContactActions } from '../../hooks';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
-import { logger } from '../../services/loggingService';
-import { createUsdcRequestUri } from '@features/qr';
+import { logger } from '../../services/core';
+import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { Container } from '../../components/shared';
 
 interface ContactsScreenProps {

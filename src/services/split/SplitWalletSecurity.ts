@@ -5,7 +5,7 @@
  */
 
 import * as SecureStore from 'expo-secure-store';
-import { logger } from '../loggingService';
+import { logger } from '../core';
 
 export class SplitWalletSecurity {
   private static readonly PRIVATE_KEY_PREFIX = 'split_wallet_private_key_';
@@ -301,7 +301,7 @@ export class SplitWalletSecurity {
         requesterId
       }, 'SplitWalletSecurity');
       
-      const { db } = await import('../../config/firebase');
+      const { db } = await import('../../config/firebase/firebase');
       const { doc, getDoc } = await import('firebase/firestore');
       
       // Enhanced error handling for Firebase getDoc operation
@@ -513,7 +513,7 @@ export class SplitWalletSecurity {
 
       // For Degen Split, store the private key in Firebase so all participants can access it
       // This is more secure than storing it locally on each device
-      const { db } = await import('../../config/firebase');
+      const { db } = await import('../../config/firebase/firebase');
       const { doc, setDoc } = await import('firebase/firestore');
       
       const privateKeyDocRef = doc(db, 'splitWalletPrivateKeys', splitWalletId);

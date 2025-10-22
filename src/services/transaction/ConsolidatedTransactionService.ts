@@ -8,7 +8,7 @@ import { TransactionWalletManager } from './TransactionWalletManager';
 import { TransactionProcessor } from './TransactionProcessor';
 import { PaymentRequestManager } from './PaymentRequestManager';
 import { BalanceManager } from './BalanceManager';
-import { logger } from '../loggingService';
+import { logger } from '../core';
 import { 
   TransactionParams, 
   TransactionResult, 
@@ -82,7 +82,7 @@ class ConsolidatedTransactionService {
       }
 
       // Load the user's wallet
-      const { walletService } = await import('../WalletService');
+      const { walletService } = await import('../wallet');
       const walletResult = await walletService.ensureUserWallet(params.userId);
       
       if (!walletResult.success || !walletResult.wallet) {
@@ -328,7 +328,7 @@ class ConsolidatedTransactionService {
   async getUserWalletAddress(userId: string): Promise<string | null> {
     try {
       // Use the proper WalletService method to get user's wallet address
-      const { walletService } = await import('../WalletService');
+      const { walletService } = await import('../wallet');
       const result = await walletService.getWalletInfoForUser(userId);
       
       if (result.success && result.wallet) {

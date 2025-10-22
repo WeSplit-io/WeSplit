@@ -149,5 +149,7 @@ export interface DataTransformers {
 }
 
 // Export all types
-export * from './notificationTypes';
 export * from './unified';
+export * from './billSplitting';
+export type { NotificationData } from './notificationTypes';
+export type { BillAnalysisResult, BillItem, BillParticipant, ProcessedBillData, BillAnalysisData, BillSettings, BillSplitCreationData, OCRProcessingResult } from './billAnalysis';

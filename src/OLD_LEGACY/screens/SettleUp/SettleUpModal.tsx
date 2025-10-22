@@ -7,10 +7,10 @@ import UserAvatar from '../../components/UserAvatar';
 import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
 import { convertToUSDC } from '../../services/priceService';
-import { firebaseDataService } from '../../services/firebaseDataService';
+import { firebaseDataService } from '../../services/data';
 import { GroupMember, Expense, Balance } from '../../types';
 import { styles } from './styles';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 
 interface SettleUpModalProps {
   visible?: boolean;

@@ -15,7 +15,7 @@ import {
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { FallbackDataService } from '../../utils/fallbackDataService';
+import { FallbackDataService } from '../../services/data';
 import { Container } from '../../components/shared';
 
 interface PaymentConfirmationScreenProps {

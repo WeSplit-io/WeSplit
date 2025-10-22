@@ -4,8 +4,8 @@
  * Prevents data inconsistencies and overlapping synchronization code
  */
 
-import { logger } from '../loggingService';
-import { SplitStorageService } from '../splitStorageService';
+import { logger } from '../core';
+import { SplitStorageService } from '../splits/splitStorageService';
 import type { SplitWalletParticipant } from './types';
 
 export interface SynchronizationResult {

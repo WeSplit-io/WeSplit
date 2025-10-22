@@ -4,9 +4,9 @@ import { WebView } from 'react-native-webview';
 import Icon from '../../components/Icon';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
+import { firebaseDataService } from '../../services/data';
 import styles from './styles';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 interface MoonPayWebViewParams {

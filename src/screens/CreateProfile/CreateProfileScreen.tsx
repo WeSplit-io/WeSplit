@@ -16,14 +16,14 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
-import { walletService } from '../../services/WalletService';
+import { firebaseDataService } from '../../services/data';
+import { walletService } from '../../services/wallet';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { colors } from '../../theme';
-import { UserImageService } from '../../services/userImageService';
-import { DEFAULT_AVATAR_URL } from '../../config/constants';
+import { userImageService } from '../../services/core';
+import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import * as ImagePicker from 'expo-image-picker';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 const CreateProfileScreen: React.FC = () => {

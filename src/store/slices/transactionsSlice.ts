@@ -5,7 +5,7 @@
 
 import { StateCreator } from 'zustand';
 import { TransactionsState, TransactionsActions, AppStore } from '../types';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 
 export const createTransactionsSlice: StateCreator<
   AppStore,

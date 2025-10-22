@@ -13,11 +13,12 @@ import {
   TextStyle,
 } from 'react-native';
 import { colors } from '../theme/colors';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
-import { UserImageService, UserImageInfo } from '../services/userImageService';
-import { DEFAULT_AVATAR_URL } from '../config/constants';
+import { userImageService } from '../services/core';
+import { UserImageInfo, UserImageService } from '../services/core/userImageService';
+import { DEFAULT_AVATAR_URL } from '../config/constants/constants';
 
 interface UserAvatarProps {
   userId?: string;
@@ -80,7 +81,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
       logger.debug('Fetching image info from service', null, 'UserAvatar');
       const fetchImageInfo = async () => {
         try {
-          const info = await UserImageService.getUserImageInfo(userId, userName || displayName);
+          const info = await userImageService.getUserImageInfo(userId, userName || displayName);
           logger.debug('Fetched image info', { info }, 'UserAvatar');
           setImageInfo(info);
         } catch (error) {
@@ -155,6 +156,12 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     ...textStyle,
   };
 
+  const imageStyle = {
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+  };
+
   if (!imageInfo) {
     // Loading state
     return (
@@ -184,7 +191,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
       )}
       <Image
         source={{ uri: imageUri }}
-        style={[avatarStyle, { opacity: isLoading ? 0 : 1 }]}
+        style={[imageStyle, { opacity: isLoading ? 0 : 1 }]}
         onLoadStart={handleImageLoadStart}
         onLoad={handleImageLoad}
         onError={handleImageError}

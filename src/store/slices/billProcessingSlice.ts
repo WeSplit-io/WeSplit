@@ -5,7 +5,7 @@
 
 import { StateCreator } from 'zustand';
 import { BillProcessingState, BillProcessingActions, AppStore } from '../types';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 
 export const createBillProcessingSlice: StateCreator<
   AppStore,

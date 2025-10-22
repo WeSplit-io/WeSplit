@@ -78,3 +78,14 @@ export interface BillSettings {
   taxRate?: number;
   tipRate?: number;
 }
+
+export interface BillSplitSummary {
+  id: string;
+  title: string;
+  totalAmount: number;
+  currency: string;
+  participantCount: number;
+  status: 'pending' | 'completed' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+}

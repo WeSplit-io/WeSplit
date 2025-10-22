@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { colors, spacing, typography } from '../theme';
-import { DEFAULT_AVATAR_URL } from '../config/constants';
+import { DEFAULT_AVATAR_URL } from '../../config/constants';
 
 interface BalanceRowProps {
   avatar: string;

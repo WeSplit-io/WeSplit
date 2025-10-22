@@ -5,15 +5,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Icon from './Icon';
 import { useApp } from '../context/AppContext';
 import { useContacts, useContactActions } from '../hooks';
-import { parseWeSplitDeepLink, handleJoinGroupDeepLink, handleAddContactFromProfile } from '../services/deepLinkHandler';
-import { UserSearchService, UserSearchResult } from '../services/userSearchService';
-import { isSolanaPayUri, parseUri, extractRecipientAddress, isValidSolanaAddress } from '@features/qr';
+import { deepLinkHandler } from '../services/core';
+import { userSearchService } from '../services/contacts';
+import { isSolanaPayUri, parseUri, extractRecipientAddress, isValidSolanaAddress } from '../services/core';
 import { UserContact, User } from '../types';
 import { colors } from '../theme';
 import { styles } from './ContactsList.styles';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 import UserAvatar from './UserAvatar';
-import { formatWalletAddress, getWalletAddressStatus } from '../utils/walletUtils';
+import { formatWalletAddress, getWalletAddressStatus } from '../utils/wallet';
 
 interface ContactsListProps {
   onContactSelect: (contact: UserContact) => void;
@@ -314,7 +314,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
       }
       
       // Parse the deep link
-      const linkData = parseWeSplitDeepLink(data);
+      const linkData = deepLinkHandler.parseWeSplitDeepLink(data);
       
       if (!linkData) {
         Alert.alert('Invalid QR Code', 'This QR code is not recognized by WeSplit.');
@@ -332,7 +332,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
           }
           
           try {
-            const result = await handleAddContactFromProfile(linkData, currentUser.id.toString());
+            const result = await deepLinkHandler.handleAddContactFromProfile(linkData, currentUser.id.toString());
             if (result.success) {
               Alert.alert('Success', 'Contact added successfully!');
               // Refresh contacts list
@@ -353,7 +353,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
           }
           
           try {
-            const result = await handleJoinGroupDeepLink(linkData.inviteId!, currentUser.id.toString());
+            const result = await deepLinkHandler.handleJoinGroupDeepLink(linkData.inviteId!, currentUser.id.toString());
             if (result.success) {
               Alert.alert('Success', `Successfully joined group: ${result.groupName || 'Unknown Group'}`);
               // Refresh contacts list if we're in a group context

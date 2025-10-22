@@ -4,9 +4,9 @@
  * Part of the modularized SplitWalletService
  */
 
-import { logger } from '../loggingService';
+import { logger } from '../core';
 import { doc, updateDoc, deleteDoc, collection } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { db } from '../../config/firebase/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult } from './types';
 
 export class SplitWalletCleanup {
@@ -538,7 +538,7 @@ export class SplitWalletCleanup {
   }
 
   private static async getUserWallet(userId: string): Promise<{ success: boolean; wallet?: { address: string }; error?: string }> {
-    const { walletService } = await import('../WalletService');
+    const { walletService } = await import('../wallet');
     const wallet = await walletService.getUserWallet(userId);
     return {
       success: !!wallet,

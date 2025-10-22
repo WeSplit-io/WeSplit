@@ -10,7 +10,7 @@ import {
   Notification,
   Transaction
 } from '../types';
-import { firestoreService } from '../config/firebase';
+// import { firestoreService } from '../config/firebase';
 import { 
   collection, 
   doc, 
@@ -32,8 +32,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { notificationService } from './notificationService';
-import { logger } from './loggingService';
-import { createPaymentRequestNotificationData, validateNotificationData } from './notificationDataUtils';
+import { logger } from './core/loggingService';
+// import { createPaymentRequestNotificationData, validateNotificationData } from './notificationDataUtils';
 
 // Data transformation utilities
 export const firebaseDataTransformers = {

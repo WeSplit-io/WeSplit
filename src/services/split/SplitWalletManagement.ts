@@ -4,10 +4,10 @@
  * Part of the modularized SplitWalletService
  */
 
-import { logger } from '../loggingService';
-import { roundUsdcAmount } from '../../utils/currencyUtils';
+import { logger } from '../core';
+import { roundUsdcAmount } from '../../utils/format';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { db } from '../../config/firebase/firebase';
 
 /**
  * Remove undefined values from an object (Firebase doesn't allow undefined values)
@@ -767,7 +767,7 @@ export class SplitWalletManagement {
 
   private static async updateWalletParticipants(docId: string, participants: SplitWalletParticipant[]): Promise<void> {
     const { doc, updateDoc } = await import('firebase/firestore');
-    const { db } = await import('../../config/firebase');
+    const { db } = await import('../../config/firebase/firebase');
     
     // Clean participants data to remove undefined values
     const cleanedParticipants = participants.map(p => ({

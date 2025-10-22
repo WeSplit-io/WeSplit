@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { firebaseDataService } from '../services/firebaseDataService';
+import { firebaseDataService } from '../services/data';
 import { User, UserContact } from '../types';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 
 interface ContactActionResult {
   success: boolean;

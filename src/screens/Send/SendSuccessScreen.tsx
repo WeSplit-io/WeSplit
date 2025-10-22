@@ -4,8 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
-import { notificationService } from '../../services/notificationService';
-import { logger } from '../../services/loggingService';
+import { notificationService } from '../../services/notifications';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {

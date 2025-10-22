@@ -29,8 +29,10 @@ export interface BillParticipant {
   id: string;
   name: string;
   wallet_address: string;
+  walletAddress?: string;
   amountOwed: number;
   items: string[];
+  status?: 'pending' | 'paid' | 'cancelled' | 'accepted';
 }
 
 export interface BillSettings {
@@ -38,19 +40,30 @@ export interface BillSettings {
   currency: string;
   taxRate?: number;
   tipRate?: number;
+  allowPartialPayments?: boolean;
+  requireAllAccept?: boolean;
+  autoCalculate?: boolean;
+  taxIncluded?: boolean;
 }
 
 export interface BillAnalysisResult {
   success: boolean;
   data?: BillAnalysisData;
   error?: string;
+  processingTime?: number;
+  confidence?: number;
 }
 
 export interface ProcessedBillData {
+  id: string;
   title: string;
+  merchant: string;
   location?: string;
+  date: string;
   time?: string;
   totalAmount: number;
+  subtotal?: number;
+  tax?: number;
   currency: string;
   items: BillItem[];
   participants: BillParticipant[];

@@ -6,12 +6,12 @@ import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { useContactActions } from '../../hooks';
-import { QrCodeView } from '@features/qr';
+import QrCodeView from '../../services/core/QrCodeView';
 import { styles } from './styles';
 import { colors } from '../../theme/colors';
 import { User } from '../../types';
-import { createUsdcRequestUri } from '@features/qr';
-import { logger } from '../../services/loggingService';
+import { createUsdcRequestUri } from '../../services/core/solanaPay';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {

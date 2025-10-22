@@ -3,7 +3,7 @@
  * Handles memory optimization and cleanup to prevent heap overflow
  */
 
-import { logger } from '../loggingService';
+import { logger } from '../core';
 
 interface ModuleCache {
   [key: string]: {
@@ -66,7 +66,7 @@ class MemoryManager {
           module = await import('firebase/firestore');
           break;
         case 'firebase-config':
-          module = await import('../../config/firebase');
+          module = await import('../../config/firebase/firebase');
           break;
         case 'unified-config':
           module = await import('../../config/unified');
@@ -75,7 +75,7 @@ class MemoryManager {
           module = await import('../../config/transactionConfig');
           break;
         case 'logger':
-          module = await import('../loggingService');
+          module = await import('../core');
           break;
         case 'keypair-utils':
           module = await import('./keypairUtils');

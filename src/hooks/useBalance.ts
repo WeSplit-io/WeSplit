@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useWallet } from '../context/WalletContext';
 import { useApp } from '../context/AppContext';
-import { consolidatedTransactionService } from '../services/consolidatedTransactionService';
+import { consolidatedTransactionService } from '../services/transaction';
 
 export interface UseBalanceResult {
   balance: number | null;

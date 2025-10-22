@@ -4,7 +4,7 @@
  */
 
 import { ProcessedBillData, BillAnalysisResult } from './billAnalysis';
-import { Split } from '../services/splitStorageService';
+import { Split } from '../services/splits';
 import { SplitWallet } from '../services/split';
 
 /**

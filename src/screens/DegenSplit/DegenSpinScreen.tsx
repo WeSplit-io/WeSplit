@@ -16,9 +16,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenSpinStyles';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 import { useApp } from '../../context/AppContext';
-import { notificationService } from '../../services/notificationService';
+import { notificationService } from '../../services/notifications';
 
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';

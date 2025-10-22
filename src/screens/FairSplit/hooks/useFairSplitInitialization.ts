@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useCallback } from 'react';
-import { logger } from '../../../services/loggingService';
+import { logger } from '../../../services/core';
 import { FairSplitState } from './useFairSplitState';
 
 export interface FairSplitInitialization {
@@ -28,7 +28,7 @@ export const useFairSplitInitialization = (
       try {
         // Always load fresh data from database to ensure we have the latest participant information
         if (splitData.id) {
-          const { SplitStorageService } = await import('../../../services/splitStorageService');
+          const { SplitStorageService } = await import('../../../services/splits');
           const result = await SplitStorageService.getSplit(splitData.id);
           
           if (result.success && result.split) {

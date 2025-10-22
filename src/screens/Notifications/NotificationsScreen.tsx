@@ -11,19 +11,30 @@ import {
   Image,
   Dimensions,
   SafeAreaView,
-  StatusBar
+  StatusBar,
+  ScrollView
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
-import NotificationCard from '../../components/NotificationCard';
+import { NotificationCard } from '../../components/notifications';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { db } from '../../config/firebase/firebase';
 import { Container } from '../../components/shared';
+
+// Import the NotificationData interface from the component
+import { NotificationData } from '../../components/notifications/NotificationCard';
 
 const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   const { state, notifications, loadNotifications, refreshNotifications, acceptSplitInvitation } = useApp();
+
+  // State variables
+  const [activeTab, setActiveTab] = useState<'all' | 'requests'>('all');
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [actionStates, setActionStates] = useState<Record<string, any>>({});
+  const [fadeAnimations, setFadeAnimations] = useState<Record<string, any>>({});
 
   // Function to fetch user data from Firebase
   const fetchUserData = async (userId: string) => {
@@ -99,7 +110,10 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         const splitId = notification.data?.splitId;
         if (splitId) {
           try {
-            await acceptSplitInvitation(splitId);
+            // Call acceptSplitInvitation with proper arguments if available
+            if (acceptSplitInvitation && state.currentUser?.id) {
+              await acceptSplitInvitation(splitId, state.currentUser.id);
+            }
             showToast('Split invitation accepted!');
             // Navigate to split details
             navigation.navigate('SplitDetails', { splitId });
@@ -215,19 +229,19 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   const getNotificationColor = (type: string) => {
     switch (type) {
       case 'payment_request':
-        return colors.orange;
+        return colors.warning;
       case 'payment_sent':
-        return colors.blue;
+        return colors.info;
       case 'payment_received':
         return colors.green;
       case 'split_invite':
-        return colors.purple;
+        return colors.primaryGreen;
       case 'split_completed':
         return colors.green;
       case 'split_payment_required':
         return colors.red;
       default:
-        return colors.gray;
+        return colors.GRAY;
     }
   };
 
@@ -248,6 +262,60 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     }
   };
 
+  // Function to handle refresh
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      if (refreshNotifications) {
+        await refreshNotifications();
+      }
+    } catch (error) {
+      console.error('Error refreshing notifications:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshNotifications]);
+
+  // Function to handle refresh (alias for compatibility)
+  const onRefresh = handleRefresh;
+
+  // Function to handle notification actions
+  const notificationActionHandler = useCallback(async (notification: NotificationData) => {
+    try {
+      // Handle different notification actions based on notification type
+      if (notification.type === 'payment_request') {
+        // Handle payment request
+        console.log('Handling payment request:', notification.id);
+      } else if (notification.type === 'split_invite') {
+        // Handle split invitation
+        console.log('Handling split invitation:', notification.id);
+      } else {
+        // Default action - mark as read
+        await markAsRead(notification.id);
+      }
+    } catch (error) {
+      console.error('Error handling notification action:', error);
+    }
+  }, []);
+
+  // Load notifications on component mount
+  useEffect(() => {
+    const loadNotificationsData = async () => {
+      setLoading(true);
+      try {
+        if (loadNotifications) {
+          await loadNotifications();
+        }
+      } catch (error) {
+        console.error('Error loading notifications:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadNotificationsData();
+  }, [loadNotifications]);
+
 
 
 
@@ -256,16 +324,47 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     const realNotifications = notifications || [];
     
     // Transform real notifications to match NotificationData interface
-    const transformedNotifications: NotificationData[] = realNotifications.map((notification: any) => ({
-      id: notification.id,
-      type: notification.type as NotificationData['type'],
-      title: notification.title,
-      message: notification.message,
-      created_at: notification.created_at,
-      is_read: notification.is_read,
-      status: notification.data?.status || 'pending',
-      data: notification.data || {}
-    }));
+    const transformedNotifications: NotificationData[] = realNotifications.map((notification: any) => {
+      // Map notification types to match the expected interface
+      let mappedType: NotificationData['type'] = 'general';
+      
+      switch (notification.type) {
+        case 'payment_request':
+          mappedType = 'payment_request';
+          break;
+        case 'payment_sent':
+          mappedType = 'money_sent';
+          break;
+        case 'payment_received':
+          mappedType = 'payment_received';
+          break;
+        case 'split_invite':
+          mappedType = 'split_invite';
+          break;
+        case 'split_completed':
+          mappedType = 'split_completed';
+          break;
+        case 'split_payment_required':
+          mappedType = 'split_lock_required';
+          break;
+        case 'payment_reminder':
+          mappedType = 'payment_reminder';
+          break;
+        default:
+          mappedType = 'general';
+      }
+
+      return {
+        id: notification.id,
+        type: mappedType,
+        title: notification.title || '',
+        message: notification.message || '',
+        created_at: notification.created_at,
+        is_read: notification.is_read || false,
+        status: notification.data?.status || 'pending',
+        data: notification.data || {}
+      };
+    });
     
     return activeTab === 'requests'
       ? transformedNotifications.filter((n: NotificationData) => n.type === 'payment_request' || n.type === 'payment_reminder')
@@ -355,13 +454,53 @@ const styles = StyleSheet.create({
   refreshButton: {
     paddingHorizontal: 15,
     paddingVertical: 8,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryGreen,
     borderRadius: 8,
   },
   refreshButtonText: {
     color: colors.white,
     fontSize: 14,
     fontWeight: '600',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 50,
+  },
+  emptyStateIcon: {
+    width: 80,
+    height: 80,
+    marginBottom: 20,
+    opacity: 0.5,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
   },
   notificationsList: {
     padding: 20,
@@ -382,9 +521,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   unreadNotification: {
-    backgroundColor: colors.cardBackground,
+    backgroundColor: colors.darkCard,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: colors.primaryGreen,
   },
   notificationContent: {
     flexDirection: 'row',
@@ -423,7 +562,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryGreen,
     marginLeft: 8,
     marginTop: 4,
   },
@@ -432,10 +571,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
-  },
-  emptyStateIcon: {
-    fontSize: 64,
-    marginBottom: 20,
   },
   emptyStateTitle: {
     fontSize: 20,

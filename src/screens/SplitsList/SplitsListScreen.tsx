@@ -19,20 +19,20 @@ import {
   StyleSheet,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { styles } from './styles';
+import { styles } from '../splits/SplitsList/styles';  
 import { colors } from '../../theme/colors';
 import NavBar from '../../components/NavBar';
 import UserAvatar from '../../components/UserAvatar';
 import GroupIcon from '../../components/GroupIcon';
 import Icon from '../../components/Icon';
 import { Container } from '../../components/shared';
-import { BillSplitSummary } from '../../types/unified';
-import { SplitStorageService, Split } from '../../services/splitStorageService';
-import { logger } from '../../services/loggingService';
-import { MockupDataService } from '../../data/mockupData';
-import { priceManagementService } from '../../services/priceManagementService';
+import { BillSplitSummary } from '../../types/billSplitting';
+import { splitStorageService, Split, SplitStorageService } from '../../services/splits';
+import { logger } from '../../services/core';
+import { MockupDataService } from '../../services/data';
+import { priceManagementService } from '../../services/core';
 import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
+import { firebaseDataService } from '../../services/data';
 
 
 interface SplitsListScreenProps {

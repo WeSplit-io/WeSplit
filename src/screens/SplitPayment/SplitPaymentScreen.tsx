@@ -17,9 +17,9 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { SplitWalletService, SplitWallet, SplitWalletParticipant } from '../../services/split';
-import { priceManagementService } from '../../services/priceManagementService';
+import { priceManagementService } from '../../services/core';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 interface RouteParams {

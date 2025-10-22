@@ -12,10 +12,10 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
-import { walletService, WalletProvider } from '../../services/WalletService';
+import { walletService, WalletProvider } from '../../services/wallet';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 interface ExternalWalletConnectionScreenProps {

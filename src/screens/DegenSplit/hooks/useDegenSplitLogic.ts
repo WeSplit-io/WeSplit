@@ -7,7 +7,7 @@ import { useCallback } from 'react';
 import { Alert } from 'react-native';
 import { SplitWallet } from '../../../services/split';
 import { DegenSplitState } from './useDegenSplitState';
-import { logger } from '../../../services/loggingService';
+import { logger } from '../../../services/core';
 
 export interface DegenSplitLogic {
   // Helper functions
@@ -129,7 +129,7 @@ export const useDegenSplitLogic = (
         'USDC',
         participants.map(p => {
           // Import roundUsdcAmount to fix precision issues - same as fair split
-          const { roundUsdcAmount } = require('../../../utils/formatUtils');
+          const { roundUsdcAmount } = require('../../../utils/format');
           return {
             userId: p.userId || p.id,
             name: p.name,
@@ -272,7 +272,7 @@ export const useDegenSplitLogic = (
 
     try {
       // Check user's actual USDC balance
-      const { walletService } = await import('../../../services/WalletService');
+      const { walletService } = await import('../../../services/wallet');
       const balanceResult = await walletService.getUserWalletBalance(currentUser.id.toString());
       
       const userBalance = balanceResult?.usdcBalance || 0;
@@ -325,7 +325,7 @@ export const useDegenSplitLogic = (
         const { SplitWalletService } = await import('../../../services/split');
         const participantsForUpdate = participants.map(p => {
           // Import roundUsdcAmount to fix precision issues - same as fair split
-          const { roundUsdcAmount } = require('../../../utils/formatUtils');
+          const { roundUsdcAmount } = require('../../../utils/format');
           return {
             userId: p.userId || p.id,
             name: p.name,
@@ -357,7 +357,7 @@ export const useDegenSplitLogic = (
       // Update split data to mark as active
       if (splitData && splitData.id) {
         try {
-          const { SplitStorageService } = await import('../../../services/splitStorageService');
+          const { SplitStorageService } = await import('../../../services/splits');
           await SplitStorageService.updateSplit(splitData.id, {
             splitType: 'degen',
             status: 'active',
@@ -368,7 +368,7 @@ export const useDegenSplitLogic = (
       }
 
       // Send notifications to all participants about the split being ready
-      const { notificationService } = await import('../../../services/notificationService');
+      const { notificationService } = await import('../../../services/notifications');
       const allParticipantIds = participants.map(p => p.userId || p.id);
       const billName = splitData?.title || 'Degen Split';
 
@@ -439,7 +439,7 @@ export const useDegenSplitLogic = (
       });
 
       // Send lock required notifications to all other participants
-      const { notificationService } = await import('../../../services/notificationService');
+      const { notificationService } = await import('../../../services/notifications');
       const otherParticipantIds = participants
         .filter(p => (p.userId || p.id) !== currentUser.id.toString())
         .map(p => p.userId || p.id);
@@ -503,7 +503,7 @@ export const useDegenSplitLogic = (
           logger.info('Syncing participants between split data and wallet', null, 'DegenSplitLogic');
           const participantsForUpdate = participants.map(p => {
             // Import roundUsdcAmount to fix precision issues - same as fair split
-            const { roundUsdcAmount } = require('../../../utils/formatUtils');
+            const { roundUsdcAmount } = require('../../../utils/format');
             return {
               userId: p.userId || p.id,
               name: p.name,
@@ -649,7 +649,7 @@ export const useDegenSplitLogic = (
         // Send notifications - NON-BLOCKING
         (async () => {
           try {
-            const { notificationService } = await import('../../../services/notificationService');
+            const { notificationService } = await import('../../../services/notifications');
             const billName = splitData?.title || billData?.title || processedBillData?.title || 'Degen Split';
             const winnerId = participants[finalIndex].userId || participants[finalIndex].id;
             const winnerName = participants[finalIndex].name;
