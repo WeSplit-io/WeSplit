@@ -8,11 +8,9 @@ import { devtools, persist, subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { AppStore, AppStoreState } from './types';
 import { createUserSlice } from './slices/userSlice';
-import { createGroupsSlice } from './slices/groupsSlice';
 import { createWalletSlice } from './slices/walletSlice';
 import { createNotificationsSlice } from './slices/notificationsSlice';
 import { createUISlice } from './slices/uiSlice';
-import { createExpensesSlice } from './slices/expensesSlice';
 import { createSplitsSlice } from './slices/splitsSlice';
 import { createTransactionsSlice } from './slices/transactionsSlice';
 import { createBillProcessingSlice } from './slices/billProcessingSlice';
@@ -30,19 +28,6 @@ const initialState: AppStoreState = {
     authMethod: null,
     isLoading: false,
     error: null,
-  },
-  groups: {
-    groups: [],
-    selectedGroup: null,
-    isLoading: false,
-    error: null,
-    lastFetch: 0,
-  },
-  expenses: {
-    expenses: {},
-    isLoading: false,
-    error: null,
-    lastFetch: {},
   },
   wallet: {
     isConnected: false,
@@ -121,8 +106,6 @@ const globalActions = {
   clearAllErrors: () => {
     useAppStore.setState((state) => ({
       user: { ...state.user, error: null },
-      groups: { ...state.groups, error: null },
-      expenses: { ...state.expenses, error: null },
       wallet: { ...state.wallet, error: null },
       notifications: { ...state.notifications, error: null },
       ui: { ...state.ui, error: null },
@@ -147,11 +130,9 @@ export const useAppStore = create<AppStore>()(
           ...initialState,
           ...globalActions,
           ...createUserSlice(set, get, api),
-          ...createGroupsSlice(set, get, api),
           ...createWalletSlice(set, get, api),
           ...createNotificationsSlice(set, get, api),
           ...createUISlice(set, get, api),
-          ...createExpensesSlice(set, get, api),
           ...createSplitsSlice(set, get, api),
           ...createTransactionsSlice(set, get, api),
           ...createBillProcessingSlice(set, get, api),
@@ -229,12 +210,6 @@ export const useCurrentUser = () => useAppStore((state) => state.user.currentUse
 export const useIsAuthenticated = () => useAppStore((state) => state.user.isAuthenticated);
 export const useAuthMethod = () => useAppStore((state) => state.user.authMethod);
 
-// Groups selectors
-export const useGroups = () => useAppStore((state) => state.groups.groups);
-export const useSelectedGroup = () => useAppStore((state) => state.groups.selectedGroup);
-export const useGroupById = (id: string | number) => 
-  useAppStore((state) => state.groups.groups.find(group => group.id === id));
-
 // Wallet selectors
 export const useWalletInfo = () => useAppStore((state) => ({
   isConnected: state.wallet.isConnected,
@@ -258,7 +233,6 @@ export const useUnreadCount = () => useAppStore((state) => state.notifications.u
 // UI selectors
 export const useIsLoading = () => useAppStore((state) => 
   state.user.isLoading || 
-  state.groups.isLoading || 
   state.wallet.isLoading || 
   state.notifications.isLoading || 
   state.ui.isLoading ||
@@ -270,7 +244,6 @@ export const useIsLoading = () => useAppStore((state) =>
 
 export const useError = () => useAppStore((state) => 
   state.user.error || 
-  state.groups.error || 
   state.wallet.error || 
   state.notifications.error || 
   state.ui.error ||
@@ -318,19 +291,6 @@ export const useUserActions = () => useAppStore((state) => ({
   setUserLoading: state.setUserLoading,
   setUserError: state.setUserError,
   clearUserError: state.clearUserError,
-}));
-
-// Groups actions
-export const useGroupsActions = () => useAppStore((state) => ({
-  setGroups: state.setGroups,
-  addGroup: state.addGroup,
-  updateGroup: state.updateGroup,
-  deleteGroup: state.deleteGroup,
-  selectGroup: state.selectGroup,
-  setGroupsLoading: state.setGroupsLoading,
-  setGroupsError: state.setGroupsError,
-  clearGroupsError: state.clearGroupsError,
-  refreshGroups: state.refreshGroups,
 }));
 
 // Wallet actions

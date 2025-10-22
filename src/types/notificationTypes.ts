@@ -22,7 +22,6 @@ export type NotificationType =
   | 'payment_sent'
   | 'split_payment_required'
   | 'split_completed'
-  | 'group_invite'
   | 'payment_request'
   | 'settlement_request'
   | 'money_sent'
@@ -30,20 +29,15 @@ export type NotificationType =
   | 'split_spin_available'
   | 'split_loser'
   | 'split_winner'
-  | 'group_added'
   | 'system_warning'
   | 'payment_reminder'
   | 'split_invite'
-  | 'group_payment_request'
   | 'system_notification'
   | 'degen_all_locked'
   | 'degen_ready_to_roll'
   | 'roulette_result'
   | 'split_lock_required'
-  | 'contact_added'
-  | 'expense_added'
-  | 'group_payment_sent'
-  | 'group_payment_received';
+  | 'contact_added';
 
 // Unified notification payload interface
 export interface NotificationPayload {
@@ -54,8 +48,6 @@ export interface NotificationPayload {
   recipientName?: string;
   amount?: number;
   currency?: string;
-  groupId?: string;
-  groupName?: string;
   
   // Split-specific fields
   splitId?: string;
@@ -72,10 +64,6 @@ export interface NotificationPayload {
   expenseId?: string;
   description?: string;
   note?: string;
-  
-  // Group invitation fields
-  inviteId?: string;
-  inviteLink?: string;
   
   // Transaction fields
   transactionId?: string;
@@ -109,16 +97,8 @@ export interface PaymentRequestNotificationData extends NotificationPayload {
   currency: string;
   requestId: string;
   description?: string;
-  groupId?: string;
-  groupName?: string;
 }
 
-export interface GroupInviteNotificationData extends NotificationPayload {
-  groupId: string;
-  groupName: string;
-  inviteId: string;
-  inviteLink?: string;
-}
 
 export interface SplitInviteNotificationData extends NotificationPayload {
   splitId: string;

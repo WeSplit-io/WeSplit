@@ -110,14 +110,16 @@ export function getUnifiedConfig(): UnifiedConfig {
   // Use environment network setting, fallback to devnet for development
   const network = (getEnvVar('DEV_NETWORK') as 'devnet' | 'testnet' | 'mainnet') || 'devnet';
   
-  // Debug configuration loading
-  logger.info('Configuration Debug', {
-    extra: extra,
-    DEV_NETWORK: getEnvVar('DEV_NETWORK'),
-    FORCE_MAINNET: getEnvVar('FORCE_MAINNET'),
-    resolvedNetwork: network,
-    heliusApiKey: heliusApiKey ? 'SET' : 'NOT_SET'
-  });
+  // Debug configuration loading (only in development)
+  if (__DEV__) {
+    logger.info('Configuration Debug', {
+      extra: extra,
+      DEV_NETWORK: getEnvVar('DEV_NETWORK'),
+      FORCE_MAINNET: getEnvVar('FORCE_MAINNET'),
+      resolvedNetwork: network,
+      heliusApiKey: heliusApiKey ? 'SET' : 'NOT_SET'
+    });
+  }
   
   // Validate production environment
   if (isProduction && !heliusApiKey) {

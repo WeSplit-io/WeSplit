@@ -3,7 +3,7 @@
  * Defines all state interfaces and types for the Zustand store
  */
 
-import { User, GroupWithDetails, Expense, Balance, Notification } from '../types';
+import { User, Notification } from '../types';
 
 // ============================================================================
 // CORE STATE INTERFACES
@@ -15,21 +15,6 @@ export interface UserState {
   authMethod: 'wallet' | 'email' | 'guest' | 'social' | null;
   isLoading: boolean;
   error: string | null;
-}
-
-export interface GroupsState {
-  groups: GroupWithDetails[];
-  selectedGroup: GroupWithDetails | null;
-  isLoading: boolean;
-  error: string | null;
-  lastFetch: number;
-}
-
-export interface ExpensesState {
-  expenses: Record<string, Expense[]>; // groupId -> expenses[]
-  isLoading: boolean;
-  error: string | null;
-  lastFetch: Record<string, number>; // groupId -> timestamp
 }
 
 export interface WalletState {
@@ -69,8 +54,8 @@ export interface UIState {
 }
 
 export interface SplitsState {
-  splits: Record<string, any>; // SplitWallet[]
-  activeSplit: any | null; // SplitWallet | null
+  splits: Record<string, any>;
+  activeSplit: any | null;
   isLoading: boolean;
   error: string | null;
   lastFetch: number;
@@ -107,13 +92,11 @@ export interface MultiSignState {
 }
 
 // ============================================================================
-// MAIN STORE STATE
+// COMBINED STATE INTERFACE
 // ============================================================================
 
 export interface AppStoreState {
   user: UserState;
-  groups: GroupsState;
-  expenses: ExpensesState;
   wallet: WalletState;
   notifications: NotificationsState;
   ui: UIState;
@@ -124,53 +107,25 @@ export interface AppStoreState {
 }
 
 // ============================================================================
-// ACTION TYPES
+// ACTION INTERFACES
 // ============================================================================
 
 export interface UserActions {
   setCurrentUser: (user: User | null) => void;
   authenticateUser: (user: User, method: 'wallet' | 'email' | 'guest' | 'social') => void;
   logoutUser: () => void;
-  updateUser: (updates: Partial<User>) => Promise<void>;
+  updateUser: (updates: Partial<User>) => void;
   setUserLoading: (loading: boolean) => void;
   setUserError: (error: string | null) => void;
   clearUserError: () => void;
 }
 
-export interface GroupsActions {
-  setGroups: (groups: GroupWithDetails[]) => void;
-  addGroup: (group: GroupWithDetails) => void;
-  updateGroup: (groupId: string | number, updates: Partial<GroupWithDetails>) => void;
-  deleteGroup: (groupId: string | number) => void;
-  selectGroup: (group: GroupWithDetails | null) => void;
-  setGroupsLoading: (loading: boolean) => void;
-  setGroupsError: (error: string | null) => void;
-  clearGroupsError: () => void;
-  refreshGroups: () => Promise<void>;
-}
-
-export interface ExpensesActions {
-  setExpenses: (groupId: string | number, expenses: Expense[]) => void;
-  addExpense: (groupId: string | number, expense: Expense) => void;
-  updateExpense: (groupId: string | number, expenseId: string | number, updates: Partial<Expense>) => void;
-  deleteExpense: (groupId: string | number, expenseId: string | number) => void;
-  setExpensesLoading: (loading: boolean) => void;
-  setExpensesError: (error: string | null) => void;
-  clearExpensesError: () => void;
-  refreshExpenses: (groupId: string | number) => Promise<void>;
-}
-
 export interface WalletActions {
-  // External wallet
-  connectWallet: (address: string, walletName: string, chainId?: string) => void;
+  connectWallet: (wallet: any) => void;
   disconnectWallet: () => void;
   updateBalance: (balance: number) => void;
-  
-  // App wallet
   setAppWallet: (address: string, balance: number) => void;
   updateAppWalletBalance: (balance: number) => void;
-  
-  // State management
   setWalletLoading: (loading: boolean) => void;
   setWalletError: (error: string | null) => void;
   clearWalletError: () => void;
@@ -181,9 +136,9 @@ export interface WalletActions {
 export interface NotificationsActions {
   setNotifications: (notifications: Notification[]) => void;
   addNotification: (notification: Notification) => void;
-  updateNotification: (notificationId: string, updates: Partial<Notification>) => void;
-  removeNotification: (notificationId: string) => void;
-  markAsRead: (notificationId: string) => void;
+  updateNotification: (id: string, updates: Partial<Notification>) => void;
+  removeNotification: (id: string) => void;
+  markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   setNotificationsLoading: (loading: boolean) => void;
   setNotificationsError: (error: string | null) => void;
@@ -202,38 +157,38 @@ export interface UIActions {
 
 export interface SplitsActions {
   setSplits: (splits: Record<string, any>) => void;
-  addSplit: (splitId: string, split: any) => void;
-  updateSplit: (splitId: string, updates: any) => void;
+  addSplit: (split: any) => void;
+  updateSplit: (splitId: string, updates: Partial<any>) => void;
   deleteSplit: (splitId: string) => void;
   setActiveSplit: (split: any | null) => void;
   setSplitsLoading: (loading: boolean) => void;
   setSplitsError: (error: string | null) => void;
   clearSplitsError: () => void;
   refreshSplits: () => Promise<void>;
-  createSplit: (splitData: any) => Promise<any | null>;
+  createSplit: (splitData: any) => Promise<void>;
 }
 
 export interface TransactionsActions {
   setTransactions: (transactions: any[]) => void;
   addTransaction: (transaction: any) => void;
-  updateTransaction: (transactionId: string, updates: any) => void;
-  removeTransaction: (transactionId: string) => void;
+  updateTransaction: (id: string, updates: Partial<any>) => void;
+  removeTransaction: (id: string) => void;
   addPendingTransaction: (transaction: any) => void;
-  removePendingTransaction: (transactionId: string) => void;
+  removePendingTransaction: (id: string) => void;
   setTransactionsLoading: (loading: boolean) => void;
   setTransactionsError: (error: string | null) => void;
   clearTransactionsError: () => void;
   refreshTransactions: () => Promise<void>;
-  sendTransaction: (transactionData: any) => Promise<any>;
+  sendTransaction: (transactionData: any) => Promise<void>;
 }
 
 export interface BillProcessingActions {
   setProcessing: (processing: boolean) => void;
-  setProcessingResult: (result: any) => void;
+  setProcessingResult: (result: any | null) => void;
   setExtractedItems: (items: any[]) => void;
   addExtractedItem: (item: any) => void;
-  updateExtractedItem: (itemId: string, updates: any) => void;
-  removeExtractedItem: (itemId: string) => void;
+  updateExtractedItem: (index: number, updates: Partial<any>) => void;
+  removeExtractedItem: (index: number) => void;
   setTotalAmount: (amount: number) => void;
   setMerchant: (merchant: string) => void;
   setDate: (date: string) => void;
@@ -243,7 +198,7 @@ export interface BillProcessingActions {
   setBillProcessingError: (error: string | null) => void;
   clearBillProcessingError: () => void;
   resetBillProcessing: () => void;
-  processBill: (imageUri: string, processingMethod?: 'ai' | 'mock') => Promise<any>;
+  processBill: (billData: any) => Promise<void>;
 }
 
 export interface MultiSignActions {
@@ -260,80 +215,33 @@ export interface MultiSignActions {
   refreshRemainingDays: () => Promise<void>;
 }
 
-// ============================================================================
-// COMBINED ACTIONS
-// ============================================================================
-
-export interface AppStoreActions extends 
-  UserActions, 
-  GroupsActions, 
-  ExpensesActions, 
-  WalletActions, 
-  NotificationsActions, 
-  UIActions,
-  SplitsActions,
-  TransactionsActions,
-  BillProcessingActions,
-  MultiSignActions {
-  // Global actions
+export interface GlobalActions {
   resetStore: () => void;
   clearAllErrors: () => void;
 }
 
 // ============================================================================
-// STORE TYPE
+// COMBINED STORE INTERFACE
 // ============================================================================
 
-export type AppStore = AppStoreState & AppStoreActions;
+export interface AppStore extends 
+  AppStoreState,
+  UserActions,
+  WalletActions,
+  NotificationsActions,
+  UIActions,
+  SplitsActions,
+  TransactionsActions,
+  BillProcessingActions,
+  MultiSignActions,
+  GlobalActions {}
 
 // ============================================================================
-// SELECTOR TYPES
+// SLICE CREATOR TYPES
 // ============================================================================
 
-export interface AppSelectors {
-  // User selectors
-  getCurrentUser: () => User | null;
-  isUserAuthenticated: () => boolean;
-  getUserAuthMethod: () => string | null;
-  
-  // Groups selectors
-  getAllGroups: () => GroupWithDetails[];
-  getSelectedGroup: () => GroupWithDetails | null;
-  getGroupById: (id: string | number) => GroupWithDetails | undefined;
-  
-  // Expenses selectors
-  getExpensesByGroup: (groupId: string | number) => Expense[];
-  getTotalExpenses: (groupId: string | number) => number;
-  
-  // Wallet selectors
-  getWalletInfo: () => { address: string | null; balance: number | null; isConnected: boolean };
-  getAppWalletInfo: () => { address: string | null; balance: number | null; isConnected: boolean };
-  
-  // Notifications selectors
-  getAllNotifications: () => Notification[];
-  getUnreadNotifications: () => Notification[];
-  getUnreadCount: () => number;
-  
-  // UI selectors
-  getLoadingState: () => boolean;
-  getErrorState: () => string | null;
-  getTheme: () => 'light' | 'dark';
-  getLanguage: () => string;
-}
-
-// ============================================================================
-// UTILITY TYPES
-// ============================================================================
-
-export type StoreSlice<T> = (
-  set: (partial: Partial<AppStoreState> | ((state: AppStoreState) => Partial<AppStoreState>)) => void,
-  get: () => AppStoreState
+export type SliceCreator<T> = (
+  set: (partial: Partial<T> | ((state: T) => Partial<T>)) => void,
+  get: () => T,
+  api: any
 ) => T;
-
-export interface AsyncAction<T = any> {
-  (): Promise<T>;
-}
-
-export interface AsyncActionWithParams<T = any, P = any> {
-  (params: P): Promise<T>;
-}

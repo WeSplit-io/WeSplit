@@ -114,10 +114,11 @@ const debugInfo = {
   firebaseConfigKeys: Constants.expoConfig?.extra?.firebase ? Object.keys(Constants.expoConfig.extra.firebase) : 'NO_FIREBASE_CONFIG'
 };
 
-console.log('🔥 Firebase Config - Environment Variables Debug:', debugInfo);
-
-// Log to logger service for production debugging
-logger.info('Firebase Configuration Debug', debugInfo, 'firebase');
+// Reduced logging for production
+if (__DEV__) {
+  console.log('🔥 Firebase Config - Environment Variables Debug:', debugInfo);
+  logger.info('Firebase Configuration Debug', debugInfo, 'firebase');
+}
 
 // Validate required environment variables
 if (!apiKey) {

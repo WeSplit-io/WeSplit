@@ -17,15 +17,6 @@ import { checkFirebaseConfiguration } from './src/utils/firebaseCheck';
 
 // Import all new screens
 import DashboardScreen from './src/screens/Dashboard/DashboardScreen';
-import AddExpenseScreen from './src/screens/AddExpense/AddExpenseScreen';
-import ExpenseSuccessScreen from './src/screens/AddExpense/ExpenseSuccessScreen';
-import CreateGroupScreen from './src/screens/CreateGroup/CreateGroupScreen';
-import GroupCreatedScreen from './src/screens/GroupCreated/GroupCreatedScreen';
-import AddMembersScreen from './src/screens/AddMembers/AddMembersScreen';
-import BalanceScreen from './src/screens/Balance/BalanceScreen';
-import GroupDetailsScreen from './src/screens/GroupDetails/GroupDetailsScreen';
-import SettleUpModal from './src/screens/SettleUp/SettleUpModal';
-import GroupSettingsScreen from './src/screens/GroupSettings/GroupSettingsScreen';
 import ProfileScreen from './src/screens/Profile/ProfileScreen';
 import SplashScreen from './src/screens/Splash/SplashScreen';
 import GetStartedScreen from './src/screens/GetStarted/GetStartedScreen';
@@ -50,7 +41,6 @@ import RequestContactsScreen from './src/screens/Request/RequestContactsScreen';
 import RequestAmountScreen from './src/screens/Request/RequestAmountScreen';
 import RequestConfirmationScreen from './src/screens/Request/RequestConfirmationScreen';
 import RequestSuccessScreen from './src/screens/Request/RequestSuccessScreen';
-import GroupsListScreen from './src/screens/GroupsList/GroupsListScreen';
 import BillCameraScreen from './src/screens/BillCamera/BillCameraScreen';
 import BillProcessingScreen from './src/screens/BillProcessing/BillProcessingScreen';
 import SplitDetailsScreen from './src/screens/SplitDetails/SplitDetailsScreen';
@@ -148,15 +138,6 @@ export default function App() {
                     <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
                     <Stack.Screen name="Onboarding" component={OnboardingScreen} />
                     <Stack.Screen name="Dashboard" component={DashboardScreen} />
-                    <Stack.Screen name="AddExpense" component={AddExpenseScreen} />
-                    <Stack.Screen name="ExpenseSuccess" component={ExpenseSuccessScreen} />
-                    <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
-                    <Stack.Screen name="GroupCreated" component={GroupCreatedScreen} />
-                    <Stack.Screen name="AddMembers" component={AddMembersScreen} />
-                    <Stack.Screen name="Balance" component={BalanceScreen} />
-                    <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
-
-                    <Stack.Screen name="GroupSettings" component={GroupSettingsScreen} />
                     <Stack.Screen name="Profile" component={ProfileScreen} />
                     <Stack.Screen name="Deposit" component={DepositScreen} />
                     <Stack.Screen name="CryptoTransfer" component={CryptoTransferScreen} />
@@ -176,7 +157,6 @@ export default function App() {
                     <Stack.Screen name="RequestAmount" component={RequestAmountScreen} />
                     <Stack.Screen name="RequestConfirmation" component={RequestConfirmationScreen} />
                     <Stack.Screen name="RequestSuccess" component={RequestSuccessScreen} />
-                    <Stack.Screen name="GroupsList" component={GroupsListScreen} />
                     <Stack.Screen name="BillCamera" component={BillCameraScreen} />
                     <Stack.Screen name="BillProcessing" component={BillProcessingScreen} />
                     <Stack.Screen name="SplitDetails" component={SplitDetailsScreen} />
@@ -200,7 +180,6 @@ export default function App() {
                     <Stack.Screen name="ManualSignatureInput" component={ManualSignatureInputScreen} />
                     <Stack.Screen name="ManualBillCreation" component={ManualBillCreationScreen} />
                     {/* <Stack.Screen name="AuthDebug" component={AuthDebugScreen} /> */}
-                    <Stack.Screen name="SettleUpModal" component={SettleUpModal} />
                   </Stack.Navigator>
                 </NavigationWrapper>
               </AppProvider>

@@ -26,16 +26,15 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { logger } from './loggingService';
 import { validateNotificationConsistency } from '../utils/notificationValidation';
-import { NotificationPayload, NotificationType } from '../types/notificationTypes';
+import { NotificationPayload } from '../types/notificationTypes';
 
-// Notification types
+// Notification types - Focused on splits/bills and P2P transfers
 export type NotificationType = 
   | 'general'
   | 'payment_received'
   | 'payment_sent'
   | 'split_payment_required'
   | 'split_completed'
-  | 'group_invite'
   | 'payment_request'
   | 'settlement_request'
   | 'money_sent'
@@ -43,11 +42,9 @@ export type NotificationType =
   | 'split_spin_available'
   | 'split_loser'
   | 'split_winner'
-  | 'group_added'
   | 'system_warning'
   | 'payment_reminder'
   | 'split_invite'
-  | 'group_payment_request'
   | 'system_notification'
   | 'degen_all_locked'
   | 'degen_ready_to_roll'
@@ -316,8 +313,6 @@ class NotificationServiceClass {
         return 'Money Sent';
       case 'money_received':
         return 'Money Received';
-      case 'group_invite':
-        return 'Group Invitation';
       case 'split_invite':
         return 'Split Invitation';
       case 'split_completed':
@@ -328,14 +323,10 @@ class NotificationServiceClass {
         return 'Split Result';
       case 'split_winner':
         return 'You Won!';
-      case 'group_added':
-        return 'Added to Group';
       case 'system_warning':
         return 'System Warning';
       case 'payment_reminder':
         return 'Payment Reminder';
-      case 'group_payment_request':
-        return 'Group Payment Request';
       case 'system_notification':
         return 'System Notification';
       case 'degen_all_locked':
@@ -366,8 +357,6 @@ class NotificationServiceClass {
         return `You sent ${data?.amount || 'funds'} to ${data?.recipientName || 'someone'}`;
       case 'money_received':
         return `You received ${data?.amount || 'funds'} from ${data?.senderName || 'someone'}`;
-      case 'group_invite':
-        return `You've been invited to join ${data?.groupName || 'a group'}`;
       case 'split_invite':
         return `You're invited to split "${data?.billName || 'a bill'}"`;
       case 'split_completed':
@@ -378,14 +367,10 @@ class NotificationServiceClass {
         return `The split "${data?.billName || 'Split'}" has been completed. Better luck next time!`;
       case 'split_winner':
         return `Congratulations! You won the split "${data?.billName || 'Split'}"!`;
-      case 'group_added':
-        return `You've been added to ${data?.groupName || 'a group'}`;
       case 'system_warning':
         return data?.message || 'System warning';
       case 'payment_reminder':
         return `Reminder: You have a pending payment of ${data?.amount || 'funds'}`;
-      case 'group_payment_request':
-        return `You have a group payment request for ${data?.amount || 'funds'}`;
       case 'system_notification':
         return data?.message || 'System notification';
       case 'degen_all_locked':
@@ -604,14 +589,14 @@ class NotificationServiceClass {
   /**
    * Get user notifications
    */
-  async getUserNotifications(userId: string, limit: number = 50): Promise<NotificationData[]> {
+  async getUserNotifications(userId: string, limitCount: number = 50): Promise<NotificationData[]> {
     try {
       const notificationsRef = collection(db, 'notifications');
       const notificationsQuery = query(
         notificationsRef,
         where('userId', '==', userId),
         orderBy('created_at', 'desc'),
-        limit(limit)
+        limit(limitCount)
       );
       const notificationsDocs = await getDocs(notificationsQuery);
       
@@ -719,45 +704,6 @@ class NotificationServiceClass {
           }
           break;
 
-        case 'group_invite':
-          if (notification.data?.groupId) {
-            navigation.navigate('GroupDetails', {
-              groupId: notification.data.groupId,
-              isFromNotification: true,
-              notificationId: notification.id
-            });
-          } else {
-            logger.warn('Group invite notification missing groupId', { notification }, 'NotificationService');
-            navigation.navigate('Dashboard');
-          }
-          break;
-
-        case 'expense_added':
-          if (notification.data?.groupId) {
-            navigation.navigate('GroupDetails', {
-              groupId: notification.data.groupId,
-              isFromNotification: true,
-              notificationId: notification.id
-            });
-          } else {
-            logger.warn('Expense added notification missing groupId', { notification }, 'NotificationService');
-            navigation.navigate('Dashboard');
-          }
-          break;
-
-        case 'group_payment_sent':
-        case 'group_payment_received':
-          if (notification.data?.groupId) {
-            navigation.navigate('GroupDetails', {
-              groupId: notification.data.groupId,
-              isFromNotification: true,
-              notificationId: notification.id
-            });
-          } else {
-            logger.warn('Group payment notification missing groupId', { notification }, 'NotificationService');
-            navigation.navigate('Dashboard');
-          }
-          break;
 
         case 'contact_added':
           navigation.navigate('Contacts', {

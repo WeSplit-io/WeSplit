@@ -98,7 +98,9 @@ class WalletService {
   private readonly WALLET_CACHE_DURATION_MS = 30000; // 30 seconds
 
   private constructor() {
-    logger.info('WalletService initialized', {}, 'WalletService');
+    if (__DEV__) {
+      logger.info('WalletService initialized', {}, 'WalletService');
+    }
   }
 
   public static getInstance(): WalletService {

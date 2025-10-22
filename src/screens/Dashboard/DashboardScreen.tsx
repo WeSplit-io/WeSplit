@@ -33,7 +33,7 @@ import { formatCryptoAmount } from '../../utils/cryptoUtils';
 import { notificationService } from '../../services/notificationService';
 import { createPaymentRequest, getReceivedPaymentRequests } from '../../services/firebasePaymentRequestService';
 import { walletService, UserWalletBalance } from '../../services/WalletService';
-import { firebaseTransactionService, firebaseDataService } from '../../services/firebaseDataService';
+import { firebaseDataService } from '../../services/firebaseDataService';
 import { createUsdcRequestUri } from '@features/qr';
 import { logger } from '../../services/loggingService';
 import { db } from '../../config/firebase';
@@ -428,7 +428,6 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               amount: req.amount,
               currency: req.currency,
               description: req.description,
-              groupId: req.groupId,
               status: req.status
             },
             is_read: false,
@@ -509,40 +508,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           });
         }
 
-        // Fallback: for any remaining without avatar, try group members
-        const requestsNeedingAvatar = allRequests.filter(r => !r.data?.senderAvatar || r.data.senderAvatar.trim() === '');
-        const groupIds = Array.from(new Set(
-          requestsNeedingAvatar
-            .map(r => r.data?.groupId)
-            .filter((gid: any) => gid !== undefined && gid !== null)
-            .map((gid: any) => String(gid))
-        ));
-
-        if (groupIds.length > 0) {
-          // fetch members for each group once
-          const groupMembersEntries = await Promise.all(groupIds.map(async (gid) => {
-            try {
-              const members = await firebaseDataService.group.getGroupMembers(gid);
-              return [gid, members] as const;
-            } catch (e) {
-              return [gid, []] as const;
-            }
-          }));
-
-          const groupIdToMembers: Record<string, any[]> = {};
-          groupMembersEntries.forEach(([gid, members]) => { groupIdToMembers[gid] = Array.isArray(members) ? [...members] : []; });
-
-          requestsNeedingAvatar.forEach(r => {
-            const gid = r.data?.groupId ? String(r.data.groupId) : undefined;
-            const sid = r.data?.senderId ? String(r.data.senderId) : undefined;
-            if (!gid || !sid) {return;}
-            const members = groupIdToMembers[gid] || [];
-            const m = members.find((mm: any) => String(mm.id) === sid || String(mm.user_id) === sid);
-            if (m && m.avatar && m.avatar.trim() !== '') {
-              r.data.senderAvatar = m.avatar;
-            }
-          });
-        }
+        // Removed group member avatar fallback logic
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : String(e);
         logger.warn('Could not enrich sender avatars', { error: errorMessage }, 'DashboardScreen');
@@ -601,7 +567,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     try {
       setLoadingTransactions(true);
 
-      const userTransactions = await firebaseTransactionService.getUserTransactions(currentUser.id.toString());
+      const userTransactions = await firebaseDataService.transaction.getTransactions(currentUser.id.toString());
 
       setRealTransactions(userTransactions);
     } catch (error) {
@@ -1141,7 +1107,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                   const senderName = request.data?.senderName || request.data?.fromUser || request.title || 'Unknown User';
                   const amount = request.data?.amount || 0;
                   const currency = request.data?.currency || 'USDC';
-                  const source = request.data?.groupName || 'group activity';
+                  const source = 'payment request';
                   const senderAvatar = request.data?.senderAvatar || null;
 
                   return (
@@ -1204,13 +1170,11 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                               contact: contact.name,
                               amount,
                               currency,
-                              groupId: request.data?.groupId
                             });
 
                             navigation.navigate('SendAmount', {
                               destinationType: 'friend',
                               contact: contact,
-                              groupId: request.data?.groupId,
                               prefilledAmount: amount,
                               prefilledNote: `Payment request from ${contact.name}`,
                               fromNotification: false,
@@ -1270,7 +1234,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                       </Text>
                     </Text>
                     <Text style={styles.requestSource}>
-                      from {paymentRequests[2].data?.groupName || 'group activity'}
+                      from payment request
                     </Text>
                   </View>
                   <View style={styles.requestPreviewOverlay}>

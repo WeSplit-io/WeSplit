@@ -87,12 +87,14 @@ class AuthService {
     this.twitterClientId = getEnvVarSafe('EXPO_PUBLIC_TWITTER_CLIENT_ID');
     this.appleClientId = getEnvVarSafe('EXPO_PUBLIC_APPLE_CLIENT_ID');
     
-    logger.info('AuthService initialized', {
-      hasGoogleClientId: !!this.googleClientId,
-      hasTwitterClientId: !!this.twitterClientId,
-      hasAppleClientId: !!this.appleClientId,
-      platform: Platform.OS
-    }, 'AuthService');
+    if (__DEV__) {
+      logger.info('AuthService initialized', {
+        hasGoogleClientId: !!this.googleClientId,
+        hasTwitterClientId: !!this.twitterClientId,
+        hasAppleClientId: !!this.appleClientId,
+        platform: Platform.OS
+      }, 'AuthService');
+    }
   }
 
   public static getInstance(): AuthService {

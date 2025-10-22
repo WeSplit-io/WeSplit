@@ -56,20 +56,22 @@ const storageBucket = getEnvVar('FIREBASE_STORAGE_BUCKET') || "wesplit-35186.app
 const messagingSenderId = getEnvVar('FIREBASE_MESSAGING_SENDER_ID');
 const appId = getEnvVar('FIREBASE_APP_ID');
 
-// Debug logging for production builds
-console.log('🔥 Firebase Functions Service - Environment Variables Debug:', {
-  apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'MISSING',
-  authDomain,
-  projectId,
-  storageBucket,
-  messagingSenderId: messagingSenderId ? `${messagingSenderId.substring(0, 10)}...` : 'MISSING',
-  appId: appId ? `${appId.substring(0, 10)}...` : 'MISSING',
-  hasApiKey: !!apiKey,
-  hasMessagingSenderId: !!messagingSenderId,
-  hasAppId: !!appId,
-  processEnvKeys: Object.keys(process.env).filter(key => key.includes('FIREBASE')),
-  expoConfigExtra: Constants.expoConfig?.extra ? Object.keys(Constants.expoConfig.extra).filter(key => key.includes('FIREBASE')) : 'NO_EXTRA_CONFIG'
-});
+// Debug logging for development only
+if (__DEV__) {
+  console.log('🔥 Firebase Functions Service - Environment Variables Debug:', {
+    apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'MISSING',
+    authDomain,
+    projectId,
+    storageBucket,
+    messagingSenderId: messagingSenderId ? `${messagingSenderId.substring(0, 10)}...` : 'MISSING',
+    appId: appId ? `${appId.substring(0, 10)}...` : 'MISSING',
+    hasApiKey: !!apiKey,
+    hasMessagingSenderId: !!messagingSenderId,
+    hasAppId: !!appId,
+    processEnvKeys: Object.keys(process.env).filter(key => key.includes('FIREBASE')),
+    expoConfigExtra: Constants.expoConfig?.extra ? Object.keys(Constants.expoConfig.extra).filter(key => key.includes('FIREBASE')) : 'NO_EXTRA_CONFIG'
+  });
+}
 
 // Validate required environment variables
 if (!apiKey) {
