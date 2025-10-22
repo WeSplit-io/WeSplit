@@ -1,0 +1,125 @@
+{
+  "flows": {
+    "fairSplit": {
+      "name": "Fair Split",
+      "description": "Split payment across multiple recipients fairly",
+      "entryPoints": [
+        "src/screens/SplitDetails/SplitDetailsScreen.tsx",
+        "src/screens/FairSplit/FairSplitScreen.tsx"
+      ],
+      "coreModules": [
+        "src/services/split/SplitWalletPayments.ts",
+        "src/services/split/SplitWalletCreation.ts",
+        "src/services/split/SplitWalletManagement.ts"
+      ],
+      "dbTablesOrDocs": [
+        "splits",
+        "splitWallets", 
+        "transactions",
+        "users"
+      ],
+      "externalCalls": [
+        "solana-web3.js",
+        "solana-spl-token",
+        "firebase",
+        "wallet signing"
+      ],
+      "keyFunctions": [
+        "executeFairSplitTransaction",
+        "SplitWalletPayments.sendToCastAccount",
+        "SplitWalletPayments.transferToUserWallet"
+      ]
+    },
+    "degenSplit": {
+      "name": "Degen Split", 
+      "description": "Custom/experimental split logic with different priority/rules",
+      "entryPoints": [
+        "src/screens/SplitDetails/SplitDetailsScreen.tsx",
+        "src/screens/DegenSplit/DegenLockScreen.tsx",
+        "src/screens/DegenSplit/DegenSpinScreen.tsx",
+        "src/screens/DegenSplit/DegenResultScreen.tsx"
+      ],
+      "coreModules": [
+        "src/services/split/SplitWalletPayments.ts",
+        "src/screens/DegenSplit/hooks/useDegenSplitLogic.ts",
+        "src/screens/DegenSplit/hooks/useDegenSplitState.ts"
+      ],
+      "dbTablesOrDocs": [
+        "splits",
+        "splitWallets",
+        "transactions", 
+        "users"
+      ],
+      "externalCalls": [
+        "solana-web3.js",
+        "solana-spl-token", 
+        "firebase",
+        "wallet signing"
+      ],
+      "keyFunctions": [
+        "executeDegenSplitTransaction",
+        "useDegenSplitLogic",
+        "DegenSplitState management"
+      ]
+    },
+    "send1to1": {
+      "name": "1:1 Send",
+      "description": "Single sender to single recipient direct transfer",
+      "entryPoints": [
+        "src/screens/Send/SendScreen.tsx",
+        "src/screens/Send/SendAmountScreen.tsx", 
+        "src/screens/Send/SendConfirmationScreen.tsx"
+      ],
+      "coreModules": [
+        "src/transfer/sendInternal.ts",
+        "src/services/transaction/TransactionProcessor.ts",
+        "src/services/transaction/ConsolidatedTransactionService.ts"
+      ],
+      "dbTablesOrDocs": [
+        "transactions",
+        "users",
+        "wallets"
+      ],
+      "externalCalls": [
+        "solana-web3.js",
+        "solana-spl-token",
+        "firebase",
+        "wallet signing"
+      ],
+      "keyFunctions": [
+        "InternalTransferService.sendInternalTransfer",
+        "InternalTransferService.sendInternalTransferToAddress", 
+        "TransactionProcessor.sendUSDCTransaction",
+        "ConsolidatedTransactionService.sendUSDCTransaction"
+      ]
+    }
+  },
+  "sharedComponents": {
+    "walletServices": [
+      "src/services/WalletService.ts",
+      "src/wallet/solanaWallet.ts"
+    ],
+    "transactionUtils": [
+      "src/services/shared/transactionUtilsOptimized.ts",
+      "src/services/shared/transactionUtils.ts"
+    ],
+    "feeServices": [
+      "src/config/feeConfig.ts"
+    ],
+    "notificationServices": [
+      "src/services/shared/notificationUtils.ts",
+      "src/services/notificationService.ts"
+    ]
+  },
+  "criticalPaths": {
+    "fairSplit": [
+      "SplitDetailsScreen -> FairSplitScreen -> SplitWalletCreation -> SplitWalletPayments -> executeFairSplitTransaction"
+    ],
+    "degenSplit": [
+      "SplitDetailsScreen -> DegenLockScreen -> DegenSpinScreen -> DegenResultScreen -> executeDegenSplitTransaction"
+    ],
+    "send1to1": [
+      "SendScreen -> SendAmountScreen -> SendConfirmationScreen -> InternalTransferService -> TransactionProcessor"
+    ]
+  }
+}
