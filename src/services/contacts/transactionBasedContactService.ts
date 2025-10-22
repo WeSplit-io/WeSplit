@@ -64,8 +64,7 @@ export class TransactionBasedContactService {
         if (existing) {
           // Merge split information
           contactsMap.set(contactId, {
-            ...existing,
-            mutual_groups_count: (existing.mutual_groups_count || 0) + 1
+            ...existing
           });
         } else {
           contactsMap.set(contactId, contact);
@@ -135,14 +134,14 @@ export class TransactionBasedContactService {
 
         if (transaction.from_user === userId) {
           // User sent money to this contact
-          contactUserId = transaction.to_user;
-          contactWalletAddress = transaction.to_wallet;
-          contactName = transaction.recipient_name;
+          contactUserId = transaction.to_user || '';
+          contactWalletAddress = transaction.to_wallet || '';
+          contactName = transaction.recipient_name || '';
         } else {
           // User received money from this contact
-          contactUserId = transaction.from_user;
-          contactWalletAddress = transaction.from_wallet;
-          contactName = transaction.sender_name;
+          contactUserId = transaction.from_user || '';
+          contactWalletAddress = transaction.from_wallet || '';
+          contactName = transaction.sender_name || '';
         }
 
         if (!contactUserId || !contactWalletAddress) {continue;}
@@ -212,10 +211,8 @@ export class TransactionBasedContactService {
             wallet_address: contactWalletAddress,
             wallet_public_key: '',
             created_at: transaction.created_at,
-            joined_at: transaction.created_at,
             first_met_at: transaction.created_at,
             avatar: '',
-            mutual_groups_count: 0,
             isFavorite: false
           });
         }
@@ -242,7 +239,7 @@ export class TransactionBasedContactService {
       const contactsMap = new Map<string, UserContact>();
 
       // Process splits and validate user existence
-      for (const split of userSplits.splits) {
+      for (const split of userSplits.splits || []) {
         for (const participant of split.participants) {
           if (participant.userId === userId) {continue;} // Skip self
 
@@ -302,8 +299,7 @@ export class TransactionBasedContactService {
             // Update existing contact
             contactsMap.set(contactId, {
               ...existing,
-              first_met_at: existing.first_met_at || split.createdAt,
-              mutual_groups_count: (existing.mutual_groups_count || 0) + 1
+              first_met_at: existing.first_met_at || split.createdAt
             });
           } else {
             // Create new contact
@@ -314,10 +310,8 @@ export class TransactionBasedContactService {
               wallet_address: participant.walletAddress,
               wallet_public_key: '',
               created_at: split.createdAt,
-              joined_at: participant.joinedAt || split.createdAt,
               first_met_at: split.createdAt,
               avatar: '',
-              mutual_groups_count: 1,
               isFavorite: false
             });
           }
@@ -336,7 +330,7 @@ export class TransactionBasedContactService {
    */
   private static async getManualContacts(userId: string): Promise<UserContact[]> {
     try {
-      return await firebaseDataService.user.getUserContacts(userId);
+      return await firebaseDataService.contact.getContacts(userId);
     } catch (error) {
       logger.error('Failed to get manual contacts', error, 'TransactionBasedContactService');
       return [];
@@ -392,7 +386,7 @@ export class TransactionBasedContactService {
 
       // Analyze splits
       if (userSplits.success) {
-        userSplits.splits.forEach(split => {
+        (userSplits.splits || []).forEach(split => {
           const hasParticipant = split.participants.some(p => p.userId === contactId);
           if (hasParticipant) {
             totalSplits++;
@@ -451,7 +445,7 @@ export class TransactionBasedContactService {
         wallet_address: contactData.walletAddress,
         wallet_public_key: contactData.walletPublicKey || '',
         avatar: '',
-        mutual_groups_count: 0,
+        first_met_at: new Date().toISOString(),
         isFavorite: false
       });
 

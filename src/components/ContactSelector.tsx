@@ -6,6 +6,7 @@ import Icon from './Icon';
 import { useApp } from '../context/AppContext';
 import { useContacts, useContactActions } from '../hooks';
 import { firebaseDataService } from '../services/data';
+import { UserSearchService, UserSearchResult } from '../services/contacts';
 import { UserContact, User } from '../types';
 import { colors } from '../theme';
 import { styles } from './ContactsList.styles';
@@ -59,7 +60,7 @@ export const ContactSelector: React.FC<ContactSelectorProps> = ({
   const { addContact, isUserAlreadyContact } = useContactActions();
 
   const [filteredContacts, setFilteredContacts] = useState<UserContact[]>([]);
-  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isAddingContact, setIsAddingContact] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,9 +94,16 @@ export const ContactSelector: React.FC<ContactSelectorProps> = ({
 
     try {
       setIsSearching(true);
-      const results = await firebaseDataService.group.searchUsersByUsername(
+      const results = await UserSearchService.searchUsers(
         query.trim(),
-        currentUser?.id ? String(currentUser.id) : undefined
+        currentUser?.id ? String(currentUser.id) : '',
+        {
+          limit: 20,
+          includeDeleted: false,
+          includeSuspended: false,
+          sortBy: 'relevance',
+          relationshipFilter: 'all'
+        }
       );
       setSearchResults(results);
     } catch (error) {

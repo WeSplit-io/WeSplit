@@ -6,7 +6,7 @@ import Icon from './Icon';
 import { useApp } from '../context/AppContext';
 import { useContacts, useContactActions } from '../hooks';
 import { deepLinkHandler } from '../services/core';
-import { userSearchService } from '../services/contacts';
+import { UserSearchService, UserSearchResult } from '../services/contacts';
 import { isSolanaPayUri, parseUri, extractRecipientAddress, isValidSolanaAddress } from '../services/core';
 import { UserContact, User } from '../types';
 import { colors } from '../theme';
@@ -188,20 +188,17 @@ const ContactsList: React.FC<ContactsListProps> = ({
   useEffect(() => {
     logger.debug('Search effect triggered', { activeTab, searchQuery: searchQuery.trim() }, 'ContactsList');
     
-    if (activeTab === 'Search' && searchQuery.trim()) {
+    if (searchQuery.trim() && searchQuery.length >= 2) {
       logger.debug('Setting up debounced search for', { searchQuery }, 'ContactsList');
       const timeoutId = setTimeout(() => {
         handleUserSearch(searchQuery);
       }, 500);
 
       return () => clearTimeout(timeoutId);
-    } else if (activeTab === 'Search') {
-      setSearchResults([]);
     } else {
-      // Clear search results when not in search tab
       setSearchResults([]);
     }
-  }, [searchQuery, activeTab]);
+  }, [searchQuery]);
 
   // Contact loading is now handled by the useContacts hook
 
@@ -681,7 +678,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
               }
             >
             {/* All Tab Content */}
-            {activeTab === 'All' && (
+            {activeTab === 'All' && !searchQuery.trim() && (
               <>
                 {/* Liste simple de tous les contacts filtrés */}
                 {filteredContacts.length > 0 && (
@@ -692,7 +689,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
               </>
             )}
             {/* Favorite Tab Content */}
-            {activeTab === 'Favorite' && (
+            {activeTab === 'Favorite' && !searchQuery.trim() && (
               <>
                 {/* Liste simple des contacts favoris */}
                 {filteredContacts.length > 0 && (
@@ -703,7 +700,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
               </>
             )}
             {/* Search Results */}
-            {activeTab === 'Search' && (
+            {searchQuery.trim() && searchQuery.length >= 2 && (
               <>
                 {isSearching && (
                   <View style={styles.loadingContainer}>
@@ -731,10 +728,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
                         wallet_address: user.wallet_address,
                         wallet_public_key: user.wallet_public_key,
                         created_at: user.created_at,
-                        joined_at: user.created_at,
                         first_met_at: user.created_at,
                         avatar: user.avatar,
-                        mutual_groups_count: 0,
                         isFavorite: false
                       };
 

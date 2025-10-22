@@ -4,6 +4,7 @@
  */
 
 import { firebaseDataService } from '../data/firebaseDataService';
+import { transactionHistoryService } from '../transaction/transactionHistoryService';
 import { logger } from '../core/loggingService';
 import { User } from '../../types';
 
@@ -47,17 +48,17 @@ export class UserSearchService {
       } = options;
 
       // Get basic search results
-      const searchResults = await firebaseDataService.searchUsersByUsername(
+      const searchResults = await firebaseDataService.user.searchUsers(
         searchTerm,
-        currentUserId
+        limit
       );
 
       // Get current user's contacts for relationship context
-      const userContacts = await firebaseDataService.user.getUserContacts(currentUserId);
+      const userContacts = await firebaseDataService.contact.getContacts(currentUserId);
       const contactIds = new Set(userContacts.map(contact => contact.id));
 
       // Get transaction history for relationship context
-      const transactionHistory = await firebaseDataService.transaction.getUserTransactionHistory(currentUserId);
+      const transactionHistory = await transactionHistoryService.instance.getUserTransactionHistory(currentUserId);
       const transactionPartnerIds = new Set<string>();
       
       if (transactionHistory.success) {
@@ -175,7 +176,7 @@ export class UserSearchService {
 
       // Get transaction partners
       if (includeTransactionPartners) {
-        const transactionHistory = await firebaseDataService.transaction.getUserTransactionHistory(currentUserId);
+        const transactionHistory = await transactionHistoryService.instance.getUserTransactionHistory(currentUserId);
         if (transactionHistory.success) {
           const partnerIds = new Set<string>();
           transactionHistory.transactions.forEach(transaction => {
@@ -262,9 +263,9 @@ export class UserSearchService {
       }, 'UserSearchService');
 
       // Use the existing search function with wallet address as search term
-      const searchResults = await firebaseDataService.searchUsersByUsername(
+      const searchResults = await firebaseDataService.user.searchUsers(
         walletAddress,
-        currentUserId
+        20
       );
 
       // Filter results to only include exact wallet address matches
@@ -273,7 +274,7 @@ export class UserSearchService {
       );
 
       // Enrich with relationship context
-      const userContacts = await firebaseDataService.user.getUserContacts(currentUserId);
+      const userContacts = await firebaseDataService.contact.getContacts(currentUserId);
       const contactIds = new Set(userContacts.map(contact => contact.id));
 
       const enrichedResults: UserSearchResult[] = walletMatches.map(user => ({
@@ -306,7 +307,7 @@ export class UserSearchService {
       if (!user) {return null;}
 
       // Get relationship context
-      const userContacts = await firebaseDataService.user.getUserContacts(currentUserId);
+      const userContacts = await firebaseDataService.contact.getContacts(currentUserId);
       const isAlreadyContact = userContacts.some(contact => contact.id === userId);
 
       return {

@@ -379,6 +379,63 @@ export const firebaseDataService = {
         logger.error('Failed to search users', { searchTerm, error }, 'FirebaseDataService');
         throw error;
       }
+    },
+
+    addContact: async (userId: string, contactData: Omit<UserContact, 'id' | 'created_at'>): Promise<UserContact> => {
+      try {
+        return await firebaseDataService.contact.addContact(userId, contactData);
+      } catch (error) {
+        logger.error('Failed to add contact via user service', { userId, contactData, error }, 'FirebaseDataService');
+        throw error;
+      }
+    },
+
+    removeContact: async (userId: string, contactId: string): Promise<void> => {
+      try {
+        // Find the contact by user_id and contact details
+        const q = query(
+          collection(db, 'contacts'),
+          where('user_id', '==', userId),
+          where('id', '==', contactId)
+        );
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+          throw new Error('Contact not found');
+        }
+        
+        const contactDoc = querySnapshot.docs[0];
+        await deleteDoc(contactDoc.ref);
+        
+        logger.info('Contact removed successfully', { userId, contactId }, 'FirebaseDataService');
+      } catch (error) {
+        logger.error('Failed to remove contact', { userId, contactId, error }, 'FirebaseDataService');
+        throw error;
+      }
+    },
+
+    toggleFavorite: async (userId: string, contactId: string, isFavorite: boolean): Promise<void> => {
+      try {
+        // Find the contact by user_id and contact details
+        const q = query(
+          collection(db, 'contacts'),
+          where('user_id', '==', userId),
+          where('id', '==', contactId)
+        );
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+          throw new Error('Contact not found');
+        }
+        
+        const contactDoc = querySnapshot.docs[0];
+        await updateDoc(contactDoc.ref, { isFavorite });
+        
+        logger.info('Contact favorite status updated', { userId, contactId, isFavorite }, 'FirebaseDataService');
+      } catch (error) {
+        logger.error('Failed to toggle contact favorite', { userId, contactId, isFavorite, error }, 'FirebaseDataService');
+        throw error;
+      }
     }
   },
 
@@ -388,12 +445,20 @@ export const firebaseDataService = {
       try {
         const q = query(
           collection(db, 'contacts'),
-          where('user_id', '==', userId),
-          orderBy('first_met_at', 'desc')
+          where('user_id', '==', userId)
         );
         const querySnapshot = await getDocs(q);
         
-        return querySnapshot.docs.map(doc => firebaseDataTransformers.firestoreToUserContact(doc));
+        const contacts = querySnapshot.docs.map(doc => firebaseDataTransformers.firestoreToUserContact(doc));
+        
+        // Sort by first_met_at in memory instead of using orderBy
+        contacts.sort((a, b) => {
+          const aDate = new Date(a.first_met_at || a.created_at).getTime();
+          const bDate = new Date(b.first_met_at || b.created_at).getTime();
+          return bDate - aDate; // desc order
+        });
+        
+        return contacts;
     } catch (error) {
         logger.error('Failed to get contacts', { userId, error }, 'FirebaseDataService');
       throw error;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { transactionBasedContactService } from '../services/contacts';
+import { TransactionBasedContactService } from '../services/contacts';
 import { UserContact } from '../types';
 import { logger } from '../services/core';
 

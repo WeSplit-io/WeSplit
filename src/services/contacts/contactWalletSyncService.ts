@@ -121,7 +121,7 @@ export class ContactWalletSyncService {
   }> {
     try {
       // Get all user contacts
-      const allContacts = await firebaseDataService.user.getUserContacts(userId);
+      const allContacts = await firebaseDataService.contact.getContacts(userId);
       const groupContacts = await firebaseDataService.group.getUserContacts(userId);
       
       // Combine and deduplicate

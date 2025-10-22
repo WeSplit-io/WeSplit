@@ -4,5 +4,5 @@
  */
 
 export { contactWalletSyncService } from './contactWalletSyncService';
-export { transactionBasedContactService } from './transactionBasedContactService';
-export { userSearchService } from './userSearchService';
+export { TransactionBasedContactService } from './transactionBasedContactService';
+export { UserSearchService, UserSearchResult } from './userSearchService';

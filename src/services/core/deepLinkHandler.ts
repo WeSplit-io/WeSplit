@@ -194,7 +194,7 @@ export async function handleAddContactFromProfile(linkData: DeepLinkData, curren
     }
 
     // Check if contact already exists
-    const existingContacts = await firebaseDataService.user.getUserContacts(currentUserId);
+    const existingContacts = await firebaseDataService.contact.getContacts(currentUserId);
     const contactExists = existingContacts.some(contact => 
       contact.email === linkData.userEmail || 
       contact.wallet_address === linkData.userWalletAddress
