@@ -49,6 +49,15 @@ export function validateNotificationPayload(
       validateSplitInviteNotificationData(data, errors, warnings);
       break;
     
+    case 'expense_added':
+      validateExpenseAddedNotificationData(data, errors, warnings);
+      break;
+    
+    case 'group_payment_sent':
+    case 'group_payment_received':
+      validateGroupPaymentNotificationData(data, errors, warnings);
+      break;
+    
     default:
       // Basic validation for other types
       validateBasicNotificationData(data, errors, warnings);
@@ -182,6 +191,64 @@ function validateSplitInviteNotificationData(
 }
 
 /**
+ * Validate expense added notification data
+ */
+function validateExpenseAddedNotificationData(
+  data: NotificationPayload,
+  errors: string[],
+  warnings: string[]
+): void {
+  if (!data.groupId) {
+    errors.push('groupId is required for expense added notifications');
+  }
+  
+  if (!data.expenseId) {
+    errors.push('expenseId is required for expense added notifications');
+  }
+  
+  if (typeof data.amount !== 'number' || data.amount <= 0) {
+    errors.push('amount must be a positive number');
+  }
+  
+  if (!data.currency) {
+    warnings.push('currency not specified, defaulting to USDC');
+  }
+  
+  if (!data.description) {
+    warnings.push('description not specified for expense');
+  }
+}
+
+/**
+ * Validate group payment notification data
+ */
+function validateGroupPaymentNotificationData(
+  data: NotificationPayload,
+  errors: string[],
+  warnings: string[]
+): void {
+  if (!data.groupId) {
+    errors.push('groupId is required for group payment notifications');
+  }
+  
+  if (!data.senderId) {
+    errors.push('senderId is required for group payment notifications');
+  }
+  
+  if (!data.recipientId) {
+    errors.push('recipientId is required for group payment notifications');
+  }
+  
+  if (typeof data.amount !== 'number' || data.amount <= 0) {
+    errors.push('amount must be a positive number');
+  }
+  
+  if (!data.currency) {
+    warnings.push('currency not specified, defaulting to USDC');
+  }
+}
+
+/**
  * Validate basic notification data
  */
 function validateBasicNotificationData(
@@ -288,6 +355,56 @@ export function createSplitInviteNotificationData(
     totalAmount,
     participantCount,
     currency,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Create standardized expense added notification data
+ */
+export function createExpenseAddedNotificationData(
+  groupId: string,
+  expenseId: string,
+  amount: number,
+  currency: string = 'USDC',
+  description?: string,
+  paidBy?: string,
+  groupName?: string
+): NotificationPayload {
+  return {
+    groupId,
+    expenseId,
+    amount,
+    currency,
+    description,
+    paidBy,
+    groupName,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Create standardized group payment notification data
+ */
+export function createGroupPaymentNotificationData(
+  groupId: string,
+  senderId: string,
+  recipientId: string,
+  amount: number,
+  currency: string = 'USDC',
+  groupName?: string,
+  senderName?: string,
+  recipientName?: string
+): NotificationPayload {
+  return {
+    groupId,
+    senderId,
+    recipientId,
+    amount,
+    currency,
+    groupName,
+    senderName,
+    recipientName,
     timestamp: new Date().toISOString()
   };
 }

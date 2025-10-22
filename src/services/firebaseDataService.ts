@@ -2430,9 +2430,12 @@ export const firebaseTransactionService = {
 };
 
 // Notification services
-// Notification services moved to NotificationService.ts
+// DEPRECATED: Notification services moved to NotificationService.ts
+// This service is kept for backward compatibility but should not be used for new code
+// Use notificationService from '../services/notificationService' instead
 export const firebaseNotificationService = {
   getUserNotifications: async (userId: string): Promise<Notification[]> => {
+    console.warn('🔥 DEPRECATED: firebaseNotificationService.getUserNotifications is deprecated. Use notificationService from notificationService.ts instead.');
     try {
       const notificationsRef = collection(db, 'notifications');
       const notificationsQuery = query(
@@ -2450,6 +2453,7 @@ export const firebaseNotificationService = {
   },
 
   createNotification: async (notificationData: Omit<Notification, 'id' | 'created_at'>): Promise<Notification> => {
+    console.warn('🔥 DEPRECATED: firebaseNotificationService.createNotification is deprecated. Use notificationService.sendNotification instead.');
     const notificationRef = await addDoc(collection(db, 'notifications'), firebaseDataTransformers.notificationToFirestore(notificationData));
     
     return {
@@ -2460,6 +2464,7 @@ export const firebaseNotificationService = {
   },
 
   markNotificationAsRead: async (notificationId: string): Promise<void> => {
+    console.warn('🔥 DEPRECATED: firebaseNotificationService.markNotificationAsRead is deprecated. Use notificationService.markAsRead instead.');
     const notificationRef = doc(db, 'notifications', notificationId);
     await updateDoc(notificationRef, {
       is_read: true,
@@ -2468,6 +2473,7 @@ export const firebaseNotificationService = {
   },
     
   deleteNotification: async (notificationId: string): Promise<void> => {
+    console.warn('🔥 DEPRECATED: firebaseNotificationService.deleteNotification is deprecated. Use notificationService.deleteNotification instead.');
     await deleteDoc(doc(db, 'notifications', notificationId));
   }
 };

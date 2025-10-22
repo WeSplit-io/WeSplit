@@ -3,7 +3,7 @@
  * Tests the notification system including validation, redirection, and data flow
  */
 
-import { validateNotificationConsistency, createSplitNotificationData, createPaymentRequestNotificationData } from '../../src/utils/notificationValidation';
+import { validateNotificationConsistency, createSplitNotificationData, createPaymentRequestNotificationData, createExpenseAddedNotificationData, createGroupPaymentNotificationData } from '../../src/utils/notificationValidation';
 import { NotificationType } from '../../src/types/notificationTypes';
 
 // Mock navigation object
@@ -145,6 +145,50 @@ describe('Notification System Tests', () => {
       expect(paymentData.groupName).toBe('Music Lovers');
       expect(paymentData.timestamp).toBeDefined();
     });
+
+    test('should create valid expense added notification data', () => {
+      const expenseData = createExpenseAddedNotificationData(
+        'group-123',
+        'expense-456',
+        75.50,
+        'USDC',
+        'Dinner at restaurant',
+        'user-789',
+        'Friends Group'
+      );
+
+      expect(expenseData.groupId).toBe('group-123');
+      expect(expenseData.expenseId).toBe('expense-456');
+      expect(expenseData.amount).toBe(75.50);
+      expect(expenseData.currency).toBe('USDC');
+      expect(expenseData.description).toBe('Dinner at restaurant');
+      expect(expenseData.paidBy).toBe('user-789');
+      expect(expenseData.groupName).toBe('Friends Group');
+      expect(expenseData.timestamp).toBeDefined();
+    });
+
+    test('should create valid group payment notification data', () => {
+      const groupPaymentData = createGroupPaymentNotificationData(
+        'group-123',
+        'sender-456',
+        'recipient-789',
+        50.00,
+        'USDC',
+        'Work Group',
+        'John Doe',
+        'Jane Smith'
+      );
+
+      expect(groupPaymentData.groupId).toBe('group-123');
+      expect(groupPaymentData.senderId).toBe('sender-456');
+      expect(groupPaymentData.recipientId).toBe('recipient-789');
+      expect(groupPaymentData.amount).toBe(50.00);
+      expect(groupPaymentData.currency).toBe('USDC');
+      expect(groupPaymentData.groupName).toBe('Work Group');
+      expect(groupPaymentData.senderName).toBe('John Doe');
+      expect(groupPaymentData.recipientName).toBe('Jane Smith');
+      expect(groupPaymentData.timestamp).toBeDefined();
+    });
   });
 
   describe('Notification Type Validation', () => {
@@ -180,7 +224,10 @@ describe('Notification System Tests', () => {
         'group_invite',
         'payment_request',
         'payment_reminder',
-        'split_invite'
+        'split_invite',
+        'expense_added',
+        'group_payment_sent',
+        'group_payment_received'
       ];
 
       typesRequiringData.forEach(type => {

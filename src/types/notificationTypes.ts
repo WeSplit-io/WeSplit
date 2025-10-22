@@ -40,7 +40,10 @@ export type NotificationType =
   | 'degen_ready_to_roll'
   | 'roulette_result'
   | 'split_lock_required'
-  | 'contact_added';
+  | 'contact_added'
+  | 'expense_added'
+  | 'group_payment_sent'
+  | 'group_payment_received';
 
 // Unified notification payload interface
 export interface NotificationPayload {

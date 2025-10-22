@@ -618,6 +618,71 @@ class NotificationServiceClass {
     
     return true; // Return immediately to avoid blocking
   }
+
+  /**
+   * Mark notification as read
+   */
+  async markAsRead(notificationId: string): Promise<boolean> {
+    try {
+      const notificationRef = doc(db, 'notifications', notificationId);
+      await updateDoc(notificationRef, {
+        is_read: true,
+        read_at: serverTimestamp()
+      });
+      
+      logger.info('Notification marked as read', { notificationId }, 'NotificationService');
+      return true;
+    } catch (error) {
+      logger.error('Failed to mark notification as read:', error, 'NotificationService');
+      return false;
+    }
+  }
+
+  /**
+   * Delete notification
+   */
+  async deleteNotification(notificationId: string): Promise<boolean> {
+    try {
+      await deleteDoc(doc(db, 'notifications', notificationId));
+      
+      logger.info('Notification deleted', { notificationId }, 'NotificationService');
+      return true;
+    } catch (error) {
+      logger.error('Failed to delete notification:', error, 'NotificationService');
+      return false;
+    }
+  }
+
+  /**
+   * Get user notifications
+   */
+  async getUserNotifications(userId: string, limit: number = 50): Promise<NotificationData[]> {
+    try {
+      const notificationsRef = collection(db, 'notifications');
+      const notificationsQuery = query(
+        notificationsRef,
+        where('userId', '==', userId),
+        orderBy('created_at', 'desc'),
+        limit(limit)
+      );
+      const notificationsDocs = await getDocs(notificationsQuery);
+      
+      return notificationsDocs.docs.map(doc => ({
+        id: doc.id,
+        userId: doc.data().userId,
+        type: doc.data().type,
+        title: doc.data().title,
+        message: doc.data().message,
+        data: doc.data().data || {},
+        is_read: doc.data().is_read || false,
+        created_at: doc.data().created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+        read_at: doc.data().read_at?.toDate?.()?.toISOString()
+      }));
+    } catch (error) {
+      logger.error('Failed to get user notifications:', error, 'NotificationService');
+      return [];
+    }
+  }
 }
 
 // Export singleton instance
