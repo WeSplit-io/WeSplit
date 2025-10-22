@@ -1,7 +1,13 @@
 // Token Configuration
 
+import { PublicKey } from '@solana/web3.js';
+
 export const USDC_DECIMALS = 6;
 export const SOL_DECIMALS = 9;
+
+// USDC Mint Address as PublicKey
+export const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // Mainnet USDC
+export const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112'); // Wrapped SOL
 
 export const TOKEN_CONFIG = {
   USDC: {

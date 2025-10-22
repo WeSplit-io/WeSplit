@@ -3,12 +3,12 @@ import { View, Text, TouchableOpacity, ScrollView, Image, Alert, TouchableWithou
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../../../context/AppContext';
 import { useWallet } from '../../../context/WalletContext';
-import { formatKastIdentifier } from '../../../utils/format';
-import AddDestinationSheet from '../../../components/shared';
-import { walletService } from '../../../services/wallet';
+import AddDestinationSheet from '../../../components/AddDestinationSheet';
+import { LinkedWalletService, LinkedWallet } from '../../../services/wallet/LinkedWalletService';
 import { styles } from './styles';
 import { logger } from '../../../services/core';
 import Header from '../../../components/shared/Header';
+import { Container } from '../../../components/shared';
 
 // Interfaces are now imported from the service
 
@@ -17,8 +17,8 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   const { currentUser } = state;
   const { availableWallets } = useWallet();
   
-  const [externalWallets, setExternalWallets] = useState<ExternalWallet[]>([]);
-  const [kastCards, setKastCards] = useState<KastCard[]>([]);
+  const [externalWallets, setExternalWallets] = useState<LinkedWallet[]>([]);
+  const [kastCards, setKastCards] = useState<LinkedWallet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
@@ -72,8 +72,8 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
       logger.info('Loading linked destinations for user', { userId: currentUser.id }, 'LinkedCardsScreen');
       
       // Load from the linked wallets service
-      // Get linked destinations from walletService
-      const linkedData = await walletService.getLinkedDestinations(currentUser.id.toString());
+      // Get linked destinations from LinkedWalletService
+      const linkedData = await LinkedWalletService.getLinkedDestinations(currentUser.id.toString());
       
       logger.info('Loaded linked destinations', {
         wallets: linkedData.externalWallets.length,
@@ -101,13 +101,17 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
       logger.info('Adding new destination', { destination }, 'LinkedCardsScreen');
       
       if (destination.type === 'wallet') {
-        // Add external wallet using walletService
-        const result = await walletService.addExternalWallet(
+        // Add external wallet using LinkedWalletService
+        const result = await LinkedWalletService.addLinkedWallet(
           currentUser.id.toString(),
           {
+            type: 'external',
             label: destination.name,
             address: destination.address,
-            chain: destination.chain || 'solana'
+            chain: destination.chain || 'solana',
+            status: 'active',
+            currency: 'USD',
+            isActive: true
           }
         );
         
@@ -120,10 +124,11 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           Alert.alert('Error', result.error || 'Failed to add external wallet');
         }
       } else if (destination.type === 'kast') {
-        // Add KAST card using walletService with full card information
-        const result = await walletService.addKastCard(
+        // Add KAST card using LinkedWalletService with full card information
+        const result = await LinkedWalletService.addLinkedWallet(
           currentUser.id.toString(),
           {
+            type: 'kast',
             label: destination.name,
             address: destination.address, // Use address field for consistency
             identifier: destination.identifier, // Keep for backward compatibility
@@ -132,7 +137,8 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
             balance: destination.balance,
             currency: destination.currency,
             expirationDate: destination.expirationDate,
-            cardholderName: destination.cardholderName
+            cardholderName: destination.cardholderName,
+            isActive: destination.status === 'active'
           }
         );
         
@@ -262,7 +268,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
                 <View style={styles.destinationInfo}>
                   <Text style={styles.destinationLabel}>{wallet.label}</Text>
                   <Text style={styles.destinationAddress}>
-                    {formatWalletAddress(wallet.address)}
+                    {formatWalletAddress(wallet.address || '')}
                   </Text>
                 </View>
                 <View style={styles.destinationActions}>
@@ -318,7 +324,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
                 <View style={styles.destinationInfo}>
                   <Text style={styles.destinationLabel}>{card.label}</Text>
                   <Text style={styles.destinationAddress}>
-                    {formatWalletAddress(card.address)}
+                    {formatWalletAddress(card.address || '')}
                   </Text>
                 </View>
                 <View style={styles.destinationActions}>
@@ -358,7 +364,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <TouchableWithoutFeedback onPress={closeDropdown}>
         <View style={styles.container}>
           {/* Header */}
@@ -427,7 +433,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           />
         </View>
       </TouchableWithoutFeedback>
-    </SafeAreaView>
+    </Container>
   );
 };
 

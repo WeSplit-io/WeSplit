@@ -4,7 +4,6 @@ import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
 
 export const styles = StyleSheet.create({
-
   addButton: {
     width: 32,
     height: 32,

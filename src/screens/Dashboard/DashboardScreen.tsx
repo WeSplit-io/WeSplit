@@ -956,6 +956,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           userPseudo={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
           userWallet={localAppWalletAddress || currentUser?.wallet_address || ''}
           qrValue={localAppWalletAddress || currentUser?.wallet_address || ''}
+          navigation={navigation}
         />
       </Modal>
 
