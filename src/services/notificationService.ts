@@ -25,6 +25,8 @@ import { db } from '../config/firebase';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { logger } from './loggingService';
+import { validateNotificationConsistency } from '../utils/notificationValidation';
+import { NotificationPayload, NotificationType } from '../types/notificationTypes';
 
 // Notification types
 export type NotificationType = 
@@ -81,6 +83,7 @@ class NotificationServiceClass {
       const isExpoGo = __DEV__ && Platform.OS !== 'web' && !(global as any).Expo?.modules?.expo?.modules?.ExpoModulesCore;
       if (isExpoGo) {
         logger.warn('Running in Expo Go - push notifications have limited functionality. Consider using a development build for full notification support.', null, 'NotificationService');
+        // Still initialize but with limited functionality
         this.isInitialized = true;
         return true;
       }
@@ -133,6 +136,26 @@ class NotificationServiceClass {
     type: NotificationType = 'general',
     data: { [key: string]: any } = {}
   ): Promise<boolean> {
+    // Validate notification data before sending
+    const validation = validateNotificationConsistency(data as NotificationPayload, type);
+    if (!validation.isValid) {
+      logger.error('Invalid notification data', {
+        userId,
+        type,
+        errors: validation.errors,
+        warnings: validation.warnings
+      }, 'NotificationService');
+      return false;
+    }
+    
+    if (validation.warnings.length > 0) {
+      logger.warn('Notification data warnings', {
+        userId,
+        type,
+        warnings: validation.warnings
+      }, 'NotificationService');
+    }
+    
     // Run notification sending in background to avoid blocking transactions
     this.sendNotificationAsync(userId, title, message, type, data).catch(error => {
       logger.error('Background notification failed:', error, 'NotificationService');
@@ -191,6 +214,27 @@ class NotificationServiceClass {
               type,
               error: notificationError
             }, 'NotificationService');
+            
+            // Retry push notification after a delay
+            setTimeout(async () => {
+              try {
+                await Notifications.scheduleNotificationAsync({
+                  content: {
+                    title,
+                    body: message,
+                    data: { userId, type, ...data },
+                  },
+                  trigger: null,
+                });
+                logger.info('Push notification retry successful', { userId, type }, 'NotificationService');
+              } catch (retryError) {
+                logger.error('Push notification retry failed', {
+                  userId,
+                  type,
+                  error: retryError
+                }, 'NotificationService');
+              }
+            }, 5000); // Retry after 5 seconds
           }
         }
       }

@@ -401,11 +401,29 @@ export function setupDeepLinkListeners(navigation: any, currentUser: any) {
 
         logger.info('Attempting to join split with invitation data', { splitInvitationData: linkData.splitInvitationData }, 'deepLinkHandler');
         
-        // Navigate to SplitDetails screen with the invitation data
-        navigation.navigate('SplitDetails', {
-          shareableLink: url, // Pass the original URL
-          splitInvitationData: linkData.splitInvitationData
-        });
+        try {
+          // Validate split invitation data before navigation
+          const invitationData = JSON.parse(decodeURIComponent(linkData.splitInvitationData));
+          
+          if (!invitationData.splitId) {
+            throw new Error('Invalid split invitation data: missing splitId');
+          }
+          
+          // Navigate to SplitDetails screen with validated invitation data
+          navigation.navigate('SplitDetails', {
+            shareableLink: url, // Pass the original URL
+            splitInvitationData: linkData.splitInvitationData,
+            splitId: invitationData.splitId,
+            isFromDeepLink: true
+          });
+          
+          logger.info('Successfully navigated to SplitDetails with split invitation', { 
+            splitId: invitationData.splitId 
+          }, 'deepLinkHandler');
+        } catch (error) {
+          console.error('🔥 Error processing split invitation:', error);
+          Alert.alert('Invalid Link', 'This split invitation link is corrupted or invalid.');
+        }
         break;
       
       default:
