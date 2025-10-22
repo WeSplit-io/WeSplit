@@ -7,7 +7,7 @@ import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { useContactActions } from '../../hooks';
-import { walletService } from '../../services/wallet';
+import { walletService, LinkedWalletService } from '../../services/wallet';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
@@ -17,7 +17,16 @@ import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
 
 const SendScreen: React.FC<any> = ({ navigation, route }) => {
-  const { groupId, initialTab } = route.params || {};
+  const { 
+    groupId, 
+    initialTab,
+    // Pre-filled data from notifications
+    destinationType,
+    contact,
+    prefilledAmount,
+    prefilledNote,
+    requestId
+  } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
   const { 
@@ -44,8 +53,8 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     try {
       logger.info('Loading linked destinations for user', { userId: currentUser.id }, 'SendScreen');
       
-      // Get linked destinations from walletService
-      const linkedData = await walletService.getLinkedDestinations(currentUser.id.toString());
+      // Get linked destinations from LinkedWalletService
+      const linkedData = await LinkedWalletService.getLinkedDestinations(currentUser.id.toString());
       
       logger.info('Loaded linked destinations', {
         wallets: linkedData.externalWallets.length,
@@ -66,7 +75,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   // Ensure app wallet is connected on mount
   useEffect(() => {
     if (currentUser?.id && !appWalletConnected) {
-      ensureAppWallet(currentUser.id.toString());
+      ensureAppWallet(currentUser.id?.toString() || '');
     }
   }, [currentUser?.id, appWalletConnected]);
 
@@ -85,6 +94,28 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
       }
     }, [currentUser?.id, activeTab])
   );
+
+  // Auto-navigate to SendAmount if we have pre-filled data from notification
+  useEffect(() => {
+    if (contact && prefilledAmount && currentUser?.id) {
+      logger.info('Auto-navigating to SendAmount with pre-filled data from notification', {
+        contactName: contact.name,
+        prefilledAmount,
+        prefilledNote,
+        requestId
+      }, 'SendScreen');
+      
+      // Navigate directly to SendAmount with pre-filled data
+      navigation.navigate('SendAmount', {
+        destinationType: destinationType || 'friend',
+        contact: contact,
+        groupId,
+        prefilledAmount,
+        prefilledNote,
+        requestId
+      });
+    }
+  }, [contact, prefilledAmount, currentUser?.id, navigation, destinationType, groupId, prefilledNote, requestId]);
 
   const handleSelectContact = (contact: UserContact) => {
     logger.info('Selected contact for sending', {
@@ -160,7 +191,6 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
 
   const renderFriendsTab = () => (
     <ContactsList
-      groupId={groupId}
       onContactSelect={handleSelectContact}
       onAddContact={handleAddContact}
       showAddButton={true}
@@ -237,10 +267,10 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
               <View style={styles.walletInfo}>
                 <Text style={styles.walletName}>{destination.label}</Text>
                 <Text style={styles.walletAddress}>
-                  {formatWalletAddress(destination.address)}
+                  {formatWalletAddress(destination.address || '')}
                 </Text>
                 {isKastCard && (
-                  <Text style={styles.walletType}>KAST Card</Text>
+                  <Text style={{ color: colors.primaryGreen, fontSize: 12, fontWeight: '500' }}>KAST Card</Text>
                 )}
               </View>
             </TouchableOpacity>

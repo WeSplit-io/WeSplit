@@ -3,7 +3,6 @@
  * Centralized type definitions for transaction-related functionality
  */
 
-import { TransactionResult as UnifiedTransactionResult } from '../../types/unified';
 import { TransactionType } from '../../config/constants/feeConfig';
 
 export interface TransactionParams {
@@ -14,9 +13,15 @@ export interface TransactionParams {
   priority?: 'low' | 'medium' | 'high';
   userId?: string;
   transactionType?: TransactionType;
+  requestId?: string | null;
+  groupId?: string | null;
 }
 
-export interface TransactionResult extends UnifiedTransactionResult {
+export interface TransactionResult {
+  signature: string;
+  txId: string;
+  success: boolean;
+  error?: string;
   companyFee?: number;
   netAmount?: number;
 }

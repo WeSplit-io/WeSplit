@@ -96,7 +96,7 @@ class ConsolidatedTransactionService {
 
       // Create keypair from the wallet
       const { keypairUtils } = await import('../shared/keypairUtils');
-      const keypairResult = keypairUtils.createKeypairFromSecretKey(walletResult.wallet.secretKey);
+      const keypairResult = keypairUtils.createKeypairFromSecretKey(walletResult.wallet.secretKey!);
       
       if (!keypairResult.success || !keypairResult.keypair) {
         logger.error('Failed to create keypair from wallet', { 
@@ -127,7 +127,7 @@ class ConsolidatedTransactionService {
       // Save transaction to database if successful
       if (result.success && result.signature) {
         try {
-          const { firebaseTransactionService, firebaseDataService } = await import('../firebaseDataService');
+          const { firebaseDataService } = await import('../firebaseDataService');
           
           // Find recipient user by wallet address to get their user ID
           const recipientUser = await firebaseDataService.user.getUserByWalletAddress(params.to);
@@ -148,7 +148,11 @@ class ConsolidatedTransactionService {
             status: 'completed' as const,
             group_id: params.groupId || null,
             company_fee: result.companyFee || 0,
-            net_amount: result.netAmount || params.amount
+            net_amount: result.netAmount || params.amount,
+            gas_fee: 0, // Gas fees are covered by the company
+            blockchain_network: 'solana',
+            confirmation_count: 0,
+            block_height: 0
           };
           
           // Create recipient transaction record (only if recipient is a registered user)
@@ -166,15 +170,19 @@ class ConsolidatedTransactionService {
             status: 'completed' as const,
             group_id: params.groupId || null,
             company_fee: 0, // Recipient doesn't pay company fees
-            net_amount: params.amount // Recipient gets full amount
+            net_amount: params.amount, // Recipient gets full amount
+            gas_fee: 0, // Gas fees are covered by the company
+            blockchain_network: 'solana',
+            confirmation_count: 0,
+            block_height: 0
           };
           
           // Save both transaction records
-          await firebaseTransactionService.createTransaction(senderTransactionData);
+          await firebaseDataService.transaction.createTransaction(senderTransactionData);
           
           // Only create recipient transaction if recipient is a registered user
           if (recipientUser) {
-            await firebaseTransactionService.createTransaction(recipientTransactionData);
+            await firebaseDataService.transaction.createTransaction(recipientTransactionData);
             logger.info('✅ Both sender and recipient transactions saved to database', {
               signature: result.signature,
               userId: params.userId,
@@ -193,11 +201,93 @@ class ConsolidatedTransactionService {
           logger.error('❌ Failed to save transaction to database', saveError, 'ConsolidatedTransactionService');
           // Don't fail the transaction if database save fails
         }
+
+        // Process payment request if this transaction was from a request
+        logger.info('🔍 Checking for payment request processing', {
+          requestId: params.requestId,
+          hasRequestId: !!params.requestId,
+          requestIdType: typeof params.requestId
+        }, 'ConsolidatedTransactionService');
+        
+        if (params.requestId) {
+          try {
+            const { PaymentRequestManager } = await import('./PaymentRequestManager');
+            const paymentRequestManager = new PaymentRequestManager();
+            
+            const requestResult = await paymentRequestManager.processPaymentRequest(
+              params.requestId,
+              result.signature!,
+              'completed'
+            );
+            
+            if (requestResult.success) {
+              logger.info('✅ Payment request deleted after successful completion', {
+                requestId: params.requestId,
+                signature: result.signature,
+                transactionId: result.signature
+              }, 'ConsolidatedTransactionService');
+            } else {
+              logger.error('❌ Payment request processing failed', {
+                requestId: params.requestId,
+                signature: result.signature,
+                error: requestResult.error
+              }, 'ConsolidatedTransactionService');
+              
+              // Try to mark as failed instead of deleting
+              try {
+                await paymentRequestManager.processPaymentRequest(
+                  params.requestId,
+                  result.signature!,
+                  'failed'
+                );
+                logger.info('✅ Payment request marked as failed after processing error', {
+                  requestId: params.requestId
+                }, 'ConsolidatedTransactionService');
+              } catch (fallbackError) {
+                logger.error('❌ Failed to mark payment request as failed', fallbackError, 'ConsolidatedTransactionService');
+              }
+            }
+          } catch (requestError) {
+            logger.error('❌ Failed to process payment request', {
+              requestId: params.requestId,
+              signature: result.signature,
+              error: requestError
+            }, 'ConsolidatedTransactionService');
+            
+            // Don't fail the transaction if request processing fails, but log for manual cleanup
+            logger.warn('⚠️ Manual cleanup may be required for payment request', {
+              requestId: params.requestId,
+              signature: result.signature
+            }, 'ConsolidatedTransactionService');
+          }
+        }
       }
       
       return result;
     } catch (error) {
       logger.error('Failed to send USDC transaction', error, 'ConsolidatedTransactionService');
+      
+      // If transaction failed and there was a request, mark it as failed
+      if (params.requestId) {
+        try {
+          const { PaymentRequestManager } = await import('./PaymentRequestManager');
+          const paymentRequestManager = new PaymentRequestManager();
+          
+          await paymentRequestManager.processPaymentRequest(
+            params.requestId,
+            '',
+            'failed'
+          );
+          
+          logger.info('✅ Payment request marked as failed', {
+            requestId: params.requestId,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }, 'ConsolidatedTransactionService');
+        } catch (requestError) {
+          logger.error('❌ Failed to update payment request status', requestError, 'ConsolidatedTransactionService');
+        }
+      }
+      
       return {
         signature: '',
         txId: '',
@@ -253,6 +343,13 @@ class ConsolidatedTransactionService {
    */
   async getPaymentRequests(userId: string): Promise<PaymentRequest[]> {
     return this.paymentRequestManager.getPaymentRequests(userId);
+  }
+
+  /**
+   * Cleanup orphaned payment requests for a user
+   */
+  async cleanupOrphanedPaymentRequests(userId: string): Promise<{ cleaned: number; errors: string[] }> {
+    return this.paymentRequestManager.cleanupOrphanedRequests(userId);
   }
 
   // ===== BALANCE METHODS =====
@@ -328,14 +425,14 @@ class ConsolidatedTransactionService {
   async getUserWalletAddress(userId: string): Promise<string | null> {
     try {
       // Use the proper WalletService method to get user's wallet address
-      const { walletService } = await import('../wallet');
-      const result = await walletService.getWalletInfoForUser(userId);
+      const { simplifiedWalletService } = await import('../wallet/simplifiedWalletService');
+      const walletInfo = await simplifiedWalletService.getWalletInfo(userId);
       
-      if (result.success && result.wallet) {
-        return result.wallet.address;
+      if (walletInfo) {
+        return walletInfo.address;
       }
       
-      logger.warn('No wallet found for user', { userId, error: result.error }, 'ConsolidatedTransactionService');
+      logger.warn('No wallet found for user', { userId }, 'ConsolidatedTransactionService');
       return null;
     } catch (error) {
       logger.error('Failed to get user wallet address', { userId, error }, 'ConsolidatedTransactionService');

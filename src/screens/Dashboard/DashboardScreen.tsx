@@ -702,7 +702,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => navigation.navigate('Contacts', { action: 'request' })}
+              onPress={() => navigation.navigate('RequestContacts')}
             >
               <View style={styles.actionButtonCircle}>
                 <Image

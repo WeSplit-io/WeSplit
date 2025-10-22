@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { Header } from '../../components/shared';
 import Icon from '../../components/Icon';
-import SlideButton from '../../components/shared';
+import SlideButton from '../../components/SlideButton';
 import { GroupMember } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';

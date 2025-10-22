@@ -3,7 +3,7 @@
  * Centralized exports for all payment-related services
  */
 
-export { firebasePaymentRequestService } from './firebasePaymentRequestService';
+export { firebasePaymentRequestService, createPaymentRequest } from './firebasePaymentRequestService';
 export { AmountCalculationService } from './amountCalculationService';
 
 // Funding services

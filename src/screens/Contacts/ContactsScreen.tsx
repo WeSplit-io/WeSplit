@@ -173,13 +173,22 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
 
       <View style={[styles.content, (isSplitMode || isRequestMode) && styles.contentWithButton]}>
         {isRequestMode && requestActiveTab === 'Show QR code' ? (
-          <QrCodeView
-            value={createUsdcRequestUri({ 
-              recipient: address || '', 
-              label: currentUser?.name || 'User' 
-            })}
-            size={300}
-          />
+          <View style={styles.content}>
+            {address ? (
+              <QrCodeView
+                value={createUsdcRequestUri({ 
+                  recipient: address, 
+                  label: currentUser?.name || 'User' 
+                })}
+                size={300}
+              />
+            ) : (
+              <View style={styles.content}>
+                <Text style={{ color: colors.textLight, textAlign: 'center', marginBottom: 10 }}>No wallet address available</Text>
+                <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>Please connect a wallet to generate QR code</Text>
+              </View>
+            )}
+          </View>
         ) : (
           <ContactsList
             onContactSelect={handleSelectContact}

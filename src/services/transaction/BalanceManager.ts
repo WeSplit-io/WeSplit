@@ -158,8 +158,8 @@ export class BalanceManager {
     try {
       // Import wallet service dynamically to avoid circular dependencies
       const { walletService } = await import('../wallet');
-      const wallet = await walletService.getUserWallet(userId);
-      return wallet?.address || null;
+      const walletResult = await walletService.ensureUserWallet(userId);
+      return walletResult.success && walletResult.wallet ? walletResult.wallet.address : null;
     } catch (error) {
       logger.error('Failed to get user wallet address', error, 'BalanceManager');
       return null;

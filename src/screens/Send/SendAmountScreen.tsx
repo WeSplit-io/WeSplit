@@ -55,9 +55,12 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
         name: wallet.label, // Use 'label' field for consistency
         address: wallet.address,
         id: wallet.id
-      } : null
+      } : null,
+      requestId: route.params?.requestId,
+      hasRequestId: !!route.params?.requestId,
+      requestIdType: typeof route.params?.requestId
     });
-  }, [destinationType, contact, wallet]);
+  }, [destinationType, contact, wallet, route.params?.requestId]);
 
   useEffect(() => {
     // Mesure la largeur du texte (note ou placeholder)
@@ -122,6 +125,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
         isSettlement,
         fromNotification: route.params?.fromNotification,
         notificationId: route.params?.notificationId,
+        requestId: route.params?.requestId,
       });
     } else if (destinationType === 'external') {
       if (!wallet) {

@@ -12,7 +12,7 @@ import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import { logger } from '../../services/core';
-import { notificationService } from '../../services/notifications';
+import { notificationService } from '../../services/notifications/notificationService';
 import { Container } from '../../components/shared';
 
 // --- AppleSlider adapted from WalletManagementScreen ---
@@ -139,7 +139,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
 // --- End AppleSlider ---
 
 const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
-  const { contact, wallet, destinationType, amount, description, groupId, isSettlement } = route.params || {};
+  const { contact, wallet, destinationType, amount, description, groupId, isSettlement, requestId } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
   
@@ -215,12 +215,18 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       setSending(true);
       
       // Send payment processing notification (non-blocking)
-      notificationService.sendPaymentProcessingNotification(
+      notificationService.instance.sendNotification(
         currentUser.id,
-        'payment_' + Date.now(), // Generate a temporary ID
-        'Payment to ' + (contact?.name || 'External Wallet'),
-        amount,
-        'USDC'
+        'Payment Processing',
+        `Your payment of ${amount} USDC to ${contact?.name || 'External Wallet'} is being processed...`,
+        'general',
+        {
+          amount,
+          currency: 'USDC',
+          recipient: contact?.name || 'External Wallet',
+          status: 'processing',
+          timestamp: new Date().toISOString()
+        }
       );
 
       // Get fee estimate for display
@@ -244,6 +250,15 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       } else {
         // For friends/internal transfers, use existing service
         const transactionType: TransactionType = isSettlement ? 'settlement' : 'send';
+        
+        logger.info('🔍 SendConfirmation: About to send transaction with requestId', {
+          requestId: requestId,
+          hasRequestId: !!requestId,
+          requestIdType: typeof requestId,
+          isSettlement,
+          transactionType
+        }, 'SendConfirmationScreen');
+        
         transactionResult = await consolidatedTransactionService.sendUSDCTransaction({
           to: recipientAddress,
           amount: amount,
@@ -251,7 +266,8 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           userId: currentUser.id.toString(),
           memo: description || (isSettlement ? 'Settlement payment' : 'Payment'),
           priority: 'medium',
-          transactionType: transactionType
+          transactionType: transactionType,
+          requestId: requestId || null
         });
       }
 
@@ -285,13 +301,19 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       }
 
       // Send payment confirmed notification (non-blocking)
-      notificationService.sendPaymentConfirmedNotification(
+      notificationService.instance.sendNotification(
         currentUser.id,
-        'payment_' + Date.now(),
-        'Payment to ' + (contact?.name || 'External Wallet'),
-        amount,
-        'USDC',
-        transactionResult.signature || transactionResult.transactionId
+        'Payment Confirmed',
+        `Your payment of ${amount} USDC to ${contact?.name || 'External Wallet'} has been confirmed!`,
+        'payment_sent',
+        {
+          amount,
+          currency: 'USDC',
+          recipient: contact?.name || 'External Wallet',
+          transactionId: transactionResult.signature || transactionResult.transactionId,
+          status: 'confirmed',
+          timestamp: new Date().toISOString()
+        }
       );
 
       // Navigate to success screen with real transaction data
@@ -316,13 +338,19 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       
       // Send payment failed notification (non-blocking)
       if (currentUser?.id) {
-        notificationService.sendPaymentFailedNotification(
+        notificationService.instance.sendNotification(
           currentUser.id,
-          'payment_' + Date.now(),
-          'Payment to ' + (contact?.name || 'External Wallet'),
-          amount,
-          'USDC',
-          error instanceof Error ? error.message : 'Unknown error'
+          'Payment Failed',
+          `Your payment of ${amount} USDC to ${contact?.name || 'External Wallet'} failed. Please try again.`,
+          'general',
+          {
+            amount,
+            currency: 'USDC',
+            recipient: contact?.name || 'External Wallet',
+            error: error instanceof Error ? error.message : 'Unknown error',
+            status: 'failed',
+            timestamp: new Date().toISOString()
+          }
         );
       }
       
@@ -432,16 +460,16 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Debug logging for slider state
   if (__DEV__) {
+    const sliderDisabled = walletLoading || sending || !hasExistingWallet || !hasSufficientBalance || !!walletError;
     logger.debug('Slider state', {
       sending,
       hasExistingWallet,
       hasSufficientBalance,
-      hasSufficientSol,
       existingWalletBalance,
       amount,
       walletLoading,
       walletError,
-      disabled: walletLoading || sending || !hasExistingWallet || !hasSufficientBalance || !!walletError
+      sliderDisabled
     }, 'SendConfirmationScreen');
   }
 
@@ -449,7 +477,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     <Container>
       {/* Header */}
       <Header
-        title="{isSettlement ? 'Settlement Payment' : 'Send'}"
+        title={isSettlement ? 'Settlement Payment' : 'Send'}
         onBackPress={() => navigation.goBack()}
       />
 
@@ -640,7 +668,6 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           </View>
         )}
 
-       
         
         <AppleSlider
           onSlideComplete={handleConfirmSend}

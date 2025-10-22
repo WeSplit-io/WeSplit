@@ -44,7 +44,7 @@ export function createUsdcRequestUri({
   reference?: string;
 }): string {
   // Validate recipient address
-  if (!isValidSolanaAddress(recipient)) {
+  if (!recipient || !isValidSolanaAddress(recipient)) {
     throw new Error('Invalid Solana address');
   }
 

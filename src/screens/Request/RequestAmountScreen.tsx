@@ -17,7 +17,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, groupId } = route.params || {};
   const { state } = useApp();
   const { currentUser } = state;
-  const [amount, setAmount] = useState('0');
+  const [amount, setAmount] = useState('');
   const [showAddNote, setShowAddNote] = useState(false);
   const [note, setNote] = useState('');
   const [noteInputWidth, setNoteInputWidth] = useState(60);
@@ -55,12 +55,12 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
     // Limit decimal places to 2
     if (parts.length === 2 && parts[1].length > 2) {return;}
 
-    setAmount(cleaned || '0');
+    setAmount(cleaned);
   };
 
   const handleContinue = async () => {
     const numAmount = parseFloat(amount);
-    if (!numAmount || numAmount <= 0) {
+    if (!amount || !numAmount || numAmount <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
       return;
     }
@@ -124,7 +124,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
   };
 
-  const isAmountValid = parseFloat(amount) > 0;
+  const isAmountValid = amount && parseFloat(amount) > 0;
 
   return (
     <Container>
