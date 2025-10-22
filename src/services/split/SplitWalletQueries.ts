@@ -4,9 +4,9 @@
  * Part of the modularized SplitWalletService
  */
 
-import { logger } from '../loggingService';
+import { logger } from '../core';
 import { doc, getDoc, getDocs, query, where, updateDoc, collection } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { db } from '../../config/firebase/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult } from './types';
 
 export class SplitWalletQueries {

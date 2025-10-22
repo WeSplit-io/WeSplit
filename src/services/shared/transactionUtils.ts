@@ -1,7 +1,7 @@
 // Transaction Utilities
 
 import { Connection, Transaction, PublicKey, Keypair } from '@solana/web3.js';
-import { logger } from '../loggingService';
+import { logger } from '../core/loggingService';
 
 export interface TransactionOptions {
   skipPreflight?: boolean;
@@ -106,7 +106,17 @@ export class TransactionUtils {
 }
 
 // Export singleton instance
-export const transactionUtils = new TransactionUtils();
+// Lazy singleton to avoid initialization issues during module loading
+let _transactionUtils: TransactionUtils | null = null;
+
+export const transactionUtils = {
+  get instance() {
+    if (!_transactionUtils) {
+      _transactionUtils = new TransactionUtils();
+    }
+    return _transactionUtils;
+  }
+};
 
 // Export as default for backward compatibility
 export default TransactionUtils;

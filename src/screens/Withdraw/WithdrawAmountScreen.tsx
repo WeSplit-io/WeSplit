@@ -9,8 +9,8 @@ import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { spacing } from '../../theme/spacing';
-import { FeeService, TransactionType } from '../../config/feeConfig';
-import { logger } from '../../services/loggingService';
+import { FeeService, TransactionType } from '../../config/constants/feeConfig';
+import { logger } from '../../services/core';
 
 const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const { state } = useApp();

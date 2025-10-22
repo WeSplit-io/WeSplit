@@ -5,7 +5,7 @@
 
 import { useState, useRef } from 'react';
 import { SplitWallet } from '../../../services/split';
-import { Participant } from '../../../services/amountCalculationService';
+import { Participant } from '../../../services/core';
 
 export interface FairSplitState {
   // Split configuration

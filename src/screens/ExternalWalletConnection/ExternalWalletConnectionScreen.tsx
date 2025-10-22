@@ -12,11 +12,11 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
-import { walletService, WalletProvider } from '../../services/WalletService';
+import { walletService, WalletProvider } from '../../services/wallet';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/loggingService';
-import { Container, Header } from '../../components/shared';
+import { logger } from '../../services/core';
+import { Container } from '../../components/shared';
 
 interface ExternalWalletConnectionScreenProps {
   navigation: any;
@@ -122,10 +122,17 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
 
   return (
     <Container>
-      <Header
-        title="Connect External Wallet"
-        onBackPress={() => navigation.goBack()}
-      />
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Image
+            source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Farrow-left.png?alt=media&token=103ee202-f6fd-4303-97b5-fe0138186378' }}
+            style={styles.iconWrapper}
+          />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Connect External Wallet</Text>
+        <View style={styles.placeholder} />
+      </View>
 
       {/* Content */}
       <ScrollView

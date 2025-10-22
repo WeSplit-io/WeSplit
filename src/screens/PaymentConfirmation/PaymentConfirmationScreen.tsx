@@ -15,8 +15,8 @@ import {
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { FallbackDataService } from '../../utils/fallbackDataService';
-import { Container, Header } from '../../components/shared';
+import { FallbackDataService } from '../../services/data';
+import { Container } from '../../components/shared';
 
 interface PaymentConfirmationScreenProps {
   navigation: any;
@@ -92,10 +92,16 @@ const PaymentConfirmationScreen: React.FC<PaymentConfirmationScreenProps> = ({ n
     <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
-      <Header
-        title="Split the Bill"
-        onBackPress={() => navigation.goBack()}
-      />
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backButtonText}>←</Text>
+        </TouchableOpacity>
+        
+        <Text style={styles.headerTitle}>Split the Bill</Text>
+      </View>
 
       <View style={styles.content}>
         {/* Blurred Bill Summary */}

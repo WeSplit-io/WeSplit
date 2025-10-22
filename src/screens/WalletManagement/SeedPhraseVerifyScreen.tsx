@@ -13,12 +13,29 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
-import { Container, Header } from '../../components/shared';
+import { firebaseDataService } from '../../services/data';
+import { Container } from '../../components/shared';
 
 // Temporary inline styles to fix the import issue
 const styles = StyleSheet.create({
-
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  placeholder: {
+    width: 40,
+  },
   content: {
     flex: 1,
   },
@@ -293,10 +310,13 @@ const SeedPhraseVerifyScreen: React.FC = () => {
   if (loading) {
     return (
       <Container>
-        <Header
-          title="Verify Seed Phrase"
-          onBackPress={handleBack}
-        />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <Icon name="arrow-left" size={24} color={colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Verify Seed Phrase</Text>
+          <View style={styles.placeholder} />
+        </View>
         <View style={styles.content}>
           <Text style={styles.instructionsText}>Loading seed phrase...</Text>
         </View>
@@ -307,10 +327,13 @@ const SeedPhraseVerifyScreen: React.FC = () => {
   if (error || originalSeedPhrase.length === 0) {
     return (
       <Container>
-        <Header
-          title="Verify Seed Phrase"
-          onBackPress={handleBack}
-        />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <Icon name="arrow-left" size={24} color={colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Verify Seed Phrase</Text>
+          <View style={styles.placeholder} />
+        </View>
         <View style={styles.content}>
           <View style={styles.instructionsContainer}>
             <Text style={styles.instructionsTitle}>Seed Phrase Unavailable</Text>
@@ -326,10 +349,13 @@ const SeedPhraseVerifyScreen: React.FC = () => {
   return (
     <Container>
       {/* Header */}
-      <Header
-        title="Verify Seed Phrase"
-        onBackPress={handleBack}
-      />
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <Icon name="arrow-left" size={24} color={colors.white} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Verify Seed Phrase</Text>
+        <View style={styles.placeholder} />
+      </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Instructions */}

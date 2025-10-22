@@ -6,11 +6,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { consolidatedBillAnalysisService } from '../services/consolidatedBillAnalysisService';
-import { SplitStorageService } from '../services/splitStorageService';
-import { splitRealtimeService, SplitRealtimeUpdate } from '../services/splitRealtimeService';
+import { consolidatedBillAnalysisService } from '../services/billing';
+import { splitStorageService } from '../services/splits';
+import { splitRealtimeService } from '../services/splits';
 import { UnifiedBillData } from '../types/unified';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 
 interface UseSplitDetailsParams {
   routeParams: any;

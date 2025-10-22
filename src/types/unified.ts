@@ -1,55 +1,166 @@
 /**
- * Unified Type Definitions for WeSplit
- * Consolidates all duplicate interfaces and types into a single source of truth
+ * Unified Types
+ * Centralized type definitions for the application
  */
 
-// ============================================================================
-// BILL SPLITTING TYPES
-// ============================================================================
-
-/**
- * Unified BillItem interface - consolidates all BillItem definitions
- */
-export interface BillItem {
+// User types
+export interface User {
   id: string;
+  email: string;
   name: string;
-  price: number;
-  quantity?: number;
-  category?: string;
-  participants: string[]; // User IDs who are splitting this item
+  avatar?: string;
+  phone?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-/**
- * Unified BillParticipant interface - consolidates all BillParticipant definitions
- */
-export interface BillParticipant {
+// Transaction types
+export interface Transaction {
   id: string;
+  from: string;
+  to: string;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'completed' | 'failed';
+  created_at: string;
+  updated_at: string;
+  memo?: string;
+  group_id?: string;
+  transaction_method?: string;
+  recipient_name?: string;
+  sender_name?: string;
+}
+
+// Split types
+export interface Split {
+  id: string;
+  title: string;
+  description?: string;
+  totalAmount: number;
+  currency: string;
+  splitType: 'fair' | 'custom';
+  status: 'pending' | 'active' | 'completed' | 'cancelled';
+  creatorId: string;
+  creatorName: string;
+  participants: SplitParticipant[];
+  items: SplitItem[];
+  merchant: {
+    name: string;
+    location?: string;
+  };
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SplitParticipant {
   userId: string;
   name: string;
   email: string;
-  phoneNumber?: string;
   walletAddress: string;
-  status: 'pending' | 'accepted' | 'declined';
   amountOwed: number;
-  items: string[]; // Bill item IDs this participant is responsible for
-  joinedAt?: string;
-  respondedAt?: string;
+  amountPaid: number;
+  status: 'pending' | 'accepted' | 'declined';
+  avatar?: string;
 }
 
-/**
- * Bill Split Settings
- */
-export interface BillSplitSettings {
-  allowPartialPayments: boolean;
-  requireAllAccept: boolean;
-  autoCalculate: boolean;
-  splitMethod: 'equal' | 'by_items' | 'manual' | 'custom';
-  taxIncluded: boolean;
+export interface SplitItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  category: string;
+  participants: string[];
 }
 
-/**
- * Processed Bill Data for split creation
- */
+// Notification types
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  data?: any;
+  read: boolean;
+  created_at: string;
+  user_id: string;
+}
+
+export interface NotificationData {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  data?: any;
+  read: boolean;
+  created_at: string;
+  userId: string;
+}
+
+export type NotificationType = 
+  | 'general'
+  | 'payment_received'
+  | 'payment_sent'
+  | 'split_invite'
+  | 'split_accepted'
+  | 'split_declined'
+  | 'split_paid'
+  | 'payment_request'
+  | 'payment_reminder';
+
+export interface NotificationPayload {
+  id: string;
+  type: NotificationType;
+  data?: any;
+}
+
+// Wallet types
+export interface WalletInfo {
+  address: string;
+  publicKey: string;
+  balance: number;
+  currency: string;
+}
+
+export interface UserWalletBalance {
+  solBalance: number;
+  usdcBalance: number;
+  totalUSD: number;
+  address: string;
+  isConnected: boolean;
+}
+
+// Contact types
+export interface Contact {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  avatar?: string;
+  walletAddress?: string;
+  isFavorite: boolean;
+  created_at: string;
+}
+
+// Group types
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  members: GroupMember[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupMember {
+  userId: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'member';
+  joined_at: string;
+}
+
+// Bill analysis types
 export interface ProcessedBillData {
   id: string;
   title: string;
@@ -61,231 +172,72 @@ export interface ProcessedBillData {
   totalAmount: number;
   subtotal: number;
   tax: number;
+  tip: number;
   items: BillItem[];
   participants: BillParticipant[];
-  settings: BillSplitSettings;
-  originalAnalysis?: any;
+  splitType: 'fair' | 'custom';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  createdAt: string;
+  updatedAt: string;
 }
 
-/**
- * Bill Analysis Result
- */
-export interface BillAnalysisResult {
-  success: boolean;
-  data?: any;
-  error?: string;
-  processingTime: number;
-  confidence: number;
-  rawText?: string;
-}
-
-// ============================================================================
-// WALLET TYPES
-// ============================================================================
-
-/**
- * Unified WalletInfo interface - consolidates all WalletInfo definitions
- */
-export interface WalletInfo {
-  address: string;
-  publicKey: string;
-  secretKey?: string;
-  balance?: number;
-  usdcBalance?: number;
-  walletName?: string;
-  walletType?: 'app-generated' | 'external' | 'migrated';
-  isConnected?: boolean;
-}
-
-/**
- * User Wallet Balance
- */
-export interface UserWalletBalance {
-  solBalance: number;
-  usdcBalance: number;
-  totalUSD: number;
-  address: string;
-  isConnected: boolean;
-}
-
-/**
- * Wallet Provider Interface
- */
-export interface WalletProvider {
+export interface BillItem {
+  id: string;
   name: string;
-  icon: string;
-  logoUrl: string;
-  isAvailable: boolean;
-  connect(): Promise<WalletInfo>;
-  disconnect(): Promise<void>;
-  signTransaction(transaction: any): Promise<any>;
-  signMessage(message: Uint8Array): Promise<Uint8Array>;
+  price: number;
+  quantity: number;
+  category: string;
+  participants: string[];
 }
 
-// ============================================================================
-// TRANSACTION TYPES
-// ============================================================================
-
-/**
- * Transaction Parameters
- */
-export interface TransactionParams {
-  to: string;
-  amount: number;
-  currency: 'SOL' | 'USDC';
-  memo?: string;
-  priority?: 'low' | 'medium' | 'high';
-  userId?: string;
-  transactionType?: 'send' | 'receive' | 'split' | 'settlement' | 'default';
-}
-
-/**
- * Transaction Result
- */
-export interface TransactionResult {
-  signature: string;
-  txId: string;
-  success: boolean;
-  error?: string;
-}
-
-/**
- * Validation Result
- */
-export interface ValidationResult {
-  isValid: boolean;
-  error?: string;
-  warnings?: string[];
-}
-
-// ============================================================================
-// NOTIFICATION TYPES
-// ============================================================================
-
-/**
- * Notification Data
- */
-export interface NotificationData {
-  id: string;
-  type: 'payment_request' | 'payment_reminder' | 'general' | 
-        'split_invite' | 'split_confirmed' | 'payment_received' | 
-        'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 
-        'split_completed' | 'degen_all_locked' | 'degen_ready_to_roll' | 'roulette_result' | 
-        'contact_added' | 'split_spin_available' | 'split_winner' | 
-        'split_loser' | 'split_lock_required';
-  title: string;
-  message: string;
-  created_at: string;
-  is_read: boolean;
-  status?: 'pending' | 'paid' | 'cancelled';
-  data?: {
-    amount?: number;
-    currency?: string;
-    sender?: string;
-    requester?: string;
-    senderAvatar?: string;
-    requesterAvatar?: string;
-    addedBy?: string;
-    addedByAvatar?: string;
-    inviteLink?: string;
-    invitedBy?: string;
-    invitedByName?: string;
-    expiresAt?: string;
-    transactionId?: string;
-    senderName?: string;
-    recipientName?: string;
-    status?: string;
-    warningType?: string;
-    severity?: string;
-    splitWalletId?: string;
-    billName?: string;
-    splitId?: string;
-    totalAmount?: number;
-    inviterName?: string;
-    inviterId?: string;
-    participantAmount?: number;
-    creatorName?: string;
-    creatorId?: string;
-    splitWalletAddress?: string;
-    loserId?: string;
-    loserName?: string;
-    addedByName?: string;
-    addedAt?: string;
-    type?: string;
-  };
-}
-
-// ============================================================================
-// NAVIGATION TYPES
-// ============================================================================
-
-/**
- * Unified Bill Data for Navigation
- */
-export interface UnifiedBillData {
-  id: string;
-  title: string;
-  totalAmount: number;
-  currency: string;
-  date: string;
-  merchant?: string;
-  location?: string;
-  items?: BillItem[];
-  participants?: BillParticipant[];
-  billImageUrl?: string;
-  settings?: BillSplitSettings;
-}
-
-/**
- * Unified Participant Data
- */
-export interface UnifiedParticipant {
-  id: string;
+export interface BillParticipant {
   userId: string;
   name: string;
   email: string;
-  walletAddress: string;
+  wallet_address: string;
   amountOwed: number;
   status: 'pending' | 'accepted' | 'declined';
+  items: string[];
 }
 
-// ============================================================================
-// COMMON UTILITY TYPES
-// ============================================================================
-
-/**
- * Data Source Result
- */
-export interface DataSourceResult<T> {
-  data: T;
-  source: string;
-  isFallback: boolean;
+// Split wallet types
+export interface SplitWallet {
+  id: string;
+  address: string;
+  balance: number;
+  currency: string;
+  participants: SplitWalletParticipant[];
+  created_at: string;
+  updated_at: string;
 }
 
-/**
- * API Response
- */
-export interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
+export interface SplitWalletParticipant {
+  userId: string;
+  name: string;
+  walletAddress: string;
+  share: number;
+  isActive: boolean;
 }
 
-/**
- * Loading State
- */
-export interface LoadingState {
-  isLoading: boolean;
-  error: string | null;
-}
-
-/**
- * Pagination
- */
-export interface Pagination {
-  page: number;
-  limit: number;
-  total: number;
-  hasMore: boolean;
-}
+// Export all types
+export type {
+  User,
+  Transaction,
+  Split,
+  SplitParticipant,
+  SplitItem,
+  Notification,
+  NotificationData,
+  NotificationType,
+  NotificationPayload,
+  WalletInfo,
+  UserWalletBalance,
+  Contact,
+  Group,
+  GroupMember,
+  ProcessedBillData,
+  BillItem,
+  BillParticipant,
+  SplitWallet,
+  SplitWalletParticipant
+};

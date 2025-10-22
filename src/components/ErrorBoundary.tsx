@@ -1,7 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 import { colors } from '../theme';
 
 interface Props {

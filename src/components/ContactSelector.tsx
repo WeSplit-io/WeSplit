@@ -5,13 +5,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Icon from './Icon';
 import { useApp } from '../context/AppContext';
 import { useContacts, useContactActions } from '../hooks';
-import { firebaseDataService } from '../services/firebaseDataService';
+import { firebaseDataService } from '../services/data';
 import { UserContact, User } from '../types';
 import { colors } from '../theme';
 import { styles } from './ContactsList.styles';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 import UserAvatar from './UserAvatar';
-import { formatWalletAddress } from '../utils/walletUtils';
+import { formatWalletAddress } from '../utils/wallet';
 
 export type ContactSelectorMode = 'select' | 'view' | 'add';
 export type ContactSelectorAction = 'send' | 'request' | 'split' | 'group';

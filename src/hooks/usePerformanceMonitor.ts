@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 
 interface PerformanceMetrics {
   renderCount: number;

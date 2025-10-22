@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
-import NotificationCard from '../../components/NotificationCard';
+import { NotificationCard } from '../../components/notifications';
 import { useApp } from '../../context/AppContext';
-import { notificationService, NotificationData } from '../../services/notificationService';
+import { notificationService, NotificationData } from '../../services/notifications';
 import styles from './styles';
 import { colors } from '../../theme/colors';
 import { Container, Header } from '../../components/shared';
@@ -54,7 +54,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     // Mark as read if not already read
     if (!notification.is_read) {
       try {
-        const { notificationService } = await import('../../services/notificationService');
+        const { notificationService } = await import('../../services/notifications');
         await notificationService.markAsRead(notification.id);
         loadNotifications(); // Refresh notifications to update read status
       } catch (error) {
@@ -63,7 +63,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     }
 
     // Navigate based on notification type
-    const { notificationService } = await import('../../services/notificationService');
+    const { notificationService } = await import('../../services/notifications');
     await notificationService.navigateFromNotification(
       notification,
       navigation,
@@ -91,7 +91,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       }));
 
       // Use the notification service for navigation
-      const { notificationService } = await import('../../services/notificationService');
+      const { notificationService } = await import('../../services/notifications');
       await notificationService.navigateFromNotification(
         notification,
         navigation,

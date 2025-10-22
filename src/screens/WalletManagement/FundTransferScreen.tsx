@@ -10,10 +10,10 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { useApp } from '../../context/AppContext';
-import { walletService } from '../../services/WalletService';
+import { walletService } from '../../services/wallet';
 import { colors, spacing, typography } from '../../theme';
-import { logger } from '../../services/loggingService';
-import { Container, Header } from '../../components/shared';
+import { logger } from '../../services/core';
+import { Container } from '../../components/shared';
 
 interface FundTransferScreenProps {
   navigation: any;
@@ -132,10 +132,9 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
 
   return (
     <Container>
-      <Header
-        title="Transfer Funds"
-        variant="titleOnly"
-      />
+      <View style={styles.header}>
+        <Text style={styles.title}>Transfer Funds</Text>
+      </View>
 
       <ScrollView style={styles.scrollView}>
         {/* App Wallet Info */}
@@ -255,7 +254,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textLight,
   },
-
+  header: {
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.darkBorder,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.textLight,
+  },
   scrollView: {
     flex: 1,
   },

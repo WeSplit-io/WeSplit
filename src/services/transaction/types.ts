@@ -4,7 +4,7 @@
  */
 
 import { TransactionResult as UnifiedTransactionResult } from '../../types/unified';
-import { TransactionType } from '../../config/feeConfig';
+import { TransactionType } from '../../config/constants/feeConfig';
 
 export interface TransactionParams {
   to: string;

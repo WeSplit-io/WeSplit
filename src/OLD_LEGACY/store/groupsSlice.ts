@@ -6,8 +6,8 @@
 import { StateCreator } from 'zustand';
 import { GroupWithDetails } from '../../types';
 import { GroupsState, GroupsActions, AppStore } from '../types';
-import { firebaseDataService } from '../../services/firebaseDataService';
-import { logger } from '../../services/loggingService';
+import { firebaseDataService } from '../../services/data';
+import { logger } from '../../services/core';
 
 export const createGroupsSlice: StateCreator<
   AppStore,

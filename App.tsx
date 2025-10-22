@@ -1,4 +1,3 @@
-import 'react-native-get-random-values';
 import React, { useState, useEffect } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,17 +6,16 @@ import { AppProvider } from './src/context/AppContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import NavigationWrapper from './src/components/NavigationWrapper';
 import ErrorBoundary from './src/components/ErrorBoundary';
-import { logger } from './src/services/loggingService';
+import { logger } from './src/services/core/loggingService';
 import { View, StatusBar } from 'react-native';
 import { colors } from './src/theme';
 
 // Import Firebase configuration
-import './src/config/firebase';
-import { checkFirebaseConfiguration } from './src/utils/firebaseCheck';
+import './src/config/firebase/firebase';
 
 // Import all new screens
 import DashboardScreen from './src/screens/Dashboard/DashboardScreen';
-import ProfileScreen from './src/screens/Profile/ProfileScreen';
+import ProfileScreen from './src/screens/settings/Profile/ProfileScreen';
 import SplashScreen from './src/screens/Splash/SplashScreen';
 import GetStartedScreen from './src/screens/GetStarted/GetStartedScreen';
 import AuthMethodsScreen from './src/screens/AuthMethods/AuthMethodsScreen';
@@ -28,21 +26,21 @@ import OnboardingScreen from './src/screens/Onboarding/OnboardingScreen';
 import DepositScreen from './src/screens/Deposit/DepositScreen';
 import CryptoTransferScreen from './src/screens/Deposit/CryptoTransferScreen';
 import MoonPayWebViewScreen from './src/screens/Deposit/MoonPayWebViewScreen';
-import AccountSettingsScreen from './src/screens/AccountSettings/AccountSettingsScreen';
-import PremiumScreen from './src/screens/Premium/PremiumScreen';
+import AccountSettingsScreen from './src/screens/settings/AccountSettings/AccountSettingsScreen';
+import PremiumScreen from './src/screens/settings/Premium/PremiumScreen';
 import NotificationsScreen from './src/screens/Notifications/NotificationsScreen';
-import LanguageScreen from './src/screens/Language/LanguageScreen';
+import LanguageScreen from './src/screens/settings/Language/LanguageScreen';
 import SendScreen from './src/screens/Send/SendScreen';
 import SendAmountScreen from './src/screens/Send/SendAmountScreen';
 import SendConfirmationScreen from './src/screens/Send/SendConfirmationScreen';
 import SendSuccessScreen from './src/screens/Send/SendSuccessScreen';
-import LinkedCardsScreen from './src/screens/LinkedCards/LinkedCardsScreen';
+import LinkedCardsScreen from './src/screens/settings/LinkedCards/LinkedCardsScreen';
 import RequestContactsScreen from './src/screens/Request/RequestContactsScreen';
 import RequestAmountScreen from './src/screens/Request/RequestAmountScreen';
 import RequestConfirmationScreen from './src/screens/Request/RequestConfirmationScreen';
 import RequestSuccessScreen from './src/screens/Request/RequestSuccessScreen';
-import BillCameraScreen from './src/screens/BillCamera/BillCameraScreen';
-import BillProcessingScreen from './src/screens/BillProcessing/BillProcessingScreen';
+import BillCameraScreen from './src/screens/billing/BillCamera/BillCameraScreen';
+import BillProcessingScreen from './src/screens/billing/BillProcessing/BillProcessingScreen';
 import SplitDetailsScreen from './src/screens/SplitDetails/SplitDetailsScreen';
 import SplitsListScreen from './src/screens/SplitsList/SplitsListScreen';
 import FairSplitScreen from './src/screens/FairSplit/FairSplitScreen';
@@ -62,9 +60,9 @@ import SeedPhraseVerifyScreen from './src/screens/WalletManagement/SeedPhraseVer
 import { ContactsScreen } from './src/screens/Contacts';
 import ContactActionScreen from './src/screens/ContactAction/ContactActionScreen';
 import TransactionHistoryScreen from './src/screens/TransactionHistory/TransactionHistoryScreen';
-import ExternalWalletConnectionScreen from './src/screens/ExternalWalletConnection';
+import ExternalWalletConnectionScreen from './src/screens/ExternalWalletConnection/ExternalWalletConnectionScreen';
 import ManualSignatureInputScreen from './src/screens/ExternalWalletConnection/ManualSignatureInputScreen';
-import ManualBillCreationScreen from './src/screens/ManualBillCreation/ManualBillCreationScreen';
+import ManualBillCreationScreen from './src/screens/billing/ManualBillCreation/ManualBillCreationScreen';
 // import AuthDebugScreen from './src/screens/Debug/AuthDebugScreen';
 
 

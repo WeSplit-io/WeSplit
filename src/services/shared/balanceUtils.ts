@@ -5,7 +5,7 @@
 
 // Lazy imports to reduce memory usage
 import { optimizedTransactionUtils } from './transactionUtilsOptimized';
-import { logger } from '../loggingService';
+import { logger } from '../core';
 
 export interface BalanceInfo {
   solBalance: number;

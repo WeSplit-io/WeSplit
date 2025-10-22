@@ -7,17 +7,17 @@ import GroupIcon from '../../components/GroupIcon';
 import { useApp } from '../../context/AppContext';
 import { useGroupData } from '../../hooks/useGroupData';
 import { useWallet } from '../../context/WalletContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
+import { firebaseDataService } from '../../services/data';
 import { GroupWithDetails, Expense, GroupMember, Balance, Transaction } from '../../types';
 import { calculateGroupBalances, CalculatedBalance } from '../../utils/balanceCalculator';
 import { getOptimizedSettlementTransactions, getUserSettlementTransactions, getUserTotalOwed, getUserTotalOwedTo } from '../../utils/settlementOptimizer';
 import SettleUpModal from '../SettleUp/SettleUpModal';
-import TransactionModal from '../../components/TransactionModal';
+import TransactionModal from '../../components/transactions';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
-import { DEFAULT_AVATAR_URL } from '../../config/constants';
-import { logger } from '../../services/loggingService';
+import { DEFAULT_AVATAR_URL } from '../../../config/constants/constants';
+import { logger } from '../../services/core';
 
 const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
   // Validate and extract groupId from route params

@@ -14,8 +14,8 @@ import {
   where,
   getDocs
 } from 'firebase/firestore';
-import { db } from '../../config/firebase';
-import { logger } from '../loggingService';
+import { db } from '../../config/firebase/firebase';
+import { logger } from '../core';
 import { PaymentRequest, PaymentRequestResult } from './types';
 
 export class PaymentRequestManager {

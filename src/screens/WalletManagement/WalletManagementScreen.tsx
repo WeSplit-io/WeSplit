@@ -22,16 +22,16 @@ import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
-import { walletService, UserWalletBalance } from '../../services/WalletService';
-import { MultiSignStateService } from '../../services/multiSignStateService';
+import { firebaseDataService } from '../../services/data';
+import { walletService, UserWalletBalance } from '../../services/wallet';
+import { multiSignStateService } from '../../services/core';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
 import { QRCodeScreen } from '../QRCode';
-import { createUsdcRequestUri } from '@features/qr';
-import { logger } from '../../services/loggingService';
-import { Container, Header } from '../../components/shared';
+import { createUsdcRequestUri } from '../../services/core/solanaPay';
+import { logger } from '../../services/core';
+import { Container } from '../../components/shared';
 
 const WalletManagementScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -69,11 +69,11 @@ const WalletManagementScreen: React.FC = () => {
   useEffect(() => {
     const loadMultiSignState = async () => {
       try {
-        const isEnabled = await MultiSignStateService.loadMultiSignState();
+        const isEnabled = await multiSignStateService.loadMultiSignState();
         setMultiSignEnabled(isEnabled);
 
         if (isEnabled) {
-          const remainingDays = await MultiSignStateService.getRemainingDays();
+          const remainingDays = await multiSignStateService.getRemainingDays();
           setMultiSignRemainingDays(remainingDays);
         }
       } catch (error) {
@@ -361,11 +361,11 @@ const WalletManagementScreen: React.FC = () => {
         await loadMultiSigData();
 
         // Refresh multi-sign state
-        const isEnabled = await MultiSignStateService.loadMultiSignState();
+        const isEnabled = await multiSignStateService.loadMultiSignState();
         setMultiSignEnabled(isEnabled);
 
         if (isEnabled) {
-          const remainingDays = await MultiSignStateService.getRemainingDays();
+          const remainingDays = await multiSignStateService.getRemainingDays();
           setMultiSignRemainingDays(remainingDays);
         }
 
@@ -391,7 +391,7 @@ const WalletManagementScreen: React.FC = () => {
       setShowMultiSignExplanation(true);
     } else {
       try {
-        await MultiSignStateService.saveMultiSignState(false);
+        await multiSignStateService.saveMultiSignState(false);
         setMultiSignEnabled(false);
         setMultiSignRemainingDays(0);
       } catch (error) {
@@ -697,10 +697,16 @@ const WalletManagementScreen: React.FC = () => {
     <Container>
 
       {/* Header */}
-      <Header
-        title="Wallet"
-        onBackPress={handleBack}
-      />
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBack} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+          <Image
+            source={require('../../../assets/chevron-left.png')}
+            style={{ width: 20, height: 20, tintColor: colors.white }}
+          />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Wallet</Text>
+        <View style={styles.placeholder} />
+      </View>
 
       <ScrollView
         style={styles.content}
@@ -872,7 +878,7 @@ const WalletManagementScreen: React.FC = () => {
               </View>
 
               <View style={styles.modalFooter}>
-                <AppleSlider />
+                {appleSlider()}
               </View>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -903,7 +909,7 @@ const WalletManagementScreen: React.FC = () => {
                   onPress={async () => {
                     try {
                       // Save multi-sign state
-                      await MultiSignStateService.saveMultiSignState(true);
+                      await multiSignStateService.saveMultiSignState(true);
                       setShowMultiSignActivated(false);
                       // Refresh the multi-sign state
                       handleRefresh();

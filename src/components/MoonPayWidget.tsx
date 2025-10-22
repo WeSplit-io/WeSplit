@@ -4,10 +4,10 @@ import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-g
 import { Animated } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { useWallet } from '../context/WalletContext';
-import { firebaseMoonPayService } from '../services/firebaseMoonPayService';
+import { firebaseMoonPayService } from '../services/external';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 
 interface MoonPayWidgetProps {
   isVisible: boolean;

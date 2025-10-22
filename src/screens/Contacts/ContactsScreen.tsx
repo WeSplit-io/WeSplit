@@ -4,16 +4,16 @@ import { Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import NavBar from '../../components/NavBar';
 import ContactsList from '../../components/ContactsList';
-import { QrCodeView } from '@features/qr';
+import QrCodeView, { QrCodeViewProps } from '../../services/core/QrCodeView';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { useContactActions } from '../../hooks';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
-import { logger } from '../../services/loggingService';
-import { createUsdcRequestUri } from '@features/qr';
-import { Container, Header } from '../../components/shared';
+import { logger } from '../../services/core';
+import { createUsdcRequestUri } from '../../services/core/solanaPay';
+import { Container } from '../../components/shared';
 
 interface ContactsScreenProps {
   navigation: any;
@@ -126,11 +126,20 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
   return (
     <Container>
       {/* Header */}
-      <Header
-        title={getHeaderTitle()}
-        onBackPress={() => navigation.goBack()}
-        showBackButton={isSplitMode || isRequestMode}
-      />
+      <View style={styles.header}>
+        {(isSplitMode || isRequestMode) ? (
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Image
+              source={require('../../../assets/chevron-left.png')}
+              style={styles.backIcon}
+            />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.placeholder} />
+        )}
+        <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
+        <View style={styles.placeholder} />
+      </View>
 
       {/* Request Mode Tabs */}
       {isRequestMode && (

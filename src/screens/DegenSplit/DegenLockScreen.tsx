@@ -20,9 +20,9 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenLockStyles';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/loggingService';
-import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splitRealtimeService';
-import { FallbackDataService } from '../../utils/fallbackDataService';
+import { logger } from '../../services/core';
+import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';
+import { FallbackDataService } from '../../services/data';
 
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitInitialization, useDegenSplitRealtime } from './hooks';

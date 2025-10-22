@@ -4,7 +4,7 @@
  */
 
 import { useCallback } from 'react';
-import { Participant } from '../../../services/amountCalculationService';
+import { Participant } from '../../../services/core';
 import { FairSplitState } from './useFairSplitState';
 
 export interface FairSplitLogic {

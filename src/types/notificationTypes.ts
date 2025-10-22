@@ -16,6 +16,11 @@ export interface BaseNotificationData {
   read_at?: string;
 }
 
+export interface NotificationData extends BaseNotificationData {
+  read: boolean;
+  user_id: string;
+}
+
 export type NotificationType = 
   | 'general'
   | 'payment_received'

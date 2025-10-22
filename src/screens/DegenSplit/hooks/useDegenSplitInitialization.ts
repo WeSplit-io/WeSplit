@@ -6,7 +6,7 @@
 import { useEffect, useCallback } from 'react';
 import { DegenSplitState } from './useDegenSplitState';
 import { DegenSplitLogic } from './useDegenSplitLogic';
-import { logger } from '../../../services/loggingService';
+import { logger } from '../../../services/core';
 
 export interface DegenSplitInitialization {
   // Initialization functions
@@ -98,7 +98,7 @@ export const useDegenSplitInitialization = (
       const participantsWithLatestData = await Promise.all(
         participants.map(async (participant: any) => {
           try {
-            const { firebaseDataService } = await import('../../../services/firebaseDataService');
+            const { firebaseDataService } = await import('../../../services/data');
             const latestUserData = await firebaseDataService.user.getCurrentUser(participant.userId || participant.id);
             
             return {
@@ -172,7 +172,7 @@ export const useDegenSplitInitialization = (
 
     const interval = setInterval(async () => {
       try {
-        const { SplitWalletService } = await import('../../../services/split');
+        const { SplitWalletService } = await import('../../../services/splits');
         const searchResult = await SplitWalletService.getSplitWalletByBillId(splitData.id);
         
         if (searchResult.success && searchResult.wallet) {

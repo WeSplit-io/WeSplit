@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
-import { TransactionBasedContactService } from '../services/transactionBasedContactService';
+import { transactionBasedContactService } from '../services/contacts';
 import { UserContact } from '../types';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 
 interface UseContactsResult {
   contacts: UserContact[];

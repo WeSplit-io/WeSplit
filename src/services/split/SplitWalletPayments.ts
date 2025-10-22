@@ -5,12 +5,12 @@
  */
 
 import { Platform } from 'react-native';
-import { consolidatedTransactionService } from '../consolidatedTransactionService';
-import { logger } from '../loggingService';
-import { FeeService } from '../../config/feeConfig';
-import { roundUsdcAmount } from '../../utils/currencyUtils';
+import { consolidatedTransactionService } from '../transaction';
+import { logger } from '../core';
+import { FeeService } from '../../config/constants/feeConfig';
+import { roundUsdcAmount } from '../../utils/format';
 import { doc, updateDoc, collection, getDoc, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { db } from '../../config/firebase/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult, PaymentResult } from './types';
 import { KeypairUtils } from '../shared/keypairUtils';
 import { ValidationUtils } from '../shared/validationUtils';
@@ -124,7 +124,7 @@ async function executeFairSplitTransaction(
     } catch (error) {
         // Create associated token account if it doesn't exist
         // Use company wallet as payer since it's the fee payer
-        const { COMPANY_WALLET_CONFIG } = await import('../../config/feeConfig');
+        const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
         const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
         
         transaction.add(
@@ -168,7 +168,7 @@ async function executeFairSplitTransaction(
     transaction.recentBlockhash = blockhash;
     
     // Use company wallet as fee payer
-    const { COMPANY_WALLET_CONFIG } = await import('../../config/feeConfig');
+    const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
     const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
     const companyWalletSecretKey = COMPANY_WALLET_CONFIG.secretKey;
     
@@ -357,7 +357,7 @@ async function executeDegenSplitTransaction(
     } catch (error) {
         // Create associated token account if it doesn't exist
         // Use company wallet as payer since it's the fee payer
-        const { COMPANY_WALLET_CONFIG } = await import('../../config/feeConfig');
+        const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
         const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
         
         transaction.add(
@@ -401,7 +401,7 @@ async function executeDegenSplitTransaction(
     transaction.recentBlockhash = blockhash;
     
     // Use company wallet as fee payer
-    const { COMPANY_WALLET_CONFIG } = await import('../../config/feeConfig');
+    const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
     const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
     const companyWalletSecretKey = COMPANY_WALLET_CONFIG.secretKey;
     
@@ -648,7 +648,7 @@ export class SplitWalletPayments {
       }
 
       // Get user wallet
-          const { walletService } = await import('../WalletService');
+          const { walletService } = await import('../wallet');
           const userWallet = await walletService.getUserWallet(participantId);
       if (!userWallet) {
             logger.error('User wallet not found for degen split funding', {
@@ -858,7 +858,7 @@ export class SplitWalletPayments {
       }
 
       // Get user wallet
-      const { walletService } = await import('../WalletService');
+      const { walletService } = await import('../wallet');
       const userWallet = await walletService.getUserWallet(participantId);
       if (!userWallet || !userWallet.secretKey) {
         return {
@@ -1273,7 +1273,7 @@ export class SplitWalletPayments {
       }
 
       // Get user wallet
-        const { walletService } = await import('../WalletService');
+        const { walletService } = await import('../wallet');
         const userWallet = await walletService.getUserWallet(loserUserId);
         if (!userWallet) {
           return {
@@ -1504,7 +1504,7 @@ export class SplitWalletPayments {
       const wallet = walletResult.wallet;
 
       // Get user wallet
-      const { walletService } = await import('../WalletService');
+      const { walletService } = await import('../wallet');
       const userWallet = await walletService.getUserWallet(userId);
       if (!userWallet) {
         return {

@@ -7,10 +7,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { walletService, WalletInfo as ConsolidatedWalletInfo } from '../services/WalletService';
-import { consolidatedTransactionService } from '../services/consolidatedTransactionService';
-import { solanaWalletService } from '../wallet/solanaWallet';
-import { logger } from '../services/loggingService';
+import { walletService, WalletInfo as ConsolidatedWalletInfo } from '../services/wallet';
+import { consolidatedTransactionService } from '../services/transaction';
+import { solanaWalletService } from '../services/wallet/solanaWallet.deprecated';
+import { logger } from '../services/core';
 
 // WalletInfo interface for backward compatibility
 interface WalletInfo {
@@ -177,7 +177,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [balancePollingInterval, setBalancePollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (__DEV__) { logger.info('WalletProvider mounted successfully', null, 'WalletContext'); }
+    // WalletProvider mounted
   }, [address, isConnected, chainId, balance, walletName, currentWalletId]);
 
   // Load stored wallets from AsyncStorage
@@ -523,8 +523,12 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   // App wallet methods
   const ensureAppWallet = async (userId: string) => {
     try {
+      console.log('🔍 WalletProvider: Starting ensureAppWallet...');
       // Import userWalletService to ensure app wallet
-      const { walletService } = await import('../services/WalletService');
+      const { walletService } = await import('../services/wallet');
+      console.log('🔍 WalletProvider: walletService imported:', !!walletService);
+      console.log('🔍 WalletProvider: walletService.ensureUserWallet method:', typeof walletService?.ensureUserWallet);
+      
       const walletResult = await walletService.ensureUserWallet(userId);
       
       if (walletResult.success && walletResult.wallet) {
@@ -543,7 +547,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const getAppWalletBalance = async (userId: string): Promise<number> => {
     try {
       // Import userWalletService to get app wallet balance
-      const { walletService } = await import('../services/WalletService');
+      const { walletService } = await import('../services/wallet');
       const balance = await walletService.getUserWalletBalance(userId);
       
       const totalUSD = balance?.totalUSD || 0;
@@ -559,7 +563,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const exportAppWallet = async (userId: string) => {
     try {
       // Import userWalletService to export app wallet
-      const { walletService } = await import('../services/WalletService');
+      const { walletService } = await import('../services/wallet');
       const result = await walletService.exportWallet(userId);
       
       if (result.success) {
@@ -585,7 +589,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const getAppWalletInfo = async (userId: string) => {
     try {
       // Import userWalletService to get app wallet info
-      const { walletService } = await import('../services/WalletService');
+      const { walletService } = await import('../services/wallet');
       const result = await walletService.getWalletInfoForUser(userId);
       
       if (result.success && result.walletAddress) {
@@ -614,7 +618,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const fixAppWalletMismatch = async (userId: string) => {
     try {
       // Import userWalletService to fix wallet mismatch
-      const { walletService } = await import('../services/WalletService');
+      const { walletService } = await import('../services/wallet');
       const result = await walletService.fixWalletMismatch(userId);
       
       if (result.success && result.wallet) {
@@ -658,7 +662,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
         // Refresh app wallet balance
         if (appWalletConnected) {
-          const { walletService } = await import('../services/WalletService');
+          const { walletService } = await import('../services/wallet');
           const balance = await walletService.getUserWalletBalance(userId);
           
           if (balance) {
@@ -699,7 +703,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     if (enabled) {
       logger.info('Auto-refresh enabled', null, 'WalletContext');
     } else {
-      logger.info('Auto-refresh disabled', null, 'WalletContext');
+      // Auto-refresh disabled
       stopBalancePolling();
     }
   }, [stopBalancePolling]);
@@ -939,7 +943,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   useEffect(() => {
     // Disabled automatic polling to prevent rate limiting and infinite loops
     // Users can manually refresh balances when needed
-    logger.info('Auto-refresh disabled to prevent rate limiting', null, 'WalletContext');
+    // Auto-refresh disabled to prevent rate limiting
     
     return () => {
       // Cleanup polling on unmount

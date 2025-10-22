@@ -521,6 +521,15 @@ export const styles = StyleSheet.create({
     color: colors.white70,
     fontSize: 12,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.darkGray,
+  },
   
   
 }); 

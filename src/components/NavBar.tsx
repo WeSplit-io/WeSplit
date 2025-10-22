@@ -5,9 +5,8 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { colors } from '../theme';
 import NavIcon from './NavIcon';
 import { styles } from './NavBar.styles';
-import platformUtils from '../utils/platformUtils';
-import { logger } from '../services/loggingService';
-
+import platformUtils from '../utils/core/platformUtils';
+import { logger } from '../services/core';
 
 const isImagePath = (icon: string) => {
   return icon.startsWith('../') || icon.startsWith('./') || icon.includes('.png') || icon.includes('.jpg');

@@ -2,7 +2,7 @@
  * Tests for Account Deletion Service
  */
 
-import AccountDeletionService from '../accountDeletionService';
+import AccountDeletionService from '../core';
 
 // Mock Firebase
 jest.mock('firebase/firestore', () => ({
@@ -18,7 +18,7 @@ jest.mock('firebase/firestore', () => ({
 }));
 
 // Mock logger
-jest.mock('../loggingService', () => ({
+jest.mock('../core', () => ({
   logger: {
     info: jest.fn(),
     error: jest.fn(),

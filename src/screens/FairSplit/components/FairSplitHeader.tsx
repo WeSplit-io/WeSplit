@@ -4,12 +4,11 @@
  */
 
 import React from 'react';
-import { View, Text, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '@theme/colors';
-import { spacing } from '@theme/spacing';
-import { typography } from '@theme/typography';
-import { Header } from '../../../components/shared';
+import { colors } from '../../../theme/colors';
+import { spacing } from '../../../theme/spacing';
+import { typography } from '../../../theme/typography';
 import { styles } from '../styles';
 
 // Local image mapping for category icons
@@ -38,25 +37,32 @@ const FairSplitHeader: React.FC<FairSplitHeaderProps> = ({
   onBackPress,
   isRealtimeActive = false
 }) => {
-  const renderRealtimeIndicator = () => {
-    if (!isRealtimeActive) return null;
-    
-    return (
-      <View style={styles.realtimeIndicator}>
-        <View style={styles.realtimeDot} />
-        <Text style={styles.realtimeText}>Live</Text>
-      </View>
-    );
-  };
-
   return (
     <>
       {/* Navigation Header */}
-      <Header
-        title="Fair Split"
-        onBackPress={onBackPress}
-        rightElement={renderRealtimeIndicator()}
-      />
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={onBackPress}
+        >
+          <Image 
+            source={require('../../../../assets/chevron-left.png')} 
+            style={styles.backButtonIcon}
+          />
+        </TouchableOpacity>
+        
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Fair Split</Text>
+          {isRealtimeActive && (
+            <View style={styles.realtimeIndicator}>
+              <View style={styles.realtimeDot} />
+              <Text style={styles.realtimeText}>Live</Text>
+            </View>
+          )}
+        </View>
+        
+        <View style={{ width: 40 }} />
+      </View>
 
       {/* Bill Summary Card */}
       <LinearGradient

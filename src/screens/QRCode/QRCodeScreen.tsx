@@ -10,14 +10,15 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { QrCodeView } from '@features/qr';
+import QrCodeView from '../../services/core/QrCodeView';  
 import Icon from '../../components/Icon';
 import { styles } from './QRCodeScreen.styles';
 import { colors } from '../../theme';
-import { parseUri, isSolanaPayUri, extractRecipientAddress, isValidSolanaAddress, createUsdcRequestUri } from '@features/qr';
-import { parseWeSplitDeepLink } from '../../services/deepLinkHandler';
-import { logger } from '../../services/loggingService';
-import { Container, Header } from '../../components/shared';
+import { parseUri, isSolanaPayUri, extractRecipientAddress, createUsdcRequestUri } from '../../services/core/solanaPay';
+import { isValidSolanaAddress } from '../../utils/validation';
+import { parseWeSplitDeepLink } from '../../services/core/deepLinkHandler';
+import { logger } from '../../services/core';
+import { Container } from '../../components/shared';
 
 // Fonction pour hacher l'adresse du wallet
 const hashWalletAddress = (address: string): string => {
@@ -257,12 +258,24 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
   };
 
   const renderHeader = () => (
-    <Header
-      title={activeTab === 'myCode' ? 'QR Code' : 'Scan QR Code'}
-      onBackPress={() => {
-        onBack();
-      }}
-    />
+    <View style={styles.header}>
+      <TouchableOpacity 
+        style={styles.backButton} 
+        onPress={() => {
+          onBack();
+        }}
+        activeOpacity={0.7}
+      >
+        <Image
+          source={require('../../../assets/chevron-left.png')}
+          style={styles.backIcon}
+        />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>
+        {activeTab === 'myCode' ? 'QR Code' : 'Scan QR Code'}
+      </Text>
+      <View style={styles.menuButton} />
+    </View>
   );
 
   const renderMyCodeTab = () => (

@@ -9,13 +9,13 @@ import GroupIcon from '../../components/GroupIcon';
 import { useApp } from '../../context/AppContext';
 import { useGroupList, useExpenseOperations } from '../../hooks/useGroupData';
 import { GroupWithDetails, GroupMember } from '../../types';
-import { SOLANA_CRYPTOCURRENCIES, Cryptocurrency } from '../../utils/cryptoUtils';
+import { SOLANA_CRYPTOCURRENCIES, Cryptocurrency } from '../../utils/wallet';
 import { convertToUSDC } from '../../services/priceService';
-import { firebaseDataService } from '../../services/firebaseDataService';
+import { firebaseDataService } from '../../services/data';
 import { styles } from './styles';
 import { colors } from '../../theme/colors';
-import { DEFAULT_AVATAR_URL } from '../../config/constants';
-import { logger } from '../../services/loggingService';
+import { DEFAULT_AVATAR_URL } from '../../../config/constants/constants';
+import { logger } from '../../services/core';
 
 // Updated categories with more vibrant colors matching the screenshots
 const categories = [
@@ -358,7 +358,7 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
           });
           
           // Import notification service and validation utilities
-          const { notificationService } = await import('../../services/notificationService');
+          const { notificationService } = await import('../../services/notifications');
           const { createExpenseAddedNotificationData } = await import('../../utils/notificationValidation');
           
           // Create standardized notification data

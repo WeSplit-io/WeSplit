@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { Linking, View } from 'react-native';
-import { setupDeepLinkListeners } from '../services/deepLinkHandler';
+import { logger } from '../services/core';
+import { deepLinkHandler } from '../services/core/deepLinkHandler';
+import { navigationService } from '../services/core/navigationService';
 import { useApp } from '../context/AppContext';
-import { logger } from '../services/loggingService';
 import { colors } from '../theme';
-import { navigationService } from '../services/navigationService';
 
 interface NavigationWrapperProps {
   children: React.ReactNode;
@@ -34,7 +34,7 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
       logger.info('Setting up deep link listeners for user', { userId: currentUser.id }, 'NavigationWrapper');
       
       // Set up deep link listeners when navigation and user are available
-      const subscription = setupDeepLinkListeners(navigationRef.current, currentUser);
+      const subscription = deepLinkHandler.setupDeepLinkListeners(navigationRef.current, currentUser);
       
       // Mark as set up to prevent multiple calls
       deepLinkSetupRef.current = true;
@@ -56,7 +56,9 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
       try {
         const initialURL = await Linking.getInitialURL();
         if (initialURL) {
-          logger.info('App opened with URL', { initialURL }, 'NavigationWrapper');
+          if (__DEV__) {
+            logger.info('App opened with URL', { initialURL }, 'NavigationWrapper');
+          }
           // The deep link handler will process this URL
         }
       } catch (error) {
@@ -73,8 +75,18 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
       onReady={() => {
         setIsNavigationReady(true);
         // Set the navigation reference in the navigation service
-        navigationService.setNavigationRef(navigationRef.current);
-        logger.debug('Navigation container is ready', null, 'NavigationWrapper');
+        try {
+          if (navigationService && navigationService.instance) {
+            navigationService.instance.setNavigationRef(navigationRef.current);
+          } else {
+            logger.warn('Navigation service not available', null, 'NavigationWrapper');
+          }
+        } catch (error) {
+          logger.error('Failed to set navigation reference', { error }, 'NavigationWrapper');
+        }
+        if (__DEV__) {
+          logger.debug('Navigation container is ready', null, 'NavigationWrapper');
+        }
       }}
       theme={{
         dark: true,
@@ -85,6 +97,24 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
           text: colors.textLight,
           border: colors.border,
           notification: colors.green,
+        },
+        fonts: {
+          regular: {
+            fontFamily: 'System',
+            fontWeight: '400',
+          },
+          medium: {
+            fontFamily: 'System',
+            fontWeight: '500',
+          },
+          bold: {
+            fontFamily: 'System',
+            fontWeight: '700',
+          },
+          heavy: {
+            fontFamily: 'System',
+            fontWeight: '900',
+          },
         },
       }}
     >

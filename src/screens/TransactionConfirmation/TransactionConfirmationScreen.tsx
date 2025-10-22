@@ -11,10 +11,10 @@ import Icon from '../../components/Icon';
 import UserAvatar from '../../components/UserAvatar';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import { formatCryptoAmount } from '../../utils/cryptoUtils';
+import { formatCryptoAmount } from '../../utils/wallet';
 import styles from './styles';
-import { logger } from '../../services/loggingService';
-import { Container, Header } from '../../components/shared';
+import { logger } from '../../services/core';
+import { Container } from '../../components/shared';
 
 interface TransactionParams {
   type: 'payment' | 'settlement';
@@ -58,7 +58,7 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
       }
 
       // Check actual balance using existing wallet service
-      const { consolidatedTransactionService } = await import('../../services/consolidatedTransactionService');
+      const { consolidatedTransactionService } = await import('../../services/transaction');
       const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
       if (balance.usdc < amount) {
         throw new Error(`Insufficient balance. Required: ${amount} USDC, Available: ${balance.usdc} USDC`);
@@ -93,10 +93,15 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
 
   const renderConfirmStep = () => (
     <Container>
-      <Header
-        title={params.type === 'payment' ? 'Send Payment' : 'Settle Balance'}
-        onBackPress={() => navigation.goBack()}
-      />
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Icon name="arrow-left" size={24} color="#FFF" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>
+          {params.type === 'payment' ? 'Send Payment' : 'Settle Balance'}
+        </Text>
+        <View style={styles.placeholder} />
+      </View>
 
       <View style={styles.content}>
         {/* Recipient Info */}

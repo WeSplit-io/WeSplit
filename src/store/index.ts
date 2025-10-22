@@ -15,7 +15,7 @@ import { createSplitsSlice } from './slices/splitsSlice';
 import { createTransactionsSlice } from './slices/transactionsSlice';
 import { createBillProcessingSlice } from './slices/billProcessingSlice';
 import { createMultiSignSlice } from './slices/multiSignSlice';
-import { logger } from '../services/loggingService';
+import { logger } from '../services/core';
 
 // ============================================================================
 // INITIAL STATE

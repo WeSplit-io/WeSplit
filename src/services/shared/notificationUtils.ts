@@ -4,7 +4,7 @@
  * Used by both consolidatedTransactionService and internalTransferService
  */
 
-import { logger } from '../loggingService';
+import { logger } from '../core';
 
 export interface TransactionData {
   userId: string;
@@ -151,7 +151,7 @@ export class NotificationUtils {
       };
 
       // Send notification
-      const { notificationService } = await import('../notificationService');
+      const { notificationService } = await import('../notifications');
       await notificationService.sendNotification(
         notificationData.userId,
         notificationData.title,
@@ -208,7 +208,7 @@ export class NotificationUtils {
       };
 
       // Send notification
-      const { notificationService } = await import('../notificationService');
+      const { notificationService } = await import('../notifications');
       await notificationService.sendNotification(
         notificationData.userId,
         notificationData.title,

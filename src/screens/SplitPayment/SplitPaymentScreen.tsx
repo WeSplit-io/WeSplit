@@ -17,10 +17,10 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { SplitWalletService, SplitWallet, SplitWalletParticipant } from '../../services/split';
-import { priceManagementService } from '../../services/priceManagementService';
+import { priceManagementService } from '../../services/core';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/loggingService';
-import { Container, Header } from '../../components/shared';
+import { logger } from '../../services/core';
+import { Container } from '../../components/shared';
 
 interface RouteParams {
   splitWalletId: string;
@@ -413,10 +413,13 @@ const SplitPaymentScreen: React.FC = () => {
   return (
     <Container>
       {/* Header */}
-      <Header
-        title="Pay Your Share"
-        onBackPress={handleBack}
-      />
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Text style={styles.backButtonText}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Pay Your Share</Text>
+        <View style={styles.headerSpacer} />
+      </View>
 
       <View style={styles.content}>
         {/* Bill Info Card */}

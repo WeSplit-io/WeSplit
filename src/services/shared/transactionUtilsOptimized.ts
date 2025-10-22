@@ -35,10 +35,10 @@ async function loadModule(moduleName: string): Promise<any> {
         cachedModules[moduleName] = await import('../../config/unified');
         break;
       case 'transactionConfig':
-        cachedModules[moduleName] = await import('../../config/transactionConfig');
+        cachedModules[moduleName] = await import('../../config/constants/transactionConfig');
         break;
       case 'logger':
-        cachedModules[moduleName] = await import('../loggingService');
+        cachedModules[moduleName] = await import('../core');
         break;
       default:
         throw new Error(`Unknown module: ${moduleName}`);

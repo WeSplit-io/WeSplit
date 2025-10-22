@@ -6,11 +6,11 @@ import {
   NavigationParams,
   Notification
 } from '../types';
-import { firebaseDataService } from '../services/firebaseDataService';
-import { i18nService } from '../services/i18nService';
-import { notificationService } from '../services/notificationService';
-import { MultiSignStateService } from '../services/multiSignStateService';
-import { logger } from '../services/loggingService';
+import { firebaseDataService } from '../services/data';
+import { i18nService } from '../services/core';
+import { notificationService } from '../services/notifications';
+import { multiSignStateService } from '../services/core';
+import { logger } from '../services/core';
 
 // Initial State - clean without group-related data
 const initialState: AppState = {
@@ -142,7 +142,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const shouldRefresh = forceRefresh || (now - state.lastNotificationsFetch > 5 * 60 * 1000); // 5 minutes
 
       if (shouldRefresh) {
-        const notifications = await notificationService.getUserNotifications(state.currentUser.id.toString());
+        const notifications = await notificationService.instance.getUserNotifications(state.currentUser.id.toString());
         dispatch({
           type: 'SET_NOTIFICATIONS',
           payload: {

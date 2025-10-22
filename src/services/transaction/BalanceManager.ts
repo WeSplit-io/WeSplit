@@ -9,7 +9,7 @@ import { Connection } from '@solana/web3.js';
 import { USDC_CONFIG } from '../shared/walletConstants';
 import { getConfig } from '../../config/unified';
 import { balanceUtils } from '../shared/balanceUtils';
-import { logger } from '../loggingService';
+import { logger } from '../core';
 import { WalletBalance, UsdcBalanceResult, GasCheckResult } from './types';
 
 export class BalanceManager {
@@ -157,7 +157,7 @@ export class BalanceManager {
   private async getUserWalletAddress(userId: string): Promise<string | null> {
     try {
       // Import wallet service dynamically to avoid circular dependencies
-      const { walletService } = await import('../WalletService');
+      const { walletService } = await import('../wallet');
       const wallet = await walletService.getUserWallet(userId);
       return wallet?.address || null;
     } catch (error) {

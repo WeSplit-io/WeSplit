@@ -9,7 +9,8 @@ import {
   Image,
 } from 'react-native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
-import { QrCodeView, createUsdcRequestUri } from '@features/qr';
+import QrCodeView from '../services/core/QrCodeView';
+import { createUsdcRequestUri } from '../services/core/solanaPay';
 import Icon from './Icon';
 import { styles } from './QRCodeModal.styles';
 import { colors } from '../theme';

@@ -5,12 +5,12 @@
  */
 
 import { Platform } from 'react-native';
-import { consolidatedTransactionService } from '../consolidatedTransactionService';
-import { logger } from '../loggingService';
-import { FeeService } from '../../config/feeConfig';
-import { roundUsdcAmount } from '../../utils/currencyUtils';
+import { consolidatedTransactionService } from '../transaction';
+import { logger } from '../core';
+import { FeeService } from '../../config/constants/feeConfig';
+import { roundUsdcAmount } from '../../uti../format';
 import { doc, updateDoc, collection, getDoc, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../../config/firebase';
+import { db } from '../../../config/firebase/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult, PaymentResult } from './types';
 import { KeypairUtils } from '../shared/keypairUtils';
 import { ValidationUtils } from '../shared/validationUtils';
@@ -167,7 +167,7 @@ async function executeFairSplitTransaction(
     }, 'SplitWalletPayments');
 
     // CRITICAL: Company wallet ALWAYS pays SOL fees for ALL transactions
-    const { FeeService } = await import('../../config/feeConfig');
+    const { FeeService } = await import('../../config/constants/feeConfig');
     const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
     
     logger.info('Fee payer setup for split wallet transaction', {
@@ -184,7 +184,7 @@ async function executeFairSplitTransaction(
     // CRITICAL: Always load company wallet keypair since company wallet ALWAYS pays SOL fees
     if (true) { // Always true - company wallet always pays SOL fees
       try {
-        const { COMPANY_WALLET_CONFIG } = await import('../../config/feeConfig');
+        const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
         
         logger.info('Loading company wallet keypair for split wallet transaction', {
           hasSecretKey: !!COMPANY_WALLET_CONFIG.secretKey,
@@ -1819,7 +1819,7 @@ export class SplitWalletPayments {
       const wallet = walletResult.wallet;
       
       // Get actual on-chain balance
-      const { consolidatedTransactionService } = await import('../consolidatedTransactionService');
+      const { consolidatedTransactionService } = await import('../transaction');
       const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
       
       if (!balanceResult.success) {
@@ -2001,7 +2001,7 @@ export class SplitWalletPayments {
       if (!actualTransactionSignature) {
         try {
           // Get user's wallet for the transaction
-          const { walletService } = await import('../WalletService');
+          const { walletService } = await import('../wallet');
           const userWallet = await walletService.getUserWallet(participantId);
           if (!userWallet || !userWallet.secretKey) {
             return {
@@ -2134,7 +2134,7 @@ export class SplitWalletPayments {
             
             // Optional: Log balance for monitoring (non-blocking)
             try {
-              const { consolidatedTransactionService } = await import('../consolidatedTransactionService');
+              const { consolidatedTransactionService } = await import('../transaction');
               const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
               
               if (balanceResult.success) {
@@ -2239,7 +2239,7 @@ export class SplitWalletPayments {
 
       // Trigger balance refresh for the participant
       try {
-        const { walletService } = await import('../WalletService');
+        const { walletService } = await import('../wallet');
         if (walletService.clearBalanceCache) {
           walletService.clearBalanceCache(participantId);
         }
@@ -2344,7 +2344,7 @@ export class SplitWalletPayments {
       if (!actualTransactionSignature) {
         try {
           // Get user's wallet for the transaction
-          const { walletService } = await import('../WalletService');
+          const { walletService } = await import('../wallet');
           const userWallet = await walletService.getUserWallet(participantId);
           if (!userWallet || !userWallet.secretKey) {
             return {
@@ -2452,7 +2452,7 @@ export class SplitWalletPayments {
             
             // Verify the split wallet balance increased
             try {
-              const { consolidatedTransactionService } = await import('../consolidatedTransactionService');
+              const { consolidatedTransactionService } = await import('../transaction');
               const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
               
               if (balanceResult.success) {
@@ -2613,7 +2613,7 @@ export class SplitWalletPayments {
 
       // Trigger balance refresh for the participant
       try {
-        const { walletService } = await import('../WalletService');
+        const { walletService } = await import('../wallet');
         if (walletService.clearBalanceCache) {
           walletService.clearBalanceCache(participantId);
         }
@@ -2717,7 +2717,7 @@ export class SplitWalletPayments {
 
       // Trigger balance refresh for the creator
       try {
-        const { walletService } = await import('../WalletService');
+        const { walletService } = await import('../wallet');
         if (walletService.clearBalanceCache) {
           walletService.clearBalanceCache(wallet.creatorId);
         }
@@ -3346,7 +3346,7 @@ export class SplitWalletPayments {
 
       // Notify winner that payout is processing (non-blocking)
       try {
-        const { notificationService } = await import('../notificationService');
+        const { notificationService } = await import('../notifications');
         await notificationService.sendPaymentProcessingNotification(
           winnerUserId,
           splitWalletId,
@@ -3517,7 +3517,7 @@ export class SplitWalletPayments {
 
         // Send failure notification (non-blocking)
         try {
-          const { notificationService } = await import('../notificationService');
+          const { notificationService } = await import('../notifications');
           await notificationService.endPaymentProcessingNotification(
             winnerUserId,
             splitWalletId,
@@ -3581,7 +3581,7 @@ export class SplitWalletPayments {
 
         // Send success notification (non-blocking)
         try {
-          const { notificationService } = await import('../notificationService');
+          const { notificationService } = await import('../notifications');
           await notificationService.endPaymentProcessingNotification(
             winnerUserId,
             splitWalletId,
@@ -3673,7 +3673,7 @@ export class SplitWalletPayments {
       
       if (paymentMethod === 'kast-card') {
         // Handle KAST card payment
-        const { walletService } = await import('../WalletService');
+        const { walletService } = await import('../wallet');
         const { ExternalCardPaymentService } = await import('../ExternalCardPaymentService');
         
         // Get user's linked KAST cards
@@ -3722,7 +3722,7 @@ export class SplitWalletPayments {
         
       } else {
         // Handle in-app wallet payment (existing logic)
-        const { walletService } = await import('../WalletService');
+        const { walletService } = await import('../wallet');
         const userWallet = await walletService.getUserWallet(loserUserId);
         if (!userWallet) {
           return {
@@ -3862,7 +3862,7 @@ export class SplitWalletPayments {
 
       // Trigger balance refresh for the loser
       try {
-        const { walletService } = await import('../WalletService');
+        const { walletService } = await import('../wallet');
         if (walletService.clearBalanceCache) {
           walletService.clearBalanceCache(loserUserId);
         }
@@ -4019,7 +4019,7 @@ export class SplitWalletPayments {
       });
 
       // Get user's wallet for the transaction
-      const { walletService } = await import('../WalletService');
+      const { walletService } = await import('../wallet');
       const userWallet = await walletService.getUserWallet(participantId);
       if (!userWallet || !userWallet.secretKey) {
         return {
@@ -4409,7 +4409,7 @@ export class SplitWalletPayments {
   }
 
   private static async sendTransaction(params: any): Promise<{ success: boolean; error?: string; transactionSignature?: string }> {
-    const { consolidatedTransactionService } = await import('../consolidatedTransactionService');
+    const { consolidatedTransactionService } = await import('../transaction');
     const result = await consolidatedTransactionService.sendUSDCTransaction(params);
     return {
       success: result.success,

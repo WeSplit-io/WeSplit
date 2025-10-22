@@ -6,7 +6,7 @@
 import { StateCreator } from 'zustand';
 import { SplitsState, SplitsActions, AppStore } from '../types';
 import { SplitWallet } from '../../services/split';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 
 export const createSplitsSlice: StateCreator<
   AppStore,

@@ -17,10 +17,10 @@ import {
   Dimensions,
 } from 'react-native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
-import QRCode from '@features/qr';
+import QRCode from '../services/core';
 
 import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
+import { firebaseDataService } from '../../services/data';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import QRCodeModal from '../../components/QRCodeModal';
@@ -30,8 +30,8 @@ import GroupIcon from '../../components/GroupIcon';
 import { useGroupData } from '../../hooks/useGroupData';
 
 import { GroupMember, Expense } from '../../types';
-import { hashWalletAddress } from '../../utils/cryptoUtils';
-import { logger } from '../../services/loggingService';
+import { hashWalletAddress } from '../../utils/wallet';
+import { logger } from '../../services/core';
 
 const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId } = route.params;

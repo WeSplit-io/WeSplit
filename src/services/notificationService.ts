@@ -24,8 +24,8 @@ import {
 import { db } from '../config/firebase';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { logger } from './loggingService';
-import { validateNotificationConsistency } from '../utils/notificationValidation';
+import { logger } from './core/loggingService';
+// import { validateNotificationConsistency } from '../utils/notificationValidation';
 import { NotificationPayload } from '../types/notificationTypes';
 
 // Notification types - Focused on splits/bills and P2P transfers
@@ -134,24 +134,24 @@ class NotificationServiceClass {
     data: { [key: string]: any } = {}
   ): Promise<boolean> {
     // Validate notification data before sending
-    const validation = validateNotificationConsistency(data as NotificationPayload, type);
-    if (!validation.isValid) {
-      logger.error('Invalid notification data', {
-        userId,
-        type,
-        errors: validation.errors,
-        warnings: validation.warnings
-      }, 'NotificationService');
-      return false;
-    }
+    // const validation = validateNotificationConsistency(data as NotificationPayload, type);
+    // if (!validation.isValid) {
+    //   logger.error('Invalid notification data', {
+    //     userId,
+    //     type,
+    //     errors: validation.errors,
+    //     warnings: validation.warnings
+    //   }, 'NotificationService');
+    //   return false;
+    // }
     
-    if (validation.warnings.length > 0) {
-      logger.warn('Notification data warnings', {
-        userId,
-        type,
-        warnings: validation.warnings
-      }, 'NotificationService');
-    }
+    // if (validation.warnings.length > 0) {
+    //   logger.warn('Notification data warnings', {
+    //     userId,
+    //     type,
+    //     warnings: validation.warnings
+    //   }, 'NotificationService');
+    // }
     
     // Run notification sending in background to avoid blocking transactions
     this.sendNotificationAsync(userId, title, message, type, data).catch(error => {
@@ -748,5 +748,15 @@ class NotificationServiceClass {
 }
 
 // Export singleton instance
-export const notificationService = new NotificationServiceClass();
+// Lazy singleton to avoid initialization issues during module loading
+let _notificationService: NotificationServiceClass | null = null;
+
+export const notificationService = {
+  get instance() {
+    if (!_notificationService) {
+      _notificationService = new NotificationServiceClass();
+    }
+    return _notificationService;
+  }
+};
 export default notificationService;

@@ -4,10 +4,10 @@ import { Header } from '../../components/shared';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
-import { verifyCode, sendVerificationCode } from '../../services/firebaseFunctionsService';
+import { verifyCode, sendVerificationCode } from '../../services/data';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 const CODE_LENGTH = 4; // 4-digit code
@@ -99,7 +99,7 @@ const VerificationScreen: React.FC = () => {
         if (__DEV__) { logger.info('Firebase Functions returned empty data, fetching from Firestore', null, 'VerificationScreen'); }
         
         try {
-          const { firestoreService } = await import('../../config/firebase');
+          const { firestoreService } = await import('../../config/firebase/firebase');
           const existingUserData = await firestoreService.getUserDocument(transformedUser.id);
           
           if (existingUserData && existingUserData.name && existingUserData.wallet_address) {

@@ -4,7 +4,7 @@
  */
 
 import { PublicKey } from '@solana/web3.js';
-import { logger } from '../loggingService';
+import { logger } from '../core';
 
 // Import from unified types
 import { ValidationResult } from '../../types/unified';

@@ -1,6 +1,6 @@
 import { StyleSheet, Platform } from 'react-native';
 import { colors, spacing, typography } from '../theme';
-import platformUtils from '../utils/platformUtils';
+import platformUtils from '../utils/core/platformUtils';
 
 /**
  * =======================================================================

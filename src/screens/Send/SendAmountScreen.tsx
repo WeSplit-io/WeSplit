@@ -10,8 +10,8 @@ import { useWallet } from '../../context/WalletContext';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
-import { DEFAULT_AVATAR_URL } from '../../config/constants';
-import { logger } from '../../services/loggingService';
+import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
+import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
 
 const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {

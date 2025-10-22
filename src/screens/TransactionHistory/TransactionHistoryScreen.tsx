@@ -13,13 +13,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import { firebaseTransactionService } from '../../services/firebaseDataService';
-import { firebaseDataService } from '../../services/firebaseDataService';
+import { firebaseTransactionService } from '../../services/data';
+import { firebaseDataService } from '../../services/data';
 import { Transaction, Group } from '../../types';
-import TransactionModal from '../../components/TransactionModal';
+import { TransactionModal } from '../../components/transactions';
 import styles from './styles';
 import { colors } from '../../theme/colors';
-import { logger } from '../../services/loggingService';
+import { logger } from '../../services/core';
 
 import { Container, Header } from '../../components/shared';
 
@@ -159,7 +159,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
       // If no expenses_by_currency data but we have expense_count, fetch individual expenses
       if (totalAmount === 0 && expenseCount > 0) {
         try {
-          const { firebaseDataService } = await import('../../services/firebaseDataService');
+          const { firebaseDataService } = await import('../../services/data');
           const individualExpenses = await firebaseDataService.expense.getGroupExpenses(group.id.toString());
           
           if (individualExpenses.length > 0) {
@@ -341,7 +341,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
         // Get individual expenses for this group
         let individualExpenses: any[] = [];
         try {
-          const { firebaseDataService } = await import('../../services/firebaseDataService');
+          const { firebaseDataService } = await import('../../services/data');
           individualExpenses = await firebaseDataService.expense.getGroupExpenses(group.id.toString());
           
           // Add group info to each expense
@@ -370,7 +370,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
             } else {
               // Try to get user name from group members or contacts
               try {
-                const { firebaseDataService } = await import('../../services/firebaseDataService');
+                const { firebaseDataService } = await import('../../services/data');
                 const groupMembers = await firebaseDataService.group.getGroupMembers(expense.groupId.toString());
                 const payerMember = groupMembers.find(member => String(member.id) === String(expense.paid_by));
                 if (payerMember) {

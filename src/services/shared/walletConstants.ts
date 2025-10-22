@@ -5,7 +5,7 @@
 
 // Import centralized configuration
 import { getConfig } from '../../config/unified';
-import { logger } from '../loggingService';
+import { logger } from '../core/loggingService';
 
 // RPC Configuration
 export const RPC_CONFIG = {
@@ -120,13 +120,4 @@ export const WALLET_CONFIG = {
   balanceCallDebounce: 10000, // 10 seconds
 };
 
-// Logging configuration
-if (__DEV__) {
-  logger.info('Wallet Constants initialized', {
-    rpcEndpoint: RPC_CONFIG.endpoint,
-    usdcMint: USDC_CONFIG.mintAddress,
-    network: RPC_CONFIG.network,
-    isProduction: RPC_CONFIG.isProduction,
-    companyFeePercentage: COMPANY_FEE_CONFIG.percentage,
-  });
-}
+// Wallet constants initialized

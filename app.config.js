@@ -8,7 +8,7 @@ module.exports = {
     orientation: "portrait",
     icon: "./assets/android-app-icon-no-alpha.png",
     userInterfaceStyle: "light",
-    newArchEnabled: false,
+    newArchEnabled: true,
     sdkVersion: "54.0.0",
     jsEngine: "hermes",
     ios: {

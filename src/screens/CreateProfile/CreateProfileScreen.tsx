@@ -16,15 +16,15 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
-import { walletService } from '../../services/WalletService';
+import { firebaseDataService } from '../../services/data';
+import { walletService } from '../../services/wallet';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { colors } from '../../theme';
-import { UserImageService } from '../../services/userImageService';
-import { DEFAULT_AVATAR_URL } from '../../config/constants';
+import { userImageService } from '../../services/core';
+import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import * as ImagePicker from 'expo-image-picker';
-import { logger } from '../../services/loggingService';
-import { Container, Header } from '../../components/shared';
+import { logger } from '../../services/core';
+import { Container } from '../../components/shared';
 
 const CreateProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -268,7 +268,9 @@ const CreateProfileScreen: React.FC = () => {
       >
         <View style={styles.mainContainer}>
           {/* Logo Section */}
-          <Header variant="logoOnly" />
+          <View style={styles.logoSection}>
+            <Image source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-linear.png?alt=media&token=6089c64e-c1dd-4488-8431-feb9041309b4'}} style={styles.logo} />
+          </View>
 
           {/* Main Content - Scrollable */}
           <ScrollView 
