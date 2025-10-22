@@ -27,6 +27,7 @@ import { FeeService, COMPANY_WALLET_CONFIG, TransactionType } from '../config/fe
 import { solanaWalletService } from '../wallet/solanaWallet';
 import { logger } from '../services/loggingService';
 import { optimizedTransactionUtils } from '../services/shared/transactionUtilsOptimized';
+import { TransactionUtils } from '../services/shared/transactionUtils';
 import { notificationUtils } from '../services/shared/notificationUtils';
 import { TRANSACTION_CONFIG } from '../config/transactionConfig';
 
@@ -376,7 +377,8 @@ class InternalTransferService {
       }
 
       // Get recent blockhash with retry logic
-      const blockhash = await transactionUtils.getLatestBlockhashWithRetry();
+      const connection = await optimizedTransactionUtils.getConnection();
+      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
       logger.info('Got recent blockhash', { blockhash }, 'InternalTransferService');
 
       // Use company wallet for fees if configured, otherwise use user wallet
@@ -913,7 +915,8 @@ class InternalTransferService {
       }
 
       // Get recent blockhash with retry logic
-      const blockhash = await transactionUtils.getLatestBlockhashWithRetry();
+      const connection = await optimizedTransactionUtils.getConnection();
+      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
 
       // Use company wallet for fees if configured, otherwise use user wallet
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromKeypair.publicKey);
@@ -1158,7 +1161,8 @@ class InternalTransferService {
             }, 'sendInternal');
             
             // Get fresh blockhash for each attempt with retry
-            const freshBlockhash = await this.getLatestBlockhashWithRetry('confirmed');
+            const connection = await optimizedTransactionUtils.getConnection();
+            const freshBlockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection, 'confirmed');
             
             // Update blockhash and re-sign transaction for each attempt
             transaction.recentBlockhash = freshBlockhash;

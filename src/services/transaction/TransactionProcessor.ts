@@ -24,7 +24,7 @@ import { USDC_CONFIG } from '../shared/walletConstants';
 import { getConfig } from '../../config/unified';
 import { TRANSACTION_CONFIG } from '../../config/transactionConfig';
 import { FeeService } from '../../config/feeConfig';
-import { transactionUtils } from '../shared/transactionUtils';
+import { TransactionUtils } from '../shared/transactionUtils';
 import { logger } from '../loggingService';
 import { TransactionParams, TransactionResult } from './types';
 
@@ -112,7 +112,7 @@ export class TransactionProcessor {
       }
 
       // Get recent blockhash
-      const blockhash = await transactionUtils.getLatestBlockhashWithRetry('confirmed');
+      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(this.connection, 'confirmed');
       
       // Create the transaction with proper setup
       const transaction = new Transaction({

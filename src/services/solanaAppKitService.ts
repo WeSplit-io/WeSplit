@@ -24,6 +24,7 @@ import {
 import { RPC_CONFIG, USDC_CONFIG, PHANTOM_SCHEMES } from './shared/walletConstants';
 import { FeeService, TransactionType } from '../config/feeConfig';
 import { optimizedTransactionUtils } from './shared/transactionUtilsOptimized';
+import { TransactionUtils } from './shared/transactionUtils';
 import { balanceUtils } from './shared/balanceUtils';
 import { logger } from './loggingService';
 
@@ -740,7 +741,8 @@ export class SolanaAppKitService {
       const companyFeeRaw = PriceUtils.convertUsdcToRawUnits(companyFee);
 
       // Get recent blockhash
-      const blockhash = await transactionUtils.getLatestBlockhashWithRetry();
+      const connection = await optimizedTransactionUtils.getConnection();
+      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
 
       // Use centralized fee payer logic - Company pays SOL gas fees
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
@@ -1079,7 +1081,8 @@ export class SolanaAppKitService {
       }
 
       // Get recent blockhash
-      const blockhash = await transactionUtils.getLatestBlockhashWithRetry();
+      const connection = await optimizedTransactionUtils.getConnection();
+      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
 
       // Create the transaction
       const solanaTransaction = new Transaction({
