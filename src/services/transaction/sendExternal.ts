@@ -98,7 +98,7 @@ class ExternalTransferService {
       }
 
       // Calculate company fee using centralized service with transaction type
-      const transactionType = params.transactionType || 'withdraw';
+      const transactionType = params.transactionType || 'external_payment';
       const { fee: companyFee, totalAmount, recipientAmount } = FeeService.calculateCompanyFee(params.amount, transactionType);
 
       // Ensure user's wallet is loaded

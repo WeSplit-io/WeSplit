@@ -138,16 +138,53 @@ async function executeFairSplitTransaction(
         );
       }
 
-    // Add transfer instruction
-      const transferAmount = Math.floor(amount * Math.pow(10, 6)); // USDC has 6 decimals
-      transaction.add(
-        createTransferInstruction(
-      fromTokenAccount,
-      toTokenAccount,
-      fromPublicKey,
+    // Calculate company fee for funding transactions (1.5% fee for money going INTO splits)
+    let transferAmount = Math.floor(amount * Math.pow(10, 6)); // USDC has 6 decimals
+    let companyFeeAmount = 0;
+    
+    if (transactionType === 'funding') {
+      // Collect 1.5% company fee for funding splits
+      const { FeeService } = await import('../../config/constants/feeConfig');
+      const { fee: companyFee } = FeeService.calculateCompanyFee(amount, 'split_payment');
+      companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6)); // USDC has 6 decimals
+      
+      // Add company fee transfer instruction to company wallet
+      if (companyFeeAmount > 0) {
+        const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
+        const companyTokenAccount = await getAssociatedTokenAddress(mintPublicKey, new PublicKey(COMPANY_WALLET_CONFIG.address));
+        
+        transaction.add(
+          createTransferInstruction(
+            fromTokenAccount,
+            companyTokenAccount,
+            fromPublicKey,
+            companyFeeAmount,
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+        
+        // Reduce transfer amount by company fee (recipient gets less)
+        transferAmount = transferAmount - companyFeeAmount;
+        
+        logger.info('Added company fee for split funding', {
+          amount,
+          companyFee,
+          companyFeeAmount,
           transferAmount
-        )
-      );
+        }, 'SplitWalletPayments');
+      }
+    }
+
+    // Add transfer instruction (recipient gets the amount minus company fee for funding)
+    transaction.add(
+      createTransferInstruction(
+        fromTokenAccount,
+        toTokenAccount,
+        fromPublicKey,
+        transferAmount
+      )
+    );
     }
 
     // Add memo instruction
@@ -372,8 +409,45 @@ async function executeFastTransaction(
         );
       }
 
-      // Add transfer instruction
-      const transferAmount = Math.floor(amount * Math.pow(10, 6)); // USDC has 6 decimals
+      // Calculate company fee for funding transactions (1.5% fee for money going INTO splits)
+      let transferAmount = Math.floor(amount * Math.pow(10, 6)); // USDC has 6 decimals
+      let companyFeeAmount = 0;
+      
+      if (transactionType === 'funding') {
+        // Collect 1.5% company fee for funding splits
+        const { FeeService } = await import('../../config/constants/feeConfig');
+        const { fee: companyFee } = FeeService.calculateCompanyFee(amount, 'split_payment');
+        companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6)); // USDC has 6 decimals
+        
+        // Add company fee transfer instruction to company wallet
+        if (companyFeeAmount > 0) {
+          const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
+          const companyTokenAccount = await getAssociatedTokenAddress(mintPublicKey, new PublicKey(COMPANY_WALLET_CONFIG.address));
+          
+          transaction.add(
+            createTransferInstruction(
+              fromTokenAccount,
+              companyTokenAccount,
+              fromPublicKey,
+              companyFeeAmount,
+              [],
+              TOKEN_PROGRAM_ID
+            )
+          );
+          
+          // Reduce transfer amount by company fee (recipient gets less)
+          transferAmount = transferAmount - companyFeeAmount;
+          
+          logger.info('Added company fee for split funding (fast)', {
+            amount,
+            companyFee,
+            companyFeeAmount,
+            transferAmount
+          }, 'SplitWalletPayments');
+        }
+      }
+
+      // Add transfer instruction (recipient gets the amount minus company fee for funding)
       transaction.add(
         createTransferInstruction(
           fromTokenAccount,
@@ -606,8 +680,45 @@ async function executeDegenSplitTransaction(
         );
       }
 
-      // Add transfer instruction
-      const transferAmount = Math.floor(amount * Math.pow(10, 6)); // USDC has 6 decimals
+      // Calculate company fee for funding transactions (1.5% fee for money going INTO splits)
+      let transferAmount = Math.floor(amount * Math.pow(10, 6)); // USDC has 6 decimals
+      let companyFeeAmount = 0;
+      
+      if (transactionType === 'funding') {
+        // Collect 1.5% company fee for funding splits
+        const { FeeService } = await import('../../config/constants/feeConfig');
+        const { fee: companyFee } = FeeService.calculateCompanyFee(amount, 'split_payment');
+        companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6)); // USDC has 6 decimals
+        
+        // Add company fee transfer instruction to company wallet
+        if (companyFeeAmount > 0) {
+          const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
+          const companyTokenAccount = await getAssociatedTokenAddress(mintPublicKey, new PublicKey(COMPANY_WALLET_CONFIG.address));
+          
+          transaction.add(
+            createTransferInstruction(
+              fromTokenAccount,
+              companyTokenAccount,
+              fromPublicKey,
+              companyFeeAmount,
+              [],
+              TOKEN_PROGRAM_ID
+            )
+          );
+          
+          // Reduce transfer amount by company fee (recipient gets less)
+          transferAmount = transferAmount - companyFeeAmount;
+          
+          logger.info('Added company fee for split funding (degen)', {
+            amount,
+            companyFee,
+            companyFeeAmount,
+            transferAmount
+          }, 'SplitWalletPayments');
+        }
+      }
+
+      // Add transfer instruction (recipient gets the amount minus company fee for funding)
       transaction.add(
         createTransferInstruction(
           fromTokenAccount,

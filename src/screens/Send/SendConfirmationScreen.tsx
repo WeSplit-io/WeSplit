@@ -245,11 +245,12 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           currency: 'USDC',
           memo: description || 'External wallet transfer',
           userId: currentUser.id.toString(),
-          priority: 'medium'
+          priority: 'medium',
+          transactionType: 'external_payment' // Use the new 2% fee structure
         });
       } else {
         // For friends/internal transfers, use existing service
-        const transactionType: TransactionType = isSettlement ? 'settlement' : 'send';
+        const transactionType: TransactionType = isSettlement ? 'settlement' : (requestId ? 'payment_request' : 'send');
         
         logger.info('🔍 SendConfirmation: About to send transaction with requestId', {
           requestId: requestId,

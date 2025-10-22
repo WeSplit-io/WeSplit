@@ -70,14 +70,15 @@ export class ExternalCardPaymentService {
       }, 'ExternalCardPaymentService');
 
       // Use the external wallet transfer service for KAST card payments
-      const { externalTransferService } = await import('../transfer/sendExternal');
+      const { externalTransferService } = await import('../transaction/sendExternal');
       const transferResult = await externalTransferService.sendExternalTransfer({
         to: kastWalletAddress,
         amount: params.amount,
         currency: 'USDC', // KAST cards receive USDC
         memo: params.description || 'KAST card payment',
         userId: params.userId,
-        priority: 'medium'
+        priority: 'medium',
+        transactionType: 'external_payment' // Use the new 2% fee structure for linked cards
       });
 
       if (!transferResult.success) {

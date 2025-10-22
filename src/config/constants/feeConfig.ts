@@ -24,15 +24,16 @@ export type TransactionType =
   | 'group_payment'  // Group-related payments
   | 'premium'        // Premium subscription payments
   | 'split_wallet_withdrawal' // Split wallet fund withdrawals (no company fees)
+  | 'external_payment' // External wallet or linked card payments
   | 'default';       // Fallback for unknown types
 
 // Individual fee configurations for each transaction type
 export const TRANSACTION_FEE_CONFIGS = {
-  // 1:1 Transfers - Standard fee
+  // 1:1 Transfers - Very low fee (0.01%)
   send: {
-    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SEND_PERCENTAGE') || '3.0'),
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SEND_PERCENTAGE') || '0.01'),
     minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SEND_MIN') || '0.001'),
-    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SEND_MAX') || '10.00'),
+    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SEND_MAX') || '0.10'),
     currency: 'USDC',
   },
   receive: {
@@ -41,25 +42,25 @@ export const TRANSACTION_FEE_CONFIGS = {
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_RECEIVE_MAX') || '0.0'),
     currency: 'USDC',
   },
-  // Group Split Payments - Lower fee to encourage group usage
+  // Group Split Payments - 1.5% fee for funding splits
   split_payment: {
-    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_PERCENTAGE') || '2.0'),
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_PERCENTAGE') || '1.5'),
     minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_MIN') || '0.001'),
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_MAX') || '5.00'),
     currency: 'USDC',
   },
-  // Settlement Payments - Lower fee for settlements
+  // Settlement Payments - 0% fee for settlements (money out of splits)
   settlement: {
-    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SETTLEMENT_PERCENTAGE') || '1.5'),
-    minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SETTLEMENT_MIN') || '0.001'),
-    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SETTLEMENT_MAX') || '3.00'),
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SETTLEMENT_PERCENTAGE') || '0.0'),
+    minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SETTLEMENT_MIN') || '0.0'),
+    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SETTLEMENT_MAX') || '0.0'),
     currency: 'USDC',
   },
-  // Withdrawals - Higher fee for external withdrawals
+  // Withdrawals - 2% fee for external wallet withdrawals
   withdraw: {
-    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_WITHDRAW_PERCENTAGE') || '4.0'),
-    minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_WITHDRAW_MIN') || '0.50'),
-    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_WITHDRAW_MAX') || '15.00'),
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_WITHDRAW_PERCENTAGE') || '2.0'),
+    minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_WITHDRAW_MIN') || '0.10'),
+    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_WITHDRAW_MAX') || '10.00'),
     currency: 'USDC',
   },
   // Deposits - No fee for deposits (encourages funding)
@@ -69,18 +70,18 @@ export const TRANSACTION_FEE_CONFIGS = {
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_DEPOSIT_MAX') || '0.0'),
     currency: 'USDC',
   },
-  // Payment Requests - Standard fee
+  // Payment Requests - 0.01% fee (same as 1:1 transfers)
   payment_request: {
-    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PAYMENT_REQUEST_PERCENTAGE') || '3.0'),
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PAYMENT_REQUEST_PERCENTAGE') || '0.01'),
     minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PAYMENT_REQUEST_MIN') || '0.001'),
-    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PAYMENT_REQUEST_MAX') || '10.00'),
+    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PAYMENT_REQUEST_MAX') || '0.10'),
     currency: 'USDC',
   },
-  // Group Payments - Lower fee for group activities
+  // Group Payments - 1.5% fee (same as split payments)
   group_payment: {
-    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_GROUP_PAYMENT_PERCENTAGE') || '2.5'),
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_GROUP_PAYMENT_PERCENTAGE') || '1.5'),
     minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_GROUP_PAYMENT_MIN') || '0.001'),
-    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_GROUP_PAYMENT_MAX') || '8.00'),
+    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_GROUP_PAYMENT_MAX') || '5.00'),
     currency: 'USDC',
   },
   // Premium Payments - No fee for premium subscriptions
@@ -90,18 +91,25 @@ export const TRANSACTION_FEE_CONFIGS = {
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_PREMIUM_MAX') || '0.0'),
     currency: 'USDC',
   },
-  // Split Wallet Withdrawals - No company fees to prevent insufficient funds
+  // Split Wallet Withdrawals - 0% fee (money out of splits)
   split_wallet_withdrawal: {
     percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_WALLET_WITHDRAWAL_PERCENTAGE') || '0.0'),
     minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_WALLET_WITHDRAWAL_MIN') || '0.0'),
     maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_SPLIT_WALLET_WITHDRAWAL_MAX') || '0.0'),
     currency: 'USDC',
   },
-  // Default fallback
+  // External/Linked Card Payments - 2% fee
+  external_payment: {
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_EXTERNAL_PAYMENT_PERCENTAGE') || '2.0'),
+    minFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_EXTERNAL_PAYMENT_MIN') || '0.10'),
+    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_FEE_EXTERNAL_PAYMENT_MAX') || '10.00'),
+    currency: 'USDC',
+  },
+  // Default fallback - 0.01% (same as 1:1 transfers)
   default: {
-    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE') || '3.0'),
+    percentage: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE') || '0.01'),
     minFee: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MIN_FEE') || '0.001'),
-    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MAX_FEE') || '10.00'),
+    maxFee: parseFloat(getEnvVar('EXPO_PUBLIC_COMPANY_MAX_FEE') || '0.10'),
     currency: 'USDC',
   },
 };
