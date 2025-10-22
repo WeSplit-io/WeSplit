@@ -1,0 +1,18 @@
+# Act configuration for WeSplit
+# This file configures act (GitHub Actions local runner)
+
+# Use specific Docker image for Node.js
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Set environment variables for local testing
+-e NODE_VERSION=18
+-e EXPO_VERSION=latest
+
+# Bind mount for better performance
+--bind
+
+# Use GitHub token if available
+--secret-file .secrets
+
+# Verbose output for debugging
+--verbose

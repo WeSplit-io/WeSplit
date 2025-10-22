@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
-import { consolidatedTransactionService } from '../../services/transaction';
+import { consolidatedTransactionService } from '../../services/consolidatedTransactionService';
 import { FeeService, TransactionType } from '../../config/feeConfig';
 import { GroupMember } from '../../types';
 import { colors } from '../../theme';

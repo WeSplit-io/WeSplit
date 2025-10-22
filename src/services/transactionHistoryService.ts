@@ -22,7 +22,7 @@ import {
 import { db } from '../config/firebase';
 import { Transaction } from '../types';
 import { firebaseDataTransformers } from './firebaseDataService';
-import { consolidatedTransactionService } from './transaction';
+import { consolidatedTransactionService } from './consolidatedTransactionService';
 
 export interface TransactionHistoryEntry extends Transaction {
   // Additional fields for enhanced tracking

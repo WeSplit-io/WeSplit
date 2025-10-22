@@ -51,6 +51,11 @@ export const isDevnet = (): boolean => {
 };
 
 // Export for backward compatibility
-export const CURRENT_NETWORK = CHAIN_CONFIG.DEFAULT_NETWORK;
+export const CURRENT_NETWORK = {
+  network: CHAIN_CONFIG.DEFAULT_NETWORK,
+  usdcMintAddress: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+  rpcUrl: getRpcUrl(CHAIN_CONFIG.DEFAULT_NETWORK),
+  wsUrl: getRpcUrl(CHAIN_CONFIG.DEFAULT_NETWORK).replace('https://', 'wss://'),
+};
 
 export default CHAIN_CONFIG;

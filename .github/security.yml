@@ -1,0 +1,58 @@
+name: 🔒 Security Configuration
+
+# Security policies and configurations for WeSplit
+# This file defines security standards and requirements
+
+security:
+  # Dependency scanning
+  dependencies:
+    audit_level: "moderate"
+    auto_fix: false
+    exclude_patterns:
+      - "node_modules/**"
+      - "dist/**"
+      - "build/**"
+    
+  # Secret scanning
+  secrets:
+    enabled: true
+    patterns:
+      - "AIzaSy[A-Za-z0-9_-]{35}"
+      - "sk_[A-Za-z0-9]{48}"
+      - "pk_[A-Za-z0-9]{48}"
+      - "firebase.*key"
+      - "api.*key"
+    exclude_files:
+      - "*.example"
+      - "*.template"
+      - "*.md"
+      - "SECURITY.md"
+    
+  # Code quality
+  code_quality:
+    eslint_enabled: true
+    typescript_strict: true
+    max_warnings: 0
+    
+  # Environment variables
+  environment:
+    required_vars:
+      - "EXPO_PUBLIC_FIREBASE_API_KEY"
+      - "EXPO_PUBLIC_FIREBASE_PROJECT_ID"
+      - "EXPO_PUBLIC_HELIUS_API_KEY"
+    sensitive_vars:
+      - "JWT_SECRET"
+      - "MOONPAY_SECRET_KEY"
+      - "EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY"
+    
+  # Build security
+  build:
+    require_signed_commits: true
+    require_approval: true
+    scan_artifacts: true
+    
+  # Deployment security
+  deployment:
+    require_environment_approval: true
+    scan_deployed_artifacts: true
+    monitor_runtime: true

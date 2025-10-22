@@ -153,7 +153,7 @@ describe('Deposit Flow Tests', () => {
         expect(ataExists).toBe(true);
       } catch (error) {
         // ATA doesn't exist yet, should be created
-        expect(error.message).toBe('Account not found');
+        expect((error as Error).message).toBe('Account not found');
       }
     });
   });
