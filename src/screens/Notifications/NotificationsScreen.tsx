@@ -248,42 +248,49 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     }
   };
 
-
-
-
-  // Transform real notifications to match NotificationData interface
-  const getDisplayNotifications = (): NotificationData[] => {
-    const realNotifications = notifications || [];
-    
-    // Transform real notifications to match NotificationData interface
-    const transformedNotifications: NotificationData[] = realNotifications.map((notification: any) => ({
-      id: notification.id,
-      type: notification.type as NotificationData['type'],
-      title: notification.title,
-      message: notification.message,
-      created_at: notification.created_at,
-      is_read: notification.is_read,
-      status: notification.data?.status || 'pending',
-      data: notification.data || {}
-    }));
-    
-    return activeTab === 'requests'
-      ? transformedNotifications.filter((n: NotificationData) => n.type === 'payment_request' || n.type === 'payment_reminder')
-      : transformedNotifications;
-  };
-
-  const filteredNotifications = getDisplayNotifications();
-
-  if (loading) {
-    return (
-      <Container>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#A5EA15" />
-          <Text style={styles.loadingText}>Loading notifications...</Text>
+  // Render notification item
+  const renderNotificationItem = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={[
+        styles.notificationItem,
+        { borderLeftColor: getNotificationColor(item.type) },
+        !item.read && styles.unreadNotification
+      ]}
+      onPress={() => handleNotificationPress(item)}
+    >
+      <View style={styles.notificationContent}>
+        <View style={styles.notificationHeader}>
+          <Text style={styles.notificationIcon}>
+            {getNotificationIcon(item.type)}
+          </Text>
+          <View style={styles.notificationTextContainer}>
+            <Text style={styles.notificationTitle} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <Text style={styles.notificationMessage} numberOfLines={2}>
+              {item.message}
+            </Text>
+          </View>
+          <Text style={styles.notificationTime}>
+            {formatNotificationTime(item.created_at)}
+          </Text>
         </View>
-      </Container>
-    );
-  }
+        {!item.read && <View style={styles.unreadDot} />}
+      </View>
+    </TouchableOpacity>
+  );
+
+  // Load notifications on component mount
+  useEffect(() => {
+    if (state.currentUser?.id) {
+      loadNotifications();
+    }
+  }, [state.currentUser?.id, loadNotifications]);
+
+  // Handle refresh
+  const handleRefresh = useCallback(() => {
+    refreshNotifications();
+  }, [refreshNotifications]);
 
   return (
     <Container>
@@ -298,40 +305,29 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         }
       />
 
-      {/* Notifications List */}
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#A5EA15"
-            titleColor="#FFF"
-          />
-        }
-      >
-        {filteredNotifications.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fnotif-empty-state.png?alt=media&token=c2a67bb0-0e1b-40b0-9467-6e239f41a166' }} style={styles.emptyStateIcon} />
-            <Text style={styles.emptyTitle}>No notifications yet</Text>
-            <Text style={styles.emptySubtitle}>
-              You have no notifications yet.
-              Please come back later.
-            </Text>
-          </View>
-        ) : (
-          filteredNotifications.map((notification) => (
-            <NotificationCard
-              key={notification.id}
-              notification={notification}
-              onPress={handleNotificationPress}
-              onActionPress={notificationActionHandler}
-              actionState={actionStates[notification.id]}
-              fadeAnimation={fadeAnimations[notification.id]}
+      {notifications.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateIcon}>🔔</Text>
+          <Text style={styles.emptyStateTitle}>No notifications</Text>
+          <Text style={styles.emptyStateMessage}>
+            You're all caught up! New notifications will appear here.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={notifications}
+          renderItem={renderNotificationItem}
+          keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl
+              refreshing={false}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
             />
-          ))
-        )}
-      </ScrollView>
+          }
+          contentContainerStyle={styles.notificationsList}
+        />
+      )}
     </Container>
   );
 };
