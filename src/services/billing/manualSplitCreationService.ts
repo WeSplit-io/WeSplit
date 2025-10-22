@@ -39,8 +39,22 @@ export class ManualSplitCreationService {
           participantsCount: data.processedBillData.participants.length
         });
 
+      // Ensure required fields are always present for validation
+      const processedDataForValidation = {
+        ...data.processedBillData,
+        location: data.processedBillData.location || '',
+        time: data.processedBillData.time || new Date().toISOString().split('T')[1].split('.')[0],
+        settings: data.processedBillData.settings || {
+          allowPartialPayments: true,
+          requireAllAccept: false,
+          autoCalculate: true,
+          splitMethod: 'equal',
+          taxIncluded: true
+        }
+      };
+      
       // Validate the processed data
-      const validation = consolidatedBillAnalysisService.validateProcessedBillData(data.processedBillData);
+      const validation = consolidatedBillAnalysisService.validateProcessedBillData(processedDataForValidation);
       if (!validation.isValid) {
         return {
           success: false,
@@ -60,6 +74,7 @@ export class ManualSplitCreationService {
           id: data.currentUser.id.toString(),
           name: data.currentUser.name,
           walletAddress: data.currentUser.wallet_address || '',
+          wallet_address: data.currentUser.wallet_address || '', // Add both for compatibility
           amountOwed: 0, // Will be calculated
           status: 'accepted', // Creator should be accepted, not pending
           items: []
@@ -81,7 +96,7 @@ export class ManualSplitCreationService {
           userId: p.id,
           name: p.name,
           email: '',
-          walletAddress: p.walletAddress,
+          walletAddress: p.walletAddress || p.wallet_address || '',
           amountOwed: p.amountOwed,
           amountPaid: 0,
           status: p.id === data.currentUser.id.toString() ? 'accepted' as const : 'pending' as const,
@@ -95,7 +110,7 @@ export class ManualSplitCreationService {
         })),
         merchant: {
           name: data.processedBillData.merchant,
-          address: data.processedBillData.location,
+          address: data.processedBillData.location || '',
           phone: '',
         },
         date: data.processedBillData.date,

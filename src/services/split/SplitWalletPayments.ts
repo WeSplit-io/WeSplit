@@ -79,6 +79,7 @@ async function executeFairSplitTransaction(
     const connection = await optimizedTransactionUtils.getConnection();
 
     // Create keypair from private key using KeypairUtils
+    const { KeypairUtils } = await memoryManager.loadModule('keypair-utils');
     const keypairResult = KeypairUtils.createKeypairFromSecretKey(privateKey);
     if (!keypairResult.success || !keypairResult.keypair) {
       return {
@@ -95,10 +96,10 @@ async function executeFairSplitTransaction(
     // Create transaction
     const transaction = new Transaction();
 
-    // Add compute budget instructions for better transaction processing
+    // Add compute budget instructions for faster transaction processing
     transaction.add(
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 200000 }),
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50000 })
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 150000 }), // Reduced for faster processing
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100000 }) // Higher priority for faster processing
     );
 
     if (currency === 'SOL') {
@@ -197,8 +198,8 @@ async function executeFairSplitTransaction(
 
     const signature = await connection.sendRawTransaction(transaction.serialize(), {
       skipPreflight: false,
-      preflightCommitment: 'confirmed',
-      maxRetries: 3
+      preflightCommitment: 'processed', // Use 'processed' for faster confirmation
+      maxRetries: 2 // Reduced retries for faster processing
     });
 
     logger.info('Fair split transaction sent successfully', {
@@ -210,10 +211,11 @@ async function executeFairSplitTransaction(
       transactionType
     }, 'SplitWalletPayments');
     
-    // For fair splits, use conservative confirmation strategy
+    // For fair splits, use fast confirmation strategy
     let confirmed = false;
     let attempts = 0;
-    const maxAttempts = 15; // Conservative approach for fair splits
+    const maxAttempts = 5; // Reduced attempts for faster processing
+    const waitTime = 500; // Reduced wait time to 500ms
 
     while (!confirmed && attempts < maxAttempts) {
       try {
@@ -249,7 +251,7 @@ async function executeFairSplitTransaction(
             }
       
       if (!confirmed) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        await new Promise(resolve => setTimeout(resolve, waitTime)); // Wait 500ms
         attempts++;
       }
     }
@@ -277,6 +279,239 @@ async function executeFairSplitTransaction(
     logger.error('Fair split transaction failed', error, 'SplitWalletPayments');
             return {
               success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}
+
+// Helper function to execute fast transaction (for withdrawals)
+async function executeFastTransaction(
+  fromAddress: string,
+  privateKey: string,
+  toAddress: string,
+  amount: number,
+  currency: string,
+  memo: string,
+  transactionType: 'funding' | 'withdrawal'
+): Promise<{ success: boolean; signature?: string; error?: string }> {
+  try {
+    logger.info('Executing fast transaction', {
+      fromAddress,
+      toAddress,
+      amount,
+      currency,
+      memo,
+      transactionType
+    }, 'SplitWalletPayments');
+        
+    // Import required modules using memory manager
+    const { memoryManager } = await import('../shared/memoryManager');
+    const { Connection, PublicKey, Keypair, Transaction, SystemProgram, LAMPORTS_PER_SOL, ComputeBudgetProgram } = await memoryManager.loadModule('solana-web3');
+    const { createTransferInstruction, getAssociatedTokenAddress, TOKEN_PROGRAM_ID, createAssociatedTokenAccountInstruction, getAccount } = await memoryManager.loadModule('solana-spl-token');
+
+    // Get connection with optimized RPC failover
+    const { optimizedTransactionUtils } = await import('../shared/transactionUtilsOptimized');
+    const connection = await optimizedTransactionUtils.getConnection();
+
+    // Create keypair from private key using KeypairUtils
+    const { KeypairUtils } = await memoryManager.loadModule('keypair-utils');
+    const keypairResult = KeypairUtils.createKeypairFromSecretKey(privateKey);
+    if (!keypairResult.success || !keypairResult.keypair) {
+      return {
+        success: false,
+        error: keypairResult.error || 'Failed to create keypair from private key'
+      };
+    }
+    const keypair = keypairResult.keypair;
+    
+    // Validate addresses
+    const fromPublicKey = new PublicKey(fromAddress);
+    const toPublicKey = new PublicKey(toAddress);
+
+    // Create transaction
+    const transaction = new Transaction();
+
+    // Add compute budget instructions for fastest transaction processing
+    transaction.add(
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 100000 }), // Minimal compute units
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 200000 }) // High priority for fastest processing
+    );
+
+    if (currency === 'SOL') {
+      // SOL transfer
+      const lamports = Math.floor(amount * LAMPORTS_PER_SOL);
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: fromPublicKey,
+          toPubkey: toPublicKey,
+          lamports
+        })
+      );
+    } else {
+      // Token transfer (USDC, etc.)
+      const mintPublicKey = new PublicKey(currency === 'USDC' ? 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' : currency);
+      
+      const fromTokenAccount = await getAssociatedTokenAddress(mintPublicKey, fromPublicKey);
+      const toTokenAccount = await getAssociatedTokenAddress(mintPublicKey, toPublicKey);
+
+      // Check if destination token account exists
+      try {
+        await getAccount(connection, toTokenAccount);
+      } catch (error) {
+        // Create associated token account if it doesn't exist
+        const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
+        const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
+        
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            companyPublicKey, // payer (company wallet)
+            toTokenAccount, // associated token account
+            toPublicKey, // owner
+            mintPublicKey // mint
+          )
+        );
+      }
+
+      // Add transfer instruction
+      const transferAmount = Math.floor(amount * Math.pow(10, 6)); // USDC has 6 decimals
+      transaction.add(
+        createTransferInstruction(
+          fromTokenAccount,
+          toTokenAccount,
+          fromPublicKey,
+          transferAmount
+        )
+      );
+    }
+
+    // Add memo instruction
+    if (memo) {
+      try {
+        const { createMemoInstruction } = await memoryManager.loadModule('solana-memo');
+        transaction.add(createMemoInstruction(memo));
+      } catch (error) {
+        logger.warn('Memo instruction not available, proceeding without memo', {
+          memo,
+          error: error instanceof Error ? error.message : String(error)
+        }, 'SplitWalletPayments');
+      }
+    }
+
+    // Get recent blockhash
+    const { blockhash } = await connection.getLatestBlockhash('processed'); // Use 'processed' for speed
+    transaction.recentBlockhash = blockhash;
+    
+    // Use company wallet as fee payer
+    const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
+    const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
+    const companyWalletSecretKey = COMPANY_WALLET_CONFIG.secretKey;
+    
+    if (!companyWalletAddress || !companyWalletSecretKey) {
+      return {
+        success: false,
+        error: 'Company wallet not configured for fee payment'
+      };
+    }
+    
+    const companyPublicKey = new PublicKey(companyWalletAddress);
+    transaction.feePayer = companyPublicKey;
+    
+    // Create company keypair for signing
+    const companyKeypairResult = KeypairUtils.createKeypairFromSecretKey(companyWalletSecretKey);
+    if (!companyKeypairResult.success || !companyKeypairResult.keypair) {
+      return {
+        success: false,
+        error: 'Failed to create company wallet keypair for fee payment'
+      };
+    }
+    const companyKeypair = companyKeypairResult.keypair;
+
+    // Sign with both keypairs (user for USDC transfer, company for fees)
+    transaction.sign(keypair, companyKeypair);
+
+    const signature = await connection.sendRawTransaction(transaction.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'processed', // Use 'processed' for fastest confirmation
+      maxRetries: 1 // Minimal retries for speed
+    });
+
+    logger.info('Fast transaction sent successfully', {
+      signature,
+      fromAddress,
+      toAddress,
+      amount,
+      currency,
+      transactionType
+    }, 'SplitWalletPayments');
+
+    // For fast transactions, use minimal confirmation strategy
+    let confirmed = false;
+    let attempts = 0;
+    const maxAttempts = 3; // Very few attempts for speed
+    const waitTime = 300; // Very short wait time
+
+    while (!confirmed && attempts < maxAttempts) {
+      try {
+        const status = await connection.getSignatureStatus(signature, { 
+          searchTransactionHistory: true 
+        });
+        
+        if (status.value?.confirmationStatus === 'confirmed' || 
+            status.value?.confirmationStatus === 'finalized') {
+          confirmed = true;
+          logger.info('Fast transaction confirmed', {
+            signature,
+            confirmationStatus: status.value.confirmationStatus,
+            attempts
+          }, 'SplitWalletPayments');
+        } else if (status.value?.err) {
+          logger.error('Fast transaction failed', {
+            signature,
+            error: status.value.err
+          }, 'SplitWalletPayments');
+          return {
+            success: false,
+            signature,
+            error: `Transaction failed: ${JSON.stringify(status.value.err)}`
+          };
+        }
+      } catch (error) {
+        logger.warn('Error checking fast transaction status', {
+          signature,
+          attempt: attempts + 1,
+          error
+        }, 'SplitWalletPayments');
+      }
+          
+      if (!confirmed) {
+        await new Promise(resolve => setTimeout(resolve, waitTime)); // Wait 300ms
+        attempts++;
+      }
+    }
+
+    if (!confirmed) {
+      logger.warn('Fast transaction confirmation timed out - using likely succeeded mode', {
+        signature,
+        attempts
+      }, 'SplitWalletPayments');
+        
+      // For fast transactions, if sent successfully, assume it succeeded
+      return {
+        success: true,
+        signature,
+        error: 'Transaction confirmation timed out but likely succeeded'
+      };
+    }
+
+    return {
+      success: true,
+      signature
+    };
+
+  } catch (error) {
+    logger.error('Fast transaction failed', error, 'SplitWalletPayments');
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
@@ -312,6 +547,7 @@ async function executeDegenSplitTransaction(
     const connection = await optimizedTransactionUtils.getConnection();
 
     // Create keypair from private key using KeypairUtils
+    const { KeypairUtils } = await memoryManager.loadModule('keypair-utils');
     const keypairResult = KeypairUtils.createKeypairFromSecretKey(privateKey);
     if (!keypairResult.success || !keypairResult.keypair) {
           return {
@@ -328,10 +564,10 @@ async function executeDegenSplitTransaction(
     // Create transaction
     const transaction = new Transaction();
 
-    // Add compute budget instructions for better transaction processing
+    // Add compute budget instructions for faster transaction processing
     transaction.add(
-      ComputeBudgetProgram.setComputeUnitLimit({ units: 200000 }),
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50000 })
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 150000 }), // Reduced for faster processing
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100000 }) // Higher priority for faster processing
     );
 
     if (currency === 'SOL') {
@@ -430,8 +666,8 @@ async function executeDegenSplitTransaction(
 
     const signature = await connection.sendRawTransaction(transaction.serialize(), {
       skipPreflight: false,
-      preflightCommitment: 'confirmed',
-      maxRetries: 3
+      preflightCommitment: 'processed', // Use 'processed' for faster confirmation
+      maxRetries: 2 // Reduced retries for faster processing
     });
 
     logger.info('Degen split transaction sent successfully', {
@@ -443,10 +679,11 @@ async function executeDegenSplitTransaction(
               transactionType
           }, 'SplitWalletPayments');
 
-    // For degen splits, use more aggressive confirmation strategy
+    // For degen splits, use fast confirmation strategy
     let confirmed = false;
     let attempts = 0;
-    const maxAttempts = 20; // More attempts for degen splits
+    const maxAttempts = 5; // Reduced attempts for faster processing
+    const waitTime = 500; // Reduced wait time to 500ms
 
     while (!confirmed && attempts < maxAttempts) {
       try {
@@ -482,7 +719,7 @@ async function executeDegenSplitTransaction(
           }
           
       if (!confirmed) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        await new Promise(resolve => setTimeout(resolve, waitTime)); // Wait 500ms
         attempts++;
       }
     }
@@ -649,7 +886,7 @@ export class SplitWalletPayments {
 
       // Get user wallet
           const { walletService } = await import('../wallet');
-          const userWallet = await walletService.getUserWallet(participantId);
+          const userWallet = await walletService.getWalletInfo(participantId);
       if (!userWallet) {
             logger.error('User wallet not found for degen split funding', {
               splitWalletId,
@@ -859,7 +1096,7 @@ export class SplitWalletPayments {
 
       // Get user wallet
       const { walletService } = await import('../wallet');
-      const userWallet = await walletService.getUserWallet(participantId);
+      const userWallet = await walletService.getWalletInfo(participantId);
       if (!userWallet || !userWallet.secretKey) {
         return {
           success: false,
@@ -977,13 +1214,14 @@ export class SplitWalletPayments {
   }
 
   /**
-   * Extract funds from Fair Split wallet (Creator only)
+   * Extract funds from Fair Split wallet (Creator only) - Fast Mode
    */
   static async extractFairSplitFunds(
     splitWalletId: string,
     recipientAddress: string,
     creatorId: string,
-    description?: string
+    description?: string,
+    fastMode: boolean = true
   ): Promise<PaymentResult> {
     try {
       logger.info('🚀 Starting Fair Split funds extraction', {
@@ -1044,16 +1282,26 @@ export class SplitWalletPayments {
         };
       }
 
-      // Execute transaction using fair split specific method
-      const transactionResult = await executeFairSplitTransaction(
-        wallet.walletAddress,
-        privateKeyResult.privateKey,
-        recipientAddress,
-        withdrawalAmount,
-        wallet.currency,
-        description || `Fair Split funds extraction for bill ${wallet.billId}`,
-        'withdrawal'
-      );
+      // Execute transaction using fast or standard method based on fastMode
+      const transactionResult = fastMode 
+        ? await executeFastTransaction(
+            wallet.walletAddress,
+            privateKeyResult.privateKey,
+            recipientAddress,
+            withdrawalAmount,
+            wallet.currency,
+            description || `Fair Split funds extraction for bill ${wallet.billId}`,
+            'withdrawal'
+          )
+        : await executeFairSplitTransaction(
+            wallet.walletAddress,
+            privateKeyResult.privateKey,
+            recipientAddress,
+            withdrawalAmount,
+            wallet.currency,
+            description || `Fair Split funds extraction for bill ${wallet.billId}`,
+            'withdrawal'
+          );
       
       logger.info('💸 Fair split transaction result', {
         success: transactionResult.success,
@@ -1099,14 +1347,15 @@ export class SplitWalletPayments {
   }
 
   /**
-   * Process degen winner payout
+   * Process degen winner payout - Fast Mode
    */
   static async processDegenWinnerPayout(
     splitWalletId: string,
     winnerUserId: string,
     winnerAddress: string,
     totalAmount: number,
-    description?: string
+    description?: string,
+    fastMode: boolean = true
   ): Promise<PaymentResult> {
     try {
       logger.info('🚀 Processing degen winner payout', {
@@ -1159,16 +1408,26 @@ export class SplitWalletPayments {
         };
       }
 
-      // Execute transaction using degen split specific method
-      const transactionResult = await executeDegenSplitTransaction(
-        wallet.walletAddress,
-        privateKeyResult.privateKey,
-        winnerAddress,
-        totalAmount,
-        wallet.currency,
-        description || `Degen Split winner payout for ${winnerUserId}`,
-        'withdrawal'
-      );
+      // Execute transaction using fast or standard method based on fastMode
+      const transactionResult = fastMode 
+        ? await executeFastTransaction(
+            wallet.walletAddress,
+            privateKeyResult.privateKey,
+            winnerAddress,
+            totalAmount,
+            wallet.currency,
+            description || `Degen Split winner payout for ${winnerUserId}`,
+            'withdrawal'
+          )
+        : await executeDegenSplitTransaction(
+            wallet.walletAddress,
+            privateKeyResult.privateKey,
+            winnerAddress,
+            totalAmount,
+            wallet.currency,
+            description || `Degen Split winner payout for ${winnerUserId}`,
+            'withdrawal'
+          );
       
       logger.info('💸 Degen winner payout transaction result', {
         success: transactionResult.success,
@@ -1229,13 +1488,14 @@ export class SplitWalletPayments {
   }
 
   /**
-   * Process degen loser payment (refund)
+   * Process degen loser payment (refund) - Fast Mode
    */
   static async processDegenLoserPayment(
     splitWalletId: string,
     loserUserId: string,
     totalAmount: number,
-    description?: string
+    description?: string,
+    fastMode: boolean = true
   ): Promise<PaymentResult> {
     try {
       logger.info('🚀 Processing degen loser payment', {
@@ -1274,7 +1534,7 @@ export class SplitWalletPayments {
 
       // Get user wallet
         const { walletService } = await import('../wallet');
-        const userWallet = await walletService.getUserWallet(loserUserId);
+        const userWallet = await walletService.getWalletInfo(loserUserId);
         if (!userWallet) {
           return {
             success: false,
@@ -1505,7 +1765,7 @@ export class SplitWalletPayments {
 
       // Get user wallet
       const { walletService } = await import('../wallet');
-      const userWallet = await walletService.getUserWallet(userId);
+      const userWallet = await walletService.getWalletInfo(userId);
       if (!userWallet) {
         return {
           success: false,

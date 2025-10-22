@@ -14,7 +14,7 @@ import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 import * as bip39 from 'bip39';
 import * as ed25519HdKey from 'ed25519-hd-key';
 import * as SecureStore from 'expo-secure-store';
-import { logger } from './loggingService';
+import { logger } from './core/loggingService';
 import { firebaseDataService } from './firebaseDataService';
 import { transactionUtils } from './shared/transactionUtils';
 import { balanceUtils } from './shared/balanceUtils';

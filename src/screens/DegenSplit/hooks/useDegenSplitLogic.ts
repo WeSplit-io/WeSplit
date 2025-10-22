@@ -369,19 +369,28 @@ export const useDegenSplitLogic = (
 
       // Send notifications to all participants about the split being ready
       const { notificationService } = await import('../../../services/notifications');
-      const allParticipantIds = participants.map(p => p.userId || p.id);
       const billName = splitData?.title || 'Degen Split';
 
-      if (allParticipantIds.length > 0) {
-        await notificationService.sendBulkNotifications(
-          allParticipantIds,
-          'split_spin_available',
-          {
-            splitWalletId: walletToUse.id,
-            billName,
-            amount: totalAmount,
-          }
-        );
+      // Send individual notifications to each participant
+      for (const participant of participants) {
+        try {
+          await notificationService.instance.sendNotification(
+            participant.userId || participant.id,
+            'Split Ready to Spin',
+            `${billName} is ready to spin! All participants have locked their funds.`,
+            'split_spin_available',
+            {
+              splitWalletId: walletToUse.id,
+              billName,
+              amount: totalAmount,
+            }
+          );
+        } catch (notificationError) {
+          logger.warn('Failed to send spin notification to participant', {
+            participantId: participant.userId || participant.id,
+            error: notificationError instanceof Error ? notificationError.message : String(notificationError)
+          }, 'DegenSplitLogic');
+        }
       }
 
       setState({ isCreatingWallet: false });
@@ -414,17 +423,54 @@ export const useDegenSplitLogic = (
       // For degen split, each participant locks the FULL bill amount (not their individual share)
       // This is different from fair split where they pay their individual share
       // Use the new degen fund locking function that preserves participant status as 'locked'
+      logger.info('Starting degen split fund locking', {
+        splitWalletId: walletToUse.id,
+        participantId: currentUser.id.toString(),
+        totalAmount,
+        userWalletAddress: currentUser.wallet_address
+      }, 'DegenSplitLogic');
+      
       const { SplitWalletService } = await import('../../../services/split');
       const paymentResult = await SplitWalletService.processDegenFundLocking(
         walletToUse.id,
         currentUser.id.toString(),
         totalAmount // Full bill amount for each participant in degen split
       );
+      
+      logger.info('Degen split fund locking result', {
+        success: paymentResult.success,
+        error: paymentResult.error,
+        transactionSignature: paymentResult.transactionSignature
+      }, 'DegenSplitLogic');
 
       if (!paymentResult.success) {
+        // Provide more specific error messages based on the error type
+        let errorTitle = 'Failed to Lock Split';
+        let errorMessage = paymentResult.error || 'Failed to lock the split. Please try again.';
+        
+        if (paymentResult.error?.includes('Insufficient USDC balance')) {
+          errorTitle = 'Insufficient Balance';
+          errorMessage = paymentResult.error;
+        } else if (paymentResult.error?.includes('User wallet not found')) {
+          errorTitle = 'Wallet Not Found';
+          errorMessage = 'Your wallet could not be found. Please ensure you have a wallet set up.';
+        } else if (paymentResult.error?.includes('Split wallet not found')) {
+          errorTitle = 'Split Not Found';
+          errorMessage = 'The split wallet could not be found. Please try creating the split again.';
+        } else if (paymentResult.error?.includes('Participant not found')) {
+          errorTitle = 'Participant Error';
+          errorMessage = 'You are not listed as a participant in this split.';
+        } else if (paymentResult.error?.includes('already locked')) {
+          errorTitle = 'Already Locked';
+          errorMessage = 'You have already locked your funds for this split.';
+        } else if (paymentResult.error?.includes('Transaction failed')) {
+          errorTitle = 'Transaction Failed';
+          errorMessage = 'The transaction failed. This might be due to network issues. Please try again.';
+        }
+        
         Alert.alert(
-          'Payment Failed', 
-          paymentResult.error || 'Failed to send payment. This might be due to insufficient funds or network issues.',
+          errorTitle, 
+          errorMessage,
           [{ text: 'OK' }]
         );
         setState({ isLocking: false });
@@ -440,25 +486,34 @@ export const useDegenSplitLogic = (
 
       // Send lock required notifications to all other participants
       const { notificationService } = await import('../../../services/notifications');
-      const otherParticipantIds = participants
-        .filter(p => (p.userId || p.id) !== currentUser.id.toString())
-        .map(p => p.userId || p.id);
+      const otherParticipants = participants
+        .filter(p => (p.userId || p.id) !== currentUser.id.toString());
       
       const billName = splitData?.title || billData?.title || processedBillData?.title || 'Degen Split';
 
-      if (otherParticipantIds.length > 0) {
-        await notificationService.sendBulkNotifications(
-          otherParticipantIds,
-          'split_lock_required',
-          {
-            splitWalletId: walletToUse.id,
-            splitId: splitData?.id,
-            billName,
-            amount: totalAmount, // Full bill amount
-            currency: 'USDC',
-            timestamp: new Date().toISOString()
-          }
-        );
+      // Send individual notifications to each participant
+      for (const participant of otherParticipants) {
+        try {
+          await notificationService.instance.sendNotification(
+            participant.userId || participant.id,
+            'Lock Required',
+            `Please lock your funds for ${billName}. Amount: ${totalAmount} USDC`,
+            'split_lock_required',
+            {
+              splitWalletId: walletToUse.id,
+              splitId: splitData?.id,
+              billName,
+              amount: totalAmount, // Full bill amount
+              currency: 'USDC',
+              timestamp: new Date().toISOString()
+            }
+          );
+        } catch (notificationError) {
+          logger.warn('Failed to send notification to participant', {
+            participantId: participant.userId || participant.id,
+            error: notificationError instanceof Error ? notificationError.message : String(notificationError)
+          }, 'DegenSplitLogic');
+        }
       }
 
       // Reload wallet to get updated participant status
@@ -665,29 +720,33 @@ export const useDegenSplitLogic = (
               .catch(error => console.error('❌ Failed to send winner notification:', error));
 
             // Send loser notifications - fire and forget
-            const loserIds = participants
-              .filter(p => (p.userId || p.id) !== winnerId)
-              .map(p => p.userId || p.id)
-              .filter(id => id);
+            const losers = participants.filter(p => (p.userId || p.id) !== winnerId);
 
-            if (loserIds.length > 0) {
-              const loserNotificationPromise = notificationService.sendBulkNotifications(
-                loserIds,
-                'split_loser',
-                {
-                  splitId: splitData?.id,
-                  splitWalletId: splitWallet.id,
-                  billName,
-                  amount: totalAmount,
-                  currency: 'USDC',
-                  winnerId,
-                  winnerName,
-                  timestamp: new Date().toISOString()
-                }
-              );
-              createTimeoutWrapper(loserNotificationPromise, 5000, 'Send loser notifications')
-                .then(() => console.log('✅ Loser notifications sent'))
-                .catch(error => console.error('❌ Failed to send loser notifications:', error));
+            // Send individual notifications to each loser
+            for (const loser of losers) {
+              try {
+                const loserNotificationPromise = notificationService.instance.sendNotification(
+                  loser.userId || loser.id,
+                  'Split Complete',
+                  `${billName} has been completed. ${winnerName} won the split!`,
+                  'split_loser',
+                  {
+                    splitId: splitData?.id,
+                    splitWalletId: splitWallet.id,
+                    billName,
+                    amount: totalAmount,
+                    currency: 'USDC',
+                    winnerId,
+                    winnerName,
+                    timestamp: new Date().toISOString()
+                  }
+                );
+                createTimeoutWrapper(loserNotificationPromise, 5000, 'Send loser notification')
+                  .then(() => console.log('✅ Loser notification sent'))
+                  .catch(error => console.error('❌ Failed to send loser notification:', error));
+              } catch (error) {
+                console.error('❌ Failed to send loser notification:', error);
+              }
             }
           } catch (error) {
             console.error('❌ Failed to send roulette result notifications:', error);

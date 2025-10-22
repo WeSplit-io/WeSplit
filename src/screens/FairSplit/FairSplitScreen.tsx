@@ -798,18 +798,23 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           // Send completion notifications (only if not already sent)
           try {
             const { notificationService } = await import('../../services/notifications');
-            await notificationService.sendBulkNotifications(
-              wallet.participants.map((p: any) => p.userId),
-              'split_payment_required', // Use existing notification type
-              {
-                splitId: splitData?.id,
-                splitWalletId: splitWallet.id,
-                billName: billInfo.name.data || 'Split Payment',
-                amount: wallet.totalAmount,
-                currency: 'USDC',
-                timestamp: new Date().toISOString()
-              }
-            );
+            // Send individual notifications to each participant
+            for (const participant of wallet.participants) {
+              await notificationService.instance.sendNotification(
+                participant.userId,
+                'Payment Required',
+                `You owe ${participant.amountOwed} USDC for ${billInfo.name.data || 'Split Payment'}`,
+                'split_payment_required',
+                {
+                  splitId: splitData?.id,
+                  splitWalletId: splitWallet.id,
+                  billName: billInfo.name.data || 'Split Payment',
+                  amount: participant.amountOwed,
+                  currency: 'USDC',
+                  timestamp: new Date().toISOString()
+                }
+              );
+            }
           } catch (notificationError) {
             console.warn('⚠️ Failed to send completion notifications:', notificationError);
             // Don't fail the entire process for notification errors
@@ -863,8 +868,27 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     
     try {
       // First validate the data
-      const { SplitDataValidationService } = await import('../../services/core');
-      const validationResult = SplitDataValidationService.validateSplitWallet(splitWallet);
+      const { SplitDataValidationService } = await import('../../services/splits');
+      // Convert split wallet to the format expected by validation service
+      const validationWallet = {
+        id: splitWallet.id,
+        address: splitWallet.walletAddress,
+        balance: 0, // Will be updated by validation service
+        currency: splitWallet.currency,
+        participants: splitWallet.participants.map(p => ({
+          userId: p.userId,
+          name: p.name,
+          walletAddress: p.walletAddress,
+          amountOwed: p.amountOwed,
+          amountPaid: p.amountPaid,
+          status: p.status,
+          share: p.amountOwed / splitWallet.totalAmount, // Calculate share
+          isActive: p.status !== 'failed'
+        })),
+        created_at: splitWallet.createdAt,
+        updated_at: splitWallet.updatedAt
+      };
+      const validationResult = SplitDataValidationService.validateSplitWallet(validationWallet);
       
       if (!validationResult.isValid) {
         console.warn('🔧 FairSplitScreen: Data validation issues found:', validationResult.issues);
@@ -1135,18 +1159,23 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     const participantIds = wallet.participants.map((p: any) => p.userId);
     const billName = billInfo.name.data || 'Split Payment'; // Use DataSourceService with fallback
 
-    await notificationService.sendBulkNotifications(
-      participantIds,
-      'split_payment_required',
-      {
-        splitId: splitData?.id,
-        splitWalletId: wallet.id,
-        billName,
-        amount: totalAmount / participants.length, // Equal split amount
-        currency: 'USDC',
-        timestamp: new Date().toISOString()
-      }
-    );
+    // Send individual notifications to each participant
+    for (const participant of wallet.participants) {
+      await notificationService.instance.sendNotification(
+        participant.userId,
+        'Payment Required',
+        `You owe ${participant.amountOwed} USDC for ${billName}`,
+        'split_payment_required',
+        {
+          splitId: splitData?.id,
+          splitWalletId: wallet.id,
+          billName,
+          amount: participant.amountOwed,
+          currency: 'USDC',
+          timestamp: new Date().toISOString()
+        }
+      );
+    }
   };
 
   const handlePayMyShare = () => {
@@ -1500,10 +1529,16 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         
         finalSplitWallet = walletResult.wallet;
         setSplitWallet(finalSplitWallet);
-        logger.info('Split wallet created successfully', { splitWalletId: finalSplitWallet.id }, 'FairSplitScreen');
+        if (finalSplitWallet) {
+          logger.info('Split wallet created successfully', { splitWalletId: finalSplitWallet.id }, 'FairSplitScreen');
+        }
       }
       
       // Update the split in the database with the confirmed repartition
+      if (!finalSplitWallet) {
+        throw new Error('Split wallet not created');
+      }
+      
       const { SplitStorageService } = await import('../../services/splits');
       const updateResult = await SplitStorageService.updateSplit(splitData!.id, {
         status: 'active',
@@ -1532,7 +1567,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           .filter(p => p.id !== currentUser?.id.toString()) // Don't notify the creator
           .map(async (participant) => {
             try {
-              await notificationService.sendNotification(
+              await notificationService.instance.sendNotification(
                 participant.id,
                 'Split Confirmed - Time to Pay!',
                 `The split for "${processedBillData?.title || billData?.title || 'Restaurant Night'}" has been confirmed. You owe ${participant.amountOwed.toFixed(2)} USDC. Tap to pay your share!`,
@@ -1741,7 +1776,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     // Check user's USDC balance before showing payment modal
     try {
       const { walletService } = await import('../../services/wallet');
-      const userWallet = await walletService.getUserWallet(currentUser.id.toString());
+      const userWallet = await walletService.getWalletInfo(currentUser.id.toString());
       if (userWallet) {
         const { BalanceUtils } = await import('../../services/shared/balanceUtils');
         const { PublicKey } = await import('@solana/web3.js');
@@ -2261,7 +2296,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       
       // Ensure user has a wallet before attempting payment
       const { walletService } = await import('../../services/wallet');
-      const userWallet = await walletService.getUserWallet(currentUser.id.toString());
+      const userWallet = await walletService.getWalletInfo(currentUser.id.toString());
       if (!userWallet || !userWallet.secretKey) {
         Alert.alert(
           'Wallet Required',

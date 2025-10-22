@@ -539,7 +539,7 @@ export class SplitWalletCleanup {
 
   private static async getUserWallet(userId: string): Promise<{ success: boolean; wallet?: { address: string }; error?: string }> {
     const { walletService } = await import('../wallet');
-    const wallet = await walletService.getUserWallet(userId);
+    const wallet = await walletService.getWalletInfo(userId);
     return {
       success: !!wallet,
       wallet: wallet ? { address: wallet.address } : undefined,

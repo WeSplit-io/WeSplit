@@ -4,7 +4,7 @@
  * Part of the modularized SplitWalletService
  */
 
-import { walletService } from '../wallet';
+import { walletService } from '../WalletService';
 import { logger } from '../core';
 import { roundUsdcAmount as currencyRoundUsdcAmount } from '../../utils/format';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
@@ -45,7 +45,7 @@ export class SplitWalletCreation {
    */
   static async ensureUserWalletInitialized(userId: string): Promise<{success: boolean, error?: string}> {
     try {
-      const userWallet = await walletService.getUserWallet(userId);
+      const userWallet = await walletService.getWalletInfo(userId);
       if (!userWallet) {
         return { success: false, error: 'User wallet not found' };
       }
@@ -69,12 +69,12 @@ export class SplitWalletCreation {
    */
   static async checkUsdcBalance(userId: string): Promise<{success: boolean, balance: number, error?: string}> {
     try {
-      const userWallet = await walletService.getUserWallet(userId);
+      const userWallet = await walletService.getWalletInfo(userId);
       if (!userWallet) {
         return { success: false, balance: 0, error: 'User wallet not found' };
       }
 
-      const balance = await walletService.getUserWalletBalance(userId);
+      const balance = await walletService.getWalletInfoBalance(userId);
       if (balance === null) {
         return { success: false, balance: 0, error: 'Failed to get wallet balance' };
       }

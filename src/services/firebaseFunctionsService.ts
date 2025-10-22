@@ -6,7 +6,7 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { initializeApp } from 'firebase/app';
 import Constants from 'expo-constants';
-import { logger } from './loggingService';
+import { logger } from './core/loggingService';
 
 // Get environment variables from Expo Constants
 const getEnvVar = (key: string): string => {

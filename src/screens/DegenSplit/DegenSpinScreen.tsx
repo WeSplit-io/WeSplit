@@ -159,27 +159,40 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
         return;
       }
 
-      const participantIds = participants.map((p: any) => p.userId || p.id).filter((id: any) => id);
       const billName = splitData?.title || billData?.title || processedBillData?.title || 'Degen Split';
 
-      if (participantIds.length === 0) {
+      if (participants.length === 0) {
         return;
       }
 
-      const notificationResult = await notificationService.sendBulkNotifications(
-        participantIds,
-        'split_spin_available',
-        {
-          splitWalletId: splitWallet.id,
-          splitId: splitData?.id,
-          billName,
-          amount: totalAmount,
-          currency: 'USDC',
-          timestamp: new Date().toISOString()
+      // Send individual notifications to each participant
+      const notificationResults = [];
+      for (const participant of participants) {
+        try {
+          const result = await notificationService.instance.sendNotification(
+            participant.userId || participant.id,
+            'Split Ready to Spin',
+            `${billName} is ready to spin! All participants have locked their funds.`,
+            'split_spin_available',
+            {
+              splitWalletId: splitWallet.id,
+              splitId: splitData?.id,
+              billName,
+              amount: totalAmount,
+              currency: 'USDC',
+              timestamp: new Date().toISOString()
+            }
+          );
+          notificationResults.push(result);
+        } catch (error) {
+          logger.warn('Failed to send spin notification to participant', {
+            participantId: participant.userId || participant.id,
+            error: error instanceof Error ? error.message : String(error)
+          }, 'DegenSpinScreen');
         }
-      );
+      }
 
-      logger.info('Spin available notification result', { notificationResult }, 'DegenSpinScreen');
+      logger.info('Spin available notification results', { notificationResults }, 'DegenSpinScreen');
     };
 
     sendSpinNotifications();
