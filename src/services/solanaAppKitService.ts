@@ -709,7 +709,7 @@ export class SolanaAppKitService {
         amount * LAMPORTS_PER_SOL
       );
       
-      await transactionUtils.confirmTransactionWithTimeout(signature);
+      await optimizedTransactionUtils.confirmTransactionWithTimeout(signature);
       return signature;
     } catch (error) {
       console.error('Error requesting airdrop:', error);

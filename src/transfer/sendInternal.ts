@@ -642,7 +642,7 @@ class InternalTransferService {
         }, 'InternalTransferService');
         
         // Use sendTransaction for faster response, then confirm separately
-        signature = await transactionUtils.sendTransactionWithRetry(transaction, signers, params.priority || 'medium');
+        signature = await optimizedTransactionUtils.sendTransactionWithRetry(transaction, signers, params.priority || 'medium');
         
         logger.info('Transaction signed and sent successfully', { signature }, 'InternalTransferService');
       } catch (signingError) {
@@ -658,7 +658,7 @@ class InternalTransferService {
       logger.info('Transaction sent successfully', { signature }, 'InternalTransferService');
 
       // Confirm transaction with optimized timeout handling
-      const confirmed = await transactionUtils.confirmTransactionWithTimeout(signature);
+      const confirmed = await optimizedTransactionUtils.confirmTransactionWithTimeout(signature);
       
       if (!confirmed) {
         logger.warn('Transaction confirmation timed out, but transaction was sent', { 
