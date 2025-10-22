@@ -4,27 +4,7 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
 export const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    backgroundColor: colors.darkBackground,
-  },
-  backButton: {
-    padding: 8,
-  },
-  iconWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 20,
-    height: 20,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.white,
-  },
+
   addButton: {
     width: 32,
     height: 32,

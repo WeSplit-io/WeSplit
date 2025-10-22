@@ -277,13 +277,10 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Wallet Debug</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="Wallet Debug"
+        onBackPress={() => navigation.goBack()}
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Discovery Controls */}

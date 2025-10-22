@@ -2,30 +2,6 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export default StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  iconWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 20,
-    height: 20,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
-  },
-  placeholder: {
-    width: spacing.xxl + spacing.sm,
-  },
   mainContent: {
     flex: 1,
   },

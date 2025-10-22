@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, Alert, Image } from 'react-native';
+import { Header, Container } from '../../components/shared';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
@@ -145,15 +146,12 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const totalWithdraw = feeCalculation.totalAmount; // User pays amount + fee
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="chevron-left" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Withdraw</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="Withdraw"
+        onBackPress={() => navigation.goBack()}
+      />
 
       <ScrollView 
         style={{ flex: 1 }}
@@ -396,7 +394,7 @@ const WithdrawAmountScreen: React.FC<any> = ({ navigation, route }) => {
             </Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </Container>
     );
 };
 

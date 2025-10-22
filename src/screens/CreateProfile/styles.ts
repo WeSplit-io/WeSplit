@@ -20,16 +20,7 @@ export const styles = StyleSheet.create({
   },
   buttonContainer: {
   },
-  logoSection: {
-    alignItems: 'center',
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.md,
-  },
-  logo: {
-    height: 30,
-    width: 170,
-    objectFit: 'contain',
-  },
+
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',

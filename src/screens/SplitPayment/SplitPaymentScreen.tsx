@@ -20,7 +20,7 @@ import { SplitWalletService, SplitWallet, SplitWalletParticipant } from '../../s
 import { priceManagementService } from '../../services/priceManagementService';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/loggingService';
-import { Container } from '../../components/shared';
+import { Container, Header } from '../../components/shared';
 
 interface RouteParams {
   splitWalletId: string;
@@ -413,13 +413,10 @@ const SplitPaymentScreen: React.FC = () => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Pay Your Share</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <Header
+        title="Pay Your Share"
+        onBackPress={handleBack}
+      />
 
       <View style={styles.content}>
         {/* Bill Info Card */}

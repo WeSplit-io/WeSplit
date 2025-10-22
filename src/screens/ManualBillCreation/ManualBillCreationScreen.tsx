@@ -28,7 +28,7 @@ import { convertFiatToUSDC } from '../../services/fiatCurrencyService';
 import { parseAmount } from '../../libs/format/amount';
 import { styles } from './styles';
 import { logger } from '../../services/loggingService';
-import { Container } from '../../components/shared';
+import { Header, Container } from '../../components/shared';
 
 // Category options with images
 const CATEGORIES = [
@@ -355,22 +355,10 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.backIcon}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-        
-        <Text style={styles.title}>{isEditing ? 'Edit Bill' : 'Create Bill'}</Text>
-        
-        <View style={styles.headerSpacer} />
-      </View>
+      <Header
+        title={isEditing ? 'Edit Bill' : 'Create Bill'}
+        onBackPress={() => navigation.goBack()}
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Category Selection */}

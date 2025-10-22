@@ -49,7 +49,7 @@ import {
   UnifiedBillData,
   UnifiedParticipant
 } from '../../types/splitNavigation';
-import { Container } from '../../components/shared';
+import { Container, Header } from '../../components/shared';
 
 // Image mapping for category icons
 const CATEGORY_IMAGES: { [key: string]: any } = {
@@ -1178,34 +1178,26 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
 
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.navigate('SplitsList')}
-        >
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.backButtonIcon}
-          />
-        </TouchableOpacity>
-
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Split the Bill</Text>
-          {isRealtimeActive && (
-            <View style={styles.realtimeIndicator}>
-              <View style={styles.realtimeDot} />
-              <Text style={styles.realtimeText}>Live</Text>
-            </View>
-          )}
-        </View>
-
-        <TouchableOpacity style={styles.editButton} onPress={handleEditBill}>
-          <Image
-            source={require('../../../assets/edit-icon.png')}
-            style={styles.editButtonIcon}
-          />
-        </TouchableOpacity>
-      </View>
+      <Header
+        title="Split the Bill"
+        onBackPress={() => navigation.navigate('SplitsList')}
+        rightElement={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {isRealtimeActive && (
+              <View style={styles.realtimeIndicator}>
+                <View style={styles.realtimeDot} />
+                <Text style={styles.realtimeText}>Live</Text>
+              </View>
+            )}
+            <TouchableOpacity style={styles.editButton} onPress={handleEditBill}>
+              <Image
+                source={require('../../../assets/edit-icon.png')}
+                style={styles.editButtonIcon}
+              />
+            </TouchableOpacity>
+          </View>
+        }
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Bill Details Card */}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Alert, ScrollView, Image, Animated, PanResponder, StyleSheet } from 'react-native';
+import { Header } from '../../components/shared';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
@@ -448,18 +449,10 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {isSettlement ? 'Settlement Payment' : 'Send'}
-        </Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="{isSettlement ? 'Settlement Payment' : 'Send'}"
+        onBackPress={() => navigation.goBack()}
+      />
 
       <ScrollView
         style={styles.content}

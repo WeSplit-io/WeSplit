@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Text as RNText } from 'react-native';
+import { Header } from '../../components/shared';
 import { View, Text, TouchableOpacity, Image, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
@@ -155,16 +156,10 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
 
   return (
     <Container>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Select Action</Text>
-      </View>
+      <Header
+        title="Select Action"
+        onBackPress={() => navigation.goBack()}
+      />
 
       {/* Action Toggle - Using NotificationsScreen design */}
       <View style={styles.tabContainer}>

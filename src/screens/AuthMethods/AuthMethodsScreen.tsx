@@ -30,6 +30,7 @@ import { logOAuthConfiguration } from '../../utils/oauthTest';
 import { logger } from '../../services/loggingService';
 import { testEnvironmentVariables } from '../../utils/envTest';
 import { logOAuthDebugInfo } from '../../utils/oauthDebugger';
+import { Header } from '../../components/shared';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
@@ -628,11 +629,7 @@ const AuthMethodsScreen: React.FC = () => {
       >
         {/* Logo Section */}
         {/* Header with Logo */}
-        <View style={styles.header}>
-          <View style={styles.logoSection}>
-            <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2FWeSplitLogoName.png?alt=media&token=f785d9b1-f4e8-4f51-abac-e17407e4a48f' }} style={styles.logo} />
-          </View>
-        </View>
+        <Header variant="logoOnly" />
 
         <View style={styles.contentContainer}>
           {/* Social Login Buttons */}

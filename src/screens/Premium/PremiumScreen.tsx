@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { Header } from '../../components/shared';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
@@ -206,13 +207,10 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
   if (loading) {
     return (
       <Container>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Premium Features</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <Header
+        title="Premium Features"
+        onBackPress={() => navigation.goBack()}
+      />
         <View style={[styles.content, { justifyContent: 'center', alignItems: 'center' }]}>
           <ActivityIndicator size="large" color="#A5EA15" />
           <Text style={{ color: '#FFF', marginTop: 16 }}>Loading premium features...</Text>
@@ -223,13 +221,10 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
 
   return (
     <Container>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Premium Features</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="Premium Features"
+        onBackPress={() => navigation.goBack()}
+      />
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Current Subscription Status */}

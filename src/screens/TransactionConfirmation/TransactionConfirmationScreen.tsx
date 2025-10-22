@@ -14,7 +14,7 @@ import { useWallet } from '../../context/WalletContext';
 import { formatCryptoAmount } from '../../utils/cryptoUtils';
 import styles from './styles';
 import { logger } from '../../services/loggingService';
-import { Container } from '../../components/shared';
+import { Container, Header } from '../../components/shared';
 
 interface TransactionParams {
   type: 'payment' | 'settlement';
@@ -93,15 +93,10 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
 
   const renderConfirmStep = () => (
     <Container>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {params.type === 'payment' ? 'Send Payment' : 'Settle Balance'}
-        </Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title={params.type === 'payment' ? 'Send Payment' : 'Settle Balance'}
+        onBackPress={() => navigation.goBack()}
+      />
 
       <View style={styles.content}>
         {/* Recipient Info */}

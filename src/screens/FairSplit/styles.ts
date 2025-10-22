@@ -8,31 +8,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.black,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    backgroundColor: colors.black,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backButtonIcon: {
-    width: 20,
-    height: 20,
-    tintColor: colors.white,
-  },
-  headerTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
+
   realtimeIndicator: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, Image } from 'react-native';
+import { Header } from '../../components/shared';
 import { WebView } from 'react-native-webview';
 import Icon from '../../components/Icon';
 import { useWallet } from '../../context/WalletContext';
@@ -136,17 +137,10 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
 
   return (
     <Container>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>MoonPay</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="MoonPay"
+        onBackPress={handleBack}
+      />
 
       {/* WebView */}
       <View style={styles.webViewContainer}>

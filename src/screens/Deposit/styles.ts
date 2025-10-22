@@ -2,20 +2,7 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export default StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  backButton: {
-  },
-  iconWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 20,
-    height: 20,
-    margin: 8,
 
-  },
   content: {
     paddingVertical: spacing.xl,
   },

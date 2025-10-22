@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Text as RNText } from 'react-native';
+import { Header } from '../../components/shared';
 import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
@@ -128,16 +129,10 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image
-              source={require('../../../assets/chevron-left.png')}
-              style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Request</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="Request"
+        onBackPress={() => navigation.goBack()}
+      />
 
       {/* Recipient Info */}
       <View style={styles.requestRecipientAvatarContainer}>

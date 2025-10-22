@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { Header } from '../../components/shared';
 import Icon from '../../components/Icon';
 import SlideButton from '../../components/SlideButton';
 import { GroupMember } from '../../types';
@@ -61,13 +62,10 @@ const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Confirm Request</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="Confirm Request"
+        onBackPress={() => navigation.goBack()}
+      />
 
       <View style={styles.content}>
         {/* Confirmation Details */}

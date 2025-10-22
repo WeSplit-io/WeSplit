@@ -8,6 +8,7 @@ import AddDestinationSheet from '../../components/AddDestinationSheet';
 import { walletService } from '../../services/WalletService';
 import { styles } from './styles';
 import { logger } from '../../services/loggingService';
+import { Header, Container } from '../../components/shared';
 
 // Interfaces are now imported from the service
 
@@ -357,31 +358,27 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <TouchableWithoutFeedback onPress={closeDropdown}>
-        <View style={styles.container}>
+        <View>
           {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Image
-                source={require('../../../assets/chevron-left.png')}
-                style={styles.iconWrapper}
-                tintColor="white"
-              />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Linked Wallets</Text>
-            <TouchableOpacity 
-              style={[styles.addButton, isAdding && { opacity: 0.6 }]}
-              onPress={() => setShowAddModal(true)}
-              disabled={isAdding}
-            >
-              <Image
-                source={require('../../../assets/plus-icon-green.png')}
-                style={styles.addButtonIcon}
-                tintColor="white"
-              />
-            </TouchableOpacity>
-          </View>
+          <Header
+            title="Linked Wallets"
+            onBackPress={() => navigation.goBack()}
+            rightElement={
+              <TouchableOpacity 
+                style={[styles.addButton, isAdding && { opacity: 0.6 }]}
+                onPress={() => setShowAddModal(true)}
+                disabled={isAdding}
+              >
+                <Image
+                  source={require('../../../assets/plus-icon-green.png')}
+                  style={styles.addButtonIcon}
+                  tintColor="white"
+                />
+              </TouchableOpacity>
+            }
+          />
 
           {/* Content */}
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -429,7 +426,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           />
         </View>
       </TouchableWithoutFeedback>
-    </SafeAreaView>
+    </Container>
   );
 };
 

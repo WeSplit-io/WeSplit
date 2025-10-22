@@ -20,7 +20,7 @@ import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme/colors';
 import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { Container } from '../../components/shared';
+import { Container, Header } from '../../components/shared';
 
 const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   const { state, notifications, loadNotifications, refreshNotifications, acceptSplitInvitation } = useApp();
@@ -288,12 +288,15 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-          <Text style={styles.refreshButtonText}>Refresh</Text>
-        </TouchableOpacity>
-      </View>
+      <Header
+        title="Notifications"
+        variant="titleOnly"
+        rightElement={
+          <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+            <Text style={styles.refreshButtonText}>Refresh</Text>
+          </TouchableOpacity>
+        }
+      />
 
       {/* Notifications List */}
       <ScrollView

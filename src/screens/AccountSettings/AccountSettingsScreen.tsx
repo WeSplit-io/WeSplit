@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
-  TouchableOpacity, 
+  TouchableOpacity,
+  Image,
   ScrollView, 
   TextInput, 
   Alert, 
-  Image,
   Platform,
   ActionSheetIOS,
   StatusBar,
@@ -15,6 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Header } from '../../components/shared';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { colors, spacing } from '../../theme';
@@ -403,17 +404,11 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
   return (
     <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Account info</Text>
-        <View style={styles.placeholder} />
-      </View>
+      
+      <Header
+        title="Account info"
+        onBackPress={handleBackPress}
+      />
 
       {/* Main Content */}
       <View style={styles.mainContent}>

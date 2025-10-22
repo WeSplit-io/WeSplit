@@ -1,25 +1,25 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, Platform } from 'react-native';
+import { View, Text, Platform, Image } from 'react-native';
 import { colors } from '../../theme';
 import NavBar from '../../components/NavBar';
-import { Container } from '../../components/shared';
+import { Container, Header } from '../../components/shared';
 
 const RewardsScreen: React.FC<any> = ({ navigation }) => {
+  const handleBackPress = () => {
+    if (Platform.OS === 'android') {
+      navigation.navigate('Dashboard');
+    } else {
+      navigation.goBack();
+    }
+  };
+
   return (
     <Container>
-      <View style={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.black }}>
-        <TouchableOpacity onPress={() => {
-          if (Platform.OS === 'android') {
-            navigation.navigate('Dashboard');
-          } else {
-            navigation.goBack();
-          }
-        }} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-          <Image source={require('../../../assets/chevron-left.png')} style={{ width: 20, height: 20, tintColor: colors.white }} />
-        </TouchableOpacity>
-        <Text style={{ color: colors.white, fontSize: 20, fontWeight: '600' }}>Rewards</Text>
-        <View style={{ width: 40, height: 40 }} />
-      </View>
+      <Header
+        title="Rewards"
+        onBackPress={handleBackPress}
+        backgroundColor={colors.black}
+      />
 
       <View style={{ flex: 1, paddingHorizontal: 40, paddingTop: 8, paddingBottom: 100 }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

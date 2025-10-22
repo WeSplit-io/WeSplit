@@ -15,15 +15,7 @@ export const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 9999,
   },
-  
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    minHeight: 60,
-  },
+
 
   headerLeft: {
     flexDirection: 'row',

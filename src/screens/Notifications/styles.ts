@@ -2,32 +2,7 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export default StyleSheet.create({
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 24,
-    paddingBottom: 16,
-    backgroundColor: colors.darkBackground,
-  },
-  backButton: {
-    padding: 8,
-  },
-  iconWrapper: {
-    width: 20,
-    height: 20,
-    resizeMode: 'contain',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
-    flex: 1,
-    textAlign: 'center',
-    marginRight: 40, // Balance out back button
-  },
-  placeholder: {},
+
   // Tab Navigation
   tabContainer: {
     flexDirection: 'row',

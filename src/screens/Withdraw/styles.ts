@@ -24,33 +24,6 @@ export const styles = StyleSheet.create({
     minHeight: '100%',
   },
 
-  // ===== HEADER STYLES =====
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.screenPaddingHorizontal,
-    paddingVertical: 16,
-    backgroundColor: colors.black,
-  },
-  backButton: {
-    padding: 8,
-  },
-  iconWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 24,
-    height: 24,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.white,
-  },
-  placeholder: {
-    width: 40,
-  },
-
   // ===== ALERT & NOTIFICATION STYLES =====
   alertContainer: {
     flexDirection: 'row',

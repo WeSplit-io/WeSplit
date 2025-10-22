@@ -13,7 +13,7 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import { logger } from '../../services/loggingService';
 import type { LinkedWallet } from '../../services/LinkedWalletService';
-import { Container } from '../../components/shared';
+import { Container, Header } from '../../components/shared';
 
 const SendScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId, initialTab } = route.params || {};
@@ -258,17 +258,11 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
 
   return (
     <Container>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Send</Text>
-        <View style={styles.placeholder} />
-      </View>
+        {/* Header */}
+        <Header
+          title="Send"
+          onBackPress={() => navigation.goBack()}
+        />
 
       {/* Tab Selector */}
       <View style={styles.tabContainer}>

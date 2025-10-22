@@ -28,31 +28,6 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontWeight: '600',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    backgroundColor: colors.black,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backButtonIcon: {
-    width: 20,
-    height: 20,
-    tintColor: colors.white,
-  },
-  headerTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40, // Same width as back button to center the title
-  },
   cameraContainer: {
     flex: 1,
   },

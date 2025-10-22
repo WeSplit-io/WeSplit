@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Linking } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Linking } from 'react-native'; 
 import Icon from '../../components/Icon';
 import { useTranslation, i18nService, SupportedLanguage } from '../../services/i18nService';
+import { Container, Header } from '../../components/shared';
 import styles from './styles';
 
 interface LanguageScreenProps {
@@ -57,20 +57,20 @@ const LanguageScreen: React.FC<LanguageScreenProps> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('settings.language')}</Text>
-        <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
-          {loading ? (
-            <ActivityIndicator size="small" color="#A5EA15" />
-          ) : (
-            <Text style={styles.saveButtonText}>{t('common.save')}</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+    <Container>
+      <Header
+        title={t('settings.language')}
+        onBackPress={() => navigation.goBack()}
+        rightElement={
+          <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
+            {loading ? (
+              <ActivityIndicator size="small" color="#A5EA15" />
+            ) : (
+              <Text style={styles.saveButtonText}>{t('common.save')}</Text>
+            )}
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={styles.descriptionSection}>
@@ -147,7 +147,7 @@ const LanguageScreen: React.FC<LanguageScreenProps> = ({ navigation }) => {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </Container>
   );
 };
 

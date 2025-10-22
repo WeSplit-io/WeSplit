@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, Share, Image, TextInput, ScrollView } from 'react-native';
+import { Header } from '../../components/shared';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import { QrCodeView } from '@features/qr';
@@ -198,13 +199,10 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
     <Container>
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Image source={require('../../../assets/chevron-left.png')} style={styles.iconWrapper} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Crypto Transfer</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <Header
+          title="Crypto Transfer"
+          onBackPress={() => navigation.goBack()}
+        />
 
         <View style={styles.content}>
           {/* External Wallet Section */}

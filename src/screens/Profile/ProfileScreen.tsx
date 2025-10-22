@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, Alert, Switch, ActivityIndicator, Linking } from 'react-native';
+import { Header } from '../../components/shared';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
@@ -197,16 +198,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="Profile"
+        onBackPress={() => navigation.goBack()}
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Header Card */}

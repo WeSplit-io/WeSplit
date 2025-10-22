@@ -18,26 +18,7 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.black,
     position: 'relative',
   },
-  backButton: {
-    padding: 8,
-  },
-  iconWrapper: {
-    width: 24,
-    height: 24,
-    resizeMode: 'contain',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.white,
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-  },
-  placeholder: {
-    width: 24,
-  },
+
   content: {
     flex: 1,
   },

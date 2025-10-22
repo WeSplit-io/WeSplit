@@ -9,7 +9,6 @@ import {
   Alert,
   Animated
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
 import NotificationCard from '../../components/NotificationCard';
@@ -17,6 +16,7 @@ import { useApp } from '../../context/AppContext';
 import { notificationService, NotificationData } from '../../services/notificationService';
 import styles from './styles';
 import { colors } from '../../theme/colors';
+import { Container, Header } from '../../components/shared';
 
 const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   const { state, notifications, loadNotifications, refreshNotifications } = useApp();
@@ -160,38 +160,34 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.green} />
           <Text style={styles.loadingText}>Loading notifications...</Text>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <LinearGradient
         colors={[colors.background, colors.backgroundSecondary]}
-        style={styles.gradient}
       >
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Icon name="arrow-left" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Notifications</Text>
-          <View style={styles.headerRight}>
-            {unreadCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadCount}</Text>
-              </View>
-            )}
-          </View>
-        </View>
+        <Header
+          title="Notifications"
+          onBackPress={() => navigation.goBack()}
+          rightElement={
+            <View style={styles.headerRight}>
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount}</Text>
+                </View>
+              )}
+            </View>
+          }
+        />
 
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
@@ -264,7 +260,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           )}
         </ScrollView>
       </LinearGradient>
-    </SafeAreaView>
+    </Container>
   );
 };
 

@@ -18,9 +18,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { Container, Header } from '../../components/shared';
 import { styles } from './BillCameraStyles';
 import { logger } from '../../services/loggingService';
-import { Container } from '../../components/shared';
 
 interface BillCameraScreenProps {
   navigation: any;
@@ -175,21 +175,10 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
         <StatusBar barStyle="light-content" backgroundColor={colors.black} />
         
         {/* Header with Back Button and Title */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={retakePicture}
-          >
-            <Image 
-              source={require('../../../assets/chevron-left.png')} 
-              style={styles.backButtonIcon}
-            />
-          </TouchableOpacity>
-          
-          <Text style={styles.headerTitle}>Check Image</Text>
-          
-          <View style={styles.headerSpacer} />
-        </View>
+        <Header
+          title="Check Image"
+          onBackPress={retakePicture}
+        />
 
         {/* Full Height Image */}
         <View style={styles.fullHeightImageContainer}>
@@ -225,21 +214,10 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       {/* Header with Back Button and Title */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => navigation.goBack()}
-        >
-          <Image 
-            source={require('../../../assets/chevron-left.png')} 
-            style={styles.backButtonIcon}
-          />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>Scan your receipt</Text>
-        
-        <View style={styles.headerSpacer} />
-      </View>
+      <Header
+        title="Scan your receipt"
+        onBackPress={() => navigation.goBack()}
+      />
 
       {/* Camera View - Full Screen */}
       <View style={styles.cameraContainer}>

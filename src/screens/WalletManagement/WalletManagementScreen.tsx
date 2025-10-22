@@ -31,7 +31,7 @@ import { styles } from './styles';
 import { QRCodeScreen } from '../QRCode';
 import { createUsdcRequestUri } from '@features/qr';
 import { logger } from '../../services/loggingService';
-import { Container } from '../../components/shared';
+import { Container, Header } from '../../components/shared';
 
 const WalletManagementScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -697,16 +697,10 @@ const WalletManagementScreen: React.FC = () => {
     <Container>
 
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={{ width: 20, height: 20, tintColor: colors.white }}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Wallet</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="Wallet"
+        onBackPress={handleBack}
+      />
 
       <ScrollView
         style={styles.content}

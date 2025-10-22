@@ -23,28 +23,6 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '500',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    backgroundColor: colors.black,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: '500',
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    color: colors.white,
-  },
   content: {
     flex: 1,
   },

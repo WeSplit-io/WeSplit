@@ -2,25 +2,7 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export default StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.lg,
-    borderBottomWidth: spacing.borderWidthThin,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textLight,
-  },
-  placeholder: {
-    width: spacing.xxl + spacing.sm,
-  },
+
   content: {
     flex: 1,
   },

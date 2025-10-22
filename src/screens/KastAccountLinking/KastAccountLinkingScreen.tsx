@@ -19,7 +19,7 @@ import {
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { Container } from '../../components/shared';
+import { Container, Header } from '../../components/shared';
 
 interface KastAccountLinkingScreenProps {
   navigation: any;
@@ -100,20 +100,15 @@ const KastAccountLinkingScreen: React.FC<KastAccountLinkingScreenProps> = ({ nav
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.headerTitle}>Link Kast Account</Text>
-          
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-            <Text style={styles.skipButtonText}>Skip</Text>
-          </TouchableOpacity>
-        </View>
+        <Header
+          title="Link Kast Account"
+          onBackPress={() => navigation.goBack()}
+          rightElement={
+            <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+              <Text style={styles.skipButtonText}>Skip</Text>
+            </TouchableOpacity>
+          }
+        />
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Kast Icon and Title */}
@@ -209,26 +204,7 @@ const styles = StyleSheet.create({
   keyboardAvoidingView: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    backgroundColor: colors.black,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.xl,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-  },
+
   skipButton: {
     padding: spacing.sm,
   },

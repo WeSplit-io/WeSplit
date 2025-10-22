@@ -10,29 +10,7 @@ export const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
   },
-  // Header styles
-  header: {
-    position: 'relative',
-    height: 80,
-    backgroundColor: colors.black,
-  },
-  backButton: {
-    position: 'absolute',
-    top: 24,
-    zIndex: 10,
-    padding: 8,
-  },
-  iconWrapper: {
-    width: 24,
-    height: 24,
-    resizeMode: 'contain',
-  },
-  placeholder: {
-    position: 'absolute',
-    right: spacing.lg,
-    top: 24,
-    width: 24,
-  },
+
   scrollContent: {
     flex: 1,
   },

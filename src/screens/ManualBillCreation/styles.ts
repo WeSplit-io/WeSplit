@@ -4,29 +4,7 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
 export const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    backgroundColor: colors.black,
-  },
-  backButton: {
-    padding: spacing.sm,
-  },
-  backIcon: {
-    width: 20,
-    height: 20,
-    tintColor: colors.white,
-  },
-  title: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-  },
-  headerSpacer: {
-    width: 40,
-  },
+
   content: {
     flex: 1,
   },

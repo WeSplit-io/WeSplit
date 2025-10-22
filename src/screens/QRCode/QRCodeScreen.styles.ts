@@ -4,34 +4,7 @@ import { colors, spacing, typography } from '../../theme';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const styles = StyleSheet.create({
-  // Header Styles
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    width: 20,
-    height: 20,
-    tintColor: colors.white,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.white,
-    textAlign: 'center',
-  },
-  menuButton: {
-    width: 40,
-    height: 40,
-  },
+
 
   // Tab Content Styles
   tabContent: {

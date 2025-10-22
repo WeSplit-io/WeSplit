@@ -21,7 +21,7 @@ import styles from './styles';
 import { colors } from '../../theme/colors';
 import { logger } from '../../services/loggingService';
 
-import { Container } from '../../components/shared';
+import { Container, Header } from '../../components/shared';
 
 type TabType = 'all' | 'income' | 'expenses';
 
@@ -576,16 +576,10 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>History</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="History"
+        onBackPress={handleBack}
+      />
       
       {/* Filter Tabs */}
       <View style={styles.tabContainer}>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, Image } from 'react-native';
+import { Header } from '../../components/shared';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import MoonPayWidget from '../../components/MoonPayWidget';
@@ -101,16 +102,10 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title={getHeaderTitle()}
+        onBackPress={() => navigation.goBack()}
+      />
 
       <View style={styles.content}>
         <View style={styles.mainContent}>

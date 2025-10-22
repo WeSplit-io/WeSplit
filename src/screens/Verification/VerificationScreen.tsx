@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, Linking, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Header } from '../../components/shared';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
@@ -219,18 +220,15 @@ const VerificationScreen: React.FC = () => {
       >
         <View style={styles.mainContainer}>
           {/* Header with Back Button and Logo */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Image
-                source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fchevron-left.png?alt=media&token=6b27382f-b023-4b4c-912c-96fd9139d704'}}
-                style={styles.iconWrapper}
+          <Header
+            onBackPress={() => navigation.goBack()}
+            rightElement={
+              <Image 
+                source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-linear.png?alt=media&token=6089c64e-c1dd-4488-8431-feb9041309b4'}} 
+                style={styles.logo} 
               />
-            </TouchableOpacity>
-            <View style={styles.logoSection}>
-                <Image source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-linear.png?alt=media&token=6089c64e-c1dd-4488-8431-feb9041309b4'}} style={styles.logo} />
-              </View>
-            <View style={styles.placeholder} />
-          </View>
+            }
+          />
 
           {/* Main Content - Scrollable */}
           <ScrollView 

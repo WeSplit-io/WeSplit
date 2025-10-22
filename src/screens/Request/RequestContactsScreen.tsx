@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
+import { Header } from '../../components/shared';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
 import ContactsList from '../../components/ContactsList';
@@ -71,16 +72,10 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Request</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="Request"
+        onBackPress={() => navigation.goBack()}
+      />
 
       {/* Tabs - Hidden */}
       {/* <View style={styles.requestTabsContainer}>

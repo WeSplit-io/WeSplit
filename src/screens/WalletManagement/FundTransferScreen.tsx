@@ -13,7 +13,7 @@ import { useApp } from '../../context/AppContext';
 import { walletService } from '../../services/WalletService';
 import { colors, spacing, typography } from '../../theme';
 import { logger } from '../../services/loggingService';
-import { Container } from '../../components/shared';
+import { Container, Header } from '../../components/shared';
 
 interface FundTransferScreenProps {
   navigation: any;
@@ -132,9 +132,10 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
 
   return (
     <Container>
-      <View style={styles.header}>
-        <Text style={styles.title}>Transfer Funds</Text>
-      </View>
+      <Header
+        title="Transfer Funds"
+        variant="titleOnly"
+      />
 
       <ScrollView style={styles.scrollView}>
         {/* App Wallet Info */}
@@ -254,16 +255,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textLight,
   },
-  header: {
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.darkBorder,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.textLight,
-  },
+
   scrollView: {
     flex: 1,
   },
