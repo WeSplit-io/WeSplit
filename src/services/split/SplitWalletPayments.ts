@@ -1552,16 +1552,26 @@ export class SplitWalletPayments {
         };
       }
 
-      // Execute transaction using degen split specific method
-      const transactionResult = await executeDegenSplitTransaction(
-          wallet.walletAddress,
-          privateKeyResult.privateKey,
-          userWallet.address,
-          totalAmount,
-          wallet.currency,
-        description || `Degen Split loser refund for ${loserUserId}`,
-        'withdrawal'
-      );
+      // Execute transaction using fast or standard method based on fastMode
+      const transactionResult = fastMode 
+        ? await executeFastTransaction(
+            wallet.walletAddress,
+            privateKeyResult.privateKey,
+            userWallet.address,
+            totalAmount,
+            wallet.currency,
+            description || `Degen Split loser refund for ${loserUserId}`,
+            'withdrawal'
+          )
+        : await executeDegenSplitTransaction(
+            wallet.walletAddress,
+            privateKeyResult.privateKey,
+            userWallet.address,
+            totalAmount,
+            wallet.currency,
+            description || `Degen Split loser refund for ${loserUserId}`,
+            'withdrawal'
+          );
       
       logger.info('💸 Degen loser payment transaction result', {
         success: transactionResult.success,
