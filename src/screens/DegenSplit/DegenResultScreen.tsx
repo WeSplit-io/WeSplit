@@ -288,7 +288,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
 
   // Event handlers
   const handleBack = () => {
-    navigation.goBack();
+    navigation.navigate('SplitsList');
   };
 
   const handleExternalPayment = async () => {

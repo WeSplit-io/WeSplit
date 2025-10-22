@@ -238,7 +238,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
   };
 
   const handleBack = () => {
-    navigation.goBack();
+    navigation.navigate('SplitsList');
   };
 
   return (

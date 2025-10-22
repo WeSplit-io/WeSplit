@@ -2400,7 +2400,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           billDate={billInfo.date.data}
           totalAmount={totalAmount}
           category={splitData?.category || processedBillData?.category || billData?.category}
-          onBackPress={() => navigation.goBack()}
+          onBackPress={() => navigation.navigate('SplitsList')}
           isRealtimeActive={isRealtimeActive}
         />
 

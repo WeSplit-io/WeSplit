@@ -364,7 +364,7 @@ const SplitPaymentScreen: React.FC = () => {
   };
 
   const handleBack = () => {
-    navigation.goBack();
+    navigation.navigate('SplitsList');
   };
 
   if (isLoading) {
