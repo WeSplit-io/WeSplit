@@ -5,7 +5,7 @@
 
 import { useState, useRef } from 'react';
 import { Animated } from 'react-native';
-import { SplitWallet } from '../../../services/splits';
+import { SplitWallet } from '../../../services/split';
 
 export interface DegenSplitState {
   // Wallet management

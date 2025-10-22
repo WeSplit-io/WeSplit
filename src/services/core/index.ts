@@ -34,5 +34,30 @@ export {
   setLanguage
 } from './i18nService';
 
+// Re-export price utilities
+export { 
+  formatCurrencyAmount,
+  convertFiatToUSDC
+} from './priceService';
+
+// Re-export deep link utilities
+export { 
+  deepLinkHandler,
+  parseWeSplitDeepLink
+} from './deepLinkHandler';
+
+// Re-export Solana Pay utilities
+export { 
+  isSolanaPayUri,
+  parseUri,
+  extractRecipientAddress,
+  createUsdcRequestUri
+} from './solanaPay';
+
+// Re-export validation utilities
+export { 
+  isValidSolanaAddress
+} from '../../utils/wallet/walletUtils';
+
 // Default export for backward compatibility
 export { loggingService as default } from './loggingService';

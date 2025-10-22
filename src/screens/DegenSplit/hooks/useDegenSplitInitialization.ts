@@ -172,7 +172,7 @@ export const useDegenSplitInitialization = (
 
     const interval = setInterval(async () => {
       try {
-        const { SplitWalletService } = await import('../../../services/splits');
+        const { SplitWalletService } = await import('../../../services/split');
         const searchResult = await SplitWalletService.getSplitWalletByBillId(splitData.id);
         
         if (searchResult.success && searchResult.wallet) {

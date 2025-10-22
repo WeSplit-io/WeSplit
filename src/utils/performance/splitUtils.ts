@@ -5,7 +5,7 @@
  */
 
 import { logger } from '../services/core';
-import { calculateEqualSplit as currencyCalculateEqualSplit } from '../format';
+import { calculateEqualSplit as currencyCalculateEqualSplit } from '../../OLD_LEGACY/deprecated_utils/currencyUtils';
 
 // Types
 export interface SplitCalculationResult {
@@ -353,6 +353,15 @@ export class SplitDataTransformUtils {
    * @returns Formatted amount string
    */
   static formatSplitAmount(amount: number, currency: string = 'USD', decimals: number = 2): string {
+    // Handle USDC as a special case since it's not a standard ISO 4217 currency code
+    if (currency === 'USDC') {
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      }).format(amount) + ' USDC';
+    }
+    
+    // For other currencies, use standard currency formatting
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,

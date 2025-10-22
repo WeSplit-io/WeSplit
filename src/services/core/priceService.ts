@@ -155,6 +155,15 @@ export async function getTotalSpendingInUSDC(expenses: {amount: number, currency
 // Export missing functions
 export const convertFiatToUSDC = convertToUSDC;
 export const formatCurrencyAmount = (amount: number, currency: string = 'USD'): string => {
+  // Handle USDC as a special case since it's not a standard ISO 4217 currency code
+  if (currency === 'USDC') {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount) + ' USDC';
+  }
+  
+  // For other currencies, use standard currency formatting
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency,

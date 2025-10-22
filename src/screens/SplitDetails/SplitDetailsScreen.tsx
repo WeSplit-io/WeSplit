@@ -34,7 +34,7 @@ import { NFCSplitService } from '../../services/core';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/core';
 import { firebaseDataService } from '../../services/data';
-import { splitStorageService, Split, SplitStorageService, splitInvitationService, SplitInvitationService } from '../../services/splits';
+import { splitStorageService, Split, SplitStorageService, SplitInvitationServiceClass } from '../../services/splits';
 import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';
 // Removed SplitWalletService import - wallets are now created only when split type is selected
 import { FallbackDataService } from '../../services/data';
@@ -597,7 +597,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       };
 
       // Generate shareable link
-      const shareableLink = SplitInvitationService.generateShareableLink(invitationData);
+      const shareableLink = SplitInvitationServiceClass.generateShareableLink(invitationData);
       setQrCodeData(shareableLink);
     } else {
       // Set a fallback QR code data if no split ID is available
@@ -613,7 +613,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
     try {
       setIsJoiningSplit(true);
-      const result = await SplitInvitationService.joinSplit({
+      const result = await SplitInvitationServiceClass.joinSplit({
         type: 'split_invitation',
         splitId: splitId,
         billName: currentSplitData?.title || billName,
@@ -1022,7 +1022,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       }
 
       // Generate invitation data
-      const invitationData = SplitInvitationService.generateInvitationData(
+      const invitationData = SplitInvitationServiceClass.generateInvitationData(
         splitId,
         billName,
         parseFloat(totalAmount),
@@ -1032,7 +1032,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       );
 
       // Generate shareable link
-      const shareableLink = SplitInvitationService.generateShareableLink(invitationData);
+      const shareableLink = SplitInvitationServiceClass.generateShareableLink(invitationData);
 
       // Copy to clipboard and show success message
       await Clipboard.setStringAsync(shareableLink);
@@ -1243,7 +1243,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   </Text>
                 </View>
 
-              </View>rrr
+              </View>
 
             </View>
 

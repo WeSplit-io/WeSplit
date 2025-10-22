@@ -81,9 +81,25 @@ class PriceManagementService {
   }
 
   public formatPrice(amount: number, currency: string): string {
+    // Handle special cases for non-standard currency codes
+    if (currency === 'USDC') {
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(amount) + ' USDC';
+    }
+    
+    if (currency === 'SOL') {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(amount);
+    }
+    
+    // For standard currencies, use normal formatting
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currency === 'SOL' ? 'USD' : currency
+      currency: currency
     }).format(amount);
   }
 

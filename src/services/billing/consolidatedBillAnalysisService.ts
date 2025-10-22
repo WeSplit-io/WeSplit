@@ -13,7 +13,7 @@ import {
 } from '../types/billAnalysis';
 import { OCRProcessingResult, BillItem } from '../types/billSplitting';
 import { logger } from '../core/loggingService';
-import { calculateEqualSplit } from '../../utils/format';
+import { calculateEqualSplit } from '../../OLD_LEGACY/deprecated_utils/currencyUtils';
 import { MockupDataService } from '../data/mockupData';
 
 // Configuration interfaces

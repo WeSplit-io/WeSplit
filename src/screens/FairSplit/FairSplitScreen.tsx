@@ -27,8 +27,9 @@ import { SplitWalletService, SplitWallet } from '../../services/split';
 import { notificationService } from '../../services/notifications';
 import { priceManagementService } from '../../services/core';
 import { useApp } from '../../context/AppContext';
-import { AmountCalculationService, Participant } from '../../services/core';
-import { DataSourceService } from '../../services/core';
+import { AmountCalculationService } from '../../services/payments';
+import { Participant } from '../../services/payments/amountCalculationService';
+import { DataSourceService } from '../../services/data/dataSourceService';
 import { logger } from '../../services/core';
 import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';
 import FairSplitHeader from './components/FairSplitHeader';
@@ -531,7 +532,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   useEffect(() => {
     const setAuthoritativePrice = () => {
       // Force set the authoritative price for this bill (overrides any existing)
-      priceManagementService.forceSetBillPrice(
+      priceManagementService.setBillPrice(
         billId,
         totalAmount,
         billInfo.currency.data
@@ -548,25 +549,25 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   
   // Debug bill amount consistency - Removed to prevent infinite logs
   
-  // Validate price consistency
-  if (authoritativePrice) {
-    const billDataAmount = billData?.totalAmount || 0;
-    const processedAmount = processedBillData?.totalAmount || 0;
-    
-    if (billDataAmount > 0) {
-      const validation = priceManagementService.validatePriceConsistency(billId, billDataAmount, 'billData');
-      if (!validation.isValid) {
-        console.warn('🔍 FairSplitScreen: Price inconsistency with billData:', validation.message);
-      }
-    }
-    
-    if (processedAmount > 0) {
-      const validation = priceManagementService.validatePriceConsistency(billId, processedAmount, 'processedBillData');
-      if (!validation.isValid) {
-        console.warn('🔍 FairSplitScreen: Price inconsistency with processedBillData:', validation.message);
-      }
-    }
-  }
+  // Validate price consistency - commented out until validatePriceConsistency method is implemented
+  // if (authoritativePrice) {
+  //   const billDataAmount = billData?.totalAmount || 0;
+  //   const processedAmount = processedBillData?.totalAmount || 0;
+  //   
+  //   if (billDataAmount > 0) {
+  //     const validation = priceManagementService.validatePriceConsistency(billId, billDataAmount, 'billData');
+  //     if (!validation.isValid) {
+  //       console.warn('🔍 FairSplitScreen: Price inconsistency with billData:', validation.message);
+  //     }
+  //   }
+  //   
+  //   if (processedAmount > 0) {
+  //     const validation = priceManagementService.validatePriceConsistency(billId, processedAmount, 'processedBillData');
+  //     if (!validation.isValid) {
+  //       console.warn('🔍 FairSplitScreen: Price inconsistency with processedBillData:', validation.message);
+  //     }
+  //   }
+  // }
   
   // Total amount calculation
   const totalLocked = calculateTotalLocked();

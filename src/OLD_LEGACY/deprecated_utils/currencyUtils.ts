@@ -4,12 +4,12 @@
  */
 
 // Re-export from unified format utils for backward compatibility
-import { logger } from '../services/core';
-export { roundUsdcAmount, formatUsdcAmount } from './formatUtils';
+import { logger } from '../../services/core';
+export { roundUsdcAmount, formatUsdcAmount } from '../../utils/format';
 
 // Verify export at module load time
 if (__DEV__) {
-  const { roundUsdcAmount: testFunc } = require('./formatUtils');
+  const { roundUsdcAmount: testFunc } = require('../../utils/format');
   logger.debug('roundUsdcAmount export verified', { type: typeof testFunc }, 'currencyUtils');
 }
 
