@@ -186,47 +186,24 @@ export const styles = StyleSheet.create({
     color: colors.black,
     
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: colors.blackOverlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: colors.blackWhite5,
-    borderRadius: spacing.radiusLg,
-    padding: spacing.lg,
-    width: '80%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    ...typography.textStyles.h6,
-    color: colors.white,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
+
+  /** ================================ Currency Picker Modal Styles ================================ */
   currencyOption: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderRadius: spacing.radiusSm,
+    padding: spacing.md,
+    borderRadius: spacing.md,
     marginBottom: spacing.sm,
   },
   currencyOptionSelected: {
-    backgroundColor: colors.green + '20',
+    backgroundColor: colors.white5,
   },
   currencyOptionText: {
-    ...typography.textStyles.body,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
     color: colors.white,
   },
-  modalCloseButton: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-  },
-  modalCloseText: {
-    ...typography.textStyles.body,
-    color: colors.textLightSecondary,
-  },
+
+    /** ================================ Date Picker Modal Styles ================================ */
+
   datePickerModalContent: {
     backgroundColor: colors.blackWhite5,
     borderRadius: spacing.radiusLg,

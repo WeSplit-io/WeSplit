@@ -28,7 +28,7 @@ import { convertFiatToUSDC } from '../../../services/core';
 import { parseAmount } from '../../../OLD_LEGACY/deprecated_utils/amount';
 import { styles } from './styles';
 import { logger } from '../../../services/core';
-import { Container } from '../../../components/shared';
+import { Container, Modal as CustomModal, Header, Button } from '../../../components/shared';
 
 // Category options with images
 const CATEGORIES = [
@@ -104,6 +104,8 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isDateModified, setIsDateModified] = useState(false);
+  const [initialDate, setInitialDate] = useState<Date | null>(null);
 
   // Validation state
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
@@ -168,12 +170,17 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
   const handleDateChange = (event: any, selectedDate?: Date) => {
     if (selectedDate) {
       setSelectedDate(selectedDate);
+      // Comparer avec la date initiale pour détecter les vraies modifications
+      if (initialDate && selectedDate.getTime() !== initialDate.getTime()) {
+        setIsDateModified(true);
+      }
     }
   };
 
   // Handle date picker close
   const handleDatePickerClose = () => {
     setShowDatePicker(false);
+    setIsDateModified(false); // Réinitialiser l'état de modification
   };
 
   // Handle currency selection
@@ -353,24 +360,12 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
   return (
     <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Image
-            source={require('../../../../assets/chevron-left.png')}
-            style={styles.backIcon}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-        
-        <Text style={styles.title}>{isEditing ? 'Edit Bill' : 'Create Bill'}</Text>
-        
-        <View style={styles.headerSpacer} />
-      </View>
+      <Header
+        title={isEditing ? 'Edit Bill' : 'Create Bill'}
+        onBackPress={() => navigation.goBack()}
+        showBackButton={true}
+      />
+     
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Category Selection */}
@@ -434,7 +429,11 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
           <Text style={styles.sectionLabel}>Date</Text>
           <TouchableOpacity
             style={styles.dateInput}
-            onPress={() => setShowDatePicker(true)}
+            onPress={() => {
+              setInitialDate(selectedDate); // Enregistrer la date initiale
+              setIsDateModified(false); // Réinitialiser l'état
+              setShowDatePicker(true);
+            }}
           >
             <Text style={styles.dateText}>{formatDate(selectedDate)}</Text>
             <Image
@@ -529,69 +528,57 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       </View>
 
       {/* Date Picker Modal */}
-      <Modal
+      <CustomModal
         visible={showDatePicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={handleDatePickerClose}
+        onClose={handleDatePickerClose}
+        showHandle={true}
+        closeOnBackdrop={true}
+        title="Select Date"
+        description="Choose the date for this bill"
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.datePickerModalContent}>
-            <View style={styles.datePickerHeader}>
-              <Text style={styles.modalTitle}>Select Date</Text>
-              <TouchableOpacity
-                onPress={handleDatePickerClose}
-                style={styles.datePickerCloseButton}
-              >
-                <Text style={styles.datePickerCloseText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-            <DateTimePicker
-              value={selectedDate}
-              mode="date"
-              display="spinner"
-              onChange={handleDateChange}
-              style={styles.datePicker}
-              textColor={colors.white}
-              themeVariant="dark"
-            />
-          </View>
-        </View>
-      </Modal>
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display="spinner"
+          onChange={handleDateChange}
+          style={styles.datePicker}
+          textColor={colors.white}
+          themeVariant="dark"
+        />
+        <Button
+          title={`${isDateModified ? 'Done' : 'Select Date'}`}
+          onPress={handleDatePickerClose}
+          variant="primary"
+          disabled={!isDateModified}
+          fullWidth={true}
+        />
+      </CustomModal>
 
       {/* Currency Picker Modal */}
-      <Modal
+      <CustomModal
         visible={showCurrencyPicker}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowCurrencyPicker(false)}
+        onClose={() => setShowCurrencyPicker(false)}
+        showHandle={true}
+        closeOnBackdrop={true}
+        title="Select Currency"
+        description="Choose your preferred currency for this bill"
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Currency</Text>
-            {CURRENCIES.map((currency) => (
-              <TouchableOpacity
-                key={currency.code}
-                style={[
-                  styles.currencyOption,
-                  selectedCurrency.code === currency.code && styles.currencyOptionSelected,
-                ]}
-                onPress={() => handleCurrencySelect(currency)}
-              >
-                <Text style={styles.currencyOptionText}>
-                  {currency.symbol} {currency.name} ({currency.code})
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowCurrencyPicker(false)}
-            >
-              <Text style={styles.modalCloseText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        {CURRENCIES.map((currency) => (
+          <TouchableOpacity
+            key={currency.code}
+            style={[
+              styles.currencyOption,
+              selectedCurrency.code === currency.code && styles.currencyOptionSelected,
+            ]}
+            onPress={() => handleCurrencySelect(currency)}
+          >
+            <Text style={styles.currencyOptionText}>
+              {currency.symbol} {currency.name} ({currency.code})
+            </Text>
+          </TouchableOpacity>
+        ))}
+      
+      </CustomModal>
     </Container>
   );
 };
