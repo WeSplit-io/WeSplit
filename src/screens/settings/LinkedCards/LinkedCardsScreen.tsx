@@ -28,6 +28,10 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   useEffect(() => {
     if (currentUser?.id) {
       loadLinkedDestinations();
+    } else {
+      // If no current user, set loading to false to show empty state
+      console.log('LinkedCardsScreen: No current user available');
+      setIsLoading(false);
     }
   }, [currentUser?.id]);
 
@@ -63,10 +67,12 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
 
   const loadLinkedDestinations = async () => {
     if (!currentUser?.id) {
+      console.log('LinkedCardsScreen: No current user ID available');
       setIsLoading(false);
       return;
     }
 
+    console.log('LinkedCardsScreen: Starting to load linked destinations for user:', currentUser.id);
     setIsLoading(true);
     try {
       logger.info('Loading linked destinations for user', { userId: currentUser.id }, 'LinkedCardsScreen');
@@ -75,6 +81,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
       // Get linked destinations from LinkedWalletService
       const linkedData = await LinkedWalletService.getLinkedDestinations(currentUser.id.toString());
       
+      console.log('LinkedCardsScreen: Received linked data:', linkedData);
       logger.info('Loaded linked destinations', {
         wallets: linkedData.externalWallets.length,
         cards: linkedData.kastCards.length
@@ -86,6 +93,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
       console.error('❌ Error loading linked destinations:', error);
       Alert.alert('Error', 'Failed to load linked destinations');
     } finally {
+      console.log('LinkedCardsScreen: Setting loading to false');
       setIsLoading(false);
     }
   };
@@ -150,14 +158,14 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
             isActive: destination.status === 'active'
           };
           setKastCards(prev => [...prev, newCard]);
-          logger.info('KAST card added successfully', { 
+          logger.info('SOLANA card added successfully', { 
             cardId: newCard.id,
             status: newCard.status,
             balance: newCard.balance 
           }, 'LinkedCardsScreen');
-          Alert.alert('Success', `KAST card "${newCard.label}" has been linked successfully!`);
+          Alert.alert('Success', `SOLANA card "${newCard.label}" has been linked successfully!`);
         } else {
-          Alert.alert('Error', result.error || 'Failed to add KAST card');
+          Alert.alert('Error', result.error || 'Failed to add SOLANA card');
         }
       }
       
@@ -215,8 +223,8 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
     }
 
     Alert.alert(
-      'Unlink KAST Card',
-      'Are you sure you want to unlink this KAST card?',
+      'Unlink SOLANA Card',
+      'Are you sure you want to unlink this SOLANA card?',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -227,10 +235,10 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
               // Linked wallets functionality moved to walletService
               setKastCards(prev => prev.filter(card => card.id !== cardId));
               setExpandedItemId(null);
-              logger.info('KAST card unlinked successfully', null, 'LinkedCardsScreen');
+              logger.info('SOLANA card unlinked successfully', null, 'LinkedCardsScreen');
             } catch (error) {
-              console.error('❌ Error unlinking KAST card:', error);
-              const errorMessage = error instanceof Error ? error.message : 'Failed to unlink KAST card';
+              console.error('❌ Error unlinking SOLANA card:', error);
+              const errorMessage = error instanceof Error ? error.message : 'Failed to unlink SOLANA card';
               Alert.alert('Error', errorMessage);
             }
           }
@@ -248,6 +256,11 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const isGlobalEmpty = externalWallets.length === 0 && kastCards.length === 0;
+
+  // Debug logging
+  console.log('LinkedCardsScreen render - isLoading:', isLoading, 'isGlobalEmpty:', isGlobalEmpty, 'externalWallets:', externalWallets.length, 'kastCards:', kastCards.length, 'currentUser:', currentUser?.id);
+  console.log('LinkedCardsScreen render - externalWallets array:', externalWallets);
+  console.log('LinkedCardsScreen render - kastCards array:', kastCards);
 
   const renderExternalWallets = () => {
     return (
@@ -310,9 +323,9 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   const renderKastCards = () => {
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Kast Cards</Text>
+        <Text style={styles.sectionTitle}>SOLANA Cards</Text>
         {kastCards.length === 0 ? (
-          <Text style={styles.emptyCategoryText}>No KAST cards yet</Text>
+          <Text style={styles.emptyCategoryText}>No SOLANA cards yet</Text>
         ) : (
           kastCards.map((card) => (
             <View key={card.id} style={styles.destinationItemContainer}>
@@ -393,6 +406,19 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>Loading...</Text>
               </View>
+            ) : !currentUser?.id ? (
+              <View style={styles.globalEmptyState}>
+                <View style={styles.globalEmptyStateIcon}>
+                  <Image 
+                    source={require('../../../../assets/link-icon.png')} 
+                    style={styles.globalEmptyStateIconImage}
+                  />
+                </View>
+                <Text style={styles.globalEmptyStateTitle}>Please log in to view linked wallets</Text>
+                <Text style={styles.globalEmptyStateSubtitle}>
+                  You need to be logged in to manage your linked wallets and SOLANA cards
+                </Text>
+              </View>
             ) : isGlobalEmpty ? (
               <View style={styles.globalEmptyState}>
                 <View style={styles.globalEmptyStateIcon}>
@@ -401,15 +427,15 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
                     style={styles.globalEmptyStateIconImage}
                   />
                 </View>
-                <Text style={styles.globalEmptyStateTitle}>No linked wallets or KAST cards yet</Text>
+                <Text style={styles.globalEmptyStateTitle}>No linked wallets or SOLANA cards yet</Text>
                 <Text style={styles.globalEmptyStateSubtitle}>
-                  Add wallets and KAST cards to easily send funds and manage expenses
+                  Add wallets and SOLANA cards to easily send funds and manage expenses
                 </Text>
                 <TouchableOpacity 
                   style={styles.globalEmptyStateButton}
                   onPress={() => setShowAddModal(true)}
                 >
-                  <Text style={styles.globalEmptyStateButtonText}>Link Wallet or KAST Card</Text>
+                  <Text style={styles.globalEmptyStateButtonText}>Link Wallet or SOLANA Card</Text>
                 </TouchableOpacity>
               </View>
             ) : (

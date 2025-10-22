@@ -52,27 +52,33 @@ export class LinkedWalletService {
 
       const linkedWallets = await firebaseDataService.linkedWallet.getLinkedWallets(userId);
       
+      console.log('LinkedWalletService: Raw wallets from Firebase:', linkedWallets);
+      
       // Transform the data to ensure consistent structure
-      const transformedWallets: LinkedWallet[] = linkedWallets.map(wallet => ({
-        id: wallet.id,
-        userId: wallet.userId,
-        type: wallet.type || 'external',
-        label: wallet.label || 'Unknown',
-        // For KAST cards, use identifier as address if address is not present
-        address: wallet.address || wallet.identifier,
-        identifier: wallet.identifier,
-        chain: wallet.chain || 'solana',
-        cardType: wallet.cardType,
-        status: wallet.status || 'active',
-        balance: wallet.balance,
-        currency: wallet.currency || 'USD',
-        expirationDate: wallet.expirationDate,
-        cardholderName: wallet.cardholderName,
-        isActive: wallet.isActive !== false,
-        createdAt: wallet.created_at || wallet.createdAt || new Date().toISOString(),
-        updatedAt: wallet.updated_at || wallet.updatedAt || new Date().toISOString(),
-        lastUsed: wallet.lastUsed
-      }));
+      const transformedWallets: LinkedWallet[] = linkedWallets.map(wallet => {
+        const transformed = {
+          id: wallet.id,
+          userId: wallet.userId,
+          type: wallet.type || 'external',
+          label: wallet.label || 'Unknown',
+          // For KAST cards, use identifier as address if address is not present
+          address: wallet.address || wallet.identifier,
+          identifier: wallet.identifier,
+          chain: wallet.chain || 'solana',
+          cardType: wallet.cardType,
+          status: wallet.status || 'active',
+          balance: wallet.balance,
+          currency: wallet.currency || 'USD',
+          expirationDate: wallet.expirationDate,
+          cardholderName: wallet.cardholderName,
+          isActive: wallet.isActive !== false,
+          createdAt: wallet.created_at || wallet.createdAt || new Date().toISOString(),
+          updatedAt: wallet.updated_at || wallet.updatedAt || new Date().toISOString(),
+          lastUsed: wallet.lastUsed
+        };
+        console.log('LinkedWalletService: Transformed wallet:', transformed);
+        return transformed;
+      });
 
       logger.info('Linked wallets retrieved successfully', { 
         userId, 

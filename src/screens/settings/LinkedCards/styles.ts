@@ -4,6 +4,9 @@ import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
 
 export const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   addButton: {
     width: 32,
     height: 32,

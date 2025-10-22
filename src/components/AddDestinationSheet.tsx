@@ -143,7 +143,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     setDestinationType('wallet'); // Reset to default type
   };
 
-  // Clear form fields when switching between wallet and KAST card types
+  // Clear form fields when switching between wallet and SOLANA card types
   useEffect(() => {
     // Clear the fields that are not relevant to the current type
     if (destinationType === 'wallet') {
@@ -180,7 +180,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     } else if (destinationType === 'kast') {
       const addressValidation = validateKastWalletAddress(kastAddress);
       if (!addressValidation.isValid) {
-        newErrors.kastAddress = addressValidation.error || 'Please enter a valid KAST card wallet address';
+        newErrors.kastAddress = addressValidation.error || 'Please enter a valid SOLANA card wallet address';
       }
     }
 
@@ -204,15 +204,15 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
       return;
     }
 
-    // For KAST cards, validate the wallet address and get card information
+    // For SOLANA cards, validate the wallet address and get card information
     if (destinationType === 'kast') {
       try {
         const { ExternalCardService } = await import('../services/external/ExternalCardService');
         
-        // Validate KAST card wallet address
+        // Validate SOLANA card wallet address
         const validation = await ExternalCardService.validateKastCard(kastAddress.trim());
         if (!validation.isValid) {
-          setErrors({ kastAddress: validation.error || 'Invalid KAST card wallet address' });
+          setErrors({ kastAddress: validation.error || 'Invalid SOLANA card wallet address' });
           return;
         }
 
@@ -243,7 +243,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
         resetForm();
         return;
       } catch (error) {
-        console.error('Error validating KAST card:', error);
+        console.error('Error validating SOLANA card:', error);
         setErrors({ kastAddress: 'Failed to validate card. Please try again.' });
         return;
       }
@@ -292,12 +292,12 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
 
   const renderKastForm = () => (
     <View style={styles.formSection}>
-      <Text style={styles.inputLabel}>KAST Wallet Address</Text>
+      <Text style={styles.inputLabel}>SOLANA Wallet Address</Text>
       <TextInput
         style={styles.inputField}
         value={kastAddress}
         onChangeText={setKastAddress}
-        placeholder="Enter KAST card wallet address"
+        placeholder="Enter SOLANA card wallet address"
         placeholderTextColor={colors.textSecondary}
         autoCapitalize="none"
         autoCorrect={false}
@@ -394,7 +394,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
                         styles.segmentText,
                         destinationType === 'kast' && styles.segmentTextActive
                       ]}>
-                        Kast Card
+                        SOLANA Card
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -429,12 +429,12 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
                     </View>
                   ) : (
                     <View>
-                      <Text style={styles.inputLabel}>KAST Card Address</Text>
+                      <Text style={styles.inputLabel}>SOLANA Card Address</Text>
                       <TextInput
                         style={styles.inputField}
                         value={kastAddress}
                         onChangeText={setKastAddress}
-                        placeholder="Enter KAST card wallet address"
+                        placeholder="Enter SOLANA card wallet address"
                         placeholderTextColor={colors.textSecondary}
                         autoCapitalize="none"
                         autoCorrect={false}

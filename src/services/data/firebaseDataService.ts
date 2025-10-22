@@ -748,6 +748,136 @@ export const firebaseDataService = {
     }
   },
 
+  // Linked Wallet operations
+  linkedWallet: {
+    getLinkedWallets: async (userId: string): Promise<any[]> => {
+      try {
+        logger.info('Getting linked wallets for user', { userId }, 'FirebaseDataService');
+        
+        // Try both collection structures - first check subcollection under user
+        let querySnapshot;
+        try {
+          // First try: subcollection under user document
+          const subcollectionRef = collection(db, 'users', userId, 'externalWallets');
+          querySnapshot = await getDocs(subcollectionRef);
+          console.log('Tried subcollection approach:', {
+            size: querySnapshot.size,
+            empty: querySnapshot.empty,
+            docs: querySnapshot.docs.length
+          });
+        } catch (subcollectionError) {
+          console.log('Subcollection approach failed, trying main collection:', subcollectionError);
+          // Fallback: main collection with userId filter
+          const q = query(
+            collection(db, 'linkedWallets'),
+            where('userId', '==', userId)
+          );
+          querySnapshot = await getDocs(q);
+        }
+        
+        console.log('Firebase query snapshot:', {
+          size: querySnapshot.size,
+          empty: querySnapshot.empty,
+          docs: querySnapshot.docs.length
+        });
+        
+        const linkedWallets = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log('Firebase doc data:', doc.id, data);
+          return {
+            id: doc.id,
+            ...data
+          };
+        });
+        
+        console.log('Raw linked wallets from Firebase:', linkedWallets);
+        
+        // Sort in memory instead of in Firestore
+        linkedWallets.sort((a, b) => {
+          const aTime = a.createdAt?.seconds || a.createdAt || 0;
+          const bTime = b.createdAt?.seconds || b.createdAt || 0;
+          return bTime - aTime; // Descending order
+        });
+        
+        console.log('Sorted linked wallets:', linkedWallets);
+        
+        logger.info('Linked wallets retrieved successfully', { 
+          userId, 
+          count: linkedWallets.length,
+          wallets: linkedWallets.map(w => ({ id: w.id, type: w.type, label: w.label }))
+        }, 'FirebaseDataService');
+        
+        return linkedWallets;
+      } catch (error) {
+        logger.error('Failed to get linked wallets', { userId, error }, 'FirebaseDataService');
+        return [];
+      }
+    },
+
+    addLinkedWallet: async (userId: string, walletData: any): Promise<{ success: boolean; walletId?: string; error?: string }> => {
+      try {
+        logger.info('Adding linked wallet', { userId, type: walletData.type }, 'FirebaseDataService');
+        
+        const docRef = await addDoc(collection(db, 'linkedWallets'), {
+          ...walletData,
+          userId,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        
+        logger.info('Linked wallet added successfully', { userId, walletId: docRef.id }, 'FirebaseDataService');
+        return {
+          success: true,
+          walletId: docRef.id
+        };
+      } catch (error) {
+        logger.error('Failed to add linked wallet', { userId, error }, 'FirebaseDataService');
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to add linked wallet'
+        };
+      }
+    },
+
+    removeLinkedWallet: async (userId: string, walletId: string): Promise<{ success: boolean; error?: string }> => {
+      try {
+        logger.info('Removing linked wallet', { userId, walletId }, 'FirebaseDataService');
+        
+        await deleteDoc(doc(db, 'linkedWallets', walletId));
+        
+        logger.info('Linked wallet removed successfully', { userId, walletId }, 'FirebaseDataService');
+        return { success: true };
+      } catch (error) {
+        logger.error('Failed to remove linked wallet', { userId, walletId, error }, 'FirebaseDataService');
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to remove linked wallet'
+        };
+      }
+    },
+
+    updateLinkedWallet: async (walletId: string, updates: any): Promise<{ success: boolean; error?: string }> => {
+      try {
+        logger.info('Updating linked wallet', { walletId }, 'FirebaseDataService');
+        
+        const walletRef = doc(db, 'linkedWallets', walletId);
+        await updateDoc(walletRef, {
+          ...updates,
+          updatedAt: serverTimestamp()
+        });
+        
+        logger.info('Linked wallet updated successfully', { walletId }, 'FirebaseDataService');
+        return { success: true };
+      } catch (error) {
+        logger.error('Failed to update linked wallet', { walletId, error }, 'FirebaseDataService');
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to update linked wallet'
+        };
+      }
+    }
+  },
+
   // Split operations (placeholder for future implementation)
   split: {
     // TODO: Implement split operations when needed
