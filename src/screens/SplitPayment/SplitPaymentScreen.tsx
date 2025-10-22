@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  SafeAreaView,
   StyleSheet,
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -21,6 +20,7 @@ import { SplitWalletService, SplitWallet, SplitWalletParticipant } from '../../s
 import { priceManagementService } from '../../services/priceManagementService';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 interface RouteParams {
   splitWalletId: string;
@@ -369,18 +369,18 @@ const SplitPaymentScreen: React.FC = () => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.green} />
           <Text style={styles.loadingText}>Loading split information...</Text>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Error</Text>
           <Text style={styles.errorMessage}>{error}</Text>
@@ -388,13 +388,13 @@ const SplitPaymentScreen: React.FC = () => {
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   if (!splitWallet || !participant) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Not Found</Text>
           <Text style={styles.errorMessage}>Split information not found.</Text>
@@ -402,7 +402,7 @@ const SplitPaymentScreen: React.FC = () => {
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
@@ -411,7 +411,7 @@ const SplitPaymentScreen: React.FC = () => {
   const progressPercentage = (participant.amountPaid / participant.amountOwed) * 100;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
@@ -514,19 +514,14 @@ const SplitPaymentScreen: React.FC = () => {
           </View>
         )}
       </View>
-    </SafeAreaView>
+      </Container>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     backgroundColor: colors.black,
   },
@@ -550,7 +545,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: spacing.lg,
   },
   loadingContainer: {
     flex: 1,

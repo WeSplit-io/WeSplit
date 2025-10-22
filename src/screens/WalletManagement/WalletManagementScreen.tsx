@@ -17,7 +17,6 @@ import {
   StatusBar,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import NavBar from '../../components/NavBar';
@@ -32,6 +31,7 @@ import { styles } from './styles';
 import { QRCodeScreen } from '../QRCode';
 import { createUsdcRequestUri } from '@features/qr';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 const WalletManagementScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -694,7 +694,7 @@ const WalletManagementScreen: React.FC = () => {
 
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
 
       {/* Header */}
       <View style={styles.header}>
@@ -943,7 +943,7 @@ const WalletManagementScreen: React.FC = () => {
           qrValue={currentUser?.wallet_address || ''}
         />
       </Modal>
-    </SafeAreaView>
+    </Container>
   );
 };
 

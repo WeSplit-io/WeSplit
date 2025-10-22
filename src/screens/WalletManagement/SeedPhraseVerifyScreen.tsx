@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
   ScrollView,
 } from 'react-native';
@@ -15,17 +14,13 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
+import { Container } from '../../components/shared';
 
 // Temporary inline styles to fix the import issue
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.screenPaddingHorizontal,
     paddingVertical: 16,
   },
   backButton: {
@@ -43,7 +38,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   instructionsContainer: {
     marginBottom: spacing.xl,
@@ -315,7 +309,7 @@ const SeedPhraseVerifyScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <Icon name="arrow-left" size={24} color={colors.white} />
@@ -326,13 +320,13 @@ const SeedPhraseVerifyScreen: React.FC = () => {
         <View style={styles.content}>
           <Text style={styles.instructionsText}>Loading seed phrase...</Text>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   if (error || originalSeedPhrase.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <Icon name="arrow-left" size={24} color={colors.white} />
@@ -348,12 +342,12 @@ const SeedPhraseVerifyScreen: React.FC = () => {
             </Text>
           </View>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
@@ -458,7 +452,7 @@ const SeedPhraseVerifyScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </Container>
   );
 };
 

@@ -2,15 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Text as RNText } from 'react-native';
 import { View, Text, TouchableOpacity, Image, TextInput, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import UserAvatar from '../../components/UserAvatar';
-import { UserContact } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
 import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 interface ContactActionScreenProps {
   navigation: any;
@@ -155,7 +154,7 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
   const isAmountValid = parseFloat(amount) > 0;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -340,7 +339,7 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Container>
   );
 };
 

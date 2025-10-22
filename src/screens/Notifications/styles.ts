@@ -2,16 +2,11 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export default StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
   // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
     paddingTop: 24,
     paddingBottom: 16,
     backgroundColor: colors.darkBackground,
@@ -85,8 +80,7 @@ export default StyleSheet.create({
   },
   // Content
   scrollView: {
-    flex: 1,
-    paddingHorizontal: spacing.screenPaddingHorizontal,
+    flex: 1,  
   },
   // Empty State
   emptyContainer: {

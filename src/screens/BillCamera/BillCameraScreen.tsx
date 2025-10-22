@@ -8,13 +8,10 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   Alert,
-  Dimensions,
   StatusBar,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -23,8 +20,7 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { styles } from './BillCameraStyles';
 import { logger } from '../../services/loggingService';
-
-const { width, height } = Dimensions.get('window');
+import { Container } from '../../components/shared';
 
 interface BillCameraScreenProps {
   navigation: any;
@@ -137,18 +133,18 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
 
   if (!permission) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>Requesting camera permission...</Text>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   if (!permission.granted) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>Camera access is required to capture bills</Text>
@@ -169,13 +165,13 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
             <Text style={[styles.permissionButtonText, { color: colors.text }]}>Go to Splits</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   if (capturedImage) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <StatusBar barStyle="light-content" backgroundColor={colors.black} />
         
         {/* Header with Back Button and Title */}
@@ -220,12 +216,12 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
             </TouchableOpacity>
           </LinearGradient>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       {/* Header with Back Button and Title */}
@@ -305,7 +301,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
           <Image source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmedia-icon.png?alt=media&token=27a24ab9-8512-4cd7-9520-fdaf6f9883a9'}} style={styles.bottomRightButtonIcon} />
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </Container>
   );
 };
 

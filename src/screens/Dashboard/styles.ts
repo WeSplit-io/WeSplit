@@ -26,16 +26,8 @@ export const GRAY = colors.darkGray;
 export const styles = StyleSheet.create({
   
   // === MAIN CONTAINER & LAYOUT ===
-  // Root container with dark background
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
-  
-  // Scrollable content wrapper
-  scrollContainer: {
-    flex: 1,
-  },
+
+
   
   // Content padding to avoid bottom navigation overlap
   scrollContent: {
@@ -50,7 +42,6 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginVertical: spacing.md,
-    paddingHorizontal: spacing.md,
 
   },
   
@@ -119,7 +110,6 @@ export const styles = StyleSheet.create({
     borderRadius: spacing.lg,
     borderWidth: 1,
     borderColor: colors.white10,
-    marginHorizontal: spacing.md,
     marginTop: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
@@ -166,12 +156,6 @@ export const styles = StyleSheet.create({
     tintColor: colors.white,
   },
   
-  // Loading and message styles
-  loadingCenter: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   loadingText: {
     color: colors.textLight,
     marginTop: spacing.md,
@@ -184,14 +168,6 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.md,
-  },
-  inactiveText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.xs,
-  },
-  errorText: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
   },
   balanceAmountText: {
     color: colors.white,
@@ -228,16 +204,6 @@ export const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   
-  // Copy button for wallet address
-  copyButton: {
-    padding: spacing.xs,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    borderRadius: spacing.xs,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   
   // Copy icon
   copyIcon: {
@@ -267,7 +233,6 @@ export const styles = StyleSheet.create({
   // === ACTION BUTTONS GRID ===
   // Container for action buttons below balance card
   actionsGrid: {
-    marginHorizontal: spacing.md,
     marginBottom: spacing.xxl,
     marginTop: 0,
     position: 'relative',
@@ -325,76 +290,10 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // === MORE MENU DROPDOWN ===
-  // Container for the more menu dropdown
-  moreMenuContainer: {
-    position: 'absolute',
-    top: 160,
-    right: 20,
-    backgroundColor: '#121D1F',
-    borderRadius: 15,
-    padding: spacing.sm,
-    minWidth: 230,
-    // Border to simulate inset shadow effect (same as actionButtonCircle)
-    borderWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.15)',
-    borderLeftColor: 'rgba(255, 255, 255, 0.15)',
-    borderRightColor: 'rgba(10, 138, 90, 0.15)',
-    borderBottomColor: 'rgba(10, 138, 90, 0.15)',
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-    zIndex: 1000,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-
-  // Individual menu item
-  moreMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 10,
-    marginBottom: spacing.xs,
-    backgroundColor: 'transparent',
-    minHeight: 44, // Minimum touch target size
-  },
-
-  // Text in menu item
-  moreMenuText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    flex: 1,
-  },
-
-  // Chevron icon in menu item
-  moreMenuChevron: {
-    width: 16,
-    height: 16,
-    tintColor: colors.white70,
-  },
-
-  // Overlay to close menu when clicking outside
-  moreMenuOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 998, // Lower than menu
-  },
 
   // === REQUESTS SECTION ===
   // Container for requests list
   requestsSection: {
-    marginHorizontal: spacing.md,
     marginBottom: spacing.lg,
   },
   
@@ -536,27 +435,6 @@ export const styles = StyleSheet.create({
     
   },
 
-  // === GROUPS SECTION ===
-  // Container for groups list
-  groupsSection: {
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  
-  // Header for the groups section (title + add button)
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  
-  // Text for the "Add Group" button
-  addButtonText: {
-    color: colors.green,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-  },
   
   // "See all" text
   seeAllText: {
@@ -565,30 +443,6 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.normal,
   },
   
-  // Grid layout for groups (full-width vertical layout)
-  groupsGrid: {
-    flexDirection: 'column',
-    gap: spacing.md,
-    alignItems: 'stretch',
-  },
-  
-  // Full-width group card (matches design with horizontal layout)
-  groupGridCardFullWidth: {
-    width: '100%',
-    backgroundColor: colors.white5,
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  
-  // Container for group name and role
-  groupGridNameContainer: {
-    flexDirection: 'column',
-    flex: 1,
-    marginLeft: 0, // Remove left margin for horizontal layout
-  },
   
   balanceContainer: {
     flexDirection: 'row',
@@ -596,192 +450,10 @@ export const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   
-  // Group name in grid
-  groupGridName: {
-    color: colors.white,
-    fontSize: 18,
-    fontWeight: typography.fontWeight.bold,
-    marginBottom: 4, // Smaller margin for horizontal layout
-  },
   
-  // Role container in group grid
-  groupGridRoleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
   
-  // Role icon in group grid
-  groupGridRoleIcon: {
-    width: 16,
-    height: 16,
-    marginRight: 0, // Remove marginRight since we use gap in parent
-    flexShrink: 0, // Prevent icon from shrinking
-    tintColor: colors.white70, // Apply tint color like the Icon component
-  },
   
-  // Role text in group grid  
-  groupGridRole: {
-    color: colors.white70,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.normal,
-  },
-  
-  // Member avatars container (horizontal layout)
-  memberAvatars: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 0, // Don't take up flex space
-  },
-  
-  // Empty member avatars container
-  memberAvatarsEmpty: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  
-  // Individual member avatar (overlapping style)
-  memberAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.white10,
-    marginLeft: -8, // Negative margin for overlapping effect
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  
-  // More members indicator (+4)
-  memberAvatarMore: {
-    width: 32,
-    height: 32,
-    borderRadius: 14,
-    backgroundColor: colors.black,
-    marginLeft: -8,
-    borderWidth: 2,
-    borderColor: colors.white10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  
-  // Text inside more members indicator
-  memberAvatarMoreText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: typography.fontWeight.bold,
-  },
-  
-  // Empty state for groups when no groups exist
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  
-  // Text for the empty state
-  emptyStateText: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.medium,
-    marginBottom: spacing.sm,
-  },
-  
-  // Subtext for the empty state
-  emptyStateSubtext: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.md,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  
-  // Button to create a new group
-  createGroupButton: {
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    borderRadius: spacing.radiusMd,
-  },
-  
-  // Text on the create group button
-  createGroupButtonText: {
-    color: BG_COLOR,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-  },
 
-  // Gradient wrapper for the CTA button
-  createGroupButtonGradient: {
-    borderRadius: spacing.radiusMd,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // === SPLIT CARD STYLES ===
-  // Container for split icon
-  splitIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-
-  // Split type icon
-  splitIcon: {
-    fontSize: 20,
-  },
-
-  // Container for split status
-  splitStatusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-  },
-
-  // Status indicator dot
-  splitStatusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: spacing.xs,
-  },
-
-  // Status text
-  splitStatusText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.medium,
-  },
-
-  // Container for split amount and participants info
-  splitInfoContainer: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-
-  // Split amount text
-  splitAmount: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    marginBottom: spacing.xs,
-  },
-
-  // Split participants count
-  splitParticipants: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.xs,
-  },
-
-  // Split date text
-  splitDate: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.xs,
-    marginTop: spacing.xs,
-  },
 
 
   //transaction styles

@@ -13,7 +13,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Image,
-  SafeAreaView,
   StatusBar,
   TextInput,
 } from 'react-native';
@@ -28,6 +27,7 @@ import { consolidatedBillAnalysisService } from '../../services/consolidatedBill
 import { useApp } from '../../context/AppContext';
 import { SplitStorageService } from '../../services/splitStorageService';
 import { notificationService } from '../../services/notificationService';
+import { Container } from '../../components/shared';
 
 interface RouteParams {
   imageUri: string;
@@ -578,7 +578,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
 
   if (isProcessing) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <StatusBar barStyle="light-content" backgroundColor={colors.black} />
         
         <View style={styles.processingContainer}>
@@ -598,12 +598,12 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
             </Text>
           )}
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       {/* Header */}
@@ -700,7 +700,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
           <Text style={styles.saveButtonText}>Save</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </Container>
   );
 };
 

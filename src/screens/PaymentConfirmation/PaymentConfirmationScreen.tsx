@@ -9,7 +9,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   Alert,
 } from 'react-native';
@@ -17,6 +16,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { FallbackDataService } from '../../utils/fallbackDataService';
+import { Container } from '../../components/shared';
 
 interface PaymentConfirmationScreenProps {
   navigation: any;
@@ -89,7 +89,7 @@ const PaymentConfirmationScreen: React.FC<PaymentConfirmationScreenProps> = ({ n
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       <View style={styles.header}>
@@ -184,20 +184,15 @@ const PaymentConfirmationScreen: React.FC<PaymentConfirmationScreenProps> = ({ n
           </View>
         </View>
       </View>
-    </SafeAreaView>
+    </Container>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     backgroundColor: colors.black,
   },
@@ -216,7 +211,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
   },
   blurredSection: {
     opacity: 0.3,

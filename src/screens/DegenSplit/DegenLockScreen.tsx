@@ -27,6 +27,7 @@ import { FallbackDataService } from '../../utils/fallbackDataService';
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitInitialization, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenSplitProgress, DegenSplitParticipants } from './components';
+import { Container } from '../../components/shared';
 
 // AppleSlider component adapted from SendConfirmationScreen
 interface AppleSliderProps {
@@ -427,7 +428,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     ).length || degenState.lockedParticipants.length;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       {/* Header */}
@@ -794,7 +795,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           </View>
         </View>
       )}
-    </SafeAreaView>
+    </Container>
   );
 };
 

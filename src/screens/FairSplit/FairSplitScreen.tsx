@@ -34,6 +34,7 @@ import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splitR
 import FairSplitHeader from './components/FairSplitHeader';
 import FairSplitProgress from './components/FairSplitProgress';
 import FairSplitParticipants from './components/FairSplitParticipants';
+import { Container } from '../../components/shared';
 
 // Remove local image mapping - now handled in FairSplitHeader component
 
@@ -2373,7 +2374,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   // Show error state if there's an error
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <StatusBar barStyle="light-content" backgroundColor={colors.black} />
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Something went wrong</Text>
@@ -2385,12 +2386,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -3175,7 +3176,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           </View>
         </View>
       )}
-    </SafeAreaView>
+    </Container>
   );
 };
 

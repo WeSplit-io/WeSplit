@@ -1,12 +1,12 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
 import NavBar from '../../components/NavBar';
+import { Container } from '../../components/shared';
 
 const RewardsScreen: React.FC<any> = ({ navigation }) => {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.black }}>
+    <Container>
       <View style={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.black }}>
         <TouchableOpacity onPress={() => {
           if (Platform.OS === 'android') {
@@ -30,7 +30,7 @@ const RewardsScreen: React.FC<any> = ({ navigation }) => {
       </View>
 
       <NavBar currentRoute="Rewards" navigation={navigation} />
-    </SafeAreaView>
+    </Container>
   );
 };
 

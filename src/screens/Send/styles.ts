@@ -4,15 +4,10 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
     backgroundColor: colors.darkBackground,
@@ -35,7 +30,6 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   scrollContent: {
     flexGrow: 1,
@@ -125,7 +119,6 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: spacing.md,
-    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   balanceText: {
     color: colors.textSecondary,

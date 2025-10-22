@@ -3,13 +3,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
-const { width, height } = Dimensions.get('window');
-
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
   permissionContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -38,7 +32,6 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     backgroundColor: colors.black,
   },
@@ -77,11 +70,6 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     textAlign: 'center',
     marginBottom: spacing.sm,
-  },
-  cameraErrorSubtext: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
-    textAlign: 'center',
   },
   bottomButtons: {
     position: 'absolute',

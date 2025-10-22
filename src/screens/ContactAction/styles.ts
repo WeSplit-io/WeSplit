@@ -2,15 +2,11 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 16,
     backgroundColor: colors.darkBackground,
@@ -30,9 +26,6 @@ export const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     marginRight: 40, // Balance out back button
-  },
-  placeholder: {
-    width: 24,
   },
   // Tab Navigation - Using NotificationsScreen design
   tabContainer: {
@@ -65,9 +58,6 @@ export const styles = StyleSheet.create({
 
   },
   
-  activeTab: {
-    backgroundColor: 'transparent',
-  },
   tabText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
@@ -90,11 +80,6 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
-  },
-  recipientAvatarText: {
-    color: colors.black,
-    fontSize: 25,
-    fontWeight: typography.fontWeight.bold,
   },
   recipientName: {
     color: colors.white,
@@ -179,9 +164,6 @@ export const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     alignItems: 'center',
     width: '100%',
-  },
-  mockupContinueButtonActive: {
-    backgroundColor: colors.brandGreen,
   },
   mockupContinueButtonText: {
     color: colors.white70,

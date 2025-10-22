@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, Share, Image, TextInput, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import { QrCodeView } from '@features/qr';
@@ -10,6 +9,7 @@ import styles from './styles';
 import { colors } from '../../theme';
 import { createUsdcRequestUri } from '@features/qr';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 interface CryptoTransferParams {
   targetWallet?: {
@@ -195,7 +195,7 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
 
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
@@ -283,7 +283,7 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
           <Text style={styles.doneButtonText}>Done</Text>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </Container>
   );
 };
 

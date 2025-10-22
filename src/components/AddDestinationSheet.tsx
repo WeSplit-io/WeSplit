@@ -378,7 +378,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
                     >
                       <Text style={[
                         styles.segmentText,
-                        destinationType === 'wallet' && styles.segmentTextActive
+                         destinationType === 'wallet' && styles.segmentTextActive
                       ]}>
                         Wallet
                       </Text>

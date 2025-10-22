@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import NavBar from '../../components/NavBar';
@@ -14,6 +13,7 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import { logger } from '../../services/loggingService';
 import type { LinkedWallet } from '../../services/LinkedWalletService';
+import { Container } from '../../components/shared';
 
 const SendScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId, initialTab } = route.params || {};
@@ -257,7 +257,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top','bottom']}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -319,7 +319,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
         {activeTab === 'friends' ? renderFriendsTab() : renderExternalWalletTab()}
       </View>
       
-    </SafeAreaView>
+    </Container>
   );
 };
 

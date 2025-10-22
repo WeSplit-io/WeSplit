@@ -10,7 +10,6 @@ import {
   Image,
   Animated
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
 import NotificationCard from '../../components/NotificationCard';
@@ -23,6 +22,7 @@ import styles from './styles';
 import { colors } from '../../theme/colors';
 import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { Container } from '../../components/shared';
 
 const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   const { state, notifications, loadNotifications, refreshNotifications, acceptGroupInvitation, acceptSplitInvitation } = useApp();
@@ -1624,17 +1624,17 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#A5EA15" />
           <Text style={styles.loadingText}>Loading notifications...</Text>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -1719,7 +1719,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           ))
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Container>
   );
 };
 

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
   TextInput,
@@ -15,6 +14,7 @@ import { useWallet } from '../../context/WalletContext';
 import { formatCryptoAmount } from '../../utils/cryptoUtils';
 import styles from './styles';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 interface TransactionParams {
   type: 'payment' | 'settlement';
@@ -92,7 +92,7 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
   };
 
   const renderConfirmStep = () => (
-    <>
+    <Container>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-left" size={24} color="#FFF" />
@@ -181,7 +181,7 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
           </Text>
         </TouchableOpacity>
       </View>
-    </>
+    </Container>
   );
 
   const renderProcessingStep = () => (
@@ -235,9 +235,9 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {renderContent()}
-    </SafeAreaView>
+    </Container>
   );
 };
 

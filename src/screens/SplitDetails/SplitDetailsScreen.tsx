@@ -49,6 +49,7 @@ import {
   UnifiedBillData,
   UnifiedParticipant
 } from '../../types/splitNavigation';
+import { Container } from '../../components/shared';
 
 // Image mapping for category icons
 const CATEGORY_IMAGES: { [key: string]: any } = {
@@ -1164,17 +1165,17 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // Show processing screen for new bills
   if (isProcessingNewBill) {
-    return (
-      <SafeAreaView style={styles.processingContainer}>
+      return (
+      <Container>
         <StatusBar barStyle="light-content" backgroundColor={colors.black} />
         <ActivityIndicator size="large" color={colors.green} />
         <Text style={styles.processingSubtitle}>Processing your bill...</Text>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
 
       <View style={styles.header}>
@@ -1591,7 +1592,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
       {/* Private Key Modal - MOVED TO FAIR/DEGEN SCREENS */}
 
-    </SafeAreaView>
+    </Container>
   );
 };
 

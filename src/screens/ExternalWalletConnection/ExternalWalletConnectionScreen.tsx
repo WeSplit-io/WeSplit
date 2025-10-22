@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  SafeAreaView,
   Image,
   RefreshControl,
 } from 'react-native';
@@ -17,6 +16,7 @@ import { walletService, WalletProvider } from '../../services/WalletService';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 interface ExternalWalletConnectionScreenProps {
   navigation: any;
@@ -121,7 +121,7 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -239,7 +239,7 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
           By connecting your wallet, you agree to sign a message to verify ownership and link it to your WeSplit account.
         </Text>
       </View>
-    </SafeAreaView>
+    </Container>
   );
 };
 

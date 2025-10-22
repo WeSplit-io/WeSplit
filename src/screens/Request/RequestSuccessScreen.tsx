@@ -1,11 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, amount, description, groupId, requestId, paymentRequest } = route.params || {};
@@ -41,7 +40,7 @@ const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
     return (
-    <SafeAreaView style={{flex: 1, backgroundColor: colors.darkBackground}}>
+    <Container>
       <View style={[styles.mockupSuccessContainer, {flex: 1, justifyContent: 'space-between', paddingBottom: 0}]}>  
         <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
           {/* Success Icon */}
@@ -94,7 +93,7 @@ const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaView>
+    </Container>
   );
 };
 

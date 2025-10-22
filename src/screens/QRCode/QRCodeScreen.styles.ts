@@ -4,19 +4,11 @@ import { colors, spacing, typography } from '../../theme';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-    width: '100%',
-    height: '100%',
-  },
-  
   // Header Styles
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
   backButton: {
@@ -44,7 +36,6 @@ export const styles = StyleSheet.create({
   // Tab Content Styles
   tabContent: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     backgroundColor: 'transparent',
   },

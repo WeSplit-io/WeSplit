@@ -10,6 +10,7 @@ import { styles } from './styles';
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
 import UserAvatar from '../../components/UserAvatar';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 // Helper function to safely load images with fallback
 const SafeImage = ({ source, style, fallbackSource }: any) => {
@@ -44,14 +45,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { currentUser } = state;
   const { clearAppWalletState } = useWallet();
   const [faceIdEnabled, setFaceIdEnabled] = useState(false);
-  const insets = useSafeAreaInsets();
 
   // Early return if no current user
   if (!currentUser) {
     return (
-      <View style={styles.container}>
+      <Container>
         <Text>Loading...</Text>
-      </View>
+      </Container>
     );
   }
 
@@ -195,7 +195,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const displayId = currentUser?.wallet_address ? `${currentUser.wallet_address.substring(0, 4)}.....${currentUser.wallet_address.substring(currentUser.wallet_address.length - 4)}` : 'B3gr.....sdgux';
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -387,7 +387,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       </ScrollView>
 
       <NavBar currentRoute="Profile" navigation={navigation} />
-    </View>
+    </Container>
   );
 };
 

@@ -29,6 +29,7 @@ import { useApp } from '../../context/AppContext';
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader } from './components';
+import { Container } from '@/components/shared';
 
 interface DegenResultScreenProps {
   navigation: any;
@@ -495,7 +496,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       {/* Header */}
@@ -832,7 +833,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           </View>
         </View>
       )}
-    </SafeAreaView>
+    </Container>
   );
 };
 

@@ -9,7 +9,6 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
@@ -21,6 +20,8 @@ import TransactionModal from '../../components/TransactionModal';
 import styles from './styles';
 import { colors } from '../../theme/colors';
 import { logger } from '../../services/loggingService';
+
+import { Container } from '../../components/shared';
 
 type TabType = 'all' | 'income' | 'expenses';
 
@@ -573,7 +574,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
@@ -626,7 +627,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
         onClose={handleCloseModal}
         navigation={navigation}
       />
-    </SafeAreaView>
+    </Container>
   );
 };
 

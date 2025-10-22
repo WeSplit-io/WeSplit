@@ -12,6 +12,7 @@ import { colors } from '../../theme/colors';
 import { User } from '../../types';
 import { createUsdcRequestUri } from '@features/qr';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId } = route.params || {};
@@ -68,7 +69,7 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
 
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -173,7 +174,7 @@ const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {
 
 
       )}
-    </SafeAreaView>
+    </Container>
   );
 };
 

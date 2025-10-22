@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
-  SafeAreaView, 
   TouchableOpacity, 
   ScrollView, 
   TextInput, 
@@ -24,6 +23,7 @@ import AccountDeletionService, { DeletionProgress } from '../../services/account
 import { UserImageService } from '../../services/userImageService';
 import { logger } from '../../services/loggingService';
 import styles from './styles';
+import { Container } from '../../components/shared';
 
 
 interface AccountSettingsScreenProps {
@@ -401,7 +401,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
   const displayName = currentUser?.name || 'PauluneMoon';
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
       {/* Header */}
       <View style={styles.header}>
@@ -553,7 +553,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
           </LinearGradient>
         </TouchableOpacity>
       </View>
-    </View>
+    </Container>
   );
 };
 

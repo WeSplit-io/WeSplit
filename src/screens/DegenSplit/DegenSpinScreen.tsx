@@ -10,10 +10,8 @@ import {
   TouchableOpacity,
   StatusBar,
   Animated,
-  Dimensions,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -25,8 +23,7 @@ import { notificationService } from '../../services/notificationService';
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenRoulette } from './components';
-
-const { width: screenWidth } = Dimensions.get('window');
+import { Container } from '../../components/shared';
 
 // Category images mapping for dynamic icons
 const CATEGORY_IMAGES_LOCAL: { [key: string]: any } = {
@@ -242,7 +239,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
 
       {/* Header */}
@@ -328,7 +325,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
           </TouchableOpacity>
         </LinearGradient>
       </View>
-    </SafeAreaView>
+    </Container>
   );
 };
 

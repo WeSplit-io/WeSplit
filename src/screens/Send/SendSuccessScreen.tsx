@@ -1,12 +1,12 @@
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { notificationService } from '../../services/notificationService';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, wallet, destinationType, amount, description, groupId, transactionId, isSettlement, fromNotification, notificationId } = route.params || {};
@@ -59,7 +59,7 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={{flex: 1, backgroundColor: colors.darkBackground}} edges={['top','bottom']}>
+    <Container>
       <View style={[styles.mockupSuccessContainer, {flex: 1, justifyContent: 'space-between', paddingBottom: 0}]}>  
         <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
           {/* Success Icon */}
@@ -111,7 +111,7 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaView>
+    </Container>
   );
 };
 

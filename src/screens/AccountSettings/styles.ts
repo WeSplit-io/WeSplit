@@ -2,18 +2,12 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export default StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
-    backgroundColor: colors.darkBackground,
   },
   backButton: {
     padding: spacing.sm,
@@ -116,7 +110,6 @@ export default StyleSheet.create({
   input: {
     backgroundColor: colors.white5,
     borderRadius: spacing.md,
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     fontSize: typography.fontSize.md,
     color: colors.textLight,
@@ -146,58 +139,8 @@ export default StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
     marginLeft: spacing.sm,
   },
-  deleteAccountButtonDisabled: {
-    opacity: 0.6,
-  },
-  deleteAccountTextDisabled: {
-    color: '#FF6B6B',
-    opacity: 0.6,
-  },
-  
-  // Deletion Progress
-  deletionProgressContainer: {
-    backgroundColor: colors.white5,
-    borderRadius: spacing.md,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  deletionProgressText: {
-    color: colors.textLight,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: colors.white10,
-    borderRadius: 2,
-    marginBottom: spacing.sm,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#FF6B6B',
-    borderRadius: 2,
-  },
-  deletionProgressSubtext: {
-    color: colors.white70,
-    fontSize: typography.fontSize.xs,
-    textAlign: 'center',
-  },
   
   // Save Button
-  saveButton: {
-    backgroundColor: colors.green,
-    borderRadius: 16,
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  saveButtonDisabled: {
-    backgroundColor: colors.white10,
-  },
   gradientButton: {
     borderRadius: 16,
     paddingVertical: 20,

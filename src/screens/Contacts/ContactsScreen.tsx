@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import NavBar from '../../components/NavBar';
@@ -14,6 +13,7 @@ import { colors } from '../../theme/colors';
 import { styles } from './styles';
 import { logger } from '../../services/loggingService';
 import { createUsdcRequestUri } from '@features/qr';
+import { Container } from '../../components/shared';
 
 interface ContactsScreenProps {
   navigation: any;
@@ -124,7 +124,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
   const isRequestMode = action === 'request';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         {(isSplitMode || isRequestMode) ? (
@@ -245,7 +245,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
       )}
       
       {!isSplitMode && <NavBar currentRoute="Contacts" navigation={navigation} />}
-    </SafeAreaView>
+    </Container>
   );
 };
 

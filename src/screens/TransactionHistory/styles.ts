@@ -4,16 +4,11 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
 export default StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
   // Header - identique à Send
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
     backgroundColor: colors.darkBackground,
@@ -36,7 +31,6 @@ export default StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    paddingHorizontal: 20,
   },
   // Tab Container - identique à Notifications
   tabContainer: {
@@ -45,7 +39,6 @@ export default StyleSheet.create({
     paddingVertical: spacing.xs,
     backgroundColor: colors.white5,
     borderRadius: 16,
-    marginHorizontal: spacing.screenPadding,
     padding: 5,
     marginBottom: spacing.md,
   },

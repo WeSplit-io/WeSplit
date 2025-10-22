@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from './styles';
 import { colors } from '../../theme';
+import { Container } from '../../components/shared';
 
 interface GetStartedScreenProps {
   navigation: any;
@@ -11,7 +12,7 @@ interface GetStartedScreenProps {
 
 const GetStartedScreen: React.FC<GetStartedScreenProps> = ({ navigation }) => {
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <StatusBar backgroundColor={colors.darkBackground} barStyle="light-content" />
       
       <View style={styles.content}>
@@ -55,7 +56,7 @@ const GetStartedScreen: React.FC<GetStartedScreenProps> = ({ navigation }) => {
 
         
       </View>
-    </SafeAreaView>
+    </Container>
   );
 };
 

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import SlideButton from '../../components/SlideButton';
 import { GroupMember } from '../../types';
@@ -10,6 +9,7 @@ import { createPaymentRequest } from '../../services/firebasePaymentRequestServi
 import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
+import { Container } from '../../components/shared';
 
 const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, amount, description, groupId } = route.params || {};
@@ -59,7 +59,7 @@ const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -103,7 +103,6 @@ const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
             size={48}
             avatarUrl={contact?.avatar}
             style={styles.avatar}
-            backgroundColor={colors.primaryGreen}
           />
           <View style={styles.contactInfo}>
             <Text style={styles.contactName}>{contact?.name || 'Unknown'}</Text>
@@ -130,7 +129,7 @@ const RequestConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           <Text style={styles.secondaryButtonText}>Cancel</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </Container>
   );
 };
 

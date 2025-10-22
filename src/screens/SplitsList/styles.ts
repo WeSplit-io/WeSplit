@@ -4,10 +4,6 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
   scrollView: {
     flex: 1,
   },
@@ -15,7 +11,6 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
   },
@@ -46,7 +41,6 @@ export const styles = StyleSheet.create({
   filtersContainer: {
     flexDirection: 'row',
     padding: spacing.sm,
-    marginHorizontal: spacing.md,
     marginBottom: spacing.lg,
     gap: spacing.sm,
     borderRadius: 16,
@@ -73,7 +67,6 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   splitsContainer: {
-    paddingHorizontal: spacing.md,
   },
   sectionTitle: {
     fontSize: typography.fontSize.lg,

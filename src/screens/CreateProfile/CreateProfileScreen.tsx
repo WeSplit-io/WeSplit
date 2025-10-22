@@ -13,7 +13,6 @@ import {
   Linking,
   KeyboardAvoidingView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
@@ -25,6 +24,7 @@ import { UserImageService } from '../../services/userImageService';
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
 import * as ImagePicker from 'expo-image-picker';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 const CreateProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -261,9 +261,8 @@ const CreateProfileScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <KeyboardAvoidingView 
-        style={styles.container} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
@@ -352,7 +351,7 @@ const CreateProfileScreen: React.FC = () => {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Container>
   );
 };
 

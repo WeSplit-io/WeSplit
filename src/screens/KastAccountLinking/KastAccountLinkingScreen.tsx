@@ -11,7 +11,6 @@ import {
   StyleSheet,
   TextInput,
   Alert,
-  SafeAreaView,
   StatusBar,
   KeyboardAvoidingView,
   Platform,
@@ -20,6 +19,7 @@ import {
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { Container } from '../../components/shared';
 
 interface KastAccountLinkingScreenProps {
   navigation: any;
@@ -93,7 +93,7 @@ const KastAccountLinkingScreen: React.FC<KastAccountLinkingScreenProps> = ({ nav
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       <KeyboardAvoidingView 
@@ -201,15 +201,11 @@ const KastAccountLinkingScreen: React.FC<KastAccountLinkingScreenProps> = ({ nav
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Container>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
   keyboardAvoidingView: {
     flex: 1,
   },
@@ -217,7 +213,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     backgroundColor: colors.black,
   },
@@ -243,7 +238,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
   },
   iconContainer: {
     alignItems: 'center',
@@ -361,7 +355,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   bottomContainer: {
-    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
     backgroundColor: colors.black,
   },

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Text as RNText } from 'react-native';
 import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { GroupMember } from '../../types';
 import { useApp } from '../../context/AppContext';
@@ -12,6 +11,7 @@ import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const {
@@ -172,7 +172,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const isAmountValid = amount.length > 0 && parseFloat(amount) > 0;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top','bottom']}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -391,7 +391,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Container>
   );
 };
 

@@ -411,4 +411,19 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: typography.fontWeight.bold,
   },
+  // Error styles
+  errorContainer: {
+    backgroundColor: colors.error + '20',
+    padding: spacing.md,
+    borderRadius: 8,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
 }); 

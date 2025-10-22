@@ -7,13 +7,8 @@ export const GREEN = colors.brandGreen;
 export const GRAY = colors.darkGray;
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
   mainContainer: {
     flex: 1,
-    paddingHorizontal: spacing.md,
   },
   // Header styles
   header: {

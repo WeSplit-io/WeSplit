@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import Icon from '../../components/Icon';
 import { useWallet } from '../../context/WalletContext';
@@ -8,6 +7,7 @@ import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import styles from './styles';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 interface MoonPayWebViewParams {
   url: string;
@@ -135,7 +135,7 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
   `;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
@@ -185,7 +185,7 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
           }}
         />
       </View>
-    </SafeAreaView>
+    </Container>
   );
 };
 

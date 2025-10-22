@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Alert, ScrollView, Image, Animated, PanResponder, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
@@ -14,6 +13,7 @@ import UserAvatar from '../../components/UserAvatar';
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
 import { logger } from '../../services/loggingService';
 import { notificationService } from '../../services/notificationService';
+import { Container } from '../../components/shared';
 
 // --- AppleSlider adapted from WalletManagementScreen ---
 interface AppleSliderProps {
@@ -446,7 +446,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top','bottom']}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -657,7 +657,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           text={walletLoading ? "Loading wallet..." : walletError ? "Wallet Error" : "Sign transaction"}
         />
       </View>
-    </SafeAreaView>
+    </Container>
   );
 };
 

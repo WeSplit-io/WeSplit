@@ -10,7 +10,6 @@ export default StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.iconSize,
     paddingTop: spacing.iconSize,
     paddingBottom: spacing.lg,
   },
@@ -27,7 +26,6 @@ export default StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.iconSize,
   },
   recipientCard: {
     flexDirection: 'row',

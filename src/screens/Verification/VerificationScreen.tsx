@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator, Linking, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
@@ -8,6 +7,7 @@ import { verifyCode, sendVerificationCode } from '../../services/firebaseFunctio
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 const CODE_LENGTH = 4; // 4-digit code
 const RESEND_SECONDS = 30;
@@ -211,9 +211,9 @@ const VerificationScreen: React.FC = () => {
   const timerText = `00:${timer < 10 ? '0' : ''}${timer}`;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <KeyboardAvoidingView 
-        style={styles.container} 
+        style={{flex: 1}} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
@@ -314,7 +314,7 @@ const VerificationScreen: React.FC = () => {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Container>
   );
 };
 

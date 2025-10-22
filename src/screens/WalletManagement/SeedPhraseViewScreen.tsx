@@ -17,6 +17,7 @@ import { walletService } from '../../services/WalletService';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 const SeedPhraseViewScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -145,7 +146,7 @@ const SeedPhraseViewScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaWrapper style={styles.container} top>
+      <Container safeAreaEdges={['top', 'bottom']}>
         <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Image
@@ -159,13 +160,13 @@ const SeedPhraseViewScreen: React.FC = () => {
         <View style={styles.loaderSeedPhraseContainer}>
           <Text style={styles.instructionsText}>Loading seed phrase...</Text>
         </View>
-      </SafeAreaWrapper>
+      </Container>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaWrapper style={styles.container} top>
+      <Container safeAreaEdges={['top', 'bottom']}>
         <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Image
@@ -195,12 +196,12 @@ const SeedPhraseViewScreen: React.FC = () => {
         >
           <Text style={styles.doneButtonText}>Done</Text>
         </TouchableOpacity>
-      </SafeAreaWrapper>
+      </Container>
     );
   }
 
   return (
-    <SafeAreaWrapper style={styles.container} top>
+    <Container safeAreaEdges={['top', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
       <TouchableOpacity onPress={handleBack} style={styles.backButton}>
@@ -275,7 +276,7 @@ const SeedPhraseViewScreen: React.FC = () => {
       >
         <Text style={styles.doneButtonText}>Done</Text>
       </TouchableOpacity>
-    </SafeAreaWrapper>
+    </Container>
   );
 };
 

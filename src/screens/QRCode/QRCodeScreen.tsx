@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Image,
   Alert,
@@ -18,6 +17,7 @@ import { colors } from '../../theme';
 import { parseUri, isSolanaPayUri, extractRecipientAddress, isValidSolanaAddress, createUsdcRequestUri } from '@features/qr';
 import { parseWeSplitDeepLink } from '../../services/deepLinkHandler';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 // Fonction pour hacher l'adresse du wallet
 const hashWalletAddress = (address: string): string => {
@@ -448,7 +448,7 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
 
       {renderHeader()}
@@ -456,7 +456,7 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
       {activeTab === 'myCode' ? renderMyCodeTab() : renderScanTab()}
 
       {renderToggle()}
-    </SafeAreaView>
+    </Container>
   );
 };
 

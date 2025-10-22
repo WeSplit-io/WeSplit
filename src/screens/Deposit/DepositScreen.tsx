@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import MoonPayWidget from '../../components/MoonPayWidget';
 import styles from './styles';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 interface DepositParams {
   targetWallet?: {
@@ -99,7 +99,7 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -171,7 +171,7 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
           navigation={navigation}
         />
       </View>
-    </SafeAreaView>
+    </Container>
   );
 };
 

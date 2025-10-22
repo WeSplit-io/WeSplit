@@ -2,15 +2,10 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     backgroundColor: colors.darkBackground,
   },
@@ -40,7 +35,6 @@ export const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
     paddingBottom: 150, // Add more bottom padding for NavBar and extra scrolling space
   },
   

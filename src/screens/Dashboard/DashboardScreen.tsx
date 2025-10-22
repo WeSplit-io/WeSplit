@@ -23,6 +23,7 @@ import AuthGuard from '../../components/AuthGuard';
 import NavBar from '../../components/NavBar';
 import UserAvatar from '../../components/UserAvatar';
 import WalletSelectorModal from '../../components/WalletSelectorModal';
+import { Container } from '../../components/shared';
 import { QRCodeScreen } from '../QRCode';
 import TransactionModal from '../../components/TransactionModal';
 import { useApp } from '../../context/AppContext';
@@ -903,10 +904,9 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // Removed groups loading state
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
 
       <ScrollView
-        style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
@@ -1348,7 +1348,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       {/* Removed as per edit hint */}
 
       <NavBar currentRoute="Dashboard" navigation={navigation} />
-    </SafeAreaView>
+    </Container>
   );
 };
 

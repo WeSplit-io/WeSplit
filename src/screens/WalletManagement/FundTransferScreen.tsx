@@ -12,8 +12,8 @@ import {
 import { useApp } from '../../context/AppContext';
 import { walletService } from '../../services/WalletService';
 import { colors, spacing, typography } from '../../theme';
-import theme from '../../theme';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 interface FundTransferScreenProps {
   navigation: any;
@@ -124,14 +124,14 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primaryGreen} />
+        <ActivityIndicator size="large" color={colors.green} />
         <Text style={styles.loadingText}>Loading linked wallets...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <Container>
       <View style={styles.header}>
         <Text style={styles.title}>Transfer Funds</Text>
       </View>
@@ -238,15 +238,11 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
           </View>
         )}
       </ScrollView>
-    </View>
+    </Container>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -259,7 +255,7 @@ const styles = StyleSheet.create({
     color: colors.textLight,
   },
   header: {
-    padding: 20,
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.darkBorder,
   },
@@ -272,7 +268,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    padding: 20,
+    paddingVertical: 20,
   },
   sectionTitle: {
     fontSize: 18,

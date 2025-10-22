@@ -4,15 +4,10 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     backgroundColor: colors.black,
   },
@@ -75,7 +70,6 @@ export const styles = StyleSheet.create({
   /* === Bill Card Styles === */
   content: {
     flex: 1,
-    paddingHorizontal: spacing.md,
   },
   billCard: {
     backgroundColor: colors.green,

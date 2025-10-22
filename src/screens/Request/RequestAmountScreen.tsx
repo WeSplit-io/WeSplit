@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Text as RNText } from 'react-native';
 import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
@@ -11,6 +10,7 @@ import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/firebaseDataService';
 import { createPaymentRequest } from '../../services/firebasePaymentRequestService';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, groupId } = route.params || {};
@@ -126,7 +126,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
   const isAmountValid = parseFloat(amount) > 0;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -147,7 +147,6 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
           size={60}
           avatarUrl={contact?.avatar || contact?.photoURL}
           style={styles.requestRecipientAvatar}
-          backgroundColor={colors.surface}
         />
         <Text style={styles.requestRecipientName}>
           {contact?.name || formatWalletAddress(contact?.wallet_address || '')}
@@ -271,7 +270,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Container>
   );
 };
 

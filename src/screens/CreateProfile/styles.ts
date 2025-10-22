@@ -7,13 +7,8 @@ export const GREEN = '#A5EA15';
 export const GRAY = '#A89B9B';
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
   mainContainer: {
     flex: 1,
-    paddingHorizontal: spacing.md,
   },
   scrollContent: {
     flex: 1,

@@ -4,15 +4,10 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
 export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.black,
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     backgroundColor: colors.black,
   },
@@ -45,7 +40,6 @@ export const styles = StyleSheet.create({
     borderRadius: 16,
     padding: spacing.lg,
     marginTop: spacing.md,
-    marginHorizontal: spacing.md,
     // Create ticket effect with pseudo-elements using border radius
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
@@ -181,7 +175,6 @@ export const styles = StyleSheet.create({
   },
   // Lock button at bottom of screen
   lockButtonContainer: {
-    paddingHorizontal: spacing.md,
     backgroundColor: colors.black,
     marginTop: 'auto', // Push to bottom
   },
@@ -282,7 +275,6 @@ export const styles = StyleSheet.create({
   // Participants list styles
   participantsContainer: {
     marginVertical: spacing.lg,
-    paddingHorizontal: spacing.md,
   },
   participantCard: {
     flexDirection: 'row',
@@ -656,7 +648,6 @@ export const styles = StyleSheet.create({
   // Split Wallet Section Styles
   splitWalletSection: {
     marginVertical: spacing.lg,
-    marginHorizontal: spacing.md,
   },
   splitWalletTitle: {
     color: colors.white,

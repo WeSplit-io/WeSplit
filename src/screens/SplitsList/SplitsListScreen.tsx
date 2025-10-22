@@ -18,7 +18,6 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from './styles';
 import { colors } from '../../theme/colors';
@@ -26,6 +25,7 @@ import NavBar from '../../components/NavBar';
 import UserAvatar from '../../components/UserAvatar';
 import GroupIcon from '../../components/GroupIcon';
 import Icon from '../../components/Icon';
+import { Container } from '../../components/shared';
 import { BillSplitSummary } from '../../types/unified';
 import { SplitStorageService, Split } from '../../services/splitStorageService';
 import { logger } from '../../services/loggingService';
@@ -538,8 +538,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
   const displaySplits = getFilteredSplits();
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+    <Container>
 
       <ScrollView
         style={styles.scrollView}
@@ -684,14 +683,14 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
             <Text style={styles.emptyTabText}>No pools found</Text>
           </View>
         ) : (
-          <View style={styles.splitsContainer}>
+          <View>
             {displaySplits.map(renderSplitCard)}
           </View>
         )}
       </ScrollView>
 
       <NavBar currentRoute="SplitsList" navigation={navigation} />
-    </SafeAreaView>
+    </Container>
   );
 };
 

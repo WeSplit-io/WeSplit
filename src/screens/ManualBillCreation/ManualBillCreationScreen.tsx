@@ -16,8 +16,7 @@ import {
   Modal,
   ActivityIndicator,
   Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from 'react-native';  
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../../theme/colors';
@@ -29,6 +28,7 @@ import { convertFiatToUSDC } from '../../services/fiatCurrencyService';
 import { parseAmount } from '../../libs/format/amount';
 import { styles } from './styles';
 import { logger } from '../../services/loggingService';
+import { Container } from '../../components/shared';
 
 // Category options with images
 const CATEGORIES = [
@@ -351,7 +351,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       {/* Header */}
@@ -592,7 +592,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </Container>
   );
 };
 

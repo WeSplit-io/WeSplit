@@ -2,15 +2,10 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export default StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.darkBackground,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.iconSize,
     paddingVertical: spacing.lg,
     borderBottomWidth: spacing.borderWidthThin,
     borderBottomColor: colors.border,
@@ -28,7 +23,6 @@ export default StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.iconSize,
   },
   heroSection: {
     alignItems: 'center',

@@ -7,7 +7,6 @@ export const styles = StyleSheet.create({
   participantsContainer: {
     flex: 1,
     marginBottom: spacing.lg,
-    marginHorizontal: spacing.md,
   },
   participantsScrollView: {
     flex: 1,

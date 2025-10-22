@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { SubscriptionService, SubscriptionPlan, UserSubscription, PaymentMethod } from '../../services/subscriptionService';
 import { consolidatedTransactionService } from '../../services/consolidatedTransactionService';
 import styles from './styles';
+import { Container } from '../../components/shared';
 
 interface PremiumScreenProps {
   navigation: any;
@@ -205,7 +205,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <Container>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <Icon name="arrow-left" size={24} color="#FFF" />
@@ -217,12 +217,12 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
           <ActivityIndicator size="large" color="#A5EA15" />
           <Text style={{ color: '#FFF', marginTop: 16 }}>Loading premium features...</Text>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <Container>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-left" size={24} color="#FFF" />
@@ -378,7 +378,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
           <Text style={styles.restoreButtonText}>Restore Purchases</Text>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </Container>
   );
 };
 
