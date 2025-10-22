@@ -5,6 +5,7 @@ import { setupDeepLinkListeners } from '../services/deepLinkHandler';
 import { useApp } from '../context/AppContext';
 import { logger } from '../services/loggingService';
 import { colors } from '../theme';
+import { navigationService } from '../services/navigationService';
 
 interface NavigationWrapperProps {
   children: React.ReactNode;
@@ -71,6 +72,8 @@ const NavigationWrapper: React.FC<NavigationWrapperProps> = ({ children }) => {
       ref={navigationRef}
       onReady={() => {
         setIsNavigationReady(true);
+        // Set the navigation reference in the navigation service
+        navigationService.setNavigationRef(navigationRef.current);
         logger.debug('Navigation container is ready', null, 'NavigationWrapper');
       }}
       theme={{

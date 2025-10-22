@@ -92,7 +92,8 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     // Mark as read if not already read
     if (!notification.is_read) {
       try {
-        await firebaseDataService.notification.markNotificationAsRead(String(notification.id));
+        const { notificationService } = await import('../../services/notificationService');
+        await notificationService.markAsRead(String(notification.id));
         loadNotifications(); // Refresh notifications to update read status
       } catch (error) {
         console.error('Error marking notification as read:', error);
@@ -926,7 +927,8 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           // Handle system warning notification
           try {
             // Dismiss system warning by marking as read and deleting
-            await firebaseDataService.notification.markNotificationAsRead(notificationId);
+            const { notificationService } = await import('../../services/notificationService');
+            await notificationService.markAsRead(notificationId);
             await deleteNotification(notificationId);
             
             // Mark as completed
@@ -1236,7 +1238,8 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           
           // Mark as read and delete
           try {
-            await firebaseDataService.notification.markNotificationAsRead(notificationId);
+            const { notificationService } = await import('../../services/notificationService');
+            await notificationService.markAsRead(notificationId);
             await deleteNotification(notificationId);
             
             setActionStates(prev => ({
@@ -1308,7 +1311,8 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           
           // Mark as read and delete
           try {
-            await firebaseDataService.notification.markNotificationAsRead(notificationId);
+            const { notificationService } = await import('../../services/notificationService');
+            await notificationService.markAsRead(notificationId);
             await deleteNotification(notificationId);
             
             setActionStates(prev => ({
@@ -1351,7 +1355,8 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           
           // Mark as read and delete
           try {
-            await firebaseDataService.notification.markNotificationAsRead(notificationId);
+            const { notificationService } = await import('../../services/notificationService');
+            await notificationService.markAsRead(notificationId);
             await deleteNotification(notificationId);
             
             setActionStates(prev => ({
@@ -1396,7 +1401,8 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           
           // Mark as read and delete
           try {
-            await firebaseDataService.notification.markNotificationAsRead(notificationId);
+            const { notificationService } = await import('../../services/notificationService');
+            await notificationService.markAsRead(notificationId);
             await deleteNotification(notificationId);
             
             setActionStates(prev => ({

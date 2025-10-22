@@ -177,7 +177,7 @@ class NotificationServiceClass {
   ): Promise<void> {
     try {
       // Store in Firestore
-      await addDoc(collection(db, 'notifications'), {
+      const notificationRef = await addDoc(collection(db, 'notifications'), {
         userId,
         title,
         message,
@@ -194,7 +194,12 @@ class NotificationServiceClass {
             content: {
               title,
               body: message,
-              data: { userId, type, ...data },
+              data: { 
+                userId, 
+                type, 
+                notificationId: notificationRef.id, // Include notification ID for proper navigation
+                ...data 
+              },
             },
             trigger: null, // Send immediately
           });
@@ -222,7 +227,12 @@ class NotificationServiceClass {
                   content: {
                     title,
                     body: message,
-                    data: { userId, type, ...data },
+                    data: { 
+                      userId, 
+                      type, 
+                      notificationId: notificationRef.id, // Include notification ID for proper navigation
+                      ...data 
+                    },
                   },
                   trigger: null,
                 });
@@ -290,70 +300,8 @@ class NotificationServiceClass {
     }
   }
 
-  /**
-   * Get user notifications
-   */
-  async getUserNotifications(userId: string, limitCount: number = 50): Promise<NotificationData[]> {
-    try {
-      const notificationsRef = collection(db, 'notifications');
-      const q = query(
-        notificationsRef,
-        where('userId', '==', userId),
-        orderBy('created_at', 'desc'),
-        limit(limitCount)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          userId: data.userId,
-          title: data.title,
-          message: data.message,
-          type: data.type || 'general',
-          data: data.data || {},
-          is_read: data.is_read || false,
-          created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-          read_at: data.read_at?.toDate?.()?.toISOString()
-        };
-      });
-    } catch (error) {
-      logger.error('Error fetching notifications:', error, 'NotificationService');
-      return [];
-    }
-  }
 
-  /**
-   * Mark notification as read
-   */
-  async markAsRead(notificationId: string): Promise<boolean> {
-    try {
-      const notificationRef = doc(db, 'notifications', notificationId);
-      await updateDoc(notificationRef, { 
-        is_read: true,
-        read_at: serverTimestamp()
-      });
-      return true;
-    } catch (error) {
-      logger.error('Error marking notification as read:', error, 'NotificationService');
-      return false;
-    }
-  }
 
-  /**
-   * Delete notification
-   */
-  async deleteNotification(notificationId: string): Promise<boolean> {
-    try {
-      const notificationRef = doc(db, 'notifications', notificationId);
-      await deleteDoc(notificationRef);
-      return true;
-    } catch (error) {
-      logger.error('Error deleting notification:', error, 'NotificationService');
-      return false;
-    }
-  }
 
   /**
    * Get notification title based on type
@@ -681,6 +629,174 @@ class NotificationServiceClass {
     } catch (error) {
       logger.error('Failed to get user notifications:', error, 'NotificationService');
       return [];
+    }
+  }
+
+  /**
+   * Navigate from notification (handles both push and in-app notifications)
+   */
+  async navigateFromNotification(
+    notification: { id: string; type: NotificationType; data?: any },
+    navigation: any,
+    currentUserId: string
+  ): Promise<void> {
+    try {
+      logger.info('Navigating from notification', {
+        notificationId: notification.id,
+        type: notification.type,
+        data: notification.data
+      }, 'NotificationService');
+
+      // Mark notification as read first
+      await this.markAsRead(notification.id);
+
+      // Handle navigation based on notification type
+      switch (notification.type) {
+        case 'split_invite':
+          if (notification.data?.splitId) {
+            navigation.navigate('SplitDetails', {
+              splitId: notification.data.splitId,
+              isFromNotification: true,
+              notificationId: notification.id
+            });
+          } else {
+            logger.warn('Split invite notification missing splitId', { notification }, 'NotificationService');
+            navigation.navigate('SplitsList');
+          }
+          break;
+
+        case 'split_payment_required':
+          if (notification.data?.splitId) {
+            // Navigate to the appropriate split screen based on split type
+            if (notification.data.splitType === 'fair') {
+              navigation.navigate('FairSplit', {
+                splitData: { id: notification.data.splitId },
+                isFromNotification: true,
+                notificationId: notification.id
+              });
+            } else if (notification.data.splitType === 'degen') {
+              navigation.navigate('DegenLock', {
+                splitData: { id: notification.data.splitId },
+                isFromNotification: true,
+                notificationId: notification.id
+              });
+            } else {
+              navigation.navigate('SplitDetails', {
+                splitId: notification.data.splitId,
+                isFromNotification: true,
+                notificationId: notification.id
+              });
+            }
+          } else {
+            logger.warn('Split payment notification missing splitId', { notification }, 'NotificationService');
+            navigation.navigate('SplitsList');
+          }
+          break;
+
+        case 'payment_request':
+          if (notification.data?.requestId) {
+            navigation.navigate('RequestConfirmation', {
+              requestId: notification.data.requestId,
+              isFromNotification: true,
+              notificationId: notification.id
+            });
+          } else {
+            logger.warn('Payment request notification missing requestId', { notification }, 'NotificationService');
+            navigation.navigate('Dashboard');
+          }
+          break;
+
+        case 'payment_reminder':
+          if (notification.data?.requestId) {
+            navigation.navigate('RequestConfirmation', {
+              requestId: notification.data.requestId,
+              isFromNotification: true,
+              notificationId: notification.id
+            });
+          } else {
+            logger.warn('Payment reminder notification missing requestId', { notification }, 'NotificationService');
+            navigation.navigate('Dashboard');
+          }
+          break;
+
+        case 'group_invite':
+          if (notification.data?.groupId) {
+            navigation.navigate('GroupDetails', {
+              groupId: notification.data.groupId,
+              isFromNotification: true,
+              notificationId: notification.id
+            });
+          } else {
+            logger.warn('Group invite notification missing groupId', { notification }, 'NotificationService');
+            navigation.navigate('Dashboard');
+          }
+          break;
+
+        case 'expense_added':
+          if (notification.data?.groupId) {
+            navigation.navigate('GroupDetails', {
+              groupId: notification.data.groupId,
+              isFromNotification: true,
+              notificationId: notification.id
+            });
+          } else {
+            logger.warn('Expense added notification missing groupId', { notification }, 'NotificationService');
+            navigation.navigate('Dashboard');
+          }
+          break;
+
+        case 'group_payment_sent':
+        case 'group_payment_received':
+          if (notification.data?.groupId) {
+            navigation.navigate('GroupDetails', {
+              groupId: notification.data.groupId,
+              isFromNotification: true,
+              notificationId: notification.id
+            });
+          } else {
+            logger.warn('Group payment notification missing groupId', { notification }, 'NotificationService');
+            navigation.navigate('Dashboard');
+          }
+          break;
+
+        case 'contact_added':
+          navigation.navigate('Contacts', {
+            isFromNotification: true,
+            notificationId: notification.id
+          });
+          break;
+
+        case 'general':
+        default:
+          // For general notifications, navigate to notifications screen
+          navigation.navigate('Notifications', {
+            isFromNotification: true,
+            notificationId: notification.id
+          });
+          break;
+      }
+
+      logger.info('Successfully navigated from notification', {
+        notificationId: notification.id,
+        type: notification.type
+      }, 'NotificationService');
+
+    } catch (error) {
+      logger.error('Failed to navigate from notification', {
+        notificationId: notification.id,
+        type: notification.type,
+        error
+      }, 'NotificationService');
+      
+      // Fallback navigation with error handling
+      try {
+        navigation.navigate('Dashboard');
+      } catch (fallbackError) {
+        logger.error('Fallback navigation also failed', {
+          notificationId: notification.id,
+          error: fallbackError
+        }, 'NotificationService');
+      }
     }
   }
 }

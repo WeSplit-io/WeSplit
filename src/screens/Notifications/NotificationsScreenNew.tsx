@@ -55,7 +55,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     if (!notification.is_read) {
       try {
         const { notificationService } = await import('../../services/notificationService');
-        await notificationService.markNotificationAsRead(notification.id);
+        await notificationService.markAsRead(notification.id);
         loadNotifications(); // Refresh notifications to update read status
       } catch (error) {
         console.error('Error marking notification as read:', error);
@@ -99,7 +99,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       );
 
       // Mark notification as read
-      await notificationService.markNotificationAsRead(notificationId);
+      await notificationService.markAsRead(notificationId);
 
       // Set action state to completed
       setActionStates(prev => ({

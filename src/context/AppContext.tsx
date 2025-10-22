@@ -529,17 +529,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         data: data
       }, 'AppContext');
 
-      // Create a mock navigation object for notification service
-      const mockNavigation = {
-        navigate: (screen: string, params?: any) => {
-          logger.info('Notification navigation requested', { screen, params }, 'AppContext');
-          // In a real implementation, this would use the actual navigation
-          // For now, we'll log the navigation request
-        }
-      };
-
-      // Use notification service for proper navigation
+      // Use navigation service for proper navigation
+      const { navigationService } = await import('../services/navigationService');
       const { notificationService } = await import('../services/notificationService');
+      
       const notificationData = {
         id: data?.notificationId || 'unknown',
         type: notificationType,
@@ -548,7 +541,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       await notificationService.navigateFromNotification(
         notificationData,
-        mockNavigation,
+        navigationService,
         state.currentUser?.id || ''
       );
 
