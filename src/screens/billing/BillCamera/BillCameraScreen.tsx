@@ -21,6 +21,7 @@ import { typography } from '../../../theme/typography';
 import { styles } from './BillCameraStyles';
 import { logger } from '../../../services/core';
 import { Container } from '../../../components/shared';
+import Header from '../../../components/shared/Header';
 
 interface BillCameraScreenProps {
   navigation: any;
@@ -175,21 +176,11 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
         <StatusBar barStyle="light-content" backgroundColor={colors.black} />
         
         {/* Header with Back Button and Title */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={retakePicture}
-          >
-            <Image 
-              source={require('../../../../assets/chevron-left.png')} 
-              style={styles.backButtonIcon}
-            />
-          </TouchableOpacity>
-          
-          <Text style={styles.headerTitle}>Check Image</Text>
-          
-          <View style={styles.headerSpacer} />
-        </View>
+        <Header 
+          title="Check Image"
+          onBackPress={retakePicture}
+          showBackButton={true}
+        />
 
         {/* Full Height Image */}
         <View style={styles.fullHeightImageContainer}>
@@ -225,21 +216,11 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       {/* Header with Back Button and Title */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => navigation.goBack()}
-        >
-          <Image 
-            source={require('../../../../assets/chevron-left.png')} 
-            style={styles.backButtonIcon}
-          />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>Scan your receipt</Text>
-        
-        <View style={styles.headerSpacer} />
-      </View>
+      <Header 
+        title="Scan your receipt"
+        onBackPress={() => navigation.goBack()}
+        showBackButton={true}
+      />
 
       {/* Camera View - Full Screen */}
       <View style={styles.cameraContainer}>

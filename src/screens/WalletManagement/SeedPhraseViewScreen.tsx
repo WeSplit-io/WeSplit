@@ -18,6 +18,7 @@ import { firebaseDataService } from '../../services/data';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
+import Header from '../../components/shared/Header';
 
 const SeedPhraseViewScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -147,16 +148,11 @@ const SeedPhraseViewScreen: React.FC = () => {
   if (loading) {
     return (
       <Container safeAreaEdges={['top', 'bottom']}>
-        <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-          <Text style={styles.headerTitle}>Seed phrase</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <Header 
+          title="Seed phrase"
+          onBackPress={handleBack}
+          showBackButton={true}
+        />
         <View style={styles.loaderSeedPhraseContainer}>
           <Text style={styles.instructionsText}>Loading seed phrase...</Text>
         </View>
@@ -167,16 +163,11 @@ const SeedPhraseViewScreen: React.FC = () => {
   if (error) {
     return (
       <Container safeAreaEdges={['top', 'bottom']}>
-        <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-          <Text style={styles.headerTitle}>Seed phrase</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <Header 
+          title="Seed phrase"
+          onBackPress={handleBack}
+          showBackButton={true}
+        />
         <View style={styles.content}>
           <View style={styles.instructionsContainer}>
             <Text style={styles.instructionsTitle}>Seed Phrase Unavailable</Text>
@@ -203,16 +194,11 @@ const SeedPhraseViewScreen: React.FC = () => {
   return (
     <Container safeAreaEdges={['top', 'bottom']}>
       {/* Header */}
-      <View style={styles.header}>
-      <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Seed phrase</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header 
+        title="Seed phrase"
+        onBackPress={handleBack}
+        showBackButton={true}
+      />
 
       <View style={styles.content}>
         {/* Instructions */}

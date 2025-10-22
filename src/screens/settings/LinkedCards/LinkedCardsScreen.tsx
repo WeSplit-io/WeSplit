@@ -8,6 +8,7 @@ import AddDestinationSheet from '../../../components/shared';
 import { walletService } from '../../../services/wallet';
 import { styles } from './styles';
 import { logger } from '../../../services/core';
+import Header from '../../../components/shared/Header';
 
 // Interfaces are now imported from the service
 
@@ -361,27 +362,24 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
       <TouchableWithoutFeedback onPress={closeDropdown}>
         <View style={styles.container}>
           {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Image
-                source={require('../../../../assets/chevron-left.png')}
-                style={styles.iconWrapper}
-                tintColor="white"
-              />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Linked Wallets</Text>
-            <TouchableOpacity 
-              style={[styles.addButton, isAdding && { opacity: 0.6 }]}
-              onPress={() => setShowAddModal(true)}
-              disabled={isAdding}
-            >
-              <Image
-                source={require('../../../../assets/plus-icon-green.png')}
-                style={styles.addButtonIcon}
-                tintColor="white"
-              />
-            </TouchableOpacity>
-          </View>
+          <Header 
+            title="Linked Wallets"
+            onBackPress={() => navigation.goBack()}
+            showBackButton={true}
+            rightElement={
+              <TouchableOpacity 
+                style={[styles.addButton, isAdding && { opacity: 0.6 }]}
+                onPress={() => setShowAddModal(true)}
+                disabled={isAdding}
+              >
+                <Image
+                  source={require('../../../../assets/plus-icon-green.png')}
+                  style={styles.addButtonIcon}
+                  tintColor="white"
+                />
+              </TouchableOpacity>
+            }
+          />
 
           {/* Content */}
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

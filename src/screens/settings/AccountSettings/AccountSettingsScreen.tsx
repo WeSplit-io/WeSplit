@@ -23,6 +23,7 @@ import { accountDeletionService, DeletionProgress, AccountDeletionService, UserI
 import { logger } from '../../../services/core';
 import styles from './styles';
 import { Container } from '../../../components/shared';
+import Header from '../../../components/shared/Header';
 
 
 interface AccountSettingsScreenProps {
@@ -403,16 +404,11 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
     <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.darkBackground} />
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-          <Image
-            source={require('../../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Account info</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header 
+        title="Account info"
+        onBackPress={handleBackPress}
+        showBackButton={true}
+      />
 
       {/* Main Content */}
       <View style={styles.mainContent}>

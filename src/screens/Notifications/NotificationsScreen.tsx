@@ -22,6 +22,7 @@ import { colors } from '../../theme/colors';
 import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import { Container } from '../../components/shared';
+import Header from '../../components/shared/Header';
 
 // Import the NotificationData interface from the component
 import { NotificationData } from '../../components/notifications/NotificationCard';
@@ -387,12 +388,15 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-          <Text style={styles.refreshButtonText}>Refresh</Text>
-        </TouchableOpacity>
-      </View>
+      <Header 
+        title="Notifications"
+        showBackButton={false}
+        rightElement={
+          <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+            <Text style={styles.refreshButtonText}>Refresh</Text>
+          </TouchableOpacity>
+        }
+      />
 
       {/* Notifications List */}
       <ScrollView

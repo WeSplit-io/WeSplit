@@ -14,6 +14,7 @@ import { walletService } from '../../services/wallet';
 import { colors, spacing, typography } from '../../theme';
 import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
+import Header from '../../components/shared/Header';
 
 interface FundTransferScreenProps {
   navigation: any;
@@ -132,9 +133,11 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
 
   return (
     <Container>
-      <View style={styles.header}>
-        <Text style={styles.title}>Transfer Funds</Text>
-      </View>
+      <Header 
+        title="Transfer Funds"
+        onBackPress={() => navigation.goBack()}
+        showBackButton={true}
+      />
 
       <ScrollView style={styles.scrollView}>
         {/* App Wallet Info */}

@@ -19,6 +19,7 @@ import { isValidSolanaAddress } from '../../utils/validation';
 import { parseWeSplitDeepLink } from '../../services/core/deepLinkHandler';
 import { logger } from '../../services/core';
 import { Container } from '../../components/shared';
+import Header from '../../components/shared/Header';
 
 // Fonction pour hacher l'adresse du wallet
 const hashWalletAddress = (address: string): string => {
@@ -258,24 +259,11 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
   };
 
   const renderHeader = () => (
-    <View style={styles.header}>
-      <TouchableOpacity 
-        style={styles.backButton} 
-        onPress={() => {
-          onBack();
-        }}
-        activeOpacity={0.7}
-      >
-        <Image
-          source={require('../../../assets/chevron-left.png')}
-          style={styles.backIcon}
-        />
-      </TouchableOpacity>
-      <Text style={styles.headerTitle}>
-        {activeTab === 'myCode' ? 'QR Code' : 'Scan QR Code'}
-      </Text>
-      <View style={styles.menuButton} />
-    </View>
+    <Header 
+      title={activeTab === 'myCode' ? 'QR Code' : 'Scan QR Code'}
+      onBackPress={onBack}
+      showBackButton={true}
+    />
   );
 
   const renderMyCodeTab = () => (

@@ -28,6 +28,7 @@ import { useApp } from '../../../context/AppContext';
 import { splitStorageService } from '../../../services/splits';
 import { notificationService } from '../../../services/notifications';
 import { Container } from '../../../components/shared';
+import Header from '../../../components/shared/Header';
 
 interface RouteParams {
   imageUri: string;
@@ -612,17 +613,16 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={retakePhoto}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>Edit Bill</Text>
-        
-        <TouchableOpacity style={styles.cameraButton}>
-          <Text style={styles.cameraButtonText}>CAMERA</Text>
-        </TouchableOpacity>
-      </View>
+      <Header 
+        title="Edit Bill"
+        onBackPress={retakePhoto}
+        showBackButton={true}
+        rightElement={
+          <TouchableOpacity style={styles.cameraButton}>
+            <Text style={styles.cameraButtonText}>CAMERA</Text>
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Category Section */}

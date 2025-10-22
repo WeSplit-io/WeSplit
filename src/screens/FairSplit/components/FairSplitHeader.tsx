@@ -10,6 +10,7 @@ import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
 import { styles } from '../styles';
+import Header from '../../../components/shared/Header';
 
 // Local image mapping for category icons
 const CATEGORY_IMAGES_LOCAL: { [key: string]: any } = {
@@ -40,29 +41,19 @@ const FairSplitHeader: React.FC<FairSplitHeaderProps> = ({
   return (
     <>
       {/* Navigation Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={onBackPress}
-        >
-          <Image 
-            source={require('../../../../assets/chevron-left.png')} 
-            style={styles.backButtonIcon}
-          />
-        </TouchableOpacity>
-        
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Fair Split</Text>
-          {isRealtimeActive && (
+      <Header 
+        title="Fair Split"
+        onBackPress={onBackPress}
+        showBackButton={true}
+        rightElement={
+          isRealtimeActive ? (
             <View style={styles.realtimeIndicator}>
               <View style={styles.realtimeDot} />
               <Text style={styles.realtimeText}>Live</Text>
             </View>
-          )}
-        </View>
-        
-        <View style={{ width: 40 }} />
-      </View>
+          ) : undefined
+        }
+      />
 
       {/* Bill Summary Card */}
       <LinearGradient

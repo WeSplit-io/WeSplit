@@ -7,6 +7,7 @@ import { subscriptionService, SubscriptionPlan, UserSubscription, PaymentMethod,
 import { consolidatedTransactionService } from '../../../services/transaction';
 import styles from './styles';
 import { Container } from '../../../components/shared';
+import Header from '../../../components/shared/Header';
 
 interface PremiumScreenProps {
   navigation: any;
@@ -213,13 +214,11 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
   if (loading) {
     return (
       <Container>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Premium Features</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <Header 
+          title="Premium Features"
+          onBackPress={() => navigation.goBack()}
+          showBackButton={true}
+        />
         <View style={[styles.content, { justifyContent: 'center', alignItems: 'center' }]}>
           <ActivityIndicator size="large" color="#A5EA15" />
           <Text style={{ color: '#FFF', marginTop: 16 }}>Loading premium features...</Text>
@@ -230,13 +229,11 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
 
   return (
     <Container>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Premium Features</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header 
+        title="Premium Features"
+        onBackPress={() => navigation.goBack()}
+        showBackButton={true}
+      />
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Current Subscription Status */}

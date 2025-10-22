@@ -14,6 +14,7 @@ import { styles } from './styles';
 import { logger } from '../../services/core';
 import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { Container } from '../../components/shared';
+import Header from '../../components/shared/Header';
 
 interface ContactsScreenProps {
   navigation: any;
@@ -126,20 +127,11 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        {(isSplitMode || isRequestMode) ? (
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Image
-              source={require('../../../assets/chevron-left.png')}
-              style={styles.backIcon}
-            />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.placeholder} />
-        )}
-        <Text style={styles.headerTitle}>{getHeaderTitle()}</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header 
+        title={getHeaderTitle()}
+        onBackPress={() => navigation.goBack()}
+        showBackButton={isSplitMode || isRequestMode}
+      />
 
       {/* Request Mode Tabs */}
       {isRequestMode && (

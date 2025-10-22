@@ -11,6 +11,7 @@ import { DEFAULT_AVATAR_URL } from '../../../config/constants/constants';
 import UserAvatar from '../../../components/UserAvatar';
 import { logger } from '../../../services/core';
 import { Container } from '../../../components/shared';
+import Header from '../../../components/shared/Header';
 
 // Helper function to safely load images with fallback
 const SafeImage = ({ source, style, fallbackSource }: any) => {
@@ -197,16 +198,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Image
-            source={require('../../../../assets/chevron-left.png')}
-            style={styles.iconWrapper}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header 
+        title="Profile"
+        onBackPress={() => navigation.goBack()}
+        showBackButton={true}
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Header Card */}

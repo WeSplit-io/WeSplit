@@ -15,6 +15,7 @@ import { typography } from '../../theme/typography';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/data';
 import { Container } from '../../components/shared';
+import Header from '../../components/shared/Header';
 
 // Temporary inline styles to fix the import issue
 const styles = StyleSheet.create({
@@ -310,13 +311,11 @@ const SeedPhraseVerifyScreen: React.FC = () => {
   if (loading) {
     return (
       <Container>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Verify Seed Phrase</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <Header 
+          title="Verify Seed Phrase"
+          onBackPress={handleBack}
+          showBackButton={true}
+        />
         <View style={styles.content}>
           <Text style={styles.instructionsText}>Loading seed phrase...</Text>
         </View>
