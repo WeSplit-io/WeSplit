@@ -280,7 +280,7 @@ const SplitPaymentScreen: React.FC = () => {
   };
 
   const handlePayFullAmount = async () => {
-    if (!participant || !currentUser?.id) return;
+    if (!participant || !currentUser?.id) {return;}
 
     const remainingAmount = participant.amountOwed - participant.amountPaid;
     if (remainingAmount <= 0) {
@@ -299,7 +299,7 @@ const SplitPaymentScreen: React.FC = () => {
   };
 
   const handlePayPartialAmount = async () => {
-    if (!participant || !currentUser?.id) return;
+    if (!participant || !currentUser?.id) {return;}
 
     const remainingAmount = participant.amountOwed - participant.amountPaid;
     if (remainingAmount <= 0) {
@@ -314,7 +314,7 @@ const SplitPaymentScreen: React.FC = () => {
   };
 
   const processPayment = async (amount: number) => {
-    if (!currentUser?.id || !splitWalletId) return;
+    if (!currentUser?.id || !splitWalletId) {return;}
 
     logger.info('Processing payment', {
       amount,
@@ -364,7 +364,7 @@ const SplitPaymentScreen: React.FC = () => {
   };
 
   const handleBack = () => {
-    navigation.goBack();
+    navigation.navigate('SplitsList');
   };
 
   if (isLoading) {

@@ -96,7 +96,7 @@ export const useDegenSplitLogic = (
   
   // Helper functions
   const isCurrentUserCreator = useCallback((currentUser: any, splitData: any) => {
-    if (!currentUser || !splitData) return false;
+    if (!currentUser || !splitData) {return false;}
     return splitData.creatorId === currentUser.id.toString();
   }, []);
 
@@ -105,7 +105,7 @@ export const useDegenSplitLogic = (
   }, []);
 
   const formatWalletAddress = useCallback((address: string) => {
-    if (!address || address.length < 8) return address;
+    if (!address || address.length < 8) {return address;}
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
   }, []);
 
@@ -256,7 +256,7 @@ export const useDegenSplitLogic = (
     totalAmount: number,
     participants: any[]
   ): Promise<boolean> => {
-    if (state.isLocked || state.isLocking || state.isLoadingWallet) return false;
+    if (state.isLocked || state.isLocking || state.isLoadingWallet) {return false;}
     
     if (!currentUser?.id) {
       // Log error but don't show popup
@@ -403,7 +403,7 @@ export const useDegenSplitLogic = (
     
     try {
       // Ensure we have a split wallet
-      let walletToUse = state.splitWallet;
+      const walletToUse = state.splitWallet;
       
       if (!walletToUse) {
         Alert.alert('Error', 'Split wallet not found. Please create the split first.');
@@ -482,7 +482,7 @@ export const useDegenSplitLogic = (
     splitWallet: SplitWallet,
     participants: any[]
   ): Promise<boolean> => {
-    if (!splitWallet) return false;
+    if (!splitWallet) {return false;}
 
     setState({ isCheckingLocks: true });
     try {
@@ -577,7 +577,7 @@ export const useDegenSplitLogic = (
     billData: any,
     totalAmount: number
   ): void => {
-    if (state.isSpinning || state.hasSpun) return;
+    if (state.isSpinning || state.hasSpun) {return;}
 
     setState({ isSpinning: true });
 
@@ -699,7 +699,7 @@ export const useDegenSplitLogic = (
 
   // OPTIMIZED: Centralized claim validation function
   const canUserClaimFunds = useCallback((currentUser: any, splitWallet: SplitWallet): boolean => {
-    if (!currentUser || !splitWallet) return false;
+    if (!currentUser || !splitWallet) {return false;}
     
     const participant = splitWallet.participants.find((p: any) => p.userId === currentUser.id.toString());
     return participant && participant.status !== 'paid';

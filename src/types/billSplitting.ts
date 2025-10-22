@@ -1,26 +1,22 @@
-// Bill Splitting Types
+/**
+ * Bill Splitting Types
+ * Types for bill splitting functionality
+ */
 
 export interface SplitParticipant {
   id: string;
   name: string;
-  walletAddress: string;
+  wallet_address: string;
   amountOwed: number;
-  amountPaid: number;
-  status: 'pending' | 'paid' | 'confirmed' | 'locked' | 'invited';
-  transactionSignature?: string;
-  paidAt?: string;
-  pendingSignature?: string;
-  pendingSince?: string;
-  pendingAmount?: number;
+  items: string[];
 }
 
 export interface BillParticipant {
   id: string;
   name: string;
-  walletAddress: string;
-  items: BillItem[];
-  totalAmount: number;
-  status: 'pending' | 'paid' | 'confirmed';
+  wallet_address: string;
+  amountOwed: number;
+  items: string[];
 }
 
 export interface BillItem {
@@ -28,74 +24,57 @@ export interface BillItem {
   name: string;
   price: number;
   quantity: number;
-  total: number;
   category?: string;
+  total: number;
+  participants?: any;
 }
 
 export interface Split {
   id: string;
-  name: string;
-  description?: string;
-  totalAmount: number;
-  currency: string;
-  splitMethod: 'equal' | 'manual';
   participants: SplitParticipant[];
-  createdBy: string;
-  createdAt: string;
+  totalAmount: number;
+  splitMethod: 'equal' | 'manual';
   updatedAt: string;
-  status: 'draft' | 'active' | 'completed' | 'cancelled';
-  groupId?: string;
-  billData?: any;
 }
 
-export interface SplitWallet {
-  id: string;
-  walletAddress: string;
-  publicKey: string;
-  status: 'active' | 'inactive' | 'locked';
-  participants: SplitWalletParticipant[];
+export interface OCRProcessingResult {
+  success: boolean;
+  data?: ProcessedBillData;
+  error?: string;
+}
+
+export interface BillSplitCreationData {
+  billData: BillAnalysisData;
+  splitMethod: 'equal' | 'manual';
+  participants: BillParticipant[];
+}
+
+export interface ProcessedBillData {
+  title: string;
+  location?: string;
+  time?: string;
   totalAmount: number;
   currency: string;
-  createdAt: string;
-  updatedAt: string;
-  expiresAt?: string;
-  groupId?: string;
-  splitId?: string;
+  items: BillItem[];
+  participants: BillParticipant[];
+  settings?: BillSettings;
 }
 
-export interface SplitWalletParticipant {
-  userId: string;
-  name: string;
-  walletAddress: string;
-  amountOwed: number;
-  amountPaid: number;
-  status: 'pending' | 'paid' | 'confirmed' | 'locked' | 'invited';
-  transactionSignature?: string;
-  paidAt?: string;
-  pendingSignature?: string;
-  pendingSince?: string;
-  pendingAmount?: number;
-}
-
-export interface SplitWalletResult {
-  success: boolean;
-  wallet?: SplitWallet;
-  error?: string;
-  transactionSignature?: string;
-}
-
-export interface SplitResult {
-  success: boolean;
-  split?: Split;
-  error?: string;
-}
-
-export interface SplitInvitation {
+export interface BillAnalysisData {
   id: string;
-  splitId: string;
-  userId: string;
-  invitedBy: string;
-  status: 'pending' | 'accepted' | 'declined';
-  createdAt: string;
-  expiresAt: string;
+  title: string;
+  location?: string;
+  time?: string;
+  totalAmount: number;
+  currency: string;
+  items: BillItem[];
+  participants: BillParticipant[];
+  settings?: BillSettings;
+}
+
+export interface BillSettings {
+  splitMethod: 'equal' | 'manual';
+  currency: string;
+  taxRate?: number;
+  tipRate?: number;
 }

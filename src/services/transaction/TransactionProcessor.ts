@@ -24,7 +24,8 @@ import { USDC_CONFIG } from '../shared/walletConstants';
 import { getConfig } from '../../config/unified';
 import { TRANSACTION_CONFIG } from '../../config/transactionConfig';
 import { FeeService } from '../../config/feeConfig';
-import { transactionUtils } from '../shared/transactionUtils';
+import { TransactionUtils } from '../shared/transactionUtils';
+import { optimizedTransactionUtils } from '../shared/transactionUtilsOptimized';
 import { logger } from '../loggingService';
 import { TransactionParams, TransactionResult } from './types';
 
@@ -112,7 +113,7 @@ export class TransactionProcessor {
       }
 
       // Get recent blockhash
-      const blockhash = await transactionUtils.getLatestBlockhashWithRetry('confirmed');
+      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(this.connection, 'confirmed');
       
       // Create the transaction with proper setup
       const transaction = new Transaction({
@@ -224,7 +225,7 @@ export class TransactionProcessor {
       // Send transaction with retry logic
       let signature: string;
       try {
-        signature = await transactionUtils.sendTransactionWithRetry(
+        signature = await optimizedTransactionUtils.sendTransactionWithRetry(
           transaction,
           signers,
           priority as 'low' | 'medium' | 'high'
@@ -246,7 +247,7 @@ export class TransactionProcessor {
       
       // Enhanced confirmation and verification (matching split logic)
       const confirmationTimeout = priority === 'high' ? 30000 : TRANSACTION_CONFIG.timeout.confirmation; // 30s for high priority, 60s for others
-      const confirmed = await transactionUtils.confirmTransactionWithTimeout(signature, confirmationTimeout);
+      const confirmed = await optimizedTransactionUtils.confirmTransactionWithTimeout(signature, confirmationTimeout);
       
       if (!confirmed) {
         logger.warn('Transaction confirmation timed out, attempting enhanced verification', { signature }, 'TransactionProcessor');

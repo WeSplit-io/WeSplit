@@ -27,14 +27,14 @@ export const WalletConnectButton: React.FC<WalletConnectButtonProps> = ({
   } = useWallet();
 
   const getShortAddress = (address: string | null) => {
-    if (!address) return '';
+    if (!address) {return '';}
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
   const shortAddress = getShortAddress(address);
 
   const handlePress = async () => {
-    if (isLoading) return;
+    if (isLoading) {return;}
 
     try {
       if (isConnected) {

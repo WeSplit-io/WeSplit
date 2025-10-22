@@ -45,7 +45,7 @@ export const useDegenSplitInitialization = (
     participants: any[],
     totalAmount: number
   ) => {
-    if (state.isInitializingRef.current) return;
+    if (state.isInitializingRef.current) {return;}
     
     state.isInitializingRef.current = true;
     setState({ error: null });
@@ -58,7 +58,7 @@ export const useDegenSplitInitialization = (
       }, 'DegenSplitInitialization');
       
       // Load or create split wallet
-      let wallet = await logic.handleLoadSplitWallet(splitData, currentUser);
+      const wallet = await logic.handleLoadSplitWallet(splitData, currentUser);
       
       if (!wallet && isCurrentUserCreator(currentUser, splitData)) {
         // Creator needs to create the wallet
@@ -82,13 +82,13 @@ export const useDegenSplitInitialization = (
 
   // Helper function to check if current user is creator
   const isCurrentUserCreator = useCallback((currentUser: any, splitData: any) => {
-    if (!currentUser || !splitData) return false;
+    if (!currentUser || !splitData) {return false;}
     return splitData.creatorId === currentUser.id.toString();
   }, []);
 
   // Refresh participant data with latest wallet addresses
   const refreshParticipantData = useCallback(async (participants: any[]): Promise<any[]> => {
-    if (participants.length === 0) return participants;
+    if (participants.length === 0) {return participants;}
     
     try {
       logger.info('Refreshing participant data', {

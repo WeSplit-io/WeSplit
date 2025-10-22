@@ -119,7 +119,7 @@ function getCoinGeckoId(symbol: string): string {
   return coinGeckoIds[symbol] || symbol.toLowerCase();
 }
 
-export async function getTotalSpendingInUSDC(expenses: Array<{amount: number, currency: string}>): Promise<number> {
+export async function getTotalSpendingInUSDC(expenses: {amount: number, currency: string}[]): Promise<number> {
   // Create a cache key based on the expenses array
   const cacheKey = JSON.stringify(expenses.sort((a, b) => a.currency.localeCompare(b.currency)));
   const now = Date.now();

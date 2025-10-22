@@ -41,7 +41,7 @@ export const WalletRecoveryComponent: React.FC = () => {
   }, [currentUser]);
 
   const checkRecoveryStatus = async () => {
-    if (!currentUser?.email || !currentUser?.id) return;
+    if (!currentUser?.email || !currentUser?.id) {return;}
 
     setIsLoading(true);
     try {
@@ -64,7 +64,7 @@ export const WalletRecoveryComponent: React.FC = () => {
   };
 
   const triggerWalletRecovery = async () => {
-    if (!currentUser?.email || !currentUser?.id) return;
+    if (!currentUser?.email || !currentUser?.id) {return;}
 
     Alert.alert(
       'Wallet Recovery',
@@ -112,7 +112,7 @@ export const WalletRecoveryComponent: React.FC = () => {
   };
 
   const createWalletBackup = async () => {
-    if (!currentUser?.email || !currentUser?.id || !currentUser?.wallet_address) return;
+    if (!currentUser?.email || !currentUser?.id || !currentUser?.wallet_address) {return;}
 
     setIsLoading(true);
     try {

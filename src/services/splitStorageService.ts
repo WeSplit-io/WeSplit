@@ -109,7 +109,7 @@ export class SplitStorageService {
     }
     
     return obj;
-  };
+  }
 
   /**
    * Create a new split in the database

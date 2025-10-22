@@ -1059,7 +1059,7 @@ class SolanaWalletService {
       const allSeedPhrases = [seedPhrase, oldSeedPhrase].filter(Boolean);
       
       for (const phrase of allSeedPhrases) {
-        if (!phrase) continue;
+        if (!phrase) {continue;}
         
         // Try standard derivation path first
         try {

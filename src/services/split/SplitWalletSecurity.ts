@@ -493,7 +493,7 @@ export class SplitWalletSecurity {
    */
   static async storeSplitWalletPrivateKeyForAllParticipants(
     splitWalletId: string,
-    participants: Array<{ userId: string; name: string }>,
+    participants: { userId: string; name: string }[],
     privateKey: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
@@ -572,7 +572,7 @@ export class SplitWalletSecurity {
    */
   static async deleteSplitWalletPrivateKeyForAllParticipants(
     splitWalletId: string,
-    participants: Array<{ userId: string; name: string }>
+    participants: { userId: string; name: string }[]
   ): Promise<{ success: boolean; error?: string }> {
     try {
       if (!participants || participants.length === 0) {

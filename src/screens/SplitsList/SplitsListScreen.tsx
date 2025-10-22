@@ -74,7 +74,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         });
       });
 
-      if (userIds.size === 0) return;
+      if (userIds.size === 0) {return;}
 
       // Fetch user profiles in parallel
       const avatarPromises = Array.from(userIds).map(async (userId) => {

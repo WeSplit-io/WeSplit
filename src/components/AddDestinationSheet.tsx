@@ -189,8 +189,8 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   };
 
   const isFormValid = () => {
-    if (isLoading) return false;
-    if (!name.trim()) return false;
+    if (isLoading) {return false;}
+    if (!name.trim()) {return false;}
     
     if (destinationType === 'wallet') {
       return address.trim().length > 0;

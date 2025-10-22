@@ -41,7 +41,7 @@ function createNetworkError(
  * Check if error is retryable
  */
 export function isRetryableError(error: any): boolean {
-  if (!error) return false;
+  if (!error) {return false;}
 
   // Network errors
   if (error.code === 'NETWORK_ERROR' || 
@@ -114,7 +114,7 @@ export function isRateLimitError(error: any): boolean {
  * Get error message for user display
  */
 export function getUserErrorMessage(error: any): string {
-  if (!error) return 'An unknown error occurred';
+  if (!error) {return 'An unknown error occurred';}
 
   // Network errors
   if (isNetworkError(error)) {
@@ -173,9 +173,9 @@ export function getUserErrorMessage(error: any): string {
  * Get error code for logging
  */
 export function getErrorCode(error: any): string {
-  if (error?.code) return error.code;
-  if (error?.status) return `HTTP_${error.status}`;
-  if (error?.name) return error.name;
+  if (error?.code) {return error.code;}
+  if (error?.status) {return `HTTP_${error.status}`;}
+  if (error?.name) {return error.name;}
   return 'UNKNOWN_ERROR';
 }
 

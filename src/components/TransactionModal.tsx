@@ -104,7 +104,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   }, [visible]);
 
-  if (!transaction) return null;
+  if (!transaction) {return null;}
 
   const getTransactionIcon = (transaction: Transaction) => {
     switch (transaction.type) {
@@ -147,10 +147,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) {return 'N/A';}
     try {
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'N/A';
+      if (isNaN(date.getTime())) {return 'N/A';}
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -165,7 +165,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   };
 
   const formatShortAddress = (address: string) => {
-    if (!address) return 'N/A';
+    if (!address) {return 'N/A';}
     return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
   };
 

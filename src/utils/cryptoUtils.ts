@@ -74,7 +74,7 @@ export const getCryptocurrencyBySymbol = (symbol: string): Cryptocurrency | unde
 
 export const formatCryptoAmount = (amount: number, symbol: string): string => {
   const crypto = getCryptocurrencyBySymbol(symbol);
-  if (!crypto) return `${amount} ${symbol}`;
+  if (!crypto) {return `${amount} ${symbol}`;}
   
   return `${amount.toLocaleString(undefined, { 
     minimumFractionDigits: 2, 
@@ -83,10 +83,10 @@ export const formatCryptoAmount = (amount: number, symbol: string): string => {
 }; 
 
 export const hashWalletAddress = (address: string): string => {
-  if (!address) return '';
+  if (!address) {return '';}
   
   // Simple hash function - take first 6 and last 4 characters
-  if (address.length <= 10) return address;
+  if (address.length <= 10) {return address;}
   
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 };

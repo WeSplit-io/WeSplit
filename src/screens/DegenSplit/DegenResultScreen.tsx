@@ -71,7 +71,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
           duration: 200,
           useNativeDriver: false,
         }).start(() => {
-          if (onSlideComplete) onSlideComplete();
+          if (onSlideComplete) {onSlideComplete();}
           setTimeout(() => {
             sliderValue.setValue(0);
             setIsSliderActive(false);
@@ -258,7 +258,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
   
   // Centralized function to check if user can claim funds
   const canUserClaimFunds = useCallback(() => {
-    if (!currentUser || !currentSplitWallet) return false;
+    if (!currentUser || !currentSplitWallet) {return false;}
     
     const participant = currentSplitWallet.participants.find((p: any) => p.userId === currentUser.id.toString());
     return participant && participant.status !== 'paid';
@@ -288,7 +288,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
 
   // Event handlers
   const handleBack = () => {
-    navigation.goBack();
+    navigation.navigate('SplitsList');
   };
 
   const handleExternalPayment = async () => {
@@ -341,7 +341,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
 
   // Handle signature step
   const handleSignatureStep = async () => {
-    if (!degenState.selectedPaymentMethod) return;
+    if (!degenState.selectedPaymentMethod) {return;}
     
     degenState.setIsSigning(true);
     try {

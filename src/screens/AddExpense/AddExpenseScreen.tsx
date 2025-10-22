@@ -357,21 +357,29 @@ const AddExpenseScreen: React.FC<any> = ({ navigation, route }) => {
             userId: String(member.id)
           });
           
-          await firebaseDataService.notification.createNotification({
-            userId: String(member.id),
-            type: 'expense_added',
-            title: 'New Expense Added',
-            message: `${currentUser?.name || 'Someone'} added a new expense: ${description}`,
-            data: {
-              groupId: selectedGroup.id,
-              expenseId: result.id,
-              amount: parseFloat(amount),
-              currency: selectedCurrency.symbol,
-              paidBy: paidBy,
-              description: description.trim()
-            },
-            is_read: false
-          });
+          // Import notification service and validation utilities
+          const { notificationService } = await import('../../services/notificationService');
+          const { createExpenseAddedNotificationData } = await import('../../utils/notificationValidation');
+          
+          // Create standardized notification data
+          const notificationData = createExpenseAddedNotificationData(
+            selectedGroup.id,
+            result.id,
+            parseFloat(amount),
+            selectedCurrency.symbol,
+            description.trim(),
+            paidBy,
+            selectedGroup.name
+          );
+          
+          // Send notification using unified service
+          await notificationService.sendNotification(
+            String(member.id),
+            'New Expense Added',
+            `${currentUser?.name || 'Someone'} added a new expense: ${description}`,
+            'expense_added',
+            notificationData
+          );
         }
 
         logger.info('Notifications sent to members', { count: membersToNotify.length }, 'AddExpenseScreen');

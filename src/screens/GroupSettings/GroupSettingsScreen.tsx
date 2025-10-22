@@ -110,7 +110,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   // Load real member data from backend
   useEffect(() => {
     const loadRealMembers = async () => {
-      if (!groupId) return;
+      if (!groupId) {return;}
       
       setLoadingMembers(true);
       try {
@@ -464,7 +464,7 @@ const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Refresh members list
   const refreshMembers = async () => {
-    if (!groupId) return;
+    if (!groupId) {return;}
     
     setLoadingMembers(true);
     try {

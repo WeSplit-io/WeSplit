@@ -118,7 +118,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Function to hash wallet address for display
   const hashWalletAddress = (address: string): string => {
-    if (!address || address.length < 8) return address;
+    if (!address || address.length < 8) {return address;}
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
 
@@ -370,10 +370,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Load payment requests and notifications from context
   const loadPaymentRequests = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
 
     // Prevent duplicate calls
-    if (loadingPaymentRequests) return;
+    if (loadingPaymentRequests) {return;}
 
     // Wait for notifications to be available
     if (!notifications) {
@@ -440,7 +440,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         .filter(n => {
           // Filter out notifications with $0 amounts
           const amount = n.data?.amount || 0;
-          if (amount <= 0) return false;
+          if (amount <= 0) {return false;}
 
           // Check if this notification corresponds to a Firebase payment request
           const requestId = n.data?.requestId;
@@ -499,7 +499,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           profiles.forEach(p => { idToAvatar[p.id] = p.avatar; });
 
           allRequests.forEach(r => {
-            if (!r.data) r.data = {};
+            if (!r.data) {r.data = {};}
             const sid = r.data.senderId ? String(r.data.senderId) : undefined;
             const existing = r.data.senderAvatar && r.data.senderAvatar.trim() !== '';
             if (!existing && sid && idToAvatar[sid]) {
@@ -534,7 +534,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           requestsNeedingAvatar.forEach(r => {
             const gid = r.data?.groupId ? String(r.data.groupId) : undefined;
             const sid = r.data?.senderId ? String(r.data.senderId) : undefined;
-            if (!gid || !sid) return;
+            if (!gid || !sid) {return;}
             const members = groupIdToMembers[gid] || [];
             const m = members.find((mm: any) => String(mm.id) === sid || String(mm.user_id) === sid);
             if (m && m.avatar && m.avatar.trim() !== '') {
@@ -595,7 +595,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Load real transactions from Firebase
   const loadRealTransactions = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
 
     try {
       setLoadingTransactions(true);
@@ -702,7 +702,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
 
   const onRefresh = async () => {
-    if (!isAuthenticated || !currentUser?.id) return;
+    if (!isAuthenticated || !currentUser?.id) {return;}
 
     try {
       logger.info('Manual refresh triggered', null, 'DashboardScreen');
@@ -789,7 +789,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   };
 
   const getTransactionTitle = (transaction: Transaction) => {
-    if (!transaction || !transaction.type) return 'Transaction';
+    if (!transaction || !transaction.type) {return 'Transaction';}
     
     switch (transaction.type) {
       case 'send':
@@ -806,7 +806,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   };
 
   const getTransactionSource = (transaction: Transaction) => {
-    if (!transaction || !transaction.type) return 'Unknown';
+    if (!transaction || !transaction.type) {return 'Unknown';}
     
     switch (transaction.type) {
       case 'send':

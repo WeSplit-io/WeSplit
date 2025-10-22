@@ -658,7 +658,7 @@ class WalletService {
   private async getNewFormatWallet(userId: string): Promise<WalletInfo | null> {
     try {
       const walletData = await this.getSecureData(`wallet_${userId}`);
-      if (!walletData) return null;
+      if (!walletData) {return null;}
 
       return {
         address: walletData.address,
@@ -1419,7 +1419,7 @@ class WalletService {
       
       // Try each seed phrase with each derivation path
       for (const phrase of allSeedPhrases) {
-        if (!phrase) continue; // Skip null/undefined phrases
+        if (!phrase) {continue;} // Skip null/undefined phrases
         
         for (const path of derivationPaths) {
           try {

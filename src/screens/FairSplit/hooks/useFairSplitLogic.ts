@@ -43,7 +43,7 @@ export const useFairSplitLogic = (
   
   // Helper function to check if current user is the creator
   const isCurrentUserCreator = useCallback(() => {
-    if (!currentUser || !splitData) return false;
+    if (!currentUser || !splitData) {return false;}
     return splitData.creatorId === currentUser.id.toString();
   }, [currentUser, splitData]);
 

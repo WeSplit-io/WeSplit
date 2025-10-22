@@ -63,7 +63,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
   };
 
   const handleInviteContacts = () => {
-    if (selectedContacts.length === 0) return;
+    if (selectedContacts.length === 0) {return;}
 
     // Navigate back with all selected contacts
     if (returnRoute) {

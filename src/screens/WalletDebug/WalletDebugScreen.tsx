@@ -50,7 +50,7 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
   }, []);
 
   const loadLinkedWallets = async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
     
     try {
       const wallets = await signatureLinkService.getLinkedWallets(currentUser.id.toString());
@@ -132,7 +132,7 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
   };
 
   const removeLinkedWallet = async (walletId: string) => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
     
     try {
       const success = await signatureLinkService.removeLinkedWallet(currentUser.id.toString(), walletId);
@@ -241,7 +241,7 @@ const WalletDebugScreen: React.FC<WalletDebugScreenProps> = ({ navigation }) => 
   };
 
   const renderDiscoveryStats = () => {
-    if (!discoveryStats) return null;
+    if (!discoveryStats) {return null;}
 
     return (
       <View style={styles.section}>

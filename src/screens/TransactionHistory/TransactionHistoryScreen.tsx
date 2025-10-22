@@ -61,7 +61,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
   }, [currentUser?.id]);
 
   const loadGroups = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
 
     try {
       const userGroups = await firebaseDataService.group.getUserGroups(currentUser.id.toString());
@@ -117,8 +117,8 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
   const getGroupSummary = (group: Group) => {
     // Use real data from the group instead of random values
     let totalAmount = 0;
-    let memberCount = group.member_count || 0;
-    let expenseCount = group.expense_count || 0;
+    const memberCount = group.member_count || 0;
+    const expenseCount = group.expense_count || 0;
 
     // Calculate total amount from expenses_by_currency
     if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency) && group.expenses_by_currency.length > 0) {
@@ -145,8 +145,8 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
   const getDetailedGroupSummary = async (group: Group) => {
     try {
       let totalAmount = 0;
-      let memberCount = group.member_count || 0;
-      let expenseCount = group.expense_count || 0;
+      const memberCount = group.member_count || 0;
+      const expenseCount = group.expense_count || 0;
 
       // First try to use expenses_by_currency data
       if (group.expenses_by_currency && Array.isArray(group.expenses_by_currency) && group.expenses_by_currency.length > 0) {
@@ -301,7 +301,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
 
   // Create unified transaction list that includes both real transactions and group transactions
   const createUnifiedTransactionList = useCallback(async () => {
-    const unifiedTransactions: Array<{
+    const unifiedTransactions: {
       id: string;
       type: 'send' | 'receive' | 'deposit' | 'withdraw';
       amount: number;
@@ -312,7 +312,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
       isRealTransaction: boolean;
       originalTransaction?: Transaction;
       originalGroup?: Group;
-    }> = [];
+    }[] = [];
 
     // Add real transactions from Firebase
     const realTransactions = await Promise.all(

@@ -18,10 +18,10 @@ export class FallbackDataService {
     context?: 'restaurant' | 'grocery' | 'shopping' | 'general'
   ): string {
     // Use actual data if available
-    if (processedBillData?.title) return processedBillData.title;
-    if (billData?.title) return billData.title;
-    if (processedBillData?.store?.name) return processedBillData.store.name;
-    if (billData?.store?.name) return billData.store.name;
+    if (processedBillData?.title) {return processedBillData.title;}
+    if (billData?.title) {return billData.title;}
+    if (processedBillData?.store?.name) {return processedBillData.store.name;}
+    if (billData?.store?.name) {return billData.store.name;}
 
     // Use consistent mockup data instead of random generation
     return MockupDataService.getBillName();
@@ -36,9 +36,9 @@ export class FallbackDataService {
     context?: 'restaurant' | 'grocery' | 'shopping' | 'general'
   ): number {
     // Use actual data if available
-    if (processedBillData?.totalAmount) return processedBillData.totalAmount;
-    if (billData?.totalAmount) return billData.totalAmount;
-    if (processedBillData?.transaction?.order_total) return processedBillData.transaction.order_total;
+    if (processedBillData?.totalAmount) {return processedBillData.totalAmount;}
+    if (billData?.totalAmount) {return billData.totalAmount;}
+    if (processedBillData?.transaction?.order_total) {return processedBillData.transaction.order_total;}
 
     // Use consistent mockup data instead of random generation
     return MockupDataService.getBillAmount();
@@ -99,8 +99,8 @@ export class FallbackDataService {
     billData?: any
   ): string {
     // Use actual data if available
-    if (processedBillData?.transaction?.time) return processedBillData.transaction.time;
-    if (billData?.time) return billData.time;
+    if (processedBillData?.transaction?.time) {return processedBillData.transaction.time;}
+    if (billData?.time) {return billData.time;}
 
     // Generate dynamic time
     const now = new Date();
@@ -122,10 +122,10 @@ export class FallbackDataService {
     context?: 'restaurant' | 'grocery' | 'shopping' | 'general'
   ): string {
     // Use actual data if available
-    if (processedBillData?.store?.name) return processedBillData.store.name;
-    if (billData?.store?.name) return billData.store.name;
-    if (processedBillData?.merchant?.name) return processedBillData.merchant.name;
-    if (billData?.merchant?.name) return billData.merchant.name;
+    if (processedBillData?.store?.name) {return processedBillData.store.name;}
+    if (billData?.store?.name) {return billData.store.name;}
+    if (processedBillData?.merchant?.name) {return processedBillData.merchant.name;}
+    if (billData?.merchant?.name) {return billData.merchant.name;}
 
     // Use consistent mockup data instead of random generation
     return MockupDataService.getMerchantName();
@@ -142,7 +142,7 @@ export class FallbackDataService {
     if (processedBillData?.store?.location?.city) {
       return `${processedBillData.store.location.city}, ${processedBillData.store.location.state}`;
     }
-    if (billData?.location) return billData.location;
+    if (billData?.location) {return billData.location;}
 
     // Use consistent mockup data instead of random generation
     return MockupDataService.getLocation();

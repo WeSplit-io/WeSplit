@@ -61,7 +61,7 @@ export class SplitWalletService {
     creatorId: string,
     totalAmount: number,
     currency: string,
-    participants: Array<{ userId: string; name: string; walletAddress: string; amountOwed: number }>
+    participants: { userId: string; name: string; walletAddress: string; amountOwed: number }[]
   ) {
     await loadModules();
     return SplitWalletCreation.createDegenSplitWallet(billId, creatorId, totalAmount, currency, participants);
@@ -219,7 +219,7 @@ export class SplitWalletService {
   // Degen Split methods for shared private key access
   static async storeSplitWalletPrivateKeyForAllParticipants(
     splitWalletId: string,
-    participants: Array<{ userId: string; name: string }>,
+    participants: { userId: string; name: string }[],
     privateKey: string
   ) {
     await loadModules();
@@ -228,7 +228,7 @@ export class SplitWalletService {
 
   static async deleteSplitWalletPrivateKeyForAllParticipants(
     splitWalletId: string,
-    participants: Array<{ userId: string; name: string }>
+    participants: { userId: string; name: string }[]
   ) {
     await loadModules();
     return SplitWalletSecurity.deleteSplitWalletPrivateKeyForAllParticipants(splitWalletId, participants);

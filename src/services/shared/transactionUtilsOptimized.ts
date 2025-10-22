@@ -23,7 +23,7 @@ interface Transaction {
 }
 
 // Lazy loading cache
-let cachedModules: any = {};
+const cachedModules: any = {};
 
 async function loadModule(moduleName: string): Promise<any> {
   if (!cachedModules[moduleName]) {
@@ -64,7 +64,7 @@ export class OptimizedTransactionUtils {
   }
 
   private async initialize(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized) {return;}
 
     const [configModule, transactionConfigModule, loggerModule] = await Promise.all([
       loadModule('config'),
@@ -425,7 +425,7 @@ export class OptimizedTransactionUtils {
           }
 
           const sleepMs = Math.min(pollIntervalMs, Math.max(0, deadline - Date.now()));
-          if (sleepMs <= 0) break;
+          if (sleepMs <= 0) {break;}
           await new Promise(resolve => setTimeout(resolve, sleepMs));
         }
         

@@ -256,7 +256,7 @@ const AuthMethodsScreen: React.FC = () => {
             if (__DEV__) { logger.debug('Found existing user in Firestore', { userData }, 'AuthMethodsScreen'); }
 
             // Check if user exists in Firebase Auth
-            let firebaseUser = auth.currentUser;
+            const firebaseUser = auth.currentUser;
 
             if (!firebaseUser || firebaseUser.email !== sanitizedEmail) {
               // For existing users in Firestore, we don't need to create a new Firebase Auth user

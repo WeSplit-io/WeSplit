@@ -331,6 +331,18 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               
               if (splitResult.success && splitResult.split) {
                 const split = splitResult.split;
+                
+                // Validate split data before navigation
+                if (!split.id || !split.splitType) {
+                  logger.error('Invalid split data loaded', { 
+                    splitId: split.id, 
+                    splitType: split.splitType 
+                  }, 'NotificationsScreen');
+                  showToast('Invalid split data, redirected to splits list', 'error');
+                  navigation.navigate('SplitsList');
+                  return;
+                }
+                
                 logger.info('Loaded split data for navigation', {
                   splitId: split.id,
                   splitType: split.splitType,
@@ -352,12 +364,14 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
                     notificationId: notificationId,
                   });
                 } else {
-                  // Fallback to FairSplit for unknown types
-                  navigation.navigate('FairSplit', {
-                    splitData: split,
-                    isFromNotification: true,
-                    notificationId: notificationId,
-                  });
+                  // Fallback to SplitsList for unknown types - safer than FairSplit
+                  logger.warn('Unknown split type, navigating to SplitsList', { 
+                    splitType: split.splitType, 
+                    splitId: split.id 
+                  }, 'NotificationsScreen');
+                  navigation.navigate('SplitsList');
+                  showToast('Split type not recognized, redirected to splits list');
+                  return;
                 }
                 
                 showToast('Opening split details...');

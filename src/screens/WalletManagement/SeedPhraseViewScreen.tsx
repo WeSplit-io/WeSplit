@@ -117,7 +117,7 @@ const SeedPhraseViewScreen: React.FC = () => {
   };
 
   const handleCopySeedPhrase = async () => {
-    if (seedPhrase.length === 0) return;
+    if (seedPhrase.length === 0) {return;}
     
     try {
       const seedPhraseText = seedPhrase.join(' ');

@@ -64,7 +64,7 @@ export const useFairSplitInitialization = (
   }, [state, splitData, setSplitData]);
 
   const loadParticipants = useCallback(async () => {
-    if (!splitData) return;
+    if (!splitData) {return;}
     
     try {
       // Load participants from split data
@@ -80,7 +80,7 @@ export const useFairSplitInitialization = (
   }, [splitData, setParticipants]);
 
   const loadSplitWallet = useCallback(async () => {
-    if (!splitData || state.splitWallet) return;
+    if (!splitData || state.splitWallet) {return;}
     
     try {
       // Load split wallet if it exists

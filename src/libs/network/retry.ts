@@ -242,9 +242,9 @@ class CircuitBreaker {
  * Batch retry for multiple operations
  */
 async function retryBatch<T>(
-  operations: Array<() => Promise<T>>,
+  operations: (() => Promise<T>)[],
   options: RetryOptions = {}
-): Promise<Array<RetryResult<T>>> {
+): Promise<RetryResult<T>[]> {
   const results = await Promise.allSettled(
     operations.map(op => retry(op, options))
   );

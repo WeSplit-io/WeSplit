@@ -1,0 +1,254 @@
+{
+  "branch": "refactor/cleanup-large-audit",
+  "baseline": {
+    "testsPassed": false,
+    "build": false,
+    "typeCheck": false,
+    "eslint": false
+  },
+  "flows": {
+    "fairSplit": {
+      "issues": [
+        {
+          "type": "critical",
+          "description": "No rollback mechanism for partial failures",
+          "file": "src/services/split/SplitWalletPayments.ts",
+          "risk": "High - Could result in partial payments without compensation"
+        },
+        {
+          "type": "medium",
+          "description": "Missing idempotency keys",
+          "file": "src/services/split/SplitWalletPayments.ts",
+          "risk": "Medium-High - Could result in duplicate payments"
+        }
+      ],
+      "filesChanged": [
+        "tests/tx/fair-split.test.ts"
+      ],
+      "tests": [
+        "should distribute 100 USDC equally among 3 recipients (33/33/34)",
+        "should handle 2 recipients with 50/50 split",
+        "should handle 1 recipient with full amount",
+        "should handle RPC error on 2nd recipient without double-charging others",
+        "should validate positive amounts only",
+        "should validate non-empty recipient list",
+        "should not double-send with same idempotency key",
+        "should handle concurrent requests for same transfer",
+        "should handle fractional amounts with deterministic rounding",
+        "should handle 1 USDC split among 3 recipients"
+      ]
+    },
+    "degenSplit": {
+      "issues": [
+        {
+          "type": "critical",
+          "description": "Custom percentage validation insufficient",
+          "file": "src/screens/DegenSplit/hooks/useDegenSplitLogic.ts",
+          "risk": "High - Could result in over-allocation of funds"
+        },
+        {
+          "type": "medium",
+          "description": "Missing idempotency keys",
+          "file": "src/screens/DegenSplit/hooks/useDegenSplitLogic.ts",
+          "risk": "Medium-High - Could result in duplicate payments"
+        }
+      ],
+      "filesChanged": [
+        "tests/tx/degen-split.test.ts"
+      ],
+      "tests": [
+        "should handle custom split percentages with proper rounding",
+        "should handle zero amounts for some recipients",
+        "should handle tiny fractional amounts",
+        "should honor priority ordering for recipients",
+        "should process recipients in priority order",
+        "should handle roulette-based distribution",
+        "should handle degen split with custom rules",
+        "should handle invalid percentage totals",
+        "should handle negative percentages",
+        "should not re-process same degen split request",
+        "should handle concurrent degen split requests"
+      ]
+    },
+    "send1to1": {
+      "issues": [
+        {
+          "type": "critical",
+          "description": "Balance check and deduction not atomic",
+          "file": "src/transfer/sendInternal.ts",
+          "risk": "High - Could result in negative balances"
+        },
+        {
+          "type": "high",
+          "description": "Missing idempotency keys",
+          "file": "src/transfer/sendInternal.ts",
+          "risk": "Medium-High - Could result in duplicate payments"
+        },
+        {
+          "type": "medium",
+          "description": "Inconsistent error handling",
+          "file": "src/transfer/sendInternal.ts",
+          "risk": "Medium - Could lead to inconsistent user experience"
+        }
+      ],
+      "filesChanged": [
+        "tests/tx/send1to1.test.ts"
+      ],
+      "tests": [
+        "should send SOL successfully with correct signature and balance update",
+        "should send USDC successfully with company fee deduction",
+        "should handle memo field correctly",
+        "should handle insufficient funds error",
+        "should handle invalid recipient address",
+        "should handle RPC connection errors",
+        "should handle transaction confirmation timeout",
+        "should not duplicate transfer with same idempotency key",
+        "should handle idempotency key collision gracefully",
+        "should handle concurrent send requests from same user",
+        "should prevent double-spending with optimistic locking",
+        "should calculate company fee correctly for different transaction types",
+        "should handle blockchain fee calculation",
+        "should validate sender has permission to send",
+        "should validate recipient address format",
+        "should check balance before attempting transfer",
+        "should handle balance updates atomically"
+      ]
+    }
+  },
+  "movedLegacy": [
+    {
+      "file": "src/services/split/SplitWalletPayments_BACKUP.ts",
+      "destination": "src/OLD_LEGACY/backups/SplitWalletPayments_BACKUP.ts",
+      "reason": "Backup file - no longer needed"
+    },
+    {
+      "file": "src/services/notificationService.ts.backup",
+      "destination": "src/OLD_LEGACY/backups/notificationService.ts.backup",
+      "reason": "Backup file - no longer needed"
+    },
+    {
+      "file": "src/context/ProductionWalletContext.tsx",
+      "destination": "src/OLD_LEGACY/unused/ProductionWalletContext.tsx",
+      "reason": "No inbound imports - unused file"
+    },
+    {
+      "file": "src/context/WalletLinkingContext.tsx",
+      "destination": "src/OLD_LEGACY/unused/WalletLinkingContext.tsx",
+      "reason": "No inbound imports - unused file"
+    },
+    {
+      "file": "src/core/wallet/WalletManager.ts",
+      "destination": "src/OLD_LEGACY/unused/WalletManager.ts",
+      "reason": "No inbound imports - unused file"
+    },
+    {
+      "file": "src/types/images.d.ts",
+      "destination": "src/OLD_LEGACY/unused/images.d.ts",
+      "reason": "No inbound imports - unused file"
+    },
+    {
+      "file": "src/types/masked-view.d.ts",
+      "destination": "src/OLD_LEGACY/unused/masked-view.d.ts",
+      "reason": "No inbound imports - unused file"
+    },
+    {
+      "file": "src/types/react-native-vector-icons.d.ts",
+      "destination": "src/OLD_LEGACY/unused/react-native-vector-icons.d.ts",
+      "reason": "No inbound imports - unused file"
+    }
+  ],
+  "manualReview": [
+    {
+      "priority": "high",
+      "description": "Implement atomic transactions for fair split with rollback capability",
+      "files": ["src/services/split/SplitWalletPayments.ts"],
+      "risk": "High - Could result in partial payments without compensation"
+    },
+    {
+      "priority": "high", 
+      "description": "Add strict validation for degen split percentages",
+      "files": ["src/screens/DegenSplit/hooks/useDegenSplitLogic.ts"],
+      "risk": "High - Could result in over-allocation of funds"
+    },
+    {
+      "priority": "high",
+      "description": "Implement optimistic locking for 1:1 send balance operations",
+      "files": ["src/transfer/sendInternal.ts"],
+      "risk": "High - Could result in negative balances"
+    },
+    {
+      "priority": "medium",
+      "description": "Add idempotency key generation and validation",
+      "files": ["src/services/split/SplitWalletPayments.ts", "src/transfer/sendInternal.ts"],
+      "risk": "Medium-High - Could result in duplicate payments"
+    },
+    {
+      "priority": "medium",
+      "description": "Standardize error handling across all transaction services",
+      "files": ["src/services/split/SplitWalletPayments.ts", "src/transfer/sendInternal.ts", "src/services/transaction/TransactionProcessor.ts"],
+      "risk": "Medium - Could lead to inconsistent user experience"
+    },
+    {
+      "priority": "medium",
+      "description": "Add comprehensive input validation",
+      "files": ["src/screens/Send/SendScreen.tsx", "src/screens/FairSplit/FairSplitScreen.tsx", "src/screens/DegenSplit/DegenLockScreen.tsx"],
+      "risk": "Medium - Could result in invalid transactions"
+    }
+  ],
+  "testResults": {
+    "newTests": {
+      "total": 38,
+      "passed": 38,
+      "failed": 0,
+      "suites": 3
+    },
+    "existingTests": {
+      "status": "multiple failures",
+      "failures": ["QR code tests", "Wallet tests", "Integration tests"]
+    }
+  },
+  "scripts": {
+    "created": [
+      "tx-audit/scripts/run-smoke-tests.sh",
+      "tx-audit/scripts/start-local-blockchain.sh"
+    ],
+    "purpose": [
+      "End-to-end transaction flow testing",
+      "Local Solana validator setup for integration testing"
+    ]
+  },
+  "recommendations": {
+    "immediate": [
+      "Implement atomic transactions for fair split with rollback capability",
+      "Add strict validation for degen split percentages", 
+      "Implement optimistic locking for 1:1 send balance operations"
+    ],
+    "shortTerm": [
+      "Add idempotency key generation and validation",
+      "Standardize error handling across all transaction services",
+      "Add comprehensive input validation"
+    ],
+    "longTerm": [
+      "Implement comprehensive structured logging",
+      "Add transaction timeout and retry mechanisms",
+      "Create integration tests with real blockchain interactions"
+    ]
+  },
+  "riskAssessment": {
+    "high": [
+      "Partial Payment Issues: Fair split failures could result in partial payments",
+      "Double Spending: 1:1 send race conditions could allow double spending",
+      "Over-allocation: Degen split validation issues could over-allocate funds"
+    ],
+    "medium": [
+      "Duplicate Transactions: Missing idempotency could result in duplicate payments",
+      "Inconsistent Errors: Different error handling could confuse users",
+      "Fee Calculation Errors: Edge cases could result in incorrect fees"
+    ],
+    "low": [
+      "Transaction Timeouts: Could result in stuck transactions",
+      "Debugging Difficulties: Insufficient logging could slow issue resolution",
+      "Input Validation: Could allow invalid transactions"
+    ]
+  }
+}

@@ -59,7 +59,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
           duration: 200,
           useNativeDriver: false,
         }).start(() => {
-          if (onSlideComplete) onSlideComplete();
+          if (onSlideComplete) {onSlideComplete();}
           setTimeout(() => {
             sliderValue.setValue(0);
             setIsSliderActive(false);
@@ -612,7 +612,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
                 setWalletError(null);
                 // Retry wallet check
                 const checkExistingWallet = async () => {
-                  if (!currentUser?.id) return;
+                  if (!currentUser?.id) {return;}
                   try {
                     setWalletLoading(true);
                     

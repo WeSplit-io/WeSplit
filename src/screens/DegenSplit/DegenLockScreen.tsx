@@ -58,7 +58,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
           duration: 200,
           useNativeDriver: false,
         }).start(() => {
-          if (onSlideComplete) onSlideComplete();
+          if (onSlideComplete) {onSlideComplete();}
           setTimeout(() => {
             sliderValue.setValue(0);
             setIsSliderActive(false);
@@ -314,13 +314,13 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   if (!participants || !Array.isArray(participants) || participants.length === 0) {
     // Log error but don't show popup
     console.error('Invalid participants data');
-    navigation.goBack();
+    navigation.navigate('SplitsList');
     return null;
   }
 
   // Event handlers
   const handleBack = () => {
-    navigation.goBack();
+    navigation.navigate('SplitsList');
   };
 
   const handleLockMyShare = async () => {

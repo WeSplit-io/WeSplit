@@ -58,9 +58,9 @@ const getFirebaseConfig = () => {
   
   // Validate required fields
   const missingFields = [];
-  if (!apiKey) missingFields.push('FIREBASE_API_KEY');
-  if (!messagingSenderId) missingFields.push('FIREBASE_MESSAGING_SENDER_ID');
-  if (!appId) missingFields.push('FIREBASE_APP_ID');
+  if (!apiKey) {missingFields.push('FIREBASE_API_KEY');}
+  if (!messagingSenderId) {missingFields.push('FIREBASE_MESSAGING_SENDER_ID');}
+  if (!appId) {missingFields.push('FIREBASE_APP_ID');}
   
   if (missingFields.length > 0) {
     const errorMessage = `Missing required Firebase configuration: ${missingFields.join(', ')}`;

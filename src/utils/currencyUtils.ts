@@ -4,8 +4,8 @@
  */
 
 // Re-export from unified format utils for backward compatibility
-export { roundUsdcAmount, formatUsdcAmount } from './formatUtils';
 import { logger } from '../services/loggingService';
+export { roundUsdcAmount, formatUsdcAmount } from './formatUtils';
 
 // Verify export at module load time
 if (__DEV__) {

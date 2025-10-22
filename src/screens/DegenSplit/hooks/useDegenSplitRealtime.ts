@@ -147,7 +147,7 @@ export const useDegenSplitRealtime = (
 
   // Stop real-time updates
   const stopRealtimeUpdates = useCallback(() => {
-    if (!isRealtimeActive) return;
+    if (!isRealtimeActive) {return;}
 
     try {
       console.log('🔍 DegenSplit Realtime: Stopping updates for split:', splitId);

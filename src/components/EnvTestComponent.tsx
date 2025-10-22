@@ -43,7 +43,7 @@ export const EnvTestComponent: React.FC = () => {
       
       // Parse results from logs
       const results: TestResult[] = [];
-      let currentTest = '';
+      const currentTest = '';
       
       logs.forEach(log => {
         if (log.includes('✅') || log.includes('❌')) {

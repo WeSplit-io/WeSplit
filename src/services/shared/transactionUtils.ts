@@ -98,7 +98,7 @@ export class TransactionUtils {
       try {
         return await connection.getLatestBlockhash(commitment);
       } catch (error) {
-        if (i === maxRetries - 1) throw error;
+        if (i === maxRetries - 1) {throw error;}
         await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
       }
     }

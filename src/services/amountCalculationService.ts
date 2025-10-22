@@ -160,7 +160,7 @@ export class AmountCalculationService {
    * @returns Completion percentage (0-100)
    */
   static calculateCompletionPercentage(participants: Participant[], totalAmount: number): number {
-    if (totalAmount <= 0) return 0;
+    if (totalAmount <= 0) {return 0;}
     
     const totalCollected = this.calculateTotalCollected(participants);
     const percentage = (totalCollected / totalAmount) * 100;

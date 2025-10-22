@@ -120,8 +120,8 @@ export const validateAddress = (address: string): AddressValidationResult => {
  * Format wallet address for display
  */
 export const formatWalletAddress = (address: string, maxLength: number = 10): string => {
-  if (!address) return '';
-  if (address.length <= maxLength) return address;
+  if (!address) {return '';}
+  if (address.length <= maxLength) {return address;}
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
@@ -255,7 +255,7 @@ export const validateKastIdentifier = (identifier: string): {
  * Uses the same formatting as external wallet addresses
  */
 export const formatKastWalletAddress = (address: string): string => {
-  if (!address) return '';
+  if (!address) {return '';}
   
   // Use the same formatting as external wallet addresses
   return formatWalletAddress(address);

@@ -66,7 +66,7 @@ export interface IncomingBillData {
     time: string;
     order_id: string;
     employee: string;
-    items: Array<{ name: string; price: number }>;
+    items: { name: string; price: number }[];
     sub_total: number;
     sales_tax: number;
     order_total: number;

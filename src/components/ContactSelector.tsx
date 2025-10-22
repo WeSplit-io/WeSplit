@@ -140,7 +140,7 @@ export const ContactSelector: React.FC<ContactSelectorProps> = ({
 
   // Handle adding contact
   const handleAddContact = async (user: User) => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
 
     // Check if contact already exists
     if (isUserAlreadyContact(user, contacts)) {

@@ -182,7 +182,7 @@ const AuthDebugScreen: React.FC = () => {
   };
 
   const renderIssues = () => {
-    if (!diagnostics?.issues.length) return null;
+    if (!diagnostics?.issues.length) {return null;}
 
     return (
       <View style={styles.section}>
@@ -197,7 +197,7 @@ const AuthDebugScreen: React.FC = () => {
   };
 
   const renderRecommendations = () => {
-    if (!diagnostics?.recommendations.length) return null;
+    if (!diagnostics?.recommendations.length) {return null;}
 
     return (
       <View style={styles.section}>

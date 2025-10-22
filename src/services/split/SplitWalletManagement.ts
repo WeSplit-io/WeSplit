@@ -368,10 +368,10 @@ export class SplitWalletManagement {
         
         // Only sync relevant fields to splits collection
         const splitUpdates: Partial<Split> = {};
-        if (updates.status) splitUpdates.status = updates.status;
-        if (updates.totalAmount) splitUpdates.totalAmount = updates.totalAmount;
-        if (updates.currency) splitUpdates.currency = updates.currency;
-        if (updates.updatedAt) splitUpdates.updatedAt = updates.updatedAt;
+        if (updates.status) {splitUpdates.status = updates.status;}
+        if (updates.totalAmount) {splitUpdates.totalAmount = updates.totalAmount;}
+        if (updates.currency) {splitUpdates.currency = updates.currency;}
+        if (updates.updatedAt) {splitUpdates.updatedAt = updates.updatedAt;}
         
         if (Object.keys(splitUpdates).length > 0) {
           const splitUpdateResult = await SplitStorageService.updateSplitByBillId(currentWallet.billId, splitUpdates);

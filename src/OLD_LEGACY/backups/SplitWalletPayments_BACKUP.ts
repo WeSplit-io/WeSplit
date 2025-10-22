@@ -297,7 +297,7 @@ async function executeFairSplitTransaction(
     try {
       const pendingSignatures = await connection.getSignaturesForAddress(fromPublicKey, { limit: 10 });
       const recentSignatures = pendingSignatures.filter((sig: any) => {
-        if (!sig.blockTime) return false;
+        if (!sig.blockTime) {return false;}
         const sigTime = new Date(sig.blockTime * 1000);
         const now = new Date();
         const timeDiff = now.getTime() - sigTime.getTime();
@@ -738,7 +738,7 @@ async function executeFairSplitTransaction(
       // CRITICAL: Check for recent outgoing transactions that might have spent the funds
       const recentSignatures = await connection.getSignaturesForAddress(fromPublicKey, { limit: 5 });
       const recentOutgoingTransactions = recentSignatures.filter((sig: any) => {
-        if (!sig.blockTime) return false;
+        if (!sig.blockTime) {return false;}
         const transactionTime = new Date(sig.blockTime * 1000);
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
         return transactionTime > fiveMinutesAgo && !sig.err; // Recent successful transactions
@@ -3276,7 +3276,7 @@ export class SplitWalletPayments {
   static async reconcilePendingTransactions(splitWalletId: string): Promise<void> {
     try {
       const walletResult = await this.getSplitWallet(splitWalletId);
-      if (!walletResult.success || !walletResult.wallet) return;
+      if (!walletResult.success || !walletResult.wallet) {return;}
       const wallet = walletResult.wallet;
 
       const updatedParticipants = [...wallet.participants];

@@ -30,7 +30,7 @@ export class UserMigrationService {
       }, 'UserMigrationService');
       
       // 1. Always search by email first (primary identifier)
-      let userData = await this.findUserByEmail(email);
+      const userData = await this.findUserByEmail(email);
       
       if (userData) {
         logger.info('Found existing user by email', { 

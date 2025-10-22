@@ -64,7 +64,7 @@ function percentageOf(value: number, percentage: number): number {
  * Calculate percentage change between two values
  */
 function percentageChange(oldValue: number, newValue: number): number {
-  if (oldValue === 0) return 0;
+  if (oldValue === 0) {return 0;}
   return ((newValue - oldValue) / oldValue) * 100;
 }
 

@@ -1,0 +1,219 @@
+{
+  "auditDate": "2025-01-22",
+  "branch": "refactor/cleanup-large-audit",
+  "summary": {
+    "totalFilesScanned": 500,
+    "unusedExports": 166,
+    "unusedDependencies": 45,
+    "typescriptErrors": 1879,
+    "eslintWarnings": 1789,
+    "testFailures": 8,
+    "backupFiles": 2,
+    "groupLogicFiles": 8
+  },
+  "unusedDependencies": [
+    "@invertase/react-native-apple-authentication",
+    "@moonpay/react-native-moonpay-sdk",
+    "@noble/hashes",
+    "@react-native-firebase/app",
+    "@react-native-firebase/auth",
+    "@react-native-google-signin/google-signin",
+    "@react-native/metro-config",
+    "@react-navigation/bottom-tabs",
+    "@solana/wallet-adapter-base",
+    "@solana/wallet-adapter-phantom",
+    "@solana/wallet-adapter-react",
+    "@solana/wallet-adapter-solflare",
+    "@solana/wallet-adapter-wallets",
+    "@walletconnect/react-native-compat",
+    "buffer",
+    "colors",
+    "events",
+    "expo-application",
+    "expo-dev-client",
+    "expo-device",
+    "expo-linking",
+    "expo-router",
+    "expo-status-bar",
+    "expo-system-ui",
+    "https-browserify",
+    "inherits",
+    "metro",
+    "metro-config",
+    "metro-resolver",
+    "os-browserify",
+    "path-browserify",
+    "process",
+    "querystring-es3",
+    "react-dom",
+    "react-native-crypto",
+    "react-native-inappbrowser-reborn",
+    "react-native-modal",
+    "react-native-randombytes",
+    "react-native-screens",
+    "readable-stream",
+    "rpc-websockets",
+    "stream-http",
+    "string_decoder",
+    "url",
+    "util",
+    "ws"
+  ],
+  "missingDependencies": [
+    "tweetnacl",
+    "crypto-js"
+  ],
+  "filesToMoveToLegacy": {
+    "groups": [
+      "src/store/slices/groupsSlice.ts",
+      "src/hooks/useGroupData.ts",
+      "src/screens/GroupsList/GroupsListScreen.tsx",
+      "src/screens/GroupDetails/GroupDetailsScreen.tsx",
+      "src/screens/GroupSettings/GroupSettingsScreen.tsx",
+      "src/screens/AddMembers/AddMembersScreen.tsx",
+      "src/components/GroupCard.tsx"
+    ],
+    "backups": [
+      "src/services/split/SplitWalletPayments_BACKUP.ts",
+      "src/services/notificationService.ts.backup"
+    ]
+  },
+  "unusedExports": {
+    "components": [
+      "AppLoadingScreen",
+      "AuthDebug",
+      "ContactSelector",
+      "GroupCard",
+      "WalletConnectButton",
+      "WalletExportExample",
+      "WalletMismatchFixer",
+      "WalletRecoveryComponent"
+    ],
+    "services": [
+      "AuthService",
+      "ExternalCardPaymentService",
+      "LinkedWalletService",
+      "WalletService",
+      "accountDeletionService",
+      "amountCalculationService",
+      "avatarUploadService",
+      "consolidatedBillAnalysisService",
+      "contactWalletSyncService",
+      "dataSourceService",
+      "deepLinkHandler",
+      "fiatCurrencyService",
+      "firebaseFunctionsService",
+      "firebaseMoonPayService",
+      "firebasePaymentRequestService",
+      "i18nService",
+      "manualSplitCreationService",
+      "nfcService",
+      "notificationDataUtils",
+      "priceManagementService",
+      "priceService",
+      "qrCodeService",
+      "solanaAppKitService",
+      "splitDataValidationService",
+      "splitInvitationService",
+      "splitRealtimeService",
+      "splitStorageService",
+      "subscriptionService",
+      "transactionBasedContactService",
+      "transactionHistoryService",
+      "userImageService",
+      "userSearchService"
+    ],
+    "hooks": [
+      "useGroupData",
+      "useSplitDetails",
+      "useBalance",
+      "useOptimizedCalculations",
+      "usePerformanceMonitor"
+    ],
+    "utils": [
+      "balanceCalculator",
+      "cryptoUtils",
+      "currencyUtils",
+      "splitUtils",
+      "walletUtils",
+      "authErrorHandler",
+      "cameraTest",
+      "errorHandler",
+      "fallbackDataService",
+      "firebaseCheck",
+      "formatUtils",
+      "oauthDebugger",
+      "oauthTest",
+      "priceManagerDebugger",
+      "productionDebug",
+      "runtimeEnvTest",
+      "sendUtils",
+      "serviceErrorHandler",
+      "settlementOptimizer",
+      "splitDataValidator"
+    ]
+  },
+  "testFailures": [
+    "__tests__/wallet-linking.spec.ts",
+    "src/features/qr/__tests__/solanaPay.test.ts",
+    "src/features/qr/__tests__/share.test.ts",
+    "__tests__/wallet.spec.ts",
+    "src/services/__tests__/accountDeletionService.test.ts",
+    "__tests__/wallet-detection.spec.ts",
+    "__tests__/deposit.spec.ts",
+    "__tests__/funding.spec.ts"
+  ],
+  "typescriptErrors": {
+    "critical": [
+      "Type mismatches between BillParticipant and SplitParticipant",
+      "Missing properties in ProcessedBillData interface",
+      "Undefined variables in split logic",
+      "Import errors for loggingService"
+    ],
+    "count": 1879
+  },
+  "eslintIssues": {
+    "unusedVariables": 1879,
+    "consoleStatements": 200,
+    "anyTypes": 500,
+    "totalWarnings": 1789
+  },
+  "riskAssessment": {
+    "low": [
+      "Moving group logic files to OLD_LEGACY",
+      "Moving backup files to OLD_LEGACY",
+      "Removing unused dependencies"
+    ],
+    "medium": [
+      "Removing unused exports",
+      "Consolidating duplicate files",
+      "Updating import paths"
+    ],
+    "high": [
+      "Fixing TypeScript errors",
+      "Resolving test failures",
+      "Updating type definitions"
+    ]
+  },
+  "implementationPlan": {
+    "phase1": "Create OLD_LEGACY structure and move group logic",
+    "phase2": "Remove unused dependencies and add missing ones",
+    "phase3": "Apply ESLint fixes and code cleanup",
+    "phase4": "Fix TypeScript errors (manual review required)",
+    "phase5": "Resolve test failures (manual review required)"
+  },
+  "smokeTests": [
+    "Fair Split Flow",
+    "Degen Split Flow", 
+    "Send Money Flow",
+    "Request Money Flow",
+    "Contact Search",
+    "Profile Page"
+  ],
+  "rollbackPlan": {
+    "revertCommits": "git revert <commit-hash>",
+    "restoreFiles": "git mv src/OLD_LEGACY/groups/* src/",
+    "reinstallDeps": "npm install <package-names>",
+    "restoreBackups": "git checkout HEAD~1 -- <file-paths>"
+  }
+}

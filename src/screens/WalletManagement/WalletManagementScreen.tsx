@@ -88,7 +88,7 @@ const WalletManagementScreen: React.FC = () => {
   // Load wallet information
   useEffect(() => {
     const loadWalletInfo = async () => {
-      if (!currentUser?.id) return;
+      if (!currentUser?.id) {return;}
 
       try {
         setIsLoading(true);
@@ -203,7 +203,7 @@ const WalletManagementScreen: React.FC = () => {
 
   // Load multi-signature data
   const loadMultiSigData = async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
 
     try {
       // Load user's multi-signature wallets
@@ -323,7 +323,7 @@ const WalletManagementScreen: React.FC = () => {
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      if (!currentUser?.id) return;
+      if (!currentUser?.id) {return;}
 
       logger.info('Manual refresh triggered', null, 'WalletManagementScreen');
 
@@ -404,7 +404,7 @@ const WalletManagementScreen: React.FC = () => {
 
   const handleApproveTransaction = async (transactionId: string) => {
     try {
-      if (!currentUser?.id) return;
+      if (!currentUser?.id) {return;}
 
       const result = await walletService.approveMultiSigTransaction(transactionId, currentUser.id.toString());
 
@@ -423,7 +423,7 @@ const WalletManagementScreen: React.FC = () => {
 
   const handleRejectTransaction = async (transactionId: string) => {
     try {
-      if (!currentUser?.id) return;
+      if (!currentUser?.id) {return;}
 
       const result = await walletService.rejectMultiSigTransaction(transactionId, currentUser.id.toString());
 
@@ -528,7 +528,7 @@ const WalletManagementScreen: React.FC = () => {
   };
 
   const formatAddress = (addr: string | null) => {
-    if (!addr) return 'No address';
+    if (!addr) {return 'No address';}
     return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
   };
 

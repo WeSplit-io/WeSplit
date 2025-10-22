@@ -1581,7 +1581,7 @@ export class SplitWalletPayments {
   static async reconcilePendingTransactions(splitWalletId: string): Promise<void> {
     try {
       const walletResult = await this.getSplitWallet(splitWalletId);
-      if (!walletResult.success || !walletResult.wallet) return;
+      if (!walletResult.success || !walletResult.wallet) {return;}
       const wallet = walletResult.wallet;
 
       const updatedParticipants = [...wallet.participants];

@@ -1,8 +1,4 @@
 // === DESIGN TOKEN EXPORTS ===
-export { colors } from './colors';
-export { spacing } from './spacing';
-export { typography } from './typography';
-
 // === THEME UTILITIES ===
 // Helper functions for creating consistent styles
 
@@ -10,6 +6,10 @@ export { typography } from './typography';
 import { colors } from './colors';
 import { spacing } from './spacing';
 import { typography } from './typography';
+
+export { colors } from './colors';
+export { spacing } from './spacing';
+export { typography } from './typography';
 
 // Shadow presets based on material design elevation
 export const shadows = {

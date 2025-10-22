@@ -402,10 +402,10 @@ export class SplitDataValidationService {
 
     let summary = `❌ Validation failed with ${issues.length} issues:\n`;
     
-    if (criticalCount > 0) summary += `  🔴 ${criticalCount} critical issues\n`;
-    if (highCount > 0) summary += `  🟠 ${highCount} high-severity issues\n`;
-    if (mediumCount > 0) summary += `  🟡 ${mediumCount} medium-severity issues\n`;
-    if (lowCount > 0) summary += `  🔵 ${lowCount} low-severity issues\n`;
+    if (criticalCount > 0) {summary += `  🔴 ${criticalCount} critical issues\n`;}
+    if (highCount > 0) {summary += `  🟠 ${highCount} high-severity issues\n`;}
+    if (mediumCount > 0) {summary += `  🟡 ${mediumCount} medium-severity issues\n`;}
+    if (lowCount > 0) {summary += `  🔵 ${lowCount} low-severity issues\n`;}
 
     return summary.trim();
   }

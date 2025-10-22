@@ -66,7 +66,7 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
   };
 
   const takePicture = async () => {
-    if (!cameraRef.current || isCapturing) return;
+    if (!cameraRef.current || isCapturing) {return;}
 
     setIsCapturing(true);
     try {
