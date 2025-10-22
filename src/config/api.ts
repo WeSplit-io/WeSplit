@@ -6,7 +6,7 @@ import { logger } from '../services/loggingService';
 
 // Global request throttling
 class RequestThrottler {
-  private requestQueue: Array<() => Promise<any>> = [];
+  private requestQueue: (() => Promise<any>)[] = [];
   private isProcessing = false;
   private lastRequestTime = 0;
   private minInterval = 100; // Minimum 100ms between requests

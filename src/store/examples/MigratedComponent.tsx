@@ -58,6 +58,18 @@ const OldComponent = () => {
 
 import { useApp } from '../migration/legacyHooks';
 
+// ============================================================================
+// NEW WAY (Zustand Store) - Option 2: Modern Approach
+// ============================================================================
+
+import { 
+  useCurrentUser, 
+  useGroups, 
+  useIsLoading, 
+  useError,
+  useGroupsActions 
+} from '../index';
+
 const MigratedComponentLegacy = () => {
   // Same API as before - no changes needed!
   const { state, dispatch, loadUserGroups, refreshGroups } = useApp();
@@ -75,8 +87,8 @@ const MigratedComponentLegacy = () => {
     dispatch({ type: 'SELECT_GROUP', payload: group });
   };
   
-  if (isLoading) return <Text>Loading...</Text>;
-  if (error) return <Text>Error: {error}</Text>;
+  if (isLoading) {return <Text>Loading...</Text>;}
+  if (error) {return <Text>Error: {error}</Text>;}
   
   return (
     <View>
@@ -96,18 +108,6 @@ const MigratedComponentLegacy = () => {
     </View>
   );
 };
-
-// ============================================================================
-// NEW WAY (Zustand Store) - Option 2: Modern Approach
-// ============================================================================
-
-import { 
-  useCurrentUser, 
-  useGroups, 
-  useIsLoading, 
-  useError,
-  useGroupsActions 
-} from '../index';
 
 const MigratedComponentModern = () => {
   // Selective subscriptions - only re-render when specific state changes
@@ -129,8 +129,8 @@ const MigratedComponentModern = () => {
     selectGroup(group);
   };
   
-  if (isLoading) return <Text>Loading...</Text>;
-  if (error) return <Text>Error: {error}</Text>;
+  if (isLoading) {return <Text>Loading...</Text>;}
+  if (error) {return <Text>Error: {error}</Text>;}
   
   return (
     <View>

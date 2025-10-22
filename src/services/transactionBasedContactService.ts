@@ -145,7 +145,7 @@ export class TransactionBasedContactService {
           contactName = transaction.sender_name;
         }
 
-        if (!contactUserId || !contactWalletAddress) continue;
+        if (!contactUserId || !contactWalletAddress) {continue;}
 
         const contactId = String(contactUserId);
         
@@ -244,7 +244,7 @@ export class TransactionBasedContactService {
       // Process splits and validate user existence
       for (const split of userSplits.splits) {
         for (const participant of split.participants) {
-          if (participant.userId === userId) continue; // Skip self
+          if (participant.userId === userId) {continue;} // Skip self
 
           const contactId = String(participant.userId);
           
@@ -470,8 +470,8 @@ export class TransactionBasedContactService {
    * Utility function to format wallet addresses
    */
   private static formatWalletAddress(address: string): string {
-    if (!address) return 'Unknown';
-    if (address.length <= 12) return address;
+    if (!address) {return 'Unknown';}
+    if (address.length <= 12) {return address;}
     return `${address.slice(0, 6)}...${address.slice(-6)}`;
   }
 }

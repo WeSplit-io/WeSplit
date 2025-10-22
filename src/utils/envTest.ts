@@ -7,12 +7,12 @@ import Constants from 'expo-constants';
 
 // Environment variable helper
 const getEnvVar = (key: string): string => {
-  if (process.env[key]) return process.env[key]!;
-  if (process.env[`EXPO_PUBLIC_${key}`]) return process.env[`EXPO_PUBLIC_${key}`]!;
-  if (Constants.expoConfig?.extra?.[key]) return Constants.expoConfig.extra[key];
-  if (Constants.expoConfig?.extra?.[`EXPO_PUBLIC_${key}`]) return Constants.expoConfig.extra[`EXPO_PUBLIC_${key}`];
-  if ((Constants.manifest as any)?.extra?.[key]) return (Constants.manifest as any).extra[key];
-  if ((Constants.manifest as any)?.extra?.[`EXPO_PUBLIC_${key}`]) return (Constants.manifest as any).extra[`EXPO_PUBLIC_${key}`];
+  if (process.env[key]) {return process.env[key]!;}
+  if (process.env[`EXPO_PUBLIC_${key}`]) {return process.env[`EXPO_PUBLIC_${key}`]!;}
+  if (Constants.expoConfig?.extra?.[key]) {return Constants.expoConfig.extra[key];}
+  if (Constants.expoConfig?.extra?.[`EXPO_PUBLIC_${key}`]) {return Constants.expoConfig.extra[`EXPO_PUBLIC_${key}`];}
+  if ((Constants.manifest as any)?.extra?.[key]) {return (Constants.manifest as any).extra[key];}
+  if ((Constants.manifest as any)?.extra?.[`EXPO_PUBLIC_${key}`]) {return (Constants.manifest as any).extra[`EXPO_PUBLIC_${key}`];}
   return '';
 };
 
@@ -54,10 +54,10 @@ export function testEnvironmentVariables(): void {
   
   // Check for issues
   const issues: string[] = [];
-  if (!googleClientId) issues.push('EXPO_PUBLIC_GOOGLE_CLIENT_ID not found');
-  if (!androidClientId) issues.push('ANDROID_GOOGLE_CLIENT_ID not found');
-  if (!iosClientId) issues.push('IOS_GOOGLE_CLIENT_ID not found');
-  if (!firebaseApiKey) issues.push('EXPO_PUBLIC_FIREBASE_API_KEY not found');
+  if (!googleClientId) {issues.push('EXPO_PUBLIC_GOOGLE_CLIENT_ID not found');}
+  if (!androidClientId) {issues.push('ANDROID_GOOGLE_CLIENT_ID not found');}
+  if (!iosClientId) {issues.push('IOS_GOOGLE_CLIENT_ID not found');}
+  if (!firebaseApiKey) {issues.push('EXPO_PUBLIC_FIREBASE_API_KEY not found');}
   
   if (issues.length > 0) {
     console.warn('⚠️ Environment Variable Issues:');

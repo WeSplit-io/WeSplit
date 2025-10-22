@@ -136,7 +136,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   const handleSeedPhrase = async () => {
     try {
-      if (!currentUser?.id) return;
+      if (!currentUser?.id) {return;}
 
       logger.info('Preparing secure seed phrase access', null, 'ProfileScreen');
 

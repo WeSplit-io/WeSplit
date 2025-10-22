@@ -91,7 +91,7 @@ export function getOptimizedSettlementTransactions(
     for (let i = 0; i < workingCreditors.length && remainingDebt > 0.01; i++) {
       const creditor = workingCreditors[i];
       
-      if (creditor.balance <= 0.01) continue; // Skip settled creditors
+      if (creditor.balance <= 0.01) {continue;} // Skip settled creditors
 
       // Calculate payment amount (minimum of remaining debt and creditor's available amount)
       const paymentAmount = Math.min(remainingDebt, creditor.balance);

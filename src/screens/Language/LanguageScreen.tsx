@@ -19,7 +19,7 @@ const LanguageScreen: React.FC<LanguageScreenProps> = ({ navigation }) => {
   }, [language]);
 
   const handleLanguageSelect = async (languageCode: SupportedLanguage) => {
-    if (languageCode === selectedLanguage) return;
+    if (languageCode === selectedLanguage) {return;}
 
     try {
       setLoading(true);

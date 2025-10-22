@@ -53,8 +53,8 @@ export interface FairSplitState {
   setIsSigning: (signing: boolean) => void;
   
   // Wallet management
-  externalWallets: Array<{id: string, address: string, name?: string}>;
-  setExternalWallets: (wallets: Array<{id: string, address: string, name?: string}>) => void;
+  externalWallets: {id: string, address: string, name?: string}[];
+  setExternalWallets: (wallets: {id: string, address: string, name?: string}[]) => void;
   inAppWallet: {address: string} | null;
   setInAppWallet: (wallet: {address: string} | null) => void;
   selectedWallet: {id: string, address: string, type: 'external' | 'in-app', name?: string} | null;
@@ -97,7 +97,7 @@ export const useFairSplitState = (existingSplitWallet?: SplitWallet): FairSplitS
   const [isSigning, setIsSigning] = useState(false);
   
   // Wallet management
-  const [externalWallets, setExternalWallets] = useState<Array<{id: string, address: string, name?: string}>>([]);
+  const [externalWallets, setExternalWallets] = useState<{id: string, address: string, name?: string}[]>([]);
   const [inAppWallet, setInAppWallet] = useState<{address: string} | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<{id: string, address: string, type: 'external' | 'in-app', name?: string} | null>(null);
   const [isLoadingWallets, setIsLoadingWallets] = useState(false);

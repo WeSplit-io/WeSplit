@@ -38,7 +38,7 @@ export class ContactWalletSyncService {
    */
   static async refreshContactWalletInfo(contactIds: string[]): Promise<UserContact[]> {
     try {
-      if (contactIds.length === 0) return [];
+      if (contactIds.length === 0) {return [];}
 
       logger.info('Refreshing contact wallet info', { contactCount: contactIds.length }, 'ContactWalletSyncService');
 
@@ -165,7 +165,7 @@ export class ContactWalletSyncService {
    * Batch sync wallet information for multiple users
    * Useful when updating wallet information for multiple contacts at once
    */
-  static async batchSyncWalletInfo(updates: Array<{
+  static async batchSyncWalletInfo(updates: {
     userId: string;
     walletUpdates: {
       wallet_address?: string;
@@ -173,7 +173,7 @@ export class ContactWalletSyncService {
       name?: string;
       avatar?: string;
     };
-  }>): Promise<{ success: boolean; results: Array<{ userId: string; success: boolean; error?: string }> }> {
+  }[]): Promise<{ success: boolean; results: { userId: string; success: boolean; error?: string }[] }> {
     try {
       logger.info('Starting batch wallet sync', { updateCount: updates.length }, 'ContactWalletSyncService');
 

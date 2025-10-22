@@ -13,6 +13,8 @@ import { StyleSheet } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { useApp } from '../../context/AppContext';
+import { firebaseDataService } from '../../services/firebaseDataService';
 
 // Temporary inline styles to fix the import issue
 const styles = StyleSheet.create({
@@ -195,8 +197,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
   },
 });
-import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/firebaseDataService';
 
 const SeedPhraseVerifyScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -254,7 +254,7 @@ const SeedPhraseVerifyScreen: React.FC = () => {
   };
 
   const handleConfirmWord = async () => {
-    if (!selectedWord) return;
+    if (!selectedWord) {return;}
 
     const newEnteredWords = [...enteredWords, selectedWord];
     setEnteredWords(newEnteredWords);

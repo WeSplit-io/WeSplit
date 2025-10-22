@@ -497,22 +497,22 @@ export const firebaseUserService = {
     const updateData: any = {};
     
     // Only update fields that are provided
-    if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.email !== undefined) updateData.email = updates.email;
-    if (updates.wallet_address !== undefined) updateData.wallet_address = updates.wallet_address;
-    if (updates.wallet_public_key !== undefined) updateData.wallet_public_key = updates.wallet_public_key;
-    if (updates.avatar !== undefined) updateData.avatar = updates.avatar;
-    if (updates.hasCompletedOnboarding !== undefined) updateData.hasCompletedOnboarding = updates.hasCompletedOnboarding;
+    if (updates.name !== undefined) {updateData.name = updates.name;}
+    if (updates.email !== undefined) {updateData.email = updates.email;}
+    if (updates.wallet_address !== undefined) {updateData.wallet_address = updates.wallet_address;}
+    if (updates.wallet_public_key !== undefined) {updateData.wallet_public_key = updates.wallet_public_key;}
+    if (updates.avatar !== undefined) {updateData.avatar = updates.avatar;}
+    if (updates.hasCompletedOnboarding !== undefined) {updateData.hasCompletedOnboarding = updates.hasCompletedOnboarding;}
     
     // Wallet management tracking fields
-    if (updates.wallet_status !== undefined) updateData.wallet_status = updates.wallet_status;
-    if (updates.wallet_created_at !== undefined) updateData.wallet_created_at = updates.wallet_created_at;
-    if (updates.wallet_last_fixed_at !== undefined) updateData.wallet_last_fixed_at = updates.wallet_last_fixed_at;
-    if (updates.wallet_fix_attempts !== undefined) updateData.wallet_fix_attempts = updates.wallet_fix_attempts;
-    if (updates.wallet_has_private_key !== undefined) updateData.wallet_has_private_key = updates.wallet_has_private_key;
-    if (updates.wallet_has_seed_phrase !== undefined) updateData.wallet_has_seed_phrase = updates.wallet_has_seed_phrase;
-    if (updates.wallet_type !== undefined) updateData.wallet_type = updates.wallet_type;
-    if (updates.wallet_migration_status !== undefined) updateData.wallet_migration_status = updates.wallet_migration_status;
+    if (updates.wallet_status !== undefined) {updateData.wallet_status = updates.wallet_status;}
+    if (updates.wallet_created_at !== undefined) {updateData.wallet_created_at = updates.wallet_created_at;}
+    if (updates.wallet_last_fixed_at !== undefined) {updateData.wallet_last_fixed_at = updates.wallet_last_fixed_at;}
+    if (updates.wallet_fix_attempts !== undefined) {updateData.wallet_fix_attempts = updates.wallet_fix_attempts;}
+    if (updates.wallet_has_private_key !== undefined) {updateData.wallet_has_private_key = updates.wallet_has_private_key;}
+    if (updates.wallet_has_seed_phrase !== undefined) {updateData.wallet_has_seed_phrase = updates.wallet_has_seed_phrase;}
+    if (updates.wallet_type !== undefined) {updateData.wallet_type = updates.wallet_type;}
+    if (updates.wallet_migration_status !== undefined) {updateData.wallet_migration_status = updates.wallet_migration_status;}
     
     updateData.updated_at = serverTimestamp();
     
@@ -909,7 +909,7 @@ export const firebaseGroupService = {
       // Removed excessive logging for cleaner console
       
       const groupDoc = await getDoc(doc(db, 'groups', groupId));
-      if (!groupDoc.exists()) return;
+      if (!groupDoc.exists()) {return;}
       
       const groupName = groupDoc.data()?.name;
               // Removed excessive logging for cleaner console
@@ -1260,12 +1260,12 @@ export const firebaseGroupService = {
     }
     
     const updateData: any = {};
-    if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.description !== undefined) updateData.description = updates.description;
-    if (updates.category !== undefined) updateData.category = updates.category;
-    if (updates.currency !== undefined) updateData.currency = updates.currency;
-    if (updates.icon !== undefined) updateData.icon = updates.icon;
-    if (updates.color !== undefined) updateData.color = updates.color;
+    if (updates.name !== undefined) {updateData.name = updates.name;}
+    if (updates.description !== undefined) {updateData.description = updates.description;}
+    if (updates.category !== undefined) {updateData.category = updates.category;}
+    if (updates.currency !== undefined) {updateData.currency = updates.currency;}
+    if (updates.icon !== undefined) {updateData.icon = updates.icon;}
+    if (updates.color !== undefined) {updateData.color = updates.color;}
     
     updateData.updated_at = serverTimestamp();
     
@@ -1509,16 +1509,16 @@ export const firebaseGroupService = {
         const bEmail = (b.email || '').toLowerCase();
         
         // Exact name matches first
-        if (aName === searchTermLower && bName !== searchTermLower) return -1;
-        if (bName === searchTermLower && aName !== searchTermLower) return 1;
+        if (aName === searchTermLower && bName !== searchTermLower) {return -1;}
+        if (bName === searchTermLower && aName !== searchTermLower) {return 1;}
         
         // Name starts with search term
-        if (aName.startsWith(searchTermLower) && !bName.startsWith(searchTermLower)) return -1;
-        if (bName.startsWith(searchTermLower) && !aName.startsWith(searchTermLower)) return 1;
+        if (aName.startsWith(searchTermLower) && !bName.startsWith(searchTermLower)) {return -1;}
+        if (bName.startsWith(searchTermLower) && !aName.startsWith(searchTermLower)) {return 1;}
         
         // Email starts with search term
-        if (aEmail.startsWith(searchTermLower) && !bEmail.startsWith(searchTermLower)) return -1;
-        if (bEmail.startsWith(searchTermLower) && !aEmail.startsWith(searchTermLower)) return 1;
+        if (aEmail.startsWith(searchTermLower) && !bEmail.startsWith(searchTermLower)) {return -1;}
+        if (bEmail.startsWith(searchTermLower) && !aEmail.startsWith(searchTermLower)) {return 1;}
         
         // Alphabetical order for remaining matches
         return aName.localeCompare(bName);
@@ -1964,17 +1964,17 @@ export const firebaseGroupService = {
           callback(groups);
         } catch (error) {
           if (__DEV__) { console.error('🔥 Error in real-time listener callback:', error); }
-          if (onError) onError(error);
+          if (onError) {onError(error);}
         }
       }, (error) => {
         if (__DEV__) { console.error('🔥 Real-time listener error:', error); }
-        if (onError) onError(error);
+        if (onError) {onError(error);}
       });
       
       return unsubscribe;
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error setting up real-time listener:', error); }
-      if (onError) onError(error);
+      if (onError) {onError(error);}
       return () => {}; // Return empty unsubscribe function
     }
   },
@@ -2021,17 +2021,17 @@ export const firebaseGroupService = {
       }
     } catch (error) {
           if (__DEV__) { console.error('🔥 Error in group real-time listener callback:', error); }
-          if (onError) onError(error);
+          if (onError) {onError(error);}
         }
       }, (error) => {
         if (__DEV__) { console.error('🔥 Group real-time listener error:', error); }
-        if (onError) onError(error);
+        if (onError) {onError(error);}
       });
       
       return unsubscribe;
     } catch (error) {
       if (__DEV__) { console.error('🔥 Error setting up group real-time listener:', error); }
-      if (onError) onError(error);
+      if (onError) {onError(error);}
       return () => {}; // Return empty unsubscribe function
     }
   },
@@ -2264,12 +2264,12 @@ export const firebaseExpenseService = {
     const expenseRef = doc(db, 'expenses', expenseId);
     
     const updateData: any = {};
-    if (updates.description !== undefined) updateData.description = updates.description;
-    if (updates.amount !== undefined) updateData.amount = updates.amount;
-    if (updates.currency !== undefined) updateData.currency = updates.currency;
-    if (updates.category !== undefined) updateData.category = updates.category;
-    if (updates.splitType !== undefined) updateData.split_type = updates.splitType;
-    if (updates.splitData !== undefined) updateData.split_data = updates.splitData;
+    if (updates.description !== undefined) {updateData.description = updates.description;}
+    if (updates.amount !== undefined) {updateData.amount = updates.amount;}
+    if (updates.currency !== undefined) {updateData.currency = updates.currency;}
+    if (updates.category !== undefined) {updateData.category = updates.category;}
+    if (updates.splitType !== undefined) {updateData.split_type = updates.splitType;}
+    if (updates.splitData !== undefined) {updateData.split_data = updates.splitData;}
     
     updateData.updated_at = serverTimestamp();
     
@@ -2841,7 +2841,7 @@ export const firebaseSettlementService = {
   sendBulkPaymentReminders: async (
     groupId: string,
     senderId: string,
-    debtors: Array<{ recipientId: string; amount: number; name: string }>
+    debtors: { recipientId: string; amount: number; name: string }[]
   ): Promise<{ 
     success: boolean; 
     message: string; 

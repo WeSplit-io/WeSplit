@@ -636,7 +636,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Listen for group membership changes
   useEffect(() => {
-    if (!state.currentUser?.id) return;
+    if (!state.currentUser?.id) {return;}
 
     const groupMembersRef = collection(db, 'groupMembers');
     const membershipQuery = query(
@@ -1157,7 +1157,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Notifications logic
   const NOTIFICATIONS_CACHE_AGE = 2 * 60 * 1000; // 2 minutes
   const loadNotifications = useCallback(async (forceRefresh: boolean = false) => {
-    if (!state.currentUser?.id) return;
+    if (!state.currentUser?.id) {return;}
     const now = Date.now();
     if (!forceRefresh && state.notifications && state.lastNotificationsFetch && (now - state.lastNotificationsFetch < NOTIFICATIONS_CACHE_AGE)) {
       return; // Use cached notifications

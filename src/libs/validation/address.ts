@@ -47,7 +47,7 @@ function isValidBlockchainAddress(address: string, chain: 'solana' | 'ethereum' 
  * Normalize address format
  */
 function normalizeAddress(address: string, chain: 'solana' | 'ethereum' = 'solana'): string {
-  if (!address) return '';
+  if (!address) {return '';}
   
   const trimmed = address.trim();
   

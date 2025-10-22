@@ -68,7 +68,7 @@ class MonitoringService {
 
   private detectRateLimitPatterns(endpoint: string) {
     const info = this.rateLimitMap.get(endpoint);
-    if (!info) return;
+    if (!info) {return;}
 
     // If we're getting too many 429s, suggest increasing cache duration
     if (info.consecutive429s >= this.RATE_LIMIT_THRESHOLD) {
@@ -103,7 +103,7 @@ class MonitoringService {
 
   shouldThrottle(endpoint: string): boolean {
     const info = this.rateLimitMap.get(endpoint);
-    if (!info) return false;
+    if (!info) {return false;}
 
     const timeSinceLast429 = Date.now() - info.last429Time;
     const isRecent = timeSinceLast429 < 5 * 60 * 1000; // 5 minutes

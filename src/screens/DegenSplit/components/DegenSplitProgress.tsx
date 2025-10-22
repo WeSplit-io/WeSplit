@@ -22,7 +22,7 @@ const DegenSplitProgress: React.FC<DegenSplitProgressProps> = ({
 }) => {
   // Update circle progress animation when locked count changes
   useEffect(() => {
-    if (!circleProgressRef.current) return;
+    if (!circleProgressRef.current) {return;}
     
     const progressPercentage = totalCount > 0 ? lockedCount / totalCount : 0;
     

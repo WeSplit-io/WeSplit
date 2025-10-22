@@ -206,7 +206,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
   // Contact loading is now handled by the useContacts hook
 
   const handleAddContact = async (user: User) => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
 
     // Check if contact already exists using the hook
     if (isUserAlreadyContact(user, contacts)) {
@@ -254,8 +254,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
   const getOthers = () => filteredContacts.filter(contact => !contact.isFavorite);
 
   const formatWalletAddress = (address: string) => {
-    if (!address) return '';
-    if (address.length <= 8) return address;
+    if (!address) {return '';}
+    if (address.length <= 8) {return address;}
     return `${address.substring(0, 4)}...${address.substring(address.length - 4)}`;
   };
 
@@ -263,7 +263,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
   // Handle QR code scanning
   const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
-    if (scanned || isProcessingQR) return;
+    if (scanned || isProcessingQR) {return;}
     
     setScanned(true);
     setIsProcessingQR(true);
@@ -429,7 +429,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
   // Animation function for tab changes
   const animateTabChange = (callback: () => void) => {
-    if (isAnimating) return;
+    if (isAnimating) {return;}
     
     setIsAnimating(true);
     

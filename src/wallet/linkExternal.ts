@@ -273,7 +273,7 @@ class ExternalWalletLinkingService {
       for (let i = base58.length - 1; i >= 0; i--) {
         const char = base58[i];
         const index = alphabet.indexOf(char);
-        if (index === -1) return null;
+        if (index === -1) {return null;}
         
         decoded += BigInt(index) * multi;
         multi *= 58n;

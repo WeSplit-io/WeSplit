@@ -74,8 +74,8 @@ export class UserSearchService {
       const enrichedResults: UserSearchResult[] = searchResults
         .filter(user => {
           // Apply filters
-          if (!includeDeleted && user.status === 'deleted') return false;
-          if (!includeSuspended && user.status === 'suspended') return false;
+          if (!includeDeleted && user.status === 'deleted') {return false;}
+          if (!includeSuspended && user.status === 'suspended') {return false;}
           
           // Apply relationship filter
           switch (relationshipFilter) {
@@ -119,10 +119,10 @@ export class UserSearchService {
           case 'relevance':
           default:
             // Prioritize contacts, then transaction partners, then others
-            if (a.relationshipType === 'contact' && b.relationshipType !== 'contact') return -1;
-            if (b.relationshipType === 'contact' && a.relationshipType !== 'contact') return 1;
-            if (a.relationshipType === 'transaction_partner' && b.relationshipType === 'none') return -1;
-            if (b.relationshipType === 'transaction_partner' && a.relationshipType === 'none') return 1;
+            if (a.relationshipType === 'contact' && b.relationshipType !== 'contact') {return -1;}
+            if (b.relationshipType === 'contact' && a.relationshipType !== 'contact') {return 1;}
+            if (a.relationshipType === 'transaction_partner' && b.relationshipType === 'none') {return -1;}
+            if (b.relationshipType === 'transaction_partner' && a.relationshipType === 'none') {return 1;}
             
             // Then by name
             return a.name.localeCompare(b.name);
@@ -303,7 +303,7 @@ export class UserSearchService {
   ): Promise<UserSearchResult | null> {
     try {
       const user = await firebaseDataService.user.getCurrentUser(userId);
-      if (!user) return null;
+      if (!user) {return null;}
 
       // Get relationship context
       const userContacts = await firebaseDataService.user.getUserContacts(currentUserId);

@@ -77,10 +77,10 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
     // Prevent multiple decimal points
     const parts = cleaned.split('.');
-    if (parts.length > 2) return;
+    if (parts.length > 2) {return;}
 
     // Limit decimal places to 2
-    if (parts.length === 2 && parts[1].length > 2) return;
+    if (parts.length === 2 && parts[1].length > 2) {return;}
 
     // Allow empty string or valid number
     setAmount(cleaned);
@@ -142,8 +142,8 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
 
   const formatWalletAddress = (address: string) => {
-    if (!address) return '';
-    if (address.length <= 8) return address;
+    if (!address) {return '';}
+    if (address.length <= 8) {return address;}
     return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
   };
 

@@ -151,7 +151,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
   };
 
   const handleCancelSubscription = async () => {
-    if (!currentUser || !currentSubscription) return;
+    if (!currentUser || !currentSubscription) {return;}
 
     Alert.alert(
       'Cancel Subscription',
@@ -349,7 +349,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
                   style={[styles.upgradeButton, subscribing && styles.disabledButton]}
                   onPress={() => {
                     const plan = plans.find(p => p.id === selectedPlan);
-                    if (plan) handleSubscribe(plan);
+                    if (plan) {handleSubscribe(plan);}
                   }}
                   disabled={subscribing || !isConnected}
                 >

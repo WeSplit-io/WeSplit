@@ -21,7 +21,7 @@ import { logger } from '../../services/loggingService';
 
 // Fonction pour hacher l'adresse du wallet
 const hashWalletAddress = (address: string): string => {
-  if (!address || address.length < 8) return address;
+  if (!address || address.length < 8) {return address;}
 
   const start = address.substring(0, 4);
   const end = address.substring(address.length - 4);

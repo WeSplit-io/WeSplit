@@ -115,8 +115,8 @@ export function isValidAmount(amount: string): boolean {
  * Get display precision for amount
  */
 function getDisplayPrecision(amount: number): number {
-  if (amount >= 1000) return 2;
-  if (amount >= 1) return 4;
-  if (amount >= 0.01) return 6;
+  if (amount >= 1000) {return 2;}
+  if (amount >= 1) {return 4;}
+  if (amount >= 0.01) {return 6;}
   return 8;
 }

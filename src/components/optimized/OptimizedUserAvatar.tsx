@@ -28,7 +28,7 @@ const OptimizedUserAvatar: React.FC<OptimizedUserAvatarProps> = memo(({
 
   // Memoize initials calculation
   const initials = useMemo(() => {
-    if (!displayName) return 'U';
+    if (!displayName) {return 'U';}
     
     const words = displayName.trim().split(' ');
     if (words.length === 1) {

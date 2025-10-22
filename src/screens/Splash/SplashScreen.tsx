@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Image, Text, StatusBar, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-
-const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { styles } from './styles';
 import { colors } from '../../theme';
 import { useApp } from '../../context/AppContext';
 import { auth } from '../../config/firebase';
 import { logger } from '../../services/loggingService';
+
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 interface SplashScreenProps {
   navigation: any;

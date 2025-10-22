@@ -39,7 +39,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
           duration: 200,
           useNativeDriver: false,
         }).start(() => {
-          if (onSlideComplete) onSlideComplete();
+          if (onSlideComplete) {onSlideComplete();}
           setTimeout(() => {
             sliderValue.setValue(0);
             setIsSliderActive(false);
@@ -221,8 +221,8 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const formatWalletAddress = (address: string) => {
-    if (!address) return '';
-    if (address.length <= 8) return address;
+    if (!address) {return '';}
+    if (address.length <= 8) {return address;}
     return `${address.substring(0, 4)}...${address.substring(address.length - 4)}`;
   };
 

@@ -213,7 +213,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
 
   // Event handlers
   const handleStartSpinning = () => {
-    if (degenState.isSpinning || degenState.hasSpun) return;
+    if (degenState.isSpinning || degenState.hasSpun) {return;}
 
     // Start spinning - NON-BLOCKING
     degenLogic.handleStartSpinning(

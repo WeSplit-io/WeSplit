@@ -16,7 +16,7 @@ export const useGroupData = (groupId: number | null) => {
 
   // Load group details with caching
   const loadGroup = useCallback(async (forceRefresh: boolean = false) => {
-    if (!groupId) return;
+    if (!groupId) {return;}
     
     setLoading(true);
     setError(null);
@@ -33,7 +33,7 @@ export const useGroupData = (groupId: number | null) => {
 
   // Refresh group data - FIXED: Remove problematic dependencies
   const refresh = useCallback(async () => {
-    if (!groupId) return;
+    if (!groupId) {return;}
     // Call refreshGroup directly from AppContext to avoid dependency issues
     await refreshGroup(groupId);
   }, [groupId]);
@@ -69,7 +69,7 @@ export const useGroupList = () => {
 
   // Load user groups with optional force refresh
   const loadGroups = useCallback(async (forceRefresh: boolean = false) => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
     
     try {
       await loadUserGroups(forceRefresh);

@@ -79,7 +79,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const [privateKey, setPrivateKey] = useState<string | null>(null);
   
   // Wallet management state
-  const [externalWallets, setExternalWallets] = useState<Array<{id: string, address: string, name?: string}>>([]);
+  const [externalWallets, setExternalWallets] = useState<{id: string, address: string, name?: string}[]>([]);
   const [inAppWallet, setInAppWallet] = useState<{address: string} | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<{id: string, address: string, type: 'external' | 'in-app', name?: string} | null>(null);
   const [isLoadingWallets, setIsLoadingWallets] = useState(false);
@@ -91,13 +91,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   
   // Helper function to check if current user is the creator
   const isCurrentUserCreator = () => {
-    if (!currentUser || !splitData) return false;
+    if (!currentUser || !splitData) {return false;}
     return splitData.creatorId === currentUser.id.toString();
   };
 
   // Wallet recap functions
   const formatWalletAddress = (address: string) => {
-    if (!address || address.length < 8) return address;
+    if (!address || address.length < 8) {return address;}
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
 
@@ -604,7 +604,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           Math.abs(p.amountOwed - updatedParticipants[index]?.amountOwed || 0) > 0.01
         );
         
-        if (!needsUpdate) return prev;
+        if (!needsUpdate) {return prev;}
         
         return updatedParticipants;
       });
@@ -659,7 +659,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
   // Real-time update functions
   const startRealtimeUpdates = async () => {
-    if (!splitData?.id || isRealtimeActive) return;
+    if (!splitData?.id || isRealtimeActive) {return;}
     
     try {
       logger.info('Starting real-time updates for FairSplit', { splitId: splitData.id }, 'FairSplitScreen');
@@ -719,7 +719,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   };
 
   const stopRealtimeUpdates = () => {
-    if (!isRealtimeActive) return;
+    if (!isRealtimeActive) {return;}
     
     try {
       logger.info('Stopping real-time updates for FairSplit', { splitId: splitData?.id }, 'FairSplitScreen');
@@ -766,11 +766,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
   // Check if all participants have paid their shares (with throttling to prevent excessive calls)
   const checkPaymentCompletion = async () => {
-    if (!splitWallet?.id) return;
+    if (!splitWallet?.id) {return;}
 
     try {
       const result = await SplitWalletService.getSplitWallet(splitWallet.id);
-      if (!result.success || !result.wallet) return;
+      if (!result.success || !result.wallet) {return;}
 
       const wallet = result.wallet;
       const allParticipantsPaid = wallet.participants.every((p: any) => p.status === 'paid');
@@ -857,7 +857,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   };
 
   const checkAndRepairData = async () => {
-    if (!splitWallet?.id) return;
+    if (!splitWallet?.id) {return;}
     
     try {
       // First validate the data
@@ -898,7 +898,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   };
 
   const loadSplitWalletData = async () => {
-    if (!splitWallet?.id) return;
+    if (!splitWallet?.id) {return;}
     
     try {
       // First, fix any precision issues in the split wallet data
@@ -952,7 +952,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   };
 
   const loadCompletionData = async () => {
-    if (!splitWallet?.id) return;
+    if (!splitWallet?.id) {return;}
     
     setIsLoadingCompletionData(true);
     try {
@@ -1216,7 +1216,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
   // Load user's wallets from Firebase
   const loadUserWallets = async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
     
     setIsLoadingWallets(true);
     try {
@@ -1807,7 +1807,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
   // Handle signature step
   const handleSignatureStep = async () => {
-    if (!selectedWallet || !splitWallet || !currentUser) return;
+    if (!selectedWallet || !splitWallet || !currentUser) {return;}
     
     // Show confirmation dialog before transfer
     Alert.alert(
@@ -1826,7 +1826,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
   // Execute the actual transfer
   const executeTransfer = async () => {
-    if (!selectedWallet || !splitWallet || !currentUser) return;
+    if (!selectedWallet || !splitWallet || !currentUser) {return;}
     
     setIsSigning(true);
     
@@ -2819,7 +2819,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               <Text style={styles.modalHelperText}>
                 {(() => {
                   const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
-                  if (!currentUserParticipant) return 'You owe: 0.00 USDC';
+                  if (!currentUserParticipant) {return 'You owe: 0.00 USDC';}
                   
                   const totalOwed = currentUserParticipant.amountOwed || 0;
                   const amountPaid = currentUserParticipant.amountPaid || 0;

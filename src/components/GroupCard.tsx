@@ -40,14 +40,14 @@ const GroupCard: React.FC<GroupCardProps> = ({
   };
 
   const formatBalance = (balance: number) => {
-    if (balance === 0) return 'Settled';
+    if (balance === 0) {return 'Settled';}
     const isPositive = balance > 0;
     const balanceCurrency = userBalanceCurrency || currency;
     return `${isPositive ? 'You are owed' : 'You owe'} ${Math.abs(balance).toFixed(2)} ${balanceCurrency}`;
   };
 
   const getBalanceColor = (balance: number) => {
-    if (balance === 0) return '#A89B9B';
+    if (balance === 0) {return '#A89B9B';}
     return balance > 0 ? '#A5EA15' : '#FF4D4F';
   };
 

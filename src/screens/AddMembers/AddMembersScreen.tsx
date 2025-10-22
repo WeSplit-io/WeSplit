@@ -17,7 +17,7 @@ const getAvatarColor = (name: string): string => {
     '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2'
   ];
   
-  if (!name) return colors[0];
+  if (!name) {return colors[0];}
   
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
@@ -29,8 +29,8 @@ const getAvatarColor = (name: string): string => {
 
 // Utility function to format wallet address
 const formatWalletAddress = (address: string): string => {
-  if (!address) return '';
-  if (address.length <= 12) return address;
+  if (!address) {return '';}
+  if (address.length <= 12) {return address;}
   return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
 };
 
@@ -203,8 +203,8 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
       member.id === userId || (member as any).user_id === userId
     );
     
-    if (!member) return 'not_in_group';
-    if (member.invitation_status === 'pending') return 'invited';
+    if (!member) {return 'not_in_group';}
+    if (member.invitation_status === 'pending') {return 'invited';}
     return 'member';
   };
 
@@ -252,7 +252,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const sendInvitesToSelected = async (targetGroupId: string) => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
 
     try {
       // Generate invite link for the group using hybrid service
@@ -314,7 +314,7 @@ const AddMembersScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const handleShareInviteLink = async () => {
-    if (!currentUser?.id || !groupId) return;
+    if (!currentUser?.id || !groupId) {return;}
 
     try {
       const inviteData = await firebaseDataService.group.generateInviteLink(groupId, String(currentUser.id));

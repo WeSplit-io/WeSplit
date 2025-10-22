@@ -528,7 +528,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
 
     // If less than 1 hour ago, show "X minutes ago"
     if (diffInMinutes < 60) {
-      if (diffInMinutes < 1) return 'Just now';
+      if (diffInMinutes < 1) {return 'Just now';}
       return `${diffInMinutes}m ago`;
     }
 

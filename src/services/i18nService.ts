@@ -623,7 +623,7 @@ const DEFAULT_LANGUAGE: SupportedLanguage = 'en';
 class I18nService {
   private currentLanguage: SupportedLanguage = DEFAULT_LANGUAGE;
   private currentTranslations: TranslationKeys = englishTranslations;
-  private listeners: Array<(language: SupportedLanguage) => void> = [];
+  private listeners: ((language: SupportedLanguage) => void)[] = [];
 
   // Initialize the service
   async initialize(): Promise<void> {
@@ -648,7 +648,7 @@ class I18nService {
   }
 
   // Get available languages
-  getAvailableLanguages(): Array<{ code: SupportedLanguage; name: string; nativeName: string; flag: string }> {
+  getAvailableLanguages(): { code: SupportedLanguage; name: string; nativeName: string; flag: string }[] {
     return Object.entries(SUPPORTED_LANGUAGES).map(([code, info]) => ({
       code: code as SupportedLanguage,
       ...info,

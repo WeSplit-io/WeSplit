@@ -47,7 +47,7 @@ export class NFCSplitService {
   static async isAvailable(): Promise<boolean> {
     try {
       const NFC = await this.initializeNFC();
-      if (!NFC) return false;
+      if (!NFC) {return false;}
 
       return await NFC.hasHardwareAsync();
     } catch (error) {
@@ -62,7 +62,7 @@ export class NFCSplitService {
   static async isEnabled(): Promise<boolean> {
     try {
       const NFC = await this.initializeNFC();
-      if (!NFC) return false;
+      if (!NFC) {return false;}
 
       return await NFC.isEnabledAsync();
     } catch (error) {

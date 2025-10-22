@@ -24,11 +24,11 @@ export class SplitWalletCreation {
    * Validate wallet address format
    */
   static isValidWalletAddress(address: string): boolean {
-    if (!address || typeof address !== 'string') return false;
+    if (!address || typeof address !== 'string') {return false;}
     
     // Remove common invalid values
     const invalidValues = ['No wallet address', 'Unknown wallet', '', 'null', 'undefined'];
-    if (invalidValues.includes(address.toLowerCase())) return false;
+    if (invalidValues.includes(address.toLowerCase())) {return false;}
     
     // Check if it's a valid Solana public key format
     try {
@@ -279,7 +279,7 @@ export class SplitWalletCreation {
     creatorId: string,
     totalAmount: number,
     currency: string,
-    participants: Array<{ userId: string; name: string; walletAddress: string; amountOwed: number }>
+    participants: { userId: string; name: string; walletAddress: string; amountOwed: number }[]
   ): Promise<SplitWalletResult> {
     try {
       logger.info('Creating Degen Split wallet with shared private key access', {

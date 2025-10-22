@@ -284,7 +284,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
   // Fetch user avatars dynamically
   useEffect(() => {
     const fetchUserAvatars = async () => {
-      if (!group?.members) return;
+      if (!group?.members) {return;}
 
       const avatars: Record<string, string> = {};
 
@@ -309,7 +309,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
   // Fetch reminder status when group data is available
   useEffect(() => {
     const fetchReminderStatus = async () => {
-      if (!visible || !group?.id || !currentUser?.id) return;
+      if (!visible || !group?.id || !currentUser?.id) {return;}
 
       try {
         // Use Firebase service directly
@@ -326,13 +326,13 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
 
   // Refresh reminder status periodically to update countdown timers
   useEffect(() => {
-    if (!visible || !reminderStatus) return;
+    if (!visible || !reminderStatus) {return;}
 
     const hasActiveCooldowns =
       Object.keys(reminderStatus.individualCooldowns || {}).length > 0 ||
       reminderStatus.bulkCooldown !== null;
 
-    if (!hasActiveCooldowns) return;
+    if (!hasActiveCooldowns) {return;}
 
     const interval = setInterval(async () => {
       if (group?.id && currentUser?.id) {
@@ -429,8 +429,8 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
 
   // Calculate what current user owes to others and who owes current user
   const { oweData, owedData } = useMemo(() => {
-    const owe: Array<{ name: string; amount: number; amountUSD: number; currency: string; memberId: string }> = [];
-    const owed: Array<{ name: string; amount: number; amountUSD: number; currency: string; memberId: string }> = [];
+    const owe: { name: string; amount: number; amountUSD: number; currency: string; memberId: string }[] = [];
+    const owed: { name: string; amount: number; amountUSD: number; currency: string; memberId: string }[] = [];
 
     logger.debug('Processing balances', {
       groupBalancesLength: groupBalances.length,
@@ -508,8 +508,8 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
               if (currencyData && currencyData.total_amount > 0) {
                 // Calculate the actual conversion rate used in the group
                 const groupTotalUSD = group.expenses_by_currency.reduce((sum, exp) => {
-                  if (exp.currency === 'USDC') return sum + exp.total_amount;
-                  if (exp.currency === 'SOL') return sum + (exp.total_amount * 200); // Use consistent SOL rate
+                  if (exp.currency === 'USDC') {return sum + exp.total_amount;}
+                  if (exp.currency === 'SOL') {return sum + (exp.total_amount * 200);} // Use consistent SOL rate
                   return sum + exp.total_amount; // Other currencies
                 }, 0);
                 const realRate = groupTotalUSD / currencyData.total_amount;
@@ -837,7 +837,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
     );
   };
 
-  if (!visible) return null;
+  if (!visible) {return null;}
 
   return (
     <Modal
@@ -1139,7 +1139,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
                                     (settlementLoading || reminderLoading) && { opacity: 0.6 }
                                   ]}
                                   onPress={() => {
-                                    if (settlementLoading || reminderLoading) return;
+                                    if (settlementLoading || reminderLoading) {return;}
                                     if (isOweSection) {
                                       handleIndividualSettlement(item);
                                     } else {
@@ -1210,7 +1210,7 @@ const SettleUpModal: React.FC<SettleUpModalProps> = ({
                     (settlementLoading || reminderLoading) && { opacity: 0.6 }
                   ]}
                   onPress={async () => {
-                    if (settlementLoading || reminderLoading) return;
+                    if (settlementLoading || reminderLoading) {return;}
                     if (isOweSection) {
                       handleSettleAll();
                     } else {

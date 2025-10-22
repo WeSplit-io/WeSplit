@@ -24,7 +24,7 @@ const VerificationScreen: React.FC = () => {
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
-    if (timer === 0) return;
+    if (timer === 0) {return;}
     const interval = setInterval(() => {
       setTimer(t => (t > 0 ? t - 1 : 0));
     }, 1000);

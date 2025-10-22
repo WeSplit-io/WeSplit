@@ -41,7 +41,7 @@ const SlideButton: React.FC<SlideButtonProps> = ({
   );
 
   const handleStateChange = (event: PanGestureHandlerGestureEvent) => {
-    if (disabled || loading || completed) return;
+    if (disabled || loading || completed) {return;}
 
     const { translationX, state } = event.nativeEvent;
 

@@ -95,7 +95,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
   // Load balances for groups
   useEffect(() => {
     const loadBalances = async () => {
-      if (groups.length === 0) return;
+      if (groups.length === 0) {return;}
       
       try {
         const newBalances: { [groupId: string]: { amount: number; currency: string } } = {};
@@ -158,7 +158,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
             if (individualExpenses && individualExpenses.length > 0) {
               // Calculate totals by currency from individual expenses
               const currencyTotals = individualExpenses.reduce((acc: Record<string, number>, expense: Expense) => {
-                if (!expense || expense.amount === undefined) return acc;
+                if (!expense || expense.amount === undefined) {return acc;}
                 const currency = expense.currency || 'SOL';
                 acc[currency] = (acc[currency] || 0) + (expense.amount || 0);
                 return acc;
@@ -222,8 +222,8 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
         const groupTotalAmountUSD = groupAmountsInUSD[group.id] || 0;
         const isActive = groupTotalAmountUSD > 0; // Group is active if it has expenses
         
-        if (activeFilter === 'active') return isActive;
-        if (activeFilter === 'closed') return !isActive;
+        if (activeFilter === 'active') {return isActive;}
+        if (activeFilter === 'closed') {return !isActive;}
         return true;
       });
     }
@@ -429,7 +429,7 @@ const GroupsListScreen: React.FC<any> = ({ navigation }) => {
 
   // Debug function to check all group memberships (commented out for production)
   const debugCheckAllMemberships = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
     
     try {
       // Debug functionality removed for production

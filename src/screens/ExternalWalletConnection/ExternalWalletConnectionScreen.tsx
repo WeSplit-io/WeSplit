@@ -176,8 +176,8 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
           .sort((a, b) => {
             // Sort available providers first, then unavailable ones
             // Within each group, sort alphabetically
-            if (a.isAvailable && !b.isAvailable) return -1;
-            if (!a.isAvailable && b.isAvailable) return 1;
+            if (a.isAvailable && !b.isAvailable) {return -1;}
+            if (!a.isAvailable && b.isAvailable) {return 1;}
             return a.name.localeCompare(b.name);
           })
           .map((provider, index) => {

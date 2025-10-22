@@ -106,7 +106,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // Utility function to format wallet address
   const formatWalletAddress = (address: string) => {
-    if (!address || address.length < 8) return address;
+    if (!address || address.length < 8) {return address;}
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
 
@@ -322,7 +322,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   useEffect(() => {
     // Check if split is already active/locked and redirect accordingly
     const checkSplitStateAndRedirect = async () => {
-      if (!currentSplitData || !currentSplitData.splitType) return;
+      if (!currentSplitData || !currentSplitData.splitType) {return;}
 
       // Only redirect if the split is already active/locked and we're not from a notification
       if (currentSplitData.status === 'active' || currentSplitData.status === 'locked') {
@@ -358,7 +358,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // Async function implementations
   const loadSplitData = async () => {
-    if (!splitId) return;
+    if (!splitId) {return;}
 
     try {
       const result = await SplitStorageService.getSplit(splitId);
@@ -507,7 +507,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   }, [splitId, isRealtimeActive]);
 
   const stopRealtimeUpdates = () => {
-    if (!isRealtimeActive) return;
+    if (!isRealtimeActive) {return;}
 
     try {
       logger.info('Stopping real-time updates for split', { splitId }, 'SplitDetailsScreen');
@@ -552,7 +552,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // Removed ensureSplitWithWalletExists - wallets should only be created when split type is selected
 
   const convertCurrencyToUSDC = async () => {
-    if (!totalAmount) return;
+    if (!totalAmount) {return;}
 
     try {
       setIsConvertingCurrency(true);
@@ -609,7 +609,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   const handleJoinSplitFromNotification = async () => {
-    if (!splitId || !currentUser) return;
+    if (!splitId || !currentUser) {return;}
 
     try {
       setIsJoiningSplit(true);
@@ -636,7 +636,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   const handleSplitInvitation = async () => {
-    if (!splitInvitationData) return;
+    if (!splitInvitationData) {return;}
 
     try {
       const invitationData = JSON.parse(splitInvitationData);
@@ -653,7 +653,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   const checkExistingSplit = async () => {
-    if (!currentUser || hasAttemptedProcessing) return;
+    if (!currentUser || hasAttemptedProcessing) {return;}
 
     try {
       setHasAttemptedProcessing(true);
@@ -672,7 +672,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   const inviteContact = async (contact: any) => {
-    if (!contact || !currentUser || !splitId) return;
+    if (!contact || !currentUser || !splitId) {return;}
 
     try {
       setIsInvitingUsers(true);
@@ -807,7 +807,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // Helper function to check if current user is the creator
   const isCurrentUserCreator = () => {
-    if (!currentUser) return false;
+    if (!currentUser) {return false;}
 
     // Check currentSplitData first (for joined splits)
     if (currentSplitData?.creatorId) {
@@ -844,7 +844,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // Helper function to check if all participants have accepted
   const areAllParticipantsAccepted = () => {
     const participants = currentSplitData?.participants || [];
-    if (participants.length === 0) return true;
+    if (participants.length === 0) {return true;}
 
     // Check if all participants have 'accepted' status
     const acceptedParticipants = participants.filter((participant: any) =>
@@ -880,7 +880,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // Test function to manually create a notification (for debugging)
   const testNotification = async () => {
-    if (!currentUser) return;
+    if (!currentUser) {return;}
 
     try {
       // Test notification removed - use actual split invitation instead
@@ -911,7 +911,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   };
 
   const handleContinue = async () => {
-    if (!selectedSplitType) return;
+    if (!selectedSplitType) {return;}
 
     try {
       // Continue with selected split type

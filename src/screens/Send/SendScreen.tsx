@@ -37,7 +37,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Load linked destinations
   const loadLinkedDestinations = async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
     
     setLoadingLinkedDestinations(true);
     try {
@@ -152,8 +152,8 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const formatWalletAddress = (address: string) => {
-    if (!address) return '';
-    if (address.length <= 10) return address;
+    if (!address) {return '';}
+    if (address.length <= 10) {return address;}
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 

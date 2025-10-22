@@ -85,7 +85,7 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
 
   // Load split data
   const loadSplitData = useCallback(async () => {
-    if (!routeParams?.splitId) return;
+    if (!routeParams?.splitId) {return;}
     
     setLoading(true);
     setError(null);
@@ -161,15 +161,15 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
 
   // Update split settings
   const updateSplitSettings = useCallback((settings: any) => {
-    if (settings.allowPartialPayments !== undefined) setAllowPartialPayments(settings.allowPartialPayments);
-    if (settings.requireAllAccept !== undefined) setRequireAllAccept(settings.requireAllAccept);
-    if (settings.autoCalculate !== undefined) setAutoCalculate(settings.autoCalculate);
-    if (settings.taxIncluded !== undefined) setTaxIncluded(settings.taxIncluded);
+    if (settings.allowPartialPayments !== undefined) {setAllowPartialPayments(settings.allowPartialPayments);}
+    if (settings.requireAllAccept !== undefined) {setRequireAllAccept(settings.requireAllAccept);}
+    if (settings.autoCalculate !== undefined) {setAutoCalculate(settings.autoCalculate);}
+    if (settings.taxIncluded !== undefined) {setTaxIncluded(settings.taxIncluded);}
   }, []);
 
   // Save data
   const saveSplit = useCallback(async () => {
-    if (!unifiedBillData || !routeParams?.splitId) return;
+    if (!unifiedBillData || !routeParams?.splitId) {return;}
     
     setLoading(true);
     try {
@@ -247,7 +247,7 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
 
   // Real-time update functions
   const startRealtimeUpdates = useCallback(async () => {
-    if (!routeParams?.splitId || isRealtimeActive) return;
+    if (!routeParams?.splitId || isRealtimeActive) {return;}
     
     try {
       logger.info('Starting real-time updates for split', { splitId: routeParams.splitId }, 'useSplitDetails');
@@ -325,7 +325,7 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
   }, [routeParams?.splitId, isRealtimeActive]);
 
   const stopRealtimeUpdates = useCallback(() => {
-    if (!isRealtimeActive) return;
+    if (!isRealtimeActive) {return;}
     
     try {
       logger.info('Stopping real-time updates for split', { splitId: routeParams?.splitId }, 'useSplitDetails');

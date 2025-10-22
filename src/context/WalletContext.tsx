@@ -642,7 +642,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   // Auto-refresh balance functionality
   const startBalancePolling = useCallback(async (userId: string) => {
-    if (!autoRefreshEnabled || balancePollingInterval) return;
+    if (!autoRefreshEnabled || balancePollingInterval) {return;}
 
     logger.info('Starting balance polling for user', { userId }, 'WalletContext');
     

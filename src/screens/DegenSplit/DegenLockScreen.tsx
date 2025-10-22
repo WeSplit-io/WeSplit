@@ -58,7 +58,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, lo
           duration: 200,
           useNativeDriver: false,
         }).start(() => {
-          if (onSlideComplete) onSlideComplete();
+          if (onSlideComplete) {onSlideComplete();}
           setTimeout(() => {
             sliderValue.setValue(0);
             setIsSliderActive(false);

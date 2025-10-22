@@ -209,7 +209,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Handle refresh with proper error handling
   const handleRefresh = useCallback(async () => {
-    if (!groupId) return;
+    if (!groupId) {return;}
 
     setRefreshing(true);
     setDataError(null);
@@ -311,7 +311,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Calculate optimized settlement transactions
   const calculateOptimizedSettlements = useCallback(() => {
-    if (realGroupBalances.length === 0) return;
+    if (realGroupBalances.length === 0) {return;}
 
     try {
       // Get all optimized transactions
@@ -349,7 +349,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Function to get user avatar for expense
   const getUserAvatarForExpense = useCallback((expense: Expense) => {
-    if (!expense || !expense.paid_by) return null;
+    if (!expense || !expense.paid_by) {return null;}
 
     // First, try to find the user in realMembers
     const paidByUser = realMembers.find(member => String(member.id) === String(expense.paid_by));
@@ -370,7 +370,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Function to get user name for expense
   const getUserNameForExpense = useCallback((expense: Expense) => {
-    if (!expense || !expense.paid_by) return 'Someone';
+    if (!expense || !expense.paid_by) {return 'Someone';}
 
     // First, try to find the user in realMembers
     const paidByUser = realMembers.find(member => String(member.id) === String(expense.paid_by));
@@ -511,7 +511,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
 
       if (individualExpenses.length > 0) {
         totalAmountUSD = individualExpenses.reduce((sum, expense) => {
-          if (!expense || expense.amount === undefined) return sum;
+          if (!expense || expense.amount === undefined) {return sum;}
           const currency = expense.currency || 'SOL';
           const amount = expense.amount || 0;
           // Use consistent conversion rates
@@ -540,7 +540,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
           );
 
           userPaidUSD = userPaidExpenses.reduce((sum, expense) => {
-            if (!expense || expense.amount === undefined) return sum;
+            if (!expense || expense.amount === undefined) {return sum;}
             const currency = expense.currency || 'SOL';
             const amount = expense.amount || 0;
             // Use consistent conversion rates
@@ -550,7 +550,7 @@ const GroupDetailsScreen: React.FC<any> = ({ navigation, route }) => {
 
           // Calculate total group expenses and user's share
           const totalGroupExpenses = individualExpenses.reduce((sum, expense) => {
-            if (!expense || expense.amount === undefined) return sum;
+            if (!expense || expense.amount === undefined) {return sum;}
             const currency = expense.currency || 'SOL';
             const amount = expense.amount || 0;
             const rate = currency === 'SOL' ? 200 : (currency === 'USDC' ? 1 : 100);

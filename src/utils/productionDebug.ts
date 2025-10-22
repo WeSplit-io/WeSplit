@@ -33,16 +33,16 @@ export interface ProductionDebugInfo {
  */
 const getEnvVar = (key: string): string => {
   // Try process.env first
-  if (process.env[key]) return process.env[key]!;
-  if (process.env[`EXPO_PUBLIC_${key}`]) return process.env[`EXPO_PUBLIC_${key}`]!;
+  if (process.env[key]) {return process.env[key]!;}
+  if (process.env[`EXPO_PUBLIC_${key}`]) {return process.env[`EXPO_PUBLIC_${key}`]!;}
   
   // Try Constants.expoConfig.extra
-  if (Constants.expoConfig?.extra?.[key]) return Constants.expoConfig.extra[key];
-  if (Constants.expoConfig?.extra?.[`EXPO_PUBLIC_${key}`]) return Constants.expoConfig.extra[`EXPO_PUBLIC_${key}`];
+  if (Constants.expoConfig?.extra?.[key]) {return Constants.expoConfig.extra[key];}
+  if (Constants.expoConfig?.extra?.[`EXPO_PUBLIC_${key}`]) {return Constants.expoConfig.extra[`EXPO_PUBLIC_${key}`];}
   
   // Try Constants.manifest.extra (older Expo versions)
-  if ((Constants.manifest as any)?.extra?.[key]) return (Constants.manifest as any).extra[key];
-  if ((Constants.manifest as any)?.extra?.[`EXPO_PUBLIC_${key}`]) return (Constants.manifest as any).extra[`EXPO_PUBLIC_${key}`];
+  if ((Constants.manifest as any)?.extra?.[key]) {return (Constants.manifest as any).extra[key];}
+  if ((Constants.manifest as any)?.extra?.[`EXPO_PUBLIC_${key}`]) {return (Constants.manifest as any).extra[`EXPO_PUBLIC_${key}`];}
   
   return '';
 };
