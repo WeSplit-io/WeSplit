@@ -48,7 +48,14 @@ The audit identified critical areas for improvement in transaction reliability, 
 **Risk**: High - Could result in over-allocation of funds
 **Recommendation**: Add strict validation for percentage totals
 
-#### 3. 1:1 Send - Insufficient Balance Check Race Condition
+#### 3. 1:1 Send - Function Call Issues ✅ FIXED
+**File**: `src/transfer/sendInternal.ts`, `src/services/transaction/TransactionProcessor.ts`, `src/services/solanaAppKitService.ts`
+**Issue**: `getLatestBlockhashWithRetry` was being called as instance method instead of static method
+**Risk**: High - Caused transaction failures with "function is not defined" errors
+**Status**: ✅ **RESOLVED** - Fixed static method calls and connection parameter passing
+**Fix**: Updated all calls to use `TransactionUtils.getLatestBlockhashWithRetry(connection)` with proper imports
+
+#### 4. 1:1 Send - Insufficient Balance Check Race Condition
 **File**: `src/transfer/sendInternal.ts`
 **Issue**: Balance check and deduction not atomic, allowing double-spending
 **Risk**: High - Could result in negative balances
