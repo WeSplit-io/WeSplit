@@ -3,7 +3,7 @@
  * Generates QR codes for split invitations and wallet addresses
  */
 
-import { logger } from './loggingService';
+import { logger } from '../analytics/loggingService';
 
 export interface QRCodeData {
   type: 'split_invitation' | 'wallet_address' | 'payment_request';

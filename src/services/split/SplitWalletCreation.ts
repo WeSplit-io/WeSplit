@@ -6,7 +6,7 @@
 
 import { walletService } from '../WalletService';
 import { logger } from '../core';
-import { roundUsdcAmount as currencyRoundUsdcAmount } from '../../utils/format';
+import { roundUsdcAmount as currencyRoundUsdcAmount } from '../../utils/ui/format';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult } from './types';

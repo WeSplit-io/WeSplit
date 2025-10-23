@@ -7,12 +7,12 @@ import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { useContactActions } from '../../hooks';
-import { walletService, LinkedWalletService } from '../../services/wallet';
+import { walletService, LinkedWalletService } from '../../services/blockchain/wallet';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme';
 import { styles } from './styles';
-import { logger } from '../../services/core';
-import type { LinkedWallet } from '../../services/wallet/LinkedWalletService';
+import { logger } from '../../services/analytics/loggingService';
+import type { LinkedWallet } from '../../services/blockchain/wallet/LinkedWalletService';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
 

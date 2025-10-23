@@ -177,7 +177,7 @@ export const validateAmount = (amount: string): {
   }
 
   // Use tolerant parser for locales (accepts comma decimals)
-  const { parseAmount } = require('../format/formatUtils');
+  const { parseAmount } = require('../ui/format/formatUtils');
   const numericValue = parseAmount(amount);
   
   if (isNaN(numericValue)) {

@@ -12,10 +12,10 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
-import { walletService, WalletProvider } from '../../services/wallet';
+import { walletService, WalletProvider } from '../../services/blockchain/wallet';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
 

@@ -6,9 +6,9 @@
 
 import { Platform } from 'react-native';
 import { consolidatedTransactionService } from '../transaction';
-import { logger } from '../core';
+import { logger } from '../../services/analytics/loggingService';
 import { FeeService } from '../../config/constants/feeConfig';
-import { roundUsdcAmount } from '../../uti../format';
+import { roundUsdcAmount } from '../../utils/ui/format/formatUtils';
 import { doc, updateDoc, collection, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../../config/firebase/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult, PaymentResult } from './types';

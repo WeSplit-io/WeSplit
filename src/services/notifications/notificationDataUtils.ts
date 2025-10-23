@@ -3,7 +3,7 @@
  * Provides standardized data structures and validation for notifications
  */
 
-import { logger } from '../core/loggingService';
+import { logger } from '../analytics/loggingService';
 
 export interface StandardizedNotificationData {
   // Core request data

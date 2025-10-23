@@ -20,7 +20,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenLockStyles';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';
 import { FallbackDataService } from '../../services/data/mockupData';
 

@@ -32,7 +32,7 @@ import { consolidatedBillAnalysisService } from '../../services/billing';
 import { convertFiatToUSDC, formatCurrencyAmount } from '../../services/core';
 import { NFCSplitService } from '../../services/core';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { firebaseDataService } from '../../services/data';
 import { splitStorageService, Split, SplitStorageService, SplitInvitationServiceClass } from '../../services/splits';
 import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';

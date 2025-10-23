@@ -3,7 +3,7 @@ import { View, Text, Image, TouchableOpacity, ScrollView, Dimensions } from 'rea
 import { useNavigation } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 const slides = [
   {

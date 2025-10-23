@@ -1,4 +1,4 @@
-/**
+  /**
  * Simplified Wallet Context for WeSplit
  * Clean, focused wallet state management
  * Keeps frontend interface intact while simplifying backend logic
@@ -7,10 +7,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { walletService, WalletInfo as ConsolidatedWalletInfo } from '../services/wallet';
-import { consolidatedTransactionService } from '../services/transaction';
-import { solanaWalletService } from '../services/wallet/solanaWallet.deprecated';
-import { logger } from '../services/core';
+import { walletService, WalletInfo as ConsolidatedWalletInfo } from '../services/blockchain/wallet';
+import { consolidatedTransactionService } from '../services/blockchain/transaction';
+import { solanaWalletService } from '../OLD_LEGACY/deprecated_services/solanaWallet.deprecated';
+import { logger } from '../services/analytics/loggingService';
 
 // WalletInfo interface for backward compatibility
 interface WalletInfo {
@@ -525,7 +525,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     try {
       console.log('🔍 WalletProvider: Starting ensureAppWallet...');
       // Import userWalletService to ensure app wallet
-      const { walletService } = await import('../services/wallet');
+      const { walletService } = await import('../services/blockchain/wallet');
       console.log('🔍 WalletProvider: walletService imported:', !!walletService);
       console.log('🔍 WalletProvider: walletService.ensureUserWallet method:', typeof walletService?.ensureUserWallet);
       
@@ -547,7 +547,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const getAppWalletBalance = async (userId: string): Promise<number> => {
     try {
       // Import userWalletService to get app wallet balance
-      const { walletService } = await import('../services/wallet');
+      const { walletService } = await import('../services/blockchain/wallet');
       const balance = await walletService.getUserWalletBalance(userId);
       
       const totalUSD = balance?.totalUSD || 0;
@@ -563,7 +563,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const exportAppWallet = async (userId: string) => {
     try {
       // Import userWalletService to export app wallet
-      const { walletService } = await import('../services/wallet');
+      const { walletService } = await import('../services/blockchain/wallet');
       const result = await walletService.exportWallet(userId);
       
       if (result.success) {
@@ -589,7 +589,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const getAppWalletInfo = async (userId: string) => {
     try {
       // Import userWalletService to get app wallet info
-      const { walletService } = await import('../services/wallet');
+      const { walletService } = await import('../services/blockchain/wallet');
       const result = await walletService.getWalletInfoForUser(userId);
       
       if (result.success && result.walletAddress) {
@@ -618,7 +618,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const fixAppWalletMismatch = async (userId: string) => {
     try {
       // Import userWalletService to fix wallet mismatch
-      const { walletService } = await import('../services/wallet');
+      const { walletService } = await import('../services/blockchain/wallet');
       const result = await walletService.fixWalletMismatch(userId);
       
       if (result.success && result.wallet) {
@@ -662,7 +662,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
         // Refresh app wallet balance
         if (appWalletConnected) {
-          const { walletService } = await import('../services/wallet');
+          const { walletService } = await import('../services/blockchain/wallet');
           const balance = await walletService.getUserWalletBalance(userId);
           
           if (balance) {

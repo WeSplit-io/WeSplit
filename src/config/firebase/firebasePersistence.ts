@@ -5,7 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 /**
  * Initialize Firebase Auth with React Native persistence

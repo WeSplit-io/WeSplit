@@ -5,7 +5,7 @@
  */
 
 import { logger } from '../core';
-import { roundUsdcAmount } from '../../utils/format';
+import { roundUsdcAmount } from '../../utils/ui/format';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 

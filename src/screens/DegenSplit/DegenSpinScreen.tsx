@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenSpinStyles';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { useApp } from '../../context/AppContext';
 import { notificationService } from '../../services/notifications';
 

@@ -5,7 +5,7 @@ import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { styles } from './styles';
 import { colors } from '../../theme';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 // Category options matching the mockup
 const CATEGORIES = [

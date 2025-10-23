@@ -3,7 +3,7 @@
  * Handles split invitations, QR codes, NFC sharing, and link generation
  */
 
-import { logger } from '../core/loggingService';
+import { logger } from '../analytics/loggingService';
 
 export interface SplitInvitationData {
   type: 'split_invitation';

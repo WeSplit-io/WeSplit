@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../../theme';
 import { styles } from './ExpenseSuccessStyles';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 const ExpenseSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   const { 

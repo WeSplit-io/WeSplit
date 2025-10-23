@@ -23,7 +23,7 @@ import { typography } from '../../../theme/typography';
 import { styles } from './BillProcessingStyles';
 import { BillItem, OCRProcessingResult, BillSplitCreationData } from '../../../types/billSplitting';
 import { BillAnalysisData, BillAnalysisResult, ProcessedBillData } from '../../../types/billAnalysis';
-import { ConsolidatedBillAnalysisService } from '../../../services/billing';
+import { consolidatedBillAnalysisService } from '../../../services/billing';
 import { useApp } from '../../../context/AppContext';
 import { splitStorageService } from '../../../services/splits';
 import { notificationService } from '../../../services/notifications';

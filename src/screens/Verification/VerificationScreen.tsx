@@ -7,7 +7,7 @@ import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { verifyCode, sendVerificationCode } from '../../services/data';
 import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 
 const CODE_LENGTH = 4; // 4-digit code

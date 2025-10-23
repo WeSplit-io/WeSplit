@@ -5,8 +5,8 @@
 
 import { firebaseDataService } from '../data/firebaseDataService';
 import { SplitStorageService } from '../splits/splitStorageService';
-import { TransactionHistoryService } from '../transaction/transactionHistoryService';
-import { logger } from '../core/loggingService';
+import { TransactionHistoryService } from '../blockchain/transaction/transactionHistoryService';
+import { logger } from '../analytics/loggingService';
 import { UserContact } from '../../types';
 
 export interface TransactionContact {

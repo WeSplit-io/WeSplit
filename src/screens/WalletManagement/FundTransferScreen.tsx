@@ -10,9 +10,9 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { useApp } from '../../context/AppContext';
-import { walletService } from '../../services/wallet';
+import { walletService } from '../../services/blockchain/wallet';
 import { colors, spacing, typography } from '../../theme';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
 

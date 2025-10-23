@@ -12,7 +12,7 @@ import {
   BillSplitSettings 
 } from '../types/billAnalysis';
 import { OCRProcessingResult, BillItem } from '../types/billSplitting';
-import { logger } from '../core/loggingService';
+import { logger } from '../analytics/loggingService';
 import { calculateEqualSplit } from '../../OLD_LEGACY/deprecated_utils/currencyUtils';
 import { MockupDataService } from '../data/mockupData';
 

@@ -3,7 +3,7 @@
  * Catches and handles runtime errors, especially "property is not configurable" errors
  */
 
-import { logger } from '../services/core/loggingService';
+import { logger } from '../services/analytics/loggingService';
 
 // Global error handler for unhandled errors
 export const setupGlobalErrorHandlers = () => {

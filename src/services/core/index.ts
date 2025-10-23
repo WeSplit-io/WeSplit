@@ -4,7 +4,7 @@
  */
 
 // Core services
-export { loggingService, logger } from './loggingService';
+export { loggingService, logger } from '../analytics/loggingService';
 export { subscriptionService } from './subscriptionService';
 export { accountDeletionService } from './accountDeletionService';
 export { userImageService } from './userImageService';
@@ -17,9 +17,7 @@ export type {
   NotificationData,
   NotificationType,
   User,
-  Transaction,
-  Split,
-  ProcessedBillData
+  Transaction
 } from '../../types/unified';
 
 // Utility functions are available directly from formatUtils
@@ -57,7 +55,7 @@ export {
 // Re-export validation utilities
 export { 
   isValidSolanaAddress
-} from '../../utils/wallet/walletUtils';
+} from '../../utils/crypto/wallet/walletUtils';
 
 // Default export for backward compatibility
-export { loggingService as default } from './loggingService';
+export { loggingService as default } from '../analytics/loggingService';

@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { auth } from '../../config/firebase/firebase';
 import { ProductionAuthService } from '../../services/auth/ProductionAuthService';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 interface EnvironmentStatus {
   isProduction: boolean;

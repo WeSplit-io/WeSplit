@@ -4,7 +4,7 @@ import Icon from '../../../components/Icon';
 import { useApp } from '../../../context/AppContext';
 import { useWallet } from '../../../context/WalletContext';
 import { subscriptionService, SubscriptionPlan, UserSubscription, PaymentMethod, SubscriptionService } from '../../../services/core';
-import { consolidatedTransactionService } from '../../../services/transaction';
+import { consolidatedTransactionService } from '../../../services/blockchain/transaction';
 import styles from './styles';
 import { Container } from '../../../components/shared';
 import Header from '../../../components/shared/Header';

@@ -3,7 +3,7 @@
  * Prevents "property is not configurable" errors by protecting critical global properties
  */
 
-import { logger } from '../services/core/loggingService';
+import { logger } from '../services/analytics/loggingService';
 
 // List of critical global properties that should be protected
 const CRITICAL_PROPERTIES = [

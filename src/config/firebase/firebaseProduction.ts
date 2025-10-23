@@ -13,7 +13,7 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 // Comprehensive environment variable getter
 const getEnvVar = (key: string): string => {

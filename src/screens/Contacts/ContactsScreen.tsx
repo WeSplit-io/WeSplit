@@ -11,7 +11,7 @@ import { useContactActions } from '../../hooks';
 import { UserContact, User } from '../../types';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';

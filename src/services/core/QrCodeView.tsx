@@ -15,7 +15,7 @@ import {
 import QRCode from 'react-native-qrcode-svg';
 import { colors } from '../../theme';
 import { shareAddress, copyToClipboard } from './share';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { createUsdcRequestUri, createAddressQr } from './solanaPay';
 
 export interface QrCodeViewProps {

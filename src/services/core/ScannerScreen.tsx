@@ -18,7 +18,7 @@ import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../theme';
 import { parseUri, extractRecipientAddress, isSolanaPayUri } from './solanaPay';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { isValidSolanaAddress } from '../../utils/validation';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');

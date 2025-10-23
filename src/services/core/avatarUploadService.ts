@@ -5,7 +5,7 @@
 
 import { storage } from '../../config/firebase/firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { logger } from './loggingService';
+import { logger } from '../analytics/loggingService';
 
 export interface AvatarUploadResult {
   success: boolean;

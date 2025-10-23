@@ -7,7 +7,7 @@ import { useCallback } from 'react';
 import { Alert } from 'react-native';
 import { SplitWallet } from '../../../services/split';
 import { DegenSplitState } from './useDegenSplitState';
-import { logger } from '../../../services/core';
+import { logger } from '../../../services/analytics/loggingService';
 
 export interface DegenSplitLogic {
   // Helper functions
@@ -129,7 +129,7 @@ export const useDegenSplitLogic = (
         'USDC',
         participants.map(p => {
           // Import roundUsdcAmount to fix precision issues - same as fair split
-          const { roundUsdcAmount } = require('../../../utils/format');
+          const { roundUsdcAmount } = require('../../../utils/ui/format/formatUtils');
           return {
             userId: p.userId || p.id,
             name: p.name,
@@ -272,7 +272,7 @@ export const useDegenSplitLogic = (
 
     try {
       // Check user's actual USDC balance
-      const { walletService } = await import('../../../services/wallet');
+      const { walletService } = await import('../../../services/blockchain/wallet');
       const balanceResult = await walletService.getUserWalletBalance(currentUser.id.toString());
       
       const userBalance = balanceResult?.usdcBalance || 0;
@@ -325,7 +325,7 @@ export const useDegenSplitLogic = (
         const { SplitWalletService } = await import('../../../services/split');
         const participantsForUpdate = participants.map(p => {
           // Import roundUsdcAmount to fix precision issues - same as fair split
-          const { roundUsdcAmount } = require('../../../utils/format');
+          const { roundUsdcAmount } = require('../../../utils/ui/format/formatUtils');
           return {
             userId: p.userId || p.id,
             name: p.name,
@@ -558,7 +558,7 @@ export const useDegenSplitLogic = (
           logger.info('Syncing participants between split data and wallet', null, 'DegenSplitLogic');
           const participantsForUpdate = participants.map(p => {
             // Import roundUsdcAmount to fix precision issues - same as fair split
-            const { roundUsdcAmount } = require('../../../utils/format');
+            const { roundUsdcAmount } = require('../../../utils/ui/format/formatUtils');
             return {
               userId: p.userId || p.id,
               name: p.name,

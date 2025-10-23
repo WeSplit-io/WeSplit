@@ -1,7 +1,7 @@
 // Transaction Utilities
 
 import { Connection, Transaction, PublicKey, Keypair } from '@solana/web3.js';
-import { logger } from '../core/loggingService';
+import { logger } from '../analytics/loggingService';
 
 export interface TransactionOptions {
   skipPreflight?: boolean;

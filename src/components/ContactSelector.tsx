@@ -12,7 +12,7 @@ import { colors } from '../theme';
 import { styles } from './ContactsList.styles';
 import { logger } from '../services/core';
 import UserAvatar from './UserAvatar';
-import { formatWalletAddress } from '../utils/wallet';
+import { formatWalletAddress } from '../utils/crypto/wallet';
 
 export type ContactSelectorMode = 'select' | 'view' | 'add';
 export type ContactSelectorAction = 'send' | 'request' | 'split' | 'group';

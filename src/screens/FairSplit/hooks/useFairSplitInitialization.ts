@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useCallback } from 'react';
-import { logger } from '../../../services/core';
+import { logger } from '../../../services/analytics/loggingService';
 import { FairSplitState } from './useFairSplitState';
 
 export interface FairSplitInitialization {

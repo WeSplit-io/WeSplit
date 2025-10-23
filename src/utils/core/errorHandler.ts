@@ -4,7 +4,7 @@
  */
 
 import { Alert } from 'react-native';
-import { logger } from '../../services/core/loggingService';
+import { logger } from '../../services/analytics/loggingService';
 
 export interface ErrorContext {
   screen?: string;

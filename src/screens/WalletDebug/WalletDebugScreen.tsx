@@ -19,11 +19,11 @@ import {
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import { mwaDiscoveryService, MWADiscoveryResult } from '../../services/wallet/discovery/mwaDiscoveryService';
-import { signatureLinkService } from '../../services/wallet/linking/signatureLinkService';
-import { WALLET_PROVIDER_REGISTRY, getAllWalletProviders } from '../../services/wallet/providers/registry';
+import { mwaDiscoveryService, MWADiscoveryResult } from '../../services/blockchain/wallet/discovery/mwaDiscoveryService';
+import { signatureLinkService } from '../../services/blockchain/wallet/linking/signatureLinkService';
+import { WALLET_PROVIDER_REGISTRY, getAllWalletProviders } from '../../services/blockchain/wallet/providers/registry';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 interface WalletDebugScreenProps {
   navigation: any;

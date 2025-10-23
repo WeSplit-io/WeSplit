@@ -5,7 +5,7 @@
 
 // Import centralized configuration
 import { getConfig } from '../../config/unified';
-import { logger } from '../core/loggingService';
+import { logger } from '../analytics/loggingService';
 
 // RPC Configuration
 export const RPC_CONFIG = {

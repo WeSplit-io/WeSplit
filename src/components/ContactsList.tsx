@@ -13,7 +13,7 @@ import { colors } from '../theme';
 import { styles } from './ContactsList.styles';
 import { logger } from '../services/core';
 import UserAvatar from './UserAvatar';
-import { formatWalletAddress, getWalletAddressStatus } from '../utils/wallet';
+import { formatWalletAddress, getWalletAddressStatus } from '../utils/crypto/wallet';
 
 interface ContactsListProps {
   onContactSelect: (contact: UserContact) => void;

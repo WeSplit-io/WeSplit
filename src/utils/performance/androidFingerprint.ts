@@ -4,7 +4,7 @@
  */
 
 import { Platform } from 'react-native';
-import { logger } from '../services/core';
+import { logger } from '../services/analytics/loggingService';
 
 export interface AndroidFingerprintInfo {
   platform: string;

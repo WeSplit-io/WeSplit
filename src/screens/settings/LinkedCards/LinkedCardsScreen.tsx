@@ -4,9 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../../../context/AppContext';
 import { useWallet } from '../../../context/WalletContext';
 import AddDestinationSheet from '../../../components/AddDestinationSheet';
-import { LinkedWalletService, LinkedWallet } from '../../../services/wallet/LinkedWalletService';
+import { LinkedWalletService, LinkedWallet } from '../../../services/blockchain/wallet/LinkedWalletService';
 import { styles } from './styles';
-import { logger } from '../../../services/core';
+import { logger } from '../../../services/analytics/loggingService';
 import Header from '../../../components/shared/Header';
 import { Container } from '../../../components/shared';
 
@@ -40,7 +40,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
     if (kastCards.length > 0) {
       const interval = setInterval(async () => {
         try {
-          const { ExternalCardService } = await import('../../../services/external/ExternalCardService');
+          const { ExternalCardService } = await import('../../../services/integrations/external/ExternalCardService');
           
           // Refresh each card's information
           for (const card of kastCards) {

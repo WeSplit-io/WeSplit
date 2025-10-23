@@ -15,7 +15,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useApp } from '../../context/AppContext';
-import { walletService } from '../../services/wallet';
+import { walletService } from '../../services/blockchain/wallet';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 

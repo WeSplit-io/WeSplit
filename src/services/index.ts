@@ -18,14 +18,11 @@ export * from './splits';
 // Payment Services
 export * from './payments';
 
-// Transaction Services
-export * from './transaction';
+// Blockchain Services (Wallet & Transaction)
+export * from './blockchain';
 
 // Auth Services
 export * from './auth';
-
-// Wallet Services  
-export * from './wallet';
 
 // Notification Services
 export * from './notifications';
@@ -33,5 +30,8 @@ export * from './notifications';
 // Billing Services
 export * from './billing';
 
-// External Services
-export * from './external';
+// Integration Services (External APIs)
+export * from './integrations';
+
+// Analytics Services (Logging & Monitoring)
+export { logger, monitoringService } from './analytics';

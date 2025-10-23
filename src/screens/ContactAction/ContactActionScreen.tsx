@@ -9,7 +9,7 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
 import { createPaymentRequest } from '../../services/payments';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 
 interface ContactActionScreenProps {

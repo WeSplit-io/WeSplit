@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
-import { monitoringService } from '../../services/core';
-import { logger } from '../../services/core';
+import { monitoringService } from '../../services/analytics/monitoringService';
+import { logger } from '../../services/analytics/loggingService';
 // Centralized API configuration for WeSplit app
 // Handles backend URL resolution with multiple fallback options
 

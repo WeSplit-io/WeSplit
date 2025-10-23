@@ -6,7 +6,7 @@
 import { useEffect, useCallback } from 'react';
 import { DegenSplitState } from './useDegenSplitState';
 import { DegenSplitLogic } from './useDegenSplitLogic';
-import { logger } from '../../../services/core';
+import { logger } from '../../../services/analytics/loggingService';
 
 export interface DegenSplitInitialization {
   // Initialization functions

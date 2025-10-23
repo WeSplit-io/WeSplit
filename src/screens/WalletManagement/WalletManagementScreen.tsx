@@ -23,14 +23,14 @@ import NavBar from '../../components/NavBar';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/data';
-import { walletService, UserWalletBalance } from '../../services/wallet';
+import { walletService, UserWalletBalance } from '../../services/blockchain/wallet';
 import { multiSignStateService } from '../../services/core';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
 import { QRCodeScreen } from '../QRCode';
 import { createUsdcRequestUri } from '../../services/core/solanaPay';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
 

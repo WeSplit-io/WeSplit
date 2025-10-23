@@ -4,7 +4,7 @@
  * @deprecated Format functions moved to src/utils/format.ts
  */
 
-import { logger } from '../core';
+import { logger } from '../../services/analytics/loggingService';
 
 export interface FiatCurrencyRate {
   from: string;

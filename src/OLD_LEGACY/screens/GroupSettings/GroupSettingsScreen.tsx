@@ -30,8 +30,8 @@ import GroupIcon from '../../components/GroupIcon';
 import { useGroupData } from '../../hooks/useGroupData';
 
 import { GroupMember, Expense } from '../../types';
-import { hashWalletAddress } from '../../utils/wallet';
-import { logger } from '../../services/core';
+import { hashWalletAddress } from '../../utils/crypto/wallet';
+import { logger } from '../../services/analytics/loggingService';
 
 const GroupSettingsScreen: React.FC<any> = ({ navigation, route }) => {
   const { groupId } = route.params;

@@ -7,7 +7,7 @@
 import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import { User } from '../../types/index';
-import { logger } from './loggingService';
+import { logger } from '../analytics/loggingService';
 import { firebaseDataTransformers } from '../data/firebaseDataService';
 
 export class UserMigrationService {

@@ -5,7 +5,7 @@ import { styles } from './styles';
 import { colors } from '../../theme';
 import { useApp } from '../../context/AppContext';
 import { auth } from '../../config/firebase/firebase';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 

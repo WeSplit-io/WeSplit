@@ -5,7 +5,7 @@
  */
 
 import { MockupDataService } from '../data/mockupData';
-import { logger } from '../core/loggingService';
+import { logger } from '../analytics/loggingService';
 import { ErrorHandler } from '../../utils/core/errorHandler';
 
 export interface BillData {

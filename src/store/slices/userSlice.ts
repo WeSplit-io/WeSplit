@@ -7,7 +7,7 @@ import { StateCreator } from 'zustand';
 import { User } from '../../types';
 import { UserState, UserActions, AppStore } from '../types';
 import { firebaseDataService } from '../../services/data';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 export const createUserSlice: StateCreator<
   AppStore,

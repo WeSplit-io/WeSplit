@@ -19,7 +19,7 @@ import { typography } from '../../theme/typography';
 import { SplitWalletService, SplitWallet, SplitWalletParticipant } from '../../services/split';
 import { priceManagementService } from '../../services/core';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
 

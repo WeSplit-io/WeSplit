@@ -5,11 +5,11 @@ import Icon from '../../../components/Icon';
 import NavBar from '../../../components/NavBar';
 import { useApp } from '../../../context/AppContext';
 import { useWallet } from '../../../context/WalletContext';
-import { walletService } from '../../../services/wallet';
+import { walletService } from '../../../services/blockchain/wallet';
 import { styles } from './styles';
 import { DEFAULT_AVATAR_URL } from '../../../config/constants/constants';
 import UserAvatar from '../../../components/UserAvatar';
-import { logger } from '../../../services/core';
+import { logger } from '../../../services/analytics/loggingService';
 import { Container } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
 
@@ -71,7 +71,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
               // Import required services
               const { authService } = await import('../../../services/auth');
-              const { walletService } = await import('../../../services/wallet');
+              const { walletService } = await import('../../../services/blockchain/wallet');
 
               // Step 1: Sign out from Firebase Auth
               await authService.signOut();

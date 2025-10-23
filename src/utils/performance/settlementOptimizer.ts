@@ -4,7 +4,7 @@
  */
 
 import { CalculatedBalance } from './balanceCalculator';
-import { logger } from 'services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 export interface SettleTransaction {
   fromUserId: string;

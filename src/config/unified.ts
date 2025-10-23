@@ -5,7 +5,7 @@
  */
 
 import Constants from 'expo-constants';
-import { logger } from '../services/core/loggingService';
+import { logger } from '../services/analytics/loggingService';
 
 // ============================================================================
 // ENVIRONMENT TYPES

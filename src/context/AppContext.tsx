@@ -10,7 +10,7 @@ import { firebaseDataService } from '../services/data';
 import { i18nService } from '../services/core';
 import { notificationService } from '../services/notifications';
 import { multiSignStateService } from '../services/core';
-import { logger } from '../services/core';
+import { logger } from '../services/analytics/loggingService';
 
 // Initial State - clean without group-related data
 const initialState: AppState = {

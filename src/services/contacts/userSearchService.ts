@@ -4,8 +4,8 @@
  */
 
 import { firebaseDataService } from '../data/firebaseDataService';
-import { transactionHistoryService } from '../transaction/transactionHistoryService';
-import { logger } from '../core/loggingService';
+import { transactionHistoryService } from '../blockchain/transaction/transactionHistoryService';
+import { logger } from '../analytics/loggingService';
 import { User } from '../../types';
 
 export interface UserSearchResult extends User {

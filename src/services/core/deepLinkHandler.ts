@@ -5,7 +5,7 @@
 
 import { Linking, Alert } from 'react-native';
 import { FirebaseDataService } from './firebaseDataService';
-import { logger } from './loggingService';
+import { logger } from '../analytics/loggingService';
 
 export interface DeepLinkData {
   action: 'join' | 'invite' | 'profile' | 'send' | 'transfer' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback' | 'join-split';

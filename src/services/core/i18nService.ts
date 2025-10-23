@@ -3,7 +3,7 @@
  * Handles translations and language management
  */
 
-import { logger } from './loggingService';
+import { logger } from '../analytics/loggingService';
 
 export type SupportedLanguage = 'en' | 'es' | 'fr' | 'de' | 'zh' | 'ja' | 'ko';
 

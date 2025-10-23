@@ -3,7 +3,7 @@
  * Focuses only on preventing "property is not configurable" errors
  */
 
-import { logger } from '../services/core/loggingService';
+import { logger } from '../services/analytics/loggingService';
 
 // Track logged properties to prevent infinite loops
 const loggedProperties = new Set<string>();

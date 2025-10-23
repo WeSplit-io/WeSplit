@@ -24,7 +24,7 @@ import {
 import { db } from '../../config/firebase/firebase';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { logger } from '../core/loggingService';
+import { logger } from '../analytics/loggingService';
 import { validateNotificationConsistency } from '../../utils/validation/notificationValidation';
 import { NotificationPayload } from '../../types/unified';
 

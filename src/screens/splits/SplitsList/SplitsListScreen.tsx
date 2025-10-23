@@ -30,7 +30,7 @@ import Header from '../../../components/shared/Header';
 import { BillSplitSummary } from '../../../types/billSplitting';
 import { Split } from '../../../types/unified';
 import { splitStorageService } from '../../../services/splits';
-import { logger } from '../../../services/core';
+import { logger } from '../../../services/analytics/loggingService';
 import { MockupDataService } from '../../../services/data/mockupData';
 import { priceManagementService } from '../../../services/core';
 import { useApp } from '../../../context/AppContext';

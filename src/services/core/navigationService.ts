@@ -1,5 +1,5 @@
 import { NavigationContainerRef } from '@react-navigation/native';
-import { logger } from './loggingService';
+import { logger } from '../analytics/loggingService';
 
 class NavigationServiceClass {
   private navigationRef: NavigationContainerRef<any> | null = null;

@@ -17,7 +17,7 @@ import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-g
 import { colors } from '../theme';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
-import { validateAddress, validateKastWalletAddress } from '../utils/format';
+import { validateAddress, validateKastWalletAddress } from '../utils/ui/format';
 import { styles } from './AddDestinationSheetStyles';
 
 interface AddDestinationSheetProps {
@@ -207,7 +207,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     // For SOLANA cards, validate the wallet address and get card information
     if (destinationType === 'kast') {
       try {
-        const { ExternalCardService } = await import('../services/external/ExternalCardService');
+        const { ExternalCardService } = await import('../services/integrations/external/ExternalCardService');
         
         // Validate SOLANA card wallet address
         const validation = await ExternalCardService.validateKastCard(kastAddress.trim());

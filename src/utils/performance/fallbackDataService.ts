@@ -6,7 +6,7 @@
 
 import { MockupDataService } from '../data/mockupData';
 import { consolidatedBillAnalysisService, IncomingBillData } from '../services/billing';
-import { logger } from '../services/core';
+import { logger } from '../services/analytics/loggingService';
 
 export class FallbackDataService {
   /**

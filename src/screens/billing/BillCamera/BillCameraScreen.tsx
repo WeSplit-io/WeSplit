@@ -19,7 +19,7 @@ import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
 import { styles } from './BillCameraStyles';
-import { logger } from '../../../services/core';
+import { logger } from '../../../services/analytics/loggingService';
 import { Container } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
 

@@ -3,7 +3,7 @@
  * Handles user profile image upload and management
  */
 
-import { logger } from './loggingService';
+import { logger } from '../analytics/loggingService';
 
 export interface ImageUploadResult {
   success: boolean;

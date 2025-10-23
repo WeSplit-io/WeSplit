@@ -34,7 +34,7 @@ import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { initializeFirebaseAuth } from './firebasePersistence';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 // Get environment variables from Expo Constants with enhanced production support
 const getEnvVar = (key: string): string => {

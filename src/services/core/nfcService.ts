@@ -3,7 +3,7 @@
  * Handles NFC functionality for contact sharing
  */
 
-import { logger } from './loggingService';
+import { logger } from '../analytics/loggingService';
 
 export interface NFCData {
   userId: string;

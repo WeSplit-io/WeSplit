@@ -3,7 +3,7 @@
  * Handles price calculations and currency conversions
  */
 
-import { logger } from './loggingService';
+import { logger } from '../analytics/loggingService';
 
 export interface PriceData {
   currency: string;

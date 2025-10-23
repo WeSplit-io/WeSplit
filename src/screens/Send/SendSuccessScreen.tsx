@@ -5,7 +5,7 @@ import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { notificationService } from '../../services/notifications';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 
 const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {

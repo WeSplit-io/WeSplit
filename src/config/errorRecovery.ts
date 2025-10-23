@@ -3,7 +3,7 @@
  * Provides comprehensive error recovery mechanisms for runtime errors
  */
 
-import { logger } from '../services/core/loggingService';
+import { logger } from '../services/analytics/loggingService';
 
 // Error recovery strategies
 export enum RecoveryStrategy {

@@ -17,7 +17,7 @@ import { colors } from '../../theme';
 import { parseUri, isSolanaPayUri, extractRecipientAddress, createUsdcRequestUri } from '../../services/core/solanaPay';
 import { isValidSolanaAddress } from '../../utils/validation';
 import { parseWeSplitDeepLink } from '../../services/core/deepLinkHandler';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
 

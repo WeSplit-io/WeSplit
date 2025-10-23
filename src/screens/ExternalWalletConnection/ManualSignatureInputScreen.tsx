@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors, typography, spacing } from '../../theme';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 interface RouteParams {
   challenge: {

@@ -22,10 +22,10 @@ import { Platform } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as Crypto from 'expo-crypto';
-import { logger } from '../core/loggingService';
+import { logger } from '../analytics/loggingService';
 import { getEnvVar, getPlatformGoogleClientId, getOAuthRedirectUri } from '../../utils/core';
 import { firebaseDataService } from '../data/firebaseDataService';
-import { walletService } from '../wallet';
+import { walletService } from '../blockchain/wallet';
 import { UserMigrationService } from '../core/UserMigrationService';
 import Constants from 'expo-constants';
 

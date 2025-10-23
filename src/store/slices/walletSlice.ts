@@ -5,7 +5,7 @@
 
 import { StateCreator } from 'zustand';
 import { WalletState, WalletActions, AppStore } from '../types';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 export const createWalletSlice: StateCreator<
   AppStore,

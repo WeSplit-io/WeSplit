@@ -13,7 +13,7 @@ import {
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import { Animated } from 'react-native';
 import { colors } from '../../theme/colors';
-import { logger } from '../../services/core/loggingService';
+import { logger } from '../../services/analytics/loggingService';
 import { FeeService, TransactionType } from '../../config/constants/feeConfig';
 import { Transaction } from '../../types';
 import { styles } from './TransactionModal.styles';

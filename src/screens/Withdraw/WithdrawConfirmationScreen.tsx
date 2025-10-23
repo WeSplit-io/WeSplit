@@ -8,7 +8,7 @@ import { useWallet } from '../../context/WalletContext';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { FeeService } from '../../config/constants/feeConfig';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 // --- AppleSlider adapted from SendConfirmationScreen ---
 interface AppleSliderProps {

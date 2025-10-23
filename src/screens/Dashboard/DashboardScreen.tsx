@@ -26,9 +26,9 @@ import { TransactionModal } from '../../components/transactions';
 import { useApp } from '../../context/AppContext';
 import { Transaction } from '../../types';
 import { getReceivedPaymentRequests } from '../../services/payments/firebasePaymentRequestService';
-import { walletService, UserWalletBalance } from '../../services/wallet';
+import { walletService, UserWalletBalance } from '../../services/blockchain/wallet';
 import { firebaseDataService } from '../../services/data';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { db } from '../../config/firebase/firebase';
 import { getDoc, doc } from 'firebase/firestore';
 

@@ -10,7 +10,7 @@ import UserAvatar from '../../components/UserAvatar';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/data';
 import { createPaymentRequest } from '../../services/payments';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 
 const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {

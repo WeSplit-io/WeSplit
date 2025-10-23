@@ -13,10 +13,10 @@ import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
 import { useWallet } from '../../context/WalletContext';
-import { walletService } from '../../services/wallet';
+import { walletService } from '../../services/blockchain/wallet';
 import { firebaseDataService } from '../../services/data';
 import { useApp } from '../../context/AppContext';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
 

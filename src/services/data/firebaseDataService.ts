@@ -31,7 +31,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import { notificationService } from '../notifications/notificationService';
-import { logger } from '../core/loggingService';
+import { logger } from '../analytics/loggingService';
 // import { createPaymentRequestNotificationData, validateNotificationData } from '../notifications/notificationDataUtils';
 
 // Data transformation utilities

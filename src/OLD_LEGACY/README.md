@@ -1,12 +1,12 @@
 # OLD_LEGACY - Legacy Code Archive
 
-This folder contains legacy code related to groups, expenses, and items that have been replaced by the new bills and splits logic. This code is kept here for potential future reference or reuse, but it is no longer part of the active codebase.
+This folder contains legacy code that has been replaced by newer implementations or is no longer used in the active codebase. This includes deprecated services, duplicate files, and old group/expense logic that has been replaced by the new bills and splits system.
 
 ## 📁 Folder Structure
 
 ```
 src/OLD_LEGACY/
-├── screens/           # Legacy group-related screens
+├── screens/                    # Legacy group-related screens
 │   ├── GroupsList/
 │   ├── GroupDetails/
 │   ├── GroupSettings/
@@ -16,21 +16,41 @@ src/OLD_LEGACY/
 │   ├── AddMembers/
 │   ├── CreateGroup/
 │   └── SettleUp/
-├── components/        # Legacy group-related components
+├── components/                 # Legacy group-related components
 │   ├── GroupCard.tsx
 │   ├── GroupCard.styles.ts
 │   └── ExpenseItem.tsx
-├── services/          # Legacy group-related services
+├── services/                   # Legacy group-related services
 │   └── balanceCalculator.ts
-├── store/            # Legacy store slices
+├── deprecated_services/        # Deprecated service implementations
+│   ├── solanaWallet.deprecated.ts
+│   └── walletService.deprecated.ts
+├── deprecated_services_duplicates/  # Duplicate services moved to legacy
+│   ├── notificationService.ts
+│   ├── firebaseDataService.ts
+│   └── firebaseFunctionsService.ts
+├── deprecated_utils_duplicates/     # Duplicate utility files
+│   └── priceUtils.ts
+├── root_level_services/        # Services that were at root level
+│   └── WalletService.ts
+├── store/                     # Legacy store slices
 │   ├── groupsSlice.ts
 │   └── expensesSlice.ts
-└── README.md         # This file
+├── debug_utils/               # Debug utilities
+├── deprecated_duplicates/     # Other deprecated duplicates
+├── unused/                    # Unused files
+└── README.md                  # This file
 ```
 
 ## 🚫 What Was Removed
 
-### Screens
+### Recent Cleanup (2024)
+- **Deprecated Services**: `solanaWallet.deprecated.ts`, `walletService.deprecated.ts`
+- **Duplicate Services**: Root-level `notificationService.ts`, `firebaseDataService.ts`, `firebaseFunctionsService.ts`
+- **Duplicate Utils**: Root-level `priceUtils.ts`
+- **Root-level Services**: `WalletService.ts` (moved to proper structure)
+
+### Legacy Group/Expense System
 - **GroupsList** - List of user groups
 - **GroupDetails** - Individual group details and management
 - **GroupSettings** - Group configuration and settings

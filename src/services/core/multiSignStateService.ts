@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { logger } from './loggingService';
+import { logger } from '../analytics/loggingService';
 
 interface MultiSignState {
   isEnabled: boolean;

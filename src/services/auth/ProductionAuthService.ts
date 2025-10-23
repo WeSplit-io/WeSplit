@@ -5,7 +5,7 @@
 
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { logger } from '../core/loggingService';
+import { logger } from '../analytics/loggingService';
 
 export class ProductionAuthService {
   private static instance: ProductionAuthService;

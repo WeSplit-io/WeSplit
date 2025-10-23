@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { splitRealtimeService, SplitRealtimeUpdate } from '../../../services/splits';
-import { logger } from '../../../services/core';
+import { logger } from '../../../services/analytics/loggingService';
 import { SplitWalletService } from '../../../services/split';
 
 export interface DegenSplitRealtimeState {

@@ -11,7 +11,6 @@ export { firebaseFunctionsService } from './firebaseFunctionsService';
 export type { 
   User,
   Transaction,
-  Split,
   Notification,
   Contact,
   Group

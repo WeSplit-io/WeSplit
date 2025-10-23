@@ -7,7 +7,7 @@ import { StateCreator } from 'zustand';
 import { Notification } from '../../types';
 import { NotificationsState, NotificationsActions, AppStore } from '../types';
 import { notificationService } from '../../services/notifications';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 export const createNotificationsSlice: StateCreator<
   AppStore,

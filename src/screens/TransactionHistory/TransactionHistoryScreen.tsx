@@ -19,7 +19,7 @@ import { Transaction, Group } from '../../types';
 import { TransactionModal } from '../../components/transactions';
 import styles from './styles';
 import { colors } from '../../theme/colors';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 import { Container, Header } from '../../components/shared';
 

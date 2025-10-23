@@ -27,7 +27,7 @@ import { BillAnalysisData } from '../../../types/billAnalysis';
 import { convertFiatToUSDC } from '../../../services/core';
 import { parseAmount } from '../../../OLD_LEGACY/deprecated_utils/amount';
 import { styles } from './styles';
-import { logger } from '../../../services/core';
+import { logger } from '../../../services/analytics/loggingService';
 import { Container, Modal as CustomModal, Header, Button } from '../../../components/shared';
 
 // Category options with images

@@ -20,7 +20,7 @@ import { useApp } from '../../../context/AppContext';
 import { colors, spacing } from '../../../theme';
 import * as ImagePicker from 'expo-image-picker';
 import { accountDeletionService, DeletionProgress, AccountDeletionService, UserImageService } from '../../../services/core';
-import { logger } from '../../../services/core';
+import { logger } from '../../../services/analytics/loggingService';
 import styles from './styles';
 import { Container } from '../../../components/shared';
 import Header from '../../../components/shared/Header';

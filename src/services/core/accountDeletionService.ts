@@ -3,7 +3,7 @@
  * Handles user account deletion and data cleanup
  */
 
-import { logger } from './loggingService';
+import { logger } from '../analytics/loggingService';
 
 export interface AccountDeletionRequest {
   userId: string;

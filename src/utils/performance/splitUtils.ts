@@ -4,7 +4,7 @@
  * Provides common calculations, validations, and transformations
  */
 
-import { logger } from '../services/core';
+import { logger } from '../services/analytics/loggingService';
 import { calculateEqualSplit as currencyCalculateEqualSplit } from '../../OLD_LEGACY/deprecated_utils/currencyUtils';
 
 // Types

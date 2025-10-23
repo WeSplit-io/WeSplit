@@ -5,13 +5,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/data';
-import { consolidatedTransactionService } from '../../services/transaction';
+import { consolidatedTransactionService } from '../../services/blockchain/transaction';
 import { FeeService, TransactionType } from '../../config/constants/feeConfig';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { notificationService } from '../../services/notifications/notificationService';
 import { Container } from '../../components/shared';
 
@@ -238,7 +238,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       let transactionResult: any;
       if (destinationType === 'external') {
         // For external wallets, use external transfer service
-        const { externalTransferService } = await import('../../services/transaction/sendExternal');
+        const { externalTransferService } = await import('../../services/blockchain/transaction/sendExternal');
         transactionResult = await externalTransferService.sendExternalTransfer({
           to: recipientAddress,
           amount: amount,
@@ -400,7 +400,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         logger.info('Starting wallet validation checks', null, 'SendConfirmationScreen');
         
         // Ensure user has a wallet first
-        const { walletService } = await import('../../services/wallet');
+        const { walletService } = await import('../../services/blockchain/wallet');
         const walletResult = await walletService.ensureUserWallet(currentUser.id);
         
         if (!walletResult.success || !walletResult.wallet) {
@@ -638,7 +638,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
                     setWalletLoading(true);
                     
                     // Ensure user has a wallet first
-                    const { walletService } = await import('../../services/wallet');
+                    const { walletService } = await import('../../services/blockchain/wallet');
                     const walletResult = await walletService.ensureUserWallet(currentUser.id);
                     
                     if (!walletResult.success || !walletResult.wallet) {

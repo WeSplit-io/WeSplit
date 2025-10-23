@@ -5,7 +5,7 @@
  */
 
 import { ErrorHandler, ErrorContext, ErrorHandlingOptions } from './errorHandler';
-import { logger } from '../../services/core/loggingService';
+import { logger } from '../../services/analytics/loggingService';
 
 export interface ServiceErrorResult<T> {
   success: boolean;

@@ -1,5 +1,5 @@
 import { firebaseDataService } from '../data/firebaseDataService';
-import { logger } from '../core/loggingService';
+import { logger } from '../analytics/loggingService';
 import { UserContact } from '../../types';
 
 /**

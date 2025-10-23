@@ -4,9 +4,9 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { consolidatedTransactionService, TransactionParams, TransactionResult } from '../services/transaction';
+import { consolidatedTransactionService, TransactionParams, TransactionResult } from '../services/blockchain/transaction';
 import { Keypair } from '@solana/web3.js';
-import { walletService } from '../services/wallet';
+import { walletService } from '../services/blockchain/wallet';
 import { logger } from '../services/core';
 
 interface ProductionWalletState {

@@ -97,7 +97,7 @@ import { WalletService, type WalletInfo } from '../services/wallet';
 ### Utils
 ```typescript
 // Import specific utility
-import { formatUtils } from '../utils/format';
+import { formatUtils } from '../utils/ui/format/formatUtils';
 
 // Import multiple utilities
 import { formatUtils, validationUtils } from '../utils';

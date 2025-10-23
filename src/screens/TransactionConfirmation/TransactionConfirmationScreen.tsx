@@ -11,9 +11,9 @@ import Icon from '../../components/Icon';
 import UserAvatar from '../../components/UserAvatar';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import { formatCryptoAmount } from '../../utils/wallet';
+import { formatCryptoAmount } from '../../utils/crypto/wallet';
 import styles from './styles';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
 
@@ -59,7 +59,7 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
       }
 
       // Check actual balance using existing wallet service
-      const { consolidatedTransactionService } = await import('../../services/transaction');
+      const { consolidatedTransactionService } = await import('../../services/blockchain/transaction');
       const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
       if (balance.usdc < amount) {
         throw new Error(`Insufficient balance. Required: ${amount} USDC, Available: ${balance.usdc} USDC`);

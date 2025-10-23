@@ -10,7 +10,7 @@ export {
   formatUsdcAmount,
   formatAmount,
   formatCurrency
-} from '../../utils/format';
+} from '../../utils/ui/format';
 
 /**
  * Format percentage

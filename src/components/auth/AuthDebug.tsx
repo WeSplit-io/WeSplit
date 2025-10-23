@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { auth } from '../../config/firebase/firebase';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import Constants from 'expo-constants';
 
 interface AuthDebugProps {

@@ -3,7 +3,7 @@
  * Handles errors that occur during module loading and initialization
  */
 
-import { logger } from '../services/core/loggingService';
+import { logger } from '../services/analytics/loggingService';
 
 // Safe module loading without overriding global functions
 // This approach is safer and doesn't cause circular references

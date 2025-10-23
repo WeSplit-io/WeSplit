@@ -5,7 +5,9 @@ node_modules/
 
 # Expo
 .expo/
-dist/
+tools/builds/dist/
+tools/builds/dist-android/
+tools/builds/dist-ios/
 web-build/
 expo-env.d.ts
 
@@ -19,8 +21,8 @@ expo-env.d.ts
 *.mobileprovision
 
 # Prebuild generated directories
-android/
-ios/
+apps/android/
+apps/ios/
 
 # Metro
 .metro-health-check*
@@ -43,9 +45,8 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
-firebase-functions/.env
-
-backend/.env
+services/firebase-functions/.env
+services/backend/.env
 
 # Firebase Admin SDK credentials
 **/firebase-adminsdk-*.json
@@ -188,7 +189,7 @@ bundle-report.json
 bundle-analysis.html
 
 # Test coverage
-coverage/
+tools/builds/coverage/
 .nyc_output/
 
 # Performance reports

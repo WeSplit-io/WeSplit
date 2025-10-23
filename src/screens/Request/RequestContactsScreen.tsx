@@ -12,7 +12,7 @@ import { styles } from './styles';
 import { colors } from '../../theme/colors';
 import { User } from '../../types';
 import { createUsdcRequestUri } from '../../services/core/solanaPay';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 
 const RequestContactsScreen: React.FC<any> = ({ navigation, route }) => {

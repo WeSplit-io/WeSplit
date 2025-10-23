@@ -10,7 +10,7 @@ import { convertToUSDC } from '../../services/priceService';
 import { firebaseDataService } from '../../services/data';
 import { GroupMember, Expense, Balance } from '../../types';
 import { styles } from './styles';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 interface SettleUpModalProps {
   visible?: boolean;

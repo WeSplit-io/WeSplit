@@ -16,7 +16,7 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
-import { logger } from '../core/loggingService';
+import { logger } from '../analytics/loggingService';
 import { Split, SplitParticipant } from './splitStorageService';
 
 export interface SplitRealtimeUpdate {

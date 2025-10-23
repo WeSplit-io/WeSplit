@@ -9,13 +9,13 @@ import GroupIcon from '../../components/GroupIcon';
 import { useApp } from '../../context/AppContext';
 import { useGroupList, useExpenseOperations } from '../../hooks/useGroupData';
 import { GroupWithDetails, GroupMember } from '../../types';
-import { SOLANA_CRYPTOCURRENCIES, Cryptocurrency } from '../../utils/wallet';
+import { SOLANA_CRYPTOCURRENCIES, Cryptocurrency } from '../../utils/crypto/wallet';
 import { convertToUSDC } from '../../services/priceService';
 import { firebaseDataService } from '../../services/data';
 import { styles } from './styles';
 import { colors } from '../../theme/colors';
 import { DEFAULT_AVATAR_URL } from '../../../config/constants/constants';
-import { logger } from '../../services/core';
+import { logger } from '../../services/analytics/loggingService';
 
 // Updated categories with more vibrant colors matching the screenshots
 const categories = [

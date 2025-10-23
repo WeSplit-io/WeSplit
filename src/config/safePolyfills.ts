@@ -3,7 +3,7 @@
  * Prevents "property is not configurable" errors by safely defining global properties
  */
 
-import { logger } from '../services/core/loggingService';
+import { logger } from '../services/analytics/loggingService';
 
 // Safe global property definition function
 export const defineGlobalProperty = (name: string, value: any, options: {
