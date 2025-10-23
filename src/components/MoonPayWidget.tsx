@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, Alert, Modal, StyleSheet, TextInput, Clipboard, Dimensions, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Modal, StyleSheet, TextInput, Clipboard, Dimensions, TouchableWithoutFeedback, Linking } from 'react-native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import { Animated } from 'react-native';
 import { useApp } from '../context/AppContext';
@@ -166,6 +166,11 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
         'usdc_sol' // Use Solana USDC currency code
       );
 
+      // Validate the response
+      if (!moonpayResponse || !moonpayResponse.url) {
+        throw new Error('Invalid response from MoonPay service');
+      }
+
       logger.info('Created URL via Firebase', {
         url: moonpayResponse.url,
         walletAddress: moonpayResponse.walletAddress,
@@ -181,62 +186,33 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
         });
       }
 
-      // Show instructions to user before opening MoonPay
-      Alert.alert(
-        'Wallet Address Copied',
-        `Your app wallet address has been copied to clipboard:\n\n${appWalletAddress}\n\nWhen MoonPay opens, you can paste this address into the wallet field if it's not pre-filled.`,
-        [
-          {
-            text: 'Continue to MoonPay',
-            onPress: () => {
-              // Open MoonPay URL in WebView
-              logger.info('Opening purchase URL', { url: moonpayResponse.url }, 'MoonPayWidget');
-              
-              if (navigation) {
-                // Navigate to WebView screen with the MoonPay URL
-                navigation.navigate('MoonPayWebView', {
-                  url: moonpayResponse.url,
-                  isAppWallet: true,
-                  userId: currentUser.id,
-                  onSuccess: () => {
-                    logger.info('Purchase completed via WebView', null, 'MoonPayWidget');
-                    onSuccess?.();
-                  }
-                });
-                onClose(); // Close the widget
-              } else {
-                // Fallback to alert if navigation is not available
-                Alert.alert(
-                  'MoonPay Purchase',
-                  `Purchase ${amountValue} USDC for your app wallet?\n\nWallet: ${appWalletAddress.slice(0, 8)}...${appWalletAddress.slice(-8)}\n\nURL: ${moonpayResponse.url}`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { 
-                      text: 'Purchase', 
-                      onPress: () => {
-                        // Simulate successful purchase after delay
-                        setTimeout(async () => {
-                          try {
-                            await getAppWalletBalance(currentUser.id.toString());
-                            logger.info('Balance refreshed successfully', null, 'MoonPayWidget');
-                            onSuccess?.();
-                          } catch (balanceError) {
-                            console.error('🔍 MoonPay Widget: Error refreshing balance:', balanceError);
-                          }
-                        }, 3000);
-                      }
-                    }
-                  ]
-                );
-              }
-            }
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel'
+      // Open MoonPay URL directly without showing popup
+      logger.info('Opening purchase URL', { url: moonpayResponse.url }, 'MoonPayWidget');
+      
+      if (navigation) {
+        // Close the widget first to free up memory
+        onClose();
+        
+        // Add a small delay to ensure the widget is closed before navigation
+        setTimeout(() => {
+          try {
+            // Navigate to WebView screen with the MoonPay URL (without callback function)
+            navigation.navigate('MoonPayWebView', {
+              url: moonpayResponse.url,
+              isAppWallet: true,
+              userId: currentUser.id
+            });
+          } catch (navError) {
+            console.error('🔍 MoonPayWidget: Navigation error:', navError);
+            // Fallback to external browser if navigation fails
+            Linking.openURL(moonpayResponse.url);
           }
-        ]
-      );
+        }, 100); // Small delay to ensure smooth transition
+      } else {
+        // Fallback: Open in external browser
+        Linking.openURL(moonpayResponse.url);
+        onClose();
+      }
 
     } catch (error) {
       console.error('🔍 MoonPay Widget: Error opening purchase flow:', error);

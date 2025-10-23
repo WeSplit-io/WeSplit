@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, Image } from 'react-native';
 import { Header } from '../../components/shared';
 import { useWallet } from '../../context/WalletContext';
@@ -24,6 +24,7 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
     // App wallet state (for deposits)
     appWalletAddress,
     appWalletConnected,
+    ensureAppWallet,
     // External wallet state (for fallback)
     address: externalWalletAddress 
   } = useWallet();
@@ -42,11 +43,18 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
   
   const walletName = params.targetWallet?.name || 'Your Wallet';
 
+  // Ensure app wallet is initialized on mount
+  useEffect(() => {
+    if (currentUser?.id && !appWalletConnected) {
+      ensureAppWallet(currentUser.id.toString());
+    }
+  }, [currentUser?.id, appWalletConnected, ensureAppWallet]);
+
   const getHeaderTitle = () => {
     return 'Deposit';
   };
 
-  const handleCreditDebitCard = () => {
+  const handleCreditDebitCard = async () => {
     if (!currentUser?.id) {
       Alert.alert('Error', 'Please log in to fund your wallet.');
       return;
@@ -60,12 +68,28 @@ const DepositScreen: React.FC<any> = ({ navigation, route }) => {
       depositAddress
     });
 
+    // If app wallet is not available, try to initialize it
     if (!appWalletAddress) {
-      Alert.alert(
-        'App Wallet Not Available', 
-        'Your app wallet is not initialized. Please ensure your app wallet is set up before funding.'
-      );
-      return;
+      try {
+        logger.info('App wallet not available, attempting to initialize...');
+        await ensureAppWallet(currentUser.id.toString());
+        
+        // Check again after initialization attempt
+        if (!appWalletAddress) {
+          Alert.alert(
+            'App Wallet Not Available', 
+            'Your app wallet is not initialized. Please ensure your app wallet is set up before funding.'
+          );
+          return;
+        }
+      } catch (error) {
+        logger.error('Failed to initialize app wallet', error);
+        Alert.alert(
+          'App Wallet Error', 
+          'Failed to initialize your app wallet. Please try again or contact support.'
+        );
+        return;
+      }
     }
 
     if (!depositAddress) {

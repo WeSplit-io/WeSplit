@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, Share, Image, TextInput, ScrollView } from 'react-native';
 import { Header } from '../../components/shared';
 import { useWallet } from '../../context/WalletContext';
@@ -33,7 +33,8 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
     // App wallet state (for receiving)
     appWalletAddress,
     appWalletBalance,
-    appWalletConnected
+    appWalletConnected,
+    ensureAppWallet
   } = useWallet();
   const { state } = useApp();
   const { currentUser } = state;
@@ -47,6 +48,13 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
     currentUser?.wallet_address;
 
   const walletName = params.targetWallet?.name || 'Your App Wallet';
+
+  // Ensure app wallet is initialized on mount
+  useEffect(() => {
+    if (currentUser?.id && !appWalletConnected) {
+      ensureAppWallet(currentUser.id.toString());
+    }
+  }, [currentUser?.id, appWalletConnected, ensureAppWallet]);
 
   // Transfer state
   const [transferAmount, setTransferAmount] = useState(params.prefillAmount?.toString() || '');
@@ -96,12 +104,28 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
       return;
     }
 
+    // If app wallet is not available, try to initialize it
     if (!appWalletAddress) {
-      Alert.alert(
-        'App Wallet Not Available',
-        'Your app wallet is not initialized. Please ensure your app wallet is set up.'
-      );
-      return;
+      try {
+        logger.info('App wallet not available, attempting to initialize...');
+        await ensureAppWallet(currentUser.id.toString());
+        
+        // Check again after initialization attempt
+        if (!appWalletAddress) {
+          Alert.alert(
+            'App Wallet Not Available',
+            'Your app wallet is not initialized. Please ensure your app wallet is set up.'
+          );
+          return;
+        }
+      } catch (error) {
+        logger.error('Failed to initialize app wallet', error);
+        Alert.alert(
+          'App Wallet Error',
+          'Failed to initialize your app wallet. Please try again or contact support.'
+        );
+        return;
+      }
     }
 
     if (!transferAmount || parseFloat(transferAmount) <= 0) {

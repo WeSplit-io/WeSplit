@@ -95,7 +95,7 @@ class ConsolidatedTransactionService {
       }
 
       // Create keypair from the wallet
-      const { keypairUtils } = await import('../shared/keypairUtils');
+      const { keypairUtils } = await import('../../shared/keypairUtils');
       const keypairResult = keypairUtils.createKeypairFromSecretKey(walletResult.wallet.secretKey!);
       
       if (!keypairResult.success || !keypairResult.keypair) {
@@ -127,7 +127,7 @@ class ConsolidatedTransactionService {
       // Save transaction to database if successful
       if (result.success && result.signature) {
         try {
-          const { firebaseDataService } = await import('../firebaseDataService');
+          const { firebaseDataService } = await import('../../data/firebaseDataService');
           
           // Find recipient user by wallet address to get their user ID
           const recipientUser = await firebaseDataService.user.getUserByWalletAddress(params.to);
