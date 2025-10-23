@@ -225,14 +225,13 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   modalHeader: {
-    marginBottom: 20,
-    paddingBottom: 16,
+    paddingBottom: spacing.md,
   },
   modalTitle: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.semibold,
     color: colors.white,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
     textAlign: 'center',
   },
   modalDescription: {

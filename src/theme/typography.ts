@@ -12,7 +12,7 @@ export const typography = {
     // primaryBold: 'YourCustomFont-Bold',
   },
   
-  // === FONT SIZES ===
+  // === ✅✅✅ FONT SIZES === ================================================================
   // Comprehensive scale matching Figma designs
   fontSize: {
     // Base scale (following 1.25 ratio)
@@ -23,6 +23,13 @@ export const typography = {
     xl: 20,
     xxl: 24,
     xxxl: 28,
+
+     // Component specific
+     button: 18,
+     buttonSmall: 16,
+     buttonLarge: 20,
+
+     
     
     // Semantic sizes
     tiny: 10,
@@ -38,10 +45,7 @@ export const typography = {
     hero: 48,
     gigantic: 56,
     
-    // Component specific
-    button: 16,
-    buttonSmall: 14,
-    buttonLarge: 18,
+   
     input: 16,
     label: 14,
     caption: 12,
@@ -61,7 +65,7 @@ export const typography = {
     sectionHeader: 14,
   },
   
-  // === FONT WEIGHTS ===
+  // === ✅✅✅ FONT WEIGHTS === ================================================================
   fontWeight: {
     thin: '100' as const,
     extralight: '200' as const,
@@ -191,19 +195,19 @@ export const typography = {
     
     // === BUTTONS ===
     buttonLarge: {
-      fontSize: 18,
+      fontSize: 20,
       fontWeight: '600' as const,
       lineHeight: 24,
       letterSpacing: 0.5,
     },
     button: {
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: '600' as const,
       lineHeight: 20,
       letterSpacing: 0.5,
     },
     buttonSmall: {
-      fontSize: 14,
+      fontSize: 16,
       fontWeight: '600' as const,
       lineHeight: 16,
       letterSpacing: 0.25,

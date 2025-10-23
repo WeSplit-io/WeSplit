@@ -1,4 +1,17 @@
 export const spacing = {
+
+  xs: 4,
+  sm: 8,
+  md: 16,
+  md2: 20,
+  lg: 24,
+  xl: 32,
+  xxl: 40,
+  xxxl: 48,
+
+  
+
+
   // === BASE SPACING SCALE (8px system) ===
   // Following 8px grid system for consistent spacing
   px: 1,
@@ -27,15 +40,7 @@ export const spacing = {
   
   // === SEMANTIC SPACING NAMES ===
   // Legacy names for backward compatibility
-  xs: 4,
-  sm: 8,
-  md: 16,
-  md2: 20,
-  lg: 24,
-  xl: 32,
-  xxl: 40,
-  xxxl: 48,
-  
+
   // === COMPONENT SPECIFIC SPACING ===
   // Screen-level padding and margins
   screenPadding: 16,

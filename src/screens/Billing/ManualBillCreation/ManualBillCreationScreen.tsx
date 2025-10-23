@@ -536,15 +536,17 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
         title="Select Date"
         description="Choose the date for this bill"
       >
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="spinner"
-          onChange={handleDateChange}
-          style={styles.datePicker}
-          textColor={colors.white}
-          themeVariant="dark"
-        />
+        <View style={styles.datePickerContainer}>
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display="spinner"
+            onChange={handleDateChange}
+            style={styles.datePicker}
+            textColor={colors.white}
+            themeVariant="dark"
+          />
+        </View>
         <Button
           title={`${isDateModified ? 'Done' : 'Select Date'}`}
           onPress={handleDatePickerClose}

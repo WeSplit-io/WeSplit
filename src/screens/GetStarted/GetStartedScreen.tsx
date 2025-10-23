@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StatusBar, Linking } from 'react-native';
+import { View, Text, Image, StatusBar, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from './styles';
 import { colors } from '../../theme';
 import { Container } from '../../components/shared';
+import Button from '../../components/shared/Button';
 
 interface GetStartedScreenProps {
   navigation: any;
@@ -39,19 +39,13 @@ const GetStartedScreen: React.FC<GetStartedScreenProps> = ({ navigation }) => {
 
         {/* Button Section */}
         <View style={styles.buttonSection}>
-          <TouchableOpacity
-            style={styles.getStartedButton}
+          <Button
+            title="Get Started"
             onPress={() => navigation.navigate('AuthMethods')}
-          >
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.gradientButton}
-            >
-              <Text style={styles.getStartedButtonText}>Get Started</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+            variant="primary"
+            size="large"
+            fullWidth={true}
+          />
         </View>
 
         

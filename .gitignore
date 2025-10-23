@@ -204,4 +204,4 @@ deadcode-report.json
 
 # Pipeline testing
 pipeline-test-report.json
-.secrets
+.secrets`

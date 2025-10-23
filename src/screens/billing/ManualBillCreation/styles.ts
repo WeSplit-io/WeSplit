@@ -204,39 +204,17 @@ export const styles = StyleSheet.create({
 
     /** ================================ Date Picker Modal Styles ================================ */
 
-  datePickerModalContent: {
-    backgroundColor: colors.blackWhite5,
-    borderRadius: spacing.radiusLg,
-    padding: spacing.lg,
-    width: '90%',
-    maxWidth: 400,
-    alignItems: 'center',
-    marginTop: 'auto',
-    marginBottom: 'auto',
-  },
-  datePickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  datePickerContainer: {
     width: '100%',
-    marginBottom: spacing.md,
-  },
-  datePickerCloseButton: {
-    backgroundColor: colors.white5,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: spacing.radiusMd,
-  },
-  datePickerCloseText: {
-    color: colors.green,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
   },
   datePicker: {
     width: '100%',
     height: 250,
     backgroundColor: 'transparent',
+    alignSelf: 'center',
   },
 });
 

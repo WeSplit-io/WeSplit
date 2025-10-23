@@ -2,41 +2,20 @@ import { StyleSheet } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 
 export const styles = StyleSheet.create({
-  container: {
+
+  keyboardAvoidingView: {
     flex: 1,
-    backgroundColor: colors.black,
   },
-  // Header styles
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
     justifyContent: 'center',
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-    marginTop: spacing.lg,
-  },
-  logoContainer: {
-    width: 48,
-    height: 48,
-    backgroundColor: colors.green,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  logo: {
-    height: 40,
-    width: 130,
-    objectFit: 'contain',
   },
   contentContainer: {
     flex: 1,
     justifyContent: 'center',
   },
+
+  // Social Login Buttons ================================
   socialSection: {
     marginBottom: spacing.xl,
   },
@@ -64,7 +43,6 @@ export const styles = StyleSheet.create({
   socialButtonLightDisabled: {
     opacity: 0.6,
   },
-  // Social authentication section styles
   socialOptions: {
     gap: spacing.md,
   },
@@ -107,6 +85,8 @@ export const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginHorizontal: spacing.md,
   },
+
+  // Email Authentication ================================
   emailSection: {
     marginBottom: spacing.lg,
   },

@@ -4,7 +4,6 @@ import { colors, spacing, typography } from '../../theme';
 export const styles = StyleSheet.create({
   content: {
     flex: 1,
-    paddingTop: spacing.xl,
   },
   logoSection: {
     alignItems: 'flex-start',
@@ -48,20 +47,6 @@ export const styles = StyleSheet.create({
   },
   buttonSection: {
     paddingBottom: spacing.md,
-  },
-  getStartedButton: {
-    borderRadius: spacing.md,
-    overflow: 'hidden',
-  },
-  gradientButton: {
-    paddingVertical: spacing.md2,
-    alignItems: 'center',
-    borderRadius: spacing.lg,
-  },
-  getStartedButtonText: {
-    color: colors.black,
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.medium,
   },
   helpSection: {
     alignItems: 'center',

@@ -4,7 +4,7 @@
  * Supports primary/secondary variants with disabled states
  */
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   TouchableOpacity,
   Text,
@@ -12,6 +12,8 @@ import {
   StyleSheet,
   ViewStyle,
   TextStyle,
+  View,
+  Animated,
 } from 'react-native';
 import Icon from '../Icon';
 import { colors } from '../../theme/colors';
@@ -46,13 +48,44 @@ const Button: React.FC<ButtonProps> = ({
   icon,
   iconPosition = 'left',
 }) => {
+  // Animation values
+  const opacityAnim = useRef(new Animated.Value(disabled ? 0.5 : 1)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Animate when disabled state changes
+  useEffect(() => {
+    Animated.timing(opacityAnim, {
+      toValue: disabled ? 0.5 : 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [disabled, opacityAnim]);
+
+  // Handle press animations
+  const handlePressIn = () => {
+    if (!disabled && !loading) {
+      Animated.spring(scaleAnim, {
+        toValue: 0.95,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 10,
+      }).start();
+    }
+  };
+
+  const handlePressOut = () => {
+    if (!disabled && !loading) {
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 10,
+      }).start();
+    }
+  };
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 8,
-      ...getSizeStyle(),
+      borderRadius: spacing.md,
     };
 
     if (fullWidth) {
@@ -63,35 +96,47 @@ const Button: React.FC<ButtonProps> = ({
       case 'primary':
         return {
           ...baseStyle,
-          backgroundColor: disabled ? colors.blackWhite5 : 'transparent', // LinearGradient will handle the background
+          backgroundColor: disabled ? colors.white10 : 'transparent', // LinearGradient will handle the background
+          // No padding here - LinearGradient will handle it
         };
       case 'secondary':
         return {
           ...baseStyle,
           backgroundColor: disabled ? colors.blackWhite5 : colors.greenBlue,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          ...getSizeStyle(),
         };
       default:
-        return baseStyle;
+        return {
+          ...baseStyle,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          ...getSizeStyle(),
+        };
     }
   };
 
   const getTextStyle = (): TextStyle => {
     const baseStyle: TextStyle = {
-      ...typography.textStyles.button,
+      fontSize: typography.fontSize.button,
       textAlign: 'center',
       color: colors.white,
+      fontWeight: typography.fontWeight.semibold,
     };
 
     switch (variant) {
       case 'primary':
         return {
           ...baseStyle,
-          color: disabled ? colors.textSecondary : colors.white,
+          color: disabled ? colors.white70 : colors.black,
         };
       case 'secondary':
         return {
           ...baseStyle,
-          color: disabled ? colors.textSecondary : colors.white,
+          color: disabled ? colors.white70 : colors.white,
         };
       default:
         return baseStyle;
@@ -131,7 +176,7 @@ const Button: React.FC<ButtonProps> = ({
       )}
       
       {icon && iconPosition === 'left' && !loading && (
-        <Icon name={icon} size={16} color={getTextStyle().color} style={styles.iconLeft} />
+        <Icon name={icon} size={16} color={getTextStyle().color as string} style={styles.iconLeft} />
       )}
       
       <Text style={[getTextStyle(), textStyle]}>
@@ -139,7 +184,7 @@ const Button: React.FC<ButtonProps> = ({
       </Text>
       
       {icon && iconPosition === 'right' && !loading && (
-        <Icon name={icon} size={16} color={getTextStyle().color} style={styles.iconRight} />
+        <Icon name={icon} size={16} color={getTextStyle().color as string} style={styles.iconRight} />
       )}
     </>
   );
@@ -147,38 +192,64 @@ const Button: React.FC<ButtonProps> = ({
   // Primary variant with LinearGradient
   if (variant === 'primary') {
     return (
-      <TouchableOpacity
-        style={[getButtonStyle(), style]}
-        onPress={onPress}
-        disabled={isDisabled}
-        activeOpacity={isDisabled ? 1 : 0.7}
+      <Animated.View
+        style={[
+          {
+            opacity: opacityAnim,
+            transform: [{ scale: scaleAnim }],
+          },
+          style,
+        ]}
       >
-        {disabled ? (
-          renderButtonContent()
-        ) : (
-          <LinearGradient
-            colors={[colors.green, colors.greenBlue || colors.green]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.gradient}
-          >
-            {renderButtonContent()}
-          </LinearGradient>
-        )}
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[getButtonStyle()]}
+          onPress={onPress}
+          disabled={isDisabled}
+          activeOpacity={isDisabled ? 1 : 0.7}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+        >
+          {disabled ? (
+            <View style={[styles.gradient, { backgroundColor: colors.white10 }]}>
+              {renderButtonContent()}
+            </View>
+          ) : (
+            <LinearGradient
+              colors={[colors.green, colors.greenBlue || colors.green]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradient}
+            >
+              {renderButtonContent()}
+            </LinearGradient>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
     );
   }
 
   // Secondary variant (regular TouchableOpacity)
   return (
-    <TouchableOpacity
-      style={[getButtonStyle(), style]}
-      onPress={onPress}
-      disabled={isDisabled}
-      activeOpacity={isDisabled ? 1 : 0.7}
+    <Animated.View
+      style={[
+        {
+          opacity: opacityAnim,
+          transform: [{ scale: scaleAnim }],
+        },
+        style,
+      ]}
     >
-      {renderButtonContent()}
-    </TouchableOpacity>
+      <TouchableOpacity
+        style={[getButtonStyle()]}
+        onPress={onPress}
+        disabled={isDisabled}
+        activeOpacity={isDisabled ? 1 : 0.7}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+      >
+        {renderButtonContent()}
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -187,9 +258,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
-    width: '100%',
-    height: '100%',
+    borderRadius: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   loader: {
     marginRight: spacing.sm,

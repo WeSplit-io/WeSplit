@@ -12,10 +12,10 @@ import {
   Platform,
   Linking 
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { styles } from './styles';
 import { colors } from '../../theme';
+import { Container, Header, Button, Input } from '../../components/shared';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -30,7 +30,6 @@ import { logOAuthConfiguration } from '../../utils/core';
 import { logger } from '../../services/analytics/loggingService';
 import { testEnvironmentVariables } from '../../utils/core';
 import { logOAuthDebugInfo } from '../../utils/core';
-import Header from '../../components/shared/Header';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
@@ -617,20 +616,20 @@ const AuthMethodsScreen: React.FC = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <Container>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        {/* Header with Logo */}
-        <Header variant="logoOnly" />
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Header variant="logoOnly" />
 
-        <View style={styles.contentContainer}>
+          <View style={styles.contentContainer}>
           {/* Social Login Buttons */}
           {/*<View style={styles.socialSection}>
             <TouchableOpacity
@@ -682,64 +681,48 @@ const AuthMethodsScreen: React.FC = () => {
             <View style={styles.separatorLine} />
             <Text style={styles.separatorText}>or</Text>
             <View style={styles.separatorLine} />
-          </View>
+          </View>*/}
 
           {/* Email Input */}
-          <View style={styles.emailSection}>
-            <Text style={styles.emailLabel}>Email</Text>
-            <TextInput
-              style={styles.emailInput}
-              placeholder="Enter your email"
-              placeholderTextColor={colors.white50}
-              value={email}
-              onChangeText={(text) => {
-                logger.debug('Email input changed', { text }, 'AuthMethodsScreen');
-                setEmail(text);
-              }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="emailAddress"
-              autoComplete="email"
-            />
-          </View>
+          <Input
+            label="Email"
+            placeholder="Enter your email"
+            value={email}
+            onChangeText={(text) => {
+              logger.debug('Email input changed', { text }, 'AuthMethodsScreen');
+              setEmail(text);
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="emailAddress"
+            autoComplete="email"
+          />
           {/* Next Button */}
-          <TouchableOpacity
-            style={[styles.nextButton, (!email || !isValidEmail(email) || loading || socialLoading !== null) && styles.nextButtonDisabled]}
+          <Button
+            title="Next"
             onPress={() => {
               logger.info('Next button pressed', { email, loading, socialLoading }, 'AuthMethodsScreen');
               handleEmailAuth();
             }}
+            variant="primary"
+            size="large"
+            fullWidth={true}
             disabled={!email || !isValidEmail(email) || loading || socialLoading !== null}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.black} />
-            ) : (
-              (!email || !isValidEmail(email) || loading || socialLoading !== null) ? (
-                <Text style={[styles.nextButtonText, styles.nextButtonTextDisabled]}>Next</Text>
-              ) : (
-                <LinearGradient
-                  colors={[colors.gradientStart, colors.gradientEnd]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.gradientNextButton}
-                >
-                  <Text style={styles.nextButtonText}>Next</Text>
-                </LinearGradient>
-              )
-            )}
-          </TouchableOpacity>
+            loading={loading}
+          />
 
         </View>
 
-        {/* Help Link */}
-        <View style={styles.helpSection}>
-          <TouchableOpacity onPress={() => Linking.openURL('https://t.me/wesplit_support_bot')}>
-            <Text style={styles.helpText}>Need help?</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          {/* Help Link */}
+          <View style={styles.helpSection}>
+            <TouchableOpacity onPress={() => Linking.openURL('https://t.me/wesplit_support_bot')}>
+              <Text style={styles.helpText}>Need help?</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Container>
   );
 };
 
