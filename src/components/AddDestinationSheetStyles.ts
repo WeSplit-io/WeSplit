@@ -124,4 +124,7 @@ export const styles = StyleSheet.create({
   saveButtonTextDisabled: {
     color: colors.textSecondary,
   },
+  mwaDetectionButton: {
+    marginBottom: spacing.md,
+  },
 });

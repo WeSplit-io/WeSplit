@@ -19,6 +19,7 @@ import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 import { validateAddress, validateKastWalletAddress } from '../utils/ui/format';
 import { styles } from './AddDestinationSheetStyles';
+import MWADetectionButton from './wallet/MWADetectionButton';
 
 interface AddDestinationSheetProps {
   visible: boolean;
@@ -199,6 +200,26 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     }
   };
 
+  const handleWalletDetected = (walletInfo: {
+    name: string;
+    address: string;
+    publicKey: string;
+    isMock?: boolean;
+  }) => {
+    // Auto-fill the form with detected wallet information
+    setName(walletInfo.name);
+    setAddress(walletInfo.address);
+    
+    // Clear any existing errors
+    setErrors({});
+    
+    // Show success message
+    Alert.alert(
+      'Wallet Detected',
+      `Successfully detected ${walletInfo.name} wallet!\n\nAddress: ${walletInfo.address.slice(0, 8)}...${walletInfo.address.slice(-8)}${walletInfo.isMock ? '\n\n(Mock wallet for demo purposes)' : ''}`
+    );
+  };
+
   const handleSave = async () => {
     if (isLoading || !validateForm()) {
       return;
@@ -264,6 +285,13 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
 
   const renderWalletForm = () => (
     <View style={styles.formSection}>
+      {/* MWA Detection Button */}
+      <MWADetectionButton
+        onWalletDetected={handleWalletDetected}
+        disabled={isLoading}
+        style={styles.mwaDetectionButton}
+      />
+      
       <Text style={styles.inputLabel}>Wallet Address</Text>
       <TextInput
         style={styles.inputField}
@@ -401,59 +429,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
 
                   {/* Form Content */}
                   <View style={styles.formContent}>
-                    {destinationType === 'wallet' ? (
-                      <View>
-                        <Text style={styles.inputLabel}>Wallet Address</Text>
-                        <TextInput
-                          style={styles.inputField}
-                          value={address}
-                          onChangeText={setAddress}
-                          placeholder="Enter wallet address"
-                          placeholderTextColor={colors.textSecondary}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                        />
-                        {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
-
-                      <Text style={styles.inputLabel}>Name</Text>
-                      <TextInput
-                        style={styles.inputField}
-                        value={name}
-                        onChangeText={setName}
-                        placeholder="e.g., Cold Wallet, Treasury"
-                        placeholderTextColor={colors.textSecondary}
-                        autoCapitalize="words"
-                        autoCorrect={false}
-                      />
-                      {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-                    </View>
-                  ) : (
-                    <View>
-                      <Text style={styles.inputLabel}>SOLANA Card Address</Text>
-                      <TextInput
-                        style={styles.inputField}
-                        value={kastAddress}
-                        onChangeText={setKastAddress}
-                        placeholder="Enter SOLANA card wallet address"
-                        placeholderTextColor={colors.textSecondary}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                      {errors.kastAddress && <Text style={styles.errorText}>{errors.kastAddress}</Text>}
-
-                        <Text style={styles.inputLabel}>Name</Text>
-                        <TextInput
-                          style={styles.inputField}
-                          value={name}
-                          onChangeText={setName}
-                          placeholder="e.g., Team Card, Marketing"
-                          placeholderTextColor={colors.textSecondary}
-                          autoCapitalize="words"
-                          autoCorrect={false}
-                        />
-                        {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-                      </View>
-                    )}
+                    {destinationType === 'wallet' ? renderWalletForm() : renderKastForm()}
                   </View>
 
                   {/* Actions */}

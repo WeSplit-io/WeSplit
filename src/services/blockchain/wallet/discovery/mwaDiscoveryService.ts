@@ -8,6 +8,7 @@ import { WALLET_PROVIDER_REGISTRY, WalletProviderInfo, getMWASupportedProviders 
 import { startRemoteScenario, transact } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import { SolanaMobileWalletAdapterError, SolanaMobileWalletAdapterErrorCode } from '@solana-mobile/mobile-wallet-adapter-protocol';
 import { logger } from '../../../analytics/loggingService';
+import { getPlatformInfo, isMWAAvailable } from '../../../../utils/core/platformDetection';
 
 export interface MWADiscoveryResult {
   provider: WalletProviderInfo;
@@ -226,6 +227,32 @@ class MWADiscoveryService {
     logger.info('Trying MWA discovery for', { providerName: provider.name }, 'mwaDiscoveryService');
     
     try {
+      // Check if MWA is available on this platform
+      if (!isMWAAvailable()) {
+        logger.debug('MWA not available on this platform', { providerName: provider.name }, 'mwaDiscoveryService');
+        return {
+          provider,
+          isAvailable: false,
+          detectionMethod: 'mwa',
+          error: 'MWA not available on this platform',
+          timestamp: Date.now()
+        };
+      }
+
+      // Check if provider supports MWA
+      if (!provider.mwaSupported) {
+        logger.debug('Provider does not support MWA', { providerName: provider.name }, 'mwaDiscoveryService');
+        return {
+          provider,
+          isAvailable: false,
+          detectionMethod: 'mwa',
+          error: 'Provider does not support MWA',
+          timestamp: Date.now()
+        };
+      }
+
+      logger.debug('Testing MWA availability for', { providerName: provider.name }, 'mwaDiscoveryService');
+      
       // For now, we'll use a simplified MWA test
       // The actual MWA API requires more complex setup
       // This is a placeholder that will be updated when we have the full MWA implementation
@@ -253,13 +280,14 @@ class MWADiscoveryService {
       };
       
     } catch (mwaError) {
-      logger.warn('Provider not available via MWA', { providerName: provider.name, error: mwaError.message }, 'mwaDiscoveryService');
+      const errorMessage = mwaError instanceof Error ? mwaError.message : 'Unknown MWA error';
+      logger.warn('Provider not available via MWA', { providerName: provider.name, error: errorMessage }, 'mwaDiscoveryService');
       
       return {
         provider,
         isAvailable: false,
         detectionMethod: 'mwa',
-        error: mwaError instanceof Error ? mwaError.message : 'MWA discovery failed',
+        error: errorMessage,
         timestamp: Date.now()
       };
     }
@@ -409,6 +437,96 @@ class MWADiscoveryService {
       mwaSupported: allProviders.filter(p => p.mwaSupported).length,
       cacheSize: this.discoveryCache.size,
       platform: Platform.OS
+    };
+  }
+
+  /**
+   * Get available wallets for UI display
+   * Returns only wallets that are actually available on the device
+   */
+  async getAvailableWallets(): Promise<{
+    mwaWallets: MWADiscoveryResult[];
+    deepLinkWallets: MWADiscoveryResult[];
+    allAvailable: MWADiscoveryResult[];
+  }> {
+    const platformInfo = getPlatformInfo();
+    
+    // If running in Expo Go, return mock data
+    if (platformInfo.isExpoGo) {
+      return this.getMockAvailableWallets();
+    }
+
+    // Perform discovery for all providers
+    const results = await this.discoverProviders({
+      timeout: 5000, // Shorter timeout for UI
+      useCache: true,
+      includeUnsupported: false
+    });
+
+    const availableResults = results.filter(r => r.isAvailable);
+    const mwaWallets = availableResults.filter(r => r.detectionMethod === 'mwa');
+    const deepLinkWallets = availableResults.filter(r => r.detectionMethod === 'deep-link');
+
+    return {
+      mwaWallets,
+      deepLinkWallets,
+      allAvailable: availableResults
+    };
+  }
+
+  /**
+   * Get mock available wallets for Expo Go
+   */
+  private getMockAvailableWallets(): {
+    mwaWallets: MWADiscoveryResult[];
+    deepLinkWallets: MWADiscoveryResult[];
+    allAvailable: MWADiscoveryResult[];
+  } {
+    const mockProviders = [
+      {
+        name: 'Phantom',
+        displayName: 'Phantom',
+        mwaSupported: true,
+        deepLinkScheme: 'phantom://',
+        packageName: 'app.phantom',
+        icon: 'https://phantom.app/img/phantom-logo.png'
+      },
+      {
+        name: 'Solflare',
+        displayName: 'Solflare',
+        mwaSupported: true,
+        deepLinkScheme: 'solflare://',
+        packageName: 'com.solflare.mobile',
+        icon: 'https://solflare.com/favicon.ico'
+      },
+      {
+        name: 'Backpack',
+        displayName: 'Backpack',
+        mwaSupported: true,
+        deepLinkScheme: 'backpack://',
+        packageName: 'com.backpack.app',
+        icon: 'https://backpack.app/favicon.ico'
+      }
+    ];
+
+    const mockResults: MWADiscoveryResult[] = mockProviders.map(provider => ({
+      provider: {
+        ...provider,
+        logoUrl: provider.icon,
+        fallbackIcon: provider.icon,
+        isAvailable: true,
+        detectionMethod: 'mwa' as const,
+        priority: 1
+      } as WalletProviderInfo,
+      isAvailable: true,
+      detectionMethod: 'mwa' as const,
+      timestamp: Date.now()
+    }));
+
+    return {
+      mwaWallets: mockResults,
+      deepLinkWallets: [],
+      allAvailable: mockResults
     };
   }
 }
