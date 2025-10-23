@@ -25,44 +25,8 @@ import { db } from '../../config/firebase/firebase';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { logger } from '../analytics/loggingService';
-import { validateNotificationConsistency } from '../../utils/validation/notificationValidation';
-import { NotificationPayload } from '../../types/unified';
-
-// Notification types - Focused on splits/bills and P2P transfers
-export type NotificationType = 
-  | 'general'
-  | 'payment_received'
-  | 'payment_sent'
-  | 'split_payment_required'
-  | 'split_completed'
-  | 'payment_request'
-  | 'settlement_request'
-  | 'money_sent'
-  | 'money_received'
-  | 'split_spin_available'
-  | 'split_loser'
-  | 'split_winner'
-  | 'system_warning'
-  | 'payment_reminder'
-  | 'split_invite'
-  | 'system_notification'
-  | 'degen_all_locked'
-  | 'degen_ready_to_roll'
-  | 'roulette_result'
-  | 'split_lock_required'
-  | 'contact_added';
-
-export interface NotificationData {
-  id: string;
-  userId: string;
-  title: string;
-  message: string;
-  type: NotificationType;
-  data?: { [key: string]: any };
-  is_read: boolean;
-  created_at: string;
-  read_at?: string;
-}
+// Removed unused validation import
+import { NotificationType, NotificationData, NotificationPayload } from '../../types/notifications';
 
 class NotificationServiceClass {
   private isInitialized = false;
@@ -133,25 +97,7 @@ class NotificationServiceClass {
     type: NotificationType = 'general',
     data: { [key: string]: any } = {}
   ): Promise<boolean> {
-    // Validate notification data before sending
-    const validation = validateNotificationConsistency(data as NotificationPayload, type);
-    if (!validation.isValid) {
-      logger.error('Invalid notification data', {
-        userId,
-        type,
-        errors: validation.errors,
-        warnings: validation.warnings
-      }, 'NotificationService');
-      return false;
-    }
-    
-    if (validation.warnings.length > 0) {
-      logger.warn('Notification data warnings', {
-        userId,
-        type,
-        warnings: validation.warnings
-      }, 'NotificationService');
-    }
+    // Data validation is handled at the data layer
     
     // Run notification sending in background to avoid blocking transactions
     this.sendNotificationAsync(userId, title, message, type, data).catch(error => {
@@ -160,6 +106,29 @@ class NotificationServiceClass {
     
     // Return immediately to avoid blocking the caller
     return true;
+  }
+
+  /**
+   * Check if notification type should trigger push notification
+   */
+  private shouldSendPushNotification(type: NotificationType): boolean {
+    // Essential notifications that should trigger push notifications
+    const pushNotificationTypes: NotificationType[] = [
+      'payment_request',      // User requests money
+      'payment_received',     // User receives money
+      'payment_sent',         // User sent money
+      'money_sent',           // User sent money (legacy)
+      'money_received',       // User received money (legacy)
+      'split_invite',         // User invited to split
+      'split_payment_required', // User needs to pay for split
+      'split_completed',      // Split is completed
+      'split_confirmed',      // Split is confirmed
+      'contact_added',        // New contact added
+      'system_warning',       // Important system warnings
+      'payment_reminder'      // Payment reminders
+    ];
+    
+    return pushNotificationTypes.includes(type);
   }
 
   /**
@@ -184,8 +153,8 @@ class NotificationServiceClass {
         created_at: serverTimestamp()
       });
 
-      // Send push notification if possible
-      if (this.isInitialized) {
+      // Send push notification only for essential types
+      if (this.isInitialized && this.shouldSendPushNotification(type)) {
         try {
           await Notifications.scheduleNotificationAsync({
             content: {
@@ -415,142 +384,59 @@ class NotificationServiceClass {
   }
 
   /**
-   * Send payment processing notification (non-blocking)
+   * Send payment status notification (unified method)
    */
-  async sendPaymentProcessingNotification(
+  async sendPaymentStatusNotification(
     userId: string,
-    splitId: string,
-    billName: string,
     amount: number,
-    currency: string = 'USD'
-  ): Promise<boolean> {
-    // Send notification in background to avoid blocking transaction
-    this.sendNotificationAsync(
-      userId,
-      'Payment Processing',
-      `Your payment of ${amount} ${currency} for "${billName}" is being processed...`,
-      'general',
-      {
-        splitId,
-        billName,
-        amount,
-        currency,
-        status: 'processing',
-        timestamp: new Date().toISOString()
-      }
-    ).catch(error => {
-      logger.error('Payment processing notification failed:', error, 'NotificationService');
-    });
-    
-    return true; // Return immediately to avoid blocking
-  }
-
-  /**
-   * Send payment confirmed notification (non-blocking)
-   */
-  async sendPaymentConfirmedNotification(
-    userId: string,
-    splitId: string,
-    billName: string,
-    amount: number,
-    currency: string = 'USD',
+    currency: string = 'USDC',
+    billName?: string,
+    splitId?: string,
+    status: 'processing' | 'completed' | 'failed' = 'completed',
+    reason?: string,
     transactionHash?: string
   ): Promise<boolean> {
+    const titles = {
+      processing: 'Payment Processing',
+      completed: 'Payment Confirmed',
+      failed: 'Payment Failed'
+    };
+    
+    const messages = {
+      processing: `Your payment of ${amount} ${currency}${billName ? ` for "${billName}"` : ''} is being processed...`,
+      completed: `Your payment of ${amount} ${currency}${billName ? ` for "${billName}"` : ''} has been confirmed!`,
+      failed: `Your payment of ${amount} ${currency}${billName ? ` for "${billName}"` : ''} failed${reason ? `: ${reason}` : ''}`
+    };
+    
+    const notificationTypes = {
+      processing: 'general',
+      completed: 'payment_received',
+      failed: 'system_warning'
+    };
+    
     // Send notification in background to avoid blocking transaction
     this.sendNotificationAsync(
       userId,
-      'Payment Confirmed',
-      `Your payment of ${amount} ${currency} for "${billName}" has been confirmed!`,
-      'payment_received',
+      titles[status],
+      messages[status],
+      notificationTypes[status] as NotificationType,
       {
         splitId,
         billName,
         amount,
         currency,
         transactionHash,
-        status: 'confirmed',
-        timestamp: new Date().toISOString()
-      }
-    ).catch(error => {
-      logger.error('Payment confirmed notification failed:', error, 'NotificationService');
-    });
-    
-    return true; // Return immediately to avoid blocking
-  }
-
-  /**
-   * Send payment failed notification (non-blocking)
-   */
-  async sendPaymentFailedNotification(
-    userId: string,
-    splitId: string,
-    billName: string,
-    amount: number,
-    currency: string = 'USD',
-    reason?: string
-  ): Promise<boolean> {
-    // Send notification in background to avoid blocking transaction
-    this.sendNotificationAsync(
-      userId,
-      'Payment Failed',
-      `Your payment of ${amount} ${currency} for "${billName}" failed${reason ? `: ${reason}` : ''}`,
-      'system_warning',
-      {
-        splitId,
-        billName,
-        amount,
-        currency,
         reason,
-        status: 'failed',
-        timestamp: new Date().toISOString()
-      }
-    ).catch(error => {
-      logger.error('Payment failed notification failed:', error, 'NotificationService');
-    });
-    
-    return true; // Return immediately to avoid blocking
-  }
-
-  /**
-   * End payment processing notification (completes the processing state) - non-blocking
-   */
-  async endPaymentProcessingNotification(
-    userId: string,
-    splitId: string,
-    billName: string,
-    amount: number,
-    currency: string = 'USD',
-    status: 'completed' | 'failed' = 'completed',
-    transactionHash?: string,
-    reason?: string
-  ): Promise<boolean> {
-    const title = status === 'completed' ? 'Payment Completed' : 'Payment Failed';
-    const message = status === 'completed' 
-      ? `Your payment of ${amount} ${currency} for "${billName}" has been completed successfully!`
-      : `Your payment of ${amount} ${currency} for "${billName}" failed${reason ? `: ${reason}` : ''}`;
-
-    // Send notification in background to avoid blocking transaction
-    this.sendNotificationAsync(
-      userId,
-      title,
-      message,
-      status === 'completed' ? 'payment_received' : 'system_warning',
-      {
-        splitId,
-        billName,
-        amount,
-        currency,
         status,
-        transactionHash,
-        reason,
         timestamp: new Date().toISOString()
       }
     ).catch(error => {
-      logger.error('End payment processing notification failed:', error, 'NotificationService');
+      logger.error(`Payment ${status} notification failed:`, error, 'NotificationService');
     });
     
     return true; // Return immediately to avoid blocking
   }
+
 
   /**
    * Mark notification as read
@@ -567,6 +453,415 @@ class NotificationServiceClass {
       return true;
     } catch (error) {
       logger.error('Failed to mark notification as read:', error, 'NotificationService');
+      return false;
+    }
+  }
+
+  /**
+   * Mark payment request notification as completed and remove it from display
+   */
+  async markPaymentRequestCompleted(requestId: string, userId: string): Promise<boolean> {
+    try {
+      // Find notifications related to this payment request
+      const notificationsQuery = query(
+        collection(db, 'notifications'),
+        where('userId', '==', userId),
+        where('type', '==', 'payment_request'),
+        where('data.requestId', '==', requestId)
+      );
+
+      const querySnapshot = await getDocs(notificationsQuery);
+      
+      if (querySnapshot.empty) {
+        logger.warn('No payment request notifications found to mark as completed', { requestId, userId }, 'NotificationService');
+        return true; // Not an error, just no notifications to update
+      }
+
+      // Mark all related notifications as completed
+      const batch = writeBatch(db);
+      querySnapshot.docs.forEach((doc) => {
+        batch.update(doc.ref, {
+          is_read: true,
+          data: {
+            ...doc.data().data,
+            status: 'completed',
+            completed_at: serverTimestamp()
+          },
+          updated_at: serverTimestamp()
+        });
+      });
+
+      await batch.commit();
+      
+      logger.info('Payment request notifications marked as completed', { 
+        requestId, 
+        userId, 
+        count: querySnapshot.docs.length 
+      }, 'NotificationService');
+      
+      return true;
+    } catch (error) {
+      logger.error('Failed to mark payment request notifications as completed', { 
+        requestId, 
+        userId, 
+        error 
+      }, 'NotificationService');
+      return false;
+    }
+  }
+
+  /**
+   * Send personalized payment completion notifications to both users after payment request completion
+   */
+  async sendPaymentRequestCompletionNotifications(
+    requestId: string,
+    senderId: string,
+    senderName: string,
+    recipientId: string,
+    recipientName: string,
+    amount: number,
+    currency: string = 'USDC',
+    transactionId?: string
+  ): Promise<boolean> {
+    try {
+      logger.info('Sending payment request completion notifications', {
+        requestId,
+        senderId,
+        recipientId,
+        amount,
+        currency
+      }, 'NotificationService');
+
+      // Send personalized notification to the requester (recipient of the payment)
+      const requesterMessage = `${senderName} covered your request, think about thanking him later on!!`;
+      await this.sendNotificationAsync(
+        recipientId,
+        'Request Fulfilled! 🎉',
+        requesterMessage,
+        'payment_received',
+        {
+          requestId,
+          senderId,
+          senderName,
+          recipientId,
+          recipientName,
+          amount,
+          currency,
+          transactionId,
+          status: 'completed',
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      // Send personalized notification to the sender (person who paid)
+      const senderMessage = `${recipientName} correctly received the funds you can go back to your dashboard`;
+      await this.sendNotificationAsync(
+        senderId,
+        'Payment Delivered! ✅',
+        senderMessage,
+        'payment_sent',
+        {
+          requestId,
+          senderId,
+          senderName,
+          recipientId,
+          recipientName,
+          amount,
+          currency,
+          transactionId,
+          status: 'completed',
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      logger.info('Payment request completion notifications sent successfully', {
+        requestId,
+        senderId,
+        recipientId,
+        amount,
+        currency
+      }, 'NotificationService');
+
+      return true;
+    } catch (error) {
+      logger.error('Failed to send payment request completion notifications', {
+        requestId,
+        senderId,
+        recipientId,
+        amount,
+        currency,
+        error
+      }, 'NotificationService');
+      return false;
+    }
+  }
+
+  /**
+   * Send split invitation notification
+   */
+  async sendSplitInvitationNotification(
+    splitId: string,
+    splitName: string,
+    inviterId: string,
+    inviterName: string,
+    inviteeId: string,
+    inviteeName: string,
+    amount: number,
+    currency: string = 'USDC'
+  ): Promise<boolean> {
+    try {
+      logger.info('Sending split invitation notification', {
+        splitId,
+        inviterId,
+        inviteeId,
+        amount,
+        currency
+      }, 'NotificationService');
+
+      const message = `${inviterName} invited you to split ${amount} ${currency}${splitName ? ` for ${splitName}` : ''}`;
+      await this.sendNotificationAsync(
+        inviteeId,
+        'Split Invitation! 🎯',
+        message,
+        'split_invite',
+        {
+          splitId,
+          inviterId,
+          inviterName,
+          inviteeId,
+          inviteeName,
+          amount,
+          currency,
+          splitName,
+          status: 'pending',
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      logger.info('Split invitation notification sent successfully', {
+        splitId,
+        inviterId,
+        inviteeId,
+        amount,
+        currency
+      }, 'NotificationService');
+
+      return true;
+    } catch (error) {
+      logger.error('Failed to send split invitation notification', {
+        splitId,
+        inviterId,
+        inviteeId,
+        amount,
+        currency,
+        error
+      }, 'NotificationService');
+      return false;
+    }
+  }
+
+  /**
+   * Send split payment required notification
+   */
+  async sendSplitPaymentRequiredNotification(
+    splitId: string,
+    splitName: string,
+    payerId: string,
+    payerName: string,
+    amount: number,
+    currency: string = 'USDC'
+  ): Promise<boolean> {
+    try {
+      logger.info('Sending split payment required notification', {
+        splitId,
+        payerId,
+        amount,
+        currency
+      }, 'NotificationService');
+
+      const message = `You need to pay ${amount} ${currency} for ${splitName || 'the split'}`;
+      await this.sendNotificationAsync(
+        payerId,
+        'Payment Required! 💰',
+        message,
+        'split_payment_required',
+        {
+          splitId,
+          splitName,
+          payerId,
+          payerName,
+          amount,
+          currency,
+          status: 'pending',
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      logger.info('Split payment required notification sent successfully', {
+        splitId,
+        payerId,
+        amount,
+        currency
+      }, 'NotificationService');
+
+      return true;
+    } catch (error) {
+      logger.error('Failed to send split payment required notification', {
+        splitId,
+        payerId,
+        amount,
+        currency,
+        error
+      }, 'NotificationService');
+      return false;
+    }
+  }
+
+  /**
+   * Send split completion notification
+   */
+  async sendSplitCompletionNotification(
+    splitId: string,
+    splitName: string,
+    participantId: string,
+    participantName: string,
+    totalAmount: number,
+    currency: string = 'USDC'
+  ): Promise<boolean> {
+    try {
+      logger.info('Sending split completion notification', {
+        splitId,
+        participantId,
+        totalAmount,
+        currency
+      }, 'NotificationService');
+
+      const message = `Split "${splitName || 'Untitled'}" has been completed! Total: ${totalAmount} ${currency}`;
+      await this.sendNotificationAsync(
+        participantId,
+        'Split Completed! ✅',
+        message,
+        'split_completed',
+        {
+          splitId,
+          splitName,
+          participantId,
+          participantName,
+          totalAmount,
+          currency,
+          status: 'completed',
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      logger.info('Split completion notification sent successfully', {
+        splitId,
+        participantId,
+        totalAmount,
+        currency
+      }, 'NotificationService');
+
+      return true;
+    } catch (error) {
+      logger.error('Failed to send split completion notification', {
+        splitId,
+        participantId,
+        totalAmount,
+        currency,
+        error
+      }, 'NotificationService');
+      return false;
+    }
+  }
+
+  /**
+   * Send contact added notification
+   */
+  async sendContactAddedNotification(
+    userId: string,
+    contactName: string,
+    contactId: string
+  ): Promise<boolean> {
+    try {
+      logger.info('Sending contact added notification', {
+        userId,
+        contactName,
+        contactId
+      }, 'NotificationService');
+
+      const message = `${contactName} has been added to your contacts!`;
+      await this.sendNotificationAsync(
+        userId,
+        'New Contact Added! 👋',
+        message,
+        'contact_added',
+        {
+          contactId,
+          contactName,
+          userId,
+          status: 'added',
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      logger.info('Contact added notification sent successfully', {
+        userId,
+        contactName,
+        contactId
+      }, 'NotificationService');
+
+      return true;
+    } catch (error) {
+      logger.error('Failed to send contact added notification', {
+        userId,
+        contactName,
+        contactId,
+        error
+      }, 'NotificationService');
+      return false;
+    }
+  }
+
+  /**
+   * Send system warning notification
+   */
+  async sendSystemWarningNotification(
+    userId: string,
+    title: string,
+    message: string,
+    data?: { [key: string]: any }
+  ): Promise<boolean> {
+    try {
+      logger.info('Sending system warning notification', {
+        userId,
+        title
+      }, 'NotificationService');
+
+      await this.sendNotificationAsync(
+        userId,
+        title,
+        message,
+        'system_warning',
+        {
+          ...data,
+          userId,
+          status: 'warning',
+          timestamp: new Date().toISOString()
+        }
+      );
+
+      logger.info('System warning notification sent successfully', {
+        userId,
+        title
+      }, 'NotificationService');
+
+      return true;
+    } catch (error) {
+      logger.error('Failed to send system warning notification', {
+        userId,
+        title,
+        error
+      }, 'NotificationService');
       return false;
     }
   }
@@ -609,7 +904,8 @@ class NotificationServiceClass {
         data: doc.data().data || {},
         is_read: doc.data().is_read || false,
         created_at: doc.data().created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-        read_at: doc.data().read_at?.toDate?.()?.toISOString()
+        read_at: doc.data().read_at?.toDate?.()?.toISOString(),
+        user_id: doc.data().userId // Add user_id for backward compatibility
       }));
     } catch (error) {
       logger.error('Failed to get user notifications:', error, 'NotificationService');
@@ -680,11 +976,46 @@ class NotificationServiceClass {
 
         case 'payment_request':
           if (notification.data?.requestId) {
-            navigation.navigate('RequestConfirmation', {
-              requestId: notification.data.requestId,
-              isFromNotification: true,
-              notificationId: notification.id
-            });
+            // Navigate to Send screen with pre-filled data (same as NotificationsScreen)
+            try {
+              const { standardizeNotificationData } = await import('./notificationDataUtils');
+              const standardizedData = standardizeNotificationData(notification.data, 'payment_request');
+              
+              if (standardizedData) {
+                const { senderId: requesterId, amount, currency, requestId } = standardizedData;
+                
+                // Fetch user data for the requester
+                const { firebaseDataService } = await import('../data/firebaseDataService');
+                const requesterData = await firebaseDataService.user.getCurrentUser(requesterId);
+                
+                if (requesterData) {
+                  navigation.navigate('Send', {
+                    destinationType: 'friend',
+                    contact: {
+                      id: requesterId,
+                      name: requesterData.name || 'Unknown User',
+                      email: requesterData.email || '',
+                      wallet_address: requesterData.wallet_address || '',
+                      avatar: requesterData.avatar || null
+                    },
+                    prefilledAmount: amount,
+                    prefilledNote: `Payment request from ${requesterData.name}`,
+                    requestId: requestId,
+                    fromNotification: true,
+                    notificationId: notification.id
+                  });
+                } else {
+                  logger.warn('Could not fetch requester data for payment request', { requesterId }, 'NotificationService');
+                  navigation.navigate('Dashboard');
+                }
+              } else {
+                logger.warn('Could not standardize payment request data', { notification }, 'NotificationService');
+                navigation.navigate('Dashboard');
+              }
+            } catch (error) {
+              logger.error('Error handling payment request notification', { error, notification }, 'NotificationService');
+              navigation.navigate('Dashboard');
+            }
           } else {
             logger.warn('Payment request notification missing requestId', { notification }, 'NotificationService');
             navigation.navigate('Dashboard');
@@ -704,6 +1035,96 @@ class NotificationServiceClass {
           }
           break;
 
+
+        case 'payment_sent':
+        case 'payment_received':
+        case 'money_sent':
+        case 'money_received':
+          // Handle payment sent/received notifications
+          const transactionId = notification.data?.transactionId || notification.data?.tx_hash || notification.data?.signature;
+          if (transactionId) {
+            navigation.navigate('TransactionHistory', {
+              transactionId,
+              isFromNotification: true,
+              notificationId: notification.id
+            });
+          } else {
+            logger.warn('Payment notification missing transactionId', { notification }, 'NotificationService');
+            navigation.navigate('Dashboard');
+          }
+          break;
+
+        case 'split_invite':
+          const splitId = notification.data?.splitId;
+          if (splitId) {
+            navigation.navigate('SplitDetails', {
+              splitId,
+              isFromNotification: true,
+              notificationId: notification.id
+            });
+          } else {
+            logger.warn('Split invite notification missing splitId', { notification }, 'NotificationService');
+            navigation.navigate('Dashboard');
+          }
+          break;
+
+        case 'split_payment_required':
+          const paymentSplitId = notification.data?.splitId;
+          if (paymentSplitId) {
+            navigation.navigate('SplitPayment', {
+              splitId: paymentSplitId,
+              isFromNotification: true,
+              notificationId: notification.id
+            });
+          } else {
+            logger.warn('Split payment required notification missing splitId', { notification }, 'NotificationService');
+            navigation.navigate('Dashboard');
+          }
+          break;
+
+        case 'split_completed':
+          const completedSplitId = notification.data?.splitId;
+          if (completedSplitId) {
+            navigation.navigate('SplitDetails', {
+              splitId: completedSplitId,
+              isFromNotification: true,
+              notificationId: notification.id
+            });
+          } else {
+            logger.warn('Split completed notification missing splitId', { notification }, 'NotificationService');
+            navigation.navigate('Dashboard');
+          }
+          break;
+
+        case 'split_confirmed':
+          const confirmedSplitId = notification.data?.splitId;
+          if (confirmedSplitId) {
+            navigation.navigate('SplitDetails', {
+              splitId: confirmedSplitId,
+              isFromNotification: true,
+              notificationId: notification.id
+            });
+          } else {
+            logger.warn('Split confirmed notification missing splitId', { notification }, 'NotificationService');
+            navigation.navigate('Dashboard');
+          }
+          break;
+
+        case 'split_accepted':
+        case 'split_declined':
+        case 'split_paid':
+          const statusSplitId = notification.data?.splitId;
+          if (statusSplitId) {
+            navigation.navigate('SplitDetails', {
+              splitId: statusSplitId,
+              isFromNotification: true,
+              notificationId: notification.id
+            });
+          } else {
+            logger.warn('Split status notification missing splitId', { notification }, 'NotificationService');
+            navigation.navigate('Dashboard');
+          }
+          break;
 
         case 'contact_added':
           navigation.navigate('Contacts', {

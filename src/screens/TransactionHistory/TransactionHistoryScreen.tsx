@@ -25,7 +25,7 @@ import { Container, Header } from '../../components/shared';
 
 type TabType = 'all' | 'income' | 'expenses';
 
-const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
+const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
   const { state } = useApp();
   const { currentUser } = state;
   const { balance } = useWallet();
@@ -38,6 +38,31 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation }) => {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [detailedGroupSummaries, setDetailedGroupSummaries] = useState<Record<string, { expenseCount: number; totalAmount: number; memberCount: number }>>({});
+
+  // Handle transactionId from route params (from notification)
+  useEffect(() => {
+    if (route?.params?.transactionId && transactions.length > 0) {
+      const targetTransaction = transactions.find(t => 
+        t.tx_hash === route.params.transactionId || 
+        t.id === route.params.transactionId ||
+        t.transactionId === route.params.transactionId
+      );
+      
+      if (targetTransaction) {
+        setSelectedTransaction(targetTransaction);
+        setModalVisible(true);
+        logger.info('Transaction selected from notification', { 
+          transactionId: route.params.transactionId,
+          transaction: targetTransaction 
+        }, 'TransactionHistoryScreen');
+      } else {
+        logger.warn('Transaction not found from notification', { 
+          transactionId: route.params.transactionId,
+          availableTransactions: transactions.map(t => ({ id: t.id, tx_hash: t.tx_hash }))
+        }, 'TransactionHistoryScreen');
+      }
+    }
+  }, [route?.params?.transactionId, transactions]);
 
   const loadTransactions = useCallback(async () => {
     if (!currentUser?.id) {

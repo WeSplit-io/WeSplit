@@ -11,15 +11,7 @@ export type {
   NotificationData,
   NotificationType,
   NotificationPayload
-} from '../../types/unified';
-
-// Re-export utility functions
-export { 
-  createNotification,
-  sendNotification,
-  markNotificationAsRead,
-  deleteNotification
-} from './notificationService';
+} from '../../types/notifications';
 
 // Default export for backward compatibility
 export { notificationService as default } from './notificationService';

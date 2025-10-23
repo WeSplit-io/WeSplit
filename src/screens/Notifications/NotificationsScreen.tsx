@@ -24,8 +24,8 @@ import { db } from '../../config/firebase/firebase';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
 
-// Import the NotificationData interface from the component
-import { NotificationData } from '../../components/notifications/NotificationCard';
+// Import the unified NotificationData interface
+import { NotificationData } from '../../types/notifications';
 
 const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   const { state, notifications, loadNotifications, refreshNotifications, acceptSplitInvitation } = useApp();
@@ -60,7 +60,6 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       amount: data.amount || 0,
       currency: data.currency || 'USDC',
       requestId: data.requestId || data.id || '',
-      expenseId: data.expenseId || '',
       description: data.description || data.note || '',
       note: data.note || data.description || '',
       splitId: data.splitId || '',
@@ -103,10 +102,14 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   // Function to handle notification press
   const handleNotificationPress = async (notification: any) => {
     try {
+      console.log('🔔 Handling notification press:', {
+        type: notification.type,
+        data: notification.data,
+        id: notification.id
+      });
+
       // Navigate based on notification type
-      if (notification.type === 'settlement_request' || notification.type === 'settlement_notification') {
-        // Removed group navigation logic
-      } else if (notification.type === 'split_invite') {
+      if (notification.type === 'split_invite') {
         // Handle split invitation by accepting it first, then navigating to split details
         const splitId = notification.data?.splitId;
         if (splitId) {
@@ -126,16 +129,43 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       } else if (notification.type === 'payment_request') {
         // Handle payment request notification
         try {
+          console.log('💰 Processing payment request notification:', notification);
+          
           const standardizedData = standardizeNotificationData(notification);
+          console.log('📊 Standardized data:', standardizedData);
+          
           logNotificationData(standardizedData, 'Payment request handling', notification.type);
 
           const { senderId: requesterId, amount, currency, requestId } = standardizedData;
+          
+          console.log('🔍 Extracted data:', { requesterId, amount, currency, requestId });
+
+          if (!requesterId) {
+            throw new Error('No requester ID found in notification data');
+          }
 
           // Fetch user data for the requester
+          console.log('👤 Fetching user data for requester:', requesterId);
           const requesterData = await fetchUserData(requesterId);
+          console.log('👤 Fetched requester data:', requesterData);
+          
           if (!requesterData) {
             throw new Error('Could not fetch requester data');
           }
+
+          console.log('🚀 Navigating to Send screen with data:', {
+            destinationType: 'friend',
+            contact: {
+              id: requesterId,
+              name: requesterData.name || 'Unknown User',
+              email: requesterData.email || '',
+              wallet_address: requesterData.wallet_address || '',
+              avatar: requesterData.avatar || null
+            },
+            prefilledAmount: amount,
+            prefilledNote: `Payment request from ${requesterData.name}`,
+            requestId: requestId
+          });
 
           // Navigate to send screen with prefilled data
           navigation.navigate('Send', {
@@ -151,16 +181,26 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             prefilledNote: `Payment request from ${requesterData.name}`,
             requestId: requestId
           });
+          
+          console.log('✅ Successfully navigated to Send screen');
         } catch (error) {
-          console.error('Error handling payment request:', error);
-          showToast('Failed to process payment request', 'error');
+          console.error('❌ Error handling payment request:', error);
+          showToast(`Failed to process payment request: ${error instanceof Error ? error.message : String(error)}`, 'error');
         }
-      } else if (notification.type === 'payment_sent' || notification.type === 'payment_received') {
+      } else if (notification.type === 'payment_sent' || notification.type === 'payment_received' || notification.type === 'money_sent' || notification.type === 'money_received') {
         // Handle payment sent/received notifications
-        const transactionId = notification.data?.transactionId;
+        console.log('💸 Processing payment notification:', notification);
+        
+        const transactionId = notification.data?.transactionId || notification.data?.tx_hash || notification.data?.signature;
+        console.log('🔍 Transaction ID found:', transactionId);
+        
         if (transactionId) {
+          console.log('🚀 Navigating to TransactionHistory with transactionId:', transactionId);
           // Navigate to transaction details
           navigation.navigate('TransactionHistory', { transactionId });
+        } else {
+          console.warn('⚠️ No transaction ID found in notification data:', notification.data);
+          showToast('Transaction ID not found in notification', 'error');
         }
       } else if (notification.type === 'split_completed') {
         // Handle split completion notification
@@ -357,6 +397,8 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
       return {
         id: notification.id,
+        userId: notification.userId || notification.user_id || '',
+        user_id: notification.userId || notification.user_id || '', // For backward compatibility
         type: mappedType,
         title: notification.title || '',
         message: notification.message || '',
@@ -368,7 +410,12 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
     });
     
     return activeTab === 'requests'
-      ? transformedNotifications.filter((n: NotificationData) => n.type === 'payment_request' || n.type === 'payment_reminder')
+      ? transformedNotifications.filter((n: NotificationData) => {
+          if (n.type === 'payment_request') {
+            return n.data?.status !== 'completed' && !n.is_read;
+          }
+          return n.type === 'payment_reminder';
+        })
       : transformedNotifications;
   };
 

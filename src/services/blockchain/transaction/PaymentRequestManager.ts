@@ -252,13 +252,52 @@ export class PaymentRequestManager {
   }
 
   /**
+   * Get a specific payment request by ID
+   */
+  async getPaymentRequest(requestId: string): Promise<PaymentRequest | null> {
+    try {
+      logger.info('Fetching payment request', { requestId }, 'PaymentRequestManager');
+
+      const requestRef = doc(db, 'paymentRequests', requestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        logger.warn('Payment request not found', { requestId }, 'PaymentRequestManager');
+        return null;
+      }
+
+      const data = requestDoc.data();
+      const paymentRequest: PaymentRequest = {
+        id: requestDoc.id,
+        senderId: data.senderId,
+        recipientId: data.recipientId,
+        amount: data.amount,
+        currency: data.currency,
+        description: data.description,
+        groupId: data.groupId,
+        status: data.status,
+        created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+        updated_at: data.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+        senderName: data.senderName,
+        recipientName: data.recipientName
+      };
+
+      logger.info('Payment request fetched successfully', { requestId }, 'PaymentRequestManager');
+      return paymentRequest;
+    } catch (error) {
+      logger.error('Failed to fetch payment request', { requestId, error }, 'PaymentRequestManager');
+      return null;
+    }
+  }
+
+  /**
    * Cleanup orphaned payment requests (requests that have completed transactions but weren't deleted)
    */
   async cleanupOrphanedRequests(userId: string): Promise<{ cleaned: number; errors: string[] }> {
     try {
       logger.info('Starting cleanup of orphaned payment requests', { userId }, 'PaymentRequestManager');
       
-      const { firebaseDataService } = await import('../firebaseDataService');
+      const { firebaseDataService } = await import('../../data/firebaseDataService');
       
       // Get all payment requests for the user
       const requests = await this.getPaymentRequests(userId);

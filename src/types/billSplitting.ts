@@ -3,14 +3,6 @@
  * Types for bill splitting functionality
  */
 
-export interface SplitParticipant {
-  id: string;
-  name: string;
-  wallet_address: string;
-  amountOwed: number;
-  items: string[];
-}
-
 export interface BillParticipant {
   id: string;
   name: string;
@@ -27,14 +19,6 @@ export interface BillItem {
   category?: string;
   total: number;
   participants?: any;
-}
-
-export interface Split {
-  id: string;
-  participants: SplitParticipant[];
-  totalAmount: number;
-  splitMethod: 'equal' | 'manual';
-  updatedAt: string;
 }
 
 export interface OCRProcessingResult {

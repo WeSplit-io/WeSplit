@@ -127,7 +127,6 @@ export async function createPaymentRequest(
           amount,
           currency,
           description,
-          groupId ? String(groupId) : undefined,
           paymentRequest.id
         );
 

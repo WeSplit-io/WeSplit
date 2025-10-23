@@ -73,46 +73,8 @@ export interface SplitItem {
   participants: string[];
 }
 
-// Notification types
-export interface Notification {
-  id: string;
-  userId: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  data?: any;
-  read: boolean;
-  created_at: string;
-  user_id: string;
-}
-
-export interface NotificationData {
-  id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  data?: any;
-  read: boolean;
-  created_at: string;
-  userId: string;
-}
-
-export type NotificationType = 
-  | 'general'
-  | 'payment_received'
-  | 'payment_sent'
-  | 'split_invite'
-  | 'split_accepted'
-  | 'split_declined'
-  | 'split_paid'
-  | 'payment_request'
-  | 'payment_reminder';
-
-export interface NotificationPayload {
-  id: string;
-  type: NotificationType;
-  data?: any;
-}
+// Re-export unified notification types
+export { NotificationType, NotificationData, NotificationPayload } from './notifications';
 
 // Wallet types
 export interface WalletInfo {

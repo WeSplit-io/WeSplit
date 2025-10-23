@@ -17,16 +17,28 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
     const completeNotificationProcess = async () => {
       if (fromNotification && notificationId && transactionId) {
         try {
-          logger.info('Completing notification process for payment request', null, 'SendSuccessScreen');
-          
-          // Get current user ID from navigation state or context
-          // For now, we'll use a placeholder - in a real app, you'd get this from context
-          const currentUserId = 'current_user_id'; // This should be replaced with actual user ID
+          logger.info('Completing notification process for payment request', {
+            notificationId,
+            transactionId,
+            fromNotification
+          }, 'SendSuccessScreen');
           
           // Mark notification as read using the notification service
           await notificationService.markAsRead(notificationId);
           
-          logger.info('Notification process completed successfully', null, 'SendSuccessScreen');
+          // If we have a requestId, also mark payment request notifications as completed
+          const requestId = route.params?.requestId;
+          if (requestId) {
+            // Get current user ID from route params or context
+            const currentUserId = route.params?.currentUserId || 'current_user_id';
+            await notificationService.markPaymentRequestCompleted(requestId, currentUserId);
+          }
+          
+          logger.info('Notification process completed successfully', {
+            notificationId,
+            transactionId,
+            requestId: route.params?.requestId
+          }, 'SendSuccessScreen');
         } catch (error) {
           console.error('🔍 SendSuccess: Failed to complete notification process:', error);
           // Don't fail the success screen if notification completion fails
@@ -35,15 +47,18 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
     };
 
     completeNotificationProcess();
-  }, [fromNotification, notificationId, transactionId, amount, contact, groupId]);
+  }, [fromNotification, notificationId, transactionId, amount, contact, groupId, route.params?.requestId, route.params?.currentUserId]);
 
   const handleBackHome = () => {
     if (isSettlement && groupId) {
       // Navigate back to group details for settlement payments
       navigation.navigate('GroupDetails', { groupId });
     } else {
-      // Navigate back to the dashboard/home screen
-      navigation.navigate('Dashboard');
+      // Navigate back to the dashboard/home screen with refresh flag
+      navigation.navigate('Dashboard', { 
+        refreshRequests: true,
+        refreshBalance: true 
+      });
     }
   };
 

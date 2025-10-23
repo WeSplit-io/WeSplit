@@ -4,7 +4,7 @@
  */
 
 import { PublicKey } from '@solana/web3.js';
-import { solanaWalletService } from '../../OLD_LEGACY/deprecated_services/solanaWallet.deprecated';
+import { solanaWalletService } from './api/solanaWalletApi';
 import { logger } from '../../analytics/loggingService';
 
 export interface WalletVerificationResult {

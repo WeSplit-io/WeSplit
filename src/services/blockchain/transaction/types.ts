@@ -37,6 +37,8 @@ export interface PaymentRequest {
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
   created_at: string;
   updated_at: string;
+  senderName?: string;
+  recipientName?: string;
 }
 
 export interface PaymentRequestResult {

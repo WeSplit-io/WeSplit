@@ -10,53 +10,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import styles from './NotificationCard.styles';
-
-export interface NotificationData {
-  id: string;
-  type: 'payment_request' | 'payment_reminder' | 'general' | 'split_invite' | 'split_confirmed' | 'payment_received' | 'system_warning' | 'system_notification' | 'money_sent' | 'money_received' | 'split_completed' | 'degen_all_locked' | 'degen_ready_to_roll' | 'roulette_result' | 'contact_added' | 'split_spin_available' | 'split_winner' | 'split_loser' | 'split_lock_required';
-  title: string;
-  message: string;
-  created_at: string;
-  is_read: boolean;
-  status?: 'pending' | 'paid' | 'cancelled';
-  data?: {
-    amount?: number;
-    currency?: string;
-    sender?: string;
-    requester?: string;
-    senderAvatar?: string;
-    requesterAvatar?: string;
-    addedBy?: string;
-    addedByAvatar?: string;
-    inviteLink?: string;
-    invitedBy?: string;
-    invitedByName?: string;
-    expiresAt?: string;
-    transactionId?: string;
-    senderName?: string;
-    recipientName?: string;
-    status?: string;
-    warningType?: string;
-    severity?: string;
-    splitWalletId?: string;
-    billName?: string;
-    splitId?: string;
-    totalAmount?: number;
-    currency?: string;
-    inviterName?: string;
-    inviterId?: string;
-    participantAmount?: number;
-    creatorName?: string;
-    creatorId?: string;
-    splitWalletId?: string;
-    splitWalletAddress?: string;
-    loserId?: string;
-    loserName?: string;
-    addedByName?: string;
-    addedAt?: string;
-    type?: string;
-  };
-}
+import { NotificationData } from '../../types/notifications';
 
 interface NotificationCardProps {
   notification: NotificationData;
@@ -145,25 +99,6 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
         : require('../../../assets/user-icon-black.png');
     }
     
-    // For settlement notifications, use wallet icon
-    if (notification.type === 'settlement_request' || notification.type === 'settlement_notification') {
-      return require('../../../assets/wallet-icon-default.png');
-    }
-    
-    // For funding notifications, use wallet icon
-    if (notification.type === 'funding_notification') {
-      return require('../../../assets/wallet-icon-default.png');
-    }
-    
-    // For expense added, use book icon
-    if (notification.type === 'expense_added') {
-      return require('../../../assets/book-icon-default.png');
-    }
-    
-    // For group invites, use pool icon
-    if (notification.type === 'group_invite') {
-      return require('../../../assets/pool-icon.png');
-    }
     
     // For split invites, use pool icon (same as group invites)
     if (notification.type === 'split_invite') {
@@ -180,17 +115,6 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       return require('../../../assets/wallet-icon-default.png');
     }
     
-    // For group payment requests, use sender avatar or user icon
-    if (notification.type === 'group_payment_request') {
-      return notification.data?.senderAvatar
-        ? { uri: notification.data.senderAvatar }
-        : require('../../../assets/user-icon-black.png');
-    }
-    
-    // For group added, use pool icon
-    if (notification.type === 'group_added') {
-      return require('../../../assets/pool-icon.png');
-    }
     
     // For system warnings, use warning icon
     if (notification.type === 'system_warning') {
@@ -212,15 +136,6 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       return require('../../../assets/wallet-icon-default.png');
     }
     
-    // For group payment sent, use send icon
-    if (notification.type === 'group_payment_sent') {
-      return require('../../../assets/icon-send.png');
-    }
-    
-    // For group payment received, use wallet icon
-    if (notification.type === 'group_payment_received') {
-      return require('../../../assets/wallet-icon-default.png');
-    }
     
     // For split completed, use award icon
     if (notification.type === 'split_completed') {
@@ -247,15 +162,6 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       case 'payment_request':
       case 'payment_reminder':
         return '#A5EA15';
-      case 'settlement_request':
-        return '#FF6B6B';
-      case 'settlement_notification':
-        return '#A5EA15';
-      case 'funding_notification':
-        return '#45B7D1';
-      case 'expense_added':
-        return colors.green;
-      case 'group_invite':
       case 'split_invite':
       case 'split_confirmed':
         return colors.green;
@@ -263,10 +169,6 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
         return '#A89B9B';
       case 'payment_received':
         return '#A5EA15';
-      case 'group_payment_request':
-        return '#A5EA15';
-      case 'group_added':
-        return colors.green;
       case 'system_warning':
         return '#FF6B6B';
       case 'system_notification':
@@ -274,10 +176,6 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       case 'money_sent':
         return '#A5EA15';
       case 'money_received':
-        return '#A5EA15';
-      case 'group_payment_sent':
-        return '#A5EA15';
-      case 'group_payment_received':
         return '#A5EA15';
       case 'split_completed':
         return '#A5EA15';
@@ -309,14 +207,6 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
           disabled: isPaid || isCompleted || isPending,
           backgroundColor: isPaid || isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
           textColor: isPaid || isCompleted ? '#666' : isError ? '#FFF' : colors.black
-        };
-      case 'group_invite':
-        return {
-          show: true,
-          text: isCompleted ? 'Joined' : isPending ? 'Joining...' : 'Join',
-          disabled: isCompleted || isPending,
-          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
-          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
         };
       case 'split_invite':
         return {
@@ -366,30 +256,6 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
           backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
           textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
         };
-      case 'expense_added':
-        return {
-          show: true,
-          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
-          disabled: isCompleted || isPending,
-          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
-          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
-        };
-      case 'settlement_request':
-        return {
-          show: true,
-          text: isPaid || isCompleted ? 'Done' : isPending ? 'Opening...' : 'Settle',
-          disabled: isPaid || isCompleted || isPending,
-          backgroundColor: isPaid || isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
-          textColor: isPaid || isCompleted ? '#666' : isError ? '#FFF' : colors.black
-        };
-      case 'settlement_notification':
-        return {
-          show: true,
-          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
-          disabled: isCompleted || isPending,
-          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
-          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
-        };
       case 'general':
         return {
           show: false,
@@ -399,22 +265,6 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
           textColor: colors.black
         };
       case 'payment_received':
-        return {
-          show: true,
-          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
-          disabled: isCompleted || isPending,
-          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
-          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
-        };
-      case 'group_payment_request':
-        return {
-          show: true,
-          text: isPaid || isCompleted ? 'Done' : isPending ? 'Processing...' : 'Send',
-          disabled: isPaid || isCompleted || isPending,
-          backgroundColor: isPaid || isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
-          textColor: isPaid || isCompleted ? '#666' : isError ? '#FFF' : colors.black
-        };
-      case 'group_added':
         return {
           show: true,
           text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
@@ -447,22 +297,6 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
           textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
         };
       case 'money_received':
-        return {
-          show: true,
-          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
-          disabled: isCompleted || isPending,
-          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
-          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
-        };
-      case 'group_payment_sent':
-        return {
-          show: true,
-          text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
-          disabled: isCompleted || isPending,
-          backgroundColor: isCompleted ? '#A8A8A8' : isError ? '#FF6B6B' : colors.green,
-          textColor: isCompleted ? '#666' : isError ? '#FFF' : colors.black
-        };
-      case 'group_payment_received':
         return {
           show: true,
           text: isCompleted ? 'Viewed' : isPending ? 'Opening...' : 'View',
@@ -555,7 +389,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       // Default action handling
       if (notification.type === 'payment_request' || notification.type === 'payment_reminder') {
         Alert.alert('Send Payment', 'Navigate to send payment screen');
-      } else if (notification.type === 'group_invite' || notification.type === 'split_invite' || notification.type === 'expense_added') {
+      } else if (notification.type === 'split_invite') {
         Alert.alert('View Details', 'Navigate to details screen');
       } else if (notification.type === 'split_confirmed') {
         Alert.alert('Pay Your Share', 'Navigate to payment screen');
@@ -567,8 +401,6 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
         Alert.alert('Claim Funds', 'Navigate to claim funds screen');
       } else if (notification.type === 'split_loser') {
         Alert.alert('Pay Now', 'Navigate to payment screen');
-      } else if (notification.type === 'settlement_request') {
-        Alert.alert('Settle Up', 'Navigate to settlement screen');
       }
     }
   };

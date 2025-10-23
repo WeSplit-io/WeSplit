@@ -24,7 +24,7 @@ import {
 } from '@solana/spl-token';
 import { getConfig } from '../../../config/unified';
 import { FeeService, COMPANY_WALLET_CONFIG, TransactionType } from '../../../config/constants/feeConfig';
-import { solanaWalletService } from '../../../OLD_LEGACY/deprecated_services/solanaWallet.deprecated';
+import { solanaWalletService } from '../wallet';
 import { logger } from '../../analytics/loggingService';
 import { optimizedTransactionUtils } from '../../shared/transactionUtilsOptimized';
 import { TransactionUtils as transactionUtils } from '../../shared/transactionUtils';

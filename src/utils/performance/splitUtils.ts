@@ -5,7 +5,7 @@
  */
 
 import { logger } from '../services/analytics/loggingService';
-import { calculateEqualSplit as currencyCalculateEqualSplit } from '../../OLD_LEGACY/deprecated_utils/currencyUtils';
+import { calculateEqualSplit as currencyCalculateEqualSplit } from '../ui/format/formatUtils';
 
 // Types
 export interface SplitCalculationResult {

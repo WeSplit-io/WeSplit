@@ -231,10 +231,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       // Get payment requests from Firebase
       const firebaseRequests = await getReceivedPaymentRequests(currentUser.id, 10);
       
-      // Get notification requests
+      // Get notification requests (exclude completed ones)
       const notificationRequests = notifications?.filter(n =>
         n.type === 'payment_request' &&
-        (n.data?.amount || 0) > 0
+        (n.data?.amount || 0) > 0 &&
+        n.data?.status !== 'completed' &&
+        !n.read
       ) || [];
 
       // Combine and deduplicate requests
@@ -378,14 +380,33 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     }, [isAuthenticated, currentUser?.id]) // Removed function dependencies to prevent infinite loops
   );
 
-  // Handle refreshBalance parameter from navigation
+  // Handle refresh parameters from navigation
   useEffect(() => {
-    if (route?.params?.refreshBalance && currentUser?.id) {
-      navigation.setParams({ refreshBalance: undefined });
-      loadWalletBalance();
-      logger.info('Balance refresh triggered from navigation parameter', null, 'DashboardScreen');
+    if (currentUser?.id) {
+      const shouldRefreshBalance = route?.params?.refreshBalance;
+      const shouldRefreshRequests = route?.params?.refreshRequests;
+      
+      if (shouldRefreshBalance || shouldRefreshRequests) {
+        // Clear the parameters to prevent infinite loops
+        navigation.setParams({ 
+          refreshBalance: undefined,
+          refreshRequests: undefined 
+        });
+        
+        // Trigger appropriate refreshes
+        if (shouldRefreshBalance) {
+          loadWalletBalance();
+          logger.info('Balance refresh triggered from navigation parameter', null, 'DashboardScreen');
+        }
+        
+        if (shouldRefreshRequests) {
+          loadPaymentRequests();
+          refreshNotifications();
+          logger.info('Requests refresh triggered from navigation parameter', null, 'DashboardScreen');
+        }
+      }
     }
-  }, [route?.params?.refreshBalance, currentUser?.id, navigation, loadWalletBalance]);
+  }, [route?.params?.refreshBalance, route?.params?.refreshRequests, currentUser?.id, navigation, loadWalletBalance, loadPaymentRequests, refreshNotifications]);
 
   // Load notifications when dashboard loads
   useEffect(() => {

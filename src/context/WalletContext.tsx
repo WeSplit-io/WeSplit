@@ -9,7 +9,7 @@ import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { walletService, WalletInfo as ConsolidatedWalletInfo } from '../services/blockchain/wallet';
 import { consolidatedTransactionService } from '../services/blockchain/transaction';
-import { solanaWalletService } from '../OLD_LEGACY/deprecated_services/solanaWallet.deprecated';
+import { solanaWalletService } from '../services/blockchain/wallet';
 import { logger } from '../services/analytics/loggingService';
 
 // WalletInfo interface for backward compatibility

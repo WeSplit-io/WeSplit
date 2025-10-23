@@ -13,20 +13,23 @@ export class TransactionWalletManager {
   /**
    * Load wallet from secure storage
    */
-  async loadWallet(): Promise<boolean> {
+  async loadWallet(userId?: string): Promise<boolean> {
     try {
       logger.debug('Loading wallet from secure storage', null, 'TransactionWalletManager');
       
-      // Use the existing solanaWalletService to load the wallet securely
-      const { solanaWalletService } = await import('../../wallet/solanaWallet.deprecated');
-      const walletLoaded = await solanaWalletService.loadWallet();
+      if (!userId) {
+        logger.warn('No userId provided for wallet loading', null, 'TransactionWalletManager');
+        return false;
+      }
       
-      if (walletLoaded) {
-        // Get the keypair from solanaWalletService
-        const walletInfo = await solanaWalletService.getWalletInfo();
-        if (walletInfo && walletInfo.secretKey) {
-          // Convert secret key back to keypair for this service using shared utility
-          const keypairResult = keypairUtils.createKeypairFromSecretKey(walletInfo.secretKey);
+      // Use the walletService to ensure user wallet
+      const { walletService } = await import('../wallet');
+      const walletResult = await walletService.ensureUserWallet(userId);
+      
+      if (walletResult.success && walletResult.wallet && walletResult.wallet.secretKey) {
+        // Convert secret key back to keypair for this service using shared utility
+        const keypairResult = keypairUtils.createKeypairFromSecretKey(walletResult.wallet.secretKey);
+        if (keypairResult.success && keypairResult.keypair) {
           this.keypair = keypairResult.keypair;
           
           logger.debug('Wallet loaded successfully', {

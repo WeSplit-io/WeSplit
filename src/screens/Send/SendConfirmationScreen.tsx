@@ -215,18 +215,13 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       setSending(true);
       
       // Send payment processing notification (non-blocking)
-      notificationService.instance.sendNotification(
+      notificationService.instance.sendPaymentStatusNotification(
         currentUser.id,
-        'Payment Processing',
-        `Your payment of ${amount} USDC to ${contact?.name || 'External Wallet'} is being processed...`,
-        'general',
-        {
-          amount,
-          currency: 'USDC',
-          recipient: contact?.name || 'External Wallet',
-          status: 'processing',
-          timestamp: new Date().toISOString()
-        }
+        amount,
+        'USDC',
+        `Payment to ${contact?.name || 'External Wallet'}`,
+        undefined, // splitId
+        'processing'
       );
 
       // Get fee estimate for display
@@ -301,21 +296,9 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         }
       }
 
-      // Send payment confirmed notification (non-blocking)
-      notificationService.instance.sendNotification(
-        currentUser.id,
-        'Payment Confirmed',
-        `Your payment of ${amount} USDC to ${contact?.name || 'External Wallet'} has been confirmed!`,
-        'payment_sent',
-        {
-          amount,
-          currency: 'USDC',
-          recipient: contact?.name || 'External Wallet',
-          transactionId: transactionResult.signature || transactionResult.transactionId,
-          status: 'confirmed',
-          timestamp: new Date().toISOString()
-        }
-      );
+      // Note: Personalized settlement notifications are now sent automatically 
+      // by the ConsolidatedTransactionService when processing payment requests
+      // This ensures both users get appropriate notifications
 
       // Navigate to success screen with real transaction data
       navigation.navigate('SendSuccess', {
@@ -333,25 +316,22 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         blockchainFee: transactionResult.fee || 0,
         fromNotification: route.params?.fromNotification,
         notificationId: route.params?.notificationId,
+        requestId: route.params?.requestId,
+        currentUserId: currentUser?.id,
       });
     } catch (error) {
       console.error('Send error:', error);
       
       // Send payment failed notification (non-blocking)
       if (currentUser?.id) {
-        notificationService.instance.sendNotification(
+        notificationService.instance.sendPaymentStatusNotification(
           currentUser.id,
-          'Payment Failed',
-          `Your payment of ${amount} USDC to ${contact?.name || 'External Wallet'} failed. Please try again.`,
-          'general',
-          {
-            amount,
-            currency: 'USDC',
-            recipient: contact?.name || 'External Wallet',
-            error: error instanceof Error ? error.message : 'Unknown error',
-            status: 'failed',
-            timestamp: new Date().toISOString()
-          }
+          amount,
+          'USDC',
+          `Payment to ${contact?.name || 'External Wallet'}`,
+          undefined, // splitId
+          'failed',
+          error instanceof Error ? error.message : 'Unknown error'
         );
       }
       

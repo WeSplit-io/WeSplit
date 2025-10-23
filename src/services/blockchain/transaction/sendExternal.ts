@@ -23,7 +23,7 @@ import {
 import { getConfig } from '../../../config/unified';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';
 import { FeeService, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG, TransactionType } from '../../../config/constants/feeConfig';
-import { solanaWalletService } from '../../../OLD_LEGACY/deprecated_services/solanaWallet.deprecated';
+import { solanaWalletService } from '../wallet';
 import { logger } from '../../analytics/loggingService';
 import type { LinkedWallet } from '../wallet/LinkedWalletService';
 

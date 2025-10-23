@@ -130,17 +130,8 @@ export type AppAction =
   | { type: 'UPDATE_CACHE_TIMESTAMP'; payload: { type: string; timestamp: number } }
   | { type: 'SET_NOTIFICATIONS'; payload: { notifications: Notification[]; timestamp: number } };
 
-// Notification types
-export interface Notification {
-  id: string;
-  type: 'payment_request' | 'payment_sent' | 'payment_received' | 'split_invite' | 'split_accepted' | 'split_declined' | 'split_paid' | 'general';
-  title: string;
-  message: string;
-  data?: any;
-  read: boolean;
-  created_at: string;
-  user_id: string;
-}
+// Re-export unified notification types
+export { NotificationType, NotificationData as Notification, NotificationPayload } from './notifications';
 
 // Data transformers interface
 export interface DataTransformers {
@@ -150,6 +141,9 @@ export interface DataTransformers {
 
 // Export all types
 export * from './unified';
-export * from './billSplitting';
+export { 
+  BillParticipant, BillItem, OCRProcessingResult, BillSplitCreationData,
+  ProcessedBillData, BillAnalysisData, BillSettings, BillSplitSummary
+} from './billSplitting';
 export type { NotificationData } from './notificationTypes';
-export type { BillAnalysisResult, BillItem, BillParticipant, ProcessedBillData, BillAnalysisData, BillSettings, BillSplitCreationData, OCRProcessingResult } from './billAnalysis';
+export type { BillAnalysisResult } from './billAnalysis';

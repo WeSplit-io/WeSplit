@@ -151,6 +151,27 @@ export function parseAmount(amountString: string): number {
   return isNaN(parsed) ? 0 : parsed;
 }
 
+/**
+ * Calculate equal split amount with consistent rounding
+ * @param totalAmount Total bill amount
+ * @param participantCount Number of participants
+ * @returns Amount each person should pay
+ */
+export function calculateEqualSplit(totalAmount: number, participantCount: number): number {
+  if (participantCount <= 0) {
+    console.warn('calculateEqualSplit: Invalid participant count:', participantCount);
+    return 0;
+  }
+  
+  if (totalAmount < 0) {
+    console.warn('calculateEqualSplit: Invalid total amount:', totalAmount);
+    return 0;
+  }
+  
+  const splitAmount = totalAmount / participantCount;
+  return roundUsdcAmount(splitAmount);
+}
+
 export const formatUtils = {
   usdc: formatUsdcAmount,
   sol: formatSolAmount,
@@ -163,6 +184,7 @@ export const formatUtils = {
   percentage: formatPercentage,
   largeNumber: formatLargeNumber,
   parseAmount,
+  calculateEqualSplit,
 };
 
 export default formatUtils;

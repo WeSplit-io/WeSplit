@@ -7,6 +7,7 @@ export { simplifiedWalletService as walletService } from './simplifiedWalletServ
 export { walletRecoveryService } from './walletRecoveryService';
 export { LinkedWalletService } from './LinkedWalletService';
 export { SolanaAppKitService } from './solanaAppKitService';
+export { solanaWalletService } from './api/solanaWalletApi';
 
 // Wallet utilities
 export { generateMnemonic12, generateMnemonic24, deriveKeypairFromMnemonic, publicKeyFromMnemonic, generateWalletFromMnemonic, validateBip39Mnemonic, tryRecoverWalletFromMnemonic, verifyExportImportParity, generateWalletChecksum, validateWalletChecksum } from './derive';

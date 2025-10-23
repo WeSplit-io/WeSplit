@@ -1,8 +1,12 @@
 /**
- * Unified Notification Types
- * Provides consistent data structures for all notification types
+ * DEPRECATED: Use src/types/notifications.ts instead
+ * This file is kept for backward compatibility only
  */
 
+// Re-export unified types
+export { NotificationType, NotificationData, NotificationPayload } from './notifications';
+
+// Legacy interfaces for backward compatibility
 export interface BaseNotificationData {
   id: string;
   userId: string;
@@ -16,75 +20,13 @@ export interface BaseNotificationData {
   read_at?: string;
 }
 
-export interface NotificationData extends BaseNotificationData {
-  read: boolean;
-  user_id: string;
+// Legacy notification data interface with both field names for compatibility
+export interface LegacyNotificationData extends BaseNotificationData {
+  read: boolean; // Legacy field name
+  user_id: string; // Legacy field name
 }
 
-export type NotificationType = 
-  | 'general'
-  | 'payment_received'
-  | 'payment_sent'
-  | 'split_payment_required'
-  | 'split_completed'
-  | 'payment_request'
-  | 'settlement_request'
-  | 'money_sent'
-  | 'money_received'
-  | 'split_spin_available'
-  | 'split_loser'
-  | 'split_winner'
-  | 'system_warning'
-  | 'payment_reminder'
-  | 'split_invite'
-  | 'system_notification'
-  | 'degen_all_locked'
-  | 'degen_ready_to_roll'
-  | 'roulette_result'
-  | 'split_lock_required'
-  | 'contact_added';
-
-// Unified notification payload interface
-export interface NotificationPayload {
-  // Common fields
-  senderId?: string;
-  senderName?: string;
-  recipientId?: string;
-  recipientName?: string;
-  amount?: number;
-  currency?: string;
-  
-  // Split-specific fields
-  splitId?: string;
-  splitWalletId?: string;
-  splitType?: 'fair' | 'degen';
-  splitStatus?: string;
-  billName?: string;
-  billId?: string;
-  participantAmount?: number;
-  totalAmount?: number;
-  
-  // Payment request fields
-  requestId?: string;
-  expenseId?: string;
-  description?: string;
-  note?: string;
-  
-  // Transaction fields
-  transactionId?: string;
-  transactionHash?: string;
-  status?: string;
-  
-  // Deep link fields
-  shareableLink?: string;
-  splitInvitationData?: string;
-  
-  // Additional context
-  timestamp?: string;
-  [key: string]: any;
-}
-
-// Specific notification data interfaces
+// Specific notification data interfaces (kept for specialized use cases)
 export interface SplitNotificationData extends NotificationPayload {
   splitId: string;
   splitWalletId: string;
@@ -103,7 +45,6 @@ export interface PaymentRequestNotificationData extends NotificationPayload {
   requestId: string;
   description?: string;
 }
-
 
 export interface SplitInviteNotificationData extends NotificationPayload {
   splitId: string;

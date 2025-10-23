@@ -214,6 +214,9 @@ class ConsolidatedTransactionService {
             const { PaymentRequestManager } = await import('./PaymentRequestManager');
             const paymentRequestManager = new PaymentRequestManager();
             
+            // Get payment request details before processing (for settlement notifications)
+            const requestDetails = await paymentRequestManager.getPaymentRequest(params.requestId);
+            
             const requestResult = await paymentRequestManager.processPaymentRequest(
               params.requestId,
               result.signature!,
@@ -226,6 +229,34 @@ class ConsolidatedTransactionService {
                 signature: result.signature,
                 transactionId: result.signature
               }, 'ConsolidatedTransactionService');
+
+              // Send personalized settlement notifications to both users
+              if (requestDetails) {
+                try {
+                  const { notificationService } = await import('../../notifications/notificationService');
+                  await notificationService.instance.sendPaymentRequestCompletionNotifications(
+                    params.requestId,
+                    requestDetails.senderId,
+                    requestDetails.senderName || 'Unknown User',
+                    requestDetails.recipientId,
+                    requestDetails.recipientName || 'Unknown User',
+                    requestDetails.amount,
+                    requestDetails.currency,
+                    result.signature
+                  );
+                  logger.info('✅ Settlement notifications sent successfully', {
+                    requestId: params.requestId,
+                    senderId: requestDetails.senderId,
+                    recipientId: requestDetails.recipientId
+                  }, 'ConsolidatedTransactionService');
+                } catch (notificationError) {
+                  logger.error('❌ Failed to send settlement notifications', {
+                    requestId: params.requestId,
+                    error: notificationError
+                  }, 'ConsolidatedTransactionService');
+                  // Don't fail the transaction if notifications fail
+                }
+              }
             } else {
               logger.error('❌ Payment request processing failed', {
                 requestId: params.requestId,

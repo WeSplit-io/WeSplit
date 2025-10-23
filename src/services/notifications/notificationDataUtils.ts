@@ -8,12 +8,12 @@ import { logger } from '../analytics/loggingService';
 export interface StandardizedNotificationData {
   // Core request data
   requestId?: string;
-  expenseId?: string;
   splitId?: string;
   
   // User identification (multiple field names for compatibility)
   senderId: string;
   senderName: string;
+  recipientId?: string;
   requester: string;
   sender: string;
   
@@ -21,10 +21,6 @@ export interface StandardizedNotificationData {
   amount: number;
   currency: string;
   description?: string;
-  
-  // Group context
-  groupId?: string;
-  groupName?: string;
   
   // Status
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
@@ -50,9 +46,11 @@ export function standardizeNotificationData(
       return null;
     }
 
-    // Extract amount with validation
+    // Extract amount with validation (only for payment-related notifications)
     const amount = parseFloat(rawData?.amount || '0');
-    if (!amount || amount <= 0) {
+    const requiresAmount = ['payment_request', 'payment_received', 'payment_sent', 'money_sent', 'money_received', 'split_invite', 'split_payment_required', 'split_completed'];
+    
+    if (requiresAmount.includes(notificationType) && (!amount || amount <= 0)) {
       logger.error('Invalid amount in notification data', { rawData, notificationType, amount }, 'notificationDataUtils');
       return null;
     }
@@ -64,7 +62,6 @@ export function standardizeNotificationData(
     const standardizedData: StandardizedNotificationData = {
       // Core request data
       requestId: rawData?.requestId,
-      expenseId: rawData?.expenseId,
       splitId: rawData?.splitId,
       
       // User identification (multiple field names for compatibility)
@@ -77,10 +74,6 @@ export function standardizeNotificationData(
       amount: amount,
       currency: currency,
       description: rawData?.description || '',
-      
-      // Group context
-      groupId: rawData?.groupId,
-      groupName: rawData?.groupName,
       
       // Status
       status: rawData?.status || 'pending',
@@ -124,24 +117,28 @@ export function validateNotificationData(
     errors.push('Missing or invalid sender name');
   }
 
-  if (!data.amount || data.amount <= 0) {
-    errors.push('Invalid amount');
-  }
+  // Only validate amount for payment-related notifications
+  const requiresAmount = ['payment_request', 'payment_received', 'payment_sent', 'money_sent', 'money_received', 'split_invite', 'split_payment_required', 'split_completed'];
+  if (requiresAmount.includes(notificationType)) {
+    if (!data.amount || data.amount <= 0) {
+      errors.push('Invalid amount');
+    }
 
-  if (!data.currency) {
-    errors.push('Missing currency');
+    if (!data.currency) {
+      errors.push('Missing currency');
+    }
   }
 
   // Type-specific validation
   if (notificationType === 'payment_request') {
-    if (!data.requestId && !data.expenseId) {
-      errors.push('Missing request or expense ID for payment request');
+    if (!data.requestId) {
+      errors.push('Missing request ID for payment request');
     }
   }
 
-  if (notificationType === 'group_payment_request') {
-    if (!data.groupId) {
-      errors.push('Missing group ID for group payment request');
+  if (notificationType === 'split_invite' || notificationType === 'split_payment_required') {
+    if (!data.splitId) {
+      errors.push('Missing split ID for split notification');
     }
   }
 
@@ -168,21 +165,18 @@ export function createPaymentRequestNotificationData(
   amount: number,
   currency: string = 'USDC',
   description?: string,
-  groupId?: string,
-  requestId?: string,
-  expenseId?: string
+  requestId?: string
 ): StandardizedNotificationData {
   return {
     requestId,
-    expenseId,
     senderId: String(senderId),
     senderName: String(senderName),
+    recipientId: String(recipientId),
     requester: String(senderId),
     sender: String(senderId),
     amount: Number(amount),
     currency: String(currency),
     description: description || '',
-    groupId: groupId ? String(groupId) : undefined,
     status: 'pending'
   };
 }
