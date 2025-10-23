@@ -19,21 +19,21 @@ import {
   StyleSheet,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { styles } from '../splits/SplitsList/styles';  
-import { colors } from '../../theme/colors';
-import NavBar from '../../components/NavBar';
-import UserAvatar from '../../components/UserAvatar';
-import GroupIcon from '../../components/GroupIcon';
-import Icon from '../../components/Icon';
-import { Container } from '../../components/shared';
-import Header from '../../components/shared/Header';
-import { BillSplitSummary } from '../../types/billSplitting';
-import { splitStorageService, Split, SplitStorageService } from '../../services/splits';
-import { logger } from '../../services/analytics/loggingService';
-import { MockupDataService } from '../../services/data';
-import { priceManagementService } from '../../services/core';
-import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/data';
+import { styles } from './styles';  
+import { colors } from '../../../theme/colors';
+import NavBar from '../../../components/NavBar';
+import UserAvatar from '../../../components/UserAvatar';
+import GroupIcon from '../../../components/GroupIcon';
+import Icon from '../../../components/Icon';
+import { Container } from '../../../components/shared';
+import Header from '../../../components/shared/Header';
+import { BillSplitSummary } from '../../../types/billSplitting';
+import { splitStorageService, Split, SplitStorageService } from '../../../services/splits';
+import { logger } from '../../../services/analytics/loggingService';
+import { MockupDataService } from '../../../services/data';
+import { priceManagementService } from '../../../services/core';
+import { useApp } from '../../../context/AppContext';
+import { firebaseDataService } from '../../../services/data';
 
 
 interface SplitsListScreenProps {
@@ -378,8 +378,8 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
               <View style={styles.roleContainer}>
                 <Image 
                   source={split.creatorId === currentUser?.id 
-                    ? require('../../../assets/award-icon.png') 
-                    : require('../../../assets/user-icon.png')
+                    ? require('../../../../assets/award-icon.png') 
+                    : require('../../../../assets/user-icon.png')
                   }
                   style={styles.roleIcon}
                 />
@@ -447,7 +447,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           </View>
 
           <Image 
-            source={require('../../../assets/chevron-right.png')} 
+            source={require('../../../../assets/chevron-right.png')} 
             style={styles.splitCardArrow} 
           />
         </View>
@@ -657,7 +657,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           // Global empty state when there are no pools at all
           <View style={styles.emptyState}>
             <Image
-              source={require('../../../assets/pool-empty-icon.png')}
+              source={require('../../../../assets/pool-empty-icon.png')}
               style={styles.emptyStateIcon}
             />
             <View style={styles.emptyStateContent}>
