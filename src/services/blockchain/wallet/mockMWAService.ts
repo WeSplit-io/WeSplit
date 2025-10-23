@@ -41,8 +41,15 @@ class MockMWAService {
       name: 'Backpack',
       address: '3QJmV3qfvL9SuYo34YihAf3sRCW3qSinyA',
       publicKey: '3QJmV3qfvL9SuYo34YihAf3sRCW3qSinyA',
-      isConnected: false,
-      balance: 0
+      isConnected: true, // Changed to true for better mockup
+      balance: 0.8
+    },
+    {
+      name: 'Slope',
+      address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+      publicKey: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+      isConnected: true,
+      balance: 0.2
     }
   ];
 
@@ -65,8 +72,10 @@ class MockMWAService {
    * Get available mock wallets
    */
   getAvailableWallets(): MockWalletInfo[] {
-    logger.info('Getting mock available wallets', null, 'MockMWAService');
-    return this.mockWallets.filter(wallet => wallet.isConnected);
+    logger.info('Getting mock available wallets', { totalWallets: this.mockWallets.length }, 'MockMWAService');
+    const connectedWallets = this.mockWallets.filter(wallet => wallet.isConnected);
+    logger.info('Filtered connected wallets', { connectedCount: connectedWallets.length }, 'MockMWAService');
+    return connectedWallets;
   }
 
   /**

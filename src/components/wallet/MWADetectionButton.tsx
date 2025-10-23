@@ -44,6 +44,17 @@ interface WalletOption {
   publicKey?: string;
 }
 
+// Helper function to get wallet icons
+const getWalletIcon = (walletName: string): string => {
+  const iconMap: { [key: string]: string } = {
+    'Phantom': 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png', // Using SOL logo as fallback
+    'Solflare': 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png',
+    'Backpack': 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png',
+    'Slope': 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png'
+  };
+  return iconMap[walletName] || 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png';
+};
+
 const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
   onWalletDetected,
   disabled = false,
@@ -55,6 +66,40 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
   const [isConnecting, setIsConnecting] = useState<string | null>(null);
   
   const platformInfo = getPlatformInfo();
+  
+  // Check if MWA is actually available by testing the import
+  const [mwaActuallyAvailable, setMwaActuallyAvailable] = useState<boolean | null>(null);
+  
+  useEffect(() => {
+    const checkMWAAvailability = async () => {
+      console.log('🔍 Checking MWA availability:', {
+        isExpoGo: platformInfo.isExpoGo,
+        environment: platformInfo.environment
+      });
+      
+      if (platformInfo.isExpoGo) {
+        console.log('❌ Expo Go detected, MWA not available');
+        setMwaActuallyAvailable(false);
+        return;
+      }
+      
+      try {
+        console.log('🔄 Attempting to import MWA module...');
+        const mwaModule = await import('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
+        const isAvailable = !!(mwaModule.startRemoteScenario);
+        console.log('✅ MWA module imported successfully:', {
+          hasStartRemoteScenario: !!mwaModule.startRemoteScenario,
+          isAvailable
+        });
+        setMwaActuallyAvailable(isAvailable);
+      } catch (error) {
+        console.log('❌ MWA module not available:', error);
+        setMwaActuallyAvailable(false);
+      }
+    };
+    
+    checkMWAAvailability();
+  }, [platformInfo.isExpoGo]);
 
   // Load available wallets when component mounts
   useEffect(() => {
@@ -68,14 +113,19 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
       if (platformInfo.isExpoGo) {
         // Use mock service for Expo Go
         const mockWallets = mockMWAService.getAvailableWallets();
+        console.log('🔍 Mock wallets from service:', mockWallets);
+        
         const walletOptions: WalletOption[] = mockWallets.map(wallet => ({
           name: wallet.name,
           displayName: wallet.name,
+          icon: getWalletIcon(wallet.name),
           isAvailable: wallet.isConnected,
           isMock: true,
           address: wallet.address,
           publicKey: wallet.publicKey
         }));
+        
+        console.log('🔍 Mapped wallet options:', walletOptions);
         setAvailableWallets(walletOptions);
       } else {
         // Use real MWA discovery for development builds
@@ -104,9 +154,35 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
   };
 
   const handleDetectWallets = async () => {
-    if (disabled) return;
+    console.log('🔍 MWA Detection Button Pressed:', {
+      disabled,
+      mwaActuallyAvailable,
+      isDetecting,
+      platformInfo: platformInfo.environment
+    });
+    
+    if (disabled) {
+      console.log('❌ Button is disabled');
+      return;
+    }
+    
+    // Check if MWA is available before attempting detection
+    if (mwaActuallyAvailable === false && !platformInfo.isExpoGo) {
+      console.log('❌ MWA not available in dev build, showing alert');
+      Alert.alert(
+        'MWA Not Available',
+        'Mobile Wallet Adapter is not properly configured in this build. You can still manually enter your wallet address below.'
+      );
+      return;
+    }
+    
+    // In Expo Go, we always show mock wallets for design purposes
+    if (platformInfo.isExpoGo) {
+      console.log('✅ Expo Go detected, showing mock wallets for design');
+    }
     
     try {
+      console.log('✅ Starting wallet detection...');
       setIsDetecting(true);
       await loadAvailableWallets();
       setShowWalletModal(true);
@@ -144,13 +220,79 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
         } else {
           Alert.alert('Error', result.error || 'Failed to connect wallet');
         }
-      } else {
-        // Use real MWA connection (placeholder for now)
-        Alert.alert(
-          'Development Build Required',
-          'Real wallet connection requires a development build. This feature is not available in Expo Go.'
-        );
-      }
+                  } else {
+                    // Use real MWA connection for development builds
+                    try {
+                      // Check if MWA is actually available
+                      if (mwaActuallyAvailable === false) {
+                        throw new Error('MWA not available in this build');
+                      }
+                      
+                      // Check if MWA is available before attempting to import
+                      const mwaModule = await import('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
+                      
+                      if (!mwaModule.startRemoteScenario) {
+                        throw new Error('MWA startRemoteScenario not available');
+                      }
+                      
+                      // Start MWA session
+                      const scenario = await mwaModule.startRemoteScenario({
+                        app: {
+                          name: 'WeSplit',
+                          uri: 'https://wesplit.app',
+                          icon: 'https://wesplit.app/icon.png'
+                        }
+                      });
+                      
+                      // Request authorization
+                      const authResult = await scenario.requestAuthorization({
+                        identity: {
+                          name: 'WeSplit',
+                          uri: 'https://wesplit.app',
+                          icon: 'https://wesplit.app/icon.png'
+                        },
+                        accounts: []
+                      });
+                      
+                      if (authResult.accounts && authResult.accounts.length > 0) {
+                        const account = authResult.accounts[0];
+                        onWalletDetected({
+                          name: wallet.displayName,
+                          address: account.address,
+                          publicKey: account.address,
+                          isMock: false
+                        });
+                        
+                        setShowWalletModal(false);
+                        Alert.alert(
+                          'Wallet Connected',
+                          `Successfully connected to ${wallet.displayName}!\n\nAddress: ${account.address.slice(0, 8)}...${account.address.slice(-8)}`
+                        );
+                      } else {
+                        Alert.alert('Error', 'No accounts found in wallet');
+                      }
+                      
+                    } catch (mwaError) {
+                      console.error('MWA connection error:', mwaError);
+                      
+                      // Check if it's a native module error
+                      if (mwaError instanceof Error && (
+                        mwaError.message.includes('TurboModuleRegistry') ||
+                        mwaError.message.includes('startRemoteScenario is not a function') ||
+                        mwaError.message.includes('SolanaMobileWalletAdapter')
+                      )) {
+                        Alert.alert(
+                          'MWA Not Available',
+                          'The Mobile Wallet Adapter is not properly configured in this build. This feature requires a properly configured development build with MWA support.\n\nFor now, you can manually enter your wallet address below.'
+                        );
+                      } else {
+                        Alert.alert(
+                          'Connection Failed',
+                          `Failed to connect to ${wallet.displayName}. Please make sure the wallet app is installed and try again.\n\nError: ${mwaError instanceof Error ? mwaError.message : 'Unknown error'}`
+                        );
+                      }
+                    }
+                  }
       
     } catch (error) {
       logger.error('Failed to connect wallet', error, 'MWADetectionButton');

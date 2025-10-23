@@ -5,6 +5,7 @@
 
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 
 export interface PlatformInfo {
   isExpoGo: boolean;
@@ -19,61 +20,37 @@ export interface PlatformInfo {
 
 /**
  * Detect if running in Expo Go
- * Expo Go has limited native module support
+ * Expo Go has limited native module support and a specific app ownership.
  */
 const isExpoGo = (): boolean => {
-  try {
-    // Method 1: Check for Expo Go specific constants
-    if (Constants.appOwnership === 'expo') {
-      return true;
-    }
-
-    // Method 2: Check for missing native modules that are available in dev builds
-    if (__DEV__ && Platform.OS !== 'web') {
-      try {
-        // Try to access a native module that's only available in dev builds
-        const hasNativeModules = !!(global as any).Expo?.modules?.expo?.modules?.ExpoModulesCore;
-        return !hasNativeModules;
-      } catch {
-        return true;
-      }
-    }
-
-    // Method 3: Check for Expo Go specific manifest
-    const manifest = Constants.manifest || Constants.expoConfig;
-    if (manifest && typeof manifest === 'object') {
-      const extra = (manifest as any).extra;
-      if (extra && extra.expoGo === true) {
-        return true;
-      }
-    }
-
-    return false;
-  } catch (error) {
-    console.warn('Error detecting Expo Go:', error);
-    return false;
-  }
+  // The most reliable way to detect Expo Go is `Constants.appOwnership === 'expo'`.
+  // If `Constants.appOwnership` is `null` or `undefined`, it's ambiguous,
+  // but typically a development client would have 'standalone'.
+  return Constants.appOwnership === 'expo';
 };
 
 /**
- * Detect if running in a development build
- * Development builds have full native module support
+ * Detect if running in a development build (custom client)
+ * Development builds have full native module support and are not Expo Go.
  */
 const isDevelopmentBuild = (): boolean => {
-  try {
-    if (Platform.OS === 'web') {
-      return false;
-    }
-
-    // Check if we have native modules available
-    const hasNativeModules = !!(global as any).Expo?.modules?.expo?.modules?.ExpoModulesCore;
-    
-    // Development builds have native modules but are not production
-    return hasNativeModules && __DEV__;
-  } catch (error) {
-    console.warn('Error detecting development build:', error);
+  if (Platform.OS === 'web') {
     return false;
   }
+
+  // A development build should have __DEV__ set to true
+  if (!__DEV__) {
+    return false;
+  }
+
+  // It should not be Expo Go (based on strict definition)
+  if (isExpoGo()) {
+    return false;
+  }
+
+  // If it's __DEV__ and not Expo Go, and appOwnership is not 'expo',
+  // we consider it a development build. This handles the `null` appOwnership case.
+  return Constants.appOwnership !== 'expo';
 };
 
 /**
@@ -90,25 +67,17 @@ const isProduction = (): boolean => {
 
 /**
  * Check if MWA (Mobile Wallet Adapter) can be used
- * MWA requires native modules and is not available in Expo Go
+ * MWA requires native modules and is not available in Expo Go.
+ * Note: Even in development builds, MWA may not be available if native modules aren't properly configured.
  */
 const canUseMWA = (): boolean => {
-  try {
-    if (Platform.OS === 'web') {
-      return false;
-    }
-
-    // MWA requires native modules
-    const hasNativeModules = !!(global as any).Expo?.modules?.expo?.modules?.ExpoModulesCore;
-    
-    // MWA is not available in Expo Go
-    const expoGo = isExpoGo();
-    
-    return hasNativeModules && !expoGo;
-  } catch (error) {
-    console.warn('Error checking MWA availability:', error);
+  if (Platform.OS === 'web') {
     return false;
   }
+
+  // MWA is available if it's a development build AND native modules are available.
+  // This is a more conservative check since MWA requires specific native module setup.
+  return isDevelopmentBuild() && !!(global as any).Expo?.modules?.expo?.modules?.ExpoModulesCore;
 };
 
 /**
@@ -133,6 +102,28 @@ export const getPlatformInfo = (): PlatformInfo => {
   } else {
     environment = 'production';
   }
+
+  // Debug logging - Updated Platform Detection
+  console.log('🔍 Platform Detection Debug (FIXED):', {
+    Constants_appOwnership: Constants.appOwnership,
+    __DEV__,
+    Platform_OS: Platform.OS,
+    hasNativeModules,
+    hasDevClient: !!(global as any).Expo?.modules?.expo?.modules?.ExpoDevClient,
+    expoGo,
+    devBuild,
+    production,
+    mwaAvailable,
+    environment,
+    Constants_manifest: !!Constants.manifest,
+    Constants_expoConfig: !!Constants.expoConfig,
+    global_Expo_modules: !!(global as any).Expo?.modules,
+    applicationId: Application.applicationId,
+    appOwnership: Constants.appOwnership,
+    // Logic breakdown
+    isExpoGo_result: Constants.appOwnership === 'expo',
+    isDevBuild_result: __DEV__ && Platform.OS !== 'web' && Constants.appOwnership !== 'expo'
+  });
 
   return {
     isExpoGo: expoGo,
