@@ -12,8 +12,6 @@ export type {
   PaymentResult
 } from './types';
 
-// Import utility functions - using inline implementation to avoid import issues
-
 // Import modules using dynamic imports to avoid circular dependencies
 let SplitWalletCreation: any;
 let SplitWalletManagement: any;

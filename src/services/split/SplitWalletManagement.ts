@@ -9,30 +9,8 @@ import { roundUsdcAmount } from '../../utils/ui/format';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 
-/**
- * Remove undefined values from an object (Firebase doesn't allow undefined values)
- */
-function removeUndefinedValues(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return null;
-  }
-  
-  if (Array.isArray(obj)) {
-    return obj.map(item => removeUndefinedValues(item));
-  }
-  
-  if (typeof obj === 'object') {
-    const cleaned: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (value !== undefined) {
-        cleaned[key] = removeUndefinedValues(value);
-      }
-    }
-    return cleaned;
-  }
-  
-  return obj;
-}
+// Import shared utility function instead of duplicating
+import { removeUndefinedValues } from '../shared/dataUtils';
 
 /**
  * Fix data consistency issues in split wallets
@@ -263,7 +241,7 @@ export class SplitWalletManagement {
 
       // CRITICAL: Also update the splits collection to keep both databases synchronized
       try {
-        const { SplitStorageService } = await import('../splitStorageService');
+        const { SplitStorageService } = await import('./splitStorageService');
         
         const splitUpdateResult = await SplitStorageService.updateSplitByBillId(currentWallet.billId, {
           totalAmount: roundedAmount,
@@ -364,7 +342,7 @@ export class SplitWalletManagement {
 
       // CRITICAL: Also update the splits collection to keep both databases synchronized
       try {
-        const { SplitStorageService } = await import('../splitStorageService');
+        const { SplitStorageService } = await import('./splitStorageService');
         
         // Only sync relevant fields to splits collection
         const splitUpdates: Partial<Split> = {};

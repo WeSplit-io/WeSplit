@@ -25,11 +25,12 @@ import { SplitWalletService } from '../../services/split';
 import { SplitWallet } from '../../services/split/types';
 import { notificationService } from '../../services/notifications';
 import { useApp } from '../../context/AppContext';
+import { roundUsdcAmount, formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
 
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader } from './components';
-import { Container, Button } from '@/components/shared';
+import { Container, Button, AppleSlider } from '@/components/shared';
 import CustomModal from '@/components/shared/Modal';
 
 interface DegenResultScreenProps {
@@ -43,116 +44,6 @@ interface SelectedParticipant {
   userId: string;
 }
 
-// AppleSlider component adapted from SendConfirmationScreen
-interface AppleSliderProps {
-  onSlideComplete: () => void;
-  disabled: boolean;
-  loading: boolean;
-  text?: string;
-}
-
-const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, loading, text = 'Slide to Pay' }) => {
-  const maxSlideDistance = 300;
-  const sliderValue = useRef(new Animated.Value(0)).current;
-  const [isSliderActive, setIsSliderActive] = useState(false);
-
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => !disabled && !loading,
-    onMoveShouldSetPanResponder: () => !disabled && !loading,
-    onPanResponderGrant: () => {
-      setIsSliderActive(true);
-    },
-    onPanResponderMove: (_, gestureState) => {
-      const newValue = Math.max(0, Math.min(gestureState.dx, maxSlideDistance));
-      sliderValue.setValue(newValue);
-    },
-    onPanResponderRelease: (_, gestureState) => {
-      if (gestureState.dx > maxSlideDistance * 0.6) {
-        Animated.timing(sliderValue, {
-          toValue: maxSlideDistance,
-          duration: 200,
-          useNativeDriver: false,
-        }).start(() => {
-          if (onSlideComplete) {onSlideComplete();}
-          setTimeout(() => {
-            sliderValue.setValue(0);
-            setIsSliderActive(false);
-          }, 1000);
-        });
-      } else {
-        Animated.timing(sliderValue, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }).start(() => {
-          setIsSliderActive(false);
-        });
-      }
-    },
-  });
-
-  return (
-    <LinearGradient
-      colors={[colors.green, colors.greenBlue]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
-      style={styles.appleSliderGradientBorder}
-    >
-      <View style={[styles.appleSliderContainer, disabled && { opacity: 0.5 }]} {...panResponder.panHandlers}>
-        <Animated.View style={styles.appleSliderTrack}>
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              opacity: sliderValue.interpolate({ inputRange: [0, maxSlideDistance], outputRange: [0, 1] }) as any,
-              borderRadius: 999,
-            }}
-          >
-            <LinearGradient
-              colors={[colors.green, colors.greenBlue]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{
-                ...StyleSheet.absoluteFillObject,
-                borderRadius: 999,
-              }}
-            />
-          </Animated.View>
-          <Animated.Text
-            style={[
-              styles.appleSliderText,
-              { color: colors.white }
-            ]}
-          >
-            {loading ? 'Processing...' : text}
-          </Animated.Text>
-        </Animated.View>
-        <Animated.View
-          style={[
-            styles.appleSliderThumb,
-            {
-              transform: [{ translateX: sliderValue }],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={[colors.green, colors.greenBlue]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              borderRadius: 30,
-            }}
-          />
-          <Image 
-            source={require('../../../assets/chevron-right.png')} 
-            style={styles.appleSliderThumbIcon}
-          />
-        </Animated.View>
-      </View>
-    </LinearGradient>
-  );
-};
 
 const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route }) => {
   const { billData, participants, totalAmount, selectedParticipant, splitWallet, processedBillData, splitData } = route.params;
@@ -197,13 +88,13 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
               if (isWinner) {
                 Alert.alert(
                   '🎉 Winner Payout Complete!', 
-                  `Congratulations! You've received the full amount of ${totalAmount} USDC from the degen split. Your locked funds have been returned to you.`,
+                  `Congratulations! You've received the full amount of ${formatUsdcForDisplay(totalAmount)} USDC from the degen split. Your locked funds have been returned to you.`,
                   [{ text: 'OK' }]
                 );
               } else {
                 Alert.alert(
                   '✅ Payment Confirmed!', 
-                  `Your locked funds (${totalAmount} USDC) have been successfully withdrawn from the split wallet to your in-app wallet.`,
+                  `Your locked funds (${formatUsdcForDisplay(totalAmount)} USDC) have been successfully withdrawn from the split wallet to your in-app wallet.`,
                   [
                     {
                       text: 'OK',
@@ -322,7 +213,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         } else {
           Alert.alert(
             '✅ Payment Confirmed!', 
-            `Your locked funds (${totalAmount} USDC) have been successfully withdrawn from the split wallet to your KAST card.`,
+            `Your locked funds (${formatUsdcForDisplay(totalAmount)} USDC) have been successfully withdrawn from the split wallet to your KAST card.`,
             [
               {
                 text: 'OK',
@@ -409,7 +300,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         } else {
           Alert.alert(
             '✅ Payment Confirmed!', 
-            `Your locked funds (${totalAmount} USDC) have been successfully withdrawn from the split wallet to your in-app wallet.`,
+            `Your locked funds (${formatUsdcForDisplay(totalAmount)} USDC) have been successfully withdrawn from the split wallet to your in-app wallet.`,
             [
               {
                 text: 'OK',
@@ -537,7 +428,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
             {isWinner ? 'You Get' : 'You Pay'}
           </Text>
           <Text style={styles.amountValue}>
-            {totalAmount} USDC
+            {formatUsdcForDisplay(totalAmount)} USDC
           </Text>
         </View>
 
@@ -608,8 +499,8 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         onClose={() => degenState.setShowClaimModal(false)}
         title={hasAlreadyClaimed ? 'Funds Already Claimed' : 'Claim Your Winnings'}
         description={hasAlreadyClaimed 
-          ? `You have already claimed your ${totalAmount} USDC winnings.`
-          : `You won the degen split! Claim your ${totalAmount} USDC winnings.`
+          ? `You have already claimed your ${formatUsdcForDisplay(totalAmount)} USDC winnings.`
+          : `You won the degen split! Claim your ${formatUsdcForDisplay(totalAmount)} USDC winnings.`
         }
         showHandle={true}
         closeOnBackdrop={true}
@@ -658,7 +549,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         onClose={() => degenState.setShowPaymentOptionsModal(false)}
         title={!degenState.showSignatureStep ? 'Choose Payment Method' : 'Withdraw Your Locked Funds'}
         description={!degenState.showSignatureStep 
-          ? `You need to pay the full ${totalAmount} USDC bill. How would you like to pay?`
+          ? `You need to pay the full ${formatUsdcForDisplay(totalAmount)} USDC bill. How would you like to pay?`
           : 'Your locked funds will be sent from the split wallet to your chosen destination.'
         }
         showHandle={true}

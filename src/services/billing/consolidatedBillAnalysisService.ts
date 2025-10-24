@@ -12,6 +12,7 @@ import {
 import { BillItem } from '../../types/billSplitting';
 import { logger } from '../core';
 import { MockupDataService } from '../data/mockupData';
+import { roundUsdcAmount } from '../../utils/ui/format/formatUtils';
 
 // Essential interfaces only
 export interface ManualBillInput {
@@ -161,11 +162,11 @@ class ConsolidatedBillAnalysisService {
           time: manualInput.date.toTimeString().split(' ')[0],
           order_id: this.generateBillId(),
           employee: '',
-          items: [{ name: manualInput.description || 'Manual Entry', price: manualInput.amount }],
-          sub_total: manualInput.amount,
+          items: [{ name: manualInput.description || 'Manual Entry', price: roundUsdcAmount(manualInput.amount) }],
+          sub_total: roundUsdcAmount(manualInput.amount),
           sales_tax: 0,
-          order_total: manualInput.amount,
-          calculated_total: manualInput.amount
+          order_total: roundUsdcAmount(manualInput.amount),
+          calculated_total: roundUsdcAmount(manualInput.amount)
         },
         currency: manualInput.currency
       };
@@ -394,10 +395,10 @@ class ConsolidatedBillAnalysisService {
     const items: BillItem[] = (analysisData.transaction?.items || []).map((item, index) => ({
       id: `${billId}_item_${index}`,
       name: item.name,
-      price: item.price,
+      price: roundUsdcAmount(item.price),
       quantity: 1,
       category: this.categorizeItem(item.name),
-      total: item.price,
+      total: roundUsdcAmount(item.price),
       participants: [],
     }));
 
@@ -406,8 +407,8 @@ class ConsolidatedBillAnalysisService {
       {
         id: currentUser?.id || `${billId}_participant_1`,
         name: currentUser?.name || 'You',
-        wallet_address: currentUser?.wallet_address || '',
-        walletAddress: currentUser?.wallet_address || '',
+        wallet_address: '', // Empty until dedicated split wallet is created
+        walletAddress: '', // Empty until dedicated split wallet is created
         status: 'accepted',
         amountOwed: 0,
         items: [],
@@ -431,7 +432,7 @@ class ConsolidatedBillAnalysisService {
       location: analysisData.store?.location?.address || '',
       date: analysisData.transaction?.date || dateStr,
       time: analysisData.transaction?.time || timeStr,
-      totalAmount: analysisData.transaction?.order_total || 0,
+      totalAmount: roundUsdcAmount(analysisData.transaction?.order_total || 0),
       currency: 'USDC', // Always use USDC for processed bills
       items,
       participants: defaultParticipants,

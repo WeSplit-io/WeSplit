@@ -4,7 +4,6 @@
  * Part of the modularized SplitWalletService
  */
 
-import { walletService } from '../blockchain/wallet';
 import { logger } from '../core';
 import { roundUsdcAmount as currencyRoundUsdcAmount } from '../../utils/ui/format';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
@@ -45,6 +44,7 @@ export class SplitWalletCreation {
    */
   static async ensureUserWalletInitialized(userId: string): Promise<{success: boolean, error?: string}> {
     try {
+      const { walletService } = await import('../blockchain/wallet');
       const userWallet = await walletService.getWalletInfo(userId);
       if (!userWallet) {
         return { success: false, error: 'User wallet not found' };
@@ -69,12 +69,13 @@ export class SplitWalletCreation {
    */
   static async checkUsdcBalance(userId: string): Promise<{success: boolean, balance: number, error?: string}> {
     try {
+      const { walletService } = await import('../blockchain/wallet');
       const userWallet = await walletService.getWalletInfo(userId);
       if (!userWallet) {
         return { success: false, balance: 0, error: 'User wallet not found' };
       }
 
-      const balance = await walletService.getWalletInfoBalance(userId);
+      const balance = await walletService.getUserWalletBalance(userId);
       if (balance === null) {
         return { success: false, balance: 0, error: 'Failed to get wallet balance' };
       }
@@ -175,17 +176,20 @@ export class SplitWalletCreation {
       }, 'SplitWalletCreation');
 
       // Create a new dedicated wallet for this split
-      // This wallet will be managed by the creator but is separate from their main wallet
-      const walletResult = await walletService.createWallet(creatorId);
+      // This wallet will be completely independent and not tied to any user account
+      const { solanaWalletService } = await import('../blockchain/wallet/api/solanaWalletApi');
+      const walletResult = await solanaWalletService.instance.createWalletFromMnemonic();
       if (!walletResult.success || !walletResult.wallet) {
-        throw new Error('Failed to create wallet for split');
+        throw new Error('Failed to create dedicated split wallet');
       }
       const wallet = walletResult.wallet;
       
       
       logger.info('Split wallet created with address', { 
         walletAddress: wallet.address,
-        publicKey: wallet.publicKey 
+        publicKey: wallet.publicKey,
+        isNewWallet: true,
+        walletType: 'dedicated_split_wallet'
       }, 'SplitWalletCreation');
 
       // Create split wallet record (NO PRIVATE KEYS STORED)
@@ -217,6 +221,15 @@ export class SplitWalletCreation {
         ...splitWalletData,
         firebaseDocId: docRef.id,
       };
+
+      logger.info('Split wallet data stored in Firebase', {
+        splitWalletId: createdSplitWallet.id,
+        walletAddress: createdSplitWallet.walletAddress,
+        publicKey: createdSplitWallet.publicKey,
+        billId: createdSplitWallet.billId,
+        creatorId: createdSplitWallet.creatorId,
+        firebaseDocId: createdSplitWallet.firebaseDocId
+      }, 'SplitWalletCreation');
 
       // Store private key securely for the creator (Regular Split)
       // The wallet service returns secretKey (base64), not privateKey
@@ -288,19 +301,23 @@ export class SplitWalletCreation {
         creatorId,
         totalAmount,
         currency,
-        participantsCount: participants.length
+        participantsCount: participants.length,
+        participantWalletAddresses: participants.map(p => p.walletAddress)
       }, 'SplitWalletCreation');
 
       // Create a new dedicated wallet for this Degen Split
-      const walletResult = await walletService.createWallet(creatorId);
+      const { solanaWalletService } = await import('../blockchain/wallet/api/solanaWalletApi');
+      const walletResult = await solanaWalletService.instance.createWalletFromMnemonic();
       if (!walletResult.success || !walletResult.wallet) {
-        throw new Error('Failed to create wallet for Degen Split');
+        throw new Error('Failed to create dedicated Degen Split wallet');
       }
       const wallet = walletResult.wallet;
       
       logger.info('Degen Split wallet created with address', { 
         walletAddress: wallet.address,
-        publicKey: wallet.publicKey 
+        publicKey: wallet.publicKey,
+        isNewWallet: true,
+        walletType: 'dedicated_degen_split_wallet'
       }, 'SplitWalletCreation');
 
       // Create split wallet record
@@ -332,6 +349,17 @@ export class SplitWalletCreation {
         ...splitWalletData,
         firebaseDocId: docRef.id,
       };
+
+      logger.info('Degen Split wallet data stored in Firebase', {
+        splitWalletId: createdSplitWallet.id,
+        splitWalletAddress: createdSplitWallet.walletAddress,
+        publicKey: createdSplitWallet.publicKey,
+        billId: createdSplitWallet.billId,
+        creatorId: createdSplitWallet.creatorId,
+        firebaseDocId: createdSplitWallet.firebaseDocId,
+        participantWalletAddresses: participants.map(p => p.walletAddress),
+        isDedicatedWallet: true
+      }, 'SplitWalletCreation');
 
       // Store private key for ALL participants (Degen Split feature)
       // The wallet service returns secretKey (base64), not privateKey
@@ -403,10 +431,11 @@ export class SplitWalletCreation {
 
       const currentWallet = currentWalletResult.wallet;
 
-      // Create a new wallet with the same ID but reset data
-      const newWalletResult = await walletService.createWallet(creatorId);
+      // Create a new dedicated wallet with the same ID but reset data
+      const { solanaWalletService } = await import('../blockchain/wallet/api/solanaWalletApi');
+      const newWalletResult = await solanaWalletService.instance.createWalletFromMnemonic();
       if (!newWalletResult.success || !newWalletResult.wallet) {
-        throw new Error('Failed to create new wallet for reset');
+        throw new Error('Failed to create new dedicated wallet for reset');
       }
       const newWallet = newWalletResult.wallet;
 
@@ -420,12 +449,12 @@ export class SplitWalletCreation {
           amountPaid: 0,
           status: 'pending' as const,
           // Remove undefined fields - Firebase doesn't allow undefined values
-          transactionSignature: null,
-          paidAt: null,
+          transactionSignature: undefined,
+          paidAt: undefined,
         })),
         updatedAt: new Date().toISOString(),
         // Remove undefined fields - Firebase doesn't allow undefined values
-        completedAt: null,
+        completedAt: undefined,
       };
 
       // Update in Firebase

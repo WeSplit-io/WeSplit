@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import { logger } from '../analytics/loggingService';
+import { removeUndefinedValues } from '../shared/dataUtils';
 
 export interface Split {
   id: string;
@@ -86,30 +87,6 @@ export interface SplitListResult {
 export class SplitStorageServiceClass {
   private static readonly COLLECTION_NAME = 'splits'
 
-  /**
-   * Remove undefined values from an object to prevent Firebase errors
-   */
-  private static removeUndefinedValues(obj: any): any {
-    if (obj === null || obj === undefined) {
-      return obj;
-    }
-    
-    if (Array.isArray(obj)) {
-      return obj.map(item => this.removeUndefinedValues(item));
-    }
-    
-    if (typeof obj === 'object') {
-      const cleaned: any = {};
-      for (const [key, value] of Object.entries(obj)) {
-        if (value !== undefined) {
-          cleaned[key] = this.removeUndefinedValues(value);
-        }
-      }
-      return cleaned;
-    }
-    
-    return obj;
-  }
 
   /**
    * Create a new split in the database
@@ -131,7 +108,9 @@ export class SplitStorageServiceClass {
         updatedAt: new Date().toISOString(),
       };
 
-      const docRef = await addDoc(collection(db, this.COLLECTION_NAME), split);
+      // Remove undefined values to prevent Firebase errors
+      const cleanedSplit = removeUndefinedValues(split);
+      const docRef = await addDoc(collection(db, this.COLLECTION_NAME), cleanedSplit);
       
       const createdSplit: Split = {
         ...split,
@@ -444,7 +423,7 @@ export class SplitStorageServiceClass {
       };
 
       // Remove undefined values to prevent Firebase errors
-      const cleanedUpdateData = this.removeUndefinedValues(updateData);
+      const cleanedUpdateData = removeUndefinedValues(updateData);
 
       await updateDoc(doc(db, this.COLLECTION_NAME, docId), cleanedUpdateData);
 
@@ -490,7 +469,7 @@ export class SplitStorageServiceClass {
       };
 
       // Remove undefined values to prevent Firebase errors
-      const cleanedUpdateData = this.removeUndefinedValues(updateData);
+      const cleanedUpdateData = removeUndefinedValues(updateData);
 
       await updateDoc(doc(db, this.COLLECTION_NAME, docId), cleanedUpdateData);
 

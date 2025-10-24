@@ -1024,7 +1024,7 @@ class NotificationServiceClass {
 
         case 'payment_reminder':
           if (notification.data?.requestId) {
-            navigation.navigate('RequestConfirmation', {
+            navigation.navigate('RequestAmount', {
               requestId: notification.data.requestId,
               isFromNotification: true,
               notificationId: notification.id

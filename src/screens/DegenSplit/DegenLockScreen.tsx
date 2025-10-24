@@ -27,118 +27,9 @@ import { FallbackDataService } from '../../services/data/mockupData';
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitInitialization, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenSplitProgress, DegenSplitParticipants } from './components';
-import { Container, Button, Modal } from '../../components/shared';
+import { Container, Button, Modal, AppleSlider } from '../../components/shared';
+import { roundUsdcAmount, formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
 
-// AppleSlider component adapted from SendConfirmationScreen
-interface AppleSliderProps {
-  onSlideComplete: () => void;
-  disabled: boolean;
-  loading: boolean;
-  text?: string;
-}
-
-const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, loading, text = 'Slide to Lock' }) => {
-  const maxSlideDistance = 300;
-  const sliderValue = useRef(new Animated.Value(0)).current;
-  const [isSliderActive, setIsSliderActive] = useState(false);
-
-  const panResponder = require('react-native').PanResponder.create({
-    onStartShouldSetPanResponder: () => !disabled && !loading,
-    onMoveShouldSetPanResponder: () => !disabled && !loading,
-    onPanResponderGrant: () => {
-      setIsSliderActive(true);
-    },
-    onPanResponderMove: (_: any, gestureState: any) => {
-      const newValue = Math.max(0, Math.min(gestureState.dx, maxSlideDistance));
-      sliderValue.setValue(newValue);
-    },
-    onPanResponderRelease: (_: any, gestureState: any) => {
-      if (gestureState.dx > maxSlideDistance * 0.6) {
-        Animated.timing(sliderValue, {
-          toValue: maxSlideDistance,
-          duration: 200,
-          useNativeDriver: false,
-        }).start(() => {
-          if (onSlideComplete) {onSlideComplete();}
-          setTimeout(() => {
-            sliderValue.setValue(0);
-            setIsSliderActive(false);
-          }, 1000);
-        });
-      } else {
-        Animated.timing(sliderValue, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }).start(() => {
-          setIsSliderActive(false);
-        });
-      }
-    },
-  });
-
-  return (
-    <LinearGradient
-      colors={[colors.green, colors.greenBlue]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
-      style={styles.appleSliderGradientBorder}
-    >
-      <View style={[styles.appleSliderContainer, disabled && { opacity: 0.5 }]} {...panResponder.panHandlers}>
-        <Animated.View style={styles.appleSliderTrack}>
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              ...require('react-native').StyleSheet.absoluteFillObject,
-              opacity: sliderValue.interpolate({ inputRange: [0, maxSlideDistance], outputRange: [0, 1] }) as any,
-              borderRadius: 999,
-            }}
-          >
-            <LinearGradient
-              colors={[colors.green, colors.greenBlue]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{
-                ...require('react-native').StyleSheet.absoluteFillObject,
-                borderRadius: 999,
-              }}
-            />
-          </Animated.View>
-          <Animated.Text
-            style={[
-              styles.appleSliderText,
-              { color: colors.white }
-            ]}
-          >
-            {loading ? 'Locking...' : text}
-          </Animated.Text>
-        </Animated.View>
-        <Animated.View
-          style={[
-            styles.appleSliderThumb,
-            {
-              transform: [{ translateX: sliderValue }],
-            },
-          ]}
-        >
-          <LinearGradient
-            colors={[colors.green, colors.greenBlue]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{
-              ...require('react-native').StyleSheet.absoluteFillObject,
-              borderRadius: 30,
-            }}
-          />
-          <Image 
-            source={require('../../../assets/chevron-right.png')} 
-            style={styles.appleSliderThumbIcon}
-          />
-        </Animated.View>
-      </View>
-    </LinearGradient>
-  );
-};
 
 // Category image mapping
 const CATEGORY_IMAGES: { [key: string]: any } = {
@@ -174,6 +65,25 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   
   // Use route params if available, otherwise fallback to split data
   const totalAmount = routeTotalAmount || splitData?.totalAmount || 0;
+  
+  // Debug logging for amount values
+  useEffect(() => {
+    const testAmount = 0.11599999999999999;
+    const testRounded = roundUsdcAmount(testAmount);
+    
+    console.log('🔍 DegenLockScreen amount debugging:', {
+      routeTotalAmount,
+      splitDataTotalAmount: splitData?.totalAmount,
+      finalTotalAmount: totalAmount,
+      roundedAmount: roundUsdcAmount(totalAmount),
+      isNumber: typeof totalAmount === 'number',
+      isFinite: Number.isFinite(totalAmount),
+      testAmount,
+      testRounded,
+      testAmountString: testAmount.toString(),
+      testRoundedString: testRounded.toString()
+    });
+  }, [totalAmount, routeTotalAmount, splitData?.totalAmount]);
   const { state } = useApp();
   const { currentUser } = state;
   
@@ -468,7 +378,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           </View>
           <View style={styles.totalBillRow}>
             <Text style={styles.totalBillLabel}>Total Bill</Text>
-            <Text style={styles.totalBillAmount}>{totalAmount} USDC</Text>
+            <Text style={styles.totalBillAmount}>{formatUsdcForDisplay(totalAmount)} USDC</Text>
           </View>
           <View style={styles.billCardDotLeft}/>
           <View style={styles.billCardDotRight}/>
@@ -640,7 +550,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         visible={degenState.showLockModal}
         onClose={() => degenState.setShowLockModal(false)}
         showHandle={true}
-        title={`Lock ${totalAmount} USDC to split the Bill`}
+        title={`Lock ${formatUsdcForDisplay(totalAmount)} USDC to split the Bill`}
         description="Lock your funds to participate in the degen split roulette!"
       >
         <View style={styles.modalIconContainer}>

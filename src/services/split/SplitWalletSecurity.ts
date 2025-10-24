@@ -686,12 +686,10 @@ export class SplitWalletSecurity {
     olderThanDays: number = 30
   ): Promise<{ success: boolean; cleanedCount: number; error?: string }> {
     try {
-
-      // Note: This is a placeholder implementation
-      // In a real implementation, you would need to maintain a separate index
-      // of stored keys with timestamps to enable cleanup
+      logger.info('Private key cleanup requested', { olderThanDays }, 'SplitWalletSecurity');
       
-      
+      // TODO: Implement proper cleanup logic with key index
+      // For now, return success with no cleanup
       return {
         success: true,
         cleanedCount: 0,
@@ -699,7 +697,6 @@ export class SplitWalletSecurity {
       };
 
     } catch (error) {
-      console.error('🔍 SplitWalletSecurity: Error cleaning up old private keys:', error);
       logger.error('Failed to cleanup old private keys', error, 'SplitWalletSecurity');
       return {
         success: false,

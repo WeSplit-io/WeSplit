@@ -4,7 +4,6 @@
  * Part of the modularized SplitWalletService
  */
 
-import { Platform } from 'react-native';
 import { consolidatedTransactionService } from '../blockchain/transaction';
 import { logger } from '../core';
 import { FeeService } from '../../config/constants/feeConfig';
@@ -143,9 +142,9 @@ async function executeFairSplitTransaction(
     let companyFeeAmount = 0;
     
     if (transactionType === 'funding') {
-      // Collect 1.5% company fee for funding splits
+      // Calculate company fee for funding splits
       const { FeeService } = await import('../../config/constants/feeConfig');
-      const { fee: companyFee } = FeeService.calculateCompanyFee(amount, 'split_payment');
+      const { fee: companyFee, recipientAmount } = FeeService.calculateCompanyFee(amount, 'split_payment');
       companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6)); // USDC has 6 decimals
       
       // Add company fee transfer instruction to company wallet
@@ -164,19 +163,20 @@ async function executeFairSplitTransaction(
           )
         );
         
-        // Reduce transfer amount by company fee (recipient gets less)
-        transferAmount = transferAmount - companyFeeAmount;
+        // Recipient gets the full amount they expect (no deduction)
+        transferAmount = Math.floor(recipientAmount * Math.pow(10, 6)); // USDC has 6 decimals
         
         logger.info('Added company fee for split funding', {
           amount,
           companyFee,
           companyFeeAmount,
+          recipientAmount,
           transferAmount
         }, 'SplitWalletPayments');
       }
     }
 
-    // Add transfer instruction (recipient gets the amount minus company fee for funding)
+    // Add transfer instruction (recipient gets the full amount they expect)
     transaction.add(
       createTransferInstruction(
         fromTokenAccount,
@@ -414,9 +414,9 @@ async function executeFastTransaction(
       let companyFeeAmount = 0;
       
       if (transactionType === 'funding') {
-        // Collect 1.5% company fee for funding splits
+        // Calculate company fee for funding splits
         const { FeeService } = await import('../../config/constants/feeConfig');
-        const { fee: companyFee } = FeeService.calculateCompanyFee(amount, 'split_payment');
+        const { fee: companyFee, recipientAmount } = FeeService.calculateCompanyFee(amount, 'split_payment');
         companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6)); // USDC has 6 decimals
         
         // Add company fee transfer instruction to company wallet
@@ -435,19 +435,20 @@ async function executeFastTransaction(
             )
           );
           
-          // Reduce transfer amount by company fee (recipient gets less)
-          transferAmount = transferAmount - companyFeeAmount;
+          // Recipient gets the full amount they expect (no deduction)
+          transferAmount = Math.floor(recipientAmount * Math.pow(10, 6)); // USDC has 6 decimals
           
           logger.info('Added company fee for split funding (fast)', {
             amount,
             companyFee,
             companyFeeAmount,
+            recipientAmount,
             transferAmount
           }, 'SplitWalletPayments');
         }
       }
 
-      // Add transfer instruction (recipient gets the amount minus company fee for funding)
+      // Add transfer instruction (recipient gets the full amount they expect)
       transaction.add(
         createTransferInstruction(
           fromTokenAccount,
@@ -608,8 +609,24 @@ async function executeDegenSplitTransaction(
       amount,
       currency,
       memo,
-      transactionType
+      transactionType,
+      privateKeyLength: privateKey.length
         }, 'SplitWalletPayments');
+        
+    // Validate inputs
+    if (!fromAddress || !toAddress || !privateKey) {
+      return {
+        success: false,
+        error: 'Missing required transaction parameters'
+      };
+    }
+    
+    if (amount <= 0) {
+      return {
+        success: false,
+        error: 'Invalid transaction amount'
+      };
+    }
         
     // Import required modules using memory manager
     const { memoryManager } = await import('../shared/memoryManager');
@@ -618,18 +635,53 @@ async function executeDegenSplitTransaction(
 
     // Get connection with optimized RPC failover
     const { optimizedTransactionUtils } = await import('../shared/transactionUtilsOptimized');
-    const connection = await optimizedTransactionUtils.getConnection();
+    let connection;
+    try {
+      connection = await optimizedTransactionUtils.getConnection();
+    } catch (connectionError) {
+      logger.error('Failed to get Solana connection', {
+        error: connectionError instanceof Error ? connectionError.message : String(connectionError)
+      }, 'SplitWalletPayments');
+      
+      return {
+        success: false,
+        error: 'Failed to connect to Solana network. Please check your internet connection and try again.'
+      };
+    }
 
-    // Create keypair from private key using KeypairUtils
+    // Create keypair from private key using KeypairUtils with enhanced error handling
     const { KeypairUtils } = await memoryManager.loadModule('keypair-utils');
     const keypairResult = KeypairUtils.createKeypairFromSecretKey(privateKey);
     if (!keypairResult.success || !keypairResult.keypair) {
-          return {
+      logger.error('Failed to create keypair from private key', {
+        fromAddress,
+        toAddress,
+        amount,
+        currency,
+        privateKeyLength: privateKey.length,
+        privateKeyPreview: privateKey.substring(0, 20) + '...',
+        error: keypairResult.error
+      }, 'SplitWalletPayments');
+      
+      return {
         success: false,
-        error: keypairResult.error || 'Failed to create keypair from private key'
+        error: `Failed to create keypair from private key: ${keypairResult.error || 'Unknown error'}`
       };
     }
     const keypair = keypairResult.keypair;
+    
+    // Validate that the keypair matches the expected from address
+    if (keypair.publicKey.toBase58() !== fromAddress) {
+      logger.error('Keypair address mismatch', {
+        expectedAddress: fromAddress,
+        actualAddress: keypair.publicKey.toBase58()
+      }, 'SplitWalletPayments');
+      
+      return {
+        success: false,
+        error: `Keypair address mismatch. Expected: ${fromAddress}, Got: ${keypair.publicKey.toBase58()}`
+      };
+    }
     
     // Validate addresses
     const fromPublicKey = new PublicKey(fromAddress);
@@ -680,14 +732,14 @@ async function executeDegenSplitTransaction(
         );
       }
 
-      // Calculate company fee for funding transactions (1.5% fee for money going INTO splits)
+      // Calculate company fee for funding transactions
       let transferAmount = Math.floor(amount * Math.pow(10, 6)); // USDC has 6 decimals
       let companyFeeAmount = 0;
       
       if (transactionType === 'funding') {
-        // Collect 1.5% company fee for funding splits
+        // Calculate company fee for funding splits
         const { FeeService } = await import('../../config/constants/feeConfig');
-        const { fee: companyFee } = FeeService.calculateCompanyFee(amount, 'split_payment');
+        const { fee: companyFee, recipientAmount } = FeeService.calculateCompanyFee(amount, 'split_payment');
         companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6)); // USDC has 6 decimals
         
         // Add company fee transfer instruction to company wallet
@@ -706,19 +758,20 @@ async function executeDegenSplitTransaction(
             )
           );
           
-          // Reduce transfer amount by company fee (recipient gets less)
-          transferAmount = transferAmount - companyFeeAmount;
+          // Recipient gets the full amount they expect (no deduction)
+          transferAmount = Math.floor(recipientAmount * Math.pow(10, 6)); // USDC has 6 decimals
           
           logger.info('Added company fee for split funding (degen)', {
             amount,
             companyFee,
             companyFeeAmount,
+            recipientAmount,
             transferAmount
           }, 'SplitWalletPayments');
         }
       }
 
-      // Add transfer instruction (recipient gets the amount minus company fee for funding)
+      // Add transfer instruction (recipient gets the full amount they expect)
       transaction.add(
         createTransferInstruction(
           fromTokenAccount,
@@ -775,11 +828,27 @@ async function executeDegenSplitTransaction(
     // Sign with both keypairs (user for USDC transfer, company for fees)
     transaction.sign(keypair, companyKeypair);
 
-    const signature = await connection.sendRawTransaction(transaction.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'processed', // Use 'processed' for faster confirmation
-      maxRetries: 2 // Reduced retries for faster processing
-    });
+    let signature;
+    try {
+      signature = await connection.sendRawTransaction(transaction.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'processed', // Use 'processed' for faster confirmation
+        maxRetries: 2 // Reduced retries for faster processing
+      });
+    } catch (sendError) {
+      logger.error('Failed to send degen split transaction', {
+        fromAddress,
+        toAddress,
+        amount,
+        currency,
+        error: sendError instanceof Error ? sendError.message : String(sendError)
+      }, 'SplitWalletPayments');
+      
+      return {
+        success: false,
+        error: `Transaction failed to send: ${sendError instanceof Error ? sendError.message : 'Unknown error'}`
+      };
+    }
 
     logger.info('Degen split transaction sent successfully', {
             signature,
@@ -1020,21 +1089,28 @@ export class SplitWalletPayments {
       try {
         const { balanceUtils } = await import('../shared/balanceUtils');
         const { PublicKey } = await import('@solana/web3.js');
+        const { FeeService } = await import('../../config/constants/feeConfig');
         const usdcMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
         const userBalance = await balanceUtils.getUsdcBalance(new PublicKey(userWallet.address), usdcMint);
+        
+        // Calculate total amount user needs to pay (share + fees)
+        const { totalAmount: totalPaymentAmount } = FeeService.calculateCompanyFee(roundedAmount, 'split_payment');
+        
         logger.info('User USDC balance check for degen split funding', {
           splitWalletId,
           participantId,
           userWalletAddress: userWallet.address,
           userUsdcBalance: userBalance.balance,
-          requiredAmount: roundedAmount,
-          hasSufficientBalance: userBalance.balance >= roundedAmount
+          shareAmount: roundedAmount,
+          totalPaymentAmount,
+          feeAmount: totalPaymentAmount - roundedAmount,
+          hasSufficientBalance: userBalance.balance >= totalPaymentAmount
         }, 'SplitWalletPayments');
 
-        if (userBalance.balance < roundedAmount) {
+        if (userBalance.balance < totalPaymentAmount) {
           return {
             success: false,
-            error: `Insufficient USDC balance. You have ${userBalance.balance.toFixed(6)} USDC but need ${roundedAmount.toFixed(6)} USDC.`
+            error: `Insufficient USDC balance. You have ${userBalance.balance.toFixed(6)} USDC but need ${totalPaymentAmount.toFixed(6)} USDC to make this payment (${roundedAmount.toFixed(6)} USDC for your share + ${(totalPaymentAmount - roundedAmount).toFixed(6)} USDC in fees). Please add USDC to your wallet first.`
           };
         }
       } catch (balanceError) {
@@ -1046,21 +1122,42 @@ export class SplitWalletPayments {
         // Continue with transaction even if balance check fails
       }
 
+      // Calculate total amount user needs to pay (share + fees) for transaction
+      const { FeeService } = await import('../../config/constants/feeConfig');
+      const { totalAmount: totalPaymentAmount } = FeeService.calculateCompanyFee(roundedAmount, 'split_payment');
+
       // Execute transaction using degen split specific method
       logger.info('Starting degen split fund locking transaction', {
         splitWalletId,
         participantId,
         fromAddress: userWallet.address,
         toAddress: wallet.walletAddress,
-        amount: roundedAmount,
-        currency: 'USDC'
+        shareAmount: roundedAmount,
+        totalPaymentAmount,
+        feeAmount: totalPaymentAmount - roundedAmount,
+        currency: 'USDC',
+        hasSecretKey: !!userWallet.secretKey
       }, 'SplitWalletPayments');
+
+      // Validate secret key before attempting transaction
+      if (!userWallet.secretKey) {
+        logger.error('User wallet secret key is missing', {
+          splitWalletId,
+          participantId,
+          userWalletAddress: userWallet.address
+        }, 'SplitWalletPayments');
+        
+        return {
+          success: false,
+          error: 'User wallet secret key is missing. Please ensure your wallet is properly set up.'
+        };
+      }
 
       const transactionResult = await executeDegenSplitTransaction(
             userWallet.address,
-        userWallet.secretKey || '',
+        userWallet.secretKey,
             wallet.walletAddress,
-            roundedAmount,
+            roundedAmount, // Use only the share amount - executeDegenSplitTransaction will calculate fees
             'USDC',
             `Degen Split fund locking - ${wallet.id}`,
             'funding'
@@ -1220,6 +1317,7 @@ export class SplitWalletPayments {
         const { BalanceUtils } = await import('../shared/balanceUtils');
         const { PublicKey } = await import('@solana/web3.js');
         const { getConfig } = await import('../../config/unified');
+        const { FeeService } = await import('../../config/constants/feeConfig');
         
         const userPublicKey = new PublicKey(userWallet.address);
         const usdcMint = new PublicKey(getConfig().blockchain.usdcMintAddress);
@@ -1227,17 +1325,22 @@ export class SplitWalletPayments {
         const balanceResult = await BalanceUtils.getUsdcBalance(userPublicKey, usdcMint);
         const userUsdcBalance = balanceResult.balance;
         
+        // Calculate total amount user needs to pay (share + fees)
+        const { totalAmount: totalPaymentAmount } = FeeService.calculateCompanyFee(roundedAmount, 'split_payment');
+        
         logger.info('User USDC balance check', {
           participantId,
           userAddress: userWallet.address,
           userUsdcBalance,
-          paymentAmount: roundedAmount
+          shareAmount: roundedAmount,
+          totalPaymentAmount,
+          feeAmount: totalPaymentAmount - roundedAmount
         }, 'SplitWalletPayments');
         
-        if (userUsdcBalance < roundedAmount) {
+        if (userUsdcBalance < totalPaymentAmount) {
             return {
               success: false,
-            error: `Insufficient USDC balance. You have ${userUsdcBalance.toFixed(6)} USDC but need ${roundedAmount.toFixed(6)} USDC to make this payment. Please add USDC to your wallet first.`,
+            error: `Insufficient USDC balance. You have ${userUsdcBalance.toFixed(6)} USDC but need ${totalPaymentAmount.toFixed(6)} USDC to make this payment (${roundedAmount.toFixed(6)} USDC for your share + ${(totalPaymentAmount - roundedAmount).toFixed(6)} USDC in fees). Please add USDC to your wallet first.`,
           };
         }
       } catch (error) {
@@ -1509,6 +1612,18 @@ export class SplitWalletPayments {
         };
       }
 
+      // Calculate the actual total amount from all participants' locked funds
+      // For degen splits, the winner gets all the money that was locked by all participants
+      const actualTotalAmount = wallet.participants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+      
+      logger.info('Degen winner payout amount calculation', {
+        splitWalletId,
+        winnerUserId,
+        passedTotalAmount: totalAmount,
+        actualTotalAmount,
+        participantAmounts: wallet.participants.map(p => ({ userId: p.userId, amountPaid: p.amountPaid }))
+      }, 'SplitWalletPayments');
+
       // Get the private key using degen split specific logic
       const privateKeyResult = await this.getSplitWalletPrivateKeyPrivate(splitWalletId, winnerUserId);
       
@@ -1525,7 +1640,7 @@ export class SplitWalletPayments {
             wallet.walletAddress,
             privateKeyResult.privateKey,
             winnerAddress,
-            totalAmount,
+            actualTotalAmount, // Use actual total amount from all participants
             wallet.currency,
             description || `Degen Split winner payout for ${winnerUserId}`,
             'withdrawal'
@@ -1534,7 +1649,7 @@ export class SplitWalletPayments {
             wallet.walletAddress,
             privateKeyResult.privateKey,
             winnerAddress,
-            totalAmount,
+            actualTotalAmount, // Use actual total amount from all participants
             wallet.currency,
             description || `Degen Split winner payout for ${winnerUserId}`,
             'withdrawal'
@@ -1559,7 +1674,7 @@ export class SplitWalletPayments {
           ? { 
               ...p,
               status: 'paid' as const,
-              amountPaid: totalAmount,
+              amountPaid: actualTotalAmount, // Winner gets the total amount from all participants
               transactionSignature: transactionResult.signature,
               paidAt: new Date().toISOString()
             }

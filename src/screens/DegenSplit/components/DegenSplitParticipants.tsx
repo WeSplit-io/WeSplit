@@ -8,6 +8,7 @@ import { View, Text, ScrollView } from 'react-native';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import UserAvatar from '../../../components/UserAvatar';
+import { roundUsdcAmount, formatUsdcForDisplay } from '../../../utils/ui/format/formatUtils';
 import { styles } from './DegenSplitParticipantsStyles';
 
 interface Participant {
@@ -75,7 +76,7 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
               </View>
               
               <View style={styles.participantAmountContainer}>
-                <Text style={styles.participantAmount}>{totalAmount} USDC</Text>
+                <Text style={styles.participantAmount}>{formatUsdcForDisplay(totalAmount)} USDC</Text>
                 {isParticipantLocked ? (
                   <View style={styles.lockedIndicator}>
                     <Text style={styles.lockedIndicatorText}>🔒 Locked</Text>

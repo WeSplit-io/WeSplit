@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Animated, PanResponder, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Animated, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import PhosphorIcon from './PhosphorIcon';
 import { colors, spacing } from '../../theme';
 import { logger } from '../../services/analytics/loggingService';
@@ -56,22 +57,26 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
     }, 'AppleSlider');
   }
 
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => {
-      return !disabled && !loading;
-    },
-    onMoveShouldSetPanResponder: () => {
-      return !disabled && !loading;
-    },
-    onPanResponderGrant: () => {
+  const handleGestureEvent = Animated.event(
+    [{ nativeEvent: { translationX: sliderValue } }],
+    { 
+      useNativeDriver: false,
+      listener: (event: any) => {
+        const translationX = event.nativeEvent.translationX;
+        const newValue = Math.max(0, Math.min(translationX, maxSlideDistance));
+        sliderValue.setValue(newValue);
+      }
+    }
+  );
+
+  const handleStateChange = (event: PanGestureHandlerGestureEvent) => {
+    const { translationX, state } = event.nativeEvent;
+
+    if (state === 2) { // BEGAN
       setIsSliderActive(true);
-    },
-    onPanResponderMove: (_, gestureState) => {
-      const newValue = Math.max(0, Math.min(gestureState.dx, maxSlideDistance));
-      sliderValue.setValue(newValue);
-    },
-    onPanResponderRelease: (_, gestureState) => {
-      if (gestureState.dx > maxSlideDistance * 0.6) {
+    } else if (state === 4 || state === 5) { // END or CANCELLED
+      if (translationX > maxSlideDistance * 0.6) {
+        // Complete the slide
         Animated.timing(sliderValue, {
           toValue: maxSlideDistance,
           duration: 200,
@@ -86,16 +91,16 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
           }, 1000);
         });
       } else {
+        // Reset to start
+        setIsSliderActive(false);
         Animated.timing(sliderValue, {
           toValue: 0,
           duration: 200,
           useNativeDriver: false,
-        }).start(() => {
-          setIsSliderActive(false);
-        });
+        }).start();
       }
-    },
-  });
+    }
+  };
 
   const styles = StyleSheet.create({
     appleSliderGradientBorder: {
@@ -181,7 +186,12 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
       end={{ x: 1, y: 0 }}
       style={[styles.appleSliderGradientBorder, style]}
     >
-      <View style={[styles.appleSliderContainer, disabled && { opacity: 0.5 }]} {...panResponder.panHandlers}>
+      <PanGestureHandler
+        onGestureEvent={handleGestureEvent}
+        onHandlerStateChange={handleStateChange}
+        enabled={!disabled && !loading}
+      >
+        <View style={[styles.appleSliderContainer, disabled && { opacity: 0.5 }]}>
         <Animated.View style={styles.appleSliderTrack}>
           <Animated.View
             pointerEvents="none"
@@ -229,7 +239,8 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
           />
           <PhosphorIcon name="CaretRight" size={20} color={colors.black} weight="bold" />
         </Animated.View>
-      </View>
+        </View>
+      </PanGestureHandler>
     </LinearGradient>
   );
 };

@@ -710,7 +710,7 @@ export const useDegenSplitLogic = (
             const winnerName = participants[finalIndex].name;
 
             // Send winner notification - fire and forget
-            const winnerNotificationPromise = notificationService.sendWinnerNotification(
+            const winnerNotificationPromise = notificationService.instance.sendWinnerNotification(
               winnerId,
               splitWallet.id,
               billName

@@ -312,8 +312,41 @@ export class WalletRecoveryService {
     try {
       logger.info('Starting wallet recovery', { userId }, 'WalletRecoveryService');
 
-      // 1. Get user's public key from database
-      const userData = await firebaseDataService.user.getCurrentUser(userId);
+      // 1. Get user's public key from database with error handling
+      let userData;
+      try {
+        userData = await firebaseDataService.user.getCurrentUser(userId);
+      } catch (error) {
+        logger.warn('Failed to get user data from database, trying local recovery only', { 
+          userId, 
+          error: error instanceof Error ? error.message : String(error) 
+        }, 'WalletRecoveryService');
+        
+        // Try to recover from local storage only
+        const storedWallets = await this.getStoredWallets(userId);
+        if (storedWallets.length > 0) {
+          const firstWallet = storedWallets[0];
+          logger.info('Using first stored wallet for recovery', { 
+            userId, 
+            address: firstWallet.address 
+          }, 'WalletRecoveryService');
+          
+          return {
+            success: true,
+            wallet: {
+              address: firstWallet.address,
+              publicKey: firstWallet.publicKey,
+              privateKey: firstWallet.privateKey
+            }
+          };
+        }
+        
+        return {
+          success: false,
+          error: 'User not found in database and no local wallets available'
+        };
+      }
+      
       if (!userData?.wallet_address) {
         return {
           success: false,

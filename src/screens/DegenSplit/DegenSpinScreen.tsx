@@ -23,6 +23,7 @@ import { notificationService } from '../../services/notifications';
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenRoulette } from './components';
 import { Container, Button } from '../../components/shared';
+import { roundUsdcAmount, formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
 
 // Category images mapping for dynamic icons
 const CATEGORY_IMAGES_LOCAL: { [key: string]: any } = {
@@ -302,7 +303,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
           </View>
           <View style={styles.billTotalRow}>
             <Text style={styles.billTotalLabel}>Total Bill</Text>
-            <Text style={styles.billTotalAmount}>{totalAmount} USDC</Text>
+            <Text style={styles.billTotalAmount}>{formatUsdcForDisplay(totalAmount)} USDC</Text>
           </View>
           <View style={styles.billCardDotLeft}></View>
           <View style={styles.billCardDotRight}></View>

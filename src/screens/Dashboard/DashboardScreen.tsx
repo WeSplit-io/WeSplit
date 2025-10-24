@@ -28,6 +28,7 @@ import { Transaction } from '../../types';
 import { getReceivedPaymentRequests } from '../../services/payments/firebasePaymentRequestService';
 import { walletService, UserWalletBalance } from '../../services/blockchain/wallet';
 import { firebaseDataService } from '../../services/data';
+import { getUserDisplayName, preloadUserData } from '../../services/shared/dataUtils';
 import { logger } from '../../services/analytics/loggingService';
 import { db } from '../../config/firebase/firebase';
 import { getDoc, doc } from 'firebase/firestore';
@@ -159,7 +160,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // Load notification count from context notifications
   useEffect(() => {
     if (notifications) {
-      const unreadCount = notifications.filter(n => !n.read).length;
+      const unreadCount = notifications.filter(n => !n.is_read).length;
       setUnreadNotifications(unreadCount);
     }
   }, [notifications]);
@@ -236,7 +237,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         n.type === 'payment_request' &&
         (n.data?.amount || 0) > 0 &&
         n.data?.status !== 'completed' &&
-        !n.read
+        !n.is_read
       ) || [];
 
       // Combine and deduplicate requests
@@ -359,7 +360,19 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
     try {
       setLoadingTransactions(true);
-      const userTransactions = await firebaseDataService.transaction.getTransactions(currentUser.id.toString());
+      const userTransactions = await firebaseDataService.transaction.getUserTransactions(currentUser.id.toString());
+      
+      // Preload user data for all transaction participants
+      const userIds = new Set<string>();
+      userTransactions.forEach(transaction => {
+        if (transaction.from_user) userIds.add(transaction.from_user);
+        if (transaction.to_user) userIds.add(transaction.to_user);
+      });
+      
+      if (userIds.size > 0) {
+        await preloadUserData(Array.from(userIds));
+      }
+      
       setRealTransactions(userTransactions);
     } catch (error) {
       logger.error('Error loading transactions', error, 'DashboardScreen');
@@ -455,14 +468,32 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     }
   };
 
-  const getTransactionTitle = (transaction: Transaction) => {
+  const getTransactionTitle = async (transaction: Transaction) => {
     if (!transaction || !transaction.type) {return 'Transaction';}
     
     switch (transaction.type) {
       case 'send':
-        return `Send to ${transaction.to_user || 'Unknown'}`;
+        // Use stored recipient name if available, otherwise fetch from database
+        if (transaction.recipient_name) {
+          return `Send to ${transaction.recipient_name}`;
+        }
+        try {
+          const recipientName = await getUserDisplayName(transaction.to_user);
+          return `Send to ${recipientName}`;
+        } catch (error) {
+          return `Send to ${transaction.to_user || 'Unknown'}`;
+        }
       case 'receive':
-        return `Received from ${transaction.from_user || 'Unknown'}`;
+        // Use stored sender name if available, otherwise fetch from database
+        if (transaction.sender_name) {
+          return `Received from ${transaction.sender_name}`;
+        }
+        try {
+          const senderName = await getUserDisplayName(transaction.from_user);
+          return `Received from ${senderName}`;
+        } catch (error) {
+          return `Received from ${transaction.from_user || 'Unknown'}`;
+        }
       case 'deposit':
         return 'Deposit';
       case 'withdraw':
@@ -547,7 +578,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
         <View style={styles.transactionContent}>
           <Text style={styles.transactionMessageWithAmount}>
-            <Text style={styles.transactionSenderName}>{getTransactionTitle(transaction)}</Text>
+            <Text style={styles.transactionSenderName}>
+              {transaction.recipient_name || transaction.sender_name || 
+               (transaction.type === 'send' ? `Send to ${transaction.to_user}` : 
+                transaction.type === 'receive' ? `Received from ${transaction.from_user}` : 
+                'Transaction')}
+            </Text>
           </Text>
           <Text style={styles.transactionSource}>
             {getTransactionSource(transaction)} • {transactionTime}

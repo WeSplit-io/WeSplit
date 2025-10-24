@@ -66,6 +66,15 @@ export interface Transaction {
   blockchain_network?: string;
   confirmation_count?: number;
   block_height?: number;
+  // User-friendly display names
+  recipient_name?: string;
+  sender_name?: string;
+  // Additional transaction metadata
+  group_id?: string;
+  transaction_method?: string;
+  app_version?: string;
+  device_info?: string;
+  gas_fee_covered_by_company?: boolean;
 }
 
 // Transaction summary for UI display

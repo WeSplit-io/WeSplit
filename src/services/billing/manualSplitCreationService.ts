@@ -90,7 +90,7 @@ export class ManualSplitCreationService {
         description: `Manual split for ${data.processedBillData.title}`,
         totalAmount: data.processedBillData.totalAmount,
         currency: data.processedBillData.currency,
-        splitType: undefined, // Let user choose in SplitDetailsScreen
+        // Remove splitType field entirely - will be set when user chooses in SplitDetailsScreen
         status: 'pending' as const, // Split starts as pending until user confirms repartition
         creatorId: data.currentUser.id.toString(),
         creatorName: data.currentUser.name,

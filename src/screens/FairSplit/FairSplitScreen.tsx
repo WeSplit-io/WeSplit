@@ -35,7 +35,7 @@ import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits
 import FairSplitHeader from './components/FairSplitHeader';
 import FairSplitProgress from './components/FairSplitProgress';
 import FairSplitParticipants from './components/FairSplitParticipants';
-import { Container, Button } from '../../components/shared';
+import { Container, Button, AppleSlider } from '../../components/shared';
 import CustomModal from '../../components/shared/Modal';
 
 // Remove local image mapping - now handled in FairSplitHeader component
@@ -70,11 +70,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Apple slider states
-  const [sliderWidth, setSliderWidth] = useState(0);
-  const slideAnimation = useRef(new Animated.Value(2)).current; // Start at left position (2px)
-  const fillAnimation = useRef(new Animated.Value(0)).current; // Fill animation (0 to 1)
-  const [isSliding, setIsSliding] = useState(false);
   
   // Wallet recap modal state
   const [showWalletRecapModal, setShowWalletRecapModal] = useState(false);
@@ -147,78 +142,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const hasInvalidAmounts = () => participants.some(p => !p.amountOwed || p.amountOwed <= 0);
   const hasZeroAmounts = () => participants.some(p => p.amountOwed === 0);
 
-  // Apple slider logic
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => !isSigning && !isSliding,
-    onMoveShouldSetPanResponder: () => !isSigning && !isSliding,
-    onPanResponderGrant: () => {
-      setIsSliding(true);
-    },
-    onPanResponderMove: (evt, gestureState) => {
-      if (!isSigning) {
-        const newX = Math.max(2, Math.min(sliderWidth - 58, gestureState.dx + 2));
-        slideAnimation.setValue(newX);
-        
-        // Update fill animation based on slide progress
-        const progress = Math.max(0, Math.min(1, gestureState.dx / (sliderWidth * 0.7)));
-        fillAnimation.setValue(progress);
-      }
-    },
-    onPanResponderRelease: (evt, gestureState) => {
-      setIsSliding(false);
-      
-      if (!isSigning) {
-        const threshold = sliderWidth * 0.7; // 70% of slider width to trigger action
-        
-        if (gestureState.dx >= threshold) {
-          // Slide completed - trigger transfer
-          Animated.parallel([
-            Animated.timing(slideAnimation, {
-              toValue: sliderWidth - 58,
-              duration: 200,
-              useNativeDriver: false,
-            }),
-            Animated.timing(fillAnimation, {
-              toValue: 1,
-              duration: 200,
-              useNativeDriver: false,
-            })
-          ]).start(() => {
-            handleSignatureStep();
-            // Reset slider after a delay
-            setTimeout(() => {
-              Animated.parallel([
-                Animated.timing(slideAnimation, {
-                  toValue: 2,
-                  duration: 300,
-                  useNativeDriver: false,
-                }),
-                Animated.timing(fillAnimation, {
-                  toValue: 0,
-                  duration: 300,
-                  useNativeDriver: false,
-                })
-              ]).start();
-            }, 1000);
-          });
-        } else {
-          // Slide not far enough - return to start
-          Animated.parallel([
-            Animated.timing(slideAnimation, {
-              toValue: 2,
-              duration: 300,
-              useNativeDriver: false,
-            }),
-            Animated.timing(fillAnimation, {
-              toValue: 0,
-              duration: 300,
-              useNativeDriver: false,
-            })
-          ]).start();
-        }
-      }
-    },
-  });
 
   // Use ref to prevent infinite loops
   const isInitializingRef = useRef(false);
@@ -588,10 +511,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   // Calculate amounts when split method or total amount changes
   useEffect(() => {
     if (splitMethod === 'equal' && participants.length > 0) {
-      // Check if participants have zero amounts and trigger repair if needed
-      if (hasZeroAmounts() && splitWallet?.id) {
-        checkAndRepairData();
-        return; // Let the repair handle the update
+      // Check if participants have zero amounts and recalculate if needed
+      if (hasZeroAmounts()) {
+        // Simply recalculate amounts instead of triggering repair
+        const amountPerPerson = totalAmount / participants.length;
+        const updatedParticipants = participants.map(p => ({ ...p, amountOwed: amountPerPerson }));
+        setParticipants(updatedParticipants);
+        return;
       }
       
       // Use AmountCalculationService for consistent calculations
@@ -891,32 +817,35 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       };
       const validationResult = SplitDataValidationService.validateSplitWallet(validationWallet);
       
-      if (!validationResult.isValid) {
-        console.warn('🔧 FairSplitScreen: Data validation issues found:', validationResult.issues);
+      // Only repair if there are critical errors, not warnings or info
+      const criticalIssues = validationResult.issues.filter(issue => 
+        issue.type === 'error' && issue.severity === 'critical'
+      );
+      
+      if (criticalIssues.length > 0) {
+        console.warn('🔧 FairSplitScreen: Critical data validation issues found:', criticalIssues);
         
-        // Try to repair the data
+        // Try to repair the data only for critical issues
         const repairResult = await SplitWalletService.repairSplitWalletData(splitWallet.id);
         
         if (repairResult.success && repairResult.repaired) {
-          Alert.alert(
-            'Data Repaired',
-            'We detected and fixed data issues with your split. You can now proceed with payment.',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  // Reload the split wallet data
-                  loadSplitWalletData();
-                }
-              }
-            ]
-          );
+          // Silently reload the split wallet data without showing popup
+          loadSplitWalletData();
+          logger.info('Split wallet data repaired successfully', { splitWalletId: splitWallet.id }, 'FairSplitScreen');
         } else if (repairResult.success && !repairResult.repaired) {
           // No repair needed, but validation issues exist
           const summary = SplitDataValidationService.getValidationSummary(validationResult);
           logger.debug('Validation summary', { summary }, 'FairSplitScreen');
         } else {
           console.error('🔧 FairSplitScreen: Data repair failed:', repairResult.error);
+        }
+      } else {
+        // Log non-critical issues for debugging but don't repair
+        const nonCriticalIssues = validationResult.issues.filter(issue => 
+          issue.type !== 'error' || issue.severity !== 'critical'
+        );
+        if (nonCriticalIssues.length > 0) {
+          logger.debug('Non-critical validation issues found', { issues: nonCriticalIssues }, 'FairSplitScreen');
         }
       }
     } catch (error) {
@@ -1134,19 +1063,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           'USDC'
         );
         
-        Alert.alert(
-          'Split Wallet Created!',
-          'Your split wallet has been created successfully. Participants can now send their payments.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Send notifications to participants
-                sendPaymentNotifications(newWallet);
-              },
-            },
-          ]
-        );
+        // Send notifications to participants silently
+        sendPaymentNotifications(newWallet);
       }
 
     } catch (error) {
@@ -2957,57 +2875,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               </View>
             )}
             
-            <View
-              style={styles.appleSliderGradientBorder}
-              onLayout={(event) => {
-                const { width } = event.nativeEvent.layout;
-                setSliderWidth(width);
-              }}
-            >
-              <View style={styles.appleSliderContainer}>
-                {/* Background fill animation */}
-                <Animated.View
-                  style={[
-                    styles.appleSliderFill,
-                    {
-                      width: fillAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, sliderWidth - 4], // 4px for border
-                        extrapolate: 'clamp',
-                      }),
-                    }
-                  ]}
-                >
-                  <LinearGradient
-                    colors={[colors.green, colors.greenBlue]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.appleSliderFillGradient}
-                  />
-                </Animated.View>
-                
-                <View style={styles.appleSliderTrack}>
-                  <Text style={[styles.appleSliderText, { color: colors.white70 }]}>
-                    {isSigning ? 'Transferring...' : 'Slide to Transfer Funds'}
-                  </Text>
-                </View>
-                
-                <Animated.View
-                  style={[
-                    styles.appleSliderThumb,
-                    {
-                      left: slideAnimation,
-                      backgroundColor: isSigning ? colors.textSecondary : colors.green,
-                    }
-                  ]}
-                  {...panResponder.panHandlers}
-                >
-                  <Text style={[styles.appleSliderThumbIcon, { fontSize: 16, color: colors.white }]}>
-                    →
-                  </Text>
-                </Animated.View>
-              </View>
-            </View>
+            <AppleSlider
+              onSlideComplete={handleSignatureStep}
+              disabled={!selectedWallet || isSigning}
+              loading={isSigning}
+              text="Slide to Transfer Funds"
+            />
 
             <Button
               title="Back"

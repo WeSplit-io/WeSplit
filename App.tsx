@@ -37,7 +37,6 @@ import SendSuccessScreen from './src/screens/Send/SendSuccessScreen';
 import LinkedCardsScreen from './src/screens/Settings/LinkedCards/LinkedCardsScreen';
 import RequestContactsScreen from './src/screens/Request/RequestContactsScreen';
 import RequestAmountScreen from './src/screens/Request/RequestAmountScreen';
-import RequestConfirmationScreen from './src/screens/Request/RequestConfirmationScreen';
 import RequestSuccessScreen from './src/screens/Request/RequestSuccessScreen';
 import BillCameraScreen from './src/screens/Billing/BillCamera/BillCameraScreen';
 import BillProcessingScreen from './src/screens/Billing/BillProcessing/BillProcessingScreen';
@@ -153,7 +152,6 @@ export default function App() {
                     <Stack.Screen name="LinkedCards" component={LinkedCardsScreen} />
                     <Stack.Screen name="RequestContacts" component={RequestContactsScreen} />
                     <Stack.Screen name="RequestAmount" component={RequestAmountScreen} />
-                    <Stack.Screen name="RequestConfirmation" component={RequestConfirmationScreen} />
                     <Stack.Screen name="RequestSuccess" component={RequestSuccessScreen} />
                     <Stack.Screen name="BillCamera" component={BillCameraScreen} />
                     <Stack.Screen name="BillProcessing" component={BillProcessingScreen} />
