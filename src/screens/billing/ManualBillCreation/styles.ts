@@ -4,9 +4,9 @@ import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
 
 export const styles = StyleSheet.create({
-
   content: {
     flex: 1,
+    paddingHorizontal: spacing.md,
   },
   section: {
     marginVertical: spacing.md,
@@ -156,6 +156,80 @@ export const styles = StyleSheet.create({
     height: 250,
     backgroundColor: 'transparent',
     alignSelf: 'center',
+  },
+
+  /** ================================ Input Styles ================================ */
+  textInput: {
+    backgroundColor: colors.surface,
+    borderRadius: spacing.radiusMd,
+    paddingHorizontal: spacing.inputPaddingHorizontal,
+    paddingVertical: spacing.inputPaddingVertical,
+    borderWidth: spacing.borderWidthThin,
+    borderColor: colors.border,
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    height: spacing.inputHeight,
+  },
+  amountInput: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: spacing.radiusMd,
+    paddingHorizontal: spacing.inputPaddingHorizontal,
+    paddingVertical: spacing.inputPaddingVertical,
+    borderWidth: spacing.borderWidthThin,
+    borderColor: colors.border,
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    height: spacing.inputHeight,
+  },
+  inputError: {
+    borderColor: colors.error,
+    borderWidth: 2,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: typography.fontSize.sm,
+    marginTop: spacing.xs,
+  },
+
+  /** ================================ Date Input Styles ================================ */
+  dateInput: {
+    backgroundColor: colors.surface,
+    borderRadius: spacing.radiusMd,
+    paddingHorizontal: spacing.inputPaddingHorizontal,
+    paddingVertical: spacing.inputPaddingVertical,
+    borderWidth: spacing.borderWidthThin,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: spacing.inputHeight,
+  },
+  calendarIcon: {
+    width: 20,
+    height: 20,
+    tintColor: colors.textLightSecondary,
+  },
+
+  /** ================================ Button Styles ================================ */
+  continueButton: {
+    borderRadius: spacing.radiusMd,
+    overflow: 'hidden',
+    height: spacing.buttonHeight,
+  },
+  buttonGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+  },
+  buttonText: {
+    color: colors.black,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
 });
 

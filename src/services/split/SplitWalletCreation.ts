@@ -176,10 +176,11 @@ export class SplitWalletCreation {
 
       // Create a new dedicated wallet for this split
       // This wallet will be managed by the creator but is separate from their main wallet
-      const wallet = await walletService.createWalletForProvider();
-      if (!wallet) {
+      const walletResult = await walletService.createWallet(creatorId);
+      if (!walletResult.success || !walletResult.wallet) {
         throw new Error('Failed to create wallet for split');
       }
+      const wallet = walletResult.wallet;
       
       
       logger.info('Split wallet created with address', { 
@@ -291,10 +292,11 @@ export class SplitWalletCreation {
       }, 'SplitWalletCreation');
 
       // Create a new dedicated wallet for this Degen Split
-      const wallet = await walletService.createWalletForProvider();
-      if (!wallet) {
+      const walletResult = await walletService.createWallet(creatorId);
+      if (!walletResult.success || !walletResult.wallet) {
         throw new Error('Failed to create wallet for Degen Split');
       }
+      const wallet = walletResult.wallet;
       
       logger.info('Degen Split wallet created with address', { 
         walletAddress: wallet.address,
@@ -402,10 +404,11 @@ export class SplitWalletCreation {
       const currentWallet = currentWalletResult.wallet;
 
       // Create a new wallet with the same ID but reset data
-      const newWallet = await walletService.createWalletForProvider();
-      if (!newWallet) {
+      const newWalletResult = await walletService.createWallet(creatorId);
+      if (!newWalletResult.success || !newWalletResult.wallet) {
         throw new Error('Failed to create new wallet for reset');
       }
+      const newWallet = newWalletResult.wallet;
 
       // Update the wallet with new address and reset participants
       const updatedWalletData = {

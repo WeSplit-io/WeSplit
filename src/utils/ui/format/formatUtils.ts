@@ -136,6 +136,7 @@ export function formatLargeNumber(value: number, decimals: number = 1): string {
 // Export all functions as a single object for convenience
 /**
  * Parse amount string to number
+ * Handles both US (dot) and European (comma) decimal separators
  * @param amountString String representation of amount
  * @returns Parsed number or 0 if invalid
  */
@@ -144,8 +145,32 @@ export function parseAmount(amountString: string): number {
     return 0;
   }
   
-  // Remove any non-numeric characters except decimal point and minus sign
-  const cleaned = amountString.replace(/[^0-9.-]/g, '');
+  // Handle European number format (comma as decimal separator)
+  // Convert comma to dot for parsing, but be careful about thousands separators
+  let cleaned = amountString.trim();
+  
+  // If there's a comma and it's likely a decimal separator (not thousands)
+  // Check if there are 1-3 digits after the comma
+  const commaMatch = cleaned.match(/(\d+),(\d{1,3})$/);
+  if (commaMatch) {
+    // Replace comma with dot for decimal parsing
+    cleaned = cleaned.replace(',', '.');
+  } else {
+    // Remove any non-numeric characters except decimal point, comma, and minus sign
+    cleaned = cleaned.replace(/[^0-9.,-]/g, '');
+    
+    // If there's a comma and it's not followed by exactly 1-3 digits, treat it as thousands separator
+    const hasComma = cleaned.includes(',');
+    const hasDot = cleaned.includes('.');
+    
+    if (hasComma && !hasDot) {
+      // Only comma, treat as decimal separator
+      cleaned = cleaned.replace(',', '.');
+    } else if (hasComma && hasDot) {
+      // Both comma and dot - assume comma is thousands separator
+      cleaned = cleaned.replace(/,/g, '');
+    }
+  }
   
   const parsed = parseFloat(cleaned);
   return isNaN(parsed) ? 0 : parsed;

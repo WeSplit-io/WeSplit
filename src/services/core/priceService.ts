@@ -86,6 +86,47 @@ export async function convertToUSDC(amount: number, fromCurrency: string): Promi
     return amount;
   }
 
+  // Handle fiat currencies (EUR, USD, GBP, etc.) with direct API call
+  const fiatCurrencies = ['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'AUD', 'JPY', 'CNY'];
+  if (fiatCurrencies.includes(fromCurrency)) {
+    try {
+      // Use ExchangeRate-API for fiat currency conversion
+      const response = await fetch(
+        `https://api.exchangerate-api.com/v4/latest/${fromCurrency}`
+      );
+      
+      if (!response.ok) {
+        console.warn(`Failed to fetch exchange rate for ${fromCurrency} to USD`);
+        return amount; // Fallback to 1:1 ratio
+      }
+
+      const data = await response.json();
+      const rate = data.rates['USD'];
+
+      if (!rate) {
+        console.warn(`No exchange rate found for ${fromCurrency} to USD`);
+        return amount; // Fallback to 1:1 ratio
+      }
+
+      const convertedAmount = amount * rate;
+      
+      if (__DEV__) {
+        logger.info('Converting fiat currency to USDC', { 
+          amount, 
+          fromCurrency, 
+          rate, 
+          convertedAmount: convertedAmount.toFixed(2) 
+        }, 'priceService');
+      }
+
+      return convertedAmount;
+    } catch (error) {
+      console.warn(`Could not convert ${amount} ${fromCurrency} to USDC - using 1:1 ratio`, error);
+      return amount; // Fallback to 1:1 ratio
+    }
+  }
+
+  // Handle crypto currencies with CoinGecko
   const priceData = await getCryptoPrice(fromCurrency);
   if (!priceData) {
     console.warn(`Could not convert ${amount} ${fromCurrency} to USDC - using 1:1 ratio`);

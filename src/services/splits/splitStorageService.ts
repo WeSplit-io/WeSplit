@@ -763,3 +763,16 @@ export class SplitStorageServiceClass {
 
 // Export the SplitStorageService class
 export { SplitStorageServiceClass as SplitStorageService };
+
+// Export singleton instance
+// Lazy singleton to avoid initialization issues during module loading
+let _splitStorageService: SplitStorageServiceClass | null = null;
+
+export const splitStorageService = {
+  get instance() {
+    if (!_splitStorageService) {
+      _splitStorageService = new SplitStorageServiceClass();
+    }
+    return _splitStorageService;
+  }
+};

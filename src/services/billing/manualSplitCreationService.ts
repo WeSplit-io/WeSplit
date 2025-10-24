@@ -49,6 +49,7 @@ export class ManualSplitCreationService {
           requireAllAccept: false,
           autoCalculate: true,
           splitMethod: 'equal',
+          currency: 'USDC',
           taxIncluded: true
         }
       };
@@ -62,9 +63,10 @@ export class ManualSplitCreationService {
         };
       }
 
-      // Wallet creation moved to split type selection (FairSplit/DegenLock screens)
+      // OPTIMIZED: Wallet creation moved to split type selection (FairSplit/DegenLock screens)
+      // Removed wallet creation logic - focuses on split creation only
 
-      // Ensure the creator is included as a participant
+      // Ensure the creator is included as a participant - NO WALLET CREATION
       const allParticipants = [...data.processedBillData.participants];
       
       // Check if creator is already in participants, if not add them
@@ -73,8 +75,8 @@ export class ManualSplitCreationService {
         allParticipants.push({
           id: data.currentUser.id.toString(),
           name: data.currentUser.name,
-          walletAddress: data.currentUser.wallet_address || '',
-          wallet_address: data.currentUser.wallet_address || '', // Add both for compatibility
+          walletAddress: '', // Empty until wallet is created
+          wallet_address: '', // Empty until wallet is created
           amountOwed: 0, // Will be calculated
           status: 'accepted', // Creator should be accepted, not pending
           items: []
@@ -88,7 +90,7 @@ export class ManualSplitCreationService {
         description: `Manual split for ${data.processedBillData.title}`,
         totalAmount: data.processedBillData.totalAmount,
         currency: data.processedBillData.currency,
-        splitType: 'fair' as const,
+        splitType: undefined, // Let user choose in SplitDetailsScreen
         status: 'pending' as const, // Split starts as pending until user confirms repartition
         creatorId: data.currentUser.id.toString(),
         creatorName: data.currentUser.name,

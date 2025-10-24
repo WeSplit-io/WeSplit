@@ -27,17 +27,18 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { styles } from './styles';
 import { ProcessedBillData } from '../../services/billing';
-import { BillAnalysisResult } from '../../types/unified';
+import { BillAnalysisResult } from '../../types/billAnalysis';
 import { consolidatedBillAnalysisService } from '../../services/billing';
 import { convertFiatToUSDC, formatCurrencyAmount } from '../../services/core';
-import { NFCSplitService } from '../../services/core';
+import { nfcService } from '../../services/core';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
 import { firebaseDataService } from '../../services/data';
-import { splitStorageService, Split, SplitStorageService, SplitInvitationServiceClass } from '../../services/splits';
+import { splitStorageService, Split, SplitStorageService, splitInvitationService } from '../../services/splits';
+import { SplitInvitationService } from '../../services/splits/splitInvitationService';
 import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';
 // Removed SplitWalletService import - wallets are now created only when split type is selected
-import { FallbackDataService } from '../../services/data';
+import FallbackDataService from '../../services/data';
 import { MockupDataService } from '../../services/data/mockupData';
 import { notificationService } from '../../services/notifications';
 import UserAvatar from '../../components/UserAvatar';
@@ -463,10 +464,15 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                   })
                   .catch(error => {
                     console.error('Error converting currency:', error);
+                    // Fallback to original amount if conversion fails
+                    setUsdcEquivalent(update.split?.totalAmount || 0);
                   })
                   .finally(() => {
                     setIsConvertingCurrency(false);
                   });
+              } else {
+                // If already USDC, set equivalent to the amount
+                setUsdcEquivalent(update.split?.totalAmount || 0);
               }
             }
           },
@@ -558,9 +564,16 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     try {
       setIsConvertingCurrency(true);
       const amount = parseFloat(totalAmount);
-      const currency = splitData?.currency || processedBillData?.currency || billData?.currency || 'USD';
+      const currency = splitData?.currency || processedBillData?.currency || billData?.currency || 'USDC';
 
-      if (currency !== 'USD') {
+      // If currency is already USDC, no conversion needed
+      if (currency === 'USDC') {
+        setUsdcEquivalent(amount);
+        return;
+      }
+
+      // Only convert if currency is not USDC
+      if (currency !== 'USD' && currency !== 'USDC') {
         const usdcAmount = await convertFiatToUSDC(amount, currency);
         setUsdcEquivalent(usdcAmount);
       } else {
@@ -568,6 +581,8 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       }
     } catch (error) {
       console.error('Error converting currency:', error);
+      // Fallback to original amount if conversion fails
+      setUsdcEquivalent(parseFloat(totalAmount));
     } finally {
       setIsConvertingCurrency(false);
     }
@@ -598,7 +613,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       };
 
       // Generate shareable link
-      const shareableLink = SplitInvitationServiceClass.generateShareableLink(invitationData);
+      const shareableLink = SplitInvitationService.generateShareableLink(invitationData);
       setQrCodeData(shareableLink);
     } else {
       // Set a fallback QR code data if no split ID is available
@@ -614,7 +629,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
     try {
       setIsJoiningSplit(true);
-      const result = await SplitInvitationServiceClass.joinSplit({
+      const result = await SplitInvitationService.joinSplit({
         type: 'split_invitation',
         splitId: splitId,
         billName: currentSplitData?.title || billName,
@@ -756,7 +771,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         billName: billName
       }, 'SplitDetailsScreen');
 
-      const notificationResult = await notificationService.sendNotification(
+      const notificationResult = await notificationService.instance.sendNotification(
         contact.id || contact.userId,
         'Split Invitation',
         `${currentUser.name} has invited you to split "${billName}"`,
@@ -1023,7 +1038,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       }
 
       // Generate invitation data
-      const invitationData = SplitInvitationServiceClass.generateInvitationData(
+      const invitationData = SplitInvitationService.generateInvitationData(
         splitId,
         billName,
         parseFloat(totalAmount),
@@ -1033,7 +1048,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       );
 
       // Generate shareable link
-      const shareableLink = SplitInvitationServiceClass.generateShareableLink(invitationData);
+      const shareableLink = SplitInvitationService.generateShareableLink(invitationData);
 
       // Copy to clipboard and show success message
       await Clipboard.setStringAsync(shareableLink);
@@ -1252,8 +1267,17 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
               <Text style={styles.billAmountLabel}>Total Bill</Text>
               <View style={styles.billAmountRow}>
                 {(() => {
-                  const currency = splitData?.currency || processedBillData?.currency || billData?.currency || 'USD';
+                  const currency = splitData?.currency || processedBillData?.currency || billData?.currency || 'USDC';
                   const amount = parseFloat(totalAmount);
+
+                  // If currency is already USDC, show only USDC amount
+                  if (currency === 'USDC') {
+                    return (
+                      <Text style={styles.billAmountUSDC}>
+                        {formatCurrencyAmount(amount, 'USDC')}
+                      </Text>
+                    );
+                  }
 
                   // Show original currency first, then USDC equivalent
                   return (
