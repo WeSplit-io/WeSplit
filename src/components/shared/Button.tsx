@@ -15,7 +15,7 @@ import {
   View,
   Animated,
 } from 'react-native';
-import Icon from '../Icon';
+import PhosphorIcon, { PhosphorIconName } from './PhosphorIcon';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
@@ -31,7 +31,7 @@ interface ButtonProps {
   fullWidth?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
-  icon?: string;
+  icon?: PhosphorIconName;
   iconPosition?: 'left' | 'right';
 }
 
@@ -102,7 +102,7 @@ const Button: React.FC<ButtonProps> = ({
       case 'secondary':
         return {
           ...baseStyle,
-          backgroundColor: disabled ? colors.blackWhite5 : colors.greenBlue,
+          backgroundColor: disabled ? colors.blackWhite5 : colors.white10,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
@@ -176,15 +176,17 @@ const Button: React.FC<ButtonProps> = ({
       )}
       
       {icon && iconPosition === 'left' && !loading && (
-        <Icon name={icon} size={16} color={getTextStyle().color as string} style={styles.iconLeft} />
+        <PhosphorIcon name={icon} size={title ? 16 : 24} color={getTextStyle().color as string} style={styles.iconLeft} />
       )}
       
-      <Text style={[getTextStyle(), textStyle]}>
-        {loading ? 'Loading...' : title}
-      </Text>
+      {title && (
+        <Text style={[getTextStyle(), textStyle]}>
+          {loading ? 'Loading...' : title}
+        </Text>
+      )}
       
       {icon && iconPosition === 'right' && !loading && (
-        <Icon name={icon} size={16} color={getTextStyle().color as string} style={styles.iconRight} />
+        <PhosphorIcon name={icon} size={title ? 16 : 24} color={getTextStyle().color as string} style={styles.iconRight} />
       )}
     </>
   );

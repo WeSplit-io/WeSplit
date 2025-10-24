@@ -13,10 +13,10 @@ export const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.white,
+    fontWeight: typography.fontWeight.regular,
+    color: colors.white80,
     marginBottom: spacing.md,
-  },
+},
   categoryContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -61,67 +61,19 @@ export const styles = StyleSheet.create({
     width: 24,
     height: 24,
   },
-  textInput: {
-    backgroundColor: colors.white5,
-    borderRadius: spacing.radiusMd,
-    paddingHorizontal: spacing.inputPaddingHorizontal,
-    paddingVertical: spacing.inputPaddingVertical,
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-    height: spacing.inputHeight,
-    textAlignVertical: 'center',
-    paddingBottom: spacing.md,
-  },
-  inputError: {
-    borderColor: colors.error,
-  },
-  errorText: {
-    color: colors.error,
-    ...typography.textStyles.caption,
-    marginTop: spacing.xs,
-  },
-  dateInput: {
-    backgroundColor: colors.white5,
-    borderRadius: spacing.radiusMd,
-    paddingHorizontal: spacing.inputPaddingHorizontal,
-    paddingVertical: spacing.inputPaddingVertical,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-    height: spacing.inputHeight,
-  },
+
+
   dateText: {
     color: colors.white,
     ...typography.textStyles.body,
   },
-  calendarIcon: {
-    width: spacing.iconSizeSmall,
-    height: spacing.iconSizeSmall,
-    tintColor: colors.white50,
-  },
+
   amountContainer: {
     flexDirection: 'row',
     gap: spacing.sm,
+    width: '100%',
   },
-  amountInput: {
-    flex: 1,
-    backgroundColor: colors.white5,
-    borderRadius: spacing.radiusMd,
-    paddingHorizontal: spacing.inputPaddingHorizontal,
-    paddingVertical: spacing.inputPaddingVertical,
-    color: colors.white,
-    ...typography.textStyles.body,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-    height: spacing.inputHeight,
-    textAlignVertical: 'center',
-    alignItems: 'center',
-    paddingBottom: spacing.md,
-  },
+
   currencyButton: {
     backgroundColor: colors.white5,
     borderRadius: spacing.radiusMd,
@@ -133,6 +85,7 @@ export const styles = StyleSheet.create({
     borderColor: colors.border,
     minWidth: 100,
     height: spacing.inputHeight,
+    gap: spacing.sm,
   },
   currencyText: {
     color: colors.white,
@@ -143,6 +96,8 @@ export const styles = StyleSheet.create({
     color: colors.textLightSecondary,
     fontSize: spacing.iconSizeSmall,
   },
+
+  /** ================================ Total Styles ================================ */
   totalContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -150,42 +105,28 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   totalLabel: {
-    ...typography.textStyles.label,
+    fontSize: typography.fontSize.md,
     color: colors.white,
   },
   totalValueContainer: {
     alignItems: 'flex-end',
   },
   totalValue: {
-    ...typography.textStyles.amountMedium,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
     color: colors.green,
   },
   totalValuePlaceholder: {
-    ...typography.textStyles.body,
+    fontSize: typography.fontSize.md,
     color: colors.textLightSecondary,
   },
+
+  /** ================================ Button Styles ================================ */
+
   buttonContainer: {
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
-  continueButton: {
-    borderRadius: spacing.radiusMd,
-    overflow: 'hidden',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonGradient: {
-    paddingVertical: spacing.buttonPaddingVertical,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: spacing.buttonHeight,
-  },
-  buttonText: {
-    ...typography.textStyles.button,
-    color: colors.black,
-    
-  },
+
 
   /** ================================ Currency Picker Modal Styles ================================ */
   currencyOption: {

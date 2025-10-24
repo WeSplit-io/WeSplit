@@ -749,11 +749,7 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
   },
   mockupContinueButton: {
-    backgroundColor: colors.white10,
-    borderRadius: 16,
-    paddingVertical: spacing.md,
     marginBottom: spacing.md,
-    alignItems: 'center',
     width: '100%',
   },
   mockupContinueButtonActive: {
@@ -992,18 +988,8 @@ export const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   mockupBackHomeButton: {
-    backgroundColor: colors.brandGreen,
-    borderRadius: 16,
-    paddingVertical: spacing.md,
-    paddingHorizontal: 48,
-    alignItems: 'center',
     width: '100%',
-
-  },
-  mockupBackHomeButtonText: {
-    color: colors.black,
-    fontSize: 16,
-    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.md,
   },
 
   // === SEND QR CODE STYLES ===
@@ -1081,7 +1067,6 @@ export const styles = StyleSheet.create({
   // === MOCKUP AMOUNT CARD STYLES ===
   amountCardMockup: {
     borderRadius: 16,
-    marginHorizontal: spacing.md,
     marginBottom: 24,
     alignItems: 'center',
     minHeight: 180,
@@ -1167,18 +1152,14 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.darkBackground,
     paddingTop: 8,
     alignItems: 'center',
     borderTopWidth: 0,
-    marginHorizontal: spacing.screenPaddingHorizontal,
 
   },
 
   // AppleSlider styles (adapted from WalletManagement)
   appleSliderContainerWrapper: {
-    marginHorizontal: spacing.screenPaddingHorizontal,
-    // width: '100%', // supprimé pour éviter le débordement
   },
   appleSliderGradientBorder: {
     borderRadius: 999,

@@ -35,7 +35,8 @@ import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits
 import FairSplitHeader from './components/FairSplitHeader';
 import FairSplitProgress from './components/FairSplitProgress';
 import FairSplitParticipants from './components/FairSplitParticipants';
-import { Container } from '../../components/shared';
+import { Container, Button } from '../../components/shared';
+import CustomModal from '../../components/shared/Modal';
 
 // Remove local image mapping - now handled in FairSplitHeader component
 
@@ -2583,52 +2584,29 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       {/* Action Buttons */}
       <View style={styles.bottomContainer}>
         {!splitWallet ? (
-            <TouchableOpacity 
-              onPress={handleCreateSplitWallet}
-              disabled={isCreatingWallet}
-            >
-              <LinearGradient
-                colors={[colors.green, colors.greenBlue]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.createWalletButton}
-              >
-                {isCreatingWallet ? (
-                  <ActivityIndicator color={colors.black} />
-                ) : (
-                  <Text style={styles.createWalletButtonText}>
-                    Continue
-                  </Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+          <Button
+            title="Continue"
+            onPress={handleCreateSplitWallet}
+            variant="primary"
+            disabled={isCreatingWallet}
+            loading={isCreatingWallet}
+            fullWidth={true}
+            style={styles.createWalletButton}
+          />
         ) : (
           <View style={styles.actionButtonsContainer}>
             {!isSplitConfirmed ? (
               // Phase 1: Creator can confirm split repartition
               isCurrentUserCreator() ? (
-            <LinearGradient
-              colors={[colors.green, colors.greenBlue]}
-              style={[
-                styles.confirmButton,
-                isCreatingWallet && styles.confirmButtonDisabled
-              ]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <TouchableOpacity 
-                style={styles.confirmButtonTouchable}
-                onPress={handleConfirmSplit}
-                disabled={isCreatingWallet}
-              >
-                <Text style={[
-                  styles.confirmButtonText,
-                  isCreatingWallet && styles.confirmButtonTextDisabled
-                ]}>
-                  {isCreatingWallet ? 'Confirming...' : 'Confirm Split'}
-                </Text>
-              </TouchableOpacity>
-            </LinearGradient>
+                <Button
+                  title={isCreatingWallet ? 'Confirming...' : 'Confirm Split'}
+                  onPress={handleConfirmSplit}
+                  variant="primary"
+                  disabled={isCreatingWallet}
+                  loading={isCreatingWallet}
+                  fullWidth={true}
+                  style={styles.confirmButton}
+                />
               ) : (
                 <View style={styles.waitingContainer}>
                   <Text style={styles.waitingText}>
@@ -2653,21 +2631,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   if (hasUserPaidFully) {
                     return (
                       <View style={styles.buttonContainer}>
-                        <TouchableOpacity 
+                        <Button
+                          title="🚀 Transfer Funds to Your Wallet"
                           onPress={handleSplitFunds}
+                          variant="primary"
+                          fullWidth={true}
                           style={styles.splitButton}
-                        >
-                          <LinearGradient
-                            colors={[colors.green, colors.greenBlue]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.splitButtonGradient}
-                          >
-                            <Text style={styles.splitButtonText}>
-                              🚀 Transfer Funds to Your Wallet
-                            </Text>
-                          </LinearGradient>
-                        </TouchableOpacity>
+                        />
                       </View>
                     );
                   }
@@ -2677,21 +2647,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   // Creator can split when 100% covered
                   return (
                     <View style={styles.buttonContainer}>
-                      <TouchableOpacity 
+                      <Button
+                        title="Withdraw Funds"
                         onPress={handleSplitFunds}
-                      >
-                        <LinearGradient
-                          colors={[colors.green, '#00D4AA']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={styles.splitButton}
-                        >
-                          <Text style={styles.splitButtonText}>
-                            Withdraw Funds
-                          </Text>
-                        </LinearGradient>
-                      </TouchableOpacity>
-                      
+                        variant="primary"
+                        fullWidth={true}
+                        style={styles.splitButton}
+                      />
                     </View>
                   );
                 } else if (isFullyCovered && !isCreator) {
@@ -2724,64 +2686,47 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   // Users can send their payments when not fully covered and haven't paid their full share
                   return (
                     <View style={styles.buttonContainer}>
-                      <LinearGradient
-                        colors={[colors.green, colors.greenBlue]}
-                        style={[
-                          styles.payButton,
-                          isSendingPayment && styles.payButtonDisabled
-                        ]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                      >
-                        <TouchableOpacity 
-                          style={styles.payButtonTouchable}
-                          onPress={handleSendMyShares}
-                          disabled={isSendingPayment}
-                        >
-                          <Text style={[
-                            styles.payButtonText,
-                            isSendingPayment && styles.payButtonTextDisabled
-                          ]}>
-                            {isSendingPayment ? 'Sending...' : (() => {
-                              const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
-                              if (currentUserParticipant && currentUserParticipant.amountPaid > 0) {
-                                return 'Pay Remaining';
-                              }
-                              return 'Pay My Share';
-                            })()}
-                          </Text>
-                        </TouchableOpacity>
-                      </LinearGradient>
+                      <Button
+                        title={isSendingPayment ? 'Sending...' : (() => {
+                          const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
+                          if (currentUserParticipant && currentUserParticipant.amountPaid > 0) {
+                            return 'Pay Remaining';
+                          }
+                          return 'Pay My Share';
+                        })()}
+                        onPress={handleSendMyShares}
+                        variant="primary"
+                        disabled={isSendingPayment}
+                        loading={isSendingPayment}
+                        fullWidth={true}
+                      />
                       
                       {/* DEV BUTTONS - Only show in development and to creators */}
                       {__DEV__ && isCurrentUserCreator() && (
                         <View style={styles.buttonContainer}>
-                          <TouchableOpacity 
-                            style={styles.devButton} 
+                          <Button
+                            title="🚀 DEV: Withdraw Funds"
                             onPress={handleDevWithdraw}
-                          >
-                            <Text style={styles.devButtonText}>
-                              🚀 DEV: Withdraw Funds
-                            </Text>
-                          </TouchableOpacity>
+                            variant="secondary"
+                            fullWidth={true}
+                            style={styles.devButton}
+                          />
                           
-                          <TouchableOpacity 
-                            style={[styles.devButton, { backgroundColor: colors.warning }]} 
+                          <Button
+                            title="🔧 DEV: Repair Split Wallet"
                             onPress={repairSplitWallet}
-                          >
-                            <Text style={styles.devButtonText}>
-                              🔧 DEV: Repair Split Wallet
-                            </Text>
-                          </TouchableOpacity>
+                            variant="secondary"
+                            fullWidth={true}
+                            style={styles.devButton}
+                          />
                           
-                          <TouchableOpacity 
-                            style={[styles.devButton, { backgroundColor: colors.info }]} 
+                          <Button
+                            title="🔍 DEV: Debug USDC Balance"
                             onPress={debugUsdcBalance}
-                          >
-                            <Text style={styles.devButtonText}>
-                              🔍 DEV: Debug USDC Balance
-                            </Text>
-                          </TouchableOpacity>
+                            variant="secondary"
+                            fullWidth={true}
+                            style={styles.devButton}
+                          />
                         </View>
                       )}
                     </View>
@@ -2794,424 +2739,372 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       </View>
 
       {/* Edit Amount Modal */}
-      {showEditModal && editingParticipant && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Edit Amount for {editingParticipant.name}</Text>
-            
-            <View style={styles.modalInputContainer}>
-              <Text style={styles.modalInputLabel}>Amount (USDC):</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={editAmount}
-                onChangeText={setEditAmount}
-                placeholder="0.00"
-                keyboardType="numeric"
-                autoFocus
-              />
-            </View>
-
-            <View style={styles.modalButtonsContainer}>
-              <TouchableOpacity 
-                style={styles.modalCancelButton}
-                onPress={handleCancelEdit}
-              >
-                <Text style={styles.modalCancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <LinearGradient
-                colors={[colors.green, colors.greenBlue]}
-                style={styles.modalSaveButton}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <TouchableOpacity 
-                  style={styles.modalSaveButtonTouchable}
-                  onPress={handleSaveEditedAmount}
-                >
-                  <Text style={styles.modalSaveButtonText}>Save</Text>
-                </TouchableOpacity>
-              </LinearGradient>
-            </View>
-          </View>
+      <CustomModal
+        visible={showEditModal && !!editingParticipant}
+        onClose={handleCancelEdit}
+        title={`Edit Amount for ${editingParticipant?.name}`}
+        showHandle={true}
+        closeOnBackdrop={true}
+      >
+        <View style={styles.modalInputContainer}>
+          <Text style={styles.modalInputLabel}>Amount (USDC):</Text>
+          <TextInput
+            style={styles.modalInput}
+            value={editAmount}
+            onChangeText={setEditAmount}
+            placeholder="0.00"
+            keyboardType="numeric"
+            autoFocus
+          />
         </View>
-      )}
+
+        <View style={styles.modalButtonsContainer}>
+          <Button
+            title="Cancel"
+            onPress={handleCancelEdit}
+            variant="secondary"
+            style={styles.modalCancelButton}
+          />
+
+          <Button
+            title="Save"
+            onPress={handleSaveEditedAmount}
+            variant="primary"
+            style={styles.modalSaveButton}
+          />
+        </View>
+      </CustomModal>
 
       {/* Payment Modal */}
-      {showPaymentModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Pay Your Share</Text>
-            
-            <View style={styles.modalInputContainer}>
-              <Text style={styles.modalInputLabel}>Amount to Pay (USDC):</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={paymentAmount}
-                onChangeText={setPaymentAmount}
-                placeholder="0.00"
-                keyboardType="numeric"
-                autoFocus
-              />
-              <Text style={styles.modalHelperText}>
-                {(() => {
-                  const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
-                  if (!currentUserParticipant) {return 'You owe: 0.00 USDC';}
-                  
-                  const totalOwed = currentUserParticipant.amountOwed || 0;
-                  const amountPaid = currentUserParticipant.amountPaid || 0;
-                  const remaining = totalOwed - amountPaid;
-                  
-                  if (amountPaid > 0) {
-                    return `Total owed: $${totalOwed.toFixed(2)} USDC\nAlready paid: $${amountPaid.toFixed(2)} USDC\nRemaining: $${remaining.toFixed(2)} USDC`;
-                  } else {
-                    return `You owe: $${totalOwed.toFixed(2)} USDC`;
-                  }
-                })()}
-              </Text>
-            </View>
-
-            <View style={styles.modalButtonsContainer}>
-              <TouchableOpacity 
-                style={styles.modalCancelButton}
-                onPress={handlePaymentModalClose}
-              >
-                <Text style={styles.modalCancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <LinearGradient
-                colors={[colors.green, colors.greenBlue]}
-                style={[
-                  styles.modalSaveButton,
-                  isSendingPayment && styles.modalSaveButtonDisabled
-                ]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <TouchableOpacity 
-                  style={styles.modalSaveButtonTouchable}
-                  onPress={handlePaymentModalConfirm}
-                  disabled={isSendingPayment}
-                >
-                  {isSendingPayment ? (
-                    <ActivityIndicator color={colors.white} size="small" />
-                  ) : (
-                    <Text style={styles.modalSaveButtonText}>Pay Now</Text>
-                  )}
-                </TouchableOpacity>
-              </LinearGradient>
-            </View>
-          </View>
+      <CustomModal
+        visible={showPaymentModal}
+        onClose={handlePaymentModalClose}
+        title="Pay Your Share"
+        showHandle={true}
+        closeOnBackdrop={true}
+      >
+        <View style={styles.modalInputContainer}>
+          <Text style={styles.modalInputLabel}>Amount to Pay (USDC):</Text>
+          <TextInput
+            style={styles.modalInput}
+            value={paymentAmount}
+            onChangeText={setPaymentAmount}
+            placeholder="0.00"
+            keyboardType="numeric"
+            autoFocus
+          />
+          <Text style={styles.modalHelperText}>
+            {(() => {
+              const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
+              if (!currentUserParticipant) {return 'You owe: 0.00 USDC';}
+              
+              const totalOwed = currentUserParticipant.amountOwed || 0;
+              const amountPaid = currentUserParticipant.amountPaid || 0;
+              const remaining = totalOwed - amountPaid;
+              
+              if (amountPaid > 0) {
+                return `Total owed: $${totalOwed.toFixed(2)} USDC\nAlready paid: $${amountPaid.toFixed(2)} USDC\nRemaining: $${remaining.toFixed(2)} USDC`;
+              } else {
+                return `You owe: $${totalOwed.toFixed(2)} USDC`;
+              }
+            })()}
+          </Text>
         </View>
-      )}
+
+        <View style={styles.modalButtonsContainer}>
+          <Button
+            title="Cancel"
+            onPress={handlePaymentModalClose}
+            variant="secondary"
+            style={styles.modalCancelButton}
+          />
+
+          <Button
+            title="Pay Now"
+            onPress={handlePaymentModalConfirm}
+            variant="primary"
+            disabled={isSendingPayment}
+            loading={isSendingPayment}
+            style={styles.modalSaveButton}
+          />
+        </View>
+      </CustomModal>
 
       {/* Split Modal */}
-      {showSplitModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            {!showSignatureStep ? (
-              // Transfer Method Selection Step
-              <>
-                <Text style={styles.modalTitle}>Transfer Funds</Text>
-                <Text style={styles.modalSubtitle}>
-                  All participants have covered their share. Choose how to transfer the funds:
-                </Text>
-                
-                {isLoadingWallets ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator color={colors.green} size="large" />
-                    <Text style={styles.loadingText}>Loading your wallets...</Text>
-                  </View>
-                ) : (
-                  <View style={styles.splitOptionsContainer}>
-                    {/* External Wallets */}
-                    {externalWallets.map((wallet) => (
-                      <TouchableOpacity 
-                        key={wallet.id}
-                        style={styles.splitOptionButton}
-                        onPress={() => handleSelectWallet({
-                          id: wallet.id,
-                          address: wallet.address,
-                          type: 'external',
-                          name: wallet.name
-                        })}
-                      >
-                        <View style={styles.splitOptionIcon}>
-                          <Text style={styles.splitOptionIconText}>🏦</Text>
-                        </View>
-                        <View style={styles.splitOptionContent}>
-                          <Text style={styles.splitOptionTitle}>{wallet.name}</Text>
-                          <Text style={styles.splitOptionDescription}>
-                            {wallet.address.slice(0, 8)}...{wallet.address.slice(-8)}
-                          </Text>
-                        </View>
-                        <Text style={styles.splitOptionArrow}>→</Text>
-                      </TouchableOpacity>
-                    ))}
-
-                    {/* In-App Wallet */}
-                    {inAppWallet && (
-                      <TouchableOpacity 
-                        style={styles.splitOptionButton}
-                        onPress={() => handleSelectWallet({
-                          id: 'in-app',
-                          address: inAppWallet.address,
-                          type: 'in-app',
-                          name: 'In-App Wallet'
-                        })}
-                      >
-                        <View style={styles.splitOptionIcon}>
-                          <Text style={styles.splitOptionIconText}>💳</Text>
-                        </View>
-                        <View style={styles.splitOptionContent}>
-                          <Text style={styles.splitOptionTitle}>In-App Wallet</Text>
-                          <Text style={styles.splitOptionDescription}>
-                            {inAppWallet.address.slice(0, 8)}...{inAppWallet.address.slice(-8)}
-                          </Text>
-                        </View>
-                        <Text style={styles.splitOptionArrow}>→</Text>
-                      </TouchableOpacity>
-                    )}
-
-                    {/* Add External Wallet Button - Show when no external wallets */}
-                    {externalWallets.length === 0 && (
-                      <TouchableOpacity 
-                        style={styles.addWalletButton}
-                        onPress={() => {
-                          setShowSplitModal(false);
-                          navigation.navigate('LinkedCards');
-                        }}
-                      >
-                        <View style={styles.addWalletIcon}>
-                          <Text style={styles.addWalletIconText}>+</Text>
-                        </View>
-                        <View style={styles.addWalletContent}>
-                          <Text style={styles.addWalletTitle}>Add External Wallet</Text>
-                          <Text style={styles.addWalletDescription}>
-                            {inAppWallet 
-                              ? 'Link a Kast card or external wallet for more transfer options'
-                              : 'Link a Kast card or external wallet to receive funds'
-                            }
-                          </Text>
-                        </View>
-                        <Text style={styles.addWalletArrow}>→</Text>
-                      </TouchableOpacity>
-                    )}
-
-                    {/* No wallets available - only show if no external wallets AND no in-app wallet */}
-                    {externalWallets.length === 0 && !inAppWallet && (
-                      <View style={styles.noWalletsContainer}>
-                        <Text style={styles.noWalletsText}>
-                          No wallets found. Please add a wallet to your profile first.
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-
-                <TouchableOpacity 
-                  style={styles.modalCancelButton}
-                  onPress={() => setShowSplitModal(false)}
-                >
-                  <Text style={styles.modalCancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              // Signature Step
-              <>
-                <Text style={styles.modalTitle}>
-                  Transfer {totalAmount.toFixed(1)} USDC to {selectedWallet?.name || 'Selected Wallet'}
-                </Text>
-                <Text style={styles.modalSubtitle}>
-                  Transfer funds to your selected wallet address.
-                </Text>
-                
-                {/* Selected Wallet Info */}
-                {selectedWallet && (
-                  <View style={styles.selectedWalletInfo}>
-                    <Text style={styles.selectedWalletLabel}>Destination:</Text>
-                    <Text style={styles.selectedWalletAddress}>
-                      {selectedWallet.address}
-                    </Text>
-                  </View>
-                )}
-                
-                {/* Transfer Visualization */}
-                {/*<View style={styles.transferVisualization}>
-                  <View style={styles.transferIcon}>
-                    <Text style={styles.transferIconText}>💳</Text>
-                </View>
-                  <View style={styles.transferArrows}>
-                    <Text style={styles.transferArrowText}>{'>>>>'}</Text>
-                  </View>
-                  <View style={styles.transferIcon}>
-                    <Text style={styles.transferIconText}>
-                      {selectedTransferMethod === 'external-wallet' ? '🏦' : '💳'}
-                    </Text>
-                  </View>
-                </View>*/}
-
-              <View
-                style={styles.appleSliderGradientBorder}
-                onLayout={(event) => {
-                  const { width } = event.nativeEvent.layout;
-                  setSliderWidth(width);
-                }}
-              >
-                <View style={styles.appleSliderContainer}>
-                  {/* Background fill animation */}
-                  <Animated.View
-                    style={[
-                      styles.appleSliderFill,
-                      {
-                        width: fillAnimation.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, sliderWidth - 4], // 4px for border
-                          extrapolate: 'clamp',
-                        }),
-                      }
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={[colors.green, colors.greenBlue]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.appleSliderFillGradient}
-                    />
-                  </Animated.View>
-                  
-                  <View style={styles.appleSliderTrack}>
-                    <Text style={[styles.appleSliderText, { color: colors.white70 }]}>
-                      {isSigning ? 'Transferring...' : 'Slide to Transfer Funds'}
-                    </Text>
-                  </View>
-                  
-                  <Animated.View
-                    style={[
-                      styles.appleSliderThumb,
-                      {
-                        left: slideAnimation,
-                        backgroundColor: isSigning ? colors.textSecondary : colors.green,
-                      }
-                    ]}
-                    {...panResponder.panHandlers}
-                  >
-                    <Text style={[styles.appleSliderThumbIcon, { fontSize: 16, color: colors.white }]}>
-                      →
-                    </Text>
-                  </Animated.View>
-                </View>
+      <CustomModal
+        visible={showSplitModal}
+        onClose={() => setShowSplitModal(false)}
+        title={!showSignatureStep ? 'Transfer Funds' : `Transfer ${totalAmount.toFixed(1)} USDC to ${selectedWallet?.name || 'Selected Wallet'}`}
+        description={!showSignatureStep 
+          ? 'All participants have covered their share. Choose how to transfer the funds:'
+          : 'Transfer funds to your selected wallet address.'
+        }
+        showHandle={true}
+        closeOnBackdrop={true}
+      >
+        {!showSignatureStep ? (
+          // Transfer Method Selection Step
+          <>
+            {isLoadingWallets ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color={colors.green} size="large" />
+                <Text style={styles.loadingText}>Loading your wallets...</Text>
               </View>
+            ) : (
+              <View style={styles.splitOptionsContainer}>
+                {/* External Wallets */}
+                {externalWallets.map((wallet) => (
+                  <TouchableOpacity 
+                    key={wallet.id}
+                    style={styles.splitOptionButton}
+                    onPress={() => handleSelectWallet({
+                      id: wallet.id,
+                      address: wallet.address,
+                      type: 'external',
+                      name: wallet.name
+                    })}
+                  >
+                    <View style={styles.splitOptionIcon}>
+                      <Text style={styles.splitOptionIconText}>🏦</Text>
+                    </View>
+                    <View style={styles.splitOptionContent}>
+                      <Text style={styles.splitOptionTitle}>{wallet.name}</Text>
+                      <Text style={styles.splitOptionDescription}>
+                        {wallet.address.slice(0, 8)}...{wallet.address.slice(-8)}
+                      </Text>
+                    </View>
+                    <Text style={styles.splitOptionArrow}>→</Text>
+                  </TouchableOpacity>
+                ))}
 
-                <TouchableOpacity 
-                  style={styles.modalCancelButton}
-                  onPress={() => {
-                    setShowSignatureStep(false);
-                    setSelectedTransferMethod(null);
-                  }}
-                >
-                  <Text style={styles.modalCancelButtonText}>Back</Text>
-                </TouchableOpacity>
-              </>
+                {/* In-App Wallet */}
+                {inAppWallet && (
+                  <TouchableOpacity 
+                    style={styles.splitOptionButton}
+                    onPress={() => handleSelectWallet({
+                      id: 'in-app',
+                      address: inAppWallet.address,
+                      type: 'in-app',
+                      name: 'In-App Wallet'
+                    })}
+                  >
+                    <View style={styles.splitOptionIcon}>
+                      <Text style={styles.splitOptionIconText}>💳</Text>
+                    </View>
+                    <View style={styles.splitOptionContent}>
+                      <Text style={styles.splitOptionTitle}>In-App Wallet</Text>
+                      <Text style={styles.splitOptionDescription}>
+                        {inAppWallet.address.slice(0, 8)}...{inAppWallet.address.slice(-8)}
+                      </Text>
+                    </View>
+                    <Text style={styles.splitOptionArrow}>→</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Add External Wallet Button - Show when no external wallets */}
+                {externalWallets.length === 0 && (
+                  <TouchableOpacity 
+                    style={styles.addWalletButton}
+                    onPress={() => {
+                      setShowSplitModal(false);
+                      navigation.navigate('LinkedCards');
+                    }}
+                  >
+                    <View style={styles.addWalletIcon}>
+                      <Text style={styles.addWalletIconText}>+</Text>
+                    </View>
+                    <View style={styles.addWalletContent}>
+                      <Text style={styles.addWalletTitle}>Add External Wallet</Text>
+                      <Text style={styles.addWalletDescription}>
+                        {inAppWallet 
+                          ? 'Link a Kast card or external wallet for more transfer options'
+                          : 'Link a Kast card or external wallet to receive funds'
+                        }
+                      </Text>
+                    </View>
+                    <Text style={styles.addWalletArrow}>→</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* No wallets available - only show if no external wallets AND no in-app wallet */}
+                {externalWallets.length === 0 && !inAppWallet && (
+                  <View style={styles.noWalletsContainer}>
+                    <Text style={styles.noWalletsText}>
+                      No wallets found. Please add a wallet to your profile first.
+                    </Text>
+                  </View>
+                )}
+              </View>
             )}
-          </View>
-      </View>
-      )}
+
+            <Button
+              title="Cancel"
+              onPress={() => setShowSplitModal(false)}
+              variant="secondary"
+              style={styles.modalCancelButton}
+            />
+          </>
+        ) : (
+          // Signature Step
+          <>
+            {/* Selected Wallet Info */}
+            {selectedWallet && (
+              <View style={styles.selectedWalletInfo}>
+                <Text style={styles.selectedWalletLabel}>Destination:</Text>
+                <Text style={styles.selectedWalletAddress}>
+                  {selectedWallet.address}
+                </Text>
+              </View>
+            )}
+            
+            <View
+              style={styles.appleSliderGradientBorder}
+              onLayout={(event) => {
+                const { width } = event.nativeEvent.layout;
+                setSliderWidth(width);
+              }}
+            >
+              <View style={styles.appleSliderContainer}>
+                {/* Background fill animation */}
+                <Animated.View
+                  style={[
+                    styles.appleSliderFill,
+                    {
+                      width: fillAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, sliderWidth - 4], // 4px for border
+                        extrapolate: 'clamp',
+                      }),
+                    }
+                  ]}
+                >
+                  <LinearGradient
+                    colors={[colors.green, colors.greenBlue]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.appleSliderFillGradient}
+                  />
+                </Animated.View>
+                
+                <View style={styles.appleSliderTrack}>
+                  <Text style={[styles.appleSliderText, { color: colors.white70 }]}>
+                    {isSigning ? 'Transferring...' : 'Slide to Transfer Funds'}
+                  </Text>
+                </View>
+                
+                <Animated.View
+                  style={[
+                    styles.appleSliderThumb,
+                    {
+                      left: slideAnimation,
+                      backgroundColor: isSigning ? colors.textSecondary : colors.green,
+                    }
+                  ]}
+                  {...panResponder.panHandlers}
+                >
+                  <Text style={[styles.appleSliderThumbIcon, { fontSize: 16, color: colors.white }]}>
+                    →
+                  </Text>
+                </Animated.View>
+              </View>
+            </View>
+
+            <Button
+              title="Back"
+              onPress={() => {
+                setShowSignatureStep(false);
+                setSelectedTransferMethod(null);
+              }}
+              variant="secondary"
+              style={styles.modalCancelButton}
+            />
+          </>
+        )}
+      </CustomModal>
 
       {/* Wallet Recap Modal */}
-      {showWalletRecapModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.walletRecapModal}>
-            <Text style={styles.walletRecapTitle}>🎉 Split Wallet Created!</Text>
-            <Text style={styles.walletRecapSubtitle}>
-              Your split wallet has been created and is ready for payments. Keep your private key secure!
-            </Text>
-            
-            {splitWallet && (
-              <View style={styles.walletRecapContent}>
-                <View style={styles.walletInfoCard}>
-                  <Text style={styles.walletInfoLabel}>Wallet Address</Text>
-                  <View style={styles.walletAddressContainer}>
-                    <Text style={styles.walletAddressText}>
-                      {formatWalletAddress(splitWallet.walletAddress)}
-                    </Text>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        const { Clipboard } = require('react-native');
-                        Clipboard.setString(splitWallet.walletAddress);
-                        Alert.alert('Copied', 'Wallet address copied to clipboard');
-                      }}
-                      style={styles.copyButton}
-                    >
-                      <Text style={styles.copyButtonText}>Copy</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                
+      <CustomModal
+        visible={showWalletRecapModal}
+        onClose={() => setShowWalletRecapModal(false)}
+        title="🎉 Split Wallet Created!"
+        description="Your split wallet has been created and is ready for payments. Keep your private key secure!"
+        showHandle={true}
+        closeOnBackdrop={true}
+      >
+        {splitWallet && (
+          <View style={styles.walletRecapContent}>
+            <View style={styles.walletInfoCard}>
+              <Text style={styles.walletInfoLabel}>Wallet Address</Text>
+              <View style={styles.walletAddressContainer}>
+                <Text style={styles.walletAddressText}>
+                  {formatWalletAddress(splitWallet.walletAddress)}
+                </Text>
                 <TouchableOpacity 
-                  style={styles.privateKeyButton} 
-                  onPress={handleShowPrivateKey}
+                  onPress={() => {
+                    const { Clipboard } = require('react-native');
+                    Clipboard.setString(splitWallet.walletAddress);
+                    Alert.alert('Copied', 'Wallet address copied to clipboard');
+                  }}
+                  style={styles.copyButton}
                 >
-                  <Text style={styles.privateKeyButtonText}>🔑 View Private Key</Text>
+                  <Text style={styles.copyButtonText}>Copy</Text>
                 </TouchableOpacity>
               </View>
-            )}
-            
-            <View style={styles.walletRecapButtons}>
-              <TouchableOpacity 
-                style={styles.walletRecapButton}
-                onPress={() => setShowWalletRecapModal(false)}
-              >
-                <Text style={styles.walletRecapButtonText}>Continue</Text>
-              </TouchableOpacity>
             </View>
+            
+            <Button
+              title="🔑 View Private Key"
+              onPress={handleShowPrivateKey}
+              variant="secondary"
+              style={styles.privateKeyButton}
+            />
           </View>
-        </View>
-      )}
+        )}
+        
+        <Button
+          title="Continue"
+          onPress={() => setShowWalletRecapModal(false)}
+          variant="primary"
+          fullWidth={true}
+          style={styles.walletRecapButton}
+        />
+      </CustomModal>
 
       {/* Private Key Modal */}
-      {showPrivateKeyModal && privateKey && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.privateKeyModal}>
-            <Text style={styles.privateKeyModalTitle}>🔑 Private Key</Text>
-            <Text style={styles.privateKeyModalSubtitle}>
-              Keep this private key secure. Anyone with access to this key can control your split wallet.
-            </Text>
-            
-            <View style={styles.privateKeyDisplay}>
-              <Text style={styles.privateKeyText}>{privateKey}</Text>
-            </View>
-            
-            <View style={styles.privateKeyWarning}>
-              <Text style={styles.privateKeyWarningText}>
-                ⚠️ Never share your private key with anyone. Store it in a secure location.
-              </Text>
-            </View>
-            
-            <View style={styles.privateKeyButtons}>
-             
-              <TouchableOpacity 
-                style={styles.closePrivateKeyButton}
-                onPress={handleClosePrivateKeyModal}
-              >
-                <Text style={styles.closePrivateKeyButtonText}>Close</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={handleCopyPrivateKey}
-              >
-                <LinearGradient
-                  colors={[colors.green, colors.greenBlue]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.copyPrivateKeyButton}
-                >
-                  <Text style={styles.copyPrivateKeyButtonText}>Copy Key</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
+      <CustomModal
+        visible={showPrivateKeyModal && !!privateKey}
+        onClose={handleClosePrivateKeyModal}
+        title="🔑 Private Key"
+        description="Keep this private key secure. Anyone with access to this key can control your split wallet."
+        showHandle={true}
+        closeOnBackdrop={true}
+      >
+        <View style={styles.privateKeyDisplay}>
+          <Text style={styles.privateKeyText}>{privateKey}</Text>
         </View>
-      )}
+        
+        <View style={styles.privateKeyWarning}>
+          <Text style={styles.privateKeyWarningText}>
+            ⚠️ Never share your private key with anyone. Store it in a secure location.
+          </Text>
+        </View>
+        
+        <View style={styles.privateKeyButtons}>
+          <Button
+            title="Close"
+            onPress={handleClosePrivateKeyModal}
+            variant="secondary"
+            style={styles.closePrivateKeyButton}
+          />
+          
+          <Button
+            title="Copy Key"
+            onPress={handleCopyPrivateKey}
+            variant="primary"
+            style={styles.copyPrivateKeyButton}
+          />
+        </View>
+      </CustomModal>
     </Container>
   );
 };

@@ -4,7 +4,7 @@
  * Part of the modularized SplitWalletService
  */
 
-import { walletService } from '../WalletService';
+import { walletService } from '../blockchain/wallet';
 import { logger } from '../core';
 import { roundUsdcAmount as currencyRoundUsdcAmount } from '../../utils/ui/format';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';

@@ -12,7 +12,6 @@ import {
   Animated,
   Image,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './DegenSpinStyles';
@@ -23,7 +22,7 @@ import { notificationService } from '../../services/notifications';
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenRoulette } from './components';
-import { Container } from '../../components/shared';
+import { Container, Button } from '../../components/shared';
 
 // Category images mapping for dynamic icons
 const CATEGORY_IMAGES_LOCAL: { [key: string]: any } = {
@@ -311,32 +310,21 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
 
       </View>
 
-      {/* Fixed Bottom Button with Gradient */}
+      {/* Fixed Bottom Button */}
       <View style={styles.bottomButtonContainer}>
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={[
-            styles.spinButtonGradient,
-            (degenState.isSpinning || degenState.hasSpun || !isCreator) && styles.spinButtonDisabled
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.spinButton}
-            onPress={handleStartSpinning}
-            disabled={degenState.isSpinning || degenState.hasSpun || !isCreator}
-          >
-            <Text style={[
-              styles.spinButtonText,
-              (degenState.isSpinning || degenState.hasSpun) && styles.spinButtonTextDisabled
-            ]}>
-              {degenState.isSpinning ? 'Spinning...' :
-                degenState.hasSpun ? 'Spinning Complete!' :
-                  isCreator ? 'Start spinning' : 'Waiting for owner to spin...'}
-            </Text>
-          </TouchableOpacity>
-        </LinearGradient>
+        <Button
+          title={
+            degenState.isSpinning ? 'Spinning...' :
+              degenState.hasSpun ? 'Spinning Complete!' :
+                isCreator ? 'Start spinning' : 'Waiting for owner to spin...'
+          }
+          onPress={handleStartSpinning}
+          variant="primary"
+          disabled={degenState.isSpinning || degenState.hasSpun || !isCreator}
+          loading={degenState.isSpinning}
+          fullWidth={true}
+          style={styles.spinButton}
+        />
       </View>
     </Container>
   );

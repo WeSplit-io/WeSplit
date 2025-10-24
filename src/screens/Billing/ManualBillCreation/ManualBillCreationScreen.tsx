@@ -28,6 +28,9 @@ import { convertFiatToUSDC } from '../../../services/core';
 import { parseAmount } from '../../../OLD_LEGACY/deprecated_utils/amount';
 import { styles } from './styles';
 import { logger } from '../../../services/analytics/loggingService';
+import CustomButton from '../../../components/shared/Button';
+import Input from '../../../components/shared/Input';
+import PhosphorIcon from '../../../components/shared/PhosphorIcon';
 import { Container, Modal as CustomModal, Header, Button } from '../../../components/shared';
 
 // Category options with images
@@ -404,63 +407,47 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
         </View>
 
         {/* Name Input */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Name</Text>
-          <TextInput
-            style={[
-              styles.textInput,
-              validationErrors.name && styles.inputError,
-            ]}
-            value={billName}
-            onChangeText={(text) => {
-              setBillName(text);
-              clearValidationErrors();
-            }}
-            placeholder="Expense Name"
-            placeholderTextColor={colors.white70}
-          />
-          {validationErrors.name && (
-            <Text style={styles.errorText}>{validationErrors.name}</Text>
-          )}
-        </View>
+        <Input
+          label="Name"
+          value={billName}
+          onChangeText={(text) => {
+            setBillName(text);
+            clearValidationErrors();
+          }}
+          placeholder="Expense Name"
+          error={validationErrors.name}
+          containerStyle={styles.section}
+        />
 
         {/* Date Input */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Date</Text>
-          <TouchableOpacity
-            style={styles.dateInput}
-            onPress={() => {
-              setInitialDate(selectedDate); // Enregistrer la date initiale
-              setIsDateModified(false); // Réinitialiser l'état
-              setShowDatePicker(true);
-            }}
-          >
-            <Text style={styles.dateText}>{formatDate(selectedDate)}</Text>
-            <Image
-              source={require('../../../../assets/calendar-icon.png')}
-              style={styles.calendarIcon}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        </View>
+        <Input
+          label="Date"
+          value={formatDate(selectedDate)}
+          placeholder="Select Date"
+          rightIcon="Calendar"
+          onRightIconPress={() => {
+            setInitialDate(selectedDate); // Enregistrer la date initiale
+            setIsDateModified(false); // Réinitialiser l'état
+            setShowDatePicker(true);
+          }}
+          containerStyle={styles.section}
+          inputStyle={{ color: colors.white }}
+        />
 
         {/* Amount Input */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Amount</Text>
           <View style={styles.amountContainer}>
-            <TextInput
-              style={[
-                styles.amountInput,
-                validationErrors.amount && styles.inputError,
-              ]}
+            <Input
               value={amount}
               onChangeText={(text) => {
                 setAmount(text);
                 clearValidationErrors();
               }}
               placeholder="0.00"
-              placeholderTextColor={colors.white70}
               keyboardType="numeric"
+              error={validationErrors.amount}
+              containerStyle={{ marginBottom: 0, flex: 1 }}
             />
             <TouchableOpacity
               style={styles.currencyButton}
@@ -469,12 +456,9 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
               <Text style={styles.currencyText}>
                 {selectedCurrency.code} {selectedCurrency.symbol}
               </Text>
-              <Text style={styles.dropdownIcon}>▼</Text>
+              <PhosphorIcon name="CaretDown" size={16} color={colors.white70} />
             </TouchableOpacity>
           </View>
-          {validationErrors.amount && (
-            <Text style={styles.errorText}>{validationErrors.amount}</Text>
-          )}
         </View>
 
         {/* Total Display */}
@@ -482,13 +466,13 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
           <Text style={styles.totalLabel}>Total</Text>
           <View style={styles.totalValueContainer}>
             {isConverting ? (
-              <ActivityIndicator size="small" color={colors.green} />
+              <ActivityIndicator size="small" color={colors.white} />
             ) : convertedAmount ? (
               <Text style={styles.totalValue}>
                 {convertedAmount.toFixed(4)} USDC
               </Text>
             ) : (
-              <Text style={styles.totalValuePlaceholder}>Calculating...</Text>
+              <Text style={styles.totalValuePlaceholder}>0.00 USDC</Text>
             )}
           </View>
         </View>
@@ -496,35 +480,24 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
 
       {/* Continue Button */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[
-            styles.continueButton, 
-            (isCreating || isConverting || !convertedAmount || convertedAmount <= 0) && styles.buttonDisabled
-          ]}
+        <CustomButton
+          title={
+            isCreating 
+              ? 'Creating...' 
+              : isConverting 
+                ? 'Converting...' 
+                : !convertedAmount || convertedAmount <= 0 
+                  ? 'Enter Amount' 
+                  : isEditing 
+                    ? 'Update Bill' 
+                    : 'Continue'
+          }
           onPress={handleCreateBill}
+          variant="primary"
           disabled={isCreating || isConverting || !convertedAmount || convertedAmount <= 0}
-        >
-          <LinearGradient
-            colors={
-              (isCreating || isConverting || !convertedAmount || convertedAmount <= 0) 
-                ? [colors.surface, colors.surface] 
-                : [colors.green, colors.greenBlue]
-            }
-            style={styles.buttonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            {isCreating ? (
-              <ActivityIndicator color={colors.black} />
-            ) : isConverting ? (
-              <Text style={[styles.buttonText, { color: colors.textSecondary }]}>Converting...</Text>
-            ) : !convertedAmount || convertedAmount <= 0 ? (
-              <Text style={[styles.buttonText, { color: colors.textSecondary }]}>Enter Amount</Text>
-            ) : (
-              <Text style={styles.buttonText}>{isEditing ? 'Update Bill' : 'Continue'}</Text>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
+          loading={isCreating}
+          fullWidth={true}
+        />
       </View>
 
       {/* Date Picker Modal */}

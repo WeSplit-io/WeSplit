@@ -155,24 +155,6 @@ export const styles = StyleSheet.create({
     paddingTop: 8,
     alignItems: 'center',
     borderTopWidth: 0,
-    marginHorizontal: spacing.lg,
   },
-  mockupContinueButton: {
-    backgroundColor: colors.white10,
-    borderRadius: 16,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.lg,
-    alignItems: 'center',
-    width: '100%',
-  },
-  mockupContinueButtonText: {
-    color: colors.white70,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  mockupContinueButtonTextActive: {
-    color: colors.black,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-  },
+
 }); 

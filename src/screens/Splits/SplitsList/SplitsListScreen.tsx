@@ -25,7 +25,7 @@ import NavBar from '../../../components/NavBar';
 import UserAvatar from '../../../components/UserAvatar';
 import GroupIcon from '../../../components/GroupIcon';
 import Icon from '../../../components/Icon';
-import { Container } from '../../../components/shared';
+import { Container, Button } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
 import { BillSplitSummary } from '../../../types/billSplitting';
 import { splitStorageService, Split, SplitStorageService } from '../../../services/splits';
@@ -552,20 +552,12 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           title="Pools"
           showBackButton={false}
           rightElement={
-            <TouchableOpacity
+            <Button
+              title="New Pool"
               onPress={handleCreateSplit}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.newPoolButton}
-              >
-                <Text style={styles.newPoolButtonIcon}>+</Text>
-                <Text style={styles.newPoolButtonText}>New Pool</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+              variant="primary"
+              style={styles.newPoolButton}
+            />
           }
         />
 

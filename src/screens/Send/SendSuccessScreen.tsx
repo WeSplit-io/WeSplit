@@ -1,12 +1,11 @@
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { notificationService } from '../../services/notifications';
 import { logger } from '../../services/analytics/loggingService';
-import { Container } from '../../components/shared';
+import { Container, Button } from '../../components/shared';
 
 const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, wallet, destinationType, amount, description, groupId, transactionId, isSettlement, fromNotification, notificationId } = route.params || {};
@@ -104,26 +103,13 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
         </View>
         {/* Back Home Button collé en bas */}
         <View style={{width: '100%', alignItems: 'center'}}>
-          <TouchableOpacity onPress={handleBackHome} activeOpacity={0.85} style={{ width: '100%' }}>
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[styles.mockupBackHomeButton, {
-                paddingVertical: 16,
-                paddingHorizontal: 48,
-                borderRadius: 12,
-                width: '100%'
-              }]}
-            >
-              <Text style={[styles.mockupBackHomeButtonText, {
-                fontSize: 16,
-                fontWeight: '600',
-              }]}> 
-                {isSettlement ? 'Back to Group' : 'Back Home'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          <Button
+            title={isSettlement ? 'Back to Group' : 'Back Home'}
+            onPress={handleBackHome}
+            variant="primary"
+            fullWidth={true}
+            style={styles.mockupBackHomeButton}
+          />
         </View>
       </View>
     </Container>

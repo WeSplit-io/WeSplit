@@ -22,6 +22,7 @@ import { styles } from './BillCameraStyles';
 import { logger } from '../../../services/analytics/loggingService';
 import { Container } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
+import Button from '../../../components/shared/Button';
 
 interface BillCameraScreenProps {
   navigation: any;
@@ -149,11 +150,15 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>Camera access is required to capture bills</Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={handleRequestPermission}>
-            <Text style={styles.permissionButtonText}>Grant Permission</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.permissionButton, { backgroundColor: colors.surface, marginTop: spacing.md }]} 
+          <Button
+            title="Grant Permission"
+            onPress={handleRequestPermission}
+            variant="primary"
+            fullWidth={true}
+            style={{ marginTop: spacing.md }}
+          />
+          <Button
+            title="Go to Splits"
             onPress={() => {
               try {
                 navigation.navigate('SplitsList');
@@ -162,9 +167,10 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
                 navigation.goBack();
               }
             }}
-          >
-            <Text style={[styles.permissionButtonText, { color: colors.text }]}>Go to Splits</Text>
-          </TouchableOpacity>
+            variant="secondary"
+            fullWidth={true}
+            style={{ marginTop: spacing.md }}
+          />
         </View>
       </Container>
     );
@@ -189,23 +195,23 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
 
         {/* Bottom Actions */}
         <View style={styles.previewActions}>
-          <TouchableOpacity style={styles.retakeButton} onPress={retakePicture}>
-            <Text style={styles.retakeButtonText}>Retake</Text>
-          </TouchableOpacity>
+          <View style={{ flex: 1}}>
+            <Button
+              title="Retake"
+              onPress={retakePicture}
+              variant="secondary"
+              fullWidth={true}
+            />
+          </View>
           
-          <LinearGradient
-            colors={[colors.green, colors.greenBlue]}
-            style={styles.processButton}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <TouchableOpacity 
-              style={styles.processButtonTouchable}
+          <View style={{ flex: 1}}>
+            <Button
+              title="Continue"
               onPress={processBill}
-            >
-              <Text style={styles.processButtonText}>Continue</Text>
-            </TouchableOpacity>
-          </LinearGradient>
+              variant="primary"
+              fullWidth={true}
+            />
+          </View>
         </View>
       </Container>
     );
@@ -242,21 +248,23 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
 
       {/* Bottom Buttons */}
       <View style={styles.bottomButtons}>
-        {/* Manual Button - Bottom Left */}
-        <TouchableOpacity 
-          style={styles.bottomLeftButton} 
-          onPress={() => {
-            try {
-              navigation.navigate('ManualBillCreation');
-            } catch (error) {
-              console.error('Error navigating to ManualBillCreation:', error);
-              navigation.goBack();
-            }
-          }}
-        >
-        <Image source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fkeyboard-icon.png?alt=media&token=b8e9177e-c02a-4e57-97c4-15748efaa7e9'}} style={styles.bottomLeftButtonIcon} />
-          <Text style={styles.bottomLeftButtonText}>Manual</Text>
-        </TouchableOpacity>
+        {/* Left spacer */}
+        <View style={{ flex: 1, alignItems: 'flex-start' }}>
+          <Button
+            title="Manual"
+            onPress={() => {
+              try {
+                navigation.navigate('ManualBillCreation');
+              } catch (error) {
+                console.error('Error navigating to ManualBillCreation:', error);
+                navigation.goBack();
+              }
+            }}
+            variant="secondary"
+            icon="Keyboard"
+            iconPosition="left"
+          />
+        </View>
 
         {/* Capture Button - Bottom Center */}
         <LinearGradient
@@ -274,13 +282,17 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </LinearGradient>
 
-        {/* Gallery Button - Bottom Right */}
-        <TouchableOpacity 
-          style={styles.bottomRightButton} 
-          onPress={pickImageFromGallery}
-        >
-          <Image source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmedia-icon.png?alt=media&token=27a24ab9-8512-4cd7-9520-fdaf6f9883a9'}} style={styles.bottomRightButtonIcon} />
-        </TouchableOpacity>
+        {/* Right spacer */}
+        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+          <Button
+            title=""
+            onPress={pickImageFromGallery}
+            variant="secondary"
+            icon="Images"
+            iconPosition="left"
+            style={{ width: 60, height: 60, borderRadius: 30 }}
+          />
+        </View>
       </View>
     </Container>
   );

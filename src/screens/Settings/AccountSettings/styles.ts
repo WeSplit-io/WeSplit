@@ -7,7 +7,6 @@ export default StyleSheet.create({
   },
   scrollContent: {
     flex: 1,
-    padding: spacing.lg,
   },
   bottomSpacing: {
     height: spacing.xl,

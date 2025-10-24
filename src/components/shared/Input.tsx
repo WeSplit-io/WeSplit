@@ -127,10 +127,10 @@ const Input: React.FC<InputProps> = ({
 
   const getLabelStyle = (): TextStyle => {
     return {
-      fontSize: typography.fontSize.lg,
+      fontSize: typography.fontSize.md,
       fontWeight: typography.fontWeight.regular,
       color: colors.white80,
-      marginBottom: spacing.sm,
+      marginBottom: spacing.md,
     };
   };
 

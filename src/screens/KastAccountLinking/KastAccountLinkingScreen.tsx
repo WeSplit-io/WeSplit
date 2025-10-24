@@ -19,7 +19,7 @@ import {
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { Container, Header } from '../../components/shared';
+import { Container, Header, Input, Button } from '../../components/shared';
 
 interface KastAccountLinkingScreenProps {
   navigation: any;
@@ -140,30 +140,23 @@ const KastAccountLinkingScreen: React.FC<KastAccountLinkingScreenProps> = ({ nav
           </View>
 
           {/* Address Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Kast Wallet Address</Text>
-            <TextInput
-              style={[
-                styles.addressInput,
-                kastAddress && !validateKastAddress(kastAddress) && styles.addressInputError
-              ]}
-              value={kastAddress}
-              onChangeText={setKastAddress}
-              placeholder="Enter your Kast wallet address..."
-              placeholderTextColor={colors.textSecondary}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {kastAddress && !validateKastAddress(kastAddress) && (
-              <Text style={styles.errorText}>Please enter a valid Solana wallet address</Text>
-            )}
-            {kastAddress && validateKastAddress(kastAddress) && (
-              <Text style={styles.successText}>✓ Valid wallet address</Text>
-            )}
-          </View>
+          <Input
+            label="Kast Wallet Address"
+            value={kastAddress}
+            onChangeText={setKastAddress}
+            placeholder="Enter your Kast wallet address..."
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+            autoCapitalize="none"
+            autoCorrect={false}
+            error={kastAddress && !validateKastAddress(kastAddress) ? 'Please enter a valid Solana wallet address' : undefined}
+            containerStyle={styles.inputContainer}
+            inputStyle={styles.addressInput}
+          />
+          {kastAddress && validateKastAddress(kastAddress) && (
+            <Text style={styles.successText}>✓ Valid wallet address</Text>
+          )}
 
           {/* Help Text */}
           <View style={styles.helpContainer}>
@@ -179,21 +172,15 @@ const KastAccountLinkingScreen: React.FC<KastAccountLinkingScreenProps> = ({ nav
 
         {/* Continue Button */}
         <View style={styles.bottomContainer}>
-          <TouchableOpacity
-            style={[
-              styles.continueButton,
-              (!kastAddress.trim() || !validateKastAddress(kastAddress.trim()) || isValidating) && styles.continueButtonDisabled
-            ]}
+          <Button
+            title={isValidating ? 'Validating...' : 'Continue to Transfer'}
             onPress={handleContinue}
+            variant="primary"
             disabled={!kastAddress.trim() || !validateKastAddress(kastAddress.trim()) || isValidating}
-          >
-            <Text style={[
-              styles.continueButtonText,
-              (!kastAddress.trim() || !validateKastAddress(kastAddress.trim()) || isValidating) && styles.continueButtonTextDisabled
-            ]}>
-              {isValidating ? 'Validating...' : 'Continue to Transfer'}
-            </Text>
-          </TouchableOpacity>
+            loading={isValidating}
+            fullWidth={true}
+            style={styles.continueButton}
+          />
         </View>
       </KeyboardAvoidingView>
     </Container>

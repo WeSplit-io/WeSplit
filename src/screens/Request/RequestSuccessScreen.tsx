@@ -1,10 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { logger } from '../../services/analytics/loggingService';
-import { Container } from '../../components/shared';
+import { Container, Button } from '../../components/shared';
 
 const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
   const { contact, amount, description, groupId, requestId, paymentRequest } = route.params || {};
@@ -71,26 +70,13 @@ const RequestSuccessScreen: React.FC<any> = ({ navigation, route }) => {
          </View>
         {/* Back Home Button collé en bas */}
         <View style={{width: '100%', alignItems: 'center'}}>
-          <TouchableOpacity onPress={handleBackHome} activeOpacity={0.85} style={{ width: '100%' }}>
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[styles.mockupBackHomeButton, {
-                paddingVertical: 16,
-                paddingHorizontal: 48,
-                borderRadius: 12,
-                width: '100%'
-              }]}
-            >
-              <Text style={[styles.mockupBackHomeButtonText, {
-                fontSize: 16,
-                fontWeight: '600',
-              }]}> 
-                Back Home
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          <Button
+            title="Back Home"
+            onPress={handleBackHome}
+            variant="primary"
+            fullWidth={true}
+            style={styles.mockupBackHomeButton}
+          />
         </View>
       </View>
     </Container>

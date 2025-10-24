@@ -48,7 +48,8 @@ import {
   UnifiedBillData,
   UnifiedParticipant
 } from '../../types/splitNavigation';
-import { Container, Header } from '../../components/shared';
+import { Container, Header, Button } from '../../components/shared';
+import CustomModal from '../../components/shared/Modal';
 
 // Image mapping for category icons
 const CATEGORY_IMAGES: { [key: string]: any } = {
@@ -1363,223 +1364,136 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       {/* Bottom Action Button - Only visible to creators */}
       {isCurrentUserCreator() && (
         <View style={styles.bottomContainer}>
-          <TouchableOpacity
-            style={styles.splitButton}
+          <Button
+            title={(() => {
+              const allAccepted = areAllParticipantsAccepted();
+              const participants = currentSplitData?.participants || [];
+              const acceptedParticipants = participants.filter((participant: any) =>
+                participant.status === 'accepted'
+              );
+              const usersNeedingAcceptance = participants.length - acceptedParticipants.length;
+
+              if (allAccepted) {
+                return 'Split';
+              } else if (usersNeedingAcceptance > 0) {
+                return `Waiting for ${usersNeedingAcceptance} user${usersNeedingAcceptance !== 1 ? 's' : ''} to accept`;
+              } else {
+                return 'Split';
+              }
+            })()}
             onPress={handleSplitBill}
+            variant="primary"
             disabled={!areAllParticipantsAccepted()}
-          >
-            <LinearGradient
-              colors={areAllParticipantsAccepted() ? [colors.green, colors.greenLight] : [colors.surface, colors.surface]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.splitButtonGradient}
-            >
-              <Text style={[
-                styles.splitButtonText,
-                !areAllParticipantsAccepted() && styles.splitButtonTextDisabled
-              ]}>
-                {(() => {
-                  const allAccepted = areAllParticipantsAccepted();
-
-                  // Count users who need to accept
-                  const participants = currentSplitData?.participants || [];
-                  const acceptedParticipants = participants.filter((participant: any) =>
-                    participant.status === 'accepted'
-                  );
-                  const usersNeedingAcceptance = participants.length - acceptedParticipants.length;
-
-                  if (allAccepted) {
-                    return 'Split';
-                  } else if (usersNeedingAcceptance > 0) {
-                    return `Waiting for ${usersNeedingAcceptance} user${usersNeedingAcceptance !== 1 ? 's' : ''} to accept`;
-                  } else {
-                    return 'Split';
-                  }
-                })()}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+            fullWidth={true}
+          />
         </View>
       )}
 
       {/* Split Type Selection Modal */}
-      <Modal
+      <CustomModal
         visible={showSplitModalState}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={handleCloseModal}
-        statusBarTranslucent={true}
+        onClose={handleCloseModal}
+        title="Choose your splitting style"
+        description="Pick how you want to settle the bill with friends."
+        showHandle={true}
+        closeOnBackdrop={true}
       >
-        <Animated.View style={[styles.modalOverlay, { opacity: splitModalOpacity }]}>
-          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-            <TouchableOpacity
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-              activeOpacity={1}
-              onPress={handleCloseModal}
+        {/* Split Type Options */}
+        <View style={styles.splitOptionsContainer}>
+          {/* Fair Split Option */}
+          <TouchableOpacity
+            style={[
+              styles.splitOption,
+              selectedSplitType === 'fair' && styles.splitOptionSelected
+            ]}
+            onPress={() => handleSplitTypeSelection('fair')}
+          >
+            <Image
+              source={require('../../../assets/fair-split-icon.png')}
+              style={styles.splitOptionIconImage}
             />
+            <Text style={styles.splitOptionTitle}>Fair Split</Text>
+            <Text style={styles.splitOptionDescription}>Split the bill equally among all participants</Text>
+          </TouchableOpacity>
 
-            <PanGestureHandler
-              onGestureEvent={handleSplitModalGestureEvent}
-              onHandlerStateChange={handleSplitModalStateChange}
-            >
-              <Animated.View
-                style={[
-                  styles.modalContainer,
-                  {
-                    transform: [{ translateY: splitModalTranslateY }],
-                  },
-                ]}
-              >
-                {/* Modal Handle */}
-                <View style={styles.modalHandle} />
+          {/* Degen Split Option */}
+          <TouchableOpacity
+            style={[
+              styles.splitOption,
+              selectedSplitType === 'degen' && styles.splitOptionSelected
+            ]}
+            onPress={() => handleSplitTypeSelection('degen')}
+          >
+            <Image
+              source={require('../../../assets/degen-split-icon.png')}
+              style={styles.splitOptionIconImage}
+            />
+            <Text style={styles.splitOptionTitle}>Degen Split</Text>
+            <Text style={styles.splitOptionDescription}>Winner takes all - high risk, high reward</Text>
+            <View style={styles.riskyModeLabel}>
+              <Text style={styles.riskyModeIcon}>🔥</Text>
+              <Text style={styles.riskyModeText}>Risky</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
-                {/* Modal Content */}
-                <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>Choose your splitting style</Text>
-                  <Text style={styles.modalSubtitle}>
-                    Pick how you want to settle the bill with friends.
-                  </Text>
-
-                  {/* Split Type Options */}
-                  <View style={styles.splitOptionsContainer}>
-                    {/* Fair Split Option */}
-                    <TouchableOpacity
-                      style={[
-                        styles.splitOption,
-                        selectedSplitType === 'fair' && styles.splitOptionSelected
-                      ]}
-                      onPress={() => handleSplitTypeSelection('fair')}
-                    >
-                      <Image
-                        source={require('../../../assets/fair-split-icon.png')}
-                        style={styles.splitOptionIconImage}
-                      />
-                      <Text style={styles.splitOptionTitle}>Fair Split</Text>
-                      <Text style={styles.splitOptionDescription}>Split the bill equally among all participants</Text>
-                    </TouchableOpacity>
-
-                    {/* Degen Split Option */}
-                    <TouchableOpacity
-                      style={[
-                        styles.splitOption,
-                        selectedSplitType === 'degen' && styles.splitOptionSelected
-                      ]}
-                      onPress={() => handleSplitTypeSelection('degen')}
-                    >
-                      <Image
-                        source={require('../../../assets/degen-split-icon.png')}
-                        style={styles.splitOptionIconImage}
-                      />
-                      <Text style={styles.splitOptionTitle}>Degen Split</Text>
-                      <Text style={styles.splitOptionDescription}>Winner takes all - high risk, high reward</Text>
-                      <View style={styles.riskyModeLabel}>
-                        <Text style={styles.riskyModeIcon}>🔥</Text>
-                        <Text style={styles.riskyModeText}>Risky</Text>
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Continue Button */}
-                  <TouchableOpacity
-                    style={[
-                      styles.continueButton,
-                      !selectedSplitType && styles.continueButtonDisabled
-                    ]}
-                    onPress={handleContinue}
-                    disabled={!selectedSplitType}
-                  >
-                    <LinearGradient
-                      colors={selectedSplitType ? [colors.green, colors.greenLight] : [colors.surface, colors.surface]}
-                      style={styles.continueButtonGradient}
-                    >
-                      <Text style={[
-                        styles.continueButtonText,
-                        !selectedSplitType && styles.continueButtonTextDisabled
-                      ]}>
-                        Continue
-                      </Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            </PanGestureHandler>
-          </View>
-        </Animated.View>
-      </Modal>
+        {/* Continue Button */}
+        <Button
+          title="Continue"
+          onPress={handleContinue}
+          variant="primary"
+          disabled={!selectedSplitType}
+          fullWidth={true}
+          style={styles.continueButton}
+        />
+      </CustomModal>
 
       {/* Add Friends Modal */}
-      <Modal
+      <CustomModal
         visible={showAddFriendsModalState}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={handleCloseAddFriendsModal}
-        statusBarTranslucent={true}
+        onClose={handleCloseAddFriendsModal}
+        title="Add Friends"
+        showHandle={true}
+        closeOnBackdrop={true}
       >
-        <Animated.View style={[styles.modalOverlay, { opacity: addFriendsModalOpacity }]}>
-          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-            <TouchableOpacity
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-              activeOpacity={1}
-              onPress={handleCloseAddFriendsModal}
-            />
-
-            <PanGestureHandler
-              onGestureEvent={handleAddFriendsModalGestureEvent}
-              onHandlerStateChange={handleAddFriendsModalStateChange}
-            >
-              <Animated.View
-                style={[
-                  styles.addFriendsModalContainer,
-                  {
-                    transform: [{ translateY: addFriendsModalTranslateY }],
-                  },
-                ]}
-              >
-                <View style={styles.dragHandle} />
-                <Text style={styles.addFriendsModalTitle}>Add Friends</Text>
-
-                <View style={styles.qrCodeSection}>
-                  <View style={styles.qrCodeContainer}>
-                    {qrCodeData && qrCodeData.length > 0 ? (
-                      <QrCodeView
-                        value={qrCodeData}
-                        size={250}
-                        backgroundColor="white"
-                        color="black"
-                        showAddress={false}
-                        showButtons={false}
-                        caption="Scan to join this split"
-                      />
-                    ) : (
-                      <View style={styles.qrCodePlaceholder}>
-                        <Text style={styles.qrCodeText}>Loading...</Text>
-                      </View>
-                    )}
-                  </View>
-                 
-                </View>
-
-                <View style={styles.addFriendsModalButtons}>
-                  <TouchableOpacity style={styles.shareLinkButton} onPress={handleLinkShare}>
-                    <Text style={styles.shareLinkButtonText}>Share Link</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.doneButton} onPress={handleAddFromContacts}>
-                    <LinearGradient
-                      colors={[colors.green, colors.greenLight]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.doneButtonGradient}
-                    >
-                      <Text style={styles.doneButtonText}>Add from Contacts</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            </PanGestureHandler>
+        <View style={styles.qrCodeSection}>
+          <View style={styles.qrCodeContainer}>
+            {qrCodeData && qrCodeData.length > 0 ? (
+              <QrCodeView
+                value={qrCodeData}
+                size={250}
+                backgroundColor="white"
+                color="black"
+                showAddress={false}
+                showButtons={false}
+                caption="Scan to join this split"
+              />
+            ) : (
+              <View style={styles.qrCodePlaceholder}>
+                <Text style={styles.qrCodeText}>Loading...</Text>
+              </View>
+            )}
           </View>
-        </Animated.View>
-      </Modal>
+        </View>
+
+        <View style={styles.addFriendsModalButtons}>
+          <Button
+            title="Share Link"
+            onPress={handleLinkShare}
+            variant="secondary"
+            fullWidth={true}
+            style={styles.shareLinkButton}
+          />
+          
+          <Button
+            title="Contact List"
+            onPress={handleAddFromContacts}
+            variant="primary"
+            fullWidth={true}
+            style={styles.doneButton}
+          />
+        </View>
+      </CustomModal>
 
       {/* Private Key Modal - MOVED TO FAIR/DEGEN SCREENS */}
 

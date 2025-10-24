@@ -173,42 +173,12 @@ export const styles = StyleSheet.create({
     fontWeight: '400',
     textAlign: 'center',
   },
-  // Lock button at bottom of screen
+  // === Lock button at bottom of screen ================================
   lockButtonContainer: {
-    backgroundColor: colors.black,
-    marginTop: 'auto', // Push to bottom
-  },
-  lockButton: {
-    borderRadius: 12,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-    // Add gradient effect shadow
-    shadowColor: colors.green,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    marginTop: 'auto',
     width: '100%',
   },
-  lockButtonDisabled: {
-    backgroundColor: colors.surface,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  lockButtonText: {
-    color: colors.black,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-  },
-  lockButtonTextDisabled: {
-    color: colors.textSecondary,
-  },
+
   slideProgress: {
     position: 'absolute',
     top: 0,
@@ -218,7 +188,7 @@ export const styles = StyleSheet.create({
     opacity: 0.3,
   },
 
-  // === ROULETTE BUTTON STYLES ===
+  // === ROULETTE BUTTON STYLES ================================
   rouletteContainer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
@@ -345,36 +315,8 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     fontWeight: '600',
   },
-  // Modal styles
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'flex-end',
-    zIndex: 1000,
-  },
-  modalContainer: {
-    backgroundColor: colors.blackWhite5,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl, // Account for safe area
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: colors.textSecondary,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: spacing.lg,
-  },
-  modalContent: {
-    paddingHorizontal: spacing.xl,
-    alignItems: 'center',
-  },
+  /** ================================ Modal Styles ================================ */
+
   modalIconContainer: {
     marginBottom: spacing.lg,
     backgroundColor: colors.white10,
@@ -388,20 +330,7 @@ export const styles = StyleSheet.create({
     height: 28,
     tintColor: colors.white,
   },
-  modalTitle: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: spacing.md,
-  },
-  modalSubtitle: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSize.md,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-    lineHeight: 22,
-  },
+
   modalSlideButton: {
     backgroundColor: colors.green,
     borderRadius: 12,

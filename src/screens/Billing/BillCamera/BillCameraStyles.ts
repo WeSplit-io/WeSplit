@@ -52,22 +52,11 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
   },
-  bottomLeftButton: {
-    backgroundColor: colors.blackWhite5,
-    borderRadius: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    minWidth: 100,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 10,
-    width: 130,
-  },
+
   bottomLeftButtonIcon: {
     width: 18,
     height: 18,
@@ -123,14 +112,13 @@ export const styles = StyleSheet.create({
   fullHeightImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'contain',
+    resizeMode: 'cover',
   },
   previewActions: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     backgroundColor: colors.black,
-    gap: spacing.md,
+    gap: 10,
   },
   retakeButton: {
     backgroundColor: colors.white10,

@@ -15,7 +15,7 @@ import './src/config/firebase/firebase';
 
 // Import all new screens
 import DashboardScreen from './src/screens/Dashboard/DashboardScreen';
-import ProfileScreen from './src/screens/Settings/Profile/ProfileScreen';
+import ProfileScreen from './src/screens/settings/Profile/ProfileScreen';
 import SplashScreen from './src/screens/Splash/SplashScreen';
 import GetStartedScreen from './src/screens/GetStarted/GetStartedScreen';
 import AuthMethodsScreen from './src/screens/AuthMethods/AuthMethodsScreen';
@@ -26,23 +26,23 @@ import OnboardingScreen from './src/screens/Onboarding/OnboardingScreen';
 import DepositScreen from './src/screens/Deposit/DepositScreen';
 import CryptoTransferScreen from './src/screens/Deposit/CryptoTransferScreen';
 import MoonPayWebViewScreen from './src/screens/Deposit/MoonPayWebViewScreen';
-import AccountSettingsScreen from './src/screens/Settings/AccountSettings/AccountSettingsScreen';
-import PremiumScreen from './src/screens/Settings/Premium/PremiumScreen';
+import AccountSettingsScreen from './src/screens/settings/AccountSettings/AccountSettingsScreen';
+import PremiumScreen from './src/screens/settings/Premium/PremiumScreen';
 import NotificationsScreen from './src/screens/Notifications/NotificationsScreen';
-import LanguageScreen from './src/screens/Settings/Language/LanguageScreen';
+import LanguageScreen from './src/screens/settings/Language/LanguageScreen';
 import SendScreen from './src/screens/Send/SendScreen';
 import SendAmountScreen from './src/screens/Send/SendAmountScreen';
 import SendConfirmationScreen from './src/screens/Send/SendConfirmationScreen';
 import SendSuccessScreen from './src/screens/Send/SendSuccessScreen';
-import LinkedCardsScreen from './src/screens/Settings/LinkedCards/LinkedCardsScreen';
+import LinkedCardsScreen from './src/screens/settings/LinkedCards/LinkedCardsScreen';
 import RequestContactsScreen from './src/screens/Request/RequestContactsScreen';
 import RequestAmountScreen from './src/screens/Request/RequestAmountScreen';
 import RequestConfirmationScreen from './src/screens/Request/RequestConfirmationScreen';
 import RequestSuccessScreen from './src/screens/Request/RequestSuccessScreen';
-import BillCameraScreen from './src/screens/Billing/BillCamera/BillCameraScreen';
-import BillProcessingScreen from './src/screens/Billing/BillProcessing/BillProcessingScreen';
+import BillCameraScreen from './src/screens/billing/BillCamera/BillCameraScreen';
+import BillProcessingScreen from './src/screens/billing/BillProcessing/BillProcessingScreen';
 import SplitDetailsScreen from './src/screens/SplitDetails/SplitDetailsScreen';
-import SplitsListScreen from './src/screens/Splits/SplitsList/SplitsListScreen';
+import SplitsListScreen from './src/screens/splits/SplitsList/SplitsListScreen';
 import FairSplitScreen from './src/screens/FairSplit/FairSplitScreen';
 import PaymentConfirmationScreen from './src/screens/PaymentConfirmation/PaymentConfirmationScreen';
 import KastAccountLinkingScreen from './src/screens/KastAccountLinking/KastAccountLinkingScreen';
@@ -62,7 +62,7 @@ import ContactActionScreen from './src/screens/ContactAction/ContactActionScreen
 import TransactionHistoryScreen from './src/screens/TransactionHistory/TransactionHistoryScreen';
 import ExternalWalletConnectionScreen from './src/screens/ExternalWalletConnection/ExternalWalletConnectionScreen';
 import ManualSignatureInputScreen from './src/screens/ExternalWalletConnection/ManualSignatureInputScreen';
-import ManualBillCreationScreen from './src/screens/Billing/ManualBillCreation/ManualBillCreationScreen';
+import ManualBillCreationScreen from './src/screens/billing/ManualBillCreation/ManualBillCreationScreen';
 // import AuthDebugScreen from './src/screens/Debug/AuthDebugScreen';
 
 

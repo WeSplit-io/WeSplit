@@ -5,7 +5,7 @@
  */
 
 import { Platform } from 'react-native';
-import { consolidatedTransactionService } from '../transaction';
+import { consolidatedTransactionService } from '../blockchain/transaction';
 import { logger } from '../core';
 import { FeeService } from '../../config/constants/feeConfig';
 import { roundUsdcAmount } from '../../utils/ui/format';
@@ -996,7 +996,7 @@ export class SplitWalletPayments {
       }
 
       // Get user wallet
-          const { walletService } = await import('../wallet');
+          const { walletService } = await import('../blockchain/wallet');
           const userWallet = await walletService.getWalletInfo(participantId);
       if (!userWallet) {
             logger.error('User wallet not found for degen split funding', {
@@ -1206,7 +1206,7 @@ export class SplitWalletPayments {
       }
 
       // Get user wallet
-      const { walletService } = await import('../wallet');
+      const { walletService } = await import('../blockchain/wallet');
       const userWallet = await walletService.getWalletInfo(participantId);
       if (!userWallet || !userWallet.secretKey) {
         return {
@@ -1644,7 +1644,7 @@ export class SplitWalletPayments {
       }
 
       // Get user wallet
-        const { walletService } = await import('../wallet');
+        const { walletService } = await import('../blockchain/wallet');
         const userWallet = await walletService.getWalletInfo(loserUserId);
         if (!userWallet) {
           return {
@@ -1885,7 +1885,7 @@ export class SplitWalletPayments {
       const wallet = walletResult.wallet;
 
       // Get user wallet
-      const { walletService } = await import('../wallet');
+      const { walletService } = await import('../blockchain/wallet');
       const userWallet = await walletService.getWalletInfo(userId);
       if (!userWallet) {
         return {

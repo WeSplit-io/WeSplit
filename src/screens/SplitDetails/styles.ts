@@ -266,7 +266,6 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
   },
   bottomContainer: {
-    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     backgroundColor: colors.black,
   },
@@ -364,7 +363,8 @@ export const styles = StyleSheet.create({
     minWidth: 140,
   },
   splitOptionSelected: {
-    borderColor: colors.green,
+    borderColor: colors.white80,
+    backgroundColor: colors.white10,
   },
 
   splitOptionIconImage: {
@@ -393,8 +393,8 @@ export const styles = StyleSheet.create({
   },
   riskyModeLabel: {
     position: 'absolute',
-    top: -6,
-    left: -6,
+    top: 5,
+    left: 5,
     borderRadius: 12,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
@@ -528,14 +528,11 @@ export const styles = StyleSheet.create({
     marginTop: 'auto',
     gap: spacing.sm,
     marginBottom: spacing.sm,
+    width: '100%',
   },
   shareLinkButton: {
     flex: 1,
-    backgroundColor: colors.white10,
-    borderRadius: spacing.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    borderWidth: 0,
+
   },
   shareLinkButtonText: {
     color: colors.white80,
@@ -544,8 +541,6 @@ export const styles = StyleSheet.create({
   },
   doneButton: {
     flex: 1,
-    borderRadius: spacing.md,
-    overflow: 'hidden',
   },
   doneButtonGradient: {
     paddingVertical: spacing.md,

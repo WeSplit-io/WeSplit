@@ -41,13 +41,11 @@ export const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.md,
   },
   billCard: {
     borderRadius: 20,
     padding: spacing.lg,
     marginBottom: spacing.xl,
-    marginHorizontal: spacing.sm,
     // Add the cut-out effect on left and right edges
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -329,7 +327,6 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   bottomContainer: {
-    paddingHorizontal: spacing.md,
     paddingVertical: spacing.lg,
     backgroundColor: colors.black,
   },
@@ -337,7 +334,6 @@ export const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: spacing.md,
     alignItems: 'center',
-    marginHorizontal: spacing.sm,
   },
   confirmButtonTouchable: {
     width: '100%',
@@ -359,11 +355,6 @@ export const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   createWalletButton: {
-    backgroundColor: colors.green,
-    borderRadius: 12,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    marginBottom: spacing.md,
   },
   createWalletButtonText: {
     color: colors.black,

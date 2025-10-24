@@ -10,7 +10,7 @@ import styles from './styles';
 import { colors } from '../../theme';
 import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { logger } from '../../services/analytics/loggingService';
-import { Container } from '../../components/shared';
+import { Container, Button } from '../../components/shared';
 
 interface CryptoTransferParams {
   targetWallet?: {
@@ -301,9 +301,12 @@ const CryptoTransferScreen: React.FC<any> = ({ navigation, route }) => {
         </View>
 
         {/* Done Button */}
-        <TouchableOpacity style={styles.doneButton} onPress={handleDone}>
-          <Text style={styles.doneButtonText}>Done</Text>
-        </TouchableOpacity>
+        <Button
+          title="Done"
+          onPress={handleDone}
+          variant="primary"
+          fullWidth={true}
+        />
       </ScrollView>
     </Container>
   );

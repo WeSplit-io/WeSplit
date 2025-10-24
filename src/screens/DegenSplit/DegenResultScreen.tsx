@@ -29,7 +29,8 @@ import { useApp } from '../../context/AppContext';
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader } from './components';
-import { Container } from '@/components/shared';
+import { Container, Button } from '@/components/shared';
+import CustomModal from '@/components/shared/Modal';
 
 interface DegenResultScreenProps {
   navigation: any;
@@ -485,7 +486,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     degenLogic.handleCopyWalletAddress(address);
   };
 
-  const handleClosePrivateKeyModal = () => {
+  const handleClosePrivateKeyCustomModal = () => {
     degenState.setShowPrivateKeyModal(false);
   };
 
@@ -544,42 +545,26 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         {isWinner ? (
           // Winner actions
           <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={styles.claimButton}
+            <Button
+              title={degenState.isProcessing ? 'Processing...' : 'Claim Funds'}
               onPress={() => degenState.setShowClaimModal(true)}
+              variant="primary"
               disabled={degenState.isProcessing}
-            >
-              <LinearGradient
-                colors={[colors.green, colors.greenBlue]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.claimButtonGradient}
-              >
-                <Text style={styles.claimButtonText}>
-                  {degenState.isProcessing ? 'Processing...' : 'Claim Funds'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
+              loading={degenState.isProcessing}
+              style={styles.claimButton}
+            />
           </View>
         ) : (
           // Loser actions
           <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={styles.payButton}
+            <Button
+              title={degenState.isProcessing ? 'Processing...' : 'Pay Your Share'}
               onPress={() => degenState.setShowPaymentOptionsModal(true)}
+              variant="primary"
               disabled={degenState.isProcessing}
-            >
-              <LinearGradient
-                colors={[colors.red, colors.red]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.payButtonGradient}
-              >
-                <Text style={styles.payButtonText}>
-                  {degenState.isProcessing ? 'Processing...' : 'Pay Your Share'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
+              loading={degenState.isProcessing}
+              style={styles.payButton}
+            />
           </View>
         )}
 
@@ -617,222 +602,200 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         )}
       </View>
 
-      {/* Claim Modal */}
-      {degenState.showClaimModal && (
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => degenState.setShowClaimModal(false)}
-        >
-          <TouchableOpacity 
-            style={styles.modalContainer}
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <View style={styles.modalHandle} />
-            <View style={styles.modalContent}>
-              <View style={styles.modalIconContainer}>
-                <Text style={styles.modalIcon}>🎉</Text>
-              </View>
-              <Text style={styles.modalTitle}>
-                {hasAlreadyClaimed ? 'Funds Already Claimed' : 'Claim Your Winnings'}
-              </Text>
-              <Text style={styles.modalSubtitle}>
-                {hasAlreadyClaimed 
-                  ? `You have already claimed your ${totalAmount} USDC winnings.`
-                  : `You won the degen split! Claim your ${totalAmount} USDC winnings.`
-                }
-              </Text>
-              
-              {hasAlreadyClaimed ? (
-                <View style={styles.claimedStatusContainer}>
-                  {hasValidTransaction ? (
-                    <>
-                      <Text style={styles.claimedStatusText}>✅ Funds Claimed Successfully</Text>
-                      <Text style={styles.claimedStatusSubtext}>
-                        Transaction: {currentUserParticipant?.transactionSignature?.slice(0, 8)}...
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={styles.claimedStatusText}>⚠️ Claim Failed or Timed Out</Text>
-                      <Text style={styles.claimedStatusSubtext}>
-                        Your previous claim attempt failed. You can try again.
-                      </Text>
-                      <AppleSlider
-                        onSlideComplete={handleClaimFunds}
-                        disabled={degenState.isProcessing}
-                        loading={degenState.isProcessing}
-                        text="Retry Claim"
-                      />
-                    </>
-                  )}
-                </View>
-              ) : (
+      {/* Claim CustomModal */}
+      <CustomModal
+        visible={degenState.showClaimModal}
+        onClose={() => degenState.setShowClaimModal(false)}
+        title={hasAlreadyClaimed ? 'Funds Already Claimed' : 'Claim Your Winnings'}
+        description={hasAlreadyClaimed 
+          ? `You have already claimed your ${totalAmount} USDC winnings.`
+          : `You won the degen split! Claim your ${totalAmount} USDC winnings.`
+        }
+        showHandle={true}
+        closeOnBackdrop={true}
+      >
+        <View style={styles.modalIconContainer}>
+          <Text style={styles.modalIcon}>🎉</Text>
+        </View>
+        
+        {hasAlreadyClaimed ? (
+          <View style={styles.claimedStatusContainer}>
+            {hasValidTransaction ? (
+              <>
+                <Text style={styles.claimedStatusText}>✅ Funds Claimed Successfully</Text>
+                <Text style={styles.claimedStatusSubtext}>
+                  Transaction: {currentUserParticipant?.transactionSignature?.slice(0, 8)}...
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.claimedStatusText}>⚠️ Claim Failed or Timed Out</Text>
+                <Text style={styles.claimedStatusSubtext}>
+                  Your previous claim attempt failed. You can try again.
+                </Text>
                 <AppleSlider
                   onSlideComplete={handleClaimFunds}
                   disabled={degenState.isProcessing}
                   loading={degenState.isProcessing}
-                  text="Slide to Claim"
+                  text="Retry Claim"
                 />
-              )}
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      )}
-
-      {/* Payment Options Modal */}
-      {degenState.showPaymentOptionsModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            {!degenState.showSignatureStep ? (
-              // Payment Method Selection Step
-              <>
-                <Text style={styles.modalTitle}>Choose Payment Method</Text>
-                <Text style={styles.modalSubtitle}>
-                  You need to pay the full {totalAmount} USDC bill. How would you like to pay?
-                </Text>
-                
-                <View style={styles.paymentOptionsModalContainer}>
-                  <TouchableOpacity 
-                    style={styles.paymentOptionButton}
-                    onPress={() => {
-                      degenState.setSelectedPaymentMethod('personal-wallet');
-                      degenState.setShowSignatureStep(true);
-                    }}
-                  >
-                    <View style={styles.paymentOptionIcon}>
-                      <Text style={styles.paymentOptionIconText}>💳</Text>
-                    </View>
-                    <View style={styles.paymentOptionContent}>
-                      <Text style={styles.paymentOptionTitle}>In-App Wallet</Text>
-                      <Text style={styles.paymentOptionDescription}>
-                        Withdraw to In-App Wallet
-                      </Text>
-                    </View>
-                    <Text style={styles.paymentOptionArrow}>→</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.paymentOptionButton}
-                    onPress={() => {
-                      degenState.setSelectedPaymentMethod('kast-card');
-                      degenState.setShowSignatureStep(true);
-                    }}
-                  >
-                    <View style={styles.paymentOptionIcon}>
-                      <Text style={styles.paymentOptionIconText}>🏦</Text>
-                    </View>
-                    <View style={styles.paymentOptionContent}>
-                      <Text style={styles.paymentOptionTitle}>KAST Card</Text>
-                      <Text style={styles.paymentOptionDescription}>
-                        Withdraw to KAST Card
-                      </Text>
-                    </View>
-                    <Text style={styles.paymentOptionArrow}>→</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity 
-                  style={styles.modalCancelButton}
-                  onPress={() => degenState.setShowPaymentOptionsModal(false)}
-                >
-                  <Text style={styles.modalCancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              // Signature Step
-              <>
-                <Text style={styles.modalTitle}>
-                  Withdraw Your Locked Funds
-                </Text>
-                <Text style={styles.modalSubtitle}>
-                  Your locked funds will be sent from the split wallet to your chosen destination.
-                </Text>
-                
-                {/* Transfer Visualization */}
-                <View style={styles.transferVisualization}>
-                  <View style={styles.transferIcon}>
-                    <Image 
-                      source={require('../../../assets/wesplit-logo-card.png')} 
-                      style={styles.transferIconImage}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <View style={styles.transferArrows}>
-                    <Text style={styles.transferArrowText}>{'>>>>'}</Text>
-                  </View>
-                  <View style={styles.transferIcon}>
-                    <Image 
-                      source={require('../../../assets/kast-logo.png')} 
-                      style={styles.transferIconImage}
-                      resizeMode="contain"
-                    />
-                  </View>
-                </View>
-
-                <AppleSlider
-                  onSlideComplete={handleSignatureStep}
-                  disabled={degenState.isSigning}
-                  loading={degenState.isSigning}
-                  text="Slide to Transfer"
-                />
-
-                <TouchableOpacity 
-                  style={styles.modalBackButton}
-                  onPress={() => {
-                    degenState.setShowSignatureStep(false);
-                    degenState.setSelectedPaymentMethod(null);
-                  }}
-                >
-                  <Image 
-                    source={require('../../../assets/chevron-left.png')} 
-                    style={styles.modalBackButtonIcon}
-                  />
-                  <Text style={styles.modalBackButtonText}>Back</Text>
-                </TouchableOpacity>
               </>
             )}
           </View>
-        </View>
-      )}
+        ) : (
+          <AppleSlider
+            onSlideComplete={handleClaimFunds}
+            disabled={degenState.isProcessing}
+            loading={degenState.isProcessing}
+            text="Slide to Claim"
+          />
+        )}
+      </CustomModal>
 
-      {/* Private Key Modal */}
-      {degenState.showPrivateKeyModal && degenState.privateKey && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.privateKeyModal}>
-            <Text style={styles.privateKeyModalTitle}>🔑 Private Key</Text>
-            <Text style={styles.privateKeyModalSubtitle}>
-              This is a shared private key for the Degen Split. All participants have access to this key to withdraw or move funds from the split wallet.
-            </Text>
-            
-            <View style={styles.privateKeyDisplay}>
-              <Text style={styles.privateKeyText}>{degenState.privateKey}</Text>
-            </View>
-            
-            <View style={styles.privateKeyWarning}>
-              <Text style={styles.privateKeyWarningText}>
-                ⚠️ This is a shared private key for the Degen Split. All participants can use this key to access the split wallet funds.
-              </Text>
-            </View>
-            
-            <View style={styles.privateKeyButtons}>
+      {/* Payment Options CustomModal */}
+      <CustomModal
+        visible={degenState.showPaymentOptionsModal}
+        onClose={() => degenState.setShowPaymentOptionsModal(false)}
+        title={!degenState.showSignatureStep ? 'Choose Payment Method' : 'Withdraw Your Locked Funds'}
+        description={!degenState.showSignatureStep 
+          ? `You need to pay the full ${totalAmount} USDC bill. How would you like to pay?`
+          : 'Your locked funds will be sent from the split wallet to your chosen destination.'
+        }
+        showHandle={true}
+        closeOnBackdrop={true}
+      >
+        {!degenState.showSignatureStep ? (
+          // Payment Method Selection Step
+          <>
+            <View style={styles.paymentOptionsModalContainer}>
               <TouchableOpacity 
-                style={styles.copyPrivateKeyButton}
-                onPress={handleCopyPrivateKey}
+                style={styles.paymentOptionButton}
+                onPress={() => {
+                  degenState.setSelectedPaymentMethod('personal-wallet');
+                  degenState.setShowSignatureStep(true);
+                }}
               >
-                <Text style={styles.copyPrivateKeyButtonText}>Copy Key</Text>
+                <View style={styles.paymentOptionIcon}>
+                  <Text style={styles.paymentOptionIconText}>💳</Text>
+                </View>
+                <View style={styles.paymentOptionContent}>
+                  <Text style={styles.paymentOptionTitle}>In-App Wallet</Text>
+                  <Text style={styles.paymentOptionDescription}>
+                    Withdraw to In-App Wallet
+                  </Text>
+                </View>
+                <Text style={styles.paymentOptionArrow}>→</Text>
               </TouchableOpacity>
+
               <TouchableOpacity 
-                style={styles.closePrivateKeyButton}
-                onPress={handleClosePrivateKeyModal}
+                style={styles.paymentOptionButton}
+                onPress={() => {
+                  degenState.setSelectedPaymentMethod('kast-card');
+                  degenState.setShowSignatureStep(true);
+                }}
               >
-                <Text style={styles.closePrivateKeyButtonText}>Close</Text>
+                <View style={styles.paymentOptionIcon}>
+                  <Text style={styles.paymentOptionIconText}>🏦</Text>
+                </View>
+                <View style={styles.paymentOptionContent}>
+                  <Text style={styles.paymentOptionTitle}>KAST Card</Text>
+                  <Text style={styles.paymentOptionDescription}>
+                    Withdraw to KAST Card
+                  </Text>
+                </View>
+                <Text style={styles.paymentOptionArrow}>→</Text>
               </TouchableOpacity>
             </View>
-          </View>
+
+            <TouchableOpacity 
+              style={styles.modalCancelButton}
+              onPress={() => degenState.setShowPaymentOptionsModal(false)}
+            >
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          // Signature Step
+          <>
+            {/* Transfer Visualization */}
+            <View style={styles.transferVisualization}>
+              <View style={styles.transferIcon}>
+                <Image 
+                  source={require('../../../assets/wesplit-logo-card.png')} 
+                  style={styles.transferIconImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.transferArrows}>
+                <Text style={styles.transferArrowText}>{'>>>>'}</Text>
+              </View>
+              <View style={styles.transferIcon}>
+                <Image 
+                  source={require('../../../assets/kast-logo.png')} 
+                  style={styles.transferIconImage}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
+
+            <AppleSlider
+              onSlideComplete={handleSignatureStep}
+              disabled={degenState.isSigning}
+              loading={degenState.isSigning}
+              text="Slide to Transfer"
+            />
+
+            <TouchableOpacity 
+              style={styles.modalBackButton}
+              onPress={() => {
+                degenState.setShowSignatureStep(false);
+                degenState.setSelectedPaymentMethod(null);
+              }}
+            >
+              <Image 
+                source={require('../../../assets/chevron-left.png')} 
+                style={styles.modalBackButtonIcon}
+              />
+              <Text style={styles.modalBackButtonText}>Back</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </CustomModal>
+
+      {/* Private Key CustomModal */}
+      <CustomModal
+        visible={degenState.showPrivateKeyModal && !!degenState.privateKey}
+        onClose={handleClosePrivateKeyCustomModal}
+        title="🔑 Private Key"
+        description="This is a shared private key for the Degen Split. All participants have access to this key to withdraw or move funds from the split wallet."
+        showHandle={true}
+        closeOnBackdrop={true}
+      >
+        <View style={styles.privateKeyDisplay}>
+          <Text style={styles.privateKeyText}>{degenState.privateKey}</Text>
         </View>
-      )}
+        
+        <View style={styles.privateKeyWarning}>
+          <Text style={styles.privateKeyWarningText}>
+            ⚠️ This is a shared private key for the Degen Split. All participants can use this key to access the split wallet funds.
+          </Text>
+        </View>
+        
+        <View style={styles.privateKeyButtons}>
+          <TouchableOpacity 
+            style={styles.copyPrivateKeyButton}
+            onPress={handleCopyPrivateKey}
+          >
+            <Text style={styles.copyPrivateKeyButtonText}>Copy Key</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.closePrivateKeyButton}
+            onPress={handleClosePrivateKeyCustomModal}
+          >
+            <Text style={styles.closePrivateKeyButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </CustomModal>
     </Container>
   );
 };

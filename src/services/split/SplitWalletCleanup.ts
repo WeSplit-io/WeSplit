@@ -538,7 +538,7 @@ export class SplitWalletCleanup {
   }
 
   private static async getUserWallet(userId: string): Promise<{ success: boolean; wallet?: { address: string }; error?: string }> {
-    const { walletService } = await import('../wallet');
+    const { walletService } = await import('../blockchain/wallet');
     const wallet = await walletService.getWalletInfo(userId);
     return {
       success: !!wallet,
@@ -548,7 +548,7 @@ export class SplitWalletCleanup {
   }
 
   private static async sendTransaction(params: any): Promise<{ success: boolean; error?: string; transactionSignature?: string }> {
-    const { consolidatedTransactionService } = await import('../transaction/ConsolidatedTransactionService');
+    const { consolidatedTransactionService } = await import('../blockchain/transaction/ConsolidatedTransactionService');
     return consolidatedTransactionService.sendTransaction(params);
   }
   

@@ -190,7 +190,6 @@ export const styles = StyleSheet.create({
   // Action buttons container
   actionButtonsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.md,
     marginTop: spacing.xl,
     gap: spacing.md,
     width: '100%',
@@ -295,7 +294,7 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: colors.white20,
+    borderColor: colors.white50,
   },
   walletAddressRow: {
     flexDirection: 'row',
@@ -362,7 +361,7 @@ export const styles = StyleSheet.create({
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: colors.white30,
+    backgroundColor: colors.white50,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: spacing.lg,

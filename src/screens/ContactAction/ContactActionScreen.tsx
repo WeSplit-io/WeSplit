@@ -5,6 +5,7 @@ import { View, Text, TouchableOpacity, Image, TextInput, ScrollView, KeyboardAvo
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
 import UserAvatar from '../../components/UserAvatar';
+import Button from '../../components/shared/Button';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
@@ -312,26 +313,15 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
 
         {/* Continue Button fixed at bottom */}
         <View style={styles.amountCardContinueButtonWrapper}>
-          <TouchableOpacity onPress={handleContinue} disabled={!isAmountValid || processing} activeOpacity={0.8} style={{ width: '100%' }}>
-            {isAmountValid && !processing ? (
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.mockupContinueButton}
-              >
-                <Text style={styles.mockupContinueButtonTextActive}>
-                  {activeAction === 'send' ? 'Send' : 'Request'}
-                </Text>
-              </LinearGradient>
-            ) : (
-              <View style={styles.mockupContinueButton}>
-                <Text style={styles.mockupContinueButtonText}>
-                  {processing ? 'Processing...' : (activeAction === 'send' ? 'Send' : 'Request')}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <Button
+            title={processing ? 'Processing...' : (activeAction === 'send' ? 'Send' : 'Request')}
+            onPress={handleContinue}
+            variant="primary"
+            disabled={!isAmountValid || processing}
+            loading={processing}
+            fullWidth={true}
+            style={{ width: '100%' }}
+          />
         </View>
       </KeyboardAvoidingView>
     </Container>

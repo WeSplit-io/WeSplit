@@ -4,7 +4,6 @@ import {
   Text, 
   TouchableOpacity, 
   ScrollView, 
-  TextInput, 
   Alert, 
   Image,
   Platform,
@@ -12,7 +11,6 @@ import {
   StatusBar,
   ActivityIndicator
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../../components/Icon';
@@ -22,7 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { accountDeletionService, DeletionProgress, AccountDeletionService, UserImageService } from '../../../services/core';
 import { logger } from '../../../services/analytics/loggingService';
 import styles from './styles';
-import { Container } from '../../../components/shared';
+import { Container, Button, Input } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
 
 
@@ -434,30 +432,22 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
           </View>
 
           {/* Pseudo Field */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Pseudo*</Text>
-            <TextInput
-              style={[styles.input, pseudoError ? styles.inputError : null]}
-              value={pseudo}
-              onChangeText={handlePseudoChange}
-              placeholder="Enter your pseudo"
-              placeholderTextColor="#A89B9B"
-            />
-            {pseudoError && <Text style={styles.errorText}>{pseudoError}</Text>}
-          </View>
+          <Input
+            label="Pseudo*"
+            value={pseudo}
+            onChangeText={handlePseudoChange}
+            placeholder="Enter your pseudo"
+            error={pseudoError || undefined}
+          />
 
           {/* Email Field */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Enter your email"
-              placeholderTextColor="#A89B9B"
-              editable={false}
-            />
-          </View>
+          <Input
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Enter your email"
+            editable={false}
+          />
 
           {/* Delete Account Button */}
           <TouchableOpacity 
@@ -527,26 +517,15 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
 
       {/* Fixed Save Button at Bottom */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <TouchableOpacity 
+        <Button
+          title="Save"
           onPress={handleSaveProfile}
+          variant="primary"
           disabled={!hasChanges || isUploadingAvatar}
-        >
-          <LinearGradient
-            colors={(!hasChanges || isUploadingAvatar) ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.gradientButton}
-          >
-            {isUploadingAvatar ? (
-              <ActivityIndicator color="white" size="small" />
-            ) : (
-              <Text style={[
-                styles.saveButtonText,
-                (!hasChanges || isUploadingAvatar) && styles.saveButtonTextDisabled
-              ]}>Save</Text>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
+          loading={isUploadingAvatar}
+          fullWidth={true}
+          style={styles.gradientButton}
+        />
       </View>
     </Container>
   );

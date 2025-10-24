@@ -27,7 +27,7 @@ import { FallbackDataService } from '../../services/data/mockupData';
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitInitialization, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenSplitProgress, DegenSplitParticipants } from './components';
-import { Container } from '../../components/shared';
+import { Container, Button, Modal } from '../../components/shared';
 
 // AppleSlider component adapted from SendConfirmationScreen
 interface AppleSliderProps {
@@ -527,44 +527,28 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         <View style={[styles.lockButtonContainer]}>
           {!degenState.splitWallet && degenLogic.isCurrentUserCreator(currentUser, splitData) ? (
             // Creator and no wallet yet - show "Lock the Split" button
-            <TouchableOpacity
+            <Button
+              title={degenState.isCreatingWallet ? 'Creating Split...' : 'Continue'}
               onPress={handleLockTheSplit}
+              variant="primary"
               disabled={degenState.isCreatingWallet}
-            >
-              <LinearGradient
-                colors={[colors.green, colors.greenBlue]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.lockButton}
-              >
-                <Text style={styles.lockButtonText}>
-                  {degenState.isCreatingWallet ? 'Creating Split...' : 'Continue'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
+              loading={degenState.isCreatingWallet}
+            />
           ) : !degenState.isLocked ? (
             // Not locked yet - show "Send My Share" button
-            <TouchableOpacity
+            <Button
+              title={degenState.isLocking ? 'Sending Share...' : degenState.isLoadingWallet ? 'Loading...' : 'Send My Share'}
               onPress={() => degenState.setShowLockModal(true)}
+              variant="primary"
               disabled={degenState.isLocking || degenState.isLoadingWallet}
-            >
-              <LinearGradient
-                colors={[colors.green, colors.greenBlue]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.lockButton}
-              >
-                <Text style={styles.lockButtonText}>
-                  {degenState.isLocking ? 'Sending Share...' : degenState.isLoadingWallet ? 'Loading...' : 'Send My Share'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
+              loading={degenState.isLocking || degenState.isLoadingWallet}
+            />
           ) : degenLogic.isCurrentUserCreator(currentUser, splitData) ? (
             // Creator and locked - show waiting or start spinning
             degenState.splitWallet?.status === 'spinning_completed' ? (
               // Roulette completed - show view results button
-              <TouchableOpacity
-                style={styles.lockButton}
+              <Button
+                title="🎯 View Results"
                 onPress={() => {
                   // Navigate to results screen with the winner information
                   if (degenState.splitWallet?.degenWinner) {
@@ -583,53 +567,35 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
                     });
                   }
                 }}
-              >
-                <LinearGradient
-                  colors={[colors.red, colors.red]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.lockButton}
-                >
-                  <Text style={styles.lockButtonText}>
-                    🎯 View Results
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                variant="primary"
+              />
             ) : degenState.allParticipantsLocked ? (
               // All locked - show start spinning button
-              <TouchableOpacity
-                style={styles.lockButton}
+              <Button
+                title={degenState.isCheckingLocks ? 'Checking...' : 'Start Spinning'}
                 onPress={handleRollRoulette}
+                variant="primary"
                 disabled={degenState.isCheckingLocks}
-              >
-                <LinearGradient
-                  colors={[colors.green, colors.greenBlue]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.lockButton}
-                >
-                  <Text style={styles.lockButtonText}>
-                    {degenState.isCheckingLocks ? 'Checking...' : 'Start Spinning'}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                loading={degenState.isCheckingLocks}
+              />
             ) : (
               // Not all locked - show waiting message
-              <View style={[styles.lockButton, styles.lockButtonDisabled]}>
-                <Text style={[styles.lockButtonText, styles.lockButtonTextDisabled]}>
-                  {(() => {
-                    const remaining = participants.length - lockedCount;
-                    return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
-                  })()}
-                </Text>
-              </View>
+              <Button
+                title={(() => {
+                  const remaining = participants.length - lockedCount;
+                  return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
+                })()}
+                onPress={() => {}}
+                variant="primary"
+                disabled={true}
+              />
             )
           ) : (
             // Not creator but locked - show waiting message or view results
             degenState.splitWallet?.status === 'spinning_completed' ? (
               // Roulette completed - show view results button
-              <TouchableOpacity
-                style={styles.lockButton}
+              <Button
+                title="🎯 View Results"
                 onPress={() => {
                   // Navigate to results screen with the winner information
                   if (degenState.splitWallet?.degenWinner) {
@@ -648,153 +614,130 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
                     });
                   }
                 }}
-              >
-                <LinearGradient
-                  colors={[colors.red, colors.red]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.lockButton}
-                >
-                  <Text style={styles.lockButtonText}>
-                    🎯 View Results
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                variant="primary"
+              />
             ) : (
               // Roulette not completed - show waiting message
-              <View style={[styles.lockButton, styles.lockButtonDisabled]}>
-                <Text style={[styles.lockButtonText, styles.lockButtonTextDisabled]}>
-                  {degenState.allParticipantsLocked 
-                    ? 'Waiting for the creator to spin!' 
-                    : (() => {
-                        const remaining = participants.length - lockedCount;
-                        return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
-                      })()
-                  }
-                </Text>
-              </View>
+              <Button
+                title={degenState.allParticipantsLocked 
+                  ? 'Waiting for the creator to spin!' 
+                  : (() => {
+                      const remaining = participants.length - lockedCount;
+                      return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
+                    })()
+                }
+                onPress={() => {}}
+                variant="primary"
+                disabled={true}
+              />
             )
           )}
         </View>
       </ScrollView>
 
       {/* Lock Confirmation Modal */}
-      {degenState.showLockModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalContent}>
-              <View style={styles.modalIconContainer}>
-                <Image 
-                  source={require('../../../assets/lock-check-icon.png')} 
-                  style={styles.modalLockIcon}
-                />
-              </View>
-              <Text style={styles.modalTitle}>
-                Lock {totalAmount} USDC to split the Bill
-              </Text>
-              <Text style={styles.modalSubtitle}>
-                Lock your funds to participate in the degen split roulette!
-              </Text>
-              
-              <AppleSlider
-                onSlideComplete={handleSendMyShare}
-                disabled={degenState.isLocking}
-                loading={degenState.isLocking}
-                text="Slide to Send My Share"
-              />
-            </View>
-          </View>
+      <Modal
+        visible={degenState.showLockModal}
+        onClose={() => degenState.setShowLockModal(false)}
+        showHandle={true}
+        title={`Lock ${totalAmount} USDC to split the Bill`}
+        description="Lock your funds to participate in the degen split roulette!"
+      >
+        <View style={styles.modalIconContainer}>
+          <Image 
+            source={require('../../../assets/lock-check-icon.png')} 
+            style={styles.modalLockIcon}
+          />
         </View>
-      )}
+        
+        <AppleSlider
+          onSlideComplete={handleSendMyShare}
+          disabled={degenState.isLocking}
+          loading={degenState.isLocking}
+          text="Slide to Send My Share"
+        />
+      </Modal>
 
       {/* Wallet Recap Modal */}
-      {degenState.showWalletRecapModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.walletRecapModal}>
-            <Text style={styles.walletRecapTitle}>🎉 Split Wallet Created!</Text>
-            <Text style={styles.walletRecapSubtitle}>
-              Your Degen Split wallet has been created with shared private key access. All participants can access the private key to withdraw or move funds.
-            </Text>
-            
-            {degenState.splitWallet && (
-              <View style={styles.walletRecapContent}>
-                <View style={styles.walletInfoCard}>
-                  <Text style={styles.walletInfoLabel}>Wallet Address</Text>
-                  <View style={styles.walletAddressContainer}>
-                    <Text style={styles.walletAddressText}>
-                      {degenLogic.formatWalletAddress(degenState.splitWallet.walletAddress)}
-                    </Text>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        const { Clipboard } = require('react-native');
-                        Clipboard.setString(degenState.splitWallet!.walletAddress);
-                        Alert.alert('Copied', 'Wallet address copied to clipboard');
-                      }}
-                      style={styles.copyButton}
-                    >
-                      <Text style={styles.copyButtonText}>Copy</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                
+      <Modal
+        visible={degenState.showWalletRecapModal}
+        onClose={() => degenState.setShowWalletRecapModal(false)}
+        showHandle={true}
+        title="🎉 Split Wallet Created!"
+        description="Your Degen Split wallet has been created with shared private key access. All participants can access the private key to withdraw or move funds."
+      >
+        {degenState.splitWallet && (
+          <View style={styles.walletRecapContent}>
+            <View style={styles.walletInfoCard}>
+              <Text style={styles.walletInfoLabel}>Wallet Address</Text>
+              <View style={styles.walletAddressContainer}>
+                <Text style={styles.walletAddressText}>
+                  {degenLogic.formatWalletAddress(degenState.splitWallet.walletAddress)}
+                </Text>
                 <TouchableOpacity 
-                  style={styles.privateKeyButton} 
-                  onPress={handleShowPrivateKey}
+                  onPress={() => {
+                    const { Clipboard } = require('react-native');
+                    Clipboard.setString(degenState.splitWallet!.walletAddress);
+                    Alert.alert('Copied', 'Wallet address copied to clipboard');
+                  }}
+                  style={styles.copyButton}
                 >
-                  <Text style={styles.privateKeyButtonText}>🔑 View Private Key</Text>
+                  <Text style={styles.copyButtonText}>Copy</Text>
                 </TouchableOpacity>
               </View>
-            )}
-            
-            <View style={styles.walletRecapButtons}>
-              <TouchableOpacity 
-                style={styles.walletRecapButton}
-                onPress={() => degenState.setShowWalletRecapModal(false)}
-              >
-                <Text style={styles.walletRecapButtonText}>Continue</Text>
-              </TouchableOpacity>
             </View>
+            
+            <Button
+              title="View Private Key"
+              onPress={handleShowPrivateKey}
+              variant="secondary"
+              size="small"
+              icon="Key"
+              iconPosition="left"
+            />
           </View>
+        )}
+        
+        <View style={styles.walletRecapButtons}>
+          <Button
+            title="Continue"
+            onPress={() => degenState.setShowWalletRecapModal(false)}
+            variant="primary"
+          />
         </View>
-      )}
+      </Modal>
 
       {/* Private Key Modal */}
-      {degenState.showPrivateKeyModal && degenState.privateKey && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.privateKeyModal}>
-            <Text style={styles.privateKeyModalTitle}>🔑 Private Key</Text>
-            <Text style={styles.privateKeyModalSubtitle}>
-              This is a shared private key for the Degen Split. All participants have access to this key to withdraw or move funds from the split wallet.
-            </Text>
-            
-            <View style={styles.privateKeyDisplay}>
-              <Text style={styles.privateKeyText}>{degenState.privateKey}</Text>
-            </View>
-            
-            <View style={styles.privateKeyWarning}>
-              <Text style={styles.privateKeyWarningText}>
-                ⚠️ This is a shared private key for the Degen Split. All participants can use this key to access the split wallet funds.
-              </Text>
-            </View>
-            
-            <View style={styles.privateKeyButtons}>
-              <TouchableOpacity 
-                style={styles.copyPrivateKeyButton}
-                onPress={handleCopyPrivateKey}
-              >
-                <Text style={styles.copyPrivateKeyButtonText}>Copy Key</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.closePrivateKeyButton}
-                onPress={handleClosePrivateKeyModal}
-              >
-                <Text style={styles.closePrivateKeyButtonText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+      <Modal
+        visible={degenState.showPrivateKeyModal && !!degenState.privateKey}
+        onClose={handleClosePrivateKeyModal}
+        showHandle={true}
+        title="🔑 Private Key"
+        description="This is a shared private key for the Degen Split. All participants have access to this key to withdraw or move funds from the split wallet."
+      >
+        <View style={styles.privateKeyDisplay}>
+          <Text style={styles.privateKeyText}>{degenState.privateKey}</Text>
         </View>
-      )}
+        
+        <View style={styles.privateKeyWarning}>
+          <Text style={styles.privateKeyWarningText}>
+            ⚠️ This is a shared private key for the Degen Split. All participants can use this key to access the split wallet funds.
+          </Text>
+        </View>
+        
+        <View style={styles.privateKeyButtons}>
+          <Button
+            title="Copy Key"
+            onPress={handleCopyPrivateKey}
+            variant="primary"
+          />
+          <Button
+            title="Close"
+            onPress={handleClosePrivateKeyModal}
+            variant="secondary"
+          />
+        </View>
+      </Modal>
     </Container>
   );
 };
