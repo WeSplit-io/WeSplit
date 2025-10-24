@@ -90,7 +90,7 @@ export class ManualSplitCreationService {
         description: `Manual split for ${data.processedBillData.title}`,
         totalAmount: data.processedBillData.totalAmount,
         currency: data.processedBillData.currency,
-        // Remove splitType field entirely - will be set when user chooses in SplitDetailsScreen
+        splitType: (data.selectedSplitType as 'fair' | 'degen') || 'fair', // Default to fair split if not specified
         status: 'pending' as const, // Split starts as pending until user confirms repartition
         creatorId: data.currentUser.id.toString(),
         creatorName: data.currentUser.name,

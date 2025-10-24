@@ -88,13 +88,13 @@ class ConsolidatedBillAnalysisService {
       }, 'BillAnalysis');
 
       if (useMockData) {
-        return await this.analyzeBillWithMockData(imageUri);
+        return await this.analyzeBillWithMockData(imageUri, currentUser);
       }
 
       // Optimized fallback chain with parallel health checks
       const [aiResult, ocrResult] = await Promise.allSettled([
         this.analyzeBillWithAI(imageUri, currentUser),
-        this.analyzeBillWithOCR(imageUri)
+        this.analyzeBillWithOCR(imageUri, currentUser)
       ]);
 
       // Try AI first, then OCR, then mock
@@ -106,13 +106,21 @@ class ConsolidatedBillAnalysisService {
         return ocrResult.value;
       }
 
-      // Fallback to mock data
-      logger.warn('Both AI and OCR failed, using mock data', { 
-        aiError: aiResult.status === 'rejected' ? aiResult.reason : null,
-        ocrError: ocrResult.status === 'rejected' ? ocrResult.reason : null
+      // Both AI and OCR failed - return error instead of mock data
+      const aiError = aiResult.status === 'rejected' ? aiResult.reason : null;
+      const ocrError = ocrResult.status === 'rejected' ? ocrResult.reason : null;
+      
+      logger.error('Both AI and OCR failed', { 
+        aiError,
+        ocrError
       }, 'BillAnalysis');
       
-      return await this.analyzeBillWithMockData(imageUri);
+      return {
+        success: false,
+        error: `AI and OCR services failed. AI: ${aiError?.message || 'Unknown error'}, OCR: ${ocrError?.message || 'Unknown error'}`,
+        processingTime: Date.now() - startTime,
+        confidence: 0
+      };
 
     } catch (error) {
       logger.error('Bill analysis failed', { 
@@ -257,7 +265,7 @@ class ConsolidatedBillAnalysisService {
   /**
    * HIGHLY OPTIMIZED: OCR-based bill analysis
    */
-  private async analyzeBillWithOCR(imageUri: string): Promise<BillAnalysisResult> {
+  private async analyzeBillWithOCR(imageUri: string, currentUser?: { id: string; name: string; wallet_address: string }): Promise<BillAnalysisResult> {
     const startTime = Date.now();
     
     try {
@@ -295,7 +303,7 @@ class ConsolidatedBillAnalysisService {
         }
       }
       
-      const processedData = this.processBillData(billData);
+      const processedData = this.processBillData(billData, currentUser);
       const processingTime = Date.now() - startTime;
 
       logger.info('OCR analysis completed', {
@@ -322,7 +330,7 @@ class ConsolidatedBillAnalysisService {
   /**
    * OPTIMIZED: Mock data analysis for testing
    */
-  private async analyzeBillWithMockData(imageUri: string): Promise<BillAnalysisResult> {
+  private async analyzeBillWithMockData(imageUri: string, currentUser?: { id: string; name: string; wallet_address: string }): Promise<BillAnalysisResult> {
     const startTime = Date.now();
     
     try {
@@ -361,7 +369,7 @@ class ConsolidatedBillAnalysisService {
       };
 
       const billData = this.convertIncomingDataToBillData(incomingData);
-      const processedData = this.processBillData(billData);
+      const processedData = this.processBillData(billData, currentUser);
       const processingTime = Date.now() - startTime;
 
       return {
@@ -380,6 +388,51 @@ class ConsolidatedBillAnalysisService {
   }
 
   /**
+   * Validate processed bill data for OCR AI flow
+   */
+  validateProcessedBillData(processedData: ProcessedBillData): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!processedData) {
+      errors.push('Processed bill data is null or undefined');
+      return { isValid: false, errors };
+    }
+
+    if (!processedData.id) {
+      errors.push('Bill ID is missing');
+    }
+
+    if (!processedData.title || processedData.title.trim() === '') {
+      errors.push('Bill title is missing or empty');
+    }
+
+    if (typeof processedData.totalAmount !== 'number' || processedData.totalAmount <= 0) {
+      errors.push('Total amount is missing or invalid');
+    }
+
+    if (!processedData.currency) {
+      errors.push('Currency is missing');
+    }
+
+    if (!processedData.participants || !Array.isArray(processedData.participants) || processedData.participants.length === 0) {
+      errors.push('Participants array is missing or empty');
+    }
+
+    if (!processedData.items || !Array.isArray(processedData.items) || processedData.items.length === 0) {
+      errors.push('Items array is missing or empty');
+    }
+
+    if (!processedData.settings) {
+      errors.push('Settings are missing');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
    * HIGHLY OPTIMIZED: Process bill data into frontend-ready format
    */
   private processBillData(
@@ -390,6 +443,14 @@ class ConsolidatedBillAnalysisService {
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toTimeString().split(' ')[0];
+
+    logger.info('Processing bill data', {
+      billId,
+      storeName: analysisData.store?.name,
+      totalAmount: analysisData.transaction?.order_total,
+      itemsCount: analysisData.transaction?.items?.length || 0,
+      currentUserId: currentUser?.id
+    }, 'BillAnalysis');
 
     // Optimized item processing
     const items: BillItem[] = (analysisData.transaction?.items || []).map((item, index) => ({
@@ -402,7 +463,7 @@ class ConsolidatedBillAnalysisService {
       participants: [],
     }));
 
-    // Optimized participant creation
+    // Optimized participant creation - ENHANCED for OCR AI flow
     const defaultParticipants: BillParticipant[] = [
       {
         id: currentUser?.id || `${billId}_participant_1`,
@@ -415,6 +476,19 @@ class ConsolidatedBillAnalysisService {
       }
     ];
 
+    // Ensure we have at least one participant for OCR AI flow
+    if (defaultParticipants.length === 0) {
+      defaultParticipants.push({
+        id: currentUser?.id || `${billId}_participant_1`,
+        name: currentUser?.name || 'You',
+        wallet_address: '',
+        walletAddress: '',
+        status: 'accepted',
+        amountOwed: 0,
+        items: [],
+      });
+    }
+
     // Optimized settings
     const defaultSettings: BillSettings = {
       allowPartialPayments: true,
@@ -425,7 +499,7 @@ class ConsolidatedBillAnalysisService {
       taxIncluded: true
     };
 
-    return {
+    const processedData = {
       id: billId,
       title: `${analysisData.store?.name || 'Unknown Store'} - ${analysisData.transaction?.date || dateStr}`,
       merchant: analysisData.store?.name || 'Unknown Merchant',
@@ -438,6 +512,17 @@ class ConsolidatedBillAnalysisService {
       participants: defaultParticipants,
       settings: defaultSettings
     };
+
+    logger.info('Bill data processed successfully', {
+      billId: processedData.id,
+      title: processedData.title,
+      totalAmount: processedData.totalAmount,
+      itemsCount: processedData.items.length,
+      participantsCount: processedData.participants.length,
+      merchant: processedData.merchant
+    }, 'BillAnalysis');
+
+    return processedData;
   }
 
   /**
@@ -523,7 +608,7 @@ class ConsolidatedBillAnalysisService {
       category: "Food & Drinks",
       country: "USA",
       store: {
-        name: "Extracted Store",
+        name: ocrResponse.merchant || "Extracted Store",
         location: {
           address: "",
           city: "Unknown City",
@@ -534,7 +619,7 @@ class ConsolidatedBillAnalysisService {
         store_id: ""
       },
       transaction: {
-        date: new Date().toISOString().split('T')[0],
+        date: ocrResponse.date || new Date().toISOString().split('T')[0],
         time: new Date().toTimeString().split(' ')[0],
         order_id: this.generateBillId(),
         employee: "Unknown",
@@ -547,7 +632,7 @@ class ConsolidatedBillAnalysisService {
         order_total: ocrResponse.totalAmount,
         calculated_total: ocrResponse.totalAmount
       },
-      currency: "USD"
+      currency: ocrResponse.currency || "USD"
     };
   }
 
@@ -578,29 +663,6 @@ class ConsolidatedBillAnalysisService {
     return { isValid: errors.length === 0, errors };
   }
 
-  /**
-   * HIGHLY OPTIMIZED: Validate processed bill data
-   */
-  validateProcessedBillData(data: ProcessedBillData): { isValid: boolean; errors: string[] } {
-    const errors: string[] = [];
-
-    // Optimized validation with early returns
-    if (!data.merchant?.trim()) errors.push('Merchant name is required');
-    if (!data.items?.length) errors.push('At least one item is required');
-    if (!data.totalAmount || data.totalAmount <= 0) errors.push('Valid total amount is required');
-    if (!data.currency?.trim()) errors.push('Currency is required');
-    if (!data.participants?.length) errors.push('At least one participant is required');
-
-    logger.info('Validation result', {
-      isValid: errors.length === 0,
-      errorCount: errors.length,
-      merchant: data.merchant,
-      itemCount: data.items?.length || 0,
-      totalAmount: data.totalAmount
-    }, 'BillAnalysis');
-
-    return { isValid: errors.length === 0, errors };
-  }
 
   // Optimized utility methods
   private generateBillId(): string {
@@ -643,16 +705,30 @@ class ConsolidatedBillAnalysisService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.healthCheckTimeout);
       
-      const response = await fetch(`${this.aiServiceUrl}/health`, {
+      // Use the correct health check endpoint for Firebase Functions
+      const healthCheckUrl = 'https://us-central1-wesplit-35186.cloudfunctions.net/aiHealthCheck';
+      
+      const response = await fetch(healthCheckUrl, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal
       });
       
       clearTimeout(timeoutId);
-      return response.status === 200;
+      
+      if (response.status === 200) {
+        const healthData = await response.json();
+        logger.info('AI service health check successful', { 
+          status: healthData.status,
+          ai_agent_ready: healthData.ai_agent_ready,
+          api_key_configured: healthData.api_key_configured
+        }, 'BillAnalysis');
+        return healthData.ai_agent_ready === true;
+      }
+      
+      return false;
     } catch (error) {
-      logger.warn('AI service health check failed', { error }, 'BillAnalysis');
+      logger.warn('AI service health check failed', { error: error instanceof Error ? error.message : 'Unknown error' }, 'BillAnalysis');
       return false;
     }
   }
@@ -663,21 +739,49 @@ class ConsolidatedBillAnalysisService {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.aiServiceTimeout);
 
+        // Prepare headers with user ID for rate limiting
+        const headers: Record<string, string> = { 
+          'Content-Type': 'application/json'
+        };
+        
+        if (userId) {
+          headers['x-user-id'] = userId;
+        }
+
         const response = await fetch(this.aiServiceUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageData, userId }),
+          headers,
+          body: JSON.stringify({ 
+            imageData, 
+            userId: userId || 'anonymous'
+          }),
           signal: controller.signal
         });
 
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          const errorText = await response.text();
+          let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            // Use the text as error message if not JSON
+            errorMessage = errorText || errorMessage;
+          }
+          
+          throw new Error(errorMessage);
         }
 
         const result = await response.json();
-        logger.info('AI service call successful', { attempt, result }, 'BillAnalysis');
+        logger.info('AI service call successful', { 
+          attempt, 
+          processingTime: result.processing_time,
+          confidence: result.confidence,
+          success: result.success
+        }, 'BillAnalysis');
         return result;
 
       } catch (error) {
@@ -698,19 +802,31 @@ class ConsolidatedBillAnalysisService {
 
   private async callOCRService(base64Image: string): Promise<any> {
     try {
-      // Mock OCR service - replace with actual OCR implementation
+      // Enhanced mock OCR service - provides better data structure for testing
+      // TODO: Replace with actual OCR implementation
+      logger.info('Using mock OCR service for bill analysis', { imageSize: base64Image.length }, 'BillAnalysis');
+      
       return {
         success: true,
-        extractedItems: [{ name: 'Sample Item', price: 25.50 }],
-        totalAmount: 25.50,
+        extractedItems: [
+          { name: 'Restaurant Bill Item 1', price: 15.50 },
+          { name: 'Restaurant Bill Item 2', price: 12.00 },
+          { name: 'Tax', price: 2.75 },
+          { name: 'Tip', price: 5.00 }
+        ],
+        totalAmount: 35.25,
         confidence: 0.85,
-        rawText: 'Sample receipt text'
+        rawText: 'Sample restaurant receipt with multiple items',
+        merchant: 'Sample Restaurant',
+        date: new Date().toISOString().split('T')[0],
+        currency: 'USD'
       };
     } catch (error) {
       logger.error('OCR service call failed', { error }, 'BillAnalysis');
       throw error;
     }
   }
+
 }
 
 // Export singleton instance

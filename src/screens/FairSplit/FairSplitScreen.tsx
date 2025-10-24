@@ -31,6 +31,7 @@ import { AmountCalculationService } from '../../services/payments';
 import { Participant } from '../../services/payments/amountCalculationService';
 import { DataSourceService } from '../../services/data/dataSourceService';
 import { logger } from '../../services/analytics/loggingService';
+import { debugSplitData, validateSplitData, clearSplitCaches } from '../../services/shared/splitDataUtils';
 import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';
 import FairSplitHeader from './components/FairSplitHeader';
 import FairSplitProgress from './components/FairSplitProgress';
@@ -163,11 +164,26 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         // Always load fresh data from database to ensure we have the latest participant information
         if (splitData.id) {
           try {
+            // Clear any potential caches first
+            clearSplitCaches();
+            
+            // Debug the incoming split data
+            debugSplitData(splitData, 'FairSplitScreen-incoming');
+            
             const { SplitStorageService } = await import('../../services/splits');
-            const result = await SplitStorageService.getSplit(splitData.id);
+            const result = await SplitStorageService.forceRefreshSplit(splitData.id);
             if (result.success && result.split) {
               // Update the split data with full information
               const fullSplitData = result.split;
+              
+              // Debug the loaded split data
+              debugSplitData(fullSplitData, 'FairSplitScreen-loaded');
+              
+              // Validate the split data
+              const validation = validateSplitData(fullSplitData);
+              if (!validation.isValid) {
+                logger.error('Invalid split data loaded', { errors: validation.errors }, 'FairSplitScreen');
+              }
               
               // Check if split is already confirmed
               const isConfirmed = fullSplitData.status === 'active' && fullSplitData.splitType === 'fair';
@@ -373,15 +389,16 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       sourceParticipants = billData.participants;
     }
 
-    if (sourceParticipants) {
+    if (sourceParticipants && Array.isArray(sourceParticipants) && (sourceParticipants as any[]).length > 0) {
       // Convert BillParticipant to FairSplitScreen Participant format
-      const mappedParticipants = sourceParticipants.map((p: any, index: number) => {
+      const participantsArray = sourceParticipants as any[];
+      const mappedParticipants = participantsArray.map((p: any, index: number) => {
         // Handle different participant formats (splitData uses userId, billData uses id)
         const participantId = p.userId || p.id || `participant_${index}`;
         
         // Calculate amount per person for equal split
         const totalAmount = splitData?.totalAmount || 0; // Use split data if available
-        const amountPerPerson = totalAmount / sourceParticipants.length;
+        const amountPerPerson = totalAmount / participantsArray.length;
         
         // If this participant is the current user, use real data
         if (currentUser && (p.name === 'You' || participantId === currentUser.id.toString())) {
@@ -442,13 +459,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const totalAmount = billInfo.amount.data;
   
   // Validate data consistency and log warnings if needed
-  if (__DEV__ && billInfo.isFallback) {
-    logger.warn('FairSplit: Using fallback data for bill info', {
+  if (__DEV__) {
+    logger.debug('FairSplit: Bill info loaded', {
       splitData: splitData?.totalAmount,
       processedBillData: processedBillData?.totalAmount,
       billData: billData?.totalAmount,
-      finalAmount: totalAmount,
-      source: billInfo.source
+      finalAmount: totalAmount
     }, 'FairSplitScreen');
   }
   
@@ -1026,7 +1042,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         
         const { SplitWalletService } = await import('../../services/split');
         const walletResult = await SplitWalletService.createSplitWallet(
-          splitData!.id,
+          splitData!.billId, // Use billId, not split ID
           currentUser!.id.toString(),
           totalAmount,
           'USDC',
@@ -1045,6 +1061,27 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         const newWallet = walletResult.wallet;
         setSplitWallet(newWallet);
         logger.info('Split wallet created successfully', { splitWalletId: newWallet.id }, 'FairSplitScreen');
+        
+        // Update the split with wallet information
+        if (splitData) {
+          const { SplitStorageService } = await import('../../services/splits/splitStorageService');
+          const updateResult = await SplitStorageService.updateSplit(splitData.id, {
+            walletId: newWallet.id,
+            walletAddress: newWallet.walletAddress,
+            status: 'active' as const
+          });
+          
+          if (updateResult.success) {
+            logger.info('Split updated with wallet information', { 
+              splitId: splitData.id, 
+              walletId: newWallet.id 
+            }, 'FairSplitScreen');
+          } else {
+            logger.warn('Failed to update split with wallet information', { 
+              error: updateResult.error 
+            }, 'FairSplitScreen');
+          }
+        }
         
         // Set the authoritative price in the price management service
         const walletBillId = newWallet.billId;

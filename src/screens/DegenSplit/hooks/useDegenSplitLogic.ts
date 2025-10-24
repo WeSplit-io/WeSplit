@@ -123,7 +123,7 @@ export const useDegenSplitLogic = (
       
       const { SplitWalletService } = await import('../../../services/split');
       const walletResult = await SplitWalletService.createDegenSplitWallet(
-        splitData.id,
+        splitData.billId, // Use billId, not split ID
         currentUser.id.toString(),
         totalAmount,
         'USDC',
@@ -149,6 +149,25 @@ export const useDegenSplitLogic = (
         isCreatingWallet: false,
         showWalletRecapModal: false // Removed popup - wallet created silently
       });
+      
+      // Update the split with wallet information
+      const { SplitStorageService } = await import('../../../services/splits/splitStorageService');
+      const updateResult = await SplitStorageService.updateSplit(splitData.id, {
+        walletId: newWallet.id,
+        walletAddress: newWallet.walletAddress,
+        status: 'active' as const
+      });
+      
+      if (updateResult.success) {
+        logger.info('Split updated with wallet information', { 
+          splitId: splitData.id, 
+          walletId: newWallet.id 
+        }, 'DegenSplitLogic');
+      } else {
+        logger.warn('Failed to update split with wallet information', { 
+          error: updateResult.error 
+        }, 'DegenSplitLogic');
+      }
       
       logger.info('Split wallet created successfully for degen split', { 
         splitWalletId: newWallet.id 

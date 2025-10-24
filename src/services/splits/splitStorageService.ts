@@ -20,7 +20,20 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import { logger } from '../analytics/loggingService';
-import { removeUndefinedValues } from '../shared/dataUtils';
+// Remove undefined values helper function
+const removeUndefinedValues = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(removeUndefinedValues);
+  
+  const cleaned: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      cleaned[key] = removeUndefinedValues(value);
+    }
+  }
+  return cleaned;
+};
 
 export interface Split {
   id: string;
@@ -119,14 +132,10 @@ export class SplitStorageServiceClass {
 
       logger.info('Split created successfully', {
         splitId: createdSplit.id,
-        firebaseDocId: docRef.id
-      });
-
-      logger.info('Split created successfully', {
-        splitId: createdSplit.id,
         firebaseDocId: docRef.id,
         title: createdSplit.title,
-        splitType: createdSplit.splitType
+        splitType: createdSplit.splitType,
+        participantsCount: createdSplit.participants.length
       }, 'SplitStorageService');
 
       return {
@@ -149,23 +158,40 @@ export class SplitStorageServiceClass {
    */
   static async getSplitByBillId(billId: string): Promise<SplitResult> {
     try {
+      logger.info('Getting split by billId', { billId }, 'splitStorageService');
 
       const splitsRef = collection(db, this.COLLECTION_NAME);
       const q = query(splitsRef, where('billId', '==', billId));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
+        logger.warn('Split not found by billId', { billId }, 'splitStorageService');
         return {
           success: false,
           error: 'Split not found',
         };
       }
 
-      const splitDoc = querySnapshot.docs[0];
+      // Get the most recent split (in case there are multiple) - sort by createdAt in JavaScript
+      const sortedDocs = querySnapshot.docs.sort((a, b) => {
+        const aTime = new Date(a.data().createdAt).getTime();
+        const bTime = new Date(b.data().createdAt).getTime();
+        return bTime - aTime; // Descending order (most recent first)
+      });
+      
+      const splitDoc = sortedDocs[0];
       const splitData = splitDoc.data() as Split;
       splitData.firebaseDocId = splitDoc.id;
 
-      logger.debug('Split found by billId', { splitId: splitData.id }, 'splitStorageService');
+      logger.info('Split found by billId', { 
+        splitId: splitData.id, 
+        firebaseDocId: splitDoc.id,
+        status: splitData.status,
+        createdAt: splitData.createdAt,
+        totalAmount: splitData.totalAmount,
+        participantsCount: splitData.participants?.length || 0
+      }, 'splitStorageService');
+      
       return {
         success: true,
         split: splitData,
@@ -186,7 +212,7 @@ export class SplitStorageServiceClass {
    */
   static async getSplit(splitId: string): Promise<SplitResult> {
     try {
-      // Getting split with ID - Removed log to prevent infinite logging
+      logger.info('Getting split by ID', { splitId }, 'splitStorageService');
 
       // First try by Firebase document ID
       if (splitId.length > 20 && !splitId.startsWith('split_')) {
@@ -195,6 +221,15 @@ export class SplitStorageServiceClass {
         if (splitDoc.exists()) {
           const splitData = splitDoc.data() as Split;
           splitData.firebaseDocId = splitDoc.id;
+          
+          logger.info('Split found by Firebase ID', { 
+            splitId: splitData.id, 
+            firebaseDocId: splitDoc.id,
+            status: splitData.status,
+            createdAt: splitData.createdAt,
+            totalAmount: splitData.totalAmount
+          }, 'splitStorageService');
+          
           return {
             success: true,
             split: splitData,
@@ -202,20 +237,31 @@ export class SplitStorageServiceClass {
         }
       }
 
-      // Try by internal ID
+      // Try by internal ID (no orderBy needed since ID is unique)
       const splitsRef = collection(db, this.COLLECTION_NAME);
       const q = query(splitsRef, where('id', '==', splitId));
       const querySnapshot = await getDocs(q);
       
       if (!querySnapshot.empty) {
+        // Get the most recent split (in case there are multiple)
         const splitData = querySnapshot.docs[0].data() as Split;
         splitData.firebaseDocId = querySnapshot.docs[0].id;
+        
+        logger.info('Split found by internal ID', { 
+          splitId: splitData.id, 
+          firebaseDocId: querySnapshot.docs[0].id,
+          status: splitData.status,
+          createdAt: splitData.createdAt,
+          totalAmount: splitData.totalAmount
+        }, 'splitStorageService');
+        
         return {
           success: true,
           split: splitData,
         };
       }
 
+      logger.warn('Split not found by ID', { splitId }, 'splitStorageService');
       return {
         success: false,
         error: 'Split not found',
@@ -243,15 +289,11 @@ export class SplitStorageServiceClass {
       // Get splits where user is creator
       const creatorQuery = query(
         splitsRef, 
-        where('creatorId', '==', userId),
-        orderBy('createdAt', 'desc')
+        where('creatorId', '==', userId)
       );
       
       // Get all splits and filter for participants (array-contains doesn't work well with complex objects)
-      const allSplitsQuery = query(
-        splitsRef,
-        orderBy('createdAt', 'desc')
-      );
+      const allSplitsQuery = query(splitsRef);
 
       const [creatorSnapshot, allSplitsSnapshot] = await Promise.all([
         getDocs(creatorQuery),
@@ -688,6 +730,38 @@ export class SplitStorageServiceClass {
   }
 
   /**
+   * Force refresh split data from database (bypass any caches)
+   */
+  static async forceRefreshSplit(splitId: string): Promise<SplitResult> {
+    try {
+      logger.info('Force refreshing split data', { splitId }, 'splitStorageService');
+      
+      // Clear any potential caches first
+      // This ensures we get the absolute latest data from Firebase
+      
+      // Try to get fresh data
+      const result = await this.getSplit(splitId);
+      
+      if (result.success && result.split) {
+        logger.info('Split data refreshed successfully', {
+          splitId: result.split.id,
+          status: result.split.status,
+          totalAmount: result.split.totalAmount,
+          participantsCount: result.split.participants?.length || 0
+        }, 'splitStorageService');
+      }
+      
+      return result;
+    } catch (error) {
+      logger.error('Error force refreshing split', { error: (error as Error).message, splitId }, 'splitStorageService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
    * Get splits by status
    */
   static async getSplitsByStatus(status: Split['status'], userId?: string): Promise<SplitListResult> {
@@ -701,14 +775,12 @@ export class SplitStorageServiceClass {
         q = query(
           splitsRef,
           where('status', '==', status),
-          where('creatorId', '==', userId),
-          orderBy('createdAt', 'desc')
+          where('creatorId', '==', userId)
         );
       } else {
         q = query(
           splitsRef,
-          where('status', '==', status),
-          orderBy('createdAt', 'desc')
+          where('status', '==', status)
         );
       }
 
@@ -718,6 +790,9 @@ export class SplitStorageServiceClass {
         splitData.firebaseDocId = doc.id;
         return splitData;
       });
+
+      // Sort by creation date (most recent first)
+      splits.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       logger.info('Found splits by status', {
         status,
