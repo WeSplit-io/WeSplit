@@ -81,17 +81,17 @@ const ModernLoader: React.FC<ModernLoaderProps> = ({
     switch (color) {
       case 'secondary':
         return {
-          gradient: [colors.gray, colors.lightGray],
+          gradient: [colors.white50, colors.white10] as const,
           text: colors.darkGray,
         };
       case 'white':
         return {
-          gradient: [colors.white, colors.lightGray],
+          gradient: [colors.white, colors.white80] as const,
           text: colors.white,
         };
       default: // primary
         return {
-          gradient: [colors.gradientStart, colors.gradientEnd],
+          gradient: [colors.gradientStart, colors.gradientEnd] as const,
           text: colors.white,
         };
     }

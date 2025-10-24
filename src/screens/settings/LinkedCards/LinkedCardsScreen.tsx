@@ -5,10 +5,14 @@ import { useApp } from '../../../context/AppContext';
 import { useWallet } from '../../../context/WalletContext';
 import AddDestinationSheet from '../../../components/AddDestinationSheet';
 import { LinkedWalletService, LinkedWallet } from '../../../services/blockchain/wallet/LinkedWalletService';
-import { styles } from './styles';
+import { styles } from '../../Settings/LinkedCards/styles';
 import { logger } from '../../../services/analytics/loggingService';
 import Header from '../../../components/shared/Header';
 import { Container } from '../../../components/shared';
+import PhosphorIcon from '../../../components/shared/PhosphorIcon';
+import Button from '../../../components/shared/Button';
+import { colors, typography } from '@/theme';
+import ModernLoader from '@/components/shared/ModernLoader';
 
 // Interfaces are now imported from the service
 
@@ -158,14 +162,14 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
             isActive: destination.status === 'active'
           };
           setKastCards(prev => [...prev, newCard]);
-          logger.info('SOLANA card added successfully', { 
+          logger.info('Solana card added successfully', { 
             cardId: newCard.id,
             status: newCard.status,
             balance: newCard.balance 
           }, 'LinkedCardsScreen');
-          Alert.alert('Success', `SOLANA card "${newCard.label}" has been linked successfully!`);
+          Alert.alert('Success', `Solana card "${newCard.label}" has been linked successfully!`);
         } else {
-          Alert.alert('Error', result.error || 'Failed to add SOLANA card');
+          Alert.alert('Error', result.error || 'Failed to add Solana card');
         }
       }
       
@@ -223,8 +227,8 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
     }
 
     Alert.alert(
-      'Unlink SOLANA Card',
-      'Are you sure you want to unlink this SOLANA card?',
+      'Unlink Solana Card',
+      'Are you sure you want to unlink this Solana card?',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -235,10 +239,10 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
               // Linked wallets functionality moved to walletService
               setKastCards(prev => prev.filter(card => card.id !== cardId));
               setExpandedItemId(null);
-              logger.info('SOLANA card unlinked successfully', null, 'LinkedCardsScreen');
+              logger.info('Solana card unlinked successfully', null, 'LinkedCardsScreen');
             } catch (error) {
-              console.error('❌ Error unlinking SOLANA card:', error);
-              const errorMessage = error instanceof Error ? error.message : 'Failed to unlink SOLANA card';
+              console.error('❌ Error unlinking Solana card:', error);
+              const errorMessage = error instanceof Error  ? error.message : 'Failed to unlink Solana card';
               Alert.alert('Error', errorMessage);
             }
           }
@@ -272,10 +276,12 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           externalWallets.map((wallet) => (
             <View key={wallet.id} style={styles.destinationItemContainer}>
               <TouchableOpacity style={styles.destinationItem}>
-                <View style={styles.destinationIcon}>
-                  <Image 
-                    source={require('../../../../assets/wallet-icon-white.png')} 
-                    style={styles.destinationIconImage}
+               <View style={styles.destinationIcon}>
+                  <PhosphorIcon 
+                    name="Wallet" 
+                    size={24} 
+                    color="white" 
+                    weight="regular"
                   />
                 </View>
                 <View style={styles.destinationInfo}>
@@ -305,9 +311,11 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
                       handleUnlinkWallet(wallet.id);
                     }}
                   >
-                    <Image 
-                      source={require('../../../../assets/bin-icon.png')} 
-                      style={styles.dropdownItemIcon}
+                    <PhosphorIcon 
+                      name="Trash" 
+                      size={16} 
+                      color="white" 
+                      weight="regular"
                     />
                     <Text style={styles.dropdownItemText}>Unlink</Text>
                   </TouchableOpacity>
@@ -323,17 +331,21 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   const renderKastCards = () => {
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>SOLANA Cards</Text>
+        <Text style={styles.sectionTitle}>Solana Cards</Text>
         {kastCards.length === 0 ? (
-          <Text style={styles.emptyCategoryText}>No SOLANA cards yet</Text>
+          <Text style={styles.emptyCategoryText}>No Solana cards yet</Text>
         ) : (
           kastCards.map((card) => (
             <View key={card.id} style={styles.destinationItemContainer}>
               <TouchableOpacity style={styles.destinationItem}>
-                <Image 
-                  source={require('../../../../assets/kast-logo.png')} 
-                  style={styles.kastCardIcon}
+              <View style={styles.destinationIcon}>
+                <PhosphorIcon 
+                  name="CreditCard" 
+                  size={24} 
+                  color="white" 
+                  weight="regular"
                 />
+                </View>
                 <View style={styles.destinationInfo}>
                   <Text style={styles.destinationLabel}>{card.label}</Text>
                   <Text style={styles.destinationAddress}>
@@ -361,9 +373,11 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
                       handleUnlinkKastCard(card.id);
                     }}
                   >
-                    <Image 
-                      source={require('../../../../assets/bin-icon.png')} 
-                      style={styles.dropdownItemIcon}
+                    <PhosphorIcon 
+                      name="Trash" 
+                      size={16} 
+                      color="white" 
+                      weight="regular"
                     />
                     <Text style={styles.dropdownItemText}>Unlink</Text>
                   </TouchableOpacity>
@@ -391,10 +405,11 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
                 onPress={() => setShowAddModal(true)}
                 disabled={isAdding}
               >
-                <Image
-                  source={require('../../../../assets/plus-icon-green.png')}
-                  style={styles.addButtonIcon}
-                  tintColor="white"
+                <PhosphorIcon 
+                  name="Plus" 
+                  size={20} 
+                  color="white" 
+                  weight="regular"
                 />
               </TouchableOpacity>
             }
@@ -404,39 +419,46 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {isLoading ? (
               <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Loading...</Text>
+                <ModernLoader />
+                <Text style={styles.loadingText}>Loading data</Text>
               </View>
             ) : !currentUser?.id ? (
               <View style={styles.globalEmptyState}>
                 <View style={styles.globalEmptyStateIcon}>
-                  <Image 
-                    source={require('../../../../assets/link-icon.png')} 
-                    style={styles.globalEmptyStateIconImage}
+                  <PhosphorIcon 
+                    name="LinkBreak" 
+                    size={48} 
+                    color="white" 
+                    weight="regular"
                   />
                 </View>
                 <Text style={styles.globalEmptyStateTitle}>Please log in to view linked wallets</Text>
                 <Text style={styles.globalEmptyStateSubtitle}>
-                  You need to be logged in to manage your linked wallets and SOLANA cards
+                  You need to be logged in to manage your linked wallets and Solana cards
                 </Text>
               </View>
             ) : isGlobalEmpty ? (
               <View style={styles.globalEmptyState}>
                 <View style={styles.globalEmptyStateIcon}>
-                  <Image 
-                    source={require('../../../../assets/link-icon.png')} 
-                    style={styles.globalEmptyStateIconImage}
+                  <PhosphorIcon 
+                    name="LinkBreak" 
+                    size={48} 
+                    color="white" 
+                    weight="regular"
                   />
                 </View>
-                <Text style={styles.globalEmptyStateTitle}>No linked wallets or SOLANA cards yet</Text>
+                <Text style={styles.globalEmptyStateTitle}>No linked wallets or Solana cards yet</Text>
                 <Text style={styles.globalEmptyStateSubtitle}>
-                  Add wallets and SOLANA cards to easily send funds and manage expenses
+                  Add wallets and Solana cards to easily send funds and manage expenses
                 </Text>
-                <TouchableOpacity 
-                  style={styles.globalEmptyStateButton}
+                <Button
+                  title="Link Wallet or Solana Card"
                   onPress={() => setShowAddModal(true)}
-                >
-                  <Text style={styles.globalEmptyStateButtonText}>Link Wallet or SOLANA Card</Text>
-                </TouchableOpacity>
+                  variant="primary"
+                  fullWidth={true}
+                  style={{ marginTop: 24 }}
+                  textStyle={{ fontSize: typography.fontSize.md}}
+                />
               </View>
             ) : (
               <>

@@ -14,19 +14,8 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addButtonText: {
-    color: colors.white,
-    fontSize: 25,
-    fontWeight: 'bold',
-  },
-  addButtonIcon: {
-    width: 20,
-    height: 20,
-    resizeMode: 'contain',
-  },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.screenPaddingHorizontal,
   },
   loadingContainer: {
     flex: 1,
@@ -62,7 +51,7 @@ export const styles = StyleSheet.create({
     width: spacing.xxl + spacing.sm,
     height: spacing.xxl + spacing.sm,
     borderRadius: spacing.xxl,
-    backgroundColor: colors.brandGreen,
+    backgroundColor: colors.white10,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,

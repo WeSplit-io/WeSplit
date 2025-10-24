@@ -14,6 +14,7 @@ import {
   Dimensions,
   StyleSheet,
   ScrollView,
+  Keyboard,
 } from 'react-native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 
@@ -50,6 +51,7 @@ const ModalComponent: React.FC<ModalProps> = ({
 }) => {
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const [keyboardHeight, setKeyboardHeight] = React.useState(0);
 
   const handleGestureEvent = Animated.event(
     [{ nativeEvent: { translationY: translateY } }],
@@ -99,6 +101,28 @@ const ModalComponent: React.FC<ModalProps> = ({
     }
   };
 
+  // Keyboard listeners
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
   // Animate in when modal becomes visible
   useEffect(() => {
     if (visible) {
@@ -146,7 +170,10 @@ const ModalComponent: React.FC<ModalProps> = ({
             <Animated.View
               style={[
                 styles.modalContent,
-                { transform: [{ translateY }] },
+                { 
+                  transform: [{ translateY }],
+                  height: keyboardHeight > 0 ? '100%' : undefined,
+                },
                 style,
               ]}
             >
@@ -170,8 +197,14 @@ const ModalComponent: React.FC<ModalProps> = ({
               
               {/* Contenu principal */}
               <ScrollView 
-                style={styles.modalBody}
-                contentContainerStyle={styles.modalBodyContent}
+                style={[
+                  styles.modalBody,
+                  keyboardHeight > 0 && styles.modalBodyKeyboardVisible
+                ]}
+                contentContainerStyle={[
+                  styles.modalBodyContent,
+                  keyboardHeight > 0 && styles.modalBodyContentKeyboardVisible
+                ]}
                 showsVerticalScrollIndicator={false}
                 bounces={false}
                 nestedScrollEnabled={true}
@@ -209,8 +242,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg, // Réduit pour laisser place à la handle
     paddingBottom: 40,
     paddingHorizontal: 20,
-    maxHeight: SCREEN_HEIGHT * 0.7, // Limité à 70% de la hauteur d'écran
-    minHeight: 200,
+    maxHeight: SCREEN_HEIGHT * 0.8, // Limité à 70% de la hauteur d'écran
+    minHeight: 300,
     alignSelf: 'stretch', // S'étend sur toute la largeur
     // Supprimer flex pour permettre l'adaptation au contenu
   },
@@ -246,6 +279,14 @@ const styles = StyleSheet.create({
   modalBodyContent: {
     flexGrow: 1, // Permet au contenu de grandir selon ses besoins
     paddingBottom: 10, // Petit padding en bas
+    
+  },
+  modalBodyKeyboardVisible: {
+    flex: 1,
+  },
+  modalBodyContentKeyboardVisible: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
   },
 });
 

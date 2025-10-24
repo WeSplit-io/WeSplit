@@ -15,6 +15,7 @@ import {
   ScrollView,
   StyleSheet
 } from 'react-native';
+import PhosphorIcon from '../shared/PhosphorIcon';
 import { colors } from '../../theme';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -353,9 +354,10 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
           {isDetecting ? (
             <ActivityIndicator size="small" color={colors.white} />
           ) : (
-            <Image
-              source={require('../../../assets/wallet-icon-white.png')}
-              style={styles.detectButtonIcon}
+            <PhosphorIcon
+              name="Wallet"
+              size={20}
+              color={colors.white}
             />
           )}
           <Text style={styles.detectButtonText}>
@@ -411,7 +413,7 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
 
 const styles = StyleSheet.create({
   detectButton: {
-    backgroundColor: colors.primaryGreen,
+    backgroundColor: colors.white10,
     borderRadius: 12,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
@@ -439,8 +441,9 @@ const styles = StyleSheet.create({
   },
   detectButtonText: {
     color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.regular,
+    paddingLeft: spacing.sm,
   },
   modalContainer: {
     flex: 1,

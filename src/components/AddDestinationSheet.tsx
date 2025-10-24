@@ -1,24 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
-  Text, 
-  TouchableOpacity, 
-  TextInput, 
-  Modal, 
-  ScrollView, 
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Animated,
+  Keyboard,
   Dimensions,
-  Keyboard
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
-import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+import { Modal, Input, Button, Tabs, Tab } from './shared';
+import { validateAddress, validateKastWalletAddress } from '../utils/ui/format';
 import { colors } from '../theme';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
-import { validateAddress, validateKastWalletAddress } from '../utils/ui/format';
-import { styles } from './AddDestinationSheetStyles';
 import MWADetectionButton from './wallet/MWADetectionButton';
 
 interface AddDestinationSheetProps {
@@ -44,54 +38,6 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-  // Animation refs
-  const translateY = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-
-  const handleGestureEvent = Animated.event(
-    [{ nativeEvent: { translationY: translateY } }],
-    { useNativeDriver: true }
-  );
-
-  const handleStateChange = (event: PanGestureHandlerGestureEvent) => {
-    const { translationY, state } = event.nativeEvent;
-
-    if (state === 2) { // BEGAN
-      opacity.setValue(1);
-    } else if (state === 4 || state === 5) { // END or CANCELLED
-      if (translationY > 100) { // Threshold to close modal
-        Animated.parallel([
-          Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(opacity, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          handleClose();
-          translateY.setValue(0);
-          opacity.setValue(0);
-        });
-      } else {
-        Animated.parallel([
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-          }),
-          Animated.timing(opacity, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }
-    }
-  };
-
   // Keyboard listeners
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -114,24 +60,10 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     };
   }, []);
 
-  // Animate in when modal becomes visible and reset form
+  // Reset form when modal becomes visible
   useEffect(() => {
     if (visible) {
-      // Reset form when modal becomes visible
       resetForm();
-      
-      Animated.parallel([
-        Animated.timing(translateY, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
     }
   }, [visible]);
 
@@ -162,6 +94,10 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     onClose();
   };
 
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
+  };
+
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
 
@@ -181,7 +117,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
     } else if (destinationType === 'kast') {
       const addressValidation = validateKastWalletAddress(kastAddress);
       if (!addressValidation.isValid) {
-        newErrors.kastAddress = addressValidation.error || 'Please enter a valid SOLANA card wallet address';
+        newErrors.kastAddress = addressValidation.error || 'Please enter a valid Solana card wallet address';
       }
     }
 
@@ -233,7 +169,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
         // Validate SOLANA card wallet address
         const validation = await ExternalCardService.validateKastCard(kastAddress.trim());
         if (!validation.isValid) {
-          setErrors({ kastAddress: validation.error || 'Invalid SOLANA card wallet address' });
+          setErrors({ kastAddress: validation.error || 'Invalid Solana card wallet address' });
           return;
         }
 
@@ -264,7 +200,7 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
         resetForm();
         return;
       } catch (error) {
-        console.error('Error validating SOLANA card:', error);
+        console.error('Error validating Solana card:', error);
         setErrors({ kastAddress: 'Failed to validate card. Please try again.' });
         return;
       }
@@ -292,172 +228,134 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
         style={styles.mwaDetectionButton}
       />
       
-      <Text style={styles.inputLabel}>Wallet Address</Text>
-      <TextInput
-        style={styles.inputField}
+      <Input
+        label="Wallet Address"
         value={address}
         onChangeText={setAddress}
         placeholder="Enter wallet address"
-        placeholderTextColor={colors.textSecondary}
         autoCapitalize="none"
         autoCorrect={false}
+        error={errors.address}
+        returnKeyType="done"
+        onSubmitEditing={dismissKeyboard}
+        blurOnSubmit={true}
       />
-      {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
 
-      <Text style={styles.inputLabel}>Name</Text>
-      <TextInput
-        style={styles.inputField}
+      <Input
+        label="Name"
         value={name}
         onChangeText={setName}
         placeholder="e.g., Cold Wallet, Treasury"
-        placeholderTextColor={colors.textSecondary}
         autoCapitalize="words"
         autoCorrect={false}
+        error={errors.name}
+        returnKeyType="done"
+        onSubmitEditing={dismissKeyboard}
+        blurOnSubmit={true}
       />
-      {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
     </View>
   );
 
   const renderKastForm = () => (
     <View style={styles.formSection}>
-      <Text style={styles.inputLabel}>SOLANA Wallet Address</Text>
-      <TextInput
-        style={styles.inputField}
+      <Input
+        label="Solana Wallet Address"
         value={kastAddress}
         onChangeText={setKastAddress}
-        placeholder="Enter SOLANA card wallet address"
-        placeholderTextColor={colors.textSecondary}
+        placeholder="Enter Solana card wallet address"
         autoCapitalize="none"
         autoCorrect={false}
+        error={errors.kastAddress}
+        returnKeyType="done"
+        onSubmitEditing={dismissKeyboard}
+        blurOnSubmit={true}
       />
-      {errors.kastAddress && <Text style={styles.errorText}>{errors.kastAddress}</Text>}
 
-      <Text style={styles.inputLabel}>Name</Text>
-      <TextInput
-        style={styles.inputField}
+      <Input
+        label="Name"
         value={name}
         onChangeText={setName}
         placeholder="e.g., Team Card, Marketing"
-        placeholderTextColor={colors.textSecondary}
         autoCapitalize="words"
         autoCorrect={false}
+        error={errors.name}
+        returnKeyType="done"
+        onSubmitEditing={dismissKeyboard}
+        blurOnSubmit={true}
       />
-      {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
     </View>
   );
 
   return (
     <Modal
       visible={visible}
-      animationType="fade"
-      transparent={true}
-      onRequestClose={handleClose}
-      statusBarTranslucent={true}
+      onClose={handleClose}
+      title="Add Wallet or Card"
+      showHandle={true}
+      style={{
+        maxHeight: keyboardHeight > 0 ? '95%' : '70%',
+      }}
     >
-      <Animated.View style={[styles.modalOverlay, { opacity }]}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <TouchableOpacity
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-            activeOpacity={1}
-            onPress={handleClose}
-          />
-          
-          <PanGestureHandler
-            onGestureEvent={handleGestureEvent}
-            onHandlerStateChange={handleStateChange}
-          >
-            <Animated.View
-              style={[
-                styles.modalContent,
-                {
-                  transform: [{ translateY }],
-                  maxHeight: keyboardHeight > 0 ? '90%' : '60%',
-                },
-              ]}
-            >
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardAvoidingView}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-                enabled={true}
-              >
-                <ScrollView 
-                  style={styles.scrollContainer}
-                  contentContainerStyle={styles.scrollContent}
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                >
-                  {/* Handle bar for slide down */}
-                  <View style={styles.grabHandle} />
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        {/* Tabs Component */}
+        <Tabs
+          tabs={[
+            { label: 'Wallet', value: 'wallet' },
+            { label: 'Solana Card', value: 'kast' }
+          ]}
+          activeTab={destinationType}
+          onTabChange={(tab) => setDestinationType(tab as 'wallet' | 'kast')}
+          enableAnimation={true}
+        />
 
-                  {/* Header */}
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Add Wallet or Card</Text>
-                  </View>
-
-                  {/* Segmented Control */}
-                  <View style={styles.segmentedControl}>
-                    <TouchableOpacity
-                      style={[
-                        styles.segment,
-                        destinationType === 'wallet' && styles.segmentActive
-                      ]}
-                      onPress={() => setDestinationType('wallet')}
-                    >
-                      <Text style={[
-                        styles.segmentText,
-                         destinationType === 'wallet' && styles.segmentTextActive
-                      ]}>
-                        Wallet
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.segment,
-                        destinationType === 'kast' && styles.segmentActive
-                      ]}
-                      onPress={() => setDestinationType('kast')}
-                    >
-                      <Text style={[
-                        styles.segmentText,
-                        destinationType === 'kast' && styles.segmentTextActive
-                      ]}>
-                        SOLANA Card
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Form Content */}
-                  <View style={styles.formContent}>
-                    {destinationType === 'wallet' ? renderWalletForm() : renderKastForm()}
-                  </View>
-
-                  {/* Actions */}
-                  <View style={styles.modalActions}>
-                    <TouchableOpacity
-                      style={[
-                        styles.saveButton,
-                        !isFormValid() && styles.saveButtonDisabled
-                      ]}
-                      onPress={handleSave}
-                      disabled={!isFormValid()}
-                    >
-                      <Text style={[
-                        styles.saveButtonText,
-                        !isFormValid() && styles.saveButtonTextDisabled
-                      ]}>
-                        {isLoading ? 'Saving...' : 'Save'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </ScrollView>
-              </KeyboardAvoidingView>
-            </Animated.View>
-          </PanGestureHandler>
+        {/* Form Content */}
+        <View style={styles.formContent}>
+          {destinationType === 'wallet' ? renderWalletForm() : renderKastForm()}
         </View>
-      </Animated.View>
+
+        {/* Actions */}
+        <View style={styles.modalActions}>
+          <Button
+            title={isLoading ? 'Saving...' : 'Save'}
+            onPress={handleSave}
+            disabled={!isFormValid()}
+            loading={isLoading}
+            fullWidth={true}
+          />
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
+
+const styles = StyleSheet.create({
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  formContent: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+  },
+  formSection: {
+    gap: spacing.md,
+  },
+  errorText: {
+    color: colors.error || '#FF6B6B',
+    fontSize: typography.fontSize.sm,
+    marginTop: spacing.xs,
+  },
+  modalActions: {
+    marginTop: 'auto',
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  mwaDetectionButton: {
+    marginBottom: spacing.md,
+  },
+});
 
 export default AddDestinationSheet;
