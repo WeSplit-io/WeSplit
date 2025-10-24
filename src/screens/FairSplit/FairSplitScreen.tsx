@@ -7,11 +7,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   ScrollView,
   Alert,
   StatusBar,
-  TextInput,
   ActivityIndicator,
   Image,
   Animated,
@@ -23,6 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
+import Input from '../../components/shared/Input';
 import { SplitWalletService, SplitWallet } from '../../services/split';
 import { notificationService } from '../../services/notifications';
 import { priceManagementService } from '../../services/core';
@@ -38,6 +39,7 @@ import FairSplitProgress from './components/FairSplitProgress';
 import FairSplitParticipants from './components/FairSplitParticipants';
 import { Container, Button, AppleSlider } from '../../components/shared';
 import CustomModal from '../../components/shared/Modal';
+import PhosphorIcon from '../../components/shared/PhosphorIcon';
 
 // Remove local image mapping - now handled in FairSplitHeader component
 
@@ -2231,18 +2233,16 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       return;
     }
 
-    const amount = parseFloat(paymentAmount);
-    if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid payment amount');
-      return;
-    }
-
     const remainingAmount = userParticipant.amountOwed - userParticipant.amountPaid;
     // Use roundUsdcAmount to fix floating point precision issues
     const { roundUsdcAmount } = await import('../../utils/ui/format/formatUtils');
     const roundedRemainingAmount = roundUsdcAmount(remainingAmount);
-    if (amount > roundedRemainingAmount) {
-      Alert.alert('Amount Too High', `You can only pay up to ${roundedRemainingAmount.toFixed(2)} USDC`);
+    
+    // Use the remaining amount as the payment amount
+    const amount = roundedRemainingAmount;
+    
+    if (amount <= 0) {
+      Alert.alert('Invalid Amount', 'You have no remaining balance to pay');
       return;
     }
 
@@ -2308,8 +2308,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         }, 'FairSplitScreen');
         
         Alert.alert(
-          'Payment Successful!',
-          `Your payment of ${amount.toFixed(2)} USDC has been successfully sent to the split wallet. The transaction has been processed on the blockchain.`,
+          '✅ Payment Successful!',
+          `Your payment of ${amount.toFixed(2)} USDC has been successfully sent to the split wallet.`,
           [{ text: 'OK' }]
         );
       } else {
@@ -2587,7 +2587,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                     return (
                       <View style={styles.buttonContainer}>
                         <Button
-                          title="🚀 Transfer Funds to Your Wallet"
+                          title="Transfer Funds to Your Wallet"
                           onPress={handleSplitFunds}
                           variant="primary"
                           fullWidth={true}
@@ -2664,7 +2664,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                             onPress={handleDevWithdraw}
                             variant="secondary"
                             fullWidth={true}
-                            style={styles.devButton}
                           />
                           
                           <Button
@@ -2672,7 +2671,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                             onPress={repairSplitWallet}
                             variant="secondary"
                             fullWidth={true}
-                            style={styles.devButton}
                           />
                           
                           <Button
@@ -2680,7 +2678,6 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                             onPress={debugUsdcBalance}
                             variant="secondary"
                             fullWidth={true}
-                            style={styles.devButton}
                           />
                         </View>
                       )}
@@ -2702,14 +2699,14 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         closeOnBackdrop={true}
       >
         <View style={styles.modalInputContainer}>
-          <Text style={styles.modalInputLabel}>Amount (USDC):</Text>
-          <TextInput
-            style={styles.modalInput}
+          <Input
+            label="Amount (USDC):"
             value={editAmount}
             onChangeText={setEditAmount}
             placeholder="0.00"
             keyboardType="numeric"
             autoFocus
+            containerStyle={{ marginBottom: 0 }}
           />
         </View>
 
@@ -2718,14 +2715,14 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             title="Cancel"
             onPress={handleCancelEdit}
             variant="secondary"
-            style={styles.modalCancelButton}
+            style={{flex: 1}}
           />
 
           <Button
             title="Save"
             onPress={handleSaveEditedAmount}
             variant="primary"
-            style={styles.modalSaveButton}
+            style={{flex: 1}}
           />
         </View>
       </CustomModal>
@@ -2739,48 +2736,37 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         closeOnBackdrop={true}
       >
         <View style={styles.modalInputContainer}>
-          <Text style={styles.modalInputLabel}>Amount to Pay (USDC):</Text>
-          <TextInput
-            style={styles.modalInput}
-            value={paymentAmount}
-            onChangeText={setPaymentAmount}
-            placeholder="0.00"
-            keyboardType="numeric"
-            autoFocus
-          />
           <Text style={styles.modalHelperText}>
             {(() => {
               const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
-              if (!currentUserParticipant) {return 'You owe: 0.00 USDC';}
+              if (!currentUserParticipant) {return 'Slide to pay 0.00 USDC';}
               
               const totalOwed = currentUserParticipant.amountOwed || 0;
               const amountPaid = currentUserParticipant.amountPaid || 0;
               const remaining = totalOwed - amountPaid;
+              const billName = processedBillData?.title || billData?.title || 'this bill';
               
-              if (amountPaid > 0) {
-                return `Total owed: $${totalOwed.toFixed(2)} USDC\nAlready paid: $${amountPaid.toFixed(2)} USDC\nRemaining: $${remaining.toFixed(2)} USDC`;
-              } else {
-                return `You owe: $${totalOwed.toFixed(2)} USDC`;
-              }
+              return `Slide to pay ${remaining.toFixed(2)} USDC for ${billName}`;
             })()}
           </Text>
         </View>
 
         <View style={styles.modalButtonsContainer}>
-          <Button
-            title="Cancel"
-            onPress={handlePaymentModalClose}
-            variant="secondary"
-            style={styles.modalCancelButton}
-          />
-
-          <Button
-            title="Pay Now"
-            onPress={handlePaymentModalConfirm}
-            variant="primary"
+          <AppleSlider
+            onSlideComplete={handlePaymentModalConfirm}
             disabled={isSendingPayment}
             loading={isSendingPayment}
-            style={styles.modalSaveButton}
+            text={(() => {
+              const currentUserParticipant = participants.find(p => p.id === currentUser?.id?.toString());
+              if (!currentUserParticipant) {return 'Slide to Pay';}
+              
+              const totalOwed = currentUserParticipant.amountOwed || 0;
+              const amountPaid = currentUserParticipant.amountPaid || 0;
+              const remaining = totalOwed - amountPaid;
+              
+              return `Slide to Pay ${remaining.toFixed(2)} USDC`;
+            })()}
+            style={{flex: 1}}
           />
         </View>
       </CustomModal>
@@ -2820,7 +2806,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                     })}
                   >
                     <View style={styles.splitOptionIcon}>
-                      <Text style={styles.splitOptionIconText}>🏦</Text>
+                      <PhosphorIcon name="Bank" size={24} color={colors.white} weight="fill" />
                     </View>
                     <View style={styles.splitOptionContent}>
                       <Text style={styles.splitOptionTitle}>{wallet.name}</Text>
@@ -2828,7 +2814,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                         {wallet.address.slice(0, 8)}...{wallet.address.slice(-8)}
                       </Text>
                     </View>
-                    <Text style={styles.splitOptionArrow}>→</Text>
+                    <PhosphorIcon name="CaretRight" size={20} color={colors.white} weight="bold" />
                   </TouchableOpacity>
                 ))}
 
@@ -2844,7 +2830,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                     })}
                   >
                     <View style={styles.splitOptionIcon}>
-                      <Text style={styles.splitOptionIconText}>💳</Text>
+                      <PhosphorIcon name="CreditCard" size={24} color={colors.white} weight="fill" />
                     </View>
                     <View style={styles.splitOptionContent}>
                       <Text style={styles.splitOptionTitle}>In-App Wallet</Text>
@@ -2852,7 +2838,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                         {inAppWallet.address.slice(0, 8)}...{inAppWallet.address.slice(-8)}
                       </Text>
                     </View>
-                    <Text style={styles.splitOptionArrow}>→</Text>
+                    <PhosphorIcon name="CaretRight" size={20} color={colors.white} weight="bold" />
                   </TouchableOpacity>
                 )}
 
@@ -2866,7 +2852,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                     }}
                   >
                     <View style={styles.addWalletIcon}>
-                      <Text style={styles.addWalletIconText}>+</Text>
+                      <PhosphorIcon name="Plus" size={24} color={colors.white} weight="bold" />
                     </View>
                     <View style={styles.addWalletContent}>
                       <Text style={styles.addWalletTitle}>Add External Wallet</Text>
@@ -2877,7 +2863,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                         }
                       </Text>
                     </View>
-                    <Text style={styles.addWalletArrow}>→</Text>
+                    <PhosphorIcon name="CaretRight" size={20} color={colors.white} weight="bold" />
                   </TouchableOpacity>
                 )}
 
@@ -2896,7 +2882,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               title="Cancel"
               onPress={() => setShowSplitModal(false)}
               variant="secondary"
-              style={styles.modalCancelButton}
+              style={{flex: 1}}
             />
           </>
         ) : (
@@ -2919,15 +2905,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               text="Slide to Transfer Funds"
             />
 
-            <Button
-              title="Back"
-              onPress={() => {
-                setShowSignatureStep(false);
-                setSelectedTransferMethod(null);
-              }}
-              variant="secondary"
-              style={styles.modalCancelButton}
-            />
+            
           </>
         )}
       </CustomModal>
@@ -3004,14 +2982,14 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             title="Close"
             onPress={handleClosePrivateKeyModal}
             variant="secondary"
-            style={styles.closePrivateKeyButton}
+            style={{flex: 1}}
           />
           
           <Button
             title="Copy Key"
             onPress={handleCopyPrivateKey}
             variant="primary"
-            style={styles.copyPrivateKeyButton}
+            style={{flex: 1}}
           />
         </View>
       </CustomModal>

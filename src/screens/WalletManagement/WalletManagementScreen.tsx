@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
-import NavBar from '../../components/NavBar';
+import NavBar from '../../components/shared/NavBar';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/data';

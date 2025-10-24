@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import NavBar from '../../components/NavBar';
+import NavBar from '../../components/shared/NavBar';
 import ContactsList from '../../components/ContactsList';
 import QrCodeView, { QrCodeViewProps } from '../../services/core/QrCodeView';
 import { useApp } from '../../context/AppContext';

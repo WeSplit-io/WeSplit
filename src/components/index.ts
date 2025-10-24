@@ -14,7 +14,7 @@ export { default as ErrorBoundary } from './ErrorBoundary';
 export { default as GroupIcon } from './GroupIcon';
 export { default as Icon } from './Icon';
 export { default as MoonPayWidget } from './MoonPayWidget';
-export { default as NavBar } from './NavBar';
+export { default as NavBar } from './shared/NavBar';
 export { default as NavIcon } from './NavIcon';
 export { default as NavigationWrapper } from './NavigationWrapper';
 export { default as QRCodeModal } from './QRCodeModal';

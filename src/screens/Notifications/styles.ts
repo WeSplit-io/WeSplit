@@ -1,44 +1,11 @@
 import { StyleSheet } from 'react-native';
-import { colors, spacing, typography } from '../../theme';
+import { colors } from '../../theme';
 
 export default StyleSheet.create({
-
-  // Tab Navigation
-  tabContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.white5,
-    borderRadius: 16,
-    marginHorizontal: spacing.md,
-    padding: 5,
-    marginBottom: spacing.md,
-  },
-  tab: {
-    flex: 1,
-    borderRadius: 12,
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabGradient: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  activeTab: {
-    backgroundColor: colors.green,
-  },
-  tabText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.white70,
-  },
-  activeTabText: {
-    color: colors.black,
+  // Header
+  refreshButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
   },
   // Loading States
   loadingContainer: {
@@ -48,7 +15,7 @@ export default StyleSheet.create({
     backgroundColor: colors.darkBackground,
   },
   loadingText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: 16,
     fontWeight: '500',
     marginTop: 16,
@@ -67,7 +34,7 @@ export default StyleSheet.create({
   emptyStateIcon: {
     height: 150,
     objectFit: 'contain',
-    marginBottom: spacing.md,
+    marginBottom: 20,
   },
   emptyTitle: {
     fontSize: 18,

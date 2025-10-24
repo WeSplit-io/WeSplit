@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import NavBar from '../../components/NavBar';
+import NavBar from '../../components/shared/NavBar';
 import ContactsList from '../../components/ContactsList';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';

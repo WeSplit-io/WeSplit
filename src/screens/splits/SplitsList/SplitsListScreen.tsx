@@ -21,7 +21,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from './styles';  
 import { colors } from '../../../theme/colors';
-import NavBar from '../../../components/NavBar';
+import NavBar from '../../../components/shared/NavBar';
 import UserAvatar from '../../../components/UserAvatar';
 import GroupIcon from '../../../components/GroupIcon';
 import Icon from '../../../components/Icon';

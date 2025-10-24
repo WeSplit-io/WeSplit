@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Image,
   Dimensions,
-  SafeAreaView,
   StatusBar,
   ScrollView
 } from 'react-native';
@@ -23,6 +22,8 @@ import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc
 import { db } from '../../config/firebase/firebase';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
+import PhosphorIcon from '../../components/shared/PhosphorIcon';
+import styles from './styles';
 
 // Import the unified NotificationData interface
 import { NotificationData } from '../../types/notifications';
@@ -437,10 +438,11 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       {/* Header */}
       <Header 
         title="Notifications"
-        showBackButton={false}
+        showBackButton={true}
+        onBackPress={() => navigation.goBack()}
         rightElement={
           <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-            <Text style={styles.refreshButtonText}>Refresh</Text>
+            <PhosphorIcon name="ArrowClockwise" size={20} color={colors.white} />
           </TouchableOpacity>
         }
       />
@@ -483,158 +485,5 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  refreshButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    backgroundColor: colors.primaryGreen,
-    borderRadius: 8,
-  },
-  refreshButtonText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 50,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 50,
-  },
-  emptyStateIcon: {
-    width: 80,
-    height: 80,
-    marginBottom: 20,
-    opacity: 0.5,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  notificationsList: {
-    padding: 20,
-  },
-  notificationItem: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  unreadNotification: {
-    backgroundColor: colors.darkCard,
-    borderWidth: 1,
-    borderColor: colors.primaryGreen,
-  },
-  notificationContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  notificationHeader: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  notificationIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  notificationTextContainer: {
-    flex: 1,
-    marginRight: 12,
-  },
-  notificationTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  notificationMessage: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  notificationTime: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primaryGreen,
-    marginLeft: 8,
-    marginTop: 4,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyStateTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  emptyStateMessage: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-});
 
 export default NotificationsScreen;

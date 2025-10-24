@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, Alert, Switch, ActivityIndicator, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../../components/Icon';
-import NavBar from '../../../components/NavBar';
+import NavBar from '../../../components/shared/NavBar';
 import { useApp } from '../../../context/AppContext';
 import { useWallet } from '../../../context/WalletContext';
 import { walletService } from '../../../services/blockchain/wallet';

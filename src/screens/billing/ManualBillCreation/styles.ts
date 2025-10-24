@@ -6,7 +6,6 @@ import { typography } from '../../../theme/typography';
 export const styles = StyleSheet.create({
   content: {
     flex: 1,
-    paddingHorizontal: spacing.md,
   },
   section: {
     marginVertical: spacing.md,

@@ -487,20 +487,6 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: spacing.md,
-    height: 40,
-  },
-  modalCancelButton: {
-    backgroundColor: colors.white10,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  modalCancelButtonText: {
-    color: colors.white80,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
   },
   modalSaveButton: {
     flex: 1,
@@ -524,7 +510,7 @@ export const styles = StyleSheet.create({
   },
   modalHelperText: {
     color: colors.textSecondary,
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.md,
     marginTop: spacing.xs,
     textAlign: 'center',
   },
@@ -729,15 +715,10 @@ export const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.green,
+    backgroundColor: colors.white5,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
-  },
-  addWalletIconText: {
-    color: colors.black,
-    fontSize: typography.fontSize.xl,
-    fontWeight: '700',
   },
   addWalletContent: {
     flex: 1,
@@ -751,11 +732,6 @@ export const styles = StyleSheet.create({
   addWalletDescription: {
     color: colors.textSecondary,
     fontSize: typography.fontSize.sm,
-  },
-  addWalletArrow: {
-    color: colors.green,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
   },
   // Transfer icon image styles
   transferIconImage: {
@@ -844,17 +820,6 @@ export const styles = StyleSheet.create({
   },
   
   // Wallet Recap Modal Styles
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
   walletRecapModal: {
     backgroundColor: colors.surface,
     borderRadius: 20,

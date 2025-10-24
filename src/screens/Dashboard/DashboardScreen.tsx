@@ -17,7 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { styles, BG_COLOR, GREEN } from './styles';
 import { colors, spacing } from '../../theme';
 import { AuthGuard } from '../../components/auth';
-import NavBar from '../../components/NavBar';
+import NavBar from '../../components/shared/NavBar';
 import UserAvatar from '../../components/UserAvatar';
 import { WalletSelectorModal } from '../../components/wallet';
 import { Container } from '../../components/shared';
