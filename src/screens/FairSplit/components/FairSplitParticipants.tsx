@@ -5,12 +5,12 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import UserAvatar from '../../../components/UserAvatar';
+import Avatar from '../../../components/shared/Avatar';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
 import { styles } from '../styles';
-import { Participant } from '../../../services/core';
+import { Participant } from '../../../services/payments/amountCalculationService';
 
 interface FairSplitParticipantsProps {
   participants: Participant[];
@@ -31,10 +31,17 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
     <View style={styles.participantsContainer}>
       {participants.map((participant) => (
         <View key={participant.id} style={styles.participantCard}>
-          <UserAvatar
-            displayName={participant.name}
+          <Avatar
+            userId={participant.id}
+            userName={participant.name}
             size={40}
-            style={styles.participantAvatar}
+            avatarUrl={participant.avatar}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: colors.white10,
+            }}
           />
           <View style={styles.participantInfo}>
             <Text style={styles.participantName}>{participant.name}</Text>
@@ -63,14 +70,14 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
                 onPress={() => onEditParticipantAmount(participant)}
               >
                 <Text style={styles.editableAmountText}>
-                  ${participant.amountOwed.toFixed(3)}
+                  ${participant.amountOwed.toFixed(2)}
                 </Text>
               </TouchableOpacity>
             ) : (
               // Read-only amount display
               <View style={styles.readOnlyAmountContainer}>
                 <Text style={styles.readOnlyAmountText}>
-                  ${participant.amountOwed.toFixed(3)}
+                  ${participant.amountOwed.toFixed(2)}
                 </Text>
                 {isSplitConfirmed && (
                   <Text style={styles.lockedIndicator}>🔒</Text>

@@ -17,7 +17,8 @@ import Icon from '../../../components/Icon';
 import { useApp } from '../../../context/AppContext';
 import { colors, spacing } from '../../../theme';
 import * as ImagePicker from 'expo-image-picker';
-import { accountDeletionService, DeletionProgress, AccountDeletionService, UserImageService } from '../../../services/core';
+import { accountDeletionService, DeletionProgress, AccountDeletionService } from '../../../services/core';
+import { AvatarUploadFallbackService } from '../../../services/core/avatarUploadFallbackService';
 import { logger } from '../../../services/analytics/loggingService';
 import styles from './styles';
 import { Container, Button, Input } from '../../../components/shared';
@@ -189,14 +190,25 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
       // If avatar has changed and is a local URI, upload it
       if (avatar && avatar !== currentUser.avatar && avatar.startsWith('file://')) {
         logger.info('Uploading new avatar', null, 'AccountSettingsScreen');
-        const uploadResult = await UserImageService.uploadUserAvatar(
+        const uploadResult = await AvatarUploadFallbackService.uploadAvatarWithFallback(
           currentUser.id.toString(), 
           avatar
         );
         
-        if (uploadResult.success && uploadResult.imageUrl) {
-          finalAvatarUrl = uploadResult.imageUrl;
-          logger.info('Avatar uploaded successfully', null, 'AccountSettingsScreen');
+        if (uploadResult.success && uploadResult.avatarUrl) {
+          finalAvatarUrl = uploadResult.avatarUrl;
+          
+          if (uploadResult.isFallback) {
+            logger.info('Avatar uploaded with fallback (local storage)', null, 'AccountSettingsScreen');
+            // Show a gentle warning that it's stored locally
+            Alert.alert(
+              'Avatar Updated', 
+              'Your avatar has been updated and is stored locally. It will be uploaded to cloud storage when possible.',
+              [{ text: 'OK' }]
+            );
+          } else {
+            logger.info('Avatar uploaded successfully to Firebase', null, 'AccountSettingsScreen');
+          }
         } else {
           Alert.alert('Error', uploadResult.error || 'Failed to upload avatar');
           return;
@@ -204,7 +216,7 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
       } else if (avatar === null && currentUser.avatar) {
         // Avatar was removed
         logger.info('Removing avatar', null, 'AccountSettingsScreen');
-        const deleteResult = await UserImageService.deleteUserAvatar(currentUser.id.toString());
+        const deleteResult = await AvatarUploadFallbackService.deleteAvatar(currentUser.id.toString());
         
         if (deleteResult.success) {
           finalAvatarUrl = '';

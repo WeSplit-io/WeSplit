@@ -3,44 +3,58 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Image,
   StyleSheet,
 } from 'react-native';
 import { Transaction } from '../../types';
-import { colors } from '../../theme/colors';
+import { colors, spacing, typography } from '../../theme';
+import { 
+  PaperPlaneTilt, 
+  HandCoins, 
+  ArrowLineDown, 
+  Bank 
+} from 'phosphor-react-native';
 
 interface TransactionItemProps {
   transaction: Transaction;
   onPress?: (transaction: Transaction) => void;
   showTime?: boolean;
+  recipientName?: string;
+  senderName?: string;
 }
 
 const TransactionItem: React.FC<TransactionItemProps> = ({
   transaction,
   onPress,
   showTime = true,
+  recipientName,
+  senderName,
 }) => {
   const getTransactionIcon = () => {
+    const iconProps = {
+      size: 20,
+      color: colors.white,
+    };
+
     switch (transaction.type) {
       case 'send':
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
+        return <PaperPlaneTilt {...iconProps} />;
       case 'receive':
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' };
+        return <HandCoins {...iconProps} />;
       case 'deposit':
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-deposit.png?alt=media&token=d832bae5-dc8e-4347-bab5-cfa9621a5c55' };
+        return <ArrowLineDown {...iconProps} />;
       case 'withdraw':
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-withdraw.png?alt=media&token=8c0da99e-287c-4d19-8515-ba422430b71b' };
+        return <Bank {...iconProps} />;
       default:
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
+        return <PaperPlaneTilt {...iconProps} />;
     }
   };
 
   const getTransactionTitle = () => {
     switch (transaction.type) {
       case 'send':
-        return `Send to ${transaction.to_user || 'Unknown'}`;
+        return `Send to ${recipientName || transaction.recipient_name || transaction.to_user || 'Unknown'}`;
       case 'receive':
-        return `Received from ${transaction.from_user || 'Unknown'}`;
+        return `Received from ${senderName || transaction.sender_name || transaction.from_user || 'Unknown'}`;
       case 'deposit':
         return 'Deposit';
       case 'withdraw':
@@ -70,7 +84,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
     const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
     
     return {
-      amount: amount.toFixed(2),
+      amount: `${isIncome ? '+' : '-'}${amount.toFixed(2)} USDC`,
       color: isIncome ? colors.primaryGreen : colors.text
     };
   };
@@ -96,10 +110,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
       disabled={!onPress}
     >
       <View style={styles.transactionIconContainer}>
-        <Image
-          source={getTransactionIcon()}
-          style={styles.transactionIcon}
-        />
+        {getTransactionIcon()}
       </View>
       <View style={styles.transactionContent}>
         <Text style={styles.transactionTitle}>
@@ -110,14 +121,10 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
         </Text>
       </View>
       <View style={styles.transactionAmountContainer}>
-        <Text style={[styles.transactionAmount, { color }]}>
+        <Text style={styles.transactionAmount}>
           {amount}
         </Text>
-        {showTime && (
-          <Text style={styles.transactionTime}>
-            {transactionTime}
-          </Text>
-        )}
+    
       </View>
     </TouchableOpacity>
   );
@@ -127,51 +134,47 @@ const styles = StyleSheet.create({
   transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
     backgroundColor: colors.white5,
-    borderRadius: 12,
-    marginBottom: 12,
+    borderRadius: spacing.md,
+    padding: spacing.md,
   },
   transactionIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primaryGreen,
+    width: 40,
+    height: 40,
+    borderRadius: 30,
+    backgroundColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
   transactionIcon: {
-    width: 24,
-    height: 24,
-    tintColor: colors.background,
+    width: 20,
+    height: 20,
+    tintColor: colors.white,
   },
   transactionContent: {
     flex: 1,
-    marginRight: 16,
+    marginRight: spacing.md,
+    marginLeft: spacing.md,
   },
   transactionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.xs / 2,
   },
   transactionSource: {
-    fontSize: 14,
-    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    color: colors.white70,
   },
   transactionAmountContainer: {
     alignItems: 'flex-end',
   },
   transactionAmount: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  transactionTime: {
-    fontSize: 12,
-    color: colors.textSecondary,
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
   },
 });
 

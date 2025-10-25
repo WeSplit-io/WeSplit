@@ -7,7 +7,6 @@ import {
   Image,
   Clipboard,
 } from 'react-native';
-import SafeAreaWrapper from '../../components/SafeAreaWrapper';
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';

@@ -32,6 +32,7 @@ import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from '.
 import { DegenSplitHeader } from './components';
 import { Container, Button, AppleSlider } from '@/components/shared';
 import CustomModal from '@/components/shared/Modal';
+import Avatar from '@/components/shared/Avatar';
 
 interface DegenResultScreenProps {
   navigation: any;
@@ -387,6 +388,19 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     }
   };
 
+  const handleShareOnX = () => {
+    const message = isWinner 
+      ? `I just WON the degen split on @wesplit_io ! ${formatUsdcForDisplay(totalAmount)}USDC covered by @${selectedParticipant.name} 😂🙏\nTry your luck next time, you never know…`
+      : `RIP me 💀 lost the degen split on @wesplit_io and paid ${formatUsdcForDisplay(totalAmount)}USDC for the team 💸\nThink you can do better? Try your luck.`;
+    
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(message)}`;
+    
+    Linking.openURL(twitterUrl).catch(err => {
+      console.error('Failed to open Twitter:', err);
+      Alert.alert('Error', 'Failed to open Twitter. Please try again.');
+    });
+  };
+
   return (
     <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
@@ -402,20 +416,24 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       <View style={styles.content}>
         {/* Avatar Container */}
         <View style={styles.avatarContainer}>
-          <View style={[
-            styles.avatar,
-            isWinner ? styles.winnerAvatar : styles.loserAvatar
-          ]}>
-            <Text style={styles.avatarText}>
-              {selectedParticipant.name.charAt(0).toUpperCase()}
-            </Text>
-          </View>
+          <Avatar
+            userId={currentUser?.id.toString()}
+            userName={currentUser?.name || currentUser?.email}
+            size={120}
+            avatarUrl={currentUser?.avatar}
+            style={[
+              styles.avatar,
+              isWinner ? styles.winnerAvatar : styles.loserAvatar
+            ]}
+            showBorder={true}
+            borderColor={isWinner ? colors.green : colors.red}
+          />
         </View>
 
         {/* Result Title */}
         <View style={styles.resultTitleContainer}>
           <Text style={styles.resultTitle}>
-            {isWinner ? '🎉 You Won!' : '😅 You Lost!'}
+            {isWinner ? "Congrats, you pay nothing!" : "You're the one paying!"}
           </Text>
         </View>
 
@@ -424,73 +442,71 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           styles.amountContainer,
           isWinner ? styles.winnerAmountContainer : styles.loserAmountContainer
         ]}>
-          <Text style={styles.amountLabel}>
-            {isWinner ? 'You Get' : 'You Pay'}
-          </Text>
           <Text style={styles.amountValue}>
-            {formatUsdcForDisplay(totalAmount)} USDC
+            {isWinner ? '+' : '-'} {formatUsdcForDisplay(totalAmount)} USDC
           </Text>
         </View>
 
-        {/* Action Buttons */}
-        {isWinner ? (
-          // Winner actions
-          <View style={styles.actionButtonsContainer}>
+        {/* Contextual Text */}
+        <View style={styles.messageContainer}>
+          <Text style={styles.messageText}>
+            {isWinner 
+              ? `You're safe @${selectedParticipant.name} is paying for you`
+              : `You covered the total bill: ${formatUsdcForDisplay(totalAmount)} USDC.`
+            }
+          </Text>
+          {!isWinner && (
+            <Text style={styles.luckMessage}>
+              (Better luck next time 🍀)
+            </Text>
+          )}
+        </View>
+
+        {/* Share Button */}
+        <TouchableOpacity style={styles.shareButton} onPress={handleShareOnX}>
+          <Text style={styles.shareButtonText}>Share on </Text>
+          <Image
+            source={require('../../../assets/twitter-x.png')}
+            style={styles.twitterIcon}
+            resizeMode="contain"
+          />
+
+        </TouchableOpacity>
+
+      </View>
+
+      {/* Action Buttons - Fixed at bottom */}
+      <View style={styles.bottomActionButtonsContainer}>
+        <View style={styles.actionButtonsContainer}>
+          <Button
+            title="Split Wallet"
+            onPress={handleShowPrivateKey}
+            variant="secondary"
+            style={styles.splitWalletButton}
+          />
+          
+          {isWinner ? (
+            // Winner - Claim button
             <Button
-              title={degenState.isProcessing ? 'Processing...' : 'Claim Funds'}
+              title={degenState.isProcessing ? 'Processing...' : 'Claim'}
               onPress={() => degenState.setShowClaimModal(true)}
               variant="primary"
               disabled={degenState.isProcessing}
               loading={degenState.isProcessing}
-              style={styles.claimButton}
+              style={{flex: 1}}
             />
-          </View>
-        ) : (
-          // Loser actions
-          <View style={styles.actionButtonsContainer}>
+          ) : (
+            // Loser - Claim button (replacing Pay with KAST)
             <Button
-              title={degenState.isProcessing ? 'Processing...' : 'Pay Your Share'}
+              title={degenState.isProcessing ? 'Processing...' : 'Claim'}
               onPress={() => degenState.setShowPaymentOptionsModal(true)}
               variant="primary"
               disabled={degenState.isProcessing}
               loading={degenState.isProcessing}
-              style={styles.payButton}
+              style={styles.claimButtonNew}
             />
-          </View>
-        )}
-
-        {/* Split Wallet Info */}
-        {splitWallet && (
-          <View style={styles.walletInfoContainer}>
-            <Text style={styles.walletInfoTitle}>Split Wallet</Text>
-            <View style={styles.walletInfoCard}>
-              <View style={styles.walletAddressRow}>
-                <Text style={styles.walletAddressLabel}>Address:</Text>
-                <View style={styles.walletAddressContainer}>
-                  <Text style={styles.walletAddressText}>
-                    {degenLogic.formatWalletAddress(splitWallet.walletAddress)}
-                  </Text>
-                  <TouchableOpacity onPress={() => handleCopyWalletAddress(splitWallet.walletAddress)}>
-                    <Image
-                      source={require('../../../assets/copy-icon.png')}
-                      style={styles.copyIcon}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.privateKeyButton}
-                onPress={handleShowPrivateKey}
-              >
-                <Image
-                  source={require('../../../assets/id-icon-white.png')}
-                  style={styles.privateKeyButtonIcon}
-                />
-                <Text style={styles.privateKeyButtonText}>View Private Key</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+          )}
+        </View>
       </View>
 
       {/* Claim CustomModal */}
@@ -657,13 +673,33 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       <CustomModal
         visible={degenState.showPrivateKeyModal && !!degenState.privateKey}
         onClose={handleClosePrivateKeyCustomModal}
-        title="🔑 Private Key"
+        title="🔑 Split Wallet Details"
         description="This is a shared private key for the Degen Split. All participants have access to this key to withdraw or move funds from the split wallet."
         showHandle={true}
         closeOnBackdrop={true}
       >
-        <View style={styles.privateKeyDisplay}>
-          <Text style={styles.privateKeyText}>{degenState.privateKey}</Text>
+        {/* Wallet Address */}
+        <View style={styles.walletAddressSection}>
+          <Text style={styles.walletAddressLabel}>Wallet Address:</Text>
+          <View style={styles.walletAddressContainer}>
+            <Text style={styles.walletAddressText}>
+              {degenLogic.formatWalletAddress(splitWallet.walletAddress)}
+            </Text>
+            <TouchableOpacity onPress={() => handleCopyWalletAddress(splitWallet.walletAddress)}>
+              <Image
+                source={require('../../../assets/copy-icon.png')}
+                style={styles.copyIcon}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Private Key */}
+        <View style={styles.privateKeySection}>
+          <Text style={styles.privateKeyLabel}>Private Key:</Text>
+          <View style={styles.privateKeyDisplay}>
+            <Text style={styles.privateKeyText}>{degenState.privateKey}</Text>
+          </View>
         </View>
         
         <View style={styles.privateKeyWarning}>

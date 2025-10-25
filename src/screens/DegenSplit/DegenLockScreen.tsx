@@ -333,9 +333,26 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
 
     // Calculate progress - check if participants have locked their funds (status 'locked' or amountPaid >= amountOwed)
     // Only count participants who have actually sent their share, not just locked status
-    const lockedCount = degenState.splitWallet?.participants?.filter((p: any) => 
-      p.amountPaid >= p.amountOwed && p.status === 'locked'
-    ).length || degenState.lockedParticipants.length;
+    let lockedCount = 0;
+    
+    if (degenState.splitWallet?.participants) {
+      // Use wallet participants for accurate count - check if they've paid their full amount AND are locked
+      lockedCount = degenState.splitWallet.participants.filter((p: any) => 
+        p.amountPaid >= p.amountOwed && p.status === 'locked'
+      ).length;
+    } else {
+      // Fallback to local state - but ensure it's accurate
+      lockedCount = degenState.lockedParticipants.length;
+    }
+    
+    // Debug logging to understand the issue
+    console.log('🔍 DegenLockScreen lockedCount calculation:', {
+      hasSplitWallet: !!degenState.splitWallet,
+      splitWalletParticipants: degenState.splitWallet?.participants,
+      lockedParticipantsLength: degenState.lockedParticipants.length,
+      finalLockedCount: lockedCount,
+      totalParticipants: participants.length
+    });
 
   return (
     <Container>
@@ -350,7 +367,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
 
       <ScrollView 
         style={styles.content} 
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: 100 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Bill Info Card with Gradient */}
@@ -380,12 +397,11 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
             <Text style={styles.totalBillLabel}>Total Bill</Text>
             <Text style={styles.totalBillAmount}>{formatUsdcForDisplay(totalAmount)} USDC</Text>
           </View>
-          <View style={styles.billCardDotLeft}/>
-          <View style={styles.billCardDotRight}/>
+
         </LinearGradient>
 
         {/* Split Wallet Section */}
-        {(degenState.splitWallet || (splitData?.splitType === 'degen' && splitData)) && (
+        {degenState.splitWallet && (
           <View style={styles.splitWalletSection}>
             <View style={styles.splitWalletCard}>
               <View style={styles.splitWalletInfo}>
@@ -429,124 +445,129 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         )}
 
         {/* Participants List */}
-        <DegenSplitParticipants
-          participants={participants}
-          totalAmount={totalAmount}
-          currentUserId={currentUser?.id?.toString()}
-          splitWallet={degenState.splitWallet}
-        />
+        <View style={styles.participantsContainer}>
+        <Text style={styles.splitMethodLabel}>Split Participants:</Text>
 
-        {/* Lock Button */}
-        <View style={[styles.lockButtonContainer]}>
-          {!degenState.splitWallet && degenLogic.isCurrentUserCreator(currentUser, splitData) ? (
-            // Creator and no wallet yet - show "Lock the Split" button
-            <Button
-              title={degenState.isCreatingWallet ? 'Creating Split...' : 'Continue'}
-              onPress={handleLockTheSplit}
-              variant="primary"
-              disabled={degenState.isCreatingWallet}
-              loading={degenState.isCreatingWallet}
-            />
-          ) : !degenState.isLocked ? (
-            // Not locked yet - show "Send My Share" button
-            <Button
-              title={degenState.isLocking ? 'Sending Share...' : degenState.isLoadingWallet ? 'Loading...' : 'Send My Share'}
-              onPress={() => degenState.setShowLockModal(true)}
-              variant="primary"
-              disabled={degenState.isLocking || degenState.isLoadingWallet}
-              loading={degenState.isLocking || degenState.isLoadingWallet}
-            />
-          ) : degenLogic.isCurrentUserCreator(currentUser, splitData) ? (
-            // Creator and locked - show waiting or start spinning
-            degenState.splitWallet?.status === 'spinning_completed' ? (
-              // Roulette completed - show view results button
-              <Button
-                title="🎯 View Results"
-                onPress={() => {
-                  // Navigate to results screen with the winner information
-                  if (degenState.splitWallet?.degenWinner) {
-                    navigation.navigate('DegenResult', {
-                      billData,
-                      participants,
-                      totalAmount,
-                      selectedParticipant: {
-                        id: degenState.splitWallet.degenWinner.userId,
-                        name: degenState.splitWallet.degenWinner.name,
-                        userId: degenState.splitWallet.degenWinner.userId
-                      },
-                      splitWallet: degenState.splitWallet,
-                      processedBillData,
-                      splitData,
-                    });
-                  }
-                }}
-                variant="primary"
-              />
-            ) : degenState.allParticipantsLocked ? (
-              // All locked - show start spinning button
-              <Button
-                title={degenState.isCheckingLocks ? 'Checking...' : 'Start Spinning'}
-                onPress={handleRollRoulette}
-                variant="primary"
-                disabled={degenState.isCheckingLocks}
-                loading={degenState.isCheckingLocks}
-              />
-            ) : (
-              // Not all locked - show waiting message
-              <Button
-                title={(() => {
-                  const remaining = participants.length - lockedCount;
-                  return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
-                })()}
-                onPress={() => {}}
-                variant="primary"
-                disabled={true}
-              />
-            )
-          ) : (
-            // Not creator but locked - show waiting message or view results
-            degenState.splitWallet?.status === 'spinning_completed' ? (
-              // Roulette completed - show view results button
-              <Button
-                title="🎯 View Results"
-                onPress={() => {
-                  // Navigate to results screen with the winner information
-                  if (degenState.splitWallet?.degenWinner) {
-                    navigation.navigate('DegenResult', {
-                      billData,
-                      participants,
-                      totalAmount,
-                      selectedParticipant: {
-                        id: degenState.splitWallet.degenWinner.userId,
-                        name: degenState.splitWallet.degenWinner.name,
-                        userId: degenState.splitWallet.degenWinner.userId
-                      },
-                      splitWallet: degenState.splitWallet,
-                      processedBillData,
-                      splitData,
-                    });
-                  }
-                }}
-                variant="primary"
-              />
-            ) : (
-              // Roulette not completed - show waiting message
-              <Button
-                title={degenState.allParticipantsLocked 
-                  ? 'Waiting for the creator to spin!' 
-                  : (() => {
-                      const remaining = participants.length - lockedCount;
-                      return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
-                    })()
-                }
-                onPress={() => {}}
-                variant="primary"
-                disabled={true}
-              />
-            )
-          )}
+          <DegenSplitParticipants
+            participants={participants}
+            totalAmount={totalAmount}
+            currentUserId={currentUser?.id?.toString()}
+            splitWallet={degenState.splitWallet}
+          />
         </View>
+
       </ScrollView>
+
+      {/* Fixed Bottom Lock Button */}
+      <View style={styles.fixedBottomButtonContainer}>
+        {!degenState.splitWallet && degenLogic.isCurrentUserCreator(currentUser, splitData) ? (
+          // Creator and no wallet yet - show "Lock the Split" button
+          <Button
+            title={degenState.isCreatingWallet ? 'Creating Split...' : 'Continue'}
+            onPress={handleLockTheSplit}
+            variant="primary"
+            disabled={degenState.isCreatingWallet}
+            loading={degenState.isCreatingWallet}
+          />
+        ) : !degenState.isLocked ? (
+          // Not locked yet - show "Send My Share" button
+          <Button
+            title={degenState.isLocking ? 'Sending Share...' : degenState.isLoadingWallet ? 'Loading...' : 'Send My Share'}
+            onPress={() => degenState.setShowLockModal(true)}
+            variant="primary"
+            disabled={degenState.isLocking || degenState.isLoadingWallet}
+            loading={degenState.isLocking || degenState.isLoadingWallet}
+          />
+        ) : degenLogic.isCurrentUserCreator(currentUser, splitData) ? (
+          // Creator and locked - show waiting or start spinning
+          degenState.splitWallet?.status === 'spinning_completed' ? (
+            // Roulette completed - show view results button
+            <Button
+              title="View Results"
+              onPress={() => {
+                // Navigate to results screen with the winner information
+                if (degenState.splitWallet?.degenWinner) {
+                  navigation.navigate('DegenResult', {
+                    billData,
+                    participants,
+                    totalAmount,
+                    selectedParticipant: {
+                      id: degenState.splitWallet.degenWinner.userId,
+                      name: degenState.splitWallet.degenWinner.name,
+                      userId: degenState.splitWallet.degenWinner.userId
+                    },
+                    splitWallet: degenState.splitWallet,
+                    processedBillData,
+                    splitData,
+                  });
+                }
+              }}
+              variant="primary"
+            />
+          ) : degenState.allParticipantsLocked ? (
+            // All locked - show start spinning button
+            <Button
+              title={degenState.isCheckingLocks ? 'Checking...' : 'Start Spinning'}
+              onPress={handleRollRoulette}
+              variant="primary"
+              disabled={degenState.isCheckingLocks}
+              loading={degenState.isCheckingLocks}
+            />
+          ) : (
+            // Not all locked - show waiting message
+            <Button
+              title={(() => {
+                const remaining = participants.length - lockedCount;
+                return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
+              })()}
+              onPress={() => {}}
+              variant="primary"
+              disabled={true}
+            />
+          )
+        ) : (
+          // Not creator but locked - show waiting message or view results
+          degenState.splitWallet?.status === 'spinning_completed' ? (
+            // Roulette completed - show view results button
+            <Button
+              title="🎯 View Results"
+              onPress={() => {
+                // Navigate to results screen with the winner information
+                if (degenState.splitWallet?.degenWinner) {
+                  navigation.navigate('DegenResult', {
+                    billData,
+                    participants,
+                    totalAmount,
+                    selectedParticipant: {
+                      id: degenState.splitWallet.degenWinner.userId,
+                      name: degenState.splitWallet.degenWinner.name,
+                      userId: degenState.splitWallet.degenWinner.userId
+                    },
+                    splitWallet: degenState.splitWallet,
+                    processedBillData,
+                    splitData,
+                  });
+                }
+              }}
+              variant="primary"
+            />
+          ) : (
+            // Roulette not completed - show waiting message
+            <Button
+              title={degenState.allParticipantsLocked 
+                ? 'Waiting for the creator to spin!' 
+                : (() => {
+                    const remaining = participants.length - lockedCount;
+                    return `Waiting for ${remaining} more participant${remaining !== 1 ? 's' : ''} to lock`;
+                  })()
+              }
+              onPress={() => {}}
+              variant="primary"
+              disabled={true}
+            />
+          )
+        )}
+      </View>
 
       {/* Lock Confirmation Modal */}
       <Modal

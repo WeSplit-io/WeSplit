@@ -419,6 +419,8 @@ export class SplitWalletQueries {
     totalAmount?: number;
     collectedAmount?: number;
     remainingAmount?: number;
+    participantsPaid?: number;
+    totalParticipants?: number;
     error?: string;
   }> {
     try {
@@ -468,6 +470,51 @@ export class SplitWalletQueries {
       const remainingAmount = totalAmount - collectedAmount;
       const completionPercentage = totalAmount > 0 ? (collectedAmount / totalAmount) * 100 : 0;
 
+      // Calculate participants paid and total participants
+      const totalParticipants = wallet.participants.length;
+      let participantsPaid = wallet.participants.filter(p => p.status === 'paid').length;
+      
+      // DIAGNOSTIC: Check if we have a data consistency issue
+      // If funds are collected but no participants are marked as paid, fix it
+      if (collectedAmount > 0 && participantsPaid === 0) {
+        logger.warn('Data consistency issue detected: funds collected but no participants marked as paid', {
+          splitWalletId,
+          collectedAmount,
+          totalParticipants,
+          participantsPaid,
+          participants: wallet.participants.map(p => ({
+            userId: p.userId,
+            name: p.name,
+            status: p.status,
+            amountPaid: p.amountPaid,
+            amountOwed: p.amountOwed
+          }))
+        }, 'SplitWalletQueries');
+        
+        // For single participant splits, automatically mark as paid if funds exist
+        if (totalParticipants === 1 && collectedAmount >= wallet.participants[0].amountOwed) {
+          logger.info('Auto-fixing single participant status: marking as paid', {
+            splitWalletId,
+            participantId: wallet.participants[0].userId,
+            collectedAmount,
+            amountOwed: wallet.participants[0].amountOwed
+          }, 'SplitWalletQueries');
+          
+          // Update the participant status in the database
+          try {
+            const { fixSplitWalletDataConsistency } = await import('./SplitWalletManagement');
+            const fixResult = await fixSplitWalletDataConsistency(splitWalletId);
+            
+            if (fixResult.success && fixResult.fixed) {
+              logger.info('Successfully auto-fixed participant status', { splitWalletId }, 'SplitWalletQueries');
+              participantsPaid = 1; // Update the count
+            }
+          } catch (error) {
+            logger.error('Failed to auto-fix participant status', { error, splitWalletId }, 'SplitWalletQueries');
+          }
+        }
+      }
+
       logger.debug('getSplitWalletCompletion calculation', {
         walletId: splitWalletId,
         totalAmount,
@@ -477,6 +524,8 @@ export class SplitWalletQueries {
         remainingAmount,
         completionPercentage,
         participantsCount: wallet.participants.length,
+        participantsPaid,
+        totalParticipants,
         isSingleParticipant,
         isAmountClose,
         tolerance,
@@ -489,6 +538,8 @@ export class SplitWalletQueries {
         totalAmount,
         collectedAmount,
         remainingAmount,
+        participantsPaid,
+        totalParticipants,
       };
 
     } catch (error) {

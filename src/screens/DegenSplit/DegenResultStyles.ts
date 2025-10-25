@@ -36,6 +36,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 50,
     alignItems: 'center',
+    paddingBottom: spacing.xl,
   },
   avatarContainer: {
     marginBottom: spacing.xl,
@@ -47,17 +48,22 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.white10,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.red,
+    borderWidth: 2,
+    borderColor: colors.white50,
+
   },
   winnerAvatar: {
     borderColor: colors.green,
+    shadowColor: colors.green,
   },
   loserAvatar: {
     borderColor: colors.red,
+    shadowColor: colors.red,
   },
   avatarText: {
     fontSize: 48,
+    color: colors.white,
+    fontWeight: '700',
   },
   resultTitleContainer: {
     marginBottom: spacing.xl,
@@ -124,7 +130,7 @@ export const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   shareButton: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.black,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: 12,
@@ -137,10 +143,11 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
+    marginLeft: spacing.sm,
   },
   twitterIcon: {
-    width: 16,
-    height: 16,
+    width: 20,
+    height: 20,
     tintColor: colors.white,
   },
   paymentOptionsContainer: {
@@ -190,15 +197,32 @@ export const styles = StyleSheet.create({
   // Action buttons container
   actionButtonsContainer: {
     flexDirection: 'row',
-    marginTop: spacing.xl,
     gap: spacing.md,
     width: '100%',
+    paddingHorizontal: spacing.md,
+  },
+  // New design action buttons
+  splitWalletButton: {
+    flex: 1,
+  },
+  claimButtonNew: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.green,
+  },
+  claimButtonNewText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
   },
   // Bottom button container - Fixed at bottom
-  bottomButtonContainer: {
-    paddingHorizontal: spacing.md,
+  bottomActionButtonsContainer: {
     paddingBottom: spacing.lg,
-    width: '100%',
+    paddingTop: spacing.md,
+    backgroundColor: colors.black,
   },
   actionButton: {
     width: '100%',
@@ -606,6 +630,26 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.lg,
     lineHeight: 20,
+  },
+  // Wallet address section in modal
+  walletAddressSection: {
+    marginBottom: spacing.lg,
+  },
+  walletAddressLabel: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    fontWeight: '500',
+    marginBottom: spacing.sm,
+  },
+  // Private key section in modal
+  privateKeySection: {
+    marginBottom: spacing.lg,
+  },
+  privateKeyLabel: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    fontWeight: '500',
+    marginBottom: spacing.sm,
   },
   privateKeyDisplay: {
     backgroundColor: colors.white5,

@@ -9,4 +9,4 @@ export { splitRealtimeService } from './splitRealtimeService';
 export { splitStorageService } from './splitStorageService';
 export { SplitStorageService } from './splitStorageService';
 export { SplitRealtimeUpdate } from './splitRealtimeService';
-export { Split } from './splitStorageService';
+export { Split, SplitParticipant } from './splitStorageService';

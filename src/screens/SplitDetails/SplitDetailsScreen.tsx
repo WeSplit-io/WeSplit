@@ -42,7 +42,7 @@ import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits
 import FallbackDataService from '../../services/data';
 import { MockupDataService } from '../../services/data/mockupData';
 import { notificationService } from '../../services/notifications';
-import UserAvatar from '../../components/UserAvatar';
+import Avatar from '../../components/shared/Avatar';
 import QrCodeView from '../../services/core/QrCodeView';
 import {
   SplitDetailsNavigationParams,
@@ -380,13 +380,14 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           participants: item.participants || [],
           isSelected: true,
         })),
-        participants: splitData.participants.map(p => ({
+        participants: splitData.participants.map((p: any) => ({
           id: p.userId,
           name: p.name,
           walletAddress: p.walletAddress,
           status: (p.status === 'invited' || p.status === 'paid' || p.status === 'locked') ? 'pending' as const : p.status as ('pending' | 'accepted' | 'declined'),
           amountOwed: p.amountOwed,
           items: [],
+          avatar: p.avatar || '',
         })),
         settings: {
           allowPartialPayments: true,
@@ -578,10 +579,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 originalWalletAddress: participant.walletAddress
               });
 
-              // Use latest wallet address if available, otherwise keep existing data
+              // Use latest wallet address and avatar if available, otherwise keep existing data
               return {
                 ...participant,
-                walletAddress: latestUserData?.wallet_address || participant.walletAddress || participant.wallet_address || ''
+                walletAddress: latestUserData?.wallet_address || participant.walletAddress || participant.wallet_address || '',
+                avatar: latestUserData?.avatar || participant.avatar || ''
               };
             } catch (error) {
               console.warn(`Could not fetch latest data for participant ${participant.userId}:`, error);
@@ -1429,12 +1431,13 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 <Text style={styles.realtimeText}>Live</Text>
               </View>
             )}
-            <TouchableOpacity style={styles.editButton} onPress={handleEditBill}>
+            {/*<TouchableOpacity style={styles.editButton} onPress={handleEditBill}>
               <Image
                 source={require('../../../assets/edit-icon.png')}
                 style={styles.editButtonIcon}
               />
             </TouchableOpacity>
+            */}
           </View>
         }
       />
@@ -1478,7 +1481,6 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                       if (billData?.date) {
                         return billData.date;
                       }
-                      const { MockupDataService } = require('../../services/data');
                       return MockupDataService.getBillDate();
                     })()}
                   </Text>
@@ -1534,17 +1536,19 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                 <Text style={styles.splitInfoLabel}>Split between:</Text>
                 <View style={styles.avatarContainer}>
                   {participants.slice(0, 4).map((participant: any, index: number) => {
-                    const avatarStyle = index > 0
-                      ? [styles.avatar, styles.avatarOverlap] as any
-                      : styles.avatar;
-
                     return (
-                      <UserAvatar
+                      <Avatar
                         key={participant.userId || participant.id || index}
                         userId={participant.userId || participant.id}
-                        displayName={participant.name}
+                        userName={participant.name}
                         size={32}
-                        style={avatarStyle}
+                        avatarUrl={participant.avatar}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 16,
+                          backgroundColor: colors.black,
+                        }}
                       />
                     );
                   })}
@@ -1571,12 +1575,17 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
           {participants.map((participant: any) => (
             <View key={participant.userId || participant.id} style={styles.participantCard}>
-              <UserAvatar
+              <Avatar
                 userId={participant.userId || participant.id}
-                displayName={participant.name}
+                userName={participant.name}
                 avatarUrl={participant.avatar}
                 size={40}
-                style={styles.participantAvatar}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: colors.white10,
+                }}
               />
               <View style={styles.participantInfo}>
                 <Text style={styles.participantName}>{participant.name}</Text>

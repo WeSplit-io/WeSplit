@@ -14,15 +14,23 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from '@react-navigation/native';
+import { 
+  PaperPlaneTilt, 
+  HandCoins, 
+  ArrowLineDown, 
+  Link,
+  QrCode,
+  Bell
+} from 'phosphor-react-native';
 import { styles, BG_COLOR, GREEN } from './styles';
 import { colors, spacing } from '../../theme';
 import { AuthGuard } from '../../components/auth';
 import NavBar from '../../components/shared/NavBar';
-import UserAvatar from '../../components/UserAvatar';
+import Avatar from '../../components/shared/Avatar';
 import { WalletSelectorModal } from '../../components/wallet';
 import { Container } from '../../components/shared';
 import { QRCodeScreen } from '../QRCode';
-import { TransactionModal } from '../../components/transactions';
+import { TransactionModal, TransactionItem } from '../../components/transactions';
 import { useApp } from '../../context/AppContext';
 import { Transaction } from '../../types';
 import { getReceivedPaymentRequests } from '../../services/payments/firebasePaymentRequestService';
@@ -34,16 +42,6 @@ import { db } from '../../config/firebase/firebase';
 import { getDoc, doc } from 'firebase/firestore';
 import { RequestCard } from '../../components/requests';
 
-// Avatar component wrapper for backward compatibility
-const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
-  return (
-    <UserAvatar
-      avatarUrl={avatar}
-      displayName={displayName}
-      style={style}
-    />
-  );
-};
 
 
 interface DashboardScreenProps {
@@ -95,6 +93,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   const [transactionModalVisible, setTransactionModalVisible] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [realTransactions, setRealTransactions] = useState<Transaction[]>([]);
+  const [userNames, setUserNames] = useState<Map<string, string>>(new Map());
   
   // Loading States
   const [loadingTransactions, setLoadingTransactions] = useState(false);
@@ -240,7 +239,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Simplified balance loading using the new wallet service
   const loadWalletBalance = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
     
     try {
       logger.debug('Loading wallet balance with simplified service', null, 'DashboardScreen');
@@ -296,7 +295,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Load payment requests
   const loadPaymentRequests = useCallback(async () => {
-    if (!currentUser?.id || loadingPaymentRequests) return;
+    if (!currentUser?.id || loadingPaymentRequests) {return;}
 
     setLoadingPaymentRequests(true);
     try {
@@ -381,7 +380,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           profiles.forEach(p => { idToAvatar[p.id] = p.avatar; });
 
           allRequests.forEach(r => {
-            if (!r.data) r.data = {};
+            if (!r.data) {r.data = {};}
             const sid = r.data.senderId ? String(r.data.senderId) : undefined;
             const existing = r.data.senderAvatar && r.data.senderAvatar.trim() !== '';
             if (!existing && sid && idToAvatar[sid]) {
@@ -420,16 +419,16 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     }
   }, [currentUser?.id, notifications, loadingPaymentRequests, initialRequestsLoaded]);
 
-
-  // Removed group summary logic
-
-  // Removed group summaries update logic
-
-  // Removed group-related effects
+  // Load user names when transactions change
+  useEffect(() => {
+    if (realTransactions.length > 0) {
+      loadUserNames(realTransactions);
+    }
+  }, [realTransactions]);
 
   // Load transactions
   const loadTransactions = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {return;}
 
     try {
       setLoadingTransactions(true);
@@ -438,8 +437,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       // Preload user data for all transaction participants
       const userIds = new Set<string>();
       userTransactions.forEach(transaction => {
-        if (transaction.from_user) userIds.add(transaction.from_user);
-        if (transaction.to_user) userIds.add(transaction.to_user);
+        if (transaction.from_user) {userIds.add(transaction.from_user);}
+        if (transaction.to_user) {userIds.add(transaction.to_user);}
       });
       
       if (userIds.size > 0) {
@@ -505,7 +504,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
 
   const onRefresh = async () => {
-    if (!isAuthenticated || !currentUser?.id) return;
+    if (!isAuthenticated || !currentUser?.id) {return;}
 
     try {
       logger.info('Manual refresh triggered', null, 'DashboardScreen');
@@ -523,153 +522,80 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     }
   };
 
-
-
-  // Enhanced transaction display functions (consistent with TransactionHistoryScreen)
-  const getTransactionIcon = (transaction: Transaction) => {
-    switch (transaction.type) {
-      case 'send':
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
-      case 'receive':
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' };
-      case 'deposit':
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-deposit.png?alt=media&token=d832bae5-dc8e-4347-bab5-cfa9621a5c55' };
-      case 'withdraw':
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-withdraw.png?alt=media&token=8c0da99e-287c-4d19-8515-ba422430b71b' };
-      default:
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
-    }
-  };
-
-  const getTransactionTitle = async (transaction: Transaction) => {
-    if (!transaction || !transaction.type) {return 'Transaction';}
+  // Load user names for transactions
+  const loadUserNames = async (transactions: Transaction[]) => {
+    const userIds = new Set<string>();
     
-    switch (transaction.type) {
-      case 'send':
-        // Use stored recipient name if available, otherwise fetch from database
-        if (transaction.recipient_name) {
-          return `Send to ${transaction.recipient_name}`;
-        }
-        try {
-          const recipientName = await getUserDisplayName(transaction.to_user);
-          return `Send to ${recipientName}`;
-        } catch (error) {
-          return `Send to ${transaction.to_user || 'Unknown'}`;
-        }
-      case 'receive':
-        // Use stored sender name if available, otherwise fetch from database
-        if (transaction.sender_name) {
-          return `Received from ${transaction.sender_name}`;
-        }
-        try {
-          const senderName = await getUserDisplayName(transaction.from_user);
-          return `Received from ${senderName}`;
-        } catch (error) {
-          return `Received from ${transaction.from_user || 'Unknown'}`;
-        }
-      case 'deposit':
-        return 'Deposit';
-      case 'withdraw':
-        return 'Withdraw';
-      default:
-        return 'Transaction';
-    }
-  };
-
-  const getTransactionSource = (transaction: Transaction) => {
-    if (!transaction || !transaction.type) {return 'Unknown';}
-    
-    switch (transaction.type) {
-      case 'send':
-        return transaction.note || 'Payment';
-      case 'receive':
-        return transaction.note || 'Payment received';
-      case 'deposit':
-        return 'MoonPay';
-      case 'withdraw':
-        return 'Wallet';
-      default:
-        return 'Unknown';
-    }
-  };
-
-  const getTransactionAmount = (transaction: Transaction) => {
-    if (!transaction || transaction.amount === undefined || transaction.amount === null) {
-      return {
-        amount: '0.00',
-        color: colors.textLight
-      };
-    }
-    
-    const amount = transaction.amount;
-    const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
-
-    return {
-      amount: amount.toFixed(2),
-      color: isIncome ? colors.primaryGreen : colors.textLight
-    };
-  };
-
-  // Removed group expenses loading logic
-
-  // Removed group transactions effect
-
-  // Removed recent splits loading logic
-
-  // Removed recent splits effect
-
-  // Render real transaction from Firebase
-  const renderRealTransaction = (transaction: Transaction) => {
-    const transactionTime = new Date(transaction.created_at).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
+    transactions.forEach(transaction => {
+      if (transaction.from_user) {userIds.add(transaction.from_user);}
+      if (transaction.to_user) {userIds.add(transaction.to_user);}
     });
 
-    const { amount, color } = getTransactionAmount(transaction);
-    const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
+    const newUserNames = new Map(userNames);
+    
+    for (const userId of userIds) {
+      if (!newUserNames.has(userId)) {
+        try {
+          const userName = await getUserDisplayName(userId);
+          newUserNames.set(userId, userName);
+        } catch (error) {
+          newUserNames.set(userId, 'Unknown User');
+        }
+      }
+    }
+    
+    setUserNames(newUserNames);
+  };
 
-    return (
-      <TouchableOpacity
-        key={transaction.id}
-        style={styles.TransactionItemNew}
-        onPress={() => {
-          setSelectedTransaction(transaction);
-          setTransactionModalVisible(true);
-        }}
-      >
-        <View style={[
-          styles.transactionAvatarNew,
-        ]}>
-          <Image
-            source={getTransactionIcon(transaction)}
-            style={[
-              styles.transactionAvatar,
-            ]}
-          />
-        </View>
+  // Combine and sort requests and transactions chronologically
+  const getCombinedActivities = () => {
+    const activities: {
+      id: string;
+      type: 'request' | 'transaction';
+      data: any;
+      timestamp: Date;
+    }[] = [];
 
-        <View style={styles.transactionContent}>
-          <Text style={styles.transactionMessageWithAmount}>
-            <Text style={styles.transactionSenderName}>
-              {transaction.recipient_name || transaction.sender_name || 
-               (transaction.type === 'send' ? `Send to ${transaction.to_user}` : 
-                transaction.type === 'receive' ? `Received from ${transaction.from_user}` : 
-                'Transaction')}
-            </Text>
-          </Text>
-          <Text style={styles.transactionSource}>
-            {getTransactionSource(transaction)} • {transactionTime}
-          </Text>
-        </View>
-        <Text style={[
-              styles.transactionAmountGreen,
-              
-            ]}>
-              {isIncome ? '+' : '-'}{amount} USDC
-            </Text>
-      </TouchableOpacity>
-    );
+    // Add payment requests
+    paymentRequests.forEach((request) => {
+      // Try different timestamp fields for requests
+      const timestamp = request.data?.created_at || 
+                       request.data?.timestamp || 
+                       request.created_at || 
+                       request.timestamp ||
+                       new Date(); // fallback to current time
+      
+      activities.push({
+        id: request.id || `request-${Math.random()}`,
+        type: 'request',
+        data: request,
+        timestamp: new Date(timestamp)
+      });
+    });
+
+    // Add transactions - filter by user perspective
+    realTransactions.forEach((transaction) => {
+      // Only show transactions from the user's perspective
+      // For 'send' transactions: show only if current user is the sender
+      // For 'receive' transactions: show only if current user is the recipient
+      const shouldShowTransaction = 
+        (transaction.type === 'send' && transaction.from_user === currentUser?.id) ||
+        (transaction.type === 'receive' && transaction.to_user === currentUser?.id) ||
+        (transaction.type === 'deposit') ||
+        (transaction.type === 'withdraw');
+
+      if (shouldShowTransaction) {
+        activities.push({
+          id: transaction.id || `transaction-${Math.random()}`,
+          type: 'transaction',
+          data: transaction,
+          timestamp: new Date(transaction.created_at)
+        });
+      }
+    });
+
+    // Sort by timestamp (most recent first)
+    return activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   };
 
   if (!isAuthenticated) {
@@ -699,10 +625,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             style={styles.headerLeft}
             onPress={() => navigation.navigate('Profile')}
           >
-            <AvatarComponent
-              avatar={currentUser?.avatar}
-              displayName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
+            <Avatar
+              userId={currentUser?.id}
+              userName={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
+              avatarUrl={currentUser?.avatar}
               style={styles.profileImage}
+              size={50}
             />
             <View style={{ marginLeft: spacing.md }}>
               <Text style={styles.welcomeText}>Welcome back,</Text>
@@ -716,9 +644,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             style={styles.bellContainer}
             onPress={() => navigation.navigate('Notifications')}
           >
-            <Image
-              source={require('../../../assets/bell-icon.png')}
-              style={styles.bellIcon}
+            <Bell
+              size={24}
+              color={colors.white}
+              weight="regular"
             />
             {unreadNotifications > 0 && (
               <LinearGradient
@@ -751,10 +680,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                 style={styles.qrCodeIcon}
                 onPress={() => setShowQRCodeScreen(true)}
               >
-                <Image
-                  source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fqr-code-scan.png?alt=media&token=3fc388bd-fdf7-4863-a8b1-9313490d6382' }}
-                  style={styles.qrCodeImage}
-                />
+                <QrCode size={30} color={colors.white} />
               </TouchableOpacity>
             </View>
           </View>
@@ -822,10 +748,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               onPress={() => navigation.navigate('Send')}
             >
               <View style={styles.actionButtonCircle}>
-                <Image
-                  source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmoney-send-new.png?alt=media&token=fa4e03f4-bd17-4596-bb92-a08965316743'}}
-                  style={styles.actionButtonIconNoTint}
-                />
+                <PaperPlaneTilt size={26} color={colors.white} />
               </View>
               <Text style={styles.actionButtonText}>Send</Text>
             </TouchableOpacity>
@@ -835,10 +758,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               onPress={() => navigation.navigate('RequestContacts')}
             >
               <View style={styles.actionButtonCircle}>
-                <Image
-                  source={{uri:'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmoney-recive-new.png?alt=media&token=a45426d1-9bf2-4f65-8067-7f76d62216fa'}}
-                  style={styles.actionButtonIconNoTint}
-                />
+                <HandCoins size={26} color={colors.white} />
               </View>
               <Text style={styles.actionButtonText}>Request</Text>
             </TouchableOpacity>
@@ -848,10 +768,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               onPress={() => navigation.navigate('Deposit')}
             >
               <View style={styles.actionButtonCircle}>
-                <Image
-                  source={{uri:'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fcard-add-new.png?alt=media&token=8ca9ad64-c616-4f4c-9f3d-2be39c3091f2'}}
-                  style={styles.actionButtonIconNoTint}
-                />
+                <ArrowLineDown size={26} color={colors.white} />
               </View>
               <Text style={styles.actionButtonText}>Deposit</Text>
             </TouchableOpacity>
@@ -863,10 +780,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               }}
             >
               <View style={styles.actionButtonCircle}>
-                <Image
-                  source={require('../../../assets/link-icon.png')}
-                  style={styles.actionButtonIconNoTint}
-                />
+                <Link size={26} color={colors.white} />
               </View>
               <Text style={styles.actionButtonText}>Link Wallet</Text>
             </TouchableOpacity>
@@ -876,90 +790,54 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
         
 
-        {/* Requests Section (first) */}
+
+        {/* Combined Activities Section */}
         <View style={styles.requestsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Requests</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
-              <Text style={styles.seeAllText}>See all</Text>
-            </TouchableOpacity>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
           </View>
 
-          {paymentRequests.length === 0 ? (
-            <View style={styles.emptyRequestsState}>
-              <Text style={styles.emptyRequestsText}>No payment requests</Text>
-
-            </View>
-          ) : (
-            <>
-              {/* Show first 2 requests */}
-              {paymentRequests.slice(0, 2).map((request, index) => (
-                <RequestCard
-                  key={request.id || index}
-                  request={request}
-                  index={index}
-                  onSendPress={handleSendPress}
-                  requestStyles={styles}
-                />
-              ))}
-
-              {/* Show preview of 3rd request if it exists */}
-              {paymentRequests.length > 2 && (
-                <TouchableOpacity
-                  style={[styles.requestItemNew, styles.requestPreviewItem]}
-                  onPress={() => navigation.navigate('Notifications')}
-                >
-                  <UserAvatar
-                    displayName={paymentRequests[2].data?.senderName || 'U'}
-                    size={40}
-                    style={styles.requestAvatarNew}
-                  />
-                  <View style={[styles.requestContent, styles.requestPreviewContent]}>
-                    <Text style={styles.requestMessageWithAmount}>
-                      <Text style={styles.requestSenderName}>
-                        {paymentRequests[2].data?.senderName || 'Unknown User'}
-                      </Text>
-                      <Text> requested a payment of </Text>
-                      <Text style={styles.requestAmountGreen}>
-                        {formatRequestAmount(paymentRequests[2].data?.amount || 0)} USDC
-                      </Text>
-                    </Text>
-                    <Text style={styles.requestSource}>
-                      from payment request
-                    </Text>
-                  </View>
-                  <View style={styles.requestPreviewOverlay}>
-                    <Text style={styles.requestPreviewText}>+{paymentRequests.length - 2} more</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-        </View>
-
-        {/* Transactions Section (second) */}
-        <View style={styles.requestsSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Transactions</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('TransactionHistory')}>
-              <Text style={styles.seeAllText}>See all</Text>
-            </TouchableOpacity>
-          </View>
-
-          {loadingTransactions || realTransactions.length === 0 ? (
-            realTransactions.length === 0 ? (
+          {loadingTransactions || (paymentRequests.length === 0 && realTransactions.length === 0) ? (
+            paymentRequests.length === 0 && realTransactions.length === 0 ? (
               <View style={styles.emptyRequestsState}>
-                <Text style={styles.emptyRequestsText}>No transactions</Text>
+                <Text style={styles.emptyRequestsText}>No recent activity</Text>
               </View>
             ) : (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color={colors.primaryGreen} />
-                <Text style={styles.loadingText}>Loading transactions...</Text>
+                <Text style={styles.loadingText}>Loading...</Text>
               </View>
             )
           ) : (
             <>
-              {realTransactions.slice(0, 3).map(t => renderRealTransaction(t))}
+              {getCombinedActivities().slice(0, 5).map((activity) => {
+                if (activity.type === 'request') {
+                  const request = activity.data;
+                  const index = paymentRequests.findIndex(r => r.id === request.id);
+                  return (
+                    <RequestCard
+                      key={activity.id}
+                      request={request}
+                      index={index}
+                      onSendPress={handleSendPress}
+                    />
+                  );
+                } else {
+                  const transaction = activity.data;
+                  return (
+                    <TransactionItem
+                      key={activity.id}
+                      transaction={transaction}
+                      recipientName={userNames.get(transaction.to_user)}
+                      senderName={userNames.get(transaction.from_user)}
+                      onPress={(transaction) => {
+                        setSelectedTransaction(transaction);
+                        setTransactionModalVisible(true);
+                      }}
+                    />
+                  );
+                }
+              })}
             </>
           )}
         </View>
@@ -1001,8 +879,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         navigation={navigation}
       />
 
-      {/* External Wallet Connection Modal */}
-      {/* Removed as per edit hint */}
+
 
       <NavBar currentRoute="Dashboard" navigation={navigation} />
     </Container>

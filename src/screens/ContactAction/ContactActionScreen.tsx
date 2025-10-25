@@ -5,6 +5,7 @@ import { View, Text, TouchableOpacity, Image, TextInput, ScrollView, KeyboardAvo
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
 import UserAvatar from '../../components/UserAvatar';
+import Avatar from '../../components/shared/Avatar';
 import Button from '../../components/shared/Button';
 import { colors } from '../../theme';
 import { styles } from './styles';
@@ -201,7 +202,7 @@ const ContactActionScreen: React.FC<ContactActionScreenProps> = ({ navigation, r
       {/* Contact Info - Using SendAmountScreen design */}
       <View style={styles.recipientAvatarContainer}>
         <View style={styles.recipientAvatar}>
-          <UserAvatar
+          <Avatar
             userId={selectedContact?.id?.toString() || ''}
             userName={selectedContact?.name}
             size={70}

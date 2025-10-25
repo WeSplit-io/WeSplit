@@ -11,6 +11,7 @@ import { i18nService } from '../services/core';
 import { notificationService } from '../services/notifications';
 import { multiSignStateService } from '../services/core';
 import { logger } from '../services/analytics/loggingService';
+import { SplitInvitationService } from '../services/splits/splitInvitationService';
 
 // Initial State - clean without group-related data
 const initialState: AppState = {
@@ -135,7 +136,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Load notifications
   const loadNotifications = useCallback(async (forceRefresh: boolean = false) => {
-    if (!state.currentUser?.id) return;
+    if (!state.currentUser?.id) {return;}
 
     try {
       const now = Date.now();
@@ -190,16 +191,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error('Invalid notification or missing split data');
       }
 
-      // Accept the split invitation
-      // Note: This would need to be implemented in firebaseDataService
-      // For now, we'll just remove the notification
-      const result = { success: true, splitId };
+      // Create invitation data from notification
+      const invitationData = {
+        type: 'split_invitation' as const,
+        splitId: notification.data.splitId,
+        billName: notification.data.billName || 'Split Bill',
+        totalAmount: notification.data.totalAmount || 0,
+        currency: notification.data.currency || 'USDC',
+        creatorId: notification.data.creatorId || '',
+        timestamp: notification.timestamp || new Date().toISOString(),
+      };
 
-      // Remove the notification
+      // Use SplitInvitationService to actually join the split
+      const joinResult = await SplitInvitationService.joinSplit(invitationData, state.currentUser.id);
+      
+      if (!joinResult.success) {
+        throw new Error(joinResult.error || 'Failed to join split');
+      }
+
+      // Remove the notification after successful join
       await removeNotification(notificationId);
-      logger.info('Split invitation accepted and notification removed', null, 'AppContext');
+      
+      logger.info('Split invitation accepted and user joined split', {
+        splitId,
+        userId: state.currentUser.id,
+        joinResult
+      }, 'AppContext');
 
-      return result;
+      return { success: true, splitId, joinResult };
     } catch (error) {
       logger.error('Failed to accept split invitation:', error, 'AppContext');
       throw error;

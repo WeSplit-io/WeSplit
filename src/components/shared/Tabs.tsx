@@ -75,7 +75,7 @@ const Tabs: React.FC<TabsProps> = ({
   };
 
   const handleTabPress = (tab: Tab) => {
-    if (tab.value === activeTab) return;
+    if (tab.value === activeTab) {return;}
     animateTabChange(() => onTabChange(tab.value));
   };
 

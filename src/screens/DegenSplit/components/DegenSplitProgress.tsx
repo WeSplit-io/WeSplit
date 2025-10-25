@@ -72,7 +72,7 @@ const DegenSplitProgress: React.FC<DegenSplitProgressProps> = ({
             {lockedCount}/{totalCount}
           </Text>
           <Text style={styles.progressAmount}>
-            Locked
+            {lockedCount === totalCount ? 'Locked' : 'Locked'}
           </Text>
         </View>
       </View>

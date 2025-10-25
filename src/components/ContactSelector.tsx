@@ -12,6 +12,7 @@ import { colors } from '../theme';
 import { styles } from './ContactsList.styles';
 import { logger } from '../services/core';
 import UserAvatar from './UserAvatar';
+import Avatar from './shared/Avatar';
 import { formatWalletAddress } from '../utils/crypto/wallet';
 
 export type ContactSelectorMode = 'select' | 'view' | 'add';
@@ -215,7 +216,7 @@ export const ContactSelector: React.FC<ContactSelectorProps> = ({
         </View>
       )}
       
-      <UserAvatar
+      <Avatar
         userId={contact.id.toString()}
         userName={contact.name}
         size={40}
@@ -272,7 +273,7 @@ export const ContactSelector: React.FC<ContactSelectorProps> = ({
         style={styles.contactRow}
         onPress={() => !isAlreadyContact && handleAddContact(user)}
       >
-        <UserAvatar
+        <Avatar
           userId={user.id.toString()}
           userName={user.name}
           size={40}

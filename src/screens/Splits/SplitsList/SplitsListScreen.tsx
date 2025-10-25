@@ -22,14 +22,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from './styles';  
 import { colors } from '../../../theme/colors';
 import NavBar from '../../../components/shared/NavBar';
-import UserAvatar from '../../../components/UserAvatar';
+import Avatar from '../../../components/shared/Avatar';
 import GroupIcon from '../../../components/GroupIcon';
 import Icon from '../../../components/Icon';
 import { Container } from '../../../components/shared';
 import { BillSplitSummary } from '../../../types/billSplitting';
 import { splitStorageService, Split, SplitStorageService } from '../../../services/splits';
 import { logger } from '../../../services/analytics/loggingService';
-import { MockupDataService } from '../../../services/data';
+import { MockupDataService } from '../../../services/data/mockupData';
 import { priceManagementService } from '../../../services/core';
 import { useApp } from '../../../context/AppContext';
 import { firebaseDataService } from '../../../services/data';
@@ -40,12 +40,20 @@ interface SplitsListScreenProps {
 }
 
 // Avatar component wrapper for backward compatibility
-const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
+const AvatarComponent = ({ avatar, displayName, style, userId }: { avatar?: string, displayName: string, style: any, userId?: string }) => {
   return (
-    <UserAvatar
+    <Avatar
+      userId={userId}
+      userName={displayName}
       avatarUrl={avatar}
-      displayName={displayName}
-      style={style}
+      size={32}
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.white10,
+        ...style,
+      }}
     />
   );
 };
@@ -76,9 +84,10 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
       if (userIds.size === 0) {return;}
 
-      // Fetch user profiles in parallel
+      // Fetch user profiles in parallel with cache busting
       const avatarPromises = Array.from(userIds).map(async (userId) => {
         try {
+          // Force refresh user data to get latest avatar
           const profile = await firebaseDataService.user.getCurrentUser(userId);
           return { userId, avatar: profile?.avatar || '' };
         } catch (error) {
@@ -96,6 +105,10 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
       });
 
       setParticipantAvatars(avatarMap);
+      
+      if (__DEV__) {
+        console.log('🔍 Avatars loaded for participants:', Object.keys(avatarMap).length);
+      }
     } catch (error) {
       console.error('Error loading participant avatars:', error);
     }
@@ -116,6 +129,8 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         if (__DEV__) {
           logger.debug('Screen focused, refreshing splits for user', { userId: currentUser.id }, 'SplitsListScreen');
         }
+        // Clear avatar cache to force reload
+        setParticipantAvatars({});
         loadSplits();
       }
     }, [currentUser?.id])
@@ -206,7 +221,8 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         // Set the splits without test data
         setSplits(updatedSplits);
 
-        // Load participant avatars
+        // Force reload participant avatars (clear cache first)
+        setParticipantAvatars({});
         loadParticipantAvatars(updatedSplits);
       } else {
         logger.error('Failed to load splits', result.error, 'SplitsListScreen');
@@ -255,7 +271,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
           logger.debug('Checking degen split wallet status', { walletId: split.walletId }, 'SplitsListScreen');
 
           // Import SplitWalletService dynamically to avoid circular dependencies
-          const { SplitWalletService } = await import('../../services/split');
+          const { SplitWalletService } = await import('../../../services/split');
           const walletResult = await SplitWalletService.getSplitWallet(split.walletId);
 
           if (walletResult.success && walletResult.wallet) {
@@ -427,6 +443,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
               {split.participants.slice(0, 3).map((participant, index) => (
                 <AvatarComponent
                   key={participant.userId}
+                  userId={participant.userId}
                   avatar={participantAvatars[participant.userId]}
                   displayName={participant.name}
                   style={[

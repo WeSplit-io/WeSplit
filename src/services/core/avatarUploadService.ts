@@ -6,6 +6,7 @@
 import { storage } from '../../config/firebase/firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { logger } from '../analytics/loggingService';
+import * as FileSystem from 'expo-file-system';
 
 export interface AvatarUploadResult {
   success: boolean;
@@ -30,30 +31,98 @@ export class AvatarUploadService {
     try {
       logger.info('Starting avatar upload for user', { userId }, 'avatarUploadService');
       
-      // TEMPORARY WORKAROUND: Check if storage rules are deployed
-      // If not, return the local URI as a temporary solution
+      // Convert local file URI to blob for upload
+      let blob: Blob;
+      
       if (imageUri.startsWith('file://')) {
-        logger.warn('Storage rules not deployed yet, using local URI temporarily', null, 'avatarUploadService');
-        return {
-          success: true,
-          avatarUrl: imageUri, // Use local URI temporarily
-        };
+        // For local files, try multiple approaches
+        logger.debug('Processing local file URI', { imageUri }, 'avatarUploadService');
+        
+        try {
+          // Method 1: Try fetch first (works in some cases)
+          const response = await fetch(imageUri);
+          blob = await response.blob();
+          logger.debug('Successfully read file with fetch', { size: blob.size }, 'avatarUploadService');
+        } catch (fetchError) {
+          logger.debug('Fetch failed, trying FileSystem approach', { error: fetchError }, 'avatarUploadService');
+          
+          try {
+            // Method 2: Try expo-file-system
+            const base64 = await FileSystem.readAsStringAsync(imageUri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            
+            // Convert base64 to blob
+            const byteCharacters = atob(base64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            blob = new Blob([byteArray], { type: 'image/jpeg' });
+            
+            logger.debug('Successfully converted file with FileSystem', { size: blob.size }, 'avatarUploadService');
+          } catch (fileSystemError) {
+            logger.error('Both fetch and FileSystem failed', { 
+              fetchError: fetchError.message, 
+              fileSystemError: fileSystemError.message 
+            }, 'avatarUploadService');
+            
+            // Method 3: Try with different file system approach
+            try {
+              // For React Native, sometimes we need to use a different approach
+              const fileInfo = await FileSystem.getInfoAsync(imageUri);
+              if (fileInfo.exists) {
+                logger.debug('File exists, trying alternative read method', { fileInfo }, 'avatarUploadService');
+                
+                // Try reading as base64 with different encoding
+                const base64 = await FileSystem.readAsStringAsync(imageUri, {
+                  encoding: FileSystem.EncodingType.Base64,
+                });
+                
+                const byteCharacters = atob(base64);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                  byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                blob = new Blob([byteArray], { type: 'image/jpeg' });
+                
+                logger.debug('Successfully read file with alternative method', { size: blob.size }, 'avatarUploadService');
+              } else {
+                throw new Error('File does not exist');
+              }
+            } catch (alternativeError) {
+              logger.error('All file reading methods failed', { 
+                fetchError: fetchError.message,
+                fileSystemError: fileSystemError.message,
+                alternativeError: alternativeError.message
+              }, 'avatarUploadService');
+              
+              throw new Error('Unable to read local file. Please try selecting the image again or restart the app.');
+            }
+          }
+        }
+      } else {
+        // For remote URLs
+        const response = await fetch(imageUri);
+        blob = await response.blob();
       }
       
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      
+      // Create Firebase Storage reference
       const avatarRef = ref(storage, `avatars/${userId}/profile.jpg`);
       
-      const uploadTask = uploadBytes(avatarRef, blob);
+      // Upload the blob
+      logger.debug('Uploading blob to Firebase Storage', { size: blob.size }, 'avatarUploadService');
       
       if (onProgress) {
         onProgress(50); // Simulate progress
       }
       
-      await uploadTask;
+      await uploadBytes(avatarRef, blob);
       logger.info('Upload completed, getting download URL', null, 'avatarUploadService');
       
+      // Get the download URL
       const downloadURL = await getDownloadURL(avatarRef);
       
       logger.info('Avatar uploaded successfully', { downloadURL }, 'avatarUploadService');
@@ -65,15 +134,6 @@ export class AvatarUploadService {
     } catch (error) {
       console.error('📸 AvatarUploadService: Error uploading avatar:', error);
       logger.error('Failed to upload avatar', error, 'AvatarUploadService');
-      
-      // TEMPORARY WORKAROUND: If upload fails due to permissions, use local URI
-      if (error instanceof Error && error.message.includes('unauthorized')) {
-        logger.warn('Storage rules not deployed, using local URI temporarily', null, 'avatarUploadService');
-        return {
-          success: true,
-          avatarUrl: imageUri, // Use local URI temporarily
-        };
-      }
       
       return {
         success: false,

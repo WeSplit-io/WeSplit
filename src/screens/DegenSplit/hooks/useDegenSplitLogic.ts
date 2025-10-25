@@ -675,10 +675,10 @@ export const useDegenSplitLogic = (
         duration: 200,
         useNativeDriver: true,
       }),
-      // Main spin animation
+      // Main spin animation - very fast for quick experience
       Animated.timing(state.spinAnimationRef.current, {
         toValue: 1,
-        duration: 4000,
+        duration: 1500, // Reduced from 3000ms to 1500ms (1.5 seconds)
         useNativeDriver: true,
       }),
       // Scale back up

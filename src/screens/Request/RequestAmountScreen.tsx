@@ -3,9 +3,9 @@ import type { Text as RNText } from 'react-native';
 import { Header, Button } from '../../components/shared';
 import { View, Text, TouchableOpacity, TextInput, Alert, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import Icon from '../../components/Icon';
-import { colors } from '../../theme';
+import { colors, spacing } from '../../theme';
 import { styles } from './styles';
-import UserAvatar from '../../components/UserAvatar';
+import Avatar from '../../components/shared/Avatar';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/data';
 import { createPaymentRequest } from '../../services/payments';
@@ -139,12 +139,18 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
 
       {/* Recipient Info */}
       <View style={styles.requestRecipientAvatarContainer}>
-        <UserAvatar
+        <Avatar
           userId={contact?.id?.toString() || ''}
           userName={contact?.name}
-          size={60}
+          size={70}
           avatarUrl={contact?.avatar || contact?.photoURL}
-          style={styles.requestRecipientAvatar}
+          style={{
+            width: 70,
+            height: 70,
+            borderRadius: 35,
+            backgroundColor: colors.white10,
+            marginBottom: spacing.md,
+          }}
         />
         <Text style={styles.requestRecipientName}>
           {contact?.name || formatWalletAddress(contact?.wallet_address || '')}
@@ -256,7 +262,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
             variant="primary"
             disabled={!isAmountValid}
             fullWidth={true}
-            style={{ width: '100%' }}
+            style={{ width: '100%'}}
           />
         </View>
       </KeyboardAvoidingView>

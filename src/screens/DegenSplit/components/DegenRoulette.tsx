@@ -3,11 +3,13 @@
  * Handles the spinning animation and participant selection
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, Animated, Dimensions, Image } from 'react-native';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { styles } from './DegenRouletteStyles';
+import Avatar from '../../../components/shared/Avatar';
+import { getUserAvatar } from '../../../services/shared/dataUtils';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -38,15 +40,52 @@ const DegenRoulette: React.FC<DegenRouletteProps> = ({
   cardScaleRef,
   onSpinComplete,
 }) => {
+  // State for storing fetched avatars
+  const [participantAvatars, setParticipantAvatars] = useState<Record<string, string>>({});
+
   // Data processing
-  const MIN_CARDS_FOR_CAROUSEL = 20; // Increased for better infinite effect
+  const MIN_CARDS_FOR_CAROUSEL = 80; // Increased to 50 for better infinite effect and to prevent disappearing
+
+  // Fetch avatars for participants
+  useEffect(() => {
+    const fetchAvatars = async () => {
+      const avatarPromises = participants.map(async (participant) => {
+        const userId = participant.userId || participant.id;
+        if (userId) {
+          try {
+            const avatar = await getUserAvatar(userId);
+            return { userId, avatar };
+          } catch (error) {
+            console.warn('Failed to fetch avatar for user:', userId);
+            return { userId, avatar: undefined };
+          }
+        }
+        return { userId: participant.id, avatar: undefined };
+      });
+
+      const avatarResults = await Promise.all(avatarPromises);
+      const avatarMap: Record<string, string> = {};
+      
+      avatarResults.forEach(({ userId, avatar }) => {
+        if (avatar) {
+          avatarMap[userId] = avatar;
+        }
+      });
+
+      setParticipantAvatars(avatarMap);
+    };
+
+    if (participants.length > 0) {
+      fetchAvatars();
+    }
+  }, [participants]);
 
   // Convert participants to card format
   const baseParticipantCards: Participant[] = participants.map((p: any, index: number) => ({
     id: p.id || `participant_${index}`,
     name: p.name || `User ${index + 1}`,
     userId: p.userId || p.id || `user_${index}`,
-    avatar: p.avatar,
+    avatar: participantAvatars[p.userId || p.id] || p.avatar,
   }));
 
   // Create infinite roulette by repeating participants multiple times
@@ -62,26 +101,36 @@ const DegenRoulette: React.FC<DegenRouletteProps> = ({
   });
 
   // Animation configuration
-  const CARD_WIDTH = 140 + (spacing.xs * 2);
+  const CARD_WIDTH = 180 + (spacing.md * 2);
   const TOTAL_CARDS = participantCards.length;
   const BASE_PARTICIPANTS = baseParticipantCards.length;
-  const ROTATIONS = 5; // Multiple full cycles through all participants
-  const TOTAL_ROTATION_DISTANCE = ROTATIONS * BASE_PARTICIPANTS * CARD_WIDTH;
-
-  // Animation interpolations - create infinite cycling effect
-  const spinTranslation = spinAnimationRef.current.interpolate({
+  
+  // Calculate center position for the selected card
+  const centerOffset = screenWidth / 2 - (CARD_WIDTH / 2);
+  
+  // Simple slider: start from right, end with selected card centered
+  const startPosition = screenWidth; // Start off-screen to the right
+  const endPosition = -(selectedIndex * CARD_WIDTH) - centerOffset;
+  
+  // Ensure we don't go too far left
+  const maxLeftPosition = -(TOTAL_CARDS * CARD_WIDTH - screenWidth);
+  const finalPosition = Math.max(endPosition, maxLeftPosition);
+  
+  // Simple slider animation
+  const sliderTranslation = spinAnimationRef.current.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -TOTAL_ROTATION_DISTANCE],
+    outputRange: [startPosition, finalPosition],
   });
 
   return (
     <View style={styles.rouletteContainer}>
+      {/* Horizontal slider */}
       <Animated.View
         style={[
-          styles.rouletteCards,
+          styles.sliderContainer,
           {
             transform: [
-              { translateX: spinTranslation },
+              { translateX: sliderTranslation },
               { scale: cardScaleRef.current },
             ],
           },
@@ -93,8 +142,6 @@ const DegenRoulette: React.FC<DegenRouletteProps> = ({
             style={[
               styles.rouletteCard,
               index === selectedIndex && styles.selectedCard,
-              // Add tilt effect for outer cards
-              Math.abs(index - selectedIndex) > 1 && styles.tiltedCard,
             ]}
           >
             {/* Background Image */}
@@ -106,30 +153,33 @@ const DegenRoulette: React.FC<DegenRouletteProps> = ({
 
             {/* Content */}
             <View style={styles.rouletteCardContent}>
-              {/* WeSplit Logo */}
-              <Image
-                source={require('../../../../assets/wesplit-logo-card.png')}
-                style={styles.rouletteCardLogo}
-                resizeMode="contain"
-              />
-              <View style={styles.rouletteCardHeader}>
-                {/* Pseudo */}
-                <Text style={styles.rouletteCardName}>{participant.name}</Text>
-
-                {/* Hashed Address */}
-                <Text style={styles.rouletteCardHash}>
-                  {participant.userId ?
-                    `${participant.userId.slice(0, 4)}...${participant.userId.slice(-4)}` :
-                    `${participant.id.slice(0, 4)}...${participant.id.slice(-4)}`
-                  }
-                </Text>
+              {/* Avatar */}
+              <View style={styles.avatarContainer}>
+                <Avatar
+                  userId={participant.userId}
+                  userName={participant.name}
+                  size={80}
+                  avatarUrl={participant.avatar}
+                  style={styles.avatar}
+                />
               </View>
+
+              {/* Name */}
+              <Text style={styles.rouletteCardName}>{participant.name}</Text>
+
+              {/* Wallet Address */}
+              <Text style={styles.rouletteCardHash}>
+                {participant.userId ?
+                  `${participant.userId.slice(0, 4)}...${participant.userId.slice(-4)}` :
+                  `${participant.id.slice(0, 4)}...${participant.id.slice(-4)}`
+                }
+              </Text>
             </View>
 
-            {/* Selection indicator - only show on selected card */}
+            {/* Selection indicator */}
             {index === selectedIndex && (
-              <View style={styles.selectionIndicator}>
-                <Text style={styles.selectionText}>SELECTED</Text>
+              <View style={styles.loserIndicator}>
+                <Text style={styles.loserText}>🎯 LOSER</Text>
               </View>
             )}
           </View>

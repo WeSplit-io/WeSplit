@@ -82,7 +82,7 @@ export const preloadUserData = async (userIds: string[]): Promise<void> => {
     const uniqueUserIds = [...new Set(userIds)];
     const uncachedIds = uniqueUserIds.filter(id => !userCache.has(id));
     
-    if (uncachedIds.length === 0) return;
+    if (uncachedIds.length === 0) {return;}
 
     // Fetch all uncached users in parallel
     const userPromises = uncachedIds.map(async (userId) => {

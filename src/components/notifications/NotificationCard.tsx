@@ -9,6 +9,15 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
+import { 
+  CheckCircle, 
+  ArrowsClockwise, 
+  User, 
+  HandCoins, 
+  PiggyBank, 
+  Warning, 
+  WarningCircle 
+} from 'phosphor-react-native';
 import styles from './NotificationCard.styles';
 import { NotificationData } from '../../types/notifications';
 
@@ -30,6 +39,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const buttonScaleAnim = useRef(new Animated.Value(1)).current;
+  const [isExpanded, setIsExpanded] = useState(false);
   
   // Use provided fade animation or default
   const animationValue = fadeAnimation || fadeAnim;
@@ -89,72 +99,44 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
       ]).start();
     }
   }, [actionState, buttonScaleAnim]);
-  const getNotificationImage = () => {
-    // For payment requests, use requester avatar or sender avatar
-    if (notification.type === 'payment_request' || notification.type === 'payment_reminder') {
-      return notification.data?.requesterAvatar 
-        ? { uri: notification.data.requesterAvatar }
-        : notification.data?.senderAvatar
-        ? { uri: notification.data.senderAvatar }
-        : require('../../../assets/user-icon-black.png');
+  const getNotificationIcon = () => {
+    const iconSize = 20;
+    
+    switch (notification.type) {
+      case 'payment_request':
+        return <HandCoins size={iconSize} color={colors.warning} weight="fill" />;
+
+      case 'payment_reminder':
+        return <HandCoins size={iconSize} color={colors.warning} weight="fill" />;
+      case 'payment_sent':
+      case 'money_sent':
+        return <CheckCircle size={iconSize} color={colors.green} weight="fill" />;
+      case 'payment_received':
+        return <CheckCircle size={iconSize} color={colors.green} weight="fill" />;
+
+      case 'money_received':
+        return <CheckCircle size={iconSize} color={colors.green} weight="fill" />;
+      case 'split_invite':
+        return <PiggyBank size={iconSize} color={colors.green} weight="fill" />;
+      case 'split_completed':
+        return <CheckCircle size={iconSize} color={colors.green} weight="fill" />;
+      case 'split_payment_required':
+      case 'split_lock_required':
+        return <HandCoins size={iconSize} color={colors.white} weight="fill" />;
+      case 'system_warning':
+        return <Warning size={iconSize} color={colors.red} weight="fill" />;
+      case 'system_notification':
+        return <WarningCircle size={iconSize} color={colors.white} weight="fill" />;
+      case 'degen_all_locked':
+      case 'degen_ready_to_roll':
+      case 'roulette_result':
+        return <PiggyBank size={iconSize} color={colors.green} weight="fill" />;
+      case 'contact_added':
+        return <User size={iconSize} color={colors.green} weight="fill" />;
+      case 'general':
+      default:
+        return <WarningCircle size={iconSize} color={colors.white} weight="fill" />;
     }
-    
-    
-    // For split invites, use pool icon (same as group invites)
-    if (notification.type === 'split_invite') {
-      return require('../../../assets/pool-icon.png');
-    }
-    
-    // For general notifications, use user icon
-    if (notification.type === 'general') {
-      return require('../../../assets/user-icon-black.png');
-    }
-    
-    // For payment received, use wallet icon
-    if (notification.type === 'payment_received') {
-      return require('../../../assets/wallet-icon-default.png');
-    }
-    
-    
-    // For system warnings, use warning icon
-    if (notification.type === 'system_warning') {
-      return require('../../../assets/warning-icon.png');
-    }
-    
-    // For system notifications, use info icon
-    if (notification.type === 'system_notification') {
-      return require('../../../assets/info-icon.png');
-    }
-    
-    // For money sent, use send icon
-    if (notification.type === 'money_sent') {
-      return require('../../../assets/icon-send.png');
-    }
-    
-    // For money received, use wallet icon
-    if (notification.type === 'money_received') {
-      return require('../../../assets/wallet-icon-default.png');
-    }
-    
-    
-    // For split completed, use award icon
-    if (notification.type === 'split_completed') {
-      return require('../../../assets/award-icon.png');
-    }
-    
-    // For degen split notifications, use dice icon
-    if (notification.type === 'degen_all_locked' || notification.type === 'degen_ready_to_roll' || notification.type === 'roulette_result') {
-      // Note: dice-icon.png doesn't exist in assets, using a fallback
-      return require('../../../assets/user-icon-black.png');
-    }
-    
-    // For contact added, use user icon
-    if (notification.type === 'contact_added') {
-      return require('../../../assets/user-icon-black.png');
-    }
-    
-    // Default fallback
-    return require('../../../assets/user-icon-black.png');
   };
 
   const getNotificationIconColor = () => {
@@ -414,96 +396,101 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
         opacity: animationValue,
       }}
     >
-      <TouchableOpacity
-        style={styles.container}
-        onPress={() => onPress(notification)}
-      >
-      <View style={styles.contentWrapper}>
-        <View style={[
-          styles.iconContainer,
-          { backgroundColor: getNotificationIconColor() + '20' }
-        ]}>
-          <Image
-            source={getNotificationImage()}
-            style={styles.icon}
-          />
+      <View style={styles.container}>
+        <View style={styles.contentWrapper}>
+          <View style={[
+            styles.iconContainer,
+            { backgroundColor: getNotificationIconColor() + '20' }
+          ]}>
+            {getNotificationIcon()}
+          </View>
+          
+          <View style={styles.textContainer}>
+            <TouchableOpacity 
+              onPress={() => setIsExpanded(!isExpanded)}
+              activeOpacity={0.7}
+              onPressIn={(e) => e.stopPropagation()}
+            >
+              <Text style={styles.message} numberOfLines={isExpanded ? undefined : 3}>
+                {notification.message.split(/(\d+\.?\d*\s*USDC|Rémi G\.|Haxxxoloto|Hackathon Solana)/).map((part: string, index: number) => {
+                  // Check if this part is a USDC amount
+                  if (/\d+\.?\d*\s*USDC/.test(part)) {
+                    return (
+                      <Text key={index} style={styles.amount}>
+                        {part}
+                      </Text>
+                    );
+                  }
+                  // Check if this part is a user name or group name
+                  if (/Rémi G\.|Haxxxoloto|Hackathon Solana/.test(part)) {
+                    return (
+                      <Text key={index} style={styles.userName}>
+                        {part}
+                      </Text>
+                    );
+                  }
+                  return (
+                    <Text key={index} style={styles.message}>
+                      {part}
+                    </Text>
+                  );
+                })}
+              </Text>
+              {notification.message.length > 100 && (
+                <Text style={styles.expandText}>
+                  {isExpanded ? 'Voir moins' : 'Voir plus'}
+                </Text>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.dateTime}>
+              {formatDateTime(notification.created_at)}
+            </Text>
+          </View>
         </View>
         
-        <View style={styles.textContainer}>
-          <Text style={styles.message} numberOfLines={2}>
-            {notification.message.split(/(\d+\.?\d*\s*USDC|Rémi G\.|Haxxxoloto|Hackathon Solana)/).map((part: string, index: number) => {
-              // Check if this part is a USDC amount
-              if (/\d+\.?\d*\s*USDC/.test(part)) {
-                return (
-                  <Text key={index} style={styles.amount}>
-                    {part}
-                  </Text>
-                );
-              }
-              // Check if this part is a user name or group name
-              if (/Rémi G\.|Haxxxoloto|Hackathon Solana/.test(part)) {
-                return (
-                  <Text key={index} style={styles.userName}>
-                    {part}
-                  </Text>
-                );
-              }
-              return (
-                <Text key={index} style={styles.message}>
-                  {part}
-                </Text>
-              );
-            })}
-          </Text>
-          <Text style={styles.dateTime}>
-            {formatDateTime(notification.created_at)}
-          </Text>
-        </View>
+        {actionConfig.show && (
+          <View style={styles.actionWrapper}>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                { opacity: actionConfig.disabled ? 0.6 : 1 }
+              ]}
+              onPress={handleActionPress}
+              disabled={actionConfig.disabled}
+            >
+              <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+                {actionConfig.disabled || actionConfig.backgroundColor === '#A8A8A8' || actionConfig.backgroundColor === '#FF6B6B' ? (
+                  <View style={[
+                    styles.actionButtonDisabled,
+                    { backgroundColor: actionConfig.backgroundColor }
+                  ]}>
+                    <Text style={[
+                      styles.actionButtonText,
+                      { color: actionConfig.textColor }
+                    ]}>
+                      {actionConfig.text}
+                    </Text>
+                  </View>
+                ) : (
+                  <LinearGradient
+                    colors={[colors.greenLight, colors.green]}
+                    style={styles.gradientButton}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={[
+                      styles.actionButtonText,
+                      { color: actionConfig.textColor }
+                    ]}>
+                      {actionConfig.text}
+                    </Text>
+                  </LinearGradient>
+                )}
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-      
-      {actionConfig.show && (
-        <View style={styles.actionWrapper}>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              { opacity: actionConfig.disabled ? 0.6 : 1 }
-            ]}
-            onPress={handleActionPress}
-            disabled={actionConfig.disabled}
-          >
-            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
-              {actionConfig.disabled || actionConfig.backgroundColor === '#A8A8A8' || actionConfig.backgroundColor === '#FF6B6B' ? (
-                <View style={[
-                  styles.actionButtonDisabled,
-                  { backgroundColor: actionConfig.backgroundColor }
-                ]}>
-                  <Text style={[
-                    styles.actionButtonText,
-                    { color: actionConfig.textColor }
-                  ]}>
-                    {actionConfig.text}
-                  </Text>
-                </View>
-              ) : (
-                <LinearGradient
-                  colors={[colors.greenLight, colors.green]}
-                  style={styles.gradientButton}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  <Text style={[
-                    styles.actionButtonText,
-                    { color: actionConfig.textColor }
-                  ]}>
-                    {actionConfig.text}
-                  </Text>
-                </LinearGradient>
-              )}
-            </Animated.View>
-          </TouchableOpacity>
-        </View>
-      )}
-      </TouchableOpacity>
     </Animated.View>
   );
 };

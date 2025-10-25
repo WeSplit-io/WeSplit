@@ -13,8 +13,9 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import { logger } from '../../services/analytics/loggingService';
 import type { LinkedWallet } from '../../services/blockchain/wallet/LinkedWalletService';
-import { Container } from '../../components/shared';
+import { Container, Button } from '../../components/shared';
 import Header from '../../components/shared/Header';
+import PhosphorIcon from '../../components/shared/PhosphorIcon';
 
 const SendScreen: React.FC<any> = ({ navigation, route }) => {
   const { 
@@ -221,21 +222,23 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
       return (
         <View style={styles.emptyStateContainer}>
           <View style={styles.emptyStateIcon}>
-            <Image
-              source={require('../../../assets/link-icon.png')}
-              style={styles.emptyStateIconImage}
+            <PhosphorIcon
+              name="LinkBreak"
+              size={38}
+              color={colors.white}
+              weight="regular"
             />
           </View>
           <Text style={styles.emptyStateTitle}>No cards or wallets connected</Text>
           <Text style={styles.emptyStateSubtitle}>
             Link a card or wallet to start sending funds easily.
           </Text>
-          <TouchableOpacity 
-            style={styles.connectWalletButton}
+          <Button
+            title="Connect a wallet"
             onPress={handleConnectWallet}
-          >
-            <Text style={styles.connectWalletButtonText}>Connect a wallet</Text>
-          </TouchableOpacity>
+            variant="primary"
+            fullWidth={true}
+          />
         </View>
       );
     }

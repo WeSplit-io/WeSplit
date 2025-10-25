@@ -184,7 +184,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
       // Starting optimized AI-powered bill analysis
       
       // Try AI service first with improved error handling - NO MOCK DATA
-      let analysisResult = await consolidatedBillAnalysisService.analyzeBillFromImage(imageUri, currentUser || undefined, false);
+      const analysisResult = await consolidatedBillAnalysisService.analyzeBillFromImage(imageUri, currentUser || undefined, false);
       
       // Handle AI analysis result with better error messages
       if (!analysisResult.success) {

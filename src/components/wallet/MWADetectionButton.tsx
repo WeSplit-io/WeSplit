@@ -196,7 +196,7 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
   };
 
   const handleWalletSelect = async (wallet: WalletOption) => {
-    if (disabled || isConnecting) return;
+    if (disabled || isConnecting) {return;}
     
     try {
       setIsConnecting(wallet.name);

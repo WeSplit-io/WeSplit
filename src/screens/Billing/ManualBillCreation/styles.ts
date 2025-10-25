@@ -26,11 +26,11 @@ export const styles = StyleSheet.create({
     flex: 1,
     height: spacing.buttonHeight,
     borderRadius: spacing.radiusMd,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white5,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
+    borderColor: colors.white10,
     marginHorizontal: spacing.xs,
     overflow: 'hidden',
   },
@@ -69,19 +69,19 @@ export const styles = StyleSheet.create({
 
   amountContainer: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.xs,
     width: '100%',
   },
 
   currencyButton: {
     backgroundColor: colors.white5,
-    borderRadius: spacing.radiusMd,
+    borderRadius: spacing.md,
     paddingHorizontal: spacing.inputPaddingHorizontal,
     paddingVertical: spacing.inputPaddingVertical,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
+    borderColor: colors.white10,
     minWidth: 100,
     height: spacing.inputHeight,
     gap: spacing.sm,
@@ -212,9 +212,6 @@ export const styles = StyleSheet.create({
 
   /** ================================ Button Styles ================================ */
   continueButton: {
-    borderRadius: spacing.radiusMd,
-    overflow: 'hidden',
-    height: spacing.buttonHeight,
   },
   buttonGradient: {
     flex: 1,

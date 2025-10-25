@@ -244,7 +244,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
         splitWallet,
         processedBillData,
       });
-    }, 2000);
+    }, 5000); // Increased to 5000ms (5 seconds) to give more time to see the selected card
   };
 
   const handleBack = () => {
@@ -305,8 +305,6 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
             <Text style={styles.billTotalLabel}>Total Bill</Text>
             <Text style={styles.billTotalAmount}>{formatUsdcForDisplay(totalAmount)} USDC</Text>
           </View>
-          <View style={styles.billCardDotLeft}></View>
-          <View style={styles.billCardDotRight}></View>
         </View>
 
       </View>

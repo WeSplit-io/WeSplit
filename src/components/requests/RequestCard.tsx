@@ -6,20 +6,19 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
-import UserAvatar from '../UserAvatar';
+import Avatar from '../shared/Avatar';
+import styles from './RequestCard.styles';
 
 interface RequestCardProps {
   request: any;
   index: number;
   onSendPress: (request: any) => void;
-  requestStyles: any;
 }
 
 const RequestCard: React.FC<RequestCardProps> = ({
   request,
   index,
   onSendPress,
-  requestStyles
 }) => {
   // Helper function to format amount with appropriate decimal places
   const formatAmount = (amount: number): string => {
@@ -38,32 +37,33 @@ const RequestCard: React.FC<RequestCardProps> = ({
     const senderAvatar = request.data?.senderAvatar || null;
 
     return (
-      <View key={request.id || index} style={requestStyles.requestItemNew}>
-        <UserAvatar
+      <View key={request.id || index} style={styles.requestItemNew}>
+        <Avatar
+          userId={request.data?.senderId}
+          userName={senderName || 'U'}
           avatarUrl={senderAvatar || ''}
-          displayName={senderName || 'U'}
-          style={requestStyles.requestAvatarNew}
+          style={styles.requestAvatarNew}
         />
-        <View style={requestStyles.requestContent}>
-          <Text style={requestStyles.requestMessageWithAmount}>
-            <Text style={requestStyles.requestSenderName}>{senderName}</Text>
+        <View style={styles.requestContent}>
+          <Text style={styles.requestMessageWithAmount}>
+            <Text style={styles.requestSenderName}>{senderName}</Text>
             <Text> requested a payment of </Text>
-            <Text style={requestStyles.requestAmountGreen}>
+            <Text style={styles.requestAmountGreen}>
               {formatAmount(amount)} {currency}
             </Text>
           </Text>
         </View>
         <TouchableOpacity
-          style={requestStyles.requestSendButtonNew}
+          style={styles.requestSendButtonNew}
           onPress={() => onSendPress(request)}
         >
           <LinearGradient
             colors={[colors.green, colors.greenLight]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={requestStyles.requestSendButtonGradient}
+            style={styles.requestSendButtonGradient}
           >
-            <Text style={requestStyles.requestSendButtonTextNew}>Send</Text>
+            <Text style={styles.requestSendButtonTextNew}>Send</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -71,12 +71,14 @@ const RequestCard: React.FC<RequestCardProps> = ({
   } catch (error) {
     console.error(`Error rendering request ${index}:`, error);
     return (
-      <View key={index} style={requestStyles.requestItemNew}>
-        <View style={requestStyles.requestAvatarNew}>
-          <Text style={requestStyles.balanceAmountText}>E</Text>
-        </View>
-        <View style={requestStyles.requestContent}>
-          <Text style={requestStyles.requestSenderName}>Error loading request</Text>
+      <View key={index} style={styles.requestItemNew}>
+        <Avatar
+          userName="Error"
+          style={styles.requestAvatarNew}
+          size={40}
+        />
+        <View style={styles.requestContent}>
+          <Text style={styles.requestSenderName}>Error loading request</Text>
         </View>
       </View>
     );

@@ -14,7 +14,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/data';
 import { Transaction } from '../../types';
-import { TransactionModal } from '../../components/transactions';
+import { TransactionModal, TransactionItem } from '../../components/transactions';
 import { getUserDisplayName, preloadUserData } from '../../services/shared/dataUtils';
 import styles from './styles';
 import { colors } from '../../theme/colors';
@@ -29,6 +29,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
   const { currentUser } = state;
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [userNames, setUserNames] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('all');
@@ -40,8 +41,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
     if (route?.params?.transactionId && transactions.length > 0) {
       const targetTransaction = transactions.find(t => 
         t.tx_hash === route.params.transactionId || 
-        t.id === route.params.transactionId ||
-        t.transactionId === route.params.transactionId
+        t.id === route.params.transactionId
       );
       
       if (targetTransaction) {
@@ -76,8 +76,8 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
       // Preload user data for all transaction participants
       const userIds = new Set<string>();
       userTransactions.forEach(transaction => {
-        if (transaction.from_user) userIds.add(transaction.from_user);
-        if (transaction.to_user) userIds.add(transaction.to_user);
+        if (transaction.from_user) {userIds.add(transaction.from_user);}
+        if (transaction.to_user) {userIds.add(transaction.to_user);}
       });
       
       if (userIds.size > 0) {
@@ -93,6 +93,37 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
     }
   }, [currentUser?.id]);
 
+  // Load user names for transactions
+  const loadUserNames = async (transactions: Transaction[]) => {
+    const userIds = new Set<string>();
+    
+    transactions.forEach(transaction => {
+      if (transaction.from_user) {userIds.add(transaction.from_user);}
+      if (transaction.to_user) {userIds.add(transaction.to_user);}
+    });
+
+    const newUserNames = new Map(userNames);
+    
+    for (const userId of userIds) {
+      if (!newUserNames.has(userId)) {
+        try {
+          const userName = await getUserDisplayName(userId);
+          newUserNames.set(userId, userName);
+        } catch (error) {
+          newUserNames.set(userId, 'Unknown User');
+        }
+      }
+    }
+    
+    setUserNames(newUserNames);
+  };
+
+  // Load user names when transactions change
+  useEffect(() => {
+    if (transactions.length > 0) {
+      loadUserNames(transactions);
+    }
+  }, [transactions]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -235,57 +266,6 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
   }, [transactions, activeTab]);
 
 
-  // Render transaction item
-  const renderTransactionItem = (transaction: Transaction) => {
-    const transactionTime = new Date(transaction.created_at).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-
-    const { amount, color } = getTransactionAmount(transaction);
-    const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
-
-    return (
-      <TouchableOpacity
-        key={transaction.id}
-        style={styles.transactionItem}
-        onPress={() => handleTransactionPress(transaction)}
-      >
-        <View style={[
-          styles.transactionIconContainer,
-          isIncome && styles.transactionIconContainerIncome
-        ]}>
-          <Image
-            source={getTransactionIcon(transaction)}
-            style={[
-              styles.transactionIcon,
-              isIncome && styles.transactionIconIncome
-            ]}
-          />
-        </View>
-        <View style={styles.transactionContent}>
-          <Text style={styles.transactionTitle}>
-            {transaction.recipient_name || transaction.sender_name || 
-             (transaction.type === 'send' ? `Send to ${transaction.to_user}` : 
-              transaction.type === 'receive' ? `Received from ${transaction.from_user}` : 
-              'Transaction')}
-          </Text>
-          <Text style={styles.transactionSource}>
-            {getTransactionSource(transaction)} • {transactionTime}
-          </Text>
-        </View>
-        <View style={styles.transactionAmountContainer}>
-          <Text style={[
-            styles.transactionAmount,
-            isIncome ? styles.transactionAmountIncome : styles.transactionAmountExpense
-          ]}>
-            {isIncome ? '+' : '-'}{amount} USDC
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -351,7 +331,16 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
           </View>
         ) : getFilteredTransactions().length > 0 ? (
           <View style={styles.transactionsList}>
-            {getFilteredTransactions().map(renderTransactionItem)}
+            {getFilteredTransactions().map(transaction => (
+              <TransactionItem
+                key={transaction.id}
+                transaction={transaction}
+                recipientName={userNames.get(transaction.to_user)}
+                senderName={userNames.get(transaction.from_user)}
+                onPress={handleTransactionPress}
+                showTime={true}
+              />
+            ))}
           </View>
         ) : (
           renderEmptyState()

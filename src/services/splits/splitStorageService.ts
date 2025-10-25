@@ -22,9 +22,9 @@ import { db } from '../../config/firebase/firebase';
 import { logger } from '../analytics/loggingService';
 // Remove undefined values helper function
 const removeUndefinedValues = (obj: any): any => {
-  if (obj === null || obj === undefined) return obj;
-  if (typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(removeUndefinedValues);
+  if (obj === null || obj === undefined) {return obj;}
+  if (typeof obj !== 'object') {return obj;}
+  if (Array.isArray(obj)) {return obj.map(removeUndefinedValues);}
   
   const cleaned: any = {};
   for (const [key, value] of Object.entries(obj)) {
@@ -76,6 +76,7 @@ export interface SplitParticipant {
   joinedAt?: string;
   paidAt?: string;
   transactionSignature?: string;
+  avatar?: string; // Optional avatar URL
 }
 
 export interface SplitItem {

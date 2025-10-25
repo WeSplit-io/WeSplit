@@ -1,16 +1,15 @@
 import { StyleSheet } from 'react-native';
-import { colors } from '../../theme/colors';
+import { colors, spacing, typography } from '../../theme';
 
 export default StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
     backgroundColor: colors.white5,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    marginTop: 8,
-    minHeight: 80,
+    borderRadius: spacing.md,
+    padding: spacing.md,
   },
   contentWrapper: {
     flexDirection: 'row',
@@ -21,38 +20,38 @@ export default StyleSheet.create({
   iconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
+    borderRadius: 30,
+    backgroundColor: colors.white10,
     justifyContent: 'center',
-    marginRight: 16,
+    alignItems: 'center',
   },
   icon: {
     width: 20,
     height: 20,
-    borderRadius: 10,
-    tintColor: '#FFF',
+    tintColor: colors.white,
   },
   textContainer: {
     flex: 1,
-    minWidth: 0,
+    marginRight: spacing.md,
+    marginLeft: spacing.md,
   },
   message: {
-    fontSize: 14,
-    color: '#E0E0E0',
-    lineHeight: 20,
-    marginBottom: 8,
-    flexShrink: 1,
+    color: colors.textLight,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.normal,
+    marginBottom: spacing.xs / 2,
   },
   amount: {
-    fontSize: 15,
-    color: colors.green,
-    fontWeight: '600',
+    fontSize: typography.fontSize.sm,
+    color: colors.greenBlue,
+    fontWeight: typography.fontWeight.medium,
     marginTop: 4,
   },
   userName: {
-    fontSize: 14,
-    color: '#E0E0E0',
-    fontWeight: '600',
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.xs / 2,
   },
   dateTime: {
     fontSize: 12,
@@ -91,5 +90,12 @@ export default StyleSheet.create({
     paddingVertical: 8,
     minWidth: 60,
     alignItems: 'center',
+  },
+  expandText: {
+    fontSize: 12,
+    color: colors.greenBlue,
+    fontWeight: typography.fontWeight.medium,
+    marginTop: 4,
+    textDecorationLine: 'underline',
   },
 });

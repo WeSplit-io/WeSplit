@@ -13,7 +13,7 @@ import { UserContact, User } from '../types';
 import { colors } from '../theme';
 import { styles } from './ContactsList.styles';
 import { logger } from '../services/core';
-import UserAvatar from './UserAvatar';
+import Avatar from './shared/Avatar';
 import { formatWalletAddress, getWalletAddressStatus } from '../utils/crypto/wallet';
 
 interface ContactsListProps {
@@ -486,13 +486,12 @@ const ContactsList: React.FC<ContactsListProps> = ({
         style={[styles.contactRow, isSelected && styles.contactRowSelected]}
         onPress={() => onContactSelect(item)}
       >
-        <UserAvatar
+        <Avatar
           userId={item.id.toString()}
           userName={item.name}
-          size={40}
+          size={50}
           avatarUrl={item.avatar}
           style={styles.avatar}
-          backgroundColor={colors.surface}
         />
       <View style={styles.contactInfo}>
         <Text style={styles.contactName}>
@@ -753,13 +752,17 @@ const ContactsList: React.FC<ContactsListProps> = ({
                           style={[styles.contactRow, isSelected && styles.contactRowSelected]}
                           onPress={() => onContactSelect(userAsContact)}
                         >
-                          <UserAvatar
+                          <Avatar
                             userId={user.id.toString()}
                             userName={user.name}
-                            size={40}
+                            size={50}
                             avatarUrl={user.avatar}
-                            style={styles.avatar}
-                            backgroundColor={colors.surface}
+                            style={{
+                              width: 50,
+                              height: 50,
+                              borderRadius: 25,
+                              backgroundColor: colors.white10,
+                            }}
                           />
                           <View style={styles.contactInfo}>
                             <Text style={styles.contactName}>

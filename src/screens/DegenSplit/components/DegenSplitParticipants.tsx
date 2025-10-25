@@ -7,7 +7,7 @@ import React from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
-import UserAvatar from '../../../components/UserAvatar';
+import Avatar from '../../../components/shared/Avatar';
 import { roundUsdcAmount, formatUsdcForDisplay } from '../../../utils/ui/format/formatUtils';
 import { styles } from './DegenSplitParticipantsStyles';
 
@@ -39,6 +39,7 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
         style={styles.participantsScrollView}
         showsVerticalScrollIndicator={false}
       >
+        
         {participants.map((participant, index) => {
           // Use wallet participant data if available for accurate lock status
           const walletParticipant = splitWallet?.participants?.find(
@@ -56,10 +57,17 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
               key={participant.userId || participant.id || `participant_${index}`} 
               style={styles.participantCard}
             >
-              <UserAvatar
-                displayName={participant.name || `Participant ${index + 1}`}
+              <Avatar
+                userId={participant.userId || participant.id}
+                userName={participant.name || `Participant ${index + 1}`}
                 size={40}
-                style={styles.participantAvatar}
+                avatarUrl={participant.avatar}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: colors.white10,
+                }}
               />
               
               <View style={styles.participantInfo}>

@@ -38,9 +38,9 @@ import { logger } from '../analytics/loggingService';
 export const firebaseDataTransformers = {
   // Transform Firestore timestamp to ISO string
   timestampToISO: (timestamp: Timestamp | null | any): string => {
-    if (!timestamp) return new Date().toISOString();
-    if (timestamp.toDate) return timestamp.toDate().toISOString();
-    if (timestamp.seconds) return new Date(timestamp.seconds * 1000).toISOString();
+    if (!timestamp) {return new Date().toISOString();}
+    if (timestamp.toDate) {return timestamp.toDate().toISOString();}
+    if (timestamp.seconds) {return new Date(timestamp.seconds * 1000).toISOString();}
     return new Date(timestamp).toISOString();
   },
 
@@ -82,26 +82,26 @@ export const firebaseDataTransformers = {
     };
     
     // Only include defined fields to avoid Firebase errors
-    if (user.name !== undefined) data.name = user.name;
-    if (user.email !== undefined) data.email = user.email;
-    if (user.wallet_address !== undefined) data.wallet_address = user.wallet_address;
-    if (user.wallet_public_key !== undefined) data.wallet_public_key = user.wallet_public_key;
-    if (user.avatar !== undefined) data.avatar = user.avatar;
-    if (user.hasCompletedOnboarding !== undefined) data.hasCompletedOnboarding = user.hasCompletedOnboarding;
-    if (user.status !== undefined) data.status = user.status;
-    if (user.wallet_status !== undefined) data.wallet_status = user.wallet_status;
-    if (user.wallet_created_at !== undefined) data.wallet_created_at = user.wallet_created_at ? firebaseDataTransformers.isoToTimestamp(user.wallet_created_at) : null;
-    if (user.wallet_last_fixed_at !== undefined) data.wallet_last_fixed_at = user.wallet_last_fixed_at ? firebaseDataTransformers.isoToTimestamp(user.wallet_last_fixed_at) : null;
-    if (user.wallet_fix_attempts !== undefined) data.wallet_fix_attempts = user.wallet_fix_attempts;
-    if (user.wallet_has_private_key !== undefined) data.wallet_has_private_key = user.wallet_has_private_key;
-    if (user.wallet_has_seed_phrase !== undefined) data.wallet_has_seed_phrase = user.wallet_has_seed_phrase;
-    if (user.wallet_type !== undefined) data.wallet_type = user.wallet_type;
-    if (user.wallet_migration_status !== undefined) data.wallet_migration_status = user.wallet_migration_status;
-    if (user.firebase_uid !== undefined) data.firebase_uid = user.firebase_uid;
-    if (user.primary_email !== undefined) data.primary_email = user.primary_email;
-    if (user.email_verified !== undefined) data.email_verified = user.email_verified;
-    if (user.migration_completed !== undefined) data.migration_completed = user.migration_completed ? firebaseDataTransformers.isoToTimestamp(user.migration_completed) : null;
-    if (user.migration_version !== undefined) data.migration_version = user.migration_version;
+    if (user.name !== undefined) {data.name = user.name;}
+    if (user.email !== undefined) {data.email = user.email;}
+    if (user.wallet_address !== undefined) {data.wallet_address = user.wallet_address;}
+    if (user.wallet_public_key !== undefined) {data.wallet_public_key = user.wallet_public_key;}
+    if (user.avatar !== undefined) {data.avatar = user.avatar;}
+    if (user.hasCompletedOnboarding !== undefined) {data.hasCompletedOnboarding = user.hasCompletedOnboarding;}
+    if (user.status !== undefined) {data.status = user.status;}
+    if (user.wallet_status !== undefined) {data.wallet_status = user.wallet_status;}
+    if (user.wallet_created_at !== undefined) {data.wallet_created_at = user.wallet_created_at ? firebaseDataTransformers.isoToTimestamp(user.wallet_created_at) : null;}
+    if (user.wallet_last_fixed_at !== undefined) {data.wallet_last_fixed_at = user.wallet_last_fixed_at ? firebaseDataTransformers.isoToTimestamp(user.wallet_last_fixed_at) : null;}
+    if (user.wallet_fix_attempts !== undefined) {data.wallet_fix_attempts = user.wallet_fix_attempts;}
+    if (user.wallet_has_private_key !== undefined) {data.wallet_has_private_key = user.wallet_has_private_key;}
+    if (user.wallet_has_seed_phrase !== undefined) {data.wallet_has_seed_phrase = user.wallet_has_seed_phrase;}
+    if (user.wallet_type !== undefined) {data.wallet_type = user.wallet_type;}
+    if (user.wallet_migration_status !== undefined) {data.wallet_migration_status = user.wallet_migration_status;}
+    if (user.firebase_uid !== undefined) {data.firebase_uid = user.firebase_uid;}
+    if (user.primary_email !== undefined) {data.primary_email = user.primary_email;}
+    if (user.email_verified !== undefined) {data.email_verified = user.email_verified;}
+    if (user.migration_completed !== undefined) {data.migration_completed = user.migration_completed ? firebaseDataTransformers.isoToTimestamp(user.migration_completed) : null;}
+    if (user.migration_version !== undefined) {data.migration_version = user.migration_version;}
     
     return data;
   },

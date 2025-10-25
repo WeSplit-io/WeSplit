@@ -40,6 +40,8 @@ export const styles = StyleSheet.create({
     borderRadius: 16,
     padding: spacing.lg,
     marginTop: spacing.md,
+    marginBottom: spacing.lg,
+
     // Create ticket effect with pseudo-elements using border radius
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
@@ -245,6 +247,12 @@ export const styles = StyleSheet.create({
   // Participants list styles
   participantsContainer: {
     marginVertical: spacing.lg,
+  },
+  splitMethodLabel: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: '600',
+    marginBottom: spacing.md,
   },
   participantCard: {
     flexDirection: 'row',
@@ -574,7 +582,7 @@ export const styles = StyleSheet.create({
   
   // Split Wallet Section Styles
   splitWalletSection: {
-    marginVertical: spacing.lg,
+    marginBottom: spacing.lg,
   },
   splitWalletTitle: {
     color: colors.white,
@@ -670,6 +678,18 @@ export const styles = StyleSheet.create({
     color: colors.green,
     fontSize: typography.fontSize.sm,
     fontWeight: '500',
+  },
+  fixedBottomButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.black,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingBottom: spacing.xl,
+    borderTopWidth: 1,
+    borderTopColor: colors.white10,
   },
 
 });

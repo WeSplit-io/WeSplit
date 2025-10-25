@@ -140,7 +140,7 @@ export const compareSplitData = (oldData: any, newData: any): { hasChanges: bool
  * Ensure split data has all required fields
  */
 export const normalizeSplitData = (splitData: any): any => {
-  if (!splitData) return null;
+  if (!splitData) {return null;}
 
   return {
     ...splitData,

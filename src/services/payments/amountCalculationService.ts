@@ -14,6 +14,7 @@ export interface Participant {
   amountPaid: number;
   amountLocked: number;
   status: 'pending' | 'locked' | 'confirmed' | 'accepted' | 'declined' | 'paid';
+  avatar?: string; // Optional avatar URL
 }
 
 export interface AmountCalculationResult {

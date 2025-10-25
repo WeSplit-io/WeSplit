@@ -39,9 +39,25 @@ const FairSplitProgress: React.FC<FairSplitProgressProps> = ({
     totalParticipants: 0
   };
 
+  // Calculate rotation for progress fill (0% = -90deg, 100% = 270deg)
+  const rotationAngle = (displayData.completionPercentage / 100) * 360 - 90;
+  
+  // For 100% completion, show full green circle
+  const isComplete = displayData.completionPercentage >= 100;
+
   return (
     <View style={styles.progressContainer}>
       <View style={styles.progressCircle}>
+        {/* Progress fill overlay */}
+        {displayData.completionPercentage > 0 && (
+          <View 
+            style={[
+              styles.progressFill,
+              isComplete ? styles.progressFillComplete : {},
+              { transform: [{ rotate: `${rotationAngle}deg` }] }
+            ]}
+          />
+        )}
         <View style={styles.progressInner}>
           <Text style={styles.progressPercentage}>
             {displayData.completionPercentage}%

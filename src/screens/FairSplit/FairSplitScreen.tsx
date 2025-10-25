@@ -210,7 +210,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                     
                     return {
                       ...p,
-                      walletAddress: latestUserData?.wallet_address || p.walletAddress || ''
+                      walletAddress: latestUserData?.wallet_address || p.walletAddress || '',
+                      avatar: latestUserData?.avatar || p.avatar || '', // Include avatar from latest user data
                     };
                   } catch (error) {
                     console.warn(`Could not fetch latest data for participant ${p.userId}:`, error);
@@ -229,6 +230,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 amountPaid: p.amountPaid || 0,
                 amountLocked: 0,
                 status: p.status,
+                avatar: p.avatar, // Include avatar from participant data
               }));
               setParticipants(transformedParticipants);
               
@@ -412,6 +414,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             amountPaid: p.amountPaid || 0, // Use existing amountPaid if available
             amountLocked: 0, // Start with no locked amounts
             status: (p.status === 'accepted' ? 'accepted' : 'pending') as 'pending' | 'locked' | 'confirmed' | 'accepted' | 'declined',
+            avatar: currentUser.avatar, // Include current user's avatar
           };
         }
         
@@ -424,6 +427,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           amountPaid: p.amountPaid || 0, // Use existing amountPaid if available
           amountLocked: 0, // Start with no locked amounts
           status: (p.status === 'accepted' ? 'accepted' : 'pending') as 'pending' | 'locked' | 'confirmed' | 'accepted' | 'declined',
+          avatar: p.avatar, // Include participant's avatar
         };
       });
       
@@ -442,6 +446,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         amountPaid: 0,
         amountLocked: 0,
         status: 'accepted' as 'pending' | 'locked' | 'confirmed' | 'accepted' | 'declined',
+        avatar: currentUser.avatar, // Include current user's avatar
       };
       
       return [currentUserParticipant];
@@ -909,6 +914,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             amountPaid: p.amountPaid || 0,
             amountLocked: 0,
             status: p.status as 'pending' | 'locked' | 'confirmed' | 'accepted' | 'declined',
+            avatar: p.avatar, // Include avatar from wallet participant data
           };
         });
         
@@ -1321,6 +1327,50 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     } catch (error) {
       console.error('❌ FairSplitScreen: Error debugging USDC balance:', error);
       Alert.alert('Error', 'Failed to debug USDC balance');
+    }
+  };
+
+  // Fix participant status for single participant splits
+  const handleFixParticipantStatus = async () => {
+    if (!splitWallet) {
+      Alert.alert('Error', 'No split wallet found');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      const { SplitWalletService } = await import('../../services/split');
+      const repairResult = await SplitWalletService.repairSplitWalletData(splitWallet.id);
+      
+      if (repairResult.success && repairResult.repaired) {
+        Alert.alert(
+          '✅ Status Fixed!',
+          'Participant status has been repaired. The data should now be consistent.',
+          [{ text: 'OK' }]
+        );
+        
+        // Reload data to reflect changes
+        await loadSplitWalletData();
+        await loadCompletionData();
+      } else if (repairResult.success && !repairResult.repaired) {
+        Alert.alert(
+          'No Issues Found',
+          'No data consistency issues were detected. The participant status is already correct.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Repair Failed',
+          repairResult.error || 'Failed to repair participant status',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fix participant status');
+      console.error('Error fixing participant status:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -2291,6 +2341,26 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         // Force reload split wallet data to ensure we have the latest participant status
         await loadSplitWalletData();
         
+        // Force data consistency fix for single participant splits
+        if (splitWallet && splitWallet.participants.length === 1) {
+          try {
+            const { SplitWalletService } = await import('../../services/split');
+            const repairResult = await SplitWalletService.repairSplitWalletData(splitWallet.id);
+            
+            if (repairResult.success && repairResult.repaired) {
+              logger.info('Participant status repaired after payment', {
+                splitWalletId: splitWallet.id,
+                participantId: currentUser.id.toString()
+              }, 'FairSplitScreen');
+              
+              // Reload data again after repair
+              await loadSplitWalletData();
+            }
+          } catch (error) {
+            logger.warn('Failed to repair participant status after payment', { error }, 'FairSplitScreen');
+          }
+        }
+        
         // Update completion data immediately
         await loadCompletionData();
         
@@ -2677,6 +2747,13 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                             variant="secondary"
                             fullWidth={true}
                           />
+                          
+                          <Button
+                            title="🔧 DEV: Fix Participant Status"
+                            onPress={handleFixParticipantStatus}
+                            variant="secondary"
+                            fullWidth={true}
+                          />
                         </View>
                       )}
                     </View>
@@ -2939,7 +3016,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             </View>
             
             <Button
-              title="🔑 View Private Key"
+              title="View Private Key"
               onPress={handleShowPrivateKey}
               variant="secondary"
               style={styles.privateKeyButton}
@@ -2960,7 +3037,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       <CustomModal
         visible={showPrivateKeyModal && !!privateKey}
         onClose={handleClosePrivateKeyModal}
-        title="🔑 Private Key"
+        title="Private Key"
         description="Keep this private key secure. Anyone with access to this key can control your split wallet."
         showHandle={true}
         closeOnBackdrop={true}

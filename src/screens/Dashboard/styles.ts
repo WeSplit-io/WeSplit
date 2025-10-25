@@ -55,9 +55,9 @@ export const styles = StyleSheet.create({
   // === USER PROFILE SECTION ===
   // Circular profile image
   profileImage: {
-    width: spacing.profileImageSize,
-    height: spacing.profileImageSize,
-    borderRadius: spacing.profileImageSize / 2,
+    width: 50,
+    height: 50,
+    borderRadius: 100,
     backgroundColor: colors.white10,
   },
   
@@ -112,15 +112,11 @@ export const styles = StyleSheet.create({
     borderColor: colors.white10,
     marginTop: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
     marginBottom: spacing.md,
-    minHeight: spacing.balanceCardMinHeight,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: spacing.xs },
-    shadowOpacity: 0.1,
-    shadowRadius: spacing.sm,
-    elevation: 4,
+    minHeight: 200,
     overflow: 'hidden',
   },
   

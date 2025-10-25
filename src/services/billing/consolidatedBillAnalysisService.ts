@@ -501,7 +501,7 @@ class ConsolidatedBillAnalysisService {
 
     const processedData = {
       id: billId,
-      title: `${analysisData.store?.name || 'Unknown Store'} - ${analysisData.transaction?.date || dateStr}`,
+      title: analysisData.store?.name || 'Unknown Store',
       merchant: analysisData.store?.name || 'Unknown Merchant',
       location: analysisData.store?.location?.address || '',
       date: analysisData.transaction?.date || dateStr,
@@ -655,10 +655,10 @@ class ConsolidatedBillAnalysisService {
   validateManualBillInput(data: ManualBillInput): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
-    if (!data.name?.trim()) errors.push('Bill name is required');
-    if (!data.amount || data.amount <= 0) errors.push('Valid amount is required');
-    if (!data.currency?.trim()) errors.push('Currency is required');
-    if (!data.category?.trim()) errors.push('Category is required');
+    if (!data.name?.trim()) {errors.push('Bill name is required');}
+    if (!data.amount || data.amount <= 0) {errors.push('Valid amount is required');}
+    if (!data.currency?.trim()) {errors.push('Currency is required');}
+    if (!data.category?.trim()) {errors.push('Category is required');}
 
     return { isValid: errors.length === 0, errors };
   }

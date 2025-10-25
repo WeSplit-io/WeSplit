@@ -89,9 +89,9 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
   },
   avatar: {
-    width: spacing.xxl + spacing.sm,
-    height: spacing.xxl + spacing.sm,
-    borderRadius: spacing.xxl,
+    width: 50,
+    height: 50,
+    borderRadius: 100,
     backgroundColor: colors.white10,
     alignItems: 'center',
     justifyContent: 'center',

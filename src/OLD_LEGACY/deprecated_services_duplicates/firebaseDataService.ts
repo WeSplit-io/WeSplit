@@ -39,9 +39,9 @@ import { logger } from './core/loggingService';
 export const firebaseDataTransformers = {
   // Transform Firestore timestamp to ISO string
   timestampToISO: (timestamp: Timestamp | null | any): string => {
-    if (!timestamp) return new Date().toISOString();
-    if (timestamp.toDate) return timestamp.toDate().toISOString();
-    if (timestamp.seconds) return new Date(timestamp.seconds * 1000).toISOString();
+    if (!timestamp) {return new Date().toISOString();}
+    if (timestamp.toDate) {return timestamp.toDate().toISOString();}
+    if (timestamp.seconds) {return new Date(timestamp.seconds * 1000).toISOString();}
     return new Date(timestamp).toISOString();
   },
 

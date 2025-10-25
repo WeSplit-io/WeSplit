@@ -9,6 +9,7 @@ import { useWallet } from '../../context/WalletContext';
 import { colors } from '../../theme';
 import { styles } from './styles';
 import UserAvatar from '../../components/UserAvatar';
+import Avatar from '../../components/shared/Avatar';
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
@@ -191,7 +192,7 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.recipientAvatarContainer}>
           <View style={styles.recipientAvatar}>
             {destinationType === 'friend' && contact ? (
-              <UserAvatar
+              <Avatar
                 userId={contact.id?.toString() || ''}
                 userName={contact.name}
                 size={70}

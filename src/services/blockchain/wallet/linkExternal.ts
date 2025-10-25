@@ -7,14 +7,14 @@ import { PublicKey } from '@solana/web3.js';
 import { solanaWalletService } from './api/solanaWalletApi';
 import { logger } from '../../analytics/loggingService';
 
+import type { LinkedWallet } from './LinkedWalletService';
+
 export interface WalletVerificationResult {
   success: boolean;
   verifiedAddress?: string;
   walletType?: 'phantom' | 'solflare' | 'backpack' | 'other';
   error?: string;
 }
-
-import type { LinkedWallet } from './LinkedWalletService';
 
 export interface LinkWalletParams {
   address: string;

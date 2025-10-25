@@ -78,10 +78,9 @@ export const styles = StyleSheet.create({
   },
   // Bill summary styles
   billSummaryContainer: {
-    backgroundColor: colors.white10,
+    backgroundColor: colors.white5,
     borderRadius: 20,
     padding: spacing.lg,
-    marginHorizontal: spacing.lg, // Add margin for bill summary
     marginTop: spacing.md, // Reduced top margin since it's now below roulette
     marginBottom: spacing.xl,
     gap: spacing.md,
@@ -302,6 +301,8 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     alignItems: 'center',
     backgroundColor: 'transparent',
+    width: '100%',
+    paddingHorizontal: spacing.md,
   },
   spinButtonDisabled: {
     opacity: 0.5,

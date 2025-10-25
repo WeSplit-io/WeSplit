@@ -128,7 +128,7 @@ const MoonPayWebViewScreen: React.FC<any> = ({ navigation, route }) => {
   };
 
   const handleMessage = async (event: any) => {
-    if (!isMountedRef.current) return;
+    if (!isMountedRef.current) {return;}
     
     try {
       const data = JSON.parse(event.nativeEvent.data);

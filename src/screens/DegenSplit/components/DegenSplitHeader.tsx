@@ -24,7 +24,7 @@ const DegenSplitHeader: React.FC<DegenSplitHeaderProps> = ({
   isRealtimeActive = false,
 }) => {
   const renderRealtimeIndicator = () => {
-    if (!isRealtimeActive) return null;
+    if (!isRealtimeActive) {return null;}
     
     return (
       <View style={styles.realtimeIndicator}>

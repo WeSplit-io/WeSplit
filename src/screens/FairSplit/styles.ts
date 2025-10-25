@@ -175,6 +175,10 @@ export const styles = StyleSheet.create({
     borderTopColor: 'transparent',
     borderRightColor: 'transparent',
   },
+  progressFillComplete: {
+    borderTopColor: colors.green,
+    borderRightColor: colors.green,
+  },
   progressInner: {
     alignItems: 'center',
   },

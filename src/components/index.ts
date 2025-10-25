@@ -18,9 +18,9 @@ export { default as NavBar } from './shared/NavBar';
 export { default as NavIcon } from './NavIcon';
 export { default as NavigationWrapper } from './NavigationWrapper';
 export { default as QRCodeModal } from './QRCodeModal';
-export { default as SafeAreaWrapper } from './SafeAreaWrapper';
 export { default as SlideButton } from './SlideButton';
 export { default as UserAvatar } from './UserAvatar';
+export { default as Avatar } from './shared/Avatar';
 
 // Categorized Components
 export * from './auth';

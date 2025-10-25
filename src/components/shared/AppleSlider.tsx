@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Animated, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Animated, StyleSheet, Dimensions, Platform, PanResponder } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import PhosphorIcon from './PhosphorIcon';
@@ -37,7 +37,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
     if (loading) {
       const interval = setInterval(() => {
         setDots(prev => {
-          if (prev === '...') return '';
+          if (prev === '...') {return '';}
           return prev + '.';
         });
       }, 500);
@@ -53,10 +53,12 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
       disabled,
       loading,
       text,
-      onSlideComplete: !!onSlideComplete
+      onSlideComplete: !!onSlideComplete,
+      platform: Platform.OS
     }, 'AppleSlider');
   }
 
+  // iOS implementation using PanGestureHandler
   const handleGestureEvent = Animated.event(
     [{ nativeEvent: { translationX: sliderValue } }],
     { 
@@ -102,6 +104,69 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
     }
   };
 
+  // Android implementation using PanResponder
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => {
+      return !disabled && !loading;
+    },
+    onMoveShouldSetPanResponder: (_, gestureState) => {
+      // Only respond to horizontal gestures
+      return !disabled && !loading && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+    },
+    onPanResponderGrant: () => {
+      setIsSliderActive(true);
+      if (__DEV__) {
+        logger.debug('AppleSlider Android: Gesture started', {}, 'AppleSlider');
+      }
+    },
+    onPanResponderMove: (_, gestureState) => {
+      const newValue = Math.max(0, Math.min(gestureState.dx, maxSlideDistance));
+      sliderValue.setValue(newValue);
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (__DEV__) {
+        logger.debug('AppleSlider Android: Gesture ended', { 
+          dx: gestureState.dx, 
+          threshold: maxSlideDistance * 0.6 
+        }, 'AppleSlider');
+      }
+      
+      if (gestureState.dx > maxSlideDistance * 0.6) {
+        // Complete the slide
+        Animated.timing(sliderValue, {
+          toValue: maxSlideDistance,
+          duration: 200,
+          useNativeDriver: false,
+        }).start(() => {
+          if (onSlideComplete) {
+            onSlideComplete();
+          }
+          setTimeout(() => {
+            sliderValue.setValue(0);
+            setIsSliderActive(false);
+          }, 1000);
+        });
+      } else {
+        // Reset to start
+        setIsSliderActive(false);
+        Animated.timing(sliderValue, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }).start();
+      }
+    },
+    onPanResponderTerminate: () => {
+      // Handle interruption (e.g., by modal gestures)
+      setIsSliderActive(false);
+      Animated.timing(sliderValue, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    },
+  });
+
   const styles = StyleSheet.create({
     appleSliderGradientBorder: {
       borderRadius: 30,
@@ -140,14 +205,6 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
       backgroundColor: colors.white,
       justifyContent: 'center',
       alignItems: 'center',
-      shadowColor: '#000',
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
-      elevation: 5,
     },
   });
 
@@ -179,6 +236,59 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
     });
   };
 
+  // Render slider content
+  const renderSliderContent = () => (
+    <View style={[styles.appleSliderContainer, disabled && { opacity: 0.5 }]}>
+      <Animated.View style={styles.appleSliderTrack}>
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            opacity: getTrackOpacity() as any,
+            borderRadius: 28,
+          }}
+        >
+          <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              borderRadius: 28,
+            }}
+          />
+        </Animated.View>
+        <Animated.Text
+          style={[
+            styles.appleSliderText,
+            { color: loading ? colors.black : colors.white }
+          ]}
+        >
+          {loading ? `Signing${dots}` : text}
+        </Animated.Text>
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.appleSliderThumb,
+          {
+            transform: [{ translateX: getThumbPosition() }],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={thumbColors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            borderRadius: 26,
+          }}
+        />
+        <PhosphorIcon name="CaretRight" size={20} color={colors.black} weight="bold" />
+      </Animated.View>
+    </View>
+  );
+
   return (
     <LinearGradient
       colors={borderColors}
@@ -186,61 +296,19 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
       end={{ x: 1, y: 0 }}
       style={[styles.appleSliderGradientBorder, style]}
     >
-      <PanGestureHandler
-        onGestureEvent={handleGestureEvent}
-        onHandlerStateChange={handleStateChange}
-        enabled={!disabled && !loading}
-      >
-        <View style={[styles.appleSliderContainer, disabled && { opacity: 0.5 }]}>
-        <Animated.View style={styles.appleSliderTrack}>
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              opacity: getTrackOpacity() as any,
-              borderRadius: 28,
-            }}
-          >
-            <LinearGradient
-              colors={[colors.gradientStart, colors.gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{
-                ...StyleSheet.absoluteFillObject,
-                borderRadius: 28,
-              }}
-            />
-          </Animated.View>
-          <Animated.Text
-            style={[
-              styles.appleSliderText,
-              { color: loading ? colors.black : colors.white }
-            ]}
-          >
-            {loading ? `Signing${dots}` : text}
-          </Animated.Text>
-        </Animated.View>
-        <Animated.View
-          style={[
-            styles.appleSliderThumb,
-            {
-              transform: [{ translateX: getThumbPosition() }],
-            },
-          ]}
+      {Platform.OS === 'ios' ? (
+        <PanGestureHandler
+          onGestureEvent={handleGestureEvent}
+          onHandlerStateChange={handleStateChange}
+          enabled={!disabled && !loading}
         >
-          <LinearGradient
-            colors={thumbColors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              borderRadius: 26,
-            }}
-          />
-          <PhosphorIcon name="CaretRight" size={20} color={colors.black} weight="bold" />
-        </Animated.View>
+          {renderSliderContent()}
+        </PanGestureHandler>
+      ) : (
+        <View {...panResponder.panHandlers}>
+          {renderSliderContent()}
         </View>
-      </PanGestureHandler>
+      )}
     </LinearGradient>
   );
 };

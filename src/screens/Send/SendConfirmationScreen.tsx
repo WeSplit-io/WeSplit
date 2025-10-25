@@ -9,7 +9,7 @@ import { consolidatedTransactionService } from '../../services/blockchain/transa
 import { FeeService, TransactionType } from '../../config/constants/feeConfig';
 import { colors } from '../../theme';
 import { styles } from './styles';
-import UserAvatar from '../../components/UserAvatar';
+import Avatar from '../../components/shared/Avatar';
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import { logger } from '../../services/analytics/loggingService';
 import { notificationService } from '../../services/notifications/notificationService';
@@ -495,12 +495,12 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         <View style={styles.mockupRecipientCard}>
           <View style={styles.mockupRecipientAvatar}>
             {(destinationType === 'friend' || (contact && !destinationType)) && contact ? (
-              <UserAvatar
+              <Avatar
                 userId={contact.id?.toString() || ''}
                 userName={contact.name}
-                size={60}
+                size={48}
                 avatarUrl={contact.avatar}
-                style={{ width: '100%', height: '100%', borderRadius: 999 }}
+                style={{ width: 48, height: 48, borderRadius: 24 }}
               />
             ) : destinationType === 'external' && (wallet as any)?.type === 'kast' ? (
               <Image
@@ -672,7 +672,15 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           onSlideComplete={handleConfirmSend}
           disabled={walletLoading || sending || !hasExistingWallet || !hasSufficientBalance || !!walletError}
           loading={walletLoading || sending}
-          text={walletLoading ? "Loading wallet..." : walletError ? "Wallet Error" : "Sign transaction"}
+          text={
+            !hasSufficientBalance 
+              ? "Insufficient funds"
+              : walletLoading 
+                ? "Loading wallet..." 
+                : walletError 
+                  ? "Wallet Error" 
+                  : "Sign transaction"
+          }
         />
       </View>
     </Container>
