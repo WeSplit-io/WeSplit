@@ -324,11 +324,9 @@ export const styles = StyleSheet.create({
     padding: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  modalLockIcon: {
-    width: 28,
-    height: 28,
-    tintColor: colors.white,
+    alignSelf: 'center',
+    width: 80,
+    height: 80,
   },
 
   modalSlideButton: {
@@ -450,7 +448,7 @@ export const styles = StyleSheet.create({
   walletAddressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
   walletAddressText: {
     fontSize: typography.fontSize.md,
@@ -605,11 +603,6 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: '500',
-  },
-  copyIcon: {
-    width: 14,
-    height: 14,
-    tintColor: colors.white80,
   },
   privateKeyButton: {
     backgroundColor: colors.white10,

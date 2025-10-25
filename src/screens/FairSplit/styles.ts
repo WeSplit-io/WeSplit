@@ -859,7 +859,7 @@ export const styles = StyleSheet.create({
   walletAddressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
   walletAddressText: {
     fontSize: typography.fontSize.md,
@@ -877,19 +877,6 @@ export const styles = StyleSheet.create({
   copyButtonText: {
     color: colors.white,
     fontSize: typography.fontSize.sm,
-    fontWeight: '600',
-  },
-  privateKeyButton: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: spacing.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  privateKeyButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
     fontWeight: '600',
   },
   walletRecapButtons: {
@@ -1060,11 +1047,6 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: '500',
-  },
-  copyIcon: {
-    width: 14,
-    height: 14,
-    tintColor: colors.white80,
   },
   privateKeyButton: {
     backgroundColor: colors.white10,

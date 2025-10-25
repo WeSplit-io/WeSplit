@@ -8,27 +8,18 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  searchInputContainer: {
+    marginBottom: 0,
+  },
+  searchInputStyle: {
     backgroundColor: colors.black,
     borderRadius: 16,
-    paddingHorizontal: spacing.screenPaddingHorizontal,
-    height: spacing.inputHeight,
-    marginBottom: spacing.lg,
     borderWidth: spacing.borderWidthThin,
     borderColor: colors.white50,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: typography.fontSize.md,
-    color: colors.textLight,
-    marginLeft: spacing.sm,
-    height: '100%',
-    textAlignVertical: 'center',
-  },
-  searchIcon: {
-    width: 20,
-    height: 20,
+    paddingHorizontal: spacing.screenPaddingHorizontal,
+    height: spacing.inputHeight,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -153,11 +144,6 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-  },
-  addButtonIcon: {
-    width: 16,
-    height: 16,
-    resizeMode: 'contain',
   },
   loadingContainer: {
     flex: 1,

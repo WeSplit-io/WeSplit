@@ -32,6 +32,7 @@ import { getUserDisplayName, preloadUserData } from '../../services/shared/dataU
 import { logger } from '../../services/analytics/loggingService';
 import { db } from '../../config/firebase/firebase';
 import { getDoc, doc } from 'firebase/firestore';
+import { RequestCard } from '../../components/requests';
 
 // Avatar component wrapper for backward compatibility
 const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
@@ -152,6 +153,78 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       case 'draft':
       default:
         return 'Draft';
+    }
+  };
+
+  // Helper function to format amount with appropriate decimal places
+  const formatRequestAmount = (amount: number): string => {
+    // If amount has decimal places, show up to 2 decimals
+    if (amount % 1 !== 0) {
+      return amount.toFixed(2);
+    }
+    // If it's a whole number, show with 1 decimal for consistency
+    return amount.toFixed(1);
+  };
+
+  // Handle send payment from request
+  const handleSendPress = async (request: any) => {
+    try {
+      const amount = request.data?.amount || 0;
+      const currency = request.data?.currency || 'USDC';
+      const senderName = request.data?.senderName || 'Unknown User';
+
+      logger.info('Send button pressed for request', {
+        requestId: request.id,
+        requestData: request.data,
+        amount,
+        currency,
+        senderName
+      });
+
+      // Get the sender ID from the request data
+      const senderId = request.data?.senderId || request.data?.requester || request.data?.sender;
+      if (!senderId) {
+        console.error('🔍 Dashboard: No sender ID found in request data:', request.data);
+        Alert.alert('Error', 'Unable to find sender information');
+        return;
+      }
+
+      logger.debug('Fetching user data for sender ID', { senderId }, 'DashboardScreen');
+      
+      // Fetch user data to get wallet address and other details
+      const contact = await fetchUserData(senderId);
+      
+      logger.debug('Fetched contact data', {
+        id: contact.id,
+        name: contact.name,
+        email: contact.email,
+        wallet: contact.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet'
+      });
+
+      // Validate that we have the necessary contact information
+      if (!contact.wallet_address) {
+        Alert.alert('Error', 'Recipient wallet address not found. Please ask them to set up their wallet.');
+        return;
+      }
+      
+      // Navigate to SendAmount screen with pre-filled data
+      logger.info('Navigating to SendAmount with data', {
+        contact: contact.name,
+        amount,
+        currency,
+      });
+
+      navigation.navigate('SendAmount', {
+        destinationType: 'friend',
+        contact: contact,
+        prefilledAmount: amount,
+        prefilledNote: `Payment request from ${contact.name}`,
+        fromNotification: false,
+        requestId: request.data?.requestId || request.id
+      });
+    } catch (error) {
+      console.error('🔍 Dashboard: Error handling send payment:', error);
+      Alert.alert('Error', 'Failed to process payment request. Please try again.');
     }
   };
 
@@ -820,116 +893,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           ) : (
             <>
               {/* Show first 2 requests */}
-              {paymentRequests.slice(0, 2).map((request, index) => {
-                try {
-
-                  const senderName = request.data?.senderName || request.data?.fromUser || request.title || 'Unknown User';
-                  const amount = request.data?.amount || 0;
-                  const currency = request.data?.currency || 'USDC';
-                  const source = 'payment request';
-                  const senderAvatar = request.data?.senderAvatar || null;
-
-                  return (
-                    <View key={request.id || index} style={styles.requestItemNew}>
-                      <AvatarComponent
-                        avatar={senderAvatar || ''}
-                        displayName={senderName || 'U'}
-                        style={styles.requestAvatarNew}
-                      />
-                      <View style={styles.requestContent}>
-                        <Text style={styles.requestMessageWithAmount}>
-                          <Text style={styles.requestSenderName}>{senderName}</Text>
-                          <Text> requested a payment of </Text>
-                          <Text style={styles.requestAmountGreen}>
-                            {amount.toFixed(1)} USDC
-                          </Text>
-                        </Text>
-                        
-                      </View>
-                      <TouchableOpacity
-                        style={styles.requestSendButtonNew}
-                        onPress={async () => {
-                          try {
-                            logger.info('Send button pressed for request', {
-                              requestId: request.id,
-                              requestData: request.data,
-                              amount,
-                              currency,
-                              senderName
-                            });
-
-                            // Get the sender ID from the request data
-                            const senderId = request.data?.senderId || request.data?.requester || request.data?.sender;
-                            if (!senderId) {
-                              console.error('🔍 Dashboard: No sender ID found in request data:', request.data);
-                              Alert.alert('Error', 'Unable to find sender information');
-                              return;
-                            }
-
-                            logger.debug('Fetching user data for sender ID', { senderId }, 'DashboardScreen');
-                            
-                            // Fetch user data to get wallet address and other details
-                            const contact = await fetchUserData(senderId);
-                            
-                            logger.debug('Fetched contact data', {
-                              id: contact.id,
-                              name: contact.name,
-                              email: contact.email,
-                              wallet: contact.wallet_address ? `${contact.wallet_address.substring(0, 6)}...${contact.wallet_address.substring(contact.wallet_address.length - 6)}` : 'No wallet'
-                            });
-
-                            // Validate that we have the necessary contact information
-                            if (!contact.wallet_address) {
-                              Alert.alert('Error', 'Recipient wallet address not found. Please ask them to set up their wallet.');
-                              return;
-                            }
-                            
-                            // Navigate to SendAmount screen with pre-filled data
-                            logger.info('Navigating to SendAmount with data', {
-                              contact: contact.name,
-                              amount,
-                              currency,
-                            });
-
-                            navigation.navigate('SendAmount', {
-                              destinationType: 'friend',
-                              contact: contact,
-                              prefilledAmount: amount,
-                              prefilledNote: `Payment request from ${contact.name}`,
-                              fromNotification: false,
-                              requestId: request.data?.requestId || request.id
-                            });
-                          } catch (error) {
-                            console.error('🔍 Dashboard: Error handling send payment:', error);
-                            Alert.alert('Error', 'Failed to process payment request. Please try again.');
-                          }
-                        }}
-                      >
-                        <LinearGradient
-                          colors={[colors.green, colors.greenLight]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={styles.requestSendButtonGradient}
-                        >
-                          <Text style={styles.requestSendButtonTextNew}>Send</Text>
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    </View>
-                  );
-                } catch (error) {
-                  console.error(`Error rendering request ${index}:`, error);
-                  return (
-                    <View key={index} style={styles.requestItemNew}>
-                      <View style={styles.requestAvatarNew}>
-                        <Text style={styles.balanceAmountText}>E</Text>
-                      </View>
-                      <View style={styles.requestContent}>
-                        <Text style={styles.requestSenderName}>Error loading request</Text>
-                      </View>
-                    </View>
-                  );
-                }
-              })}
+              {paymentRequests.slice(0, 2).map((request, index) => (
+                <RequestCard
+                  key={request.id || index}
+                  request={request}
+                  index={index}
+                  onSendPress={handleSendPress}
+                  requestStyles={styles}
+                />
+              ))}
 
               {/* Show preview of 3rd request if it exists */}
               {paymentRequests.length > 2 && (
@@ -949,7 +921,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                       </Text>
                       <Text> requested a payment of </Text>
                       <Text style={styles.requestAmountGreen}>
-                        {(paymentRequests[2].data?.amount || 0).toFixed(1)} USDC
+                        {formatRequestAmount(paymentRequests[2].data?.amount || 0)} USDC
                       </Text>
                     </Text>
                     <Text style={styles.requestSource}>

@@ -773,17 +773,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               : 'All participants have paid their shares. The split is now complete!',
             [
               {
-                text: 'Stay Here',
+                text: 'Continue',
                 style: 'default',
                 onPress: () => {
-                  // Just reload the completion data to show updated status
-                  loadCompletionData();
+                  // Navigate to splits list
+                  navigation.navigate('SplitsList');
                 }
-              },
-              {
-                text: 'View Splits',
-                style: 'default',
-                onPress: () => navigation.navigate('SplitsList'),
               },
             ]
           );
@@ -2413,17 +2408,20 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             <View style={styles.splitWalletCard}>
               <View style={styles.splitWalletInfo}>
                 <Text style={styles.splitWalletLabel}>Wallet Address</Text>
-                <View style={styles.walletAddressContainer}>
+                <TouchableOpacity 
+                  style={styles.walletAddressContainer}
+                  onPress={() => handleCopyWalletAddress(splitWallet.walletAddress)}
+                >
                   <Text style={styles.splitWalletAddress}>
                     {formatWalletAddress(splitWallet.walletAddress)}
                   </Text>
-                  <TouchableOpacity onPress={() => handleCopyWalletAddress(splitWallet.walletAddress)}>
-                    <Image
-                      source={require('../../../assets/copy-icon.png')}
-                      style={styles.copyIcon}
-                    />
-                  </TouchableOpacity>
-                </View>
+                  <PhosphorIcon
+                    name="Copy"
+                    size={20}
+                    color={colors.white}
+                    weight="regular"
+                  />
+                </TouchableOpacity>
               </View>
               <TouchableOpacity
                 style={styles.privateKeyButton}
@@ -2775,7 +2773,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       <CustomModal
         visible={showSplitModal}
         onClose={() => setShowSplitModal(false)}
-        title={!showSignatureStep ? 'Transfer Funds' : `Transfer ${totalAmount.toFixed(1)} USDC to ${selectedWallet?.name || 'Selected Wallet'}`}
+        title={!showSignatureStep ? 'Transfer Funds' : `Transfer ${totalAmount.toFixed(2)} USDC to ${selectedWallet?.name || 'Selected Wallet'}`}
         description={!showSignatureStep 
           ? 'All participants have covered their share. Choose how to transfer the funds:'
           : 'Transfer funds to your selected wallet address.'

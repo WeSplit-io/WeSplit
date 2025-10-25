@@ -49,20 +49,4 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
-  inviteButtonDisabled: {
-    opacity: 0.6,
-  },
-  inviteButtonGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inviteButtonText: {
-    color: colors.black,
-    fontSize: 16,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  inviteButtonTextDisabled: {
-  },
 }); 

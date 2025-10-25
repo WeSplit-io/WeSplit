@@ -44,8 +44,12 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
   }, [note, maxNoteInputWidth]);
 
   const handleAmountChange = (value: string) => {
-    // Only allow numbers and decimal point
-    const cleaned = value.replace(/[^0-9.]/g, '');
+    // Allow numbers, decimal point, and comma (for international keyboards)
+    // First, convert commas to dots for consistency
+    let cleaned = value.replace(/,/g, '.');
+
+    // Then remove any other non-numeric characters except dots
+    cleaned = cleaned.replace(/[^0-9.]/g, '');
 
     // Prevent multiple decimal points
     const parts = cleaned.split('.');
@@ -173,7 +177,7 @@ const RequestAmountScreen: React.FC<any> = ({ navigation, route }) => {
                 onChangeText={handleAmountChange}
                 placeholder="0"
                 placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
+                keyboardType="decimal-pad"
                 autoFocus={true}
                 textAlign="center"
                 selectionColor={colors.brandGreen}

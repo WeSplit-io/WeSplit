@@ -168,9 +168,11 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     });
     logger.info('Transaction details', {
       amount,
+      amountType: typeof amount,
       description,
       groupId,
-      isSettlement
+      isSettlement,
+      requestId
     });
     logger.debug('UI state', {
       destinationType,
@@ -179,7 +181,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       contactAvatar: contact?.avatar,
       contactId: contact?.id
     });
-  }, [destinationType, recipientName, recipientAddress, amount, description, groupId, isSettlement, contact]);
+  }, [destinationType, recipientName, recipientAddress, amount, description, groupId, isSettlement, contact, requestId]);
   const [sending, setSending] = useState(false);
 
   const handleConfirmSend = async () => {
@@ -436,8 +438,11 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
 
   // Check if user has sufficient balance using existing wallet balance - check total amount including fees
   const transactionType: TransactionType = isSettlement ? 'settlement' : 'send';
-  const totalAmountToPay = FeeService.calculateCompanyFee(amount, transactionType).totalAmount; // Amount + fee
-  const hasSufficientBalance = existingWalletBalance === null || existingWalletBalance.usdc >= totalAmountToPay;
+  // Ensure amount is a valid number
+  const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount);
+  const isValidAmount = !isNaN(numericAmount) && numericAmount > 0;
+  const totalAmountToPay = isValidAmount ? FeeService.calculateCompanyFee(numericAmount, transactionType).totalAmount : 0; // Amount + fee
+  const hasSufficientBalance = !isValidAmount ? false : (existingWalletBalance === null || existingWalletBalance.usdc >= totalAmountToPay);
 
   // Debug logging for slider state
   if (__DEV__) {
@@ -448,9 +453,22 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       hasSufficientBalance,
       existingWalletBalance,
       amount,
+      amountType: typeof amount,
+      amountValue: amount,
+      numericAmount,
+      isValidAmount,
+      totalAmountToPay,
       walletLoading,
       walletError,
-      sliderDisabled
+      sliderDisabled,
+      breakdown: {
+        walletLoading: walletLoading,
+        sending: sending,
+        hasExistingWallet: hasExistingWallet,
+        hasSufficientBalance: hasSufficientBalance,
+        hasWalletError: !!walletError,
+        isValidAmount: isValidAmount
+      }
     }, 'SendConfirmationScreen');
   }
 

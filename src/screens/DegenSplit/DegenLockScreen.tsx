@@ -27,7 +27,7 @@ import { FallbackDataService } from '../../services/data/mockupData';
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitInitialization, useDegenSplitRealtime } from './hooks';
 import { DegenSplitHeader, DegenSplitProgress, DegenSplitParticipants } from './components';
-import { Container, Button, Modal, AppleSlider } from '../../components/shared';
+import { Container, Button, Modal, AppleSlider, PhosphorIcon } from '../../components/shared';
 import { roundUsdcAmount, formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
 
 
@@ -390,17 +390,20 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
             <View style={styles.splitWalletCard}>
               <View style={styles.splitWalletInfo}>
                 <Text style={styles.splitWalletLabel}>Split Wallet Address</Text>
-                <View style={styles.walletAddressContainer}>
+                <TouchableOpacity 
+                  style={styles.walletAddressContainer}
+                  onPress={() => degenState.splitWallet && handleCopyWalletAddress(degenState.splitWallet.walletAddress)}
+                >
                   <Text style={styles.splitWalletAddress}>
                     {degenState.splitWallet ? degenLogic.formatWalletAddress(degenState.splitWallet.walletAddress) : 'Wallet not created yet'}
                   </Text>
-                  <TouchableOpacity onPress={() => degenState.splitWallet && handleCopyWalletAddress(degenState.splitWallet.walletAddress)}>
-                    <Image
-                      source={require('../../../assets/copy-icon.png')}
-                      style={styles.copyIcon}
-                    />
-                  </TouchableOpacity>
-                </View>
+                  <PhosphorIcon
+                    name="Copy"
+                    size={20}
+                    color={colors.white}
+                    weight="regular"
+                  />
+                </TouchableOpacity>
               </View>
               <TouchableOpacity
                 style={styles.privateKeyButton}
@@ -554,9 +557,11 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         description="Lock your funds to participate in the degen split roulette!"
       >
         <View style={styles.modalIconContainer}>
-          <Image 
-            source={require('../../../assets/lock-check-icon.png')} 
-            style={styles.modalLockIcon}
+          <PhosphorIcon 
+            name="Lock" 
+            size={32} 
+            color={colors.white} 
+            weight="fill"
           />
         </View>
         
@@ -622,7 +627,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
         visible={degenState.showPrivateKeyModal && !!degenState.privateKey}
         onClose={handleClosePrivateKeyModal}
         showHandle={true}
-        title="🔑 Private Key"
+        title="Private Key"
         description="This is a shared private key for the Degen Split. All participants have access to this key to withdraw or move funds from the split wallet."
       >
         <View style={styles.privateKeyDisplay}>
@@ -640,11 +645,13 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
             title="Copy Key"
             onPress={handleCopyPrivateKey}
             variant="primary"
+            style={{flex: 1}}
           />
           <Button
             title="Close"
             onPress={handleClosePrivateKeyModal}
             variant="secondary"
+            style={{flex: 1}}
           />
         </View>
       </Modal>

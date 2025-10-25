@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, TextInput, Image, Alert, Link
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from './Icon';
+import { Input, PhosphorIcon } from './shared';
 import { useApp } from '../context/AppContext';
 import { useContacts, useContactActions } from '../hooks';
 import { deepLinkHandler } from '../services/core';
@@ -525,9 +526,19 @@ const ContactsList: React.FC<ContactsListProps> = ({
       {multiSelect ? (
         <View style={styles.selectIndicator}>
           {isSelected ? (
-            <View style={styles.addButton}>
-              <Image source={require('../../assets/check-lg-linear.png')} style={styles.addButtonIcon} />
-            </View>
+            <LinearGradient
+              colors={[colors.green, colors.greenBlue || colors.green]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.addButton}
+            >
+              <PhosphorIcon 
+                name="Check" 
+                size={16} 
+                color={colors.black} 
+                weight="bold"
+              />
+            </LinearGradient>
           ) : (
             <View style={styles.addButton}>
               <Text style={styles.addButtonText}>Add</Text>
@@ -642,13 +653,13 @@ const ContactsList: React.FC<ContactsListProps> = ({
           {/* Search Input */}
           {showSearch && (
             <View style={styles.searchContainer}>
-              <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fsearch-icon-white50.png?alt=media&token=d90fd15d-40f6-4fe0-8990-c38881dc1e8a' }} style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
+              <Input
                 placeholder={activeTab === 'Search' ? "Search users by name, email, or wallet address" : placeholder}
-                placeholderTextColor={colors.textSecondary}
                 value={searchQuery}
                 onChangeText={onSearchQueryChange}
+                leftIcon="MagnifyingGlass"
+                containerStyle={{ marginBottom: 0 }}
+                
                 autoFocus={activeTab === 'Search'}
               />
             </View>
@@ -787,10 +798,19 @@ const ContactsList: React.FC<ContactsListProps> = ({
                           {multiSelect ? (
                             <View style={styles.selectIndicator}>
                               {isSelected ? (
-                                <View style={styles.addButton}>
-                                  
-                                  <Image source={require('../../assets/check-lg-linear.png')} style={styles.addButtonIcon} />
-                                </View>
+                                <LinearGradient
+                                  colors={[colors.green, colors.greenBlue || colors.green]}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 0 }}
+                                  style={styles.addButton}
+                                >
+                                  <PhosphorIcon 
+                                    name="Check" 
+                                    size={16} 
+                                    color={colors.white} 
+                                    weight="bold"
+                                  />
+                                </LinearGradient>
                               ) : (
                                 <View style={styles.addButton}>
                                   <Text style={styles.addButtonText}>Add</Text>

@@ -14,6 +14,7 @@ import { styles } from './styles';
 import { logger } from '../../services/analytics/loggingService';
 import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { Container } from '../../components/shared';
+import { Button } from '../../components/shared';
 import Header from '../../components/shared/Header';
 
 interface ContactsScreenProps {
@@ -210,38 +211,18 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
 
       {isSplitMode && (
         <View style={styles.inviteButtonContainer}>
-          <TouchableOpacity
-            style={[
-              styles.inviteButton,
-              selectedContacts.length === 0 && styles.inviteButtonDisabled
-            ]}
+          <Button
+            title={selectedContacts.length === 0 
+              ? 'Invite' 
+              : `Invite ${selectedContacts.length} ${selectedContacts.length === 1 ? 'Contact' : 'Contacts'}`
+            }
             onPress={handleInviteContacts}
+            variant="primary"
             disabled={isInviting || selectedContacts.length === 0}
-          >
-            <LinearGradient
-              colors={selectedContacts.length === 0 
-                ? [colors.darkGray, colors.darkGray] 
-                : [colors.green, colors.greenLight]
-              }
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.inviteButtonGradient}
-            >
-              {isInviting ? (
-                <ActivityIndicator size="small" color={colors.white} />
-              ) : (
-                <Text style={[
-                  styles.inviteButtonText,
-                  selectedContacts.length === 0 && styles.inviteButtonTextDisabled
-                ]}>
-                  {selectedContacts.length === 0 
-                    ? 'Invite' 
-                    : `Invite ${selectedContacts.length} ${selectedContacts.length === 1 ? 'Contact' : 'Contacts'}`
-                  }
-                </Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+            loading={isInviting}
+            fullWidth={true}
+            style={styles.inviteButton}
+          />
         </View>
       )}
       
