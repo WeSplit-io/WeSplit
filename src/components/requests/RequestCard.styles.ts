@@ -53,6 +53,16 @@ export default StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
   },
   
+  // Request description
+  requestDescription: {
+    color: colors.white70,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.normal,
+    fontStyle: 'italic',
+    marginTop: spacing.xs / 2,
+    marginLeft: spacing.xs,
+  },
+  
   // Request source info
   requestSource: {
     color: colors.white70,

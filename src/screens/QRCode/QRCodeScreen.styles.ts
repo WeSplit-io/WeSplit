@@ -179,45 +179,4 @@ export const styles = StyleSheet.create({
     pointerEvents: 'none',
   },
 
-  // Toggle Styles
-  toggleContainer: {
-    flexDirection: 'row',
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.xl,
-    backgroundColor: colors.white5,
-    borderRadius: 16,
-    padding: 4,
-    height: 56,
-  },
-  toggleButton: {
-    flex: 1,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    marginHorizontal: 2,
-  },
-  toggleButtonActive: {
-    backgroundColor: colors.green,
-  },
-  toggleButtonGradient: {
-    flex: 1,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    marginHorizontal: 2,
-  },
-  toggleButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.white70,
-  },
-  toggleButtonTextActive: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
 });

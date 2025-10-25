@@ -35,6 +35,7 @@ const RequestCard: React.FC<RequestCardProps> = ({
     const amount = request.data?.amount || 0;
     const currency = request.data?.currency || 'USDC';
     const senderAvatar = request.data?.senderAvatar || null;
+    const description = request.data?.description || request.data?.note || '';
 
     return (
       <View key={request.id || index} style={styles.requestItemNew}>
@@ -52,6 +53,11 @@ const RequestCard: React.FC<RequestCardProps> = ({
               {formatAmount(amount)} {currency}
             </Text>
           </Text>
+          {description && (
+            <Text style={styles.requestDescription}>
+              "{description}"
+            </Text>
+          )}
         </View>
         <TouchableOpacity
           style={styles.requestSendButtonNew}

@@ -58,9 +58,14 @@ const SendAmountScreen: React.FC<any> = ({ navigation, route }) => {
       } : null,
       requestId: route.params?.requestId,
       hasRequestId: !!route.params?.requestId,
-      requestIdType: typeof route.params?.requestId
+      requestIdType: typeof route.params?.requestId,
+      prefilledNote: prefilledNote,
+      hasPrefilledNote: !!prefilledNote,
+      prefilledNoteType: typeof prefilledNote,
+      note: note,
+      showAddNote: showAddNote
     });
-  }, [destinationType, contact, wallet, route.params?.requestId]);
+  }, [destinationType, contact, wallet, route.params?.requestId, prefilledNote, note, showAddNote]);
 
   useEffect(() => {
     // Mesure la largeur du texte (note ou placeholder)

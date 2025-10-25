@@ -685,11 +685,9 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: colors.black,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     paddingBottom: spacing.xl,
-    borderTopWidth: 1,
-    borderTopColor: colors.white10,
   },
 
 });

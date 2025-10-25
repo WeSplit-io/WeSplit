@@ -203,13 +203,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       };
 
       // Use SplitInvitationService to actually join the split
+      logger.info('About to call SplitInvitationService.joinSplit', { splitId, notificationId }, 'AppContext');
       const joinResult = await SplitInvitationService.joinSplit(invitationData, state.currentUser.id);
       
-      if (!joinResult.success) {
+      logger.info('joinSplit result', { 
+        success: joinResult.success, 
+        message: joinResult.message,
+        error: joinResult.error 
+      }, 'AppContext');
+      
+      // Only throw error if the user is not already a participant
+      if (!joinResult.success && !joinResult.message?.includes('already a participant')) {
+        logger.error('joinSplit failed', { 
+          success: joinResult.success, 
+          error: joinResult.error,
+          message: joinResult.message
+        }, 'AppContext');
         throw new Error(joinResult.error || 'Failed to join split');
       }
 
-      // Remove the notification after successful join
+      // Remove the notification after successful join (or if already joined)
+      logger.info('Removing notification after successful join', { notificationId }, 'AppContext');
       await removeNotification(notificationId);
       
       logger.info('Split invitation accepted and user joined split', {
@@ -221,6 +235,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return { success: true, splitId, joinResult };
     } catch (error) {
       logger.error('Failed to accept split invitation:', error, 'AppContext');
+      // Check if it's an "already participant" error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('already a participant')) {
+        logger.info('User already participant - not throwing error', null, 'AppContext');
+        return { success: true, splitId, joinResult: { success: true, message: 'User already a participant' } };
+      }
       throw error;
     }
   }, [state.currentUser, state.notifications, removeNotification]);

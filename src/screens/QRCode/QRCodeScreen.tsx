@@ -20,6 +20,7 @@ import { parseWeSplitDeepLink } from '../../services/core/deepLinkHandler';
 import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
+import Tabs from '../../components/shared/Tabs';
 
 // Fonction pour hacher l'adresse du wallet
 const hashWalletAddress = (address: string): string => {
@@ -40,6 +41,11 @@ interface QRCodeScreenProps {
 }
 
 type TabType = 'myCode' | 'scan';
+
+const tabs = [
+  { label: 'My Code', value: 'myCode' },
+  { label: 'Scan', value: 'scan' }
+];
 
 const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
   onBack,
@@ -378,62 +384,13 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
     );
   };
 
-  const renderToggle = () => (
-    <View style={styles.toggleContainer}>
-      {activeTab === 'myCode' ? (
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.toggleButtonGradient}
-        >
-          <TouchableOpacity
-            style={styles.toggleButton}
-            onPress={() => setActiveTab('myCode')}
-          >
-            <Text style={styles.toggleButtonTextActive}>
-              My Code
-            </Text>
-          </TouchableOpacity>
-        </LinearGradient>
-      ) : (
-        <TouchableOpacity
-          style={styles.toggleButton}
-          onPress={() => setActiveTab('myCode')}
-        >
-          <Text style={styles.toggleButtonText}>
-            My Code
-          </Text>
-        </TouchableOpacity>
-      )}
-      
-      {activeTab === 'scan' ? (
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.toggleButtonGradient}
-        >
-          <TouchableOpacity
-            style={styles.toggleButton}
-            onPress={() => setActiveTab('scan')}
-          >
-            <Text style={styles.toggleButtonTextActive}>
-              Scan
-            </Text>
-          </TouchableOpacity>
-        </LinearGradient>
-      ) : (
-        <TouchableOpacity
-          style={styles.toggleButton}
-          onPress={() => setActiveTab('scan')}
-        >
-          <Text style={styles.toggleButtonText}>
-            Scan
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
+  const renderTabs = () => (
+    <Tabs
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={(tabValue) => setActiveTab(tabValue as TabType)}
+      enableAnimation={true}
+    />
   );
 
   return (
@@ -444,7 +401,7 @@ const QRCodeScreen: React.FC<QRCodeScreenProps> = ({
 
       {activeTab === 'myCode' ? renderMyCodeTab() : renderScanTab()}
 
-      {renderToggle()}
+      {renderTabs()}
     </Container>
   );
 };

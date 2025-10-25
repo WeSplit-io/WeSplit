@@ -159,12 +159,16 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           
           const standardizedData = standardizeNotificationData(notification);
           console.log('📊 Standardized data:', standardizedData);
+          console.log('📊 Raw notification data:', notification.data);
           
           logNotificationData(standardizedData, 'Payment request handling', notification.type);
 
-          const { senderId: requesterId, amount, currency, requestId } = standardizedData;
+          const { senderId: requesterId, amount, currency, requestId, description } = standardizedData;
           
-          console.log('🔍 Extracted data:', { requesterId, amount, currency, requestId });
+          // Try to get description from multiple sources like RequestCard does
+          const requestDescription = description || notification.data?.description || notification.data?.note || '';
+          
+          console.log('🔍 Extracted data:', { requesterId, amount, currency, requestId, description });
 
           if (!requesterId) {
             throw new Error('No requester ID found in notification data');
@@ -179,6 +183,12 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
             throw new Error('Could not fetch requester data');
           }
 
+          // Use the original message from the user if available, otherwise use a generic message
+          const hasValidDescription = requestDescription && requestDescription.trim().length > 0;
+          const prefilledNote = hasValidDescription 
+            ? `Re: "${requestDescription.trim()}"` 
+            : `Payment request from ${requesterData.name}`;
+
           console.log('🚀 Navigating to Send screen with data:', {
             destinationType: 'friend',
             contact: {
@@ -189,8 +199,25 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               avatar: requesterData.avatar || null
             },
             prefilledAmount: amount,
-            prefilledNote: `Payment request from ${requesterData.name}`,
+            prefilledNote: prefilledNote,
             requestId: requestId
+          });
+          console.log('📝 Prefilled note details:', {
+            description: description,
+            requestDescription: requestDescription,
+            prefilledNote: prefilledNote,
+            hasDescription: !!description,
+            hasRequestDescription: !!requestDescription,
+            hasValidDescription: hasValidDescription,
+            hasPrefilledNote: !!prefilledNote,
+            descriptionType: typeof description,
+            requestDescriptionType: typeof requestDescription,
+            descriptionLength: description?.length || 0,
+            requestDescriptionLength: requestDescription?.length || 0,
+            descriptionTrimmed: description?.trim() || '',
+            requestDescriptionTrimmed: requestDescription?.trim() || '',
+            isEmpty: !description || description.trim() === '',
+            requestDescriptionEmpty: !requestDescription || requestDescription.trim() === ''
           });
 
           // Navigate to send screen with prefilled data
@@ -204,7 +231,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               avatar: requesterData.avatar || null
             },
             prefilledAmount: amount,
-            prefilledNote: `Payment request from ${requesterData.name}`,
+            prefilledNote: prefilledNote,
             requestId: requestId
           });
           
@@ -385,22 +412,36 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         const splitId = notification.data?.splitId;
         if (splitId && state.currentUser?.id) {
           try {
+            console.log('🚀 Starting split invitation acceptance...');
             // Set action state to pending
             setActionStates(prev => ({ ...prev, [notification.id]: 'pending' }));
             
             // Call acceptSplitInvitation with correct parameters: notificationId first, then splitId
             if (acceptSplitInvitation) {
-              await acceptSplitInvitation(notification.id, splitId);
+              console.log('📞 Calling acceptSplitInvitation...');
+              const result = await acceptSplitInvitation(notification.id, splitId);
+              console.log('✅ acceptSplitInvitation result:', result);
+              
+              // Check if user is already a participant
+              const isAlreadyParticipant = result?.joinResult?.message?.includes('already a participant');
+              
+              if (isAlreadyParticipant) {
+                console.log('ℹ️ User already in split');
+                showToast('You are already in this split!');
+              } else {
+                console.log('✅ User successfully joined split');
+                showToast('Split invitation accepted!');
+              }
             }
             
             // Set action state to completed
             setActionStates(prev => ({ ...prev, [notification.id]: 'completed' }));
             
-            showToast('Split invitation accepted!');
-            
             // Navigate to splits list first, then to split details
+            console.log('🧭 Navigating to SplitsList...');
             navigation.navigate('SplitsList');
             setTimeout(() => {
+              console.log('🧭 Navigating to SplitDetails...');
               navigation.navigate('SplitDetails', { 
                 splitId,
                 isFromNotification: true,
@@ -408,10 +449,33 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
               });
             }, 100);
           } catch (error) {
-            console.error('Error accepting split invitation:', error);
-            // Set action state to error
-            setActionStates(prev => ({ ...prev, [notification.id]: 'error' }));
-            showToast('Failed to accept split invitation', 'error');
+            console.error('❌ Error accepting split invitation:', error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const isAlreadyParticipant = errorMessage.includes('already a participant');
+            
+            // Check if user is already a participant
+            if (isAlreadyParticipant) {
+              console.log('ℹ️ User already participant - treating as success');
+              showToast('You are already in this split!');
+              setActionStates(prev => ({ ...prev, [notification.id]: 'completed' }));
+              
+              // Still navigate to the split
+              console.log('🧭 Navigating to SplitsList (already participant)...');
+              navigation.navigate('SplitsList');
+              setTimeout(() => {
+                console.log('🧭 Navigating to SplitDetails (already participant)...');
+                navigation.navigate('SplitDetails', { 
+                  splitId,
+                  isFromNotification: true,
+                  notificationId: notification.id
+                });
+              }, 100);
+            } else {
+              console.log('❌ Real error occurred');
+              // Set action state to error only for real errors
+              setActionStates(prev => ({ ...prev, [notification.id]: 'error' }));
+              showToast('Failed to accept split invitation', 'error');
+            }
           }
         } else {
           console.error('Missing splitId or user not authenticated');
@@ -433,7 +497,12 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       
       // Use the same logic as handleNotificationPress for payment_request
       const standardizedData = standardizeNotificationData(request);
-      const { senderId: requesterId, amount, currency, requestId } = standardizedData;
+      console.log('📊 RequestCard standardized data:', standardizedData);
+      console.log('📊 RequestCard raw request data:', request.data);
+      const { senderId: requesterId, amount, currency, requestId, description } = standardizedData;
+      
+      // Try to get description from multiple sources like RequestCard does
+      const requestDescription = description || request.data?.description || request.data?.note || '';
       
       if (!requesterId) {
         throw new Error('No requester ID found in request data');
@@ -446,6 +515,30 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
         throw new Error('Could not fetch requester data');
       }
 
+      // Use the original message from the user if available, otherwise use a generic message
+      const hasValidDescription = requestDescription && requestDescription.trim().length > 0;
+      const prefilledNote = hasValidDescription 
+        ? `Re: "${requestDescription.trim()}"` 
+        : `Payment request from ${requesterData.name}`;
+
+      console.log('📝 RequestCard prefilled note details:', {
+        description: description,
+        requestDescription: requestDescription,
+        prefilledNote: prefilledNote,
+        hasDescription: !!description,
+        hasRequestDescription: !!requestDescription,
+        hasValidDescription: hasValidDescription,
+        hasPrefilledNote: !!prefilledNote,
+        descriptionType: typeof description,
+        requestDescriptionType: typeof requestDescription,
+        descriptionLength: description?.length || 0,
+        requestDescriptionLength: requestDescription?.length || 0,
+        descriptionTrimmed: description?.trim() || '',
+        requestDescriptionTrimmed: requestDescription?.trim() || '',
+        isEmpty: !description || description.trim() === '',
+        requestDescriptionEmpty: !requestDescription || requestDescription.trim() === ''
+      });
+
       // Navigate to send screen with prefilled data
       navigation.navigate('Send', {
         destinationType: 'friend',
@@ -457,7 +550,7 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
           avatar: requesterData.avatar || null
         },
         prefilledAmount: amount,
-        prefilledNote: `Payment request from ${requesterData.name}`,
+        prefilledNote: prefilledNote,
         requestId: requestId
       });
       
@@ -506,6 +599,19 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
       try {
         firebasePaymentRequests = await getReceivedPaymentRequests(state.currentUser.id, 10);
         console.log('🔥 Loaded Firebase payment requests:', firebasePaymentRequests.length, firebasePaymentRequests);
+        firebasePaymentRequests.forEach((req, index) => {
+          console.log(`🔥 Firebase request ${index}:`, {
+            id: req.id,
+            senderName: req.senderName,
+            amount: req.amount,
+            description: req.description,
+            hasDescription: !!req.description,
+            descriptionLength: req.description?.length || 0,
+            descriptionTrimmed: req.description?.trim() || '',
+            isEmpty: !req.description || req.description.trim() === '',
+            rawData: req
+          });
+        });
       } catch (error) {
         console.error('Error loading Firebase payment requests:', error);
       }

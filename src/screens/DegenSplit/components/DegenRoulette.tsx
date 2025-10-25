@@ -146,7 +146,7 @@ const DegenRoulette: React.FC<DegenRouletteProps> = ({
           >
             {/* Background Image */}
             <Image
-              source={require('../../../../assets/card-split-bg.png')}
+              source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fcard-split-bg.png?alt=media&token=642efc16-ee03-410d-943c-d6e16378c106' }}
               style={styles.rouletteCardBackground}
               resizeMode="cover"
             />

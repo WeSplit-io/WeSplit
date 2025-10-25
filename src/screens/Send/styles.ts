@@ -1107,7 +1107,7 @@ export const styles = StyleSheet.create({
   },
 
   amountCardAddNoteRow: {
-    backgroundColor: 'rgba(0, 0, 0, 0.20)',
+    backgroundColor: colors.blackWhite5,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

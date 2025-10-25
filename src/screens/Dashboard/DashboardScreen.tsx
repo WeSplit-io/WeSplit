@@ -206,18 +206,27 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         return;
       }
       
-      // Navigate to SendAmount screen with pre-filled data
+      // Get the original message from the request
+      const requestDescription = request.data?.description || request.data?.note || '';
+      const hasValidDescription = requestDescription && requestDescription.trim().length > 0;
+      const prefilledNote = hasValidDescription 
+        ? `"${requestDescription.trim()}"` 
+        : `Payment request from ${contact.name}`;
+
       logger.info('Navigating to SendAmount with data', {
         contact: contact.name,
         amount,
         currency,
+        requestDescription,
+        hasValidDescription,
+        prefilledNote
       });
 
       navigation.navigate('SendAmount', {
         destinationType: 'friend',
         contact: contact,
         prefilledAmount: amount,
-        prefilledNote: `Payment request from ${contact.name}`,
+        prefilledNote: prefilledNote,
         fromNotification: false,
         requestId: request.data?.requestId || request.id
       });
@@ -855,7 +864,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       {/* QR Code Screen */}
       <Modal
         visible={showQRCodeScreen}
-        animationType="slide"
+        animationType="fade"
         presentationStyle="fullScreen"
         onRequestClose={() => setShowQRCodeScreen(false)}
       >

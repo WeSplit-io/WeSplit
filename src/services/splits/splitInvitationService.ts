@@ -210,10 +210,21 @@ export class SplitInvitationService {
           logger.info('Update participant result', { updateResult }, 'splitInvitationService');
           
           if (!updateResult.success) {
-            return {
-              success: false,
-              error: updateResult.error || 'Failed to update participant status',
-            };
+            logger.error('Failed to update participant status', {
+              splitId: invitationData.splitId,
+              userId,
+              error: updateResult.error
+            }, 'SplitInvitationService');
+            // Don't return error if it's about duplicate or already exists
+            if (updateResult.error?.includes('already') || updateResult.error?.includes('duplicate')) {
+              logger.info('Participant already exists - treating as success', null, 'SplitInvitationService');
+              // Continue with the flow as if it succeeded
+            } else {
+              return {
+                success: false,
+                error: updateResult.error || 'Failed to update participant status',
+              };
+            }
           }
 
           // CRITICAL: Also update the splitWallets collection to keep both databases synchronized
@@ -280,19 +291,27 @@ export class SplitInvitationService {
             // Don't fail the invitation if sync fails, but log the error
           }
           
-          // Send confirmation notification to the creator
-          const { notificationService } = await import('../notifications/notificationService');
-          await notificationService.sendNotification(
-            invitationData.creatorId,
-            'User Joined Your Split',
-            `A user has joined your split "${invitationData.billName}". The split is ready to begin!`,
-            'split_invite',
-            {
-              splitId: invitationData.splitId,
-              billName: invitationData.billName,
-              totalAmount: invitationData.totalAmount,
+          // Send confirmation notification to the creator (non-blocking)
+          try {
+            const { notificationService } = await import('../notifications/notificationService');
+            if (notificationService && typeof notificationService.sendNotification === 'function') {
+              await notificationService.sendNotification(
+                invitationData.creatorId,
+                'User Joined Your Split',
+                `A user has joined your split "${invitationData.billName}". The split is ready to begin!`,
+                'split_invite',
+                {
+                  splitId: invitationData.splitId,
+                  billName: invitationData.billName,
+                  totalAmount: invitationData.totalAmount,
+                }
+              );
             }
-          );
+          } catch (notificationError) {
+            logger.warn('Failed to send notification (non-critical)', {
+              error: notificationError instanceof Error ? notificationError.message : String(notificationError)
+            }, 'SplitInvitationService');
+          }
           
           logger.info('User successfully joined split (status updated)', {
             splitId: invitationData.splitId,
@@ -411,19 +430,27 @@ export class SplitInvitationService {
         // Don't fail the invitation if sync fails, but log the error
       }
 
-      // 5. Send confirmation notification to the creator
-      const { notificationService } = await import('../notifications/notificationService');
-      await notificationService.sendNotification(
-        invitationData.creatorId,
-        'User Joined Your Split',
-        `A user has joined your split "${invitationData.billName}". The split is ready to begin!`,
-        'split_invite',
-        {
-          splitId: invitationData.splitId,
-          billName: invitationData.billName,
-          totalAmount: invitationData.totalAmount,
+      // 5. Send confirmation notification to the creator (non-blocking)
+      try {
+        const { notificationService } = await import('../notifications/notificationService');
+        if (notificationService && typeof notificationService.sendNotification === 'function') {
+          await notificationService.sendNotification(
+            invitationData.creatorId,
+            'User Joined Your Split',
+            `A user has joined your split "${invitationData.billName}". The split is ready to begin!`,
+            'split_invite',
+            {
+              splitId: invitationData.splitId,
+              billName: invitationData.billName,
+              totalAmount: invitationData.totalAmount,
+            }
+          );
         }
-      );
+      } catch (notificationError) {
+        logger.warn('Failed to send notification (non-critical)', {
+          error: notificationError instanceof Error ? notificationError.message : String(notificationError)
+        }, 'SplitInvitationService');
+      }
 
       logger.info('User successfully joined split', {
         splitId: invitationData.splitId,
@@ -437,7 +464,24 @@ export class SplitInvitationService {
       };
 
     } catch (error) {
-      logger.error('Failed to join split', error, 'SplitInvitationService');
+      logger.error('Failed to join split', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        splitId: invitationData.splitId,
+        userId
+      }, 'SplitInvitationService');
+      
+      // Don't return error if it's about user already being a participant
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('already a participant') || errorMessage.includes('already accepted')) {
+        logger.info('User already participant - returning success', null, 'SplitInvitationService');
+        return {
+          success: true,
+          splitId: invitationData.splitId,
+          message: 'You are already a participant in this split',
+        };
+      }
+      
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
