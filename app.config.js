@@ -88,7 +88,12 @@ module.exports = {
       "expo-camera",
       ...(process.env.EAS_BUILD_PROFILE !== 'development' ? ["expo-notifications"] : []),
       "expo-web-browser",
-      "@react-native-firebase/app"
+      // Custom Firebase plugin configuration for Swift AppDelegate
+      ["@react-native-firebase/app", {
+        ios: {
+          useFrameworks: "static"
+        }
+      }]
     ],
     extra: {
       eas: {
