@@ -219,15 +219,11 @@ const VerificationScreen: React.FC = () => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <View style={styles.mainContainer}>
-          {/* Header with Back Button and Logo */}
+          {/* Header with Logo Centered */}
           <Header
             onBackPress={() => navigation.goBack()}
-            rightElement={
-              <Image 
-                source={{uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fwesplit-logo-linear.png?alt=media&token=6089c64e-c1dd-4488-8431-feb9041309b4'}} 
-                style={styles.logo} 
-              />
-            }
+            showBackButton={true}
+            variant="logoWithBack"
           />
 
           {/* Main Content - Scrollable */}

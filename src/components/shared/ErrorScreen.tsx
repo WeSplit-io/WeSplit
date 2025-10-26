@@ -8,14 +8,14 @@ import React from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from '../Icon';
+import PhosphorIcon from './PhosphorIcon';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
+import Button from './Button';
 
 interface ErrorScreenProps {
   title?: string;
@@ -38,10 +38,11 @@ const ErrorScreen: React.FC<ErrorScreenProps> = ({
     <SafeAreaView style={[styles.container, style]}>
       <View style={styles.content}>
         {showIcon && (
-          <Icon 
-            name="x-circle" 
+          <PhosphorIcon 
+            name="XCircle" 
             size={64} 
             color={colors.error} 
+            weight="fill"
             style={styles.icon}
           />
         )}
@@ -50,12 +51,12 @@ const ErrorScreen: React.FC<ErrorScreenProps> = ({
         <Text style={styles.message}>{message}</Text>
         
         {onRetry && (
-          <TouchableOpacity
-            style={styles.retryButton}
+          <Button
+            title={retryText}
             onPress={onRetry}
-          >
-            <Text style={styles.retryButtonText}>{retryText}</Text>
-          </TouchableOpacity>
+            variant="primary"
+            size="medium"
+          />
         )}
       </View>
     </SafeAreaView>
@@ -65,7 +66,7 @@ const ErrorScreen: React.FC<ErrorScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.black,
   },
   content: {
     flex: 1,
@@ -77,29 +78,19 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   title: {
-    ...typography.h2,
-    color: colors.text,
+    fontSize: typography.fontSize.xxl,
+    fontWeight: '700',
+    color: colors.white,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
   message: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontSize: typography.fontSize.md,
+    fontWeight: '400',
+    color: colors.white70,
     textAlign: 'center',
     marginBottom: spacing.xl,
     lineHeight: 24,
-  },
-  retryButton: {
-    backgroundColor: colors.green,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: 8,
-    minWidth: 120,
-  },
-  retryButtonText: {
-    ...typography.button,
-    color: colors.white,
-    textAlign: 'center',
   },
 });
 

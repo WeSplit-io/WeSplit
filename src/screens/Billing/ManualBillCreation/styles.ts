@@ -158,29 +158,7 @@ export const styles = StyleSheet.create({
   },
 
   /** ================================ Input Styles ================================ */
-  textInput: {
-    backgroundColor: colors.surface,
-    borderRadius: spacing.radiusMd,
-    paddingHorizontal: spacing.inputPaddingHorizontal,
-    paddingVertical: spacing.inputPaddingVertical,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    height: spacing.inputHeight,
-  },
-  amountInput: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: spacing.radiusMd,
-    paddingHorizontal: spacing.inputPaddingHorizontal,
-    paddingVertical: spacing.inputPaddingVertical,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    height: spacing.inputHeight,
-  },
+
   inputError: {
     borderColor: colors.error,
     borderWidth: 2,
@@ -189,25 +167,6 @@ export const styles = StyleSheet.create({
     color: colors.error,
     fontSize: typography.fontSize.sm,
     marginTop: spacing.xs,
-  },
-
-  /** ================================ Date Input Styles ================================ */
-  dateInput: {
-    backgroundColor: colors.surface,
-    borderRadius: spacing.radiusMd,
-    paddingHorizontal: spacing.inputPaddingHorizontal,
-    paddingVertical: spacing.inputPaddingVertical,
-    borderWidth: spacing.borderWidthThin,
-    borderColor: colors.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: spacing.inputHeight,
-  },
-  calendarIcon: {
-    width: 20,
-    height: 20,
-    tintColor: colors.textLightSecondary,
   },
 
   /** ================================ Button Styles ================================ */

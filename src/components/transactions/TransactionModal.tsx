@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   ScrollView,
-  Image,
   Dimensions,
   Linking,
 } from 'react-native';

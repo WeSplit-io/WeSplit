@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, Platform } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
+import PhosphorIcon from './PhosphorIcon';
 
-type HeaderVariant = 'default' | 'titleOnly' | 'logoOnly';
+type HeaderVariant = 'default' | 'titleOnly' | 'logoOnly' | 'logoWithBack';
 
 interface HeaderProps {
   title?: string;
@@ -36,7 +37,7 @@ const Header: React.FC<HeaderProps> = ({
   const effectiveShowBackButton = variant === 'titleOnly' || variant === 'logoOnly' ? false : showBackButton;
 
   const renderCenterContent = () => {
-    if (variant === 'logoOnly') {
+    if (variant === 'logoOnly' || variant === 'logoWithBack') {
       return (
         <View style={styles.logoSection}>
           <Image 
@@ -58,9 +59,10 @@ const Header: React.FC<HeaderProps> = ({
     <View style={[styles.header, { backgroundColor }, customStyle]}>
       {effectiveShowBackButton ? (
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-          <Image
-            source={require('../../../assets/chevron-left.png')}
-            style={[styles.backIcon, { tintColor: backButtonColor }]}
+          <PhosphorIcon
+            name="CaretLeft"
+            size={24}
+            color={backButtonColor}
           />
         </TouchableOpacity>
       ) : (
@@ -87,10 +89,6 @@ const styles = {
     height: 40,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-  },
-  backIcon: {
-    width: 20,
-    height: 20,
   },
   headerTitle: {
     fontSize: typography.fontSize.lg,

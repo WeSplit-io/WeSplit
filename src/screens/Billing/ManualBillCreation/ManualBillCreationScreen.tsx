@@ -12,7 +12,6 @@ import {
   ScrollView,
   Alert,
   StatusBar,
-  TextInput,
   Modal,
   ActivityIndicator,
   Image,

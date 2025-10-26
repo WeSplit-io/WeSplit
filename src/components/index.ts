@@ -8,7 +8,6 @@ export { default as AddButton } from './AddButton';
 export { default as AddDestinationSheet } from './AddDestinationSheet';
 export { default as AppLoadingScreen } from './AppLoadingScreen';
 export { default as BalanceRow } from './BalanceRow';
-export { default as ContactSelector } from './ContactSelector';
 export { default as ContactsList } from './ContactsList';
 export { default as ErrorBoundary } from './ErrorBoundary';
 export { default as GroupIcon } from './GroupIcon';

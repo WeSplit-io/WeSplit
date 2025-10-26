@@ -390,7 +390,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
 
   const handleShareOnX = () => {
     const message = isWinner 
-      ? `I just WON the degen split on @wesplit_io ! ${formatUsdcForDisplay(totalAmount)}USDC covered by @${selectedParticipant.name} 😂🙏\nTry your luck next time, you never know…`
+      ? `Got spared ${formatUsdcForDisplay(totalAmount)}USDC by the split 🎉  @wesplit_io you’re a hero 🙏\nTry your luck next time, you never know…`
       : `RIP me 💀 lost the degen split on @wesplit_io and paid ${formatUsdcForDisplay(totalAmount)}USDC for the team 💸\nThink you can do better? Try your luck.`;
     
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(message)}`;
