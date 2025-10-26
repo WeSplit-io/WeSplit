@@ -69,6 +69,8 @@ class SimplifiedWalletService {
   private connection: Connection;
   private walletRecoveryCache = new Map<string, WalletCreationResult>();
   private recoveryInProgress = new Set<string>();
+  private balanceCache = new Map<string, { balance: UserWalletBalance; timestamp: number }>();
+  private readonly CACHE_DURATION = 30000; // 30 seconds cache
 
   constructor() {
     const config = getConfig();
@@ -89,6 +91,18 @@ class SimplifiedWalletService {
   }
 
   /**
+   * Check if we have a cached wallet result
+   */
+  private getCachedWallet(userId: string): WalletCreationResult | null {
+    const cached = this.walletRecoveryCache.get(userId);
+    if (cached) {
+      logger.debug('Using cached wallet result', { userId }, 'SimplifiedWalletService');
+      return cached;
+    }
+    return null;
+  }
+
+  /**
    * Ensure user has a wallet - either recover existing or create new
    */
   async ensureUserWallet(userId: string, expectedWalletAddress?: string): Promise<WalletCreationResult> {
@@ -97,12 +111,18 @@ class SimplifiedWalletService {
     try {
       logger.debug('Ensuring user wallet', { userId, expectedWalletAddress }, 'SimplifiedWalletService');
 
+      // Check cache first - this is the key optimization
+      const cachedResult = this.getCachedWallet(userId);
+      if (cachedResult) {
+        return cachedResult;
+      }
+
       // Prevent concurrent recovery attempts
       if (this.recoveryInProgress.has(userId)) {
         logger.debug('Recovery already in progress, waiting', { userId }, 'SimplifiedWalletService');
-        const cachedResult = await this.waitForRecovery(userId);
-        if (cachedResult) {
-          return cachedResult;
+        const waitResult = await this.waitForRecovery(userId);
+        if (waitResult) {
+          return waitResult;
         }
       }
 
@@ -284,26 +304,58 @@ class SimplifiedWalletService {
   }
 
   /**
-   * Get user wallet balance
+   * Get user wallet balance with caching
    */
   async getUserWalletBalance(userId: string): Promise<UserWalletBalance | null> {
     try {
-      // First try to recover the wallet
-      const recoveryResult = await walletRecoveryService.recoverWallet(userId);
+      // Check balance cache first
+      const cachedBalance = this.balanceCache.get(userId);
+      if (cachedBalance && (Date.now() - cachedBalance.timestamp) < this.CACHE_DURATION) {
+        logger.debug('Using cached balance', { userId }, 'SimplifiedWalletService');
+        return cachedBalance.balance;
+      }
+
+      // Use ensureUserWallet which has its own caching
+      const walletResult = await this.ensureUserWallet(userId);
       
-      if (!recoveryResult.success || !recoveryResult.wallet) {
+      if (!walletResult.success || !walletResult.wallet) {
         logger.warn('Cannot get balance - wallet recovery failed', { 
           userId, 
-          error: recoveryResult.error 
+          error: walletResult.error 
         }, 'SimplifiedWalletService');
         return null;
       }
 
-      return await this.getBalanceForAddress(recoveryResult.wallet.publicKey);
+      const balance = await this.getBalanceForAddress(walletResult.wallet.address);
+      
+      // Cache the balance
+      if (balance) {
+        this.balanceCache.set(userId, { balance, timestamp: Date.now() });
+      }
+      
+      return balance;
     } catch (error) {
       logger.error('Error getting user wallet balance', error, 'SimplifiedWalletService');
       return null;
     }
+  }
+
+  /**
+   * Clear cache for a specific user (useful after transactions)
+   */
+  clearUserCache(userId: string): void {
+    this.walletRecoveryCache.delete(userId);
+    this.balanceCache.delete(userId);
+    logger.debug('Cleared cache for user', { userId }, 'SimplifiedWalletService');
+  }
+
+  /**
+   * Clear all caches
+   */
+  clearAllCaches(): void {
+    this.walletRecoveryCache.clear();
+    this.balanceCache.clear();
+    logger.debug('Cleared all caches', {}, 'SimplifiedWalletService');
   }
 
   /**

@@ -98,6 +98,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // Loading States
   const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [loadingPaymentRequests, setLoadingPaymentRequests] = useState(false);
+  const [loadingBalance, setLoadingBalance] = useState(false);
   const [initialRequestsLoaded, setInitialRequestsLoaded] = useState(false);
   
   // Local wallet state (fallback when WalletContext fails)
@@ -248,9 +249,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Simplified balance loading using the new wallet service
   const loadWalletBalance = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id || loadingBalance) return;
     
     const startTime = Date.now();
+    setLoadingBalance(true);
     
     try {
       logger.debug('Loading wallet balance with simplified service', { userId: currentUser.id }, 'DashboardScreen');
@@ -323,15 +325,20 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         error: error instanceof Error ? error.message : String(error),
         duration: `${duration}ms`
       }, 'DashboardScreen');
+    } finally {
+      setLoadingBalance(false);
     }
-  }, [currentUser?.id, currentUser?.wallet_address, updateUser]);
+  }, [currentUser?.id, currentUser?.wallet_address, updateUser, loadingBalance]);
 
-  // Load wallet balance when user changes
+  // Consolidated data loading effect - prevents multiple simultaneous calls
   useEffect(() => {
     if (currentUser?.id && isAuthenticated) {
-      loadWalletBalance();
+      // Only load if not already loading to prevent concurrent calls
+      if (!loadingBalance) {
+        loadWalletBalance();
+      }
     }
-  }, [currentUser?.id, isAuthenticated, loadWalletBalance]);
+  }, [currentUser?.id, isAuthenticated, loadWalletBalance, loadingBalance]);
 
   // Removed group amount conversion logic
 
@@ -500,7 +507,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     React.useCallback(() => {
       if (isAuthenticated && currentUser?.id) {
         // Only load data once to prevent infinite loops
-        loadWalletBalance();
+        // Removed loadWalletBalance() call - it's handled by the consolidated useEffect above
         loadTransactions();
         loadPaymentRequests();
       }
@@ -522,6 +529,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         
         // Trigger appropriate refreshes
         if (shouldRefreshBalance) {
+          // Clear cache and reload balance
+          walletService.clearUserCache(currentUser.id);
           loadWalletBalance();
           logger.info('Balance refresh triggered from navigation parameter', null, 'DashboardScreen');
         }
@@ -550,6 +559,9 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
     try {
       logger.info('Manual refresh triggered', null, 'DashboardScreen');
+      
+      // Clear cache before refresh to ensure fresh data
+      walletService.clearUserCache(currentUser.id);
       
       await Promise.all([
         loadWalletBalance(),

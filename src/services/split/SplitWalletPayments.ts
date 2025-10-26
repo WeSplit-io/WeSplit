@@ -519,6 +519,30 @@ async function executeFastTransaction(
       transactionType
     }, 'SplitWalletPayments');
 
+    // For withdrawals, capture balance before transaction for verification
+    let fromBalanceBefore: number | null = null;
+    let toBalanceBefore: number | null = null;
+    
+    try {
+      const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+      const fromBalanceResult = await consolidatedTransactionService.getUsdcBalance(fromAddress);
+      const toBalanceResult = await consolidatedTransactionService.getUsdcBalance(toAddress);
+      fromBalanceBefore = fromBalanceResult.balance;
+      toBalanceBefore = toBalanceResult.balance;
+      
+      logger.info('Captured balances before withdrawal transaction', {
+        signature,
+        fromBalanceBefore,
+        toBalanceBefore,
+        expectedAmount: amount
+      }, 'SplitWalletPayments');
+    } catch (error) {
+      logger.warn('Failed to capture balances before transaction, proceeding with confirmation', {
+        signature,
+        error: error instanceof Error ? error.message : String(error)
+      }, 'SplitWalletPayments');
+    }
+
     // For withdrawals, use proper confirmation strategy with balance verification
     let confirmed = false;
     let attempts = 0;
@@ -591,32 +615,82 @@ async function executeFastTransaction(
           expectedAmount: amount
         }, 'SplitWalletPayments');
         
-        // If the recipient balance increased by approximately the expected amount, consider it successful
-        const balanceIncrease = toBalance.balance - (toBalance.balance - amount);
+        // Check if the sender balance decreased by approximately the expected amount
+        // This is a more reliable indicator that the transaction actually occurred
         const tolerance = 0.001; // 0.001 USDC tolerance
         
-        if (Math.abs(balanceIncrease - amount) <= tolerance) {
-          logger.info('Withdrawal verified by balance change', {
+        // If we captured balances before the transaction, use them for verification
+        if (fromBalanceBefore !== null && toBalanceBefore !== null) {
+          const fromBalanceDecrease = fromBalanceBefore - fromBalance.balance;
+          const toBalanceIncrease = toBalance.balance - toBalanceBefore;
+          
+          logger.info('Balance change verification', {
             signature,
-            balanceIncrease,
-            expectedAmount: amount
-          }, 'SplitWalletPayments');
-          return {
-            success: true,
-            signature
-          };
-        } else {
-          logger.error('Withdrawal verification failed - balance change mismatch', {
-            signature,
-            balanceIncrease,
+            fromBalanceBefore,
+            fromBalanceAfter: fromBalance.balance,
+            fromBalanceDecrease,
+            toBalanceBefore,
+            toBalanceAfter: toBalance.balance,
+            toBalanceIncrease,
             expectedAmount: amount,
             tolerance
           }, 'SplitWalletPayments');
-          return {
-            success: false,
-            signature,
-            error: 'Transaction confirmation timed out and balance verification failed'
-          };
+          
+          // Check if the sender's balance decreased by approximately the expected amount
+          // and the recipient's balance increased by approximately the expected amount
+          const fromBalanceCorrect = Math.abs(fromBalanceDecrease - amount) <= tolerance;
+          const toBalanceCorrect = Math.abs(toBalanceIncrease - amount) <= tolerance;
+          
+          if (fromBalanceCorrect && toBalanceCorrect) {
+            logger.info('Withdrawal verified by balance change', {
+              signature,
+              fromBalanceDecrease,
+              toBalanceIncrease,
+              expectedAmount: amount
+            }, 'SplitWalletPayments');
+            return {
+              success: true,
+              signature
+            };
+          } else {
+            logger.error('Withdrawal verification failed - balance change mismatch', {
+              signature,
+              fromBalanceDecrease,
+              toBalanceIncrease,
+              expectedAmount: amount,
+              fromBalanceCorrect,
+              toBalanceCorrect
+            }, 'SplitWalletPayments');
+            return {
+              success: false,
+              signature,
+              error: 'Transaction confirmation timed out and balance verification failed'
+            };
+          }
+        } else {
+          // Fallback to blockchain verification if we don't have previous balances
+          const transactionConfirmed = await verifyTransactionOnBlockchain(signature);
+          
+          if (transactionConfirmed) {
+            logger.info('Withdrawal verified by blockchain confirmation', {
+              signature,
+              expectedAmount: amount
+            }, 'SplitWalletPayments');
+            return {
+              success: true,
+              signature
+            };
+          } else {
+            logger.error('Withdrawal verification failed - transaction not confirmed on blockchain', {
+              signature,
+              expectedAmount: amount
+            }, 'SplitWalletPayments');
+            return {
+              success: false,
+              signature,
+              error: 'Transaction confirmation timed out and blockchain verification failed'
+            };
+          }
         }
       } catch (balanceError) {
         logger.error('Failed to verify withdrawal balance', {
