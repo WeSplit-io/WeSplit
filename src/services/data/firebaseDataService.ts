@@ -164,14 +164,13 @@ export const firebaseDataTransformers = {
   // Transform Firestore document to Notification
   firestoreToNotification: (doc: any): Notification => ({
     id: doc.id,
-    userId: doc.data().user_id || doc.data().userId || '',
     type: doc.data().type || 'general',
     title: doc.data().title || '',
     message: doc.data().message || '',
     data: doc.data().data || {},
-    is_read: doc.data().is_read || doc.data().read || false, // Support both field names
+    read: doc.data().read || false,
     created_at: firebaseDataTransformers.timestampToISO(doc.data().created_at),
-    user_id: doc.data().user_id || '' // Keep for backward compatibility
+    user_id: doc.data().user_id || ''
   }),
 
   // Transform Notification to Firestore data
@@ -180,7 +179,7 @@ export const firebaseDataTransformers = {
     title: notification.title,
     message: notification.message,
     data: notification.data,
-    is_read: notification.is_read,
+    read: notification.read,
     user_id: notification.user_id,
     updated_at: serverTimestamp()
   }),
@@ -637,10 +636,6 @@ export const firebaseDataService = {
 
   // Transaction operations
   transaction: {
-    // Cache for transaction queries
-    transactionCache: new Map<string, { result: Transaction[]; timestamp: number }>(),
-    CACHE_DURATION: 20000, // 20 seconds cache for transactions
-
     getTransactions: async (userId: string, limitCount: number = 50): Promise<Transaction[]> => {
       try {
         const q = query(
@@ -652,22 +647,14 @@ export const firebaseDataService = {
         const querySnapshot = await getDocs(q);
         
         return querySnapshot.docs.map(doc => firebaseDataTransformers.firestoreToTransaction(doc));
-      } catch (error) {
+    } catch (error) {
         logger.error('Failed to get transactions', { userId, error }, 'FirebaseDataService');
-        throw error;
-      }
-    },
+      throw error;
+    }
+  },
 
     getUserTransactions: async (userId: string, limitCount: number = 50): Promise<Transaction[]> => {
       try {
-        // Check cache first
-        const cacheKey = `transactions_${userId}_${limitCount}`;
-        const cached = firebaseDataService.transaction.transactionCache.get(cacheKey);
-        if (cached && (Date.now() - cached.timestamp) < firebaseDataService.transaction.CACHE_DURATION) {
-          logger.debug('Using cached transactions', { userId, limitCount }, 'FirebaseDataService');
-          return cached.result;
-        }
-
         // Get transactions where user is the sender
         const sentQuery = query(
           collection(db, 'transactions'),
@@ -699,28 +686,10 @@ export const firebaseDataService = {
         allTransactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
         // Limit to requested count
-        const result = allTransactions.slice(0, limitCount);
-        
-        // Cache the result
-        firebaseDataService.transaction.transactionCache.set(cacheKey, { result, timestamp: Date.now() });
-        
-        return result;
+        return allTransactions.slice(0, limitCount);
       } catch (error) {
         logger.error('Failed to get user transactions', { userId, error }, 'FirebaseDataService');
         throw error;
-      }
-    },
-
-    // Clear transaction cache
-    clearTransactionCache: (userId?: string) => {
-      if (userId) {
-        // Clear cache for specific user
-        const keysToDelete = Array.from(firebaseDataService.transaction.transactionCache.keys())
-          .filter(key => key.startsWith(`transactions_${userId}_`));
-        keysToDelete.forEach(key => firebaseDataService.transaction.transactionCache.delete(key));
-      } else {
-        // Clear all transaction cache
-        firebaseDataService.transaction.transactionCache.clear();
       }
     },
 

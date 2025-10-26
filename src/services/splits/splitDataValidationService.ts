@@ -5,6 +5,7 @@
 
 import { SplitWallet, SplitWalletParticipant } from '../../types/unified';
 import { priceManagementService } from '../../services/core/priceManagementService';
+import { MockupDataService } from '../data/mockupData';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -65,7 +66,27 @@ export class SplitDataValidationService {
       });
     }
 
-    if (!wallet.address || wallet.address.trim() === '') {
+    if (!wallet.billId || wallet.billId.trim() === '') {
+      issues.push({
+        type: 'error',
+        category: 'wallet',
+        message: 'Bill ID is missing or empty',
+        severity: 'critical',
+        fixable: false
+      });
+    }
+
+    if (!wallet.creatorId || wallet.creatorId.trim() === '') {
+      issues.push({
+        type: 'error',
+        category: 'wallet',
+        message: 'Creator ID is missing or empty',
+        severity: 'critical',
+        fixable: false
+      });
+    }
+
+    if (!wallet.walletAddress || wallet.walletAddress.trim() === '') {
       issues.push({
         type: 'error',
         category: 'wallet',
@@ -75,14 +96,14 @@ export class SplitDataValidationService {
       });
     }
 
-    if (wallet.balance < 0) {
+    if (wallet.totalAmount <= 0) {
       issues.push({
         type: 'error',
         category: 'wallet',
-        message: 'Wallet balance cannot be negative',
+        message: 'Total amount must be greater than 0',
         severity: 'critical',
         fixable: true,
-        suggestedFix: 'Set balance to a non-negative value'
+        suggestedFix: 'Set total amount to a positive value'
       });
     }
 
@@ -112,27 +133,33 @@ export class SplitDataValidationService {
    * Validate price consistency
    */
   private static validatePriceConsistency(wallet: SplitWallet, issues: ValidationIssue[]): void {
-    // Check wallet balance consistency
-    if (wallet.balance < 0) {
-      issues.push({
-        type: 'error',
-        category: 'price',
-        message: `Wallet balance (${wallet.balance}) cannot be negative`,
-        severity: 'critical',
-        fixable: true,
-        suggestedFix: 'Set balance to a non-negative value'
-      });
+    // Check against authoritative price
+    const authoritativePrice = priceManagementService.getBillPrice(wallet.billId);
+    if (authoritativePrice) {
+      const difference = Math.abs(authoritativePrice.amount - wallet.totalAmount);
+      if (difference > 0.01) {
+        issues.push({
+          type: 'warning',
+          category: 'price',
+          message: `Wallet amount (${wallet.totalAmount}) differs from authoritative price (${authoritativePrice.amount})`,
+          severity: 'medium',
+          fixable: true,
+          suggestedFix: 'Update wallet amount to match authoritative price'
+        });
+      }
     }
 
-    // Check if balance is reasonable (not too high)
-    if (wallet.balance > 1000000) { // 1M USDC limit
+    // Check against mockup data
+    const mockupAmount = MockupDataService.getBillAmount();
+    const mockupDifference = Math.abs(mockupAmount - wallet.totalAmount);
+    if (mockupDifference > 0.01) {
       issues.push({
-        type: 'warning',
+        type: 'info',
         category: 'price',
-        message: `Wallet balance (${wallet.balance}) seems unusually high`,
-        severity: 'medium',
+        message: `Wallet amount (${wallet.totalAmount}) differs from mockup data (${mockupAmount})`,
+        severity: 'low',
         fixable: true,
-        suggestedFix: 'Verify balance amount'
+        suggestedFix: 'Consider using mockup data for consistency'
       });
     }
   }
@@ -145,16 +172,17 @@ export class SplitDataValidationService {
       return; // Already handled in structure validation
     }
 
-    // Check total participant shares
-    const totalShares = wallet.participants.reduce((sum, p) => sum + p.share, 0);
-    if (totalShares <= 0) {
+    // Check total participant amounts
+    const totalParticipantAmounts = wallet.participants.reduce((sum, p) => sum + p.amountOwed, 0);
+    const difference = Math.abs(totalParticipantAmounts - wallet.totalAmount);
+    if (difference > 0.01) {
       issues.push({
         type: 'error',
         category: 'participants',
-        message: `Total participant shares (${totalShares}) must be greater than 0`,
+        message: `Participant amounts total (${totalParticipantAmounts}) doesn't match wallet total (${wallet.totalAmount})`,
         severity: 'high',
         fixable: true,
-        suggestedFix: 'Set participant shares to positive values'
+        suggestedFix: 'Recalculate participant amounts to match wallet total'
       });
     }
 
@@ -214,37 +242,61 @@ export class SplitDataValidationService {
       });
     }
 
-    if (participant.share < 0) {
+    if (participant.amountOwed < 0) {
       issues.push({
         type: 'error',
         category: 'participants',
-        message: `Participant ${index + 1} has negative share (${participant.share})`,
+        message: `Participant ${index + 1} has negative amount owed (${participant.amountOwed})`,
         severity: 'high',
         fixable: true,
-        suggestedFix: 'Set share to a positive value'
+        suggestedFix: 'Set amount owed to a positive value'
       });
     }
 
-    if (participant.share === 0) {
+    if (participant.amountPaid < 0) {
       issues.push({
-        type: 'warning',
+        type: 'error',
         category: 'participants',
-        message: `Participant ${index + 1} has zero share`,
-        severity: 'medium',
+        message: `Participant ${index + 1} has negative amount paid (${participant.amountPaid})`,
+        severity: 'high',
         fixable: true,
-        suggestedFix: 'Set share to a positive value'
+        suggestedFix: 'Set amount paid to a positive value'
       });
     }
 
-    // Validate isActive status
-    if (typeof participant.isActive !== 'boolean') {
+    if (participant.amountPaid > participant.amountOwed) {
       issues.push({
         type: 'warning',
         category: 'participants',
-        message: `Participant ${index + 1} has invalid isActive status: ${participant.isActive}`,
+        message: `Participant ${index + 1} has paid more (${participant.amountPaid}) than they owe (${participant.amountOwed})`,
         severity: 'medium',
         fixable: true,
-        suggestedFix: 'Set isActive to true or false'
+        suggestedFix: 'Verify payment amounts'
+      });
+    }
+
+    // Check for data corruption: amountOwed = 0 but amountPaid > 0
+    if (participant.amountOwed === 0 && participant.amountPaid > 0) {
+      issues.push({
+        type: 'error',
+        category: 'data_consistency',
+        message: `Participant ${index + 1} has corrupted data: amountOwed=0 but amountPaid=${participant.amountPaid}`,
+        severity: 'critical',
+        fixable: true,
+        suggestedFix: 'Recalculate amountOwed based on wallet total and participant count'
+      });
+    }
+
+    // Validate status
+    const validStatuses = ['pending', 'locked', 'paid', 'failed'];
+    if (!validStatuses.includes(participant.status)) {
+      issues.push({
+        type: 'warning',
+        category: 'participants',
+        message: `Participant ${index + 1} has invalid status: ${participant.status}`,
+        severity: 'medium',
+        fixable: true,
+        suggestedFix: `Set status to one of: ${validStatuses.join(', ')}`
       });
     }
   }
@@ -253,26 +305,39 @@ export class SplitDataValidationService {
    * Validate data consistency
    */
   private static validateDataConsistency(wallet: SplitWallet, issues: ValidationIssue[]): void {
-    // Check if all participants have the same share (for equal splits)
+    // Check if all participants have the same amountOwed (for equal splits)
     if (wallet.participants.length > 1) {
-      const firstShare = wallet.participants[0].share;
-      const allEqual = wallet.participants.every(p => Math.abs(p.share - firstShare) < 0.01);
+      const firstAmount = wallet.participants[0].amountOwed;
+      const allEqual = wallet.participants.every(p => Math.abs(p.amountOwed - firstAmount) < 0.01);
       
       if (!allEqual) {
         issues.push({
           type: 'info',
           category: 'data_consistency',
-          message: 'Participant shares are not equal - this may be intentional for manual splits',
+          message: 'Participant amounts are not equal - this may be intentional for manual splits',
           severity: 'low',
           fixable: false
         });
       }
     }
 
+    // Check wallet status consistency
+    const validStatuses = ['active', 'locked', 'completed', 'cancelled'];
+    if (!validStatuses.includes(wallet.status)) {
+      issues.push({
+        type: 'warning',
+        category: 'wallet',
+        message: `Invalid wallet status: ${wallet.status}`,
+        severity: 'medium',
+        fixable: true,
+        suggestedFix: `Set status to one of: ${validStatuses.join(', ')}`
+      });
+    }
+
     // Check timestamp consistency
-    if (wallet.updated_at && wallet.created_at) {
-      const created = new Date(wallet.created_at);
-      const updated = new Date(wallet.updated_at);
+    if (wallet.updatedAt && wallet.createdAt) {
+      const created = new Date(wallet.createdAt);
+      const updated = new Date(wallet.updatedAt);
       
       if (updated < created) {
         issues.push({
@@ -284,19 +349,6 @@ export class SplitDataValidationService {
           suggestedFix: 'Fix timestamp ordering'
         });
       }
-    }
-
-    // Check if all participants are active
-    const inactiveParticipants = wallet.participants.filter(p => !p.isActive);
-    if (inactiveParticipants.length > 0) {
-      issues.push({
-        type: 'info',
-        category: 'data_consistency',
-        message: `${inactiveParticipants.length} participants are inactive`,
-        severity: 'low',
-        fixable: true,
-        suggestedFix: 'Consider activating participants or removing inactive ones'
-      });
     }
   }
 

@@ -7,9 +7,6 @@
 export { firebaseDataService } from './firebaseDataService';
 export { firebaseFunctionsService } from './firebaseFunctionsService';
 
-// Re-export specific functions from firebaseFunctionsService
-export { sendVerificationCode, verifyCode } from './firebaseFunctionsService';
-
 // Re-export commonly used types
 export type { 
   User,

@@ -4,7 +4,7 @@
  * Can also process real AI/OCR data when available
  */
 
-// MockupDataService removed - using proper error handling instead
+import { MockupDataService } from '../data/mockupData';
 import { consolidatedBillAnalysisService, IncomingBillData } from '../services/billing';
 import { logger } from '../services/analytics/loggingService';
 
@@ -23,8 +23,8 @@ export class FallbackDataService {
     if (processedBillData?.store?.name) {return processedBillData.store.name;}
     if (billData?.store?.name) {return billData.store.name;}
 
-    // Use fallback name
-    return 'Bill';
+    // Use consistent mockup data instead of random generation
+    return MockupDataService.getBillName();
   }
 
   /**
@@ -40,8 +40,8 @@ export class FallbackDataService {
     if (billData?.totalAmount) {return billData.totalAmount;}
     if (processedBillData?.transaction?.order_total) {return processedBillData.transaction.order_total;}
 
-    // Use fallback amount
-    return 0;
+    // Use consistent mockup data instead of random generation
+    return MockupDataService.getBillAmount();
   }
 
   /**
@@ -62,7 +62,7 @@ export class FallbackDataService {
     // Always use mockup data for consistency across all screens
     // This ensures all screens show the same date regardless of invalid data
     logger.info('Using mockup data date for consistency', null, 'fallbackDataService');
-    return new Date().toISOString().split('T')[0];
+    return MockupDataService.getBillDate();
   }
 
   /**
@@ -128,7 +128,7 @@ export class FallbackDataService {
     if (billData?.merchant?.name) {return billData.merchant.name;}
 
     // Use consistent mockup data instead of random generation
-    return 'Merchant';
+    return MockupDataService.getMerchantName();
   }
 
   /**
@@ -145,7 +145,7 @@ export class FallbackDataService {
     if (billData?.location) {return billData.location;}
 
     // Use consistent mockup data instead of random generation
-    return 'Location';
+    return MockupDataService.getLocation();
   }
 
   /**
