@@ -4,7 +4,7 @@ module.exports = {
   expo: {
     name: "WeSplit",
     slug: "WeSplit",
-    version: "1.0.1",
+    version: "1.0.2",
     orientation: "portrait",
     icon: "./assets/android-app-icon-no-alpha.png",
     userInterfaceStyle: "light",
@@ -87,13 +87,7 @@ module.exports = {
       "expo-router",
       "expo-camera",
       ...(process.env.EAS_BUILD_PROFILE !== 'development' ? ["expo-notifications"] : []),
-      "expo-web-browser",
-      // Custom Firebase plugin configuration for Swift AppDelegate
-      ["@react-native-firebase/app", {
-        ios: {
-          useFrameworks: "static"
-        }
-      }]
+      "expo-web-browser"
     ],
     extra: {
       eas: {

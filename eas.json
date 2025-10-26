@@ -27,7 +27,7 @@
         "simulator": false
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       }
     },
     "mass-distribution": {
@@ -62,6 +62,10 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "track": "alpha"
+      }
+    }
   }
 }
