@@ -87,7 +87,8 @@ module.exports = {
       "expo-router",
       "expo-camera",
       ...(process.env.EAS_BUILD_PROFILE !== 'development' ? ["expo-notifications"] : []),
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-firebase/app"
     ],
     extra: {
       eas: {
