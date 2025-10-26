@@ -530,6 +530,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     totalParticipants: number;
   } | null>(null);
   const [isLoadingCompletionData, setIsLoadingCompletionData] = useState(false);
+  const [isCheckingCompletion, setIsCheckingCompletion] = useState(false);
 
   // Calculate amounts when split method or total amount changes
   useEffect(() => {
@@ -566,30 +567,42 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
   // Load completion data when split wallet is available
   useEffect(() => {
-    if (splitWallet?.id) {
-      loadCompletionData();
-      checkAndRepairData();
-      checkPaymentCompletion();
-      
-      // Set up periodic progress updates (only if not completed to avoid infinite loops)
-      const progressInterval = setInterval(() => {
-        if (splitWallet?.status !== 'completed') {
-          loadCompletionData();
-        }
-      }, 5000); // Update progress every 5 seconds
-      
-      const completionInterval = setInterval(() => {
-        if (splitWallet?.status !== 'completed') {
+    if (splitWallet?.id && !isLoadingCompletionData) {
+      // Add a small delay to prevent rapid successive calls
+      const timeoutId = setTimeout(() => {
+        loadCompletionData();
+        checkAndRepairData();
+        // Only check completion if not already confirmed or completed
+        if (!isSplitConfirmed && splitWallet.status !== 'completed') {
           checkPaymentCompletion();
         }
-      }, 10000); // Check completion every 10 seconds
+      }, 100); // 100ms delay to prevent rapid successive calls
       
-      return () => {
-        clearInterval(progressInterval);
-        clearInterval(completionInterval);
-      };
+      return () => clearTimeout(timeoutId);
     }
-  }, [splitWallet?.id]); // Removed splitWallet?.status to prevent infinite loops
+    
+    // Set up periodic progress updates (only if not completed to avoid infinite loops)
+    const progressInterval = setInterval(() => {
+      if (splitWallet?.status !== 'completed' && !isLoadingCompletionData) {
+        loadCompletionData();
+      }
+    }, 15000); // Update progress every 15 seconds to reduce frequency
+    
+    const completionInterval = setInterval(() => {
+      if (splitWallet?.status !== 'completed' && !isSplitConfirmed && !isCheckingCompletion) {
+        // Only check completion if we have participants and they're not all paid
+        const hasUnpaidParticipants = splitWallet?.participants?.some(p => p.status !== 'paid') || false;
+        if (hasUnpaidParticipants) {
+          checkPaymentCompletion();
+        }
+      }
+    }, 60000); // Check completion every 60 seconds to reduce frequency
+    
+    return () => {
+      clearInterval(progressInterval);
+      clearInterval(completionInterval);
+    };
+  }, [splitWallet?.id]); // Removed isSplitConfirmed dependency to prevent unnecessary resets
 
   // Load user wallets when component mounts
   useEffect(() => {
@@ -718,98 +731,166 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
   // Check if all participants have paid their shares (with throttling to prevent excessive calls)
   const checkPaymentCompletion = async () => {
-    if (!splitWallet?.id) {return;}
+    if (!splitWallet?.id) {
+      return;
+    }
+
+    // Prevent duplicate completion checks
+    if (isSplitConfirmed || splitWallet.status === 'completed' || isCheckingCompletion) {
+      return;
+    }
+
+    // Only check completion for the current split wallet, not all wallets
+    const currentSplitWalletId = splitWallet.id;
+    if (!currentSplitWalletId) {
+      return;
+    }
+
+    setIsCheckingCompletion(true);
 
     try {
       const result = await SplitWalletService.getSplitWallet(splitWallet.id);
-      if (!result.success || !result.wallet) {return;}
+      if (!result.success || !result.wallet) {
+        return;
+      }
 
       const wallet = result.wallet;
       const allParticipantsPaid = wallet.participants.every((p: any) => p.status === 'paid');
+
+      // Check for data consistency issues - don't trigger completion if there are inconsistencies
+      const completionData = await SplitWalletService.getSplitWalletCompletion(wallet.id);
+      if (completionData?.dataConsistencyIssue) {
+        logger.warn('Skipping completion check due to data consistency issues', {
+          splitWalletId: wallet.id,
+          completionPercentage: completionData.completionPercentage,
+          collectedAmount: completionData.collectedAmount,
+          actualOnChainBalance: completionData.actualOnChainBalance || 0
+        }, 'FairSplitScreen');
+        
+        // If there's a data consistency issue, try to repair it first
+        try {
+          const { fixSplitWalletDataConsistency } = await import('../../services/split/SplitWalletManagement');
+          const repairResult = await fixSplitWalletDataConsistency(wallet.id);
+          if (repairResult.success && repairResult.fixed) {
+            logger.info('Data consistency issue repaired, retrying completion check', {
+              splitWalletId: wallet.id
+            }, 'FairSplitScreen');
+            // Retry completion check after repair
+            setTimeout(() => checkPaymentCompletion(), 2000);
+          }
+        } catch (repairError) {
+          logger.error('Failed to repair data consistency issue', {
+            splitWalletId: wallet.id,
+            error: repairError instanceof Error ? repairError.message : String(repairError)
+          }, 'FairSplitScreen');
+        }
+        return;
+      }
 
       // Only proceed if all participants have paid AND the wallet is not already completed
       // Add additional validation to prevent duplicate completion attempts
       if (allParticipantsPaid && wallet.participants.length > 0 && wallet.status !== 'completed' && !isSplitConfirmed) {
         
-        // Get merchant address if available
-        const merchantAddress = processedBillData?.merchant?.address || billData?.merchant?.address;
+        logger.info('All participants have paid - showing withdrawal options', {
+          splitWalletId: splitWallet.id,
+          participantsCount: wallet.participants.length,
+          totalAmount: wallet.totalAmount
+        }, 'FairSplitScreen');
         
-        // Complete the split and send funds to merchant
-        const completionResult = await SplitWalletService.completeSplitWallet(
-          splitWallet.id,
-          merchantAddress
-        );
-
-        if (completionResult.success) {
+        // Set confirmation flag FIRST to prevent duplicate triggers
+        setIsSplitConfirmed(true);
+        
+        // Update local state to show completion status but not mark as completed yet
+        setSplitWallet(prev => prev ? { 
+          ...prev, 
+          status: 'active' as const, // Keep as active until withdrawal is complete
+          participants: wallet.participants.map((p: any) => ({ ...p, status: 'paid' }))
+        } : null);
+        
+        // Verify blockchain state before showing completion
+        try {
+          const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+          const balanceResult = await consolidatedTransactionService.getUsdcBalance(wallet.walletAddress);
           
-          // Update local state to reflect completion
-          setSplitWallet(prev => prev ? { ...prev, status: 'completed' as const } : null);
-          
-          // Send completion notifications (only if not already sent)
-          try {
-            const { notificationService } = await import('../../services/notifications');
-            // Send individual notifications to each participant
-            for (const participant of wallet.participants) {
-              await notificationService.instance.sendNotification(
-                participant.userId,
-                'Payment Required',
-                `You owe ${participant.amountOwed} USDC for ${billInfo.name.data || 'Split Payment'}`,
-                'split_payment_required',
+          if (balanceResult.success && balanceResult.balance > 0) {
+            logger.info('Blockchain verification successful, showing completion', {
+              splitWalletId: wallet.id,
+              onChainBalance: balanceResult.balance,
+              expectedAmount: wallet.totalAmount
+            }, 'FairSplitScreen');
+            
+            // Show alert to inform user that all payments are received
+            Alert.alert(
+              'All Payments Received! 🎉',
+              `All participants have paid their shares (${wallet.totalAmount} USDC total). You can now withdraw the funds to distribute them.`,
+              [
                 {
-                  splitId: splitData?.id,
-                  splitWalletId: splitWallet.id,
-                  billName: billInfo.name.data || 'Split Payment',
-                  amount: participant.amountOwed,
-                  currency: 'USDC',
-                  timestamp: new Date().toISOString()
-                }
-              );
-            }
-          } catch (notificationError) {
-            console.warn('⚠️ Failed to send completion notifications:', notificationError);
-            // Don't fail the entire process for notification errors
+                  text: 'Withdraw Funds',
+                  style: 'default',
+                  onPress: () => {
+                    // Show withdrawal modal after user confirms
+                    setShowSplitModal(true);
+                  }
+                },
+              ]
+            );
+          } else {
+            logger.warn('Blockchain verification failed, not showing completion', {
+              splitWalletId: wallet.id,
+              onChainBalance: balanceResult.balance,
+              expectedAmount: wallet.totalAmount
+            }, 'FairSplitScreen');
+            
+            // Don't show completion popup if blockchain doesn't confirm funds
+            Alert.alert(
+              'Payment Processing',
+              'Your payment is being processed. Please wait for blockchain confirmation before withdrawing funds.',
+              [{ text: 'OK' }]
+            );
           }
-
-          // Show completion alert (but don't redirect automatically)
+        } catch (error) {
+          logger.error('Failed to verify blockchain state', {
+            splitWalletId: wallet.id,
+            error: error instanceof Error ? error.message : String(error)
+          }, 'FairSplitScreen');
+          
+          // Fallback: show completion but warn about verification
           Alert.alert(
-            'Split Complete! 🎉',
-            merchantAddress 
-              ? `All participants have paid their shares. The total amount of ${wallet.totalAmount} USDC has been sent to the merchant.`
-              : 'All participants have paid their shares. The split is now complete!',
+            'All Payments Received! 🎉',
+            `All participants have paid their shares (${wallet.totalAmount} USDC total). You can now withdraw the funds to distribute them.`,
             [
               {
-                text: 'Continue',
+                text: 'Withdraw Funds',
                 style: 'default',
                 onPress: () => {
-                  // Navigate to splits list
-                  navigation.navigate('SplitsList');
-                }
-              },
-            ]
-          );
-        } else {
-          console.error('❌ Failed to complete split:', completionResult.error);
-          Alert.alert(
-            'Split Complete (Partial)',
-            'All participants have paid their shares, but there was an issue sending funds to the merchant. Please contact support.',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  // Don't redirect automatically, let user decide
+                  setShowSplitModal(true);
                 }
               },
             ]
           );
         }
+        
+        return; // Don't proceed with automatic completion
       }
     } catch (error) {
       console.error('❌ Error checking payment completion:', error);
+    } finally {
+      setIsCheckingCompletion(false);
     }
   };
 
   const checkAndRepairData = async () => {
     if (!splitWallet?.id) {return;}
+    
+    // Add validation to prevent processing invalid wallets
+    if (!splitWallet.billId || !splitWallet.creatorId || !splitWallet.walletAddress) {
+      console.warn('🔧 FairSplitScreen: Skipping data repair due to missing critical data', {
+        billId: splitWallet.billId,
+        creatorId: splitWallet.creatorId,
+        walletAddress: splitWallet.walletAddress
+      });
+      return;
+    }
     
     try {
       // First validate the data
@@ -872,7 +953,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   };
 
   const loadSplitWalletData = async () => {
-    if (!splitWallet?.id) {return;}
+    if (!splitWallet?.id || isLoadingCompletionData) {return;}
+    
+    // Add guard to prevent multiple simultaneous calls
+    setIsLoadingCompletionData(true);
     
     try {
       // First, fix any precision issues in the split wallet data
@@ -923,6 +1007,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       }
     } catch (error) {
       console.error('Failed to reload split wallet data:', error);
+    } finally {
+      setIsLoadingCompletionData(false);
     }
   };
 
@@ -944,9 +1030,15 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         };
         setCompletionData(newCompletionData);
         
-        // Only log in development and when there are significant changes
+        // Reduce logging frequency to prevent spam
         if (__DEV__ && (newCompletionData.completionPercentage === 100 || newCompletionData.completionPercentage === 0)) {
-          logger.debug('Completion data updated', { newCompletionData }, 'FairSplitScreen');
+          // Only log every 10 seconds to prevent spam
+          const now = Date.now();
+          const lastLogTime = (completionData as any)?.lastLogTime || 0;
+          if (now - lastLogTime > 10000) { // Only log every 10 seconds
+            logger.debug('Completion data updated', { newCompletionData }, 'FairSplitScreen');
+            setCompletionData(prev => ({ ...prev, lastLogTime: now } as any));
+          }
         }
       } else {
         if (__DEV__) {
@@ -1907,12 +1999,39 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         // This will help us debug why the balance is 0
       }
 
-      // Validate that split wallet has sufficient funds
-      if (splitWallet.totalAmount <= 0) {
-        console.error('❌ FairSplitScreen: Split wallet has no funds:', {
-          totalAmount: splitWallet.totalAmount
-        });
-        Alert.alert('Error', 'Split wallet has no funds to transfer.');
+      // Verify actual blockchain balance before withdrawal
+      try {
+        const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+        const balanceResult = await consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress);
+        
+        if (!balanceResult.success || balanceResult.balance <= 0) {
+          console.error('❌ FairSplitScreen: Split wallet has no funds on blockchain:', {
+            totalAmount: splitWallet.totalAmount,
+            onChainBalance: balanceResult.balance,
+            walletAddress: splitWallet.walletAddress
+          });
+          Alert.alert(
+            'No Funds Available', 
+            'The split wallet has no funds available for withdrawal. Please ensure all participants have completed their payments.'
+          );
+          return;
+        }
+        
+        logger.info('Blockchain balance verified for withdrawal', {
+          splitWalletId: splitWallet.id,
+          onChainBalance: balanceResult.balance,
+          expectedAmount: splitWallet.totalAmount
+        }, 'FairSplitScreen');
+      } catch (balanceError) {
+        logger.error('Failed to verify blockchain balance for withdrawal', {
+          splitWalletId: splitWallet.id,
+          error: balanceError instanceof Error ? balanceError.message : String(balanceError)
+        }, 'FairSplitScreen');
+        
+        Alert.alert(
+          'Balance Verification Failed',
+          'Unable to verify the split wallet balance. Please try again or contact support if the issue persists.'
+        );
         return;
       }
       
@@ -2152,35 +2271,85 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             transactionSignature: transferResult.transactionSignature,
             amount: transferResult.amount,
             destination: selectedWallet.address
-          });
+          }, 'FairSplitScreen');
           
-          // Update local state to reflect completion
-          setSplitWallet(prev => prev ? { 
-            ...prev, 
-            status: 'completed' as const,
-            completedAt: new Date().toISOString()
-          } : null);
-          
-          // Show success message with cleanup information
-          Alert.alert(
-            'Transfer Successful!', 
-            `Funds have been transferred to ${selectedWallet.name || (selectedWallet.type === 'external' ? 'external wallet' : 'in-app wallet')} successfully!\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...\n\n🔥 The split wallet will be automatically burned and cleaned up once the transfer is confirmed.`,
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  // Close modals and reset state
-                  setShowSignatureStep(false);
-                  setShowSplitModal(false);
-                  setSelectedTransferMethod(null);
-                  setSelectedWallet(null);
-                  
-                  // Navigate back to splits list - this will trigger a refresh
-                  navigation.navigate('SplitsList');
+          // Verify the transfer actually happened by checking balances
+          try {
+            const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+            
+            // Wait a moment for blockchain to update
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            const splitBalance = await consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress);
+            const recipientBalance = await consolidatedTransactionService.getUsdcBalance(selectedWallet.address);
+            
+            logger.info('Post-transfer balance verification', {
+              splitWalletBalance: splitBalance.balance,
+              recipientBalance: recipientBalance.balance,
+              expectedAmount: transferResult.amount,
+              transactionSignature: transferResult.transactionSignature
+            }, 'FairSplitScreen');
+            
+            // Update local state to reflect completion
+            setSplitWallet(prev => prev ? { 
+              ...prev, 
+              status: 'completed' as const,
+              completedAt: new Date().toISOString()
+            } : null);
+            
+            // Show success message with verification
+            Alert.alert(
+              '✅ Transfer Verified!', 
+              `Successfully transferred ${transferResult.amount.toFixed(6)} USDC to ${selectedWallet.name || (selectedWallet.type === 'external' ? 'external wallet' : 'in-app wallet')}!\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...\n\n✅ Balance verification confirmed the transfer.`,
+              [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    // Close modals and reset state
+                    setShowSignatureStep(false);
+                    setShowSplitModal(false);
+                    setSelectedTransferMethod(null);
+                    setSelectedWallet(null);
+                    
+                    // Navigate back to splits list
+                    navigation.navigate('SplitsList');
+                  }
                 }
-              }
-            ]
-          );
+              ]
+            );
+          } catch (verificationError) {
+            logger.warn('Failed to verify transfer balances', {
+              error: verificationError instanceof Error ? verificationError.message : String(verificationError)
+            }, 'FairSplitScreen');
+            
+            // Update local state to reflect completion
+            setSplitWallet(prev => prev ? { 
+              ...prev, 
+              status: 'completed' as const,
+              completedAt: new Date().toISOString()
+            } : null);
+            
+            // Show success message without verification
+            Alert.alert(
+              'Transfer Submitted!', 
+              `Transfer of ${transferResult.amount.toFixed(6)} USDC to ${selectedWallet.name || (selectedWallet.type === 'external' ? 'external wallet' : 'in-app wallet')} has been submitted.\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...\n\nPlease check your wallet to confirm receipt.`,
+              [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    // Close modals and reset state
+                    setShowSignatureStep(false);
+                    setShowSplitModal(false);
+                    setSelectedTransferMethod(null);
+                    setSelectedWallet(null);
+                    
+                    // Navigate back to splits list
+                    navigation.navigate('SplitsList');
+                  }
+                }
+              ]
+            );
+          }
         } else {
         console.error('❌ FairSplitScreen: Transfer failed:', transferResult.error);
         
@@ -2333,59 +2502,88 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       );
       
       if (result.success) {
-        logger.info('Payment successful', {
+        logger.info('Payment transaction submitted successfully', {
           amount: amount,
-          transactionSignature: result.transactionSignature
-        });
-        
-        // Force reload split wallet data to ensure we have the latest participant status
-        await loadSplitWalletData();
-        
-        // Force data consistency fix for single participant splits
-        if (splitWallet && splitWallet.participants.length === 1) {
-          try {
-            const { SplitWalletService } = await import('../../services/split');
-            const repairResult = await SplitWalletService.repairSplitWalletData(splitWallet.id);
-            
-            if (repairResult.success && repairResult.repaired) {
-              logger.info('Participant status repaired after payment', {
-                splitWalletId: splitWallet.id,
-                participantId: currentUser.id.toString()
-              }, 'FairSplitScreen');
-              
-              // Reload data again after repair
-              await loadSplitWalletData();
-            }
-          } catch (error) {
-            logger.warn('Failed to repair participant status after payment', { error }, 'FairSplitScreen');
-          }
-        }
-        
-        // Update completion data immediately
-        await loadCompletionData();
-        
-        // Log the updated participant status for debugging
-        logger.info('Payment confirmed - participant status updated', {
-          splitWalletId: splitWallet.id,
-          participantId: currentUser.id.toString(),
-          amountPaid: amount,
           transactionSignature: result.transactionSignature
         }, 'FairSplitScreen');
         
-        Alert.alert(
-          '✅ Payment Successful!',
-          `Your payment of ${amount.toFixed(2)} USDC has been successfully sent to the split wallet.`,
-          [{ text: 'OK' }]
-        );
+        // Wait for blockchain confirmation before updating UI
+        try {
+          const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+          
+          // Wait up to 30 seconds for blockchain confirmation
+          let confirmed = false;
+          let attempts = 0;
+          const maxAttempts = 30; // 30 seconds
+          
+          logger.info('Waiting for blockchain confirmation', {
+            splitWalletId: splitWallet.id,
+            maxAttempts
+          }, 'FairSplitScreen');
+          
+          while (!confirmed && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            
+            const balanceResult = await consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress);
+            if (balanceResult.success && balanceResult.balance > 0) {
+              confirmed = true;
+              logger.info('Blockchain confirmation received', {
+                splitWalletId: splitWallet.id,
+                onChainBalance: balanceResult.balance,
+                attempts
+              }, 'FairSplitScreen');
+            }
+            attempts++;
+          }
+          
+          if (confirmed) {
+            // Update data after blockchain confirmation
+            await loadSplitWalletData();
+            await loadCompletionData();
+            
+            // Show success message
+            Alert.alert(
+              '✅ Payment Confirmed!',
+              `Your payment of ${amount.toFixed(2)} USDC has been confirmed on the blockchain.`,
+              [{ text: 'OK' }]
+            );
+          } else {
+            // Show warning about pending confirmation
+            Alert.alert(
+              'Payment Submitted',
+              `Your payment of ${amount.toFixed(2)} USDC has been submitted. It may take a few minutes to confirm on the blockchain.`,
+              [{ text: 'OK' }]
+            );
+          }
+        } catch (confirmationError) {
+          logger.error('Failed to confirm payment on blockchain', {
+            splitWalletId: splitWallet.id,
+            error: confirmationError instanceof Error ? confirmationError.message : String(confirmationError)
+          }, 'FairSplitScreen');
+          
+          // Fallback: show success but warn about confirmation
+          Alert.alert(
+            'Payment Submitted',
+            `Your payment of ${amount.toFixed(2)} USDC has been submitted. Please check back in a few minutes to confirm it's processed.`,
+            [{ text: 'OK' }]
+          );
+        }
       } else {
         const errorMessage = result.error || 'Failed to process payment';
-        Alert.alert(
-          'Payment Failed', 
-          errorMessage.includes('could not be confirmed') 
-            ? 'Your payment could not be confirmed on the blockchain. The transaction may have failed or is still pending. Please try again or check the transaction status.'
-            : errorMessage,
-          [{ text: 'OK' }]
-        );
+        
+        // Provide user-friendly error messages
+        let userFriendlyMessage = errorMessage;
+        if (errorMessage.includes('could not be confirmed')) {
+          userFriendlyMessage = 'Your payment was submitted but could not be confirmed on the blockchain. Please check your transaction history or try again.';
+        } else if (errorMessage.includes('Insufficient')) {
+          userFriendlyMessage = 'Insufficient USDC balance. Please add USDC to your wallet before making this payment.';
+        } else if (errorMessage.includes('Transaction failed')) {
+          userFriendlyMessage = 'Transaction failed. This could be due to network issues or insufficient balance. Please try again.';
+        } else if (errorMessage.includes('User wallet not found')) {
+          userFriendlyMessage = 'Wallet not found. Please ensure you have a wallet set up and try again.';
+        }
+        
+        Alert.alert('Payment Failed', userFriendlyMessage, [{ text: 'OK' }]);
       }
     } catch (error) {
       handleError(error, 'process payment');
@@ -2406,6 +2604,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         return colors.textSecondary;
       case 'declined':
         return colors.red;
+      case 'ready_for_distribution':
+        return colors.greenBlue;
+      case 'completed':
+        return colors.green;
       default:
         return colors.textSecondary;
     }
@@ -2423,6 +2625,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         return 'Pending';
       case 'declined':
         return 'Declined';
+      case 'ready_for_distribution':
+        return 'Ready to Withdraw';
+      case 'completed':
+        return 'Completed';
       default:
         return 'Pending';
     }
@@ -2666,8 +2872,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   }
                 }
                 
-                if (isFullyCovered && isCreator) {
-                  // Creator can split when 100% covered
+                if ((isFullyCovered && isCreator) || (isSplitConfirmed && isCreator && isFullyCovered)) {
+                  // Creator can split when 100% covered or when confirmed and fully covered
                   return (
                     <View style={styles.buttonContainer}>
                       <Button

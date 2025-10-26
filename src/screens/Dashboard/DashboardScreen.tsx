@@ -248,17 +248,25 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Simplified balance loading using the new wallet service
   const loadWalletBalance = useCallback(async () => {
-    if (!currentUser?.id) {return;}
+    if (!currentUser?.id) return;
+    
+    const startTime = Date.now();
     
     try {
-      logger.debug('Loading wallet balance with simplified service', null, 'DashboardScreen');
+      logger.debug('Loading wallet balance with simplified service', { userId: currentUser.id }, 'DashboardScreen');
       
       // Ensure the user has a wallet (recover or create)
       const walletResult = await walletService.ensureUserWallet(currentUser.id.toString(), currentUser.wallet_address);
       
       if (walletResult.success && walletResult.wallet) {
-        // Update user's wallet information if it's different
+        // Check if wallet address changed and update database if needed
         if (currentUser.wallet_address !== walletResult.wallet.address) {
+          logger.info('Wallet address changed, updating database', { 
+            userId: currentUser.id,
+            oldAddress: currentUser.wallet_address,
+            newAddress: walletResult.wallet.address
+          }, 'DashboardScreen');
+          
           try {
             const updateData: any = {
               wallet_address: walletResult.wallet.address,
@@ -271,25 +279,50 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             );
             
             await updateUser(cleanUpdateData);
+            
+            logger.info('User wallet info updated successfully', { 
+              userId: currentUser.id,
+              walletAddress: walletResult.wallet.address
+            }, 'DashboardScreen');
           } catch (updateError) {
-            logger.warn('Failed to update user wallet info', updateError, 'DashboardScreen');
+            logger.warn('Failed to update user wallet info', { 
+              userId: currentUser.id,
+              error: updateError instanceof Error ? updateError.message : String(updateError)
+            }, 'DashboardScreen');
           }
         }
         
         // Get the balance
         const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
         if (balance && balance.totalUSD !== undefined) {
-          logger.debug('Balance loaded successfully', { totalUSD: balance.totalUSD }, 'DashboardScreen');
+          const duration = Date.now() - startTime;
+          logger.debug('Balance loaded successfully', { 
+            userId: currentUser.id,
+            totalUSD: balance.totalUSD,
+            walletAddress: walletResult.wallet.address,
+            duration: `${duration}ms`
+          }, 'DashboardScreen');
+          
           // Update the local state
           setLocalAppWalletBalance(balance.totalUSD);
           setLocalAppWalletAddress(walletResult.wallet.address);
           setLocalAppWalletConnected(true);
+        } else {
+          logger.warn('Failed to get wallet balance', { userId: currentUser.id }, 'DashboardScreen');
         }
       } else {
-        logger.error('Failed to ensure wallet', walletResult.error, 'DashboardScreen');
+        logger.error('Failed to ensure wallet', { 
+          userId: currentUser.id,
+          error: walletResult.error
+        }, 'DashboardScreen');
       }
     } catch (error) {
-      logger.error('Error loading wallet balance', error, 'DashboardScreen');
+      const duration = Date.now() - startTime;
+      logger.error('Error loading wallet balance', { 
+        userId: currentUser.id,
+        error: error instanceof Error ? error.message : String(error),
+        duration: `${duration}ms`
+      }, 'DashboardScreen');
     }
   }, [currentUser?.id, currentUser?.wallet_address, updateUser]);
 

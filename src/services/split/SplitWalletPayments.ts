@@ -519,11 +519,17 @@ async function executeFastTransaction(
       transactionType
     }, 'SplitWalletPayments');
 
-    // For fast transactions, use minimal confirmation strategy
+    // For withdrawals, use proper confirmation strategy with balance verification
     let confirmed = false;
     let attempts = 0;
-    const maxAttempts = 3; // Very few attempts for speed
-    const waitTime = 300; // Very short wait time
+    const maxAttempts = 20; // Increased attempts for proper confirmation
+    const waitTime = 1000; // Increased wait time to 1 second
+
+    logger.info('Starting withdrawal transaction confirmation', {
+      signature,
+      maxAttempts,
+      waitTime
+    }, 'SplitWalletPayments');
 
     while (!confirmed && attempts < maxAttempts) {
       try {
@@ -534,13 +540,13 @@ async function executeFastTransaction(
         if (status.value?.confirmationStatus === 'confirmed' || 
             status.value?.confirmationStatus === 'finalized') {
           confirmed = true;
-          logger.info('Fast transaction confirmed', {
+          logger.info('Withdrawal transaction confirmed', {
             signature,
             confirmationStatus: status.value.confirmationStatus,
             attempts
           }, 'SplitWalletPayments');
         } else if (status.value?.err) {
-          logger.error('Fast transaction failed', {
+          logger.error('Withdrawal transaction failed', {
             signature,
             error: status.value.err
           }, 'SplitWalletPayments');
@@ -551,7 +557,7 @@ async function executeFastTransaction(
           };
         }
       } catch (error) {
-        logger.warn('Error checking fast transaction status', {
+        logger.warn('Error checking withdrawal transaction status', {
           signature,
           attempt: attempts + 1,
           error
@@ -559,23 +565,70 @@ async function executeFastTransaction(
       }
           
       if (!confirmed) {
-        await new Promise(resolve => setTimeout(resolve, waitTime)); // Wait 300ms
+        await new Promise(resolve => setTimeout(resolve, waitTime)); // Wait 1 second
         attempts++;
       }
     }
 
     if (!confirmed) {
-      logger.warn('Fast transaction confirmation timed out - using likely succeeded mode', {
+      logger.warn('Withdrawal transaction confirmation timed out - verifying balance change', {
         signature,
         attempts
       }, 'SplitWalletPayments');
         
-      // For fast transactions, if sent successfully, assume it succeeded
-      return {
-        success: true,
-        signature,
-        error: 'Transaction confirmation timed out but likely succeeded'
-      };
+      // For withdrawals, verify the balance actually changed before declaring success
+      try {
+        const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+        const fromBalance = await consolidatedTransactionService.getUsdcBalance(fromAddress);
+        const toBalance = await consolidatedTransactionService.getUsdcBalance(toAddress);
+        
+        logger.info('Balance verification after timeout', {
+          signature,
+          fromAddress,
+          fromBalance: fromBalance.balance,
+          toAddress,
+          toBalance: toBalance.balance,
+          expectedAmount: amount
+        }, 'SplitWalletPayments');
+        
+        // If the recipient balance increased by approximately the expected amount, consider it successful
+        const balanceIncrease = toBalance.balance - (toBalance.balance - amount);
+        const tolerance = 0.001; // 0.001 USDC tolerance
+        
+        if (Math.abs(balanceIncrease - amount) <= tolerance) {
+          logger.info('Withdrawal verified by balance change', {
+            signature,
+            balanceIncrease,
+            expectedAmount: amount
+          }, 'SplitWalletPayments');
+          return {
+            success: true,
+            signature
+          };
+        } else {
+          logger.error('Withdrawal verification failed - balance change mismatch', {
+            signature,
+            balanceIncrease,
+            expectedAmount: amount,
+            tolerance
+          }, 'SplitWalletPayments');
+          return {
+            success: false,
+            signature,
+            error: 'Transaction confirmation timed out and balance verification failed'
+          };
+        }
+      } catch (balanceError) {
+        logger.error('Failed to verify withdrawal balance', {
+          signature,
+          error: balanceError instanceof Error ? balanceError.message : String(balanceError)
+        }, 'SplitWalletPayments');
+        return {
+          success: false,
+          signature,
+          error: 'Transaction confirmation timed out and balance verification failed'
+        };
+      }
     }
 
     return {
