@@ -11,7 +11,7 @@ import {
 } from '../../types/billAnalysis';
 import { BillItem } from '../../types/billSplitting';
 import { logger } from '../core';
-import { MockupDataService } from '../data/mockupData';
+// MockupDataService removed - using proper error handling instead
 import { roundUsdcAmount } from '../../utils/ui/format/formatUtils';
 
 // Essential interfaces only
@@ -87,40 +87,26 @@ class ConsolidatedBillAnalysisService {
         useMockData 
       }, 'BillAnalysis');
 
+      // Mock data is disabled - use real AI service only
       if (useMockData) {
-        return await this.analyzeBillWithMockData(imageUri, currentUser);
+        logger.warn('Mock data is disabled - using real AI service instead', { imageUri }, 'BillAnalysis');
       }
 
-      // Optimized fallback chain with parallel health checks
-      const [aiResult, ocrResult] = await Promise.allSettled([
-        this.analyzeBillWithAI(imageUri, currentUser),
-        this.analyzeBillWithOCR(imageUri, currentUser)
-      ]);
-
-      // Try AI first, then OCR, then mock
-      if (aiResult.status === 'fulfilled') {
-        return aiResult.value;
+      // Use AI service only - OCR service removed
+      try {
+        return await this.analyzeBillWithAI(imageUri, currentUser);
+      } catch (aiError) {
+        logger.error('AI service failed', { 
+          error: aiError instanceof Error ? aiError.message : 'Unknown error'
+        }, 'BillAnalysis');
+        
+        return {
+          success: false,
+          error: `AI service failed: ${aiError instanceof Error ? aiError.message : 'Unknown error'}`,
+          processingTime: Date.now() - startTime,
+          confidence: 0
+        };
       }
-      
-      if (ocrResult.status === 'fulfilled') {
-        return ocrResult.value;
-      }
-
-      // Both AI and OCR failed - return error instead of mock data
-      const aiError = aiResult.status === 'rejected' ? aiResult.reason : null;
-      const ocrError = ocrResult.status === 'rejected' ? ocrResult.reason : null;
-      
-      logger.error('Both AI and OCR failed', { 
-        aiError,
-        ocrError
-      }, 'BillAnalysis');
-      
-      return {
-        success: false,
-        error: `AI and OCR services failed. AI: ${aiError?.message || 'Unknown error'}, OCR: ${ocrError?.message || 'Unknown error'}`,
-        processingTime: Date.now() - startTime,
-        confidence: 0
-      };
 
     } catch (error) {
       logger.error('Bill analysis failed', { 
@@ -262,130 +248,7 @@ class ConsolidatedBillAnalysisService {
     }
   }
 
-  /**
-   * HIGHLY OPTIMIZED: OCR-based bill analysis
-   */
-  private async analyzeBillWithOCR(imageUri: string, currentUser?: { id: string; name: string; wallet_address: string }): Promise<BillAnalysisResult> {
-    const startTime = Date.now();
-    
-    try {
-      logger.info('Starting OCR bill analysis', { imageUri }, 'BillAnalysis');
 
-      const base64Image = await this.convertImageToBase64(imageUri);
-      const ocrResponse = await this.callOCRService(base64Image);
-      
-      if (!ocrResponse.success) {
-        throw new Error(ocrResponse.error || 'OCR processing failed');
-      }
-
-      const billData = this.convertOCRResponseToBillData(ocrResponse);
-      
-      // Convert currency to USDC if needed
-      if (billData.currency && billData.currency !== 'USDC' && billData.currency !== 'USD') {
-        try {
-          const { convertFiatToUSDC } = await import('../core');
-          const convertedAmount = await convertFiatToUSDC(billData.transaction.order_total, billData.currency);
-          billData.transaction.order_total = convertedAmount;
-          billData.transaction.calculated_total = convertedAmount;
-          billData.currency = 'USDC';
-          logger.info('Converted OCR bill amount to USDC', { 
-            originalAmount: ocrResponse.totalAmount,
-            originalCurrency: billData.currency,
-            convertedAmount,
-            currency: 'USDC'
-          }, 'BillAnalysis');
-        } catch (conversionError) {
-          logger.warn('Failed to convert OCR bill amount to USDC, using original', { 
-            error: conversionError,
-            originalAmount: billData.transaction.order_total,
-            originalCurrency: billData.currency
-          }, 'BillAnalysis');
-        }
-      }
-      
-      const processedData = this.processBillData(billData, currentUser);
-      const processingTime = Date.now() - startTime;
-
-      logger.info('OCR analysis completed', {
-        processingTime,
-        itemCount: processedData.items.length,
-        totalAmount: processedData.totalAmount
-      }, 'BillAnalysis');
-
-      return {
-        success: true,
-        data: processedData,
-        processingTime,
-        confidence: ocrResponse.confidence || 0.85
-      };
-    } catch (error) {
-      logger.error('OCR analysis failed', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        processingTime: Date.now() - startTime
-      }, 'BillAnalysis');
-      throw error;
-    }
-  }
-
-  /**
-   * OPTIMIZED: Mock data analysis for testing
-   */
-  private async analyzeBillWithMockData(imageUri: string, currentUser?: { id: string; name: string; wallet_address: string }): Promise<BillAnalysisResult> {
-    const startTime = Date.now();
-    
-    try {
-      logger.info('Starting mock data analysis', { imageUri }, 'BillAnalysis');
-
-      // Simulate realistic processing time
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      const mockupData = MockupDataService.getPrimaryBillData();
-      const incomingData: InternalBillData = {
-        category: "Food & Drinks",
-        country: "USA",
-        currency: "USD",
-        store: {
-          name: mockupData.merchant,
-          location: {
-            address: mockupData.location,
-            city: "San Francisco",
-            state: "CA",
-            zip_code: "94102",
-            phone: "+1 (555) 123-4567"
-          },
-          store_id: "MOCK_STORE_001"
-        },
-        transaction: {
-          date: mockupData.date,
-          time: mockupData.time,
-          order_id: this.generateBillId(),
-          employee: "John Doe",
-          items: mockupData.items.map(item => ({ name: item.name, price: item.price })),
-          sub_total: mockupData.subtotal || mockupData.totalAmount * 0.9,
-          sales_tax: mockupData.tax || mockupData.totalAmount * 0.1,
-          order_total: mockupData.totalAmount,
-          calculated_total: mockupData.totalAmount
-        }
-      };
-
-      const billData = this.convertIncomingDataToBillData(incomingData);
-      const processedData = this.processBillData(billData, currentUser);
-      const processingTime = Date.now() - startTime;
-
-      return {
-        success: true,
-        data: processedData,
-        processingTime,
-        confidence: 0.95
-      };
-    } catch (error) {
-      logger.error('Mock data analysis failed', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        processingTime: Date.now() - startTime
-      }, 'BillAnalysis');
-      throw error;
-    }
-  }
 
   /**
    * Validate processed bill data for OCR AI flow
@@ -558,13 +421,19 @@ class ConsolidatedBillAnalysisService {
       calculatedTotal = items.reduce((sum: number, item: any) => sum + (item.price || 0), 0);
     }
     
-    // Fallback for zero total
-    if (calculatedTotal === 0) {
+    // Only use fallback if we have no items at all - don't override valid OCR data
+    if (calculatedTotal === 0 && items.length === 0) {
       calculatedTotal = 25.50;
-      if (items.length === 0) {
-        items.push({ name: 'Sample Item', price: 25.50, quantity: 1 });
-      }
-      logger.warn('AI returned 0 total, using fallback', { 
+      items.push({ name: 'Sample Item', price: 25.50, quantity: 1 });
+      logger.warn('AI returned 0 total with no items, using fallback', { 
+        originalTotal: total,
+        calculatedTotal,
+        itemCount: items.length
+      }, 'BillAnalysis');
+    } else if (calculatedTotal === 0 && items.length > 0) {
+      // If we have items but 0 total, calculate from items
+      calculatedTotal = items.reduce((sum: number, item: any) => sum + (item.price || 0), 0);
+      logger.info('AI returned 0 total but had items, calculated from items', { 
         originalTotal: total,
         calculatedTotal,
         itemCount: items.length
@@ -600,41 +469,6 @@ class ConsolidatedBillAnalysisService {
     };
   }
 
-  /**
-   * OPTIMIZED: Convert OCR response to bill data format
-   */
-  private convertOCRResponseToBillData(ocrResponse: any): InternalBillData {
-    return {
-      category: "Food & Drinks",
-      country: "USA",
-      store: {
-        name: ocrResponse.merchant || "Extracted Store",
-        location: {
-          address: "",
-          city: "Unknown City",
-          state: "Unknown State",
-          zip_code: "",
-          phone: ""
-        },
-        store_id: ""
-      },
-      transaction: {
-        date: ocrResponse.date || new Date().toISOString().split('T')[0],
-        time: new Date().toTimeString().split(' ')[0],
-        order_id: this.generateBillId(),
-        employee: "Unknown",
-        items: (ocrResponse.extractedItems || []).map((item: any) => ({
-          name: item.name || "Unknown Item",
-          price: item.price || 0
-        })),
-        sub_total: ocrResponse.totalAmount * 0.9,
-        sales_tax: ocrResponse.totalAmount * 0.1,
-        order_total: ocrResponse.totalAmount,
-        calculated_total: ocrResponse.totalAmount
-      },
-      currency: ocrResponse.currency || "USD"
-    };
-  }
 
   /**
    * OPTIMIZED: Convert incoming data to bill data format
@@ -800,32 +634,6 @@ class ConsolidatedBillAnalysisService {
     }
   }
 
-  private async callOCRService(base64Image: string): Promise<any> {
-    try {
-      // Enhanced mock OCR service - provides better data structure for testing
-      // TODO: Replace with actual OCR implementation
-      logger.info('Using mock OCR service for bill analysis', { imageSize: base64Image.length }, 'BillAnalysis');
-      
-      return {
-        success: true,
-        extractedItems: [
-          { name: 'Restaurant Bill Item 1', price: 15.50 },
-          { name: 'Restaurant Bill Item 2', price: 12.00 },
-          { name: 'Tax', price: 2.75 },
-          { name: 'Tip', price: 5.00 }
-        ],
-        totalAmount: 35.25,
-        confidence: 0.85,
-        rawText: 'Sample restaurant receipt with multiple items',
-        merchant: 'Sample Restaurant',
-        date: new Date().toISOString().split('T')[0],
-        currency: 'USD'
-      };
-    } catch (error) {
-      logger.error('OCR service call failed', { error }, 'BillAnalysis');
-      throw error;
-    }
-  }
 
 }
 

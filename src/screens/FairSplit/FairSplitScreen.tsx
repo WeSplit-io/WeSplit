@@ -155,7 +155,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     if (splitWallet && splitWallet.id) {
       loadSplitWalletData();
     }
-  }, []); // Run once on mount
+  }, [splitWallet?.id]); // Only run when splitWallet.id changes
 
   // Initialize split confirmation status and method
   useEffect(() => {
@@ -564,32 +564,36 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   }, [splitMethod, totalAmount, participants.length, splitWallet?.id]);
 
 
-  // Load completion data when split wallet is available
+  // Load completion data when split wallet is available (with throttling)
   useEffect(() => {
     if (splitWallet?.id) {
-      loadCompletionData();
-      checkAndRepairData();
-      checkPaymentCompletion();
+      // Throttle the initial load to prevent excessive calls
+      const timeoutId = setTimeout(() => {
+        loadCompletionData();
+        checkAndRepairData();
+        checkPaymentCompletion();
+      }, 500); // Small delay to prevent immediate re-execution
       
-      // Set up periodic progress updates (only if not completed to avoid infinite loops)
+      // Set up periodic progress updates (reduced frequency to prevent excessive calls)
       const progressInterval = setInterval(() => {
         if (splitWallet?.status !== 'completed') {
           loadCompletionData();
         }
-      }, 5000); // Update progress every 5 seconds
+      }, 30000); // Update progress every 30 seconds (was 5 seconds)
       
       const completionInterval = setInterval(() => {
         if (splitWallet?.status !== 'completed') {
           checkPaymentCompletion();
         }
-      }, 10000); // Check completion every 10 seconds
+      }, 60000); // Check completion every 60 seconds (was 10 seconds)
       
       return () => {
+        clearTimeout(timeoutId);
         clearInterval(progressInterval);
         clearInterval(completionInterval);
       };
     }
-  }, [splitWallet?.id]); // Removed splitWallet?.status to prevent infinite loops
+  }, [splitWallet?.id]); // Only run when splitWallet.id changes
 
   // Load user wallets when component mounts
   useEffect(() => {

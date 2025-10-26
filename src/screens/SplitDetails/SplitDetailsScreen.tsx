@@ -39,8 +39,7 @@ import { splitStorageService, Split, SplitStorageService, splitInvitationService
 import { SplitInvitationService } from '../../services/splits/splitInvitationService';
 import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';
 // Removed SplitWalletService import - wallets are now created only when split type is selected
-import FallbackDataService from '../../services/data';
-import { MockupDataService } from '../../services/data/mockupData';
+// FallbackDataService and MockupDataService removed - using proper error handling instead
 import { notificationService } from '../../services/notifications';
 import Avatar from '../../components/shared/Avatar';
 import QrCodeView from '../../services/core/QrCodeView';
@@ -107,10 +106,31 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     currentSplitData: routeCurrentSplitData
   } = route?.params || {};
 
-  // CRITICAL: Override splitId if this is a new bill to prevent loading old splits
-  // Fallback: If isNewBill/isManualCreation are undefined but we have processedBillData, treat as new bill
-  const isActuallyNewBill = isNewBill === true || (isNewBill === undefined && processedBillData && !splitId);
-  const isActuallyManualCreation = isManualCreation === true || (isManualCreation === undefined && processedBillData && !splitId);
+  // SIMPLIFIED: Single check for duplicate navigation - if we have OCR data and this is NOT a new bill, it's a duplicate
+  if (processedBillData && splitId && !isNewBill && !isManualCreation) {
+    console.log('🚨 SplitDetailsScreen: BLOCKING duplicate navigation - OCR data with existing split detected!', {
+      splitId,
+      hasProcessedBillData: !!processedBillData,
+      isNewBill,
+      isManualCreation,
+      processedBillDataTitle: processedBillData.title,
+      processedBillDataTotalAmount: processedBillData.totalAmount
+    });
+    
+    // Return early to prevent any processing
+    return (
+      <Container>
+        <StatusBar barStyle="light-content" backgroundColor={colors.black} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: colors.white, fontSize: 16 }}>Processing OCR Data...</Text>
+        </View>
+      </Container>
+    );
+  }
+
+  // SIMPLIFIED: If we have OCR data, this is always a new bill
+  const isActuallyNewBill = isNewBill === true || (processedBillData && !splitId);
+  const isActuallyManualCreation = isManualCreation === true || (processedBillData && !splitId);
   
   const effectiveSplitId = (isActuallyNewBill || isActuallyManualCreation) ? undefined : splitId;
   
@@ -136,8 +156,30 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // State to track if we've initialized with new bill data
   const [hasInitializedWithNewBillData, setHasInitializedWithNewBillData] = useState(false);
+  
+  // Split type selection state
+  const [selectedSplitType, setSelectedSplitType] = useState<'fair' | 'degen' | null>(() => {
+    // Initialize with existing split type if available
+    if (routeCurrentSplitData?.splitType) {
+      return routeCurrentSplitData.splitType;
+    }
+    if (splitData?.splitType) {
+      return splitData.splitType;
+    }
+    return null;
+  });
 
-  // Debug logging for OCR AI flow
+  // CRITICAL: Set flag when we have OCR data to prevent duplicate navigation
+  useEffect(() => {
+    if (processedBillData && (isActuallyNewBill || isActuallyManualCreation)) {
+      console.log('🔍 SplitDetailsScreen: Setting hasInitializedWithNewBillData to true for OCR data');
+      setHasInitializedWithNewBillData(true);
+    }
+  }, [processedBillData, isActuallyNewBill, isActuallyManualCreation]);
+
+  // Removed auto-showing split type selection modal - user should manually select split type
+
+  // SIMPLIFIED: Single debug logging for OCR AI flow
   useEffect(() => {
     console.log('🔍 SplitDetailsScreen: Route params received', {
       originalSplitId: splitId,
@@ -150,56 +192,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       hasCurrentSplitData: !!routeCurrentSplitData,
       isEditing,
       imageUri: !!imageUri,
-      // Additional debugging
-      allRouteParams: route?.params,
-      navigationState: navigation.getState?.()?.routes?.map(r => ({ name: r.name, params: r.params })),
-      // CRITICAL: Check if this is a duplicate navigation
-      isDuplicateNavigation: !processedBillData && splitId && !isNewBill && !isManualCreation
+      isActuallyNewBill,
+      isActuallyManualCreation
     });
-    
-    // CRITICAL: Check if isNewBill and isManualCreation are undefined
-    if (isNewBill === undefined && isManualCreation === undefined) {
-      console.log('🚨 SplitDetailsScreen: CRITICAL - isNewBill and isManualCreation are undefined!', {
-        routeParams: route?.params,
-        isNewBill,
-        isManualCreation,
-        splitId
-      });
-    }
-    
-    // CRITICAL: Check if processedBillData is missing
-    if (!processedBillData && splitId) {
-      console.log('🚨 SplitDetailsScreen: CRITICAL - No processedBillData but have splitId! This suggests navigation from SplitsList, not OCR flow!', {
-        splitId,
-        hasProcessedBillData: !!processedBillData,
-        hasBillData: !!billData,
-        navigationSource: 'Likely from SplitsList or other source, not OCR flow'
-      });
-      
-      // CRITICAL: If this is a duplicate navigation with old split data, ignore it
-      if (!isNewBill && !isManualCreation && !processedBillData && splitId) {
-        console.log('🚨 SplitDetailsScreen: BLOCKING duplicate navigation with old split data!', {
-          splitId,
-          isNewBill,
-          isManualCreation,
-          hasProcessedBillData: !!processedBillData,
-          hasInitializedWithNewBillData,
-          navigationStack: navigation.getState?.()?.routes?.map(r => ({ name: r.name, params: r.params }))
-        });
-        
-        // If we've already initialized with new bill data, ignore this old split navigation
-        if (hasInitializedWithNewBillData) {
-          console.log('🔍 SplitDetailsScreen: Already initialized with new bill data, ignoring old split navigation');
-          return;
-        }
-        
-        // Instead of navigating back, let's just ignore this navigation
-        // and keep the current state (which should be the new split data)
-        console.log('🔍 SplitDetailsScreen: Ignoring duplicate navigation, keeping current state');
-        return;
-      }
-    }
-  }, [splitId, effectiveSplitId, isNewBill, isManualCreation, processedBillData, billData, splitData, routeCurrentSplitData, isEditing, imageUri, hasInitializedWithNewBillData]);
+  }, [splitId, effectiveSplitId, isNewBill, isManualCreation, processedBillData, billData, splitData, routeCurrentSplitData, isEditing, imageUri, isActuallyNewBill, isActuallyManualCreation]);
 
   const [billName, setBillName] = useState(() => {
     console.log('🔍 SplitDetailsScreen: billName initialization', {
@@ -208,40 +204,48 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       processedBillDataTitle: processedBillData?.title,
       billDataTitle: billData?.title,
       isActuallyNewBill,
-      isActuallyManualCreation
+      isActuallyManualCreation,
+      hasProcessedBillData: !!processedBillData,
+      hasSplitData: !!splitData
     });
     
-    // For new bills, prioritize processed data over existing split data
+    // CRITICAL FIX: For new bills (OCR AI or Manual), ALWAYS prioritize processedBillData
+    // This prevents OCR data from being overwritten by existing split data
     if (isActuallyNewBill || isActuallyManualCreation) {
       if (processedBillData?.title) {
-        console.log('🔍 SplitDetailsScreen: Using processedBillData title for new bill:', processedBillData.title);
+        console.log('🔍 SplitDetailsScreen: Using processedBillData title for new bill (OCR/Manual):', processedBillData.title);
         return processedBillData.title;
       }
       if (billData?.title) {
-        console.log('🔍 SplitDetailsScreen: Using billData title for new bill:', billData.title);
+        console.log('🔍 SplitDetailsScreen: Using billData title for new bill (OCR/Manual):', billData.title);
         return billData.title;
       }
+      console.log('🔍 SplitDetailsScreen: No processed data for new bill, using default');
+      return 'New Split';
     }
     
-    // Use data from existing split if available, otherwise use processed data
+    // For existing splits, use split data
     if (routeCurrentSplitData?.title) {
-      console.log('🔍 SplitDetailsScreen: Using routeCurrentSplitData title:', routeCurrentSplitData.title);
+      console.log('🔍 SplitDetailsScreen: Using routeCurrentSplitData title for existing split:', routeCurrentSplitData.title);
       return routeCurrentSplitData.title;
     }
     if (splitData?.title) {
-      console.log('🔍 SplitDetailsScreen: Using splitData title:', splitData.title);
+      console.log('🔍 SplitDetailsScreen: Using splitData title for existing split:', splitData.title);
       return splitData.title;
     }
+    
+    // Fallback to processed data only if no split data exists
     if (processedBillData?.title) {
-      console.log('🔍 SplitDetailsScreen: Using processedBillData title:', processedBillData.title);
+      console.log('🔍 SplitDetailsScreen: Using processedBillData title as fallback:', processedBillData.title);
       return processedBillData.title;
     }
     if (billData?.title) {
-      console.log('🔍 SplitDetailsScreen: Using billData title:', billData.title);
+      console.log('🔍 SplitDetailsScreen: Using billData title as fallback:', billData.title);
       return billData.title;
     }
+    
     console.log('🔍 SplitDetailsScreen: Using default title: New Split');
-    return 'New Split'; // Default fallback instead of mockup data
+    return 'New Split';
   });
 
   const [totalAmount, setTotalAmount] = useState(() => {
@@ -251,52 +255,50 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       processedBillDataTotalAmount: processedBillData?.totalAmount,
       billDataTotalAmount: billData?.totalAmount,
       isActuallyNewBill,
-      isActuallyManualCreation
+      isActuallyManualCreation,
+      hasProcessedBillData: !!processedBillData,
+      hasSplitData: !!splitData
     });
     
-    // For new bills, prioritize processed data over existing split data
+    // CRITICAL FIX: For new bills (OCR AI or Manual), ALWAYS prioritize processedBillData
+    // This prevents OCR data from being overwritten by existing split data
     if (isActuallyNewBill || isActuallyManualCreation) {
       if (processedBillData?.totalAmount) {
-        console.log('🔍 SplitDetailsScreen: Using processedBillData totalAmount for new bill:', processedBillData.totalAmount);
+        console.log('🔍 SplitDetailsScreen: Using processedBillData totalAmount for new bill (OCR/Manual):', processedBillData.totalAmount);
         return processedBillData.totalAmount.toString();
       }
       if (billData?.totalAmount) {
-        console.log('🔍 SplitDetailsScreen: Using billData totalAmount for new bill:', billData.totalAmount);
+        console.log('🔍 SplitDetailsScreen: Using billData totalAmount for new bill (OCR/Manual):', billData.totalAmount);
         return billData.totalAmount.toString();
       }
+      console.log('🔍 SplitDetailsScreen: No processed data for new bill, using default');
+      return '0';
     }
     
-    // Use data from existing split if available, otherwise use processed data
+    // For existing splits, use split data
     if (routeCurrentSplitData?.totalAmount) {
-      console.log('🔍 SplitDetailsScreen: Using routeCurrentSplitData totalAmount:', routeCurrentSplitData.totalAmount);
+      console.log('🔍 SplitDetailsScreen: Using routeCurrentSplitData totalAmount for existing split:', routeCurrentSplitData.totalAmount);
       return routeCurrentSplitData.totalAmount.toString();
     }
     if (splitData?.totalAmount) {
-      console.log('🔍 SplitDetailsScreen: Using splitData totalAmount:', splitData.totalAmount);
+      console.log('🔍 SplitDetailsScreen: Using splitData totalAmount for existing split:', splitData.totalAmount);
       return splitData.totalAmount.toString();
     }
+    
+    // Fallback to processed data only if no split data exists
     if (processedBillData?.totalAmount) {
-      console.log('🔍 SplitDetailsScreen: Using processedBillData totalAmount:', processedBillData.totalAmount);
+      console.log('🔍 SplitDetailsScreen: Using processedBillData totalAmount as fallback:', processedBillData.totalAmount);
       return processedBillData.totalAmount.toString();
     }
     if (billData?.totalAmount) {
-      console.log('🔍 SplitDetailsScreen: Using billData totalAmount:', billData.totalAmount);
+      console.log('🔍 SplitDetailsScreen: Using billData totalAmount as fallback:', billData.totalAmount);
       return billData.totalAmount.toString();
     }
+    
     console.log('🔍 SplitDetailsScreen: Using default totalAmount: 0');
-    return '0'; // Default fallback instead of mockup data
+    return '0';
   });
   const [showSplitModalState, setShowSplitModalState] = useState(false);
-  const [selectedSplitType, setSelectedSplitType] = useState<'fair' | 'degen' | null>(() => {
-    // Initialize with existing split type if available
-    if (routeCurrentSplitData?.splitType) {
-      return routeCurrentSplitData.splitType;
-    }
-    if (splitData?.splitType) {
-      return splitData.splitType;
-    }
-    return null;
-  });
   // Private key modal state moved to FairSplit/DegenLock screens
   const [showAddFriendsModalState, setShowAddFriendsModalState] = useState(false);
 
@@ -315,15 +317,20 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       splitDataId: splitData?.id,
       routeCurrentSplitDataId: routeCurrentSplitData?.id,
       isActuallyNewBill,
-      isActuallyManualCreation
+      isActuallyManualCreation,
+      hasProcessedBillData: !!processedBillData,
+      hasBillData: !!billData
     });
     
-    // For new bills, don't initialize with any existing split data
+    // CRITICAL FIX: For new bills (OCR AI or Manual), NEVER initialize with existing split data
+    // This prevents OCR data from being contaminated by previous split data
     if (isActuallyNewBill || isActuallyManualCreation) {
-      console.log('🔍 SplitDetailsScreen: New bill - not initializing with existing split data');
+      console.log('🔍 SplitDetailsScreen: New bill (OCR/Manual) - not initializing with existing split data to prevent data contamination');
       return null;
     }
     
+    // For existing splits, use the split data
+    console.log('🔍 SplitDetailsScreen: Existing split - using split data');
     return splitData || routeCurrentSplitData || null;
   });
   const [splitWallet, setSplitWallet] = useState<any>(null);
@@ -337,28 +344,28 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       hasSplitData: !!splitData,
       splitDataId: splitData?.id,
       isActuallyNewBill,
-      isActuallyManualCreation
+      isActuallyManualCreation,
+      hasBillData: !!billData
     });
     
-    // For new bills, only use processedBillData, not splitData
+    // CRITICAL FIX: For new bills (OCR AI or Manual), ALWAYS use processedBillData
+    // This ensures OCR data is preserved and not contaminated by existing split data
     if (isActuallyNewBill || isActuallyManualCreation) {
       if (processedBillData) {
-        console.log('🔍 SplitDetailsScreen: Using processedBillData for new bill');
-        // Set flag to indicate we've initialized with new bill data
-        setTimeout(() => setHasInitializedWithNewBillData(true), 0);
+        console.log('🔍 SplitDetailsScreen: Using processedBillData for new bill (OCR/Manual) - preserving OCR data');
         return processedBillData;
       }
       console.log('🔍 SplitDetailsScreen: No processedBillData for new bill, returning null');
       return null;
     }
     
-    // Use processedBillData if available, otherwise create from splitData
+    // For existing splits, use processedBillData if available, otherwise create from splitData
     if (processedBillData) {
       console.log('🔍 SplitDetailsScreen: Using processedBillData for existing split');
       return processedBillData;
     }
     if (splitData) {
-      console.log('🔍 SplitDetailsScreen: Creating ProcessedBillData from splitData');
+      console.log('🔍 SplitDetailsScreen: Creating ProcessedBillData from splitData for existing split');
       // Create ProcessedBillData from splitData
       return {
         id: splitData.billId || splitData.id,
@@ -375,10 +382,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           id: item.id,
           name: item.name,
           price: item.price,
-          quantity: 1, // Default quantity
-          category: 'Other', // Default category
-          participants: item.participants || [],
-          isSelected: true,
+          participants: item.participants || [], // Array of participant IDs
         })),
         participants: splitData.participants.map((p: any) => ({
           id: p.userId,
@@ -476,11 +480,12 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   }, [splitInvitationData]);
 
   useEffect(() => {
-    // Check for existing split
-    if (isNewBill && !hasAttemptedProcessing) {
+    // Check for existing split ONLY if we don't have OCR/processed data
+    // If we have processedBillData, we're creating a new split from OCR and should NOT load existing splits
+    if (isNewBill && !hasAttemptedProcessing && !processedBillData) {
       checkExistingSplit();
     }
-  }, [isNewBill]);
+  }, [isNewBill, processedBillData]);
 
   useEffect(() => {
     // Invite contact if selected
@@ -1044,29 +1049,141 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
   // Get participants from current split data
   const participants = (() => {
+    console.log('🔍 SplitDetailsScreen: participants initialization', {
+      hasCurrentSplitData: !!currentSplitData,
+      hasSplitData: !!splitData,
+      hasCurrentProcessedBillData: !!currentProcessedBillData,
+      isActuallyNewBill,
+      isActuallyManualCreation,
+      currentSplitDataParticipants: currentSplitData?.participants?.length || 0,
+      splitDataParticipants: splitData?.participants?.length || 0,
+      processedBillDataParticipants: currentProcessedBillData?.participants?.length || 0
+    });
+    
+    // CRITICAL FIX: For new bills (OCR AI or Manual), prioritize processedBillData participants
+    // This ensures OCR data participants are used instead of existing split data
+    if (isActuallyNewBill || isActuallyManualCreation) {
+      if (currentProcessedBillData?.participants) {
+        console.log('🔍 SplitDetailsScreen: Using processedBillData participants for new bill (OCR/Manual)');
+        return currentProcessedBillData.participants;
+      }
+      console.log('🔍 SplitDetailsScreen: No processedBillData participants for new bill, returning empty array');
+      return [];
+    }
+    
+    // For existing splits, use split data participants
     if (currentSplitData?.participants) {
+      console.log('🔍 SplitDetailsScreen: Using currentSplitData participants for existing split');
       return currentSplitData.participants;
     }
     if (splitData?.participants) {
+      console.log('🔍 SplitDetailsScreen: Using splitData participants for existing split');
       return splitData.participants;
     }
     if (currentProcessedBillData?.participants) {
+      console.log('🔍 SplitDetailsScreen: Using processedBillData participants as fallback');
       return currentProcessedBillData.participants;
     }
+    
+    console.log('🔍 SplitDetailsScreen: No participants found, returning empty array');
     return [];
   })();
 
+  // CRITICAL: Auto-create split for OCR bills when landing on screen (without split type)
+  // This ensures the split is saved to database immediately, but user can still select type manually
+  useEffect(() => {
+    const createSplitForOCR = async () => {
+      // Only create split if:
+      // 1. We have OCR data (processedBillData)
+      // 2. This is a new bill (isActuallyNewBill)
+      // 3. We don't have a split ID yet (no effectiveSplitId)
+      // 4. We haven't already created a split (no createdSplitId)
+      if (processedBillData && isActuallyNewBill && !effectiveSplitId && !createdSplitId && currentUser) {
+        console.log('🔍 SplitDetailsScreen: Auto-creating split for OCR bill (without split type)', {
+          billId: processedBillData.id,
+          title: billName,
+          totalAmount: parseFloat(totalAmount),
+          participantsCount: participants.length
+        });
+
+        try {
+          const newSplitData = {
+            billId: processedBillData.id || 'new-bill',
+            title: billName,
+            description: `Split for ${billName}`,
+            totalAmount: parseFloat(totalAmount),
+            currency: processedBillData.currency || 'USDC',
+            splitType: undefined, // No split type selected yet - user will choose
+            status: 'draft' as const, // Draft status until user selects type
+            creatorId: currentUser.id?.toString() || '',
+            creatorName: currentUser.name || 'Unknown',
+            participants: participants.map((p: any) => ({
+              userId: 'userId' in p ? p.userId : p.id,
+              name: p.name,
+              email: p.email || '',
+              walletAddress: p.walletAddress || '',
+              amountOwed: p.amountOwed || 0,
+              amountPaid: 0,
+              status: 'accepted' as const // Creator is automatically accepted
+            })),
+            items: processedBillData.items?.map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              price: item.price,
+              participants: item.participants || []
+            })) || [],
+            merchant: {
+              name: processedBillData.merchant || 'Unknown Merchant',
+              address: processedBillData.location || '',
+              phone: ''
+            },
+            date: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+
+          console.log('🔍 SplitDetailsScreen: Creating split in database (draft status)', {
+            billId: newSplitData.billId,
+            title: newSplitData.title,
+            totalAmount: newSplitData.totalAmount,
+            participantsCount: newSplitData.participants.length,
+            status: newSplitData.status
+          });
+
+          const createResult = await SplitStorageService.createSplit(newSplitData);
+
+          if (createResult.success && createResult.split) {
+            console.log('✅ SplitDetailsScreen: Split created successfully (draft)', {
+              splitId: createResult.split.id,
+              firebaseDocId: createResult.split.firebaseDocId,
+              status: createResult.split.status
+            });
+            
+            setCreatedSplitId(createResult.split.id);
+            setCurrentSplitData(createResult.split);
+          } else {
+            console.error('❌ SplitDetailsScreen: Failed to create split:', createResult.error);
+          }
+        } catch (error) {
+          console.error('❌ SplitDetailsScreen: Error creating split:', error);
+        }
+      }
+    };
+
+    createSplitForOCR();
+  }, [processedBillData, isActuallyNewBill, effectiveSplitId, createdSplitId, currentUser, billName, totalAmount, participants]);
+
   // Helper function to check if all participants have accepted
   const areAllParticipantsAccepted = () => {
-    const participants = currentSplitData?.participants || [];
-    if (participants.length === 0) {return true;}
+    const currentParticipants = currentSplitData?.participants || [];
+    if (currentParticipants.length === 0) {return true;}
 
     // Check if all participants have 'accepted' status
-    const acceptedParticipants = participants.filter((participant: any) =>
+    const acceptedParticipants = currentParticipants.filter((participant: any) =>
       participant.status === 'accepted'
     );
 
-    return acceptedParticipants.length === participants.length;
+    return acceptedParticipants.length === currentParticipants.length;
   };
 
   // Missing function implementations - these would be added from the original implementation
@@ -1151,7 +1268,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         const updatedSplitData = {
           ...currentSplitData,
           splitType: selectedSplitType,
-          status: 'pending' as const // Keep as pending until wallet is created
+          status: 'pending' as const // Change from 'draft' to 'pending' when user selects type
         };
 
         const updateResult = await SplitStorageService.updateSplit(splitIdToUse, updatedSplitData);
@@ -1193,6 +1310,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
         const newSplitData = {
           billId: currentProcessedBillData?.id || 'new-bill',
           title: billName,
+          description: `Split for ${billName}`,
           totalAmount: parseFloat(totalAmount),
           currency: currentProcessedBillData?.currency || 'USDC',
           splitType: selectedSplitType,
@@ -1202,11 +1320,23 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           participants: participants.map((p: any) => ({
             userId: 'userId' in p ? p.userId : p.id,
             name: p.name,
-            walletAddress: p.walletAddress,
+            email: p.email || '',
+            walletAddress: p.walletAddress || '',
             amountOwed: p.amountOwed || 0,
             amountPaid: 0,
-            status: p.status
+            status: p.status || 'pending'
           })),
+          items: currentProcessedBillData?.items?.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            participants: item.participants || []
+          })) || [],
+          merchant: {
+            name: currentProcessedBillData?.merchant || 'Unknown Merchant',
+            address: currentProcessedBillData?.location || '',
+            phone: ''
+          },
           date: new Date().toISOString(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -1416,6 +1546,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     );
   }
 
+
   return (
     <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
@@ -1481,7 +1612,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
                       if (billData?.date) {
                         return billData.date;
                       }
-                      return MockupDataService.getBillDate();
+                      return new Date().toISOString().split('T')[0];
                     })()}
                   </Text>
                 </View>
@@ -1625,11 +1756,11 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           <Button
             title={(() => {
               const allAccepted = areAllParticipantsAccepted();
-              const participants = currentSplitData?.participants || [];
-              const acceptedParticipants = participants.filter((participant: any) =>
+              const currentParticipants = currentSplitData?.participants || [];
+              const acceptedParticipants = currentParticipants.filter((participant: any) =>
                 participant.status === 'accepted'
               );
-              const usersNeedingAcceptance = participants.length - acceptedParticipants.length;
+              const usersNeedingAcceptance = currentParticipants.length - acceptedParticipants.length;
 
               if (allAccepted) {
                 return 'Split';

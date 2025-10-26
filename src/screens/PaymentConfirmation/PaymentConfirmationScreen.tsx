@@ -106,7 +106,7 @@ const PaymentConfirmationScreen: React.FC<PaymentConfirmationScreenProps> = ({ n
             <View style={styles.billHeader}>
               <View style={styles.billTitleContainer}>
                 <Text style={styles.billIcon}>🧾</Text>
-                <Text style={styles.billTitle}>{MockupDataService.getBillName()}</Text>
+                <Text style={styles.billTitle}>{processedBillData?.title || 'Bill'}</Text>
               </View>
               <Text style={styles.billDate}>{FallbackDataService.generateBillDate(processedBillData, billData, true)}</Text>
             </View>

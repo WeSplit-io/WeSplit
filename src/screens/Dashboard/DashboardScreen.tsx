@@ -246,7 +246,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     }
   }, [notifications]);
 
-  // Simplified balance loading using the new wallet service
+  // Simplified balance loading using the new wallet service with caching
   const loadWalletBalance = useCallback(async () => {
     if (!currentUser?.id) {return;}
     
@@ -302,7 +302,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   // Removed group amount conversion logic
 
-  // Load payment requests
+  // Load payment requests with optimized processing
   const loadPaymentRequests = useCallback(async () => {
     if (!currentUser?.id || loadingPaymentRequests) {return;}
 
@@ -310,7 +310,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     try {
       logger.debug('Loading payment requests', null, 'DashboardScreen');
       
-      // Get payment requests from Firebase
+      // Get payment requests from Firebase (now cached)
       const firebaseRequests = await getReceivedPaymentRequests(currentUser.id, 10);
       
       // Get notification requests (exclude completed ones)
@@ -364,47 +364,57 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         return dateB - dateA;
       });
 
-      // Enrich with sender avatars
-      try {
-        const senderIds = Array.from(new Set(
-          allRequests
-            .map(r => r.data?.senderId)
-            .filter((id: any) => id !== undefined && id !== null)
-            .map((id: any) => String(id))
-        ));
-
-        if (senderIds.length > 0) {
-          const profiles = await Promise.all(
-            senderIds.map(async (id) => {
-              try {
-                const profile = await firebaseDataService.user.getCurrentUser(id);
-                return { id, avatar: profile?.avatar || '' };
-              } catch (e) {
-                return { id, avatar: '' };
-              }
-            })
-          );
-
-          const idToAvatar: Record<string, string> = {};
-          profiles.forEach(p => { idToAvatar[p.id] = p.avatar; });
-
-          allRequests.forEach(r => {
-            if (!r.data) {r.data = {};}
-            const sid = r.data.senderId ? String(r.data.senderId) : undefined;
-            const existing = r.data.senderAvatar && r.data.senderAvatar.trim() !== '';
-            if (!existing && sid && idToAvatar[sid]) {
-              r.data.senderAvatar = idToAvatar[sid];
-            }
-          });
-        }
-      } catch (e) {
-        logger.warn('Could not enrich sender avatars', { error: e }, 'DashboardScreen');
-      }
-
+      // Set requests first for immediate display
       setPaymentRequests(allRequests);
       if (!initialRequestsLoaded) {
         setInitialRequestsLoaded(true);
       }
+      
+      // Load avatars asynchronously after initial display (lazy loading)
+      setTimeout(async () => {
+        try {
+          const senderIds = Array.from(new Set(
+            allRequests
+              .map(r => r.data?.senderId)
+              .filter((id: any) => id !== undefined && id !== null)
+              .map((id: any) => String(id))
+          ));
+
+          if (senderIds.length > 0) {
+            const profiles = await Promise.all(
+              senderIds.map(async (id) => {
+                try {
+                  const profile = await firebaseDataService.user.getCurrentUser(id);
+                  return { id, avatar: profile?.avatar || '' };
+                } catch (e) {
+                  return { id, avatar: '' };
+                }
+              })
+            );
+
+            const idToAvatar: Record<string, string> = {};
+            profiles.forEach(p => { idToAvatar[p.id] = p.avatar; });
+
+            // Update requests with avatars
+            setPaymentRequests(prevRequests => 
+              prevRequests.map(r => {
+                if (!r.data) {r.data = {};}
+                const sid = r.data.senderId ? String(r.data.senderId) : undefined;
+                const existing = r.data.senderAvatar && r.data.senderAvatar.trim() !== '';
+                if (!existing && sid && idToAvatar[sid]) {
+                  return {
+                    ...r,
+                    data: { ...r.data, senderAvatar: idToAvatar[sid] }
+                  };
+                }
+                return r;
+              })
+            );
+          }
+        } catch (e) {
+          logger.warn('Could not enrich sender avatars', { error: e }, 'DashboardScreen');
+        }
+      }, 100); // Small delay to allow initial render
       
       logger.info('Payment requests loaded successfully', { count: allRequests.length }, 'DashboardScreen');
     } catch (error) {
@@ -428,14 +438,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     }
   }, [currentUser?.id, notifications, loadingPaymentRequests, initialRequestsLoaded]);
 
-  // Load user names when transactions change
-  useEffect(() => {
-    if (realTransactions.length > 0) {
-      loadUserNames(realTransactions);
-    }
-  }, [realTransactions]);
-
-  // Load transactions
+  // Load transactions with optimized processing
   const loadTransactions = useCallback(async () => {
     if (!currentUser?.id) {return;}
 
@@ -443,18 +446,28 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       setLoadingTransactions(true);
       const userTransactions = await firebaseDataService.transaction.getUserTransactions(currentUser.id.toString());
       
-      // Preload user data for all transaction participants
-      const userIds = new Set<string>();
-      userTransactions.forEach(transaction => {
-        if (transaction.from_user) {userIds.add(transaction.from_user);}
-        if (transaction.to_user) {userIds.add(transaction.to_user);}
-      });
-      
-      if (userIds.size > 0) {
-        await preloadUserData(Array.from(userIds));
-      }
-      
+      // Set transactions first for immediate display
       setRealTransactions(userTransactions);
+      
+      // Load user names asynchronously after initial display (lazy loading)
+      if (userTransactions.length > 0) {
+        setTimeout(async () => {
+          try {
+            const userIds = new Set<string>();
+            userTransactions.forEach(transaction => {
+              if (transaction.from_user) {userIds.add(transaction.from_user);}
+              if (transaction.to_user) {userIds.add(transaction.to_user);}
+            });
+            
+            if (userIds.size > 0) {
+              await preloadUserData(Array.from(userIds));
+              loadUserNames(userTransactions);
+            }
+          } catch (error) {
+            logger.warn('Error loading user names for transactions', error, 'DashboardScreen');
+          }
+        }, 200); // Small delay to allow initial render
+      }
     } catch (error) {
       logger.error('Error loading transactions', error, 'DashboardScreen');
     } finally {
@@ -462,14 +475,29 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     }
   }, [currentUser?.id]);
 
-  // Load data when component comes into focus
+  // Load data when component comes into focus (optimized to prevent excessive calls)
   useFocusEffect(
     React.useCallback(() => {
       if (isAuthenticated && currentUser?.id) {
-        // Only load data once to prevent infinite loops
-        loadWalletBalance();
-        loadTransactions();
-        loadPaymentRequests();
+        // Load data with staggered timing to prevent overwhelming the system
+        const loadData = async () => {
+          try {
+            // Load wallet balance first (most critical)
+            await loadWalletBalance();
+            
+            // Load transactions and payment requests in parallel after a short delay
+            setTimeout(async () => {
+              await Promise.all([
+                loadTransactions(),
+                loadPaymentRequests()
+              ]);
+            }, 100);
+          } catch (error) {
+            logger.error('Error loading dashboard data', error, 'DashboardScreen');
+          }
+        };
+        
+        loadData();
       }
     }, [isAuthenticated, currentUser?.id]) // Removed function dependencies to prevent infinite loops
   );
@@ -517,6 +545,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
     try {
       logger.info('Manual refresh triggered', null, 'DashboardScreen');
+      
+      // Clear caches before refresh to ensure fresh data
+      firebaseDataService.transaction.clearTransactionCache(currentUser.id);
+      const { clearPaymentRequestCache } = await import('../../services/payments/firebasePaymentRequestService');
+      clearPaymentRequestCache(currentUser.id);
+      
+      // Clear wallet recovery cache
+      const { WalletRecoveryService } = await import('../../services/blockchain/wallet/walletRecoveryService');
+      WalletRecoveryService.clearCache();
       
       await Promise.all([
         loadWalletBalance(),

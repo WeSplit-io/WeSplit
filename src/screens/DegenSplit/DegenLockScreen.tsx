@@ -22,7 +22,7 @@ import { styles } from './DegenLockStyles';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
 import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits';
-import { FallbackDataService } from '../../services/data/mockupData';
+// FallbackDataService removed - using proper error handling instead
 
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitInitialization, useDegenSplitRealtime } from './hooks';
@@ -198,18 +198,17 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     );
   }
 
-  // Memoize the bill date to prevent excessive FallbackDataService calls
+  // Memoize the bill date to prevent excessive calls
   const billDate = useMemo(() => {
-    try {
-      return FallbackDataService.getBillDate();
-    } catch (error) {
-      return new Date().toLocaleDateString('en-US', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
-      });
+    if (processedBillData?.date) {
+      return processedBillData.date;
     }
-  }, []);
+    return new Date().toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  }, [processedBillData?.date]);
 
   // Get category image based on data
   const getCategoryImage = () => {

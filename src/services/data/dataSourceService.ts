@@ -4,7 +4,7 @@
  * Replaces scattered MockupDataService fallbacks with consistent data access
  */
 
-import { MockupDataService } from '../data/mockupData';
+// MockupDataService removed - using proper error handling instead
 import { logger } from '../analytics/loggingService';
 import { ErrorHandler } from '../../utils/core/errorHandler';
 
@@ -79,17 +79,15 @@ export class DataSourceService {
       };
     }
 
-    // Fallback: Mockup data (only for development/testing)
-    const fallbackAmount = MockupDataService.getBillAmount();
-    logger.warn('Using fallback amount from MockupDataService', { 
-      fallbackAmount,
+    // No fallback - return 0 if no valid data found
+    logger.warn('No valid bill amount found in any data source', { 
       splitData: splitData?.totalAmount,
       processedBillData: processedBillData?.totalAmount,
       billData: billData?.totalAmount
     }, 'DataSourceService');
     
     return {
-      data: fallbackAmount,
+      data: 0,
       source: 'fallback',
       isFallback: true
     };
@@ -131,12 +129,15 @@ export class DataSourceService {
       };
     }
 
-    // Fallback: Mockup data (only for development/testing)
-    const fallbackName = MockupDataService.getBillName();
-    console.warn('DataSourceService: Using fallback name from MockupDataService:', fallbackName);
+    // No fallback - return empty string if no valid data found
+    logger.warn('No valid bill name found in any data source', { 
+      splitData: splitData?.title,
+      processedBillData: processedBillData?.title,
+      billData: billData?.title
+    }, 'DataSourceService');
     
     return {
-      data: fallbackName,
+      data: '',
       source: 'fallback',
       isFallback: true
     };

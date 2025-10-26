@@ -146,7 +146,7 @@ class ConsolidatedTransactionService {
             tx_hash: result.signature,
             note: params.memo || 'USDC Transfer',
             status: 'completed' as const,
-            group_id: params.groupId || null,
+            group_id: params.groupId || undefined,
             company_fee: result.companyFee || 0,
             net_amount: result.netAmount || params.amount,
             gas_fee: 0, // Gas fees are covered by the company
@@ -168,7 +168,7 @@ class ConsolidatedTransactionService {
             tx_hash: result.signature,
             note: params.memo || 'USDC Transfer',
             status: 'completed' as const,
-            group_id: params.groupId || null,
+            group_id: params.groupId || undefined,
             company_fee: 0, // Recipient doesn't pay company fees
             net_amount: params.amount, // Recipient gets full amount
             gas_fee: 0, // Gas fees are covered by the company
@@ -471,27 +471,6 @@ class ConsolidatedTransactionService {
     }
   }
 
-  /**
-   * Legacy method for sending USDC from specific wallet
-   * @deprecated Use sendUSDCTransaction instead
-   */
-  async sendUsdcFromSpecificWallet(
-    fromWalletAddress: string,
-    to: string,
-    amount: number,
-    userId: string,
-    memo?: string
-  ): Promise<TransactionResult> {
-    logger.warn('Using deprecated sendUsdcFromSpecificWallet method', null, 'ConsolidatedTransactionService');
-    
-    // This method would need to be implemented if specific wallet functionality is required
-    return {
-      signature: '',
-      txId: '',
-      success: false,
-      error: 'sendUsdcFromSpecificWallet is deprecated and not implemented in the new architecture'
-    };
-  }
 }
 
 // Export singleton instance

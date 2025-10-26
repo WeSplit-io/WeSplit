@@ -29,6 +29,10 @@ export interface StoredWallet {
 export class WalletRecoveryService {
   private static readonly WALLET_STORAGE_KEY = 'user_wallets';
   private static readonly USER_WALLET_PREFIX = 'wallet_';
+  
+  // Cache to prevent repeated wallet recovery calls
+  private static walletRecoveryCache = new Map<string, { result: WalletRecoveryResult; timestamp: number }>();
+  private static readonly CACHE_DURATION = 30000; // 30 seconds cache
 
   /**
    * Store a wallet securely on the device
@@ -58,21 +62,31 @@ export class WalletRecoveryService {
 
   /**
    * Get all stored wallets for a user (including legacy storage formats)
+   * SECURITY FIX: Only return wallets that actually belong to the specified user
    */
   static async getStoredWallets(userId: string): Promise<StoredWallet[]> {
     const wallets: StoredWallet[] = [];
     
     try {
-      // 1. Check new format: wallet_${userId}
+      // 1. Check new format: wallet_${userId} - This is safe as it's user-specific
       const newKey = `${this.USER_WALLET_PREFIX}${userId}`;
       const newStoredData = await SecureStore.getItemAsync(newKey);
       if (newStoredData) {
         const walletData: StoredWallet = JSON.parse(newStoredData);
-        wallets.push(walletData);
-        logger.debug('Found wallet in new format', { userId, address: walletData.address }, 'WalletRecoveryService');
+        // Verify the wallet actually belongs to this user
+        if (walletData.userId === userId) {
+          wallets.push(walletData);
+          logger.debug('Found wallet in new format', { userId, address: walletData.address }, 'WalletRecoveryService');
+        } else {
+          logger.warn('Found wallet with mismatched userId', { 
+            expectedUserId: userId, 
+            actualUserId: walletData.userId,
+            address: walletData.address 
+          }, 'WalletRecoveryService');
+        }
       }
 
-      // 2. Check legacy format: wallet_private_key
+      // 2. Check legacy format: wallet_private_key - SECURITY FIX: Validate ownership
       const legacyPrivateKey = await SecureStore.getItemAsync('wallet_private_key', {
         requireAuthentication: false,
         keychainService: 'WeSplitWalletData'
@@ -85,16 +99,25 @@ export class WalletRecoveryService {
           const privateKeyBuffer = Buffer.from(privateKeyArray);
           const keypair = Keypair.fromSecretKey(privateKeyBuffer);
           
-          const legacyWallet: StoredWallet = {
-            address: keypair.publicKey.toBase58(),
-            publicKey: keypair.publicKey.toBase58(),
-            privateKey: Buffer.from(keypair.secretKey).toString('base64'),
-            userId,
-            createdAt: new Date().toISOString()
-          };
-          
-          wallets.push(legacyWallet);
-          logger.debug('Found wallet in legacy format', { userId, address: legacyWallet.address }, 'WalletRecoveryService');
+          // SECURITY FIX: Verify this wallet belongs to the current user
+          const isValidForUser = await this.verifyWalletOwnership(keypair, userId);
+          if (isValidForUser) {
+            const legacyWallet: StoredWallet = {
+              address: keypair.publicKey.toBase58(),
+              publicKey: keypair.publicKey.toBase58(),
+              privateKey: Buffer.from(keypair.secretKey).toString('base64'),
+              userId,
+              createdAt: new Date().toISOString()
+            };
+            
+            wallets.push(legacyWallet);
+            logger.debug('Found wallet in legacy format', { userId, address: legacyWallet.address }, 'WalletRecoveryService');
+          } else {
+            logger.warn('Legacy wallet does not belong to current user', { 
+              userId, 
+              address: keypair.publicKey.toBase58() 
+            }, 'WalletRecoveryService');
+          }
         } catch (error) {
           logger.warn('Failed to parse legacy private key', error, 'WalletRecoveryService');
         }
@@ -126,7 +149,7 @@ export class WalletRecoveryService {
         }
       }
 
-      // 4. Check AsyncStorage for storedWallets (original format)
+      // 4. Check AsyncStorage for storedWallets (original format) - SECURITY FIX: Validate ownership
       try {
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
         const storedWalletsData = await AsyncStorage.getItem('storedWallets');
@@ -153,16 +176,25 @@ export class WalletRecoveryService {
                 const keypair = Keypair.fromSecretKey(privateKeyBuffer);
                 const derivedAddress = keypair.publicKey.toBase58();
                 
-                const asyncStorageWallet: StoredWallet = {
-                  address: derivedAddress,
-                  publicKey: derivedAddress,
-                  privateKey: Buffer.from(keypair.secretKey).toString('base64'),
-                  userId,
-                  createdAt: new Date().toISOString()
-                };
-                
-                wallets.push(asyncStorageWallet);
-                logger.debug('Found wallet in AsyncStorage format', { userId, address: asyncStorageWallet.address }, 'WalletRecoveryService');
+                // SECURITY FIX: Verify this wallet belongs to the current user
+                const isValidForUser = await this.verifyWalletOwnership(keypair, userId);
+                if (isValidForUser) {
+                  const asyncStorageWallet: StoredWallet = {
+                    address: derivedAddress,
+                    publicKey: derivedAddress,
+                    privateKey: Buffer.from(keypair.secretKey).toString('base64'),
+                    userId,
+                    createdAt: new Date().toISOString()
+                  };
+                  
+                  wallets.push(asyncStorageWallet);
+                  logger.debug('Found wallet in AsyncStorage format', { userId, address: asyncStorageWallet.address }, 'WalletRecoveryService');
+                } else {
+                  logger.warn('AsyncStorage wallet does not belong to current user', { 
+                    userId, 
+                    address: derivedAddress 
+                  }, 'WalletRecoveryService');
+                }
               } catch (error) {
                 logger.warn('Failed to parse AsyncStorage wallet', error, 'WalletRecoveryService');
               }
@@ -173,7 +205,7 @@ export class WalletRecoveryService {
         logger.warn('Failed to check AsyncStorage for wallets', error, 'WalletRecoveryService');
       }
 
-      // 5. Check for stored mnemonic (wallet_mnemonic)
+      // 5. Check for stored mnemonic (wallet_mnemonic) - SECURITY FIX: Validate ownership
       try {
         const storedMnemonic = await SecureStore.getItemAsync('wallet_mnemonic', {
           requireAuthentication: false,
@@ -189,16 +221,25 @@ export class WalletRecoveryService {
               const seed = await bip39.mnemonicToSeed(storedMnemonic);
               const keypair = Keypair.fromSeed(seed.slice(0, 32));
               
-              const mnemonicWallet: StoredWallet = {
-                address: keypair.publicKey.toBase58(),
-                publicKey: keypair.publicKey.toBase58(),
-                privateKey: Buffer.from(keypair.secretKey).toString('base64'),
-                userId,
-                createdAt: new Date().toISOString()
-              };
-              
-              wallets.push(mnemonicWallet);
-              logger.debug('Found wallet from stored mnemonic', { userId, address: mnemonicWallet.address }, 'WalletRecoveryService');
+              // SECURITY FIX: Verify this wallet belongs to the current user
+              const isValidForUser = await this.verifyWalletOwnership(keypair, userId);
+              if (isValidForUser) {
+                const mnemonicWallet: StoredWallet = {
+                  address: keypair.publicKey.toBase58(),
+                  publicKey: keypair.publicKey.toBase58(),
+                  privateKey: Buffer.from(keypair.secretKey).toString('base64'),
+                  userId,
+                  createdAt: new Date().toISOString()
+                };
+                
+                wallets.push(mnemonicWallet);
+                logger.debug('Found wallet from stored mnemonic', { userId, address: mnemonicWallet.address }, 'WalletRecoveryService');
+              } else {
+                logger.warn('Stored mnemonic wallet does not belong to current user', { 
+                  userId, 
+                  address: keypair.publicKey.toBase58() 
+                }, 'WalletRecoveryService');
+              }
             }
           } catch (error) {
             logger.warn('Failed to derive wallet from stored mnemonic', error, 'WalletRecoveryService');
@@ -208,7 +249,7 @@ export class WalletRecoveryService {
         logger.warn('Failed to check for stored mnemonic', error, 'WalletRecoveryService');
       }
 
-      // 6. Check for user-specific mnemonic (mnemonic_${userId})
+      // 6. Check for user-specific mnemonic (mnemonic_${userId}) - This is safe as it's user-specific
       try {
         const userMnemonicKey = `mnemonic_${userId}`;
         const userMnemonicData = await SecureStore.getItemAsync(userMnemonicKey, {
@@ -234,6 +275,7 @@ export class WalletRecoveryService {
               const seed = await bip39.mnemonicToSeed(mnemonic);
               const keypair = Keypair.fromSeed(seed.slice(0, 32));
               
+              // This is user-specific storage, so it's safe to use
               const userMnemonicWallet: StoredWallet = {
                 address: keypair.publicKey.toBase58(),
                 publicKey: keypair.publicKey.toBase58(),
@@ -253,7 +295,7 @@ export class WalletRecoveryService {
         logger.warn('Failed to check for user-specific mnemonic', error, 'WalletRecoveryService');
       }
 
-      // 7. Check for user-specific wallet data (wallet_${userId})
+      // 7. Check for user-specific wallet data (wallet_${userId}) - This is safe as it's user-specific
       try {
         const userWalletKey = `wallet_${userId}`;
         const userWalletData = await SecureStore.getItemAsync(userWalletKey, {
@@ -278,6 +320,7 @@ export class WalletRecoveryService {
               const keypair = Keypair.fromSecretKey(privateKeyBuffer);
               const derivedAddress = keypair.publicKey.toBase58();
               
+              // This is user-specific storage, so it's safe to use
               const userWallet: StoredWallet = {
                 address: derivedAddress,
                 publicKey: derivedAddress,
@@ -310,6 +353,14 @@ export class WalletRecoveryService {
    */
   static async recoverWallet(userId: string): Promise<WalletRecoveryResult> {
     try {
+      // Check cache first to prevent repeated calls
+      const cacheKey = `recovery_${userId}`;
+      const cached = this.walletRecoveryCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
+        logger.debug('Using cached wallet recovery result', { userId }, 'WalletRecoveryService');
+        return cached.result;
+      }
+      
       logger.info('Starting wallet recovery', { userId }, 'WalletRecoveryService');
 
       // 1. Get user's public key from database with error handling
@@ -418,7 +469,7 @@ export class WalletRecoveryService {
             const finalPublicKey = isDerivedMatch ? derivedPublicKey : storedWallet.publicKey;
             const finalAddress = isDerivedMatch ? derivedPublicKey : storedWallet.address;
             
-            return {
+            const result = {
               success: true,
               wallet: {
                 address: finalAddress,
@@ -426,6 +477,10 @@ export class WalletRecoveryService {
                 privateKey: storedWallet.privateKey
               }
             };
+            
+            // Cache the successful result
+            this.walletRecoveryCache.set(cacheKey, { result, timestamp: Date.now() });
+            return result;
           } else {
             logger.debug('Stored wallet does not match expected address', {
               storedAddress: storedWallet.address,
@@ -438,17 +493,26 @@ export class WalletRecoveryService {
         }
       }
 
-      return {
+      const result = {
         success: false,
         error: 'No matching wallet found in local storage'
       };
+      
+      // Cache the failed result as well to prevent repeated attempts
+      this.walletRecoveryCache.set(cacheKey, { result, timestamp: Date.now() });
+      return result;
 
     } catch (error) {
       logger.error('Wallet recovery failed', error, 'WalletRecoveryService');
-      return {
+      const result = {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error during wallet recovery'
       };
+      
+      // Cache the error result
+      const cacheKey = `recovery_${userId}`;
+      this.walletRecoveryCache.set(cacheKey, { result, timestamp: Date.now() });
+      return result;
     }
   }
 
@@ -529,10 +593,98 @@ export class WalletRecoveryService {
     try {
       const key = `${this.USER_WALLET_PREFIX}${userId}`;
       await SecureStore.deleteItemAsync(key);
+      
+      // Clear cache for this user
+      const cacheKey = `recovery_${userId}`;
+      this.walletRecoveryCache.delete(cacheKey);
+      
       logger.info('Stored wallet cleared', { userId }, 'WalletRecoveryService');
       return true;
     } catch (error) {
       logger.error('Failed to clear stored wallet', error, 'WalletRecoveryService');
+      return false;
+    }
+  }
+
+  /**
+   * Clear wallet recovery cache (useful for testing or when user logs out)
+   */
+  static clearCache(): void {
+    this.walletRecoveryCache.clear();
+    logger.debug('Wallet recovery cache cleared', null, 'WalletRecoveryService');
+  }
+
+  /**
+   * Verify that a wallet actually belongs to the specified user
+   * SECURITY: This prevents cross-user wallet contamination
+   */
+  private static async verifyWalletOwnership(keypair: Keypair, userId: string): Promise<boolean> {
+    try {
+      // Method 1: Check if the wallet address matches the user's wallet in database
+      const userData = await firebaseDataService.user.getCurrentUser(userId);
+      if (userData?.wallet_address === keypair.publicKey.toBase58()) {
+        logger.debug('Wallet ownership verified via database match', { 
+          userId, 
+          address: keypair.publicKey.toBase58() 
+        }, 'WalletRecoveryService');
+        return true;
+      }
+
+      // Method 2: Check if there's a user-specific storage entry for this wallet
+      const userSpecificKey = `private_key_${userId}`;
+      const userSpecificData = await SecureStore.getItemAsync(userSpecificKey);
+      if (userSpecificData) {
+        try {
+          const privateKeyArray = JSON.parse(userSpecificData);
+          const privateKeyBuffer = Buffer.from(privateKeyArray);
+          const userKeypair = Keypair.fromSecretKey(privateKeyBuffer);
+          
+          if (userKeypair.publicKey.equals(keypair.publicKey)) {
+            logger.debug('Wallet ownership verified via user-specific storage', { 
+              userId, 
+              address: keypair.publicKey.toBase58() 
+            }, 'WalletRecoveryService');
+            return true;
+          }
+        } catch (error) {
+          logger.warn('Failed to verify wallet ownership via user-specific storage', error, 'WalletRecoveryService');
+        }
+      }
+
+      // Method 3: Check if there's a mnemonic for this user that derives to this wallet
+      const userMnemonicKey = `mnemonic_${userId}`;
+      const userMnemonicData = await SecureStore.getItemAsync(userMnemonicKey, {
+        requireAuthentication: false,
+        keychainService: 'WeSplitWalletData'
+      });
+      
+      if (userMnemonicData) {
+        try {
+          const bip39 = await import('bip39');
+          if (bip39.validateMnemonic(userMnemonicData)) {
+            const seed = await bip39.mnemonicToSeed(userMnemonicData);
+            const derivedKeypair = Keypair.fromSeed(seed.slice(0, 32));
+            
+            if (derivedKeypair.publicKey.equals(keypair.publicKey)) {
+              logger.debug('Wallet ownership verified via user mnemonic', { 
+                userId, 
+                address: keypair.publicKey.toBase58() 
+              }, 'WalletRecoveryService');
+              return true;
+            }
+          }
+        } catch (error) {
+          logger.warn('Failed to verify wallet ownership via user mnemonic', error, 'WalletRecoveryService');
+        }
+      }
+
+      logger.warn('Wallet ownership verification failed', { 
+        userId, 
+        address: keypair.publicKey.toBase58() 
+      }, 'WalletRecoveryService');
+      return false;
+    } catch (error) {
+      logger.error('Error verifying wallet ownership', error, 'WalletRecoveryService');
       return false;
     }
   }

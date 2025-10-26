@@ -140,7 +140,7 @@ export async function createPaymentRequest(
         //   throw new Error(`Invalid notification data: ${validation.errors.join(', ')}`);
         // }
 
-        await notificationService.sendNotification(
+        await notificationService.instance.sendNotification(
           String(recipientId),
           'Payment Request',
           `${senderName} has requested ${amount} ${currency}${description ? ` for ${description}` : ''}`,
@@ -172,10 +172,20 @@ export async function createPaymentRequest(
   }
 }
 
+// Cache for payment requests
+const paymentRequestCache = new Map<string, { result: PaymentRequest[]; timestamp: number }>();
+const CACHE_DURATION = 15000; // 15 seconds cache for payment requests
+
 // Get payment requests for a user (received)
 export async function getReceivedPaymentRequests(userId: string | number, limitCount: number = 50): Promise<PaymentRequest[]> {
   try {
-    // Removed excessive logging for cleaner console
+    // Check cache first
+    const cacheKey = `payment_requests_${userId}_${limitCount}`;
+    const cached = paymentRequestCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+      logger.debug('Using cached payment requests', { userId, limitCount }, 'firebasePaymentRequestService');
+      return cached.result;
+    }
     
     const requestsRef = collection(db, 'paymentRequests');
     const requestsQuery = query(
@@ -191,7 +201,8 @@ export async function getReceivedPaymentRequests(userId: string | number, limitC
       paymentRequestTransformers.firestoreToPaymentRequest(doc)
     );
     
-    // Removed excessive logging for cleaner console
+    // Cache the result
+    paymentRequestCache.set(cacheKey, { result: requests, timestamp: Date.now() });
     
     return requests;
   } catch (error) {
@@ -243,7 +254,7 @@ export async function acceptPaymentRequest(requestId: string): Promise<PaymentRe
     const paymentRequest = paymentRequestTransformers.firestoreToPaymentRequest(requestDoc);
     
     // Send notification to sender
-    await notificationService.sendNotification(
+    await notificationService.instance.sendNotification(
       paymentRequest.senderId,
       'Payment Request Accepted',
       `${paymentRequest.recipientName} has accepted your payment request for ${paymentRequest.amount} ${paymentRequest.currency}`,
@@ -283,7 +294,7 @@ export async function rejectPaymentRequest(requestId: string, reason?: string): 
     const paymentRequest = paymentRequestTransformers.firestoreToPaymentRequest(requestDoc);
     
     // Send notification to sender
-    await notificationService.sendNotification(
+    await notificationService.instance.sendNotification(
       paymentRequest.senderId,
       'Payment Request Rejected',
       `${paymentRequest.recipientName} has rejected your payment request for ${paymentRequest.amount} ${paymentRequest.currency}${reason ? `: ${reason}` : ''}`,
@@ -324,7 +335,7 @@ export async function cancelPaymentRequest(requestId: string): Promise<PaymentRe
     const paymentRequest = paymentRequestTransformers.firestoreToPaymentRequest(requestDoc);
     
     // Send notification to recipient
-    await notificationService.sendNotification(
+    await notificationService.instance.sendNotification(
       paymentRequest.recipientId,
       'Payment Request Cancelled',
       `${paymentRequest.senderName} has cancelled their payment request for ${paymentRequest.amount} ${paymentRequest.currency}`,
@@ -391,6 +402,19 @@ export async function getPendingPaymentRequestsCount(userId: string | number): P
   }
 }
 
+// Clear payment request cache
+export function clearPaymentRequestCache(userId?: string | number) {
+  if (userId) {
+    // Clear cache for specific user
+    const keysToDelete = Array.from(paymentRequestCache.keys())
+      .filter(key => key.startsWith(`payment_requests_${userId}_`));
+    keysToDelete.forEach(key => paymentRequestCache.delete(key));
+  } else {
+    // Clear all payment request cache
+    paymentRequestCache.clear();
+  }
+}
+
 // Export the service object for consistency with other services
 export const firebasePaymentRequestService = {
   createPaymentRequest,
@@ -400,5 +424,6 @@ export const firebasePaymentRequestService = {
   rejectPaymentRequest,
   cancelPaymentRequest,
   getPaymentRequest,
-  getPendingPaymentRequestsCount
+  getPendingPaymentRequestsCount,
+  clearPaymentRequestCache
 }; 

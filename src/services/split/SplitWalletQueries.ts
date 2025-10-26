@@ -10,11 +10,22 @@ import { db } from '../../config/firebase/firebase';
 import type { SplitWallet, SplitWalletParticipant, SplitWalletResult } from './types';
 
 export class SplitWalletQueries {
+  // Cache to prevent repeated split wallet queries
+  private static splitWalletCache = new Map<string, { result: SplitWalletResult; timestamp: number }>();
+  private static readonly CACHE_DURATION = 15000; // 15 seconds cache for split wallets
+
   /**
    * Get split wallet by ID
    */
   static async getSplitWallet(splitWalletId: string): Promise<SplitWalletResult> {
     try {
+      // Check cache first to prevent repeated calls
+      const cached = this.splitWalletCache.get(splitWalletId);
+      if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
+        logger.debug('Using cached split wallet result', { splitWalletId }, 'SplitWalletQueries');
+        return cached.result;
+      }
+
       logger.debug('Getting split wallet', { splitWalletId }, 'SplitWalletQueries');
 
       // Try to get by Firebase document ID first
@@ -40,10 +51,14 @@ export class SplitWalletQueries {
           status: wallet.status
         }, 'SplitWalletQueries');
 
-        return {
+        const result = {
           success: true,
           wallet,
         };
+        
+        // Cache the result
+        this.splitWalletCache.set(splitWalletId, { result, timestamp: Date.now() });
+        return result;
       }
 
       // If not found by Firebase ID, try to find by custom ID
@@ -73,26 +88,54 @@ export class SplitWalletQueries {
           status: wallet.status
         }, 'SplitWalletQueries');
 
-        return {
+        const result = {
           success: true,
           wallet,
         };
+        
+        // Cache the result
+        this.splitWalletCache.set(splitWalletId, { result, timestamp: Date.now() });
+        return result;
       }
 
       logger.error('Split wallet not found', { splitWalletId }, 'SplitWalletQueries');
-      return {
+      const result = {
         success: false,
         error: 'Split wallet not found',
       };
+      
+      // Cache the error result as well to prevent repeated failed queries
+      this.splitWalletCache.set(splitWalletId, { result, timestamp: Date.now() });
+      return result;
 
     } catch (error) {
       console.error('🔍 SplitWalletQueries: Error getting split wallet:', error);
       logger.error('Failed to get split wallet', error, 'SplitWalletQueries');
-      return {
+      const result = {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
       };
+      
+      // Cache the error result
+      this.splitWalletCache.set(splitWalletId, { result, timestamp: Date.now() });
+      return result;
     }
+  }
+
+  /**
+   * Clear split wallet cache (useful for testing or when wallet is updated)
+   */
+  static clearCache(): void {
+    this.splitWalletCache.clear();
+    logger.debug('Split wallet cache cleared', null, 'SplitWalletQueries');
+  }
+
+  /**
+   * Clear cache for a specific split wallet
+   */
+  static clearCacheForWallet(splitWalletId: string): void {
+    this.splitWalletCache.delete(splitWalletId);
+    logger.debug('Split wallet cache cleared for wallet', { splitWalletId }, 'SplitWalletQueries');
   }
 
   /**
