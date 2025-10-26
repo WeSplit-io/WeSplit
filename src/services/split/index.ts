@@ -170,7 +170,7 @@ export class SplitWalletService {
 
   static async processDegenLoserPayment(splitWalletId: string, loserUserId: string, paymentMethod: any, totalAmount: number, description?: string) {
     await loadModules();
-    return SplitWalletPayments.processDegenLoserPayment(splitWalletId, loserUserId, paymentMethod, totalAmount, description);
+    return SplitWalletPayments.processDegenLoserPayment(splitWalletId, loserUserId, totalAmount, description);
   }
 
   static async payParticipantShare(splitWalletId: string, participantId: string, amount: number) {
