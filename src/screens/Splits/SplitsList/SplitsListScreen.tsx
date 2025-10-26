@@ -247,10 +247,11 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
   const handleCreateSplit = useCallback(() => {
     try {
-      navigation.navigate('BillCamera');
+      // Temporarily disabled OCR access - navigate to manual creation instead
+      navigation.navigate('ManualBillCreation');
     } catch (err) {
-      console.error('❌ SplitsListScreen: Error navigating to camera:', err);
-      Alert.alert('Navigation Error', 'Failed to open camera');
+      console.error('❌ SplitsListScreen: Error navigating to manual creation:', err);
+      Alert.alert('Navigation Error', 'Failed to open manual creation');
     }
   }, [navigation]);
 

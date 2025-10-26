@@ -493,7 +493,23 @@ export class WalletRecoveryService {
           // Check if the derived public key matches the expected one
           const isDerivedMatch = derivedPublicKey === expectedPublicKey;
           
-          if (isExactMatch || isDerivedMatch) {
+          // Additional validation: check if addresses are valid Solana addresses
+          const isValidSolanaAddress = (addr: string) => {
+            try {
+              new PublicKey(addr);
+              return true;
+            } catch {
+              return false;
+            }
+          };
+          
+          // Enhanced matching logic for better compatibility
+          const isAddressMatch = isValidSolanaAddress(expectedPublicKey) && 
+            (derivedPublicKey === expectedPublicKey || 
+             storedWallet.address === expectedPublicKey ||
+             storedWallet.publicKey === expectedPublicKey);
+          
+          if (isExactMatch || isDerivedMatch || isAddressMatch) {
             logger.info('Found matching wallet', { 
               userId, 
               address: storedWallet.address,
@@ -532,10 +548,38 @@ export class WalletRecoveryService {
         }
       }
 
+      // If no exact match found, try comprehensive recovery
+      logger.warn('No exact wallet match found, attempting comprehensive recovery', {
+        userId,
+        expectedPublicKey,
+        storedWalletsCount: storedWallets.length
+      }, 'WalletRecoveryService');
+      
+      // Try comprehensive recovery as fallback
+      const { solanaWalletService } = await import('./api/solanaWalletApi');
+      const comprehensiveResult = await solanaWalletService.instance.comprehensiveWalletRecovery(userId, expectedPublicKey);
+      
+      if (comprehensiveResult) {
+        logger.info('Comprehensive wallet recovery succeeded', {
+          userId,
+          expectedPublicKey,
+          recoveredAddress: comprehensiveResult.publicKey.toBase58()
+        }, 'WalletRecoveryService');
+        
+        return {
+          success: true,
+          wallet: {
+            address: comprehensiveResult.publicKey.toBase58(),
+            publicKey: comprehensiveResult.publicKey.toBase58(),
+            privateKey: Buffer.from(comprehensiveResult.secretKey).toString('base64')
+          }
+        };
+      }
+      
       return {
         success: false,
         error: WalletRecoveryError.DATABASE_MISMATCH,
-        errorMessage: 'No matching wallet found in local storage'
+        errorMessage: 'No matching wallet found in local storage or comprehensive recovery'
       };
 
     } catch (error) {

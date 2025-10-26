@@ -15,6 +15,7 @@ import { styles } from './ContactsList.styles';
 import { logger } from '../services/core';
 import Avatar from './shared/Avatar';
 import { formatWalletAddress, getWalletAddressStatus } from '../utils/crypto/wallet';
+import { useRealtimeUserSearch } from '../hooks/useRealtimeUserSearch';
 
 interface ContactsListProps {
   onContactSelect: (contact: UserContact) => void;
@@ -61,6 +62,31 @@ const ContactsList: React.FC<ContactsListProps> = ({
   const [filteredContacts, setFilteredContacts] = useState<UserContact[]>([]);
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  
+  // Real-time user search
+  const { 
+    users: realtimeUsers, 
+    isLoading: realtimeSearchLoading, 
+    error: realtimeSearchError,
+    subscribe: subscribeRealtimeSearch,
+    unsubscribe: unsubscribeRealtimeSearch,
+    clearResults: clearRealtimeResults
+  } = useRealtimeUserSearch({
+    enabled: true,
+    debounceMs: 500,
+    limit: 20,
+    includeDeleted: false,
+    includeSuspended: false,
+    onUserAdded: (user) => {
+      logger.info('New user added to search results', { userId: user.id, name: user.name }, 'ContactsList');
+    },
+    onUserModified: (user) => {
+      logger.info('User modified in search results', { userId: user.id, name: user.name }, 'ContactsList');
+    },
+    onUserRemoved: (user) => {
+      logger.info('User removed from search results', { userId: user.id, name: user.name }, 'ContactsList');
+    }
+  });
   const [isAddingContact, setIsAddingContact] = useState<number | null>(null);
   const [mode, setMode] = useState<'list' | 'qr'>('list');
   const [permission, requestPermission] = useCameraPermissions();
@@ -190,16 +216,22 @@ const ContactsList: React.FC<ContactsListProps> = ({
     logger.debug('Search effect triggered', { activeTab, searchQuery: searchQuery.trim() }, 'ContactsList');
     
     if (searchQuery.trim() && searchQuery.length >= 2) {
-      logger.debug('Setting up debounced search for', { searchQuery }, 'ContactsList');
-      const timeoutId = setTimeout(() => {
-        handleUserSearch(searchQuery);
-      }, 500);
-
-      return () => clearTimeout(timeoutId);
+      logger.debug('Setting up real-time search for', { searchQuery }, 'ContactsList');
+      
+      // Subscribe to real-time search
+      subscribeRealtimeSearch(searchQuery);
+      
+      // Also run traditional search as fallback
+      handleUserSearch(searchQuery);
+      
+      return () => {
+        unsubscribeRealtimeSearch();
+      };
     } else {
       setSearchResults([]);
+      clearRealtimeResults();
     }
-  }, [searchQuery]);
+  }, [searchQuery, subscribeRealtimeSearch, unsubscribeRealtimeSearch, clearRealtimeResults]);
 
   // Contact loading is now handled by the useContacts hook
 

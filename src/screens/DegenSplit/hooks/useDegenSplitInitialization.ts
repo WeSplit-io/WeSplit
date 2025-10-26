@@ -7,6 +7,7 @@ import { useEffect, useCallback } from 'react';
 import { DegenSplitState } from './useDegenSplitState';
 import { DegenSplitLogic } from './useDegenSplitLogic';
 import { logger } from '../../../services/analytics/loggingService';
+import { liveBalanceService } from '../../../services/blockchain/balance/LiveBalanceService';
 
 export interface DegenSplitInitialization {
   // Initialization functions
@@ -123,7 +124,7 @@ export const useDegenSplitInitialization = (
     }
   }, []);
 
-  // Start periodic check for participant locks
+  // Start periodic check for participant locks with live balance integration
   const startPeriodicLockCheck = useCallback((
     splitWallet: any,
     currentUser: any,
@@ -133,22 +134,49 @@ export const useDegenSplitInitialization = (
       return () => {}; // Return empty cleanup function
     }
 
-    logger.info('Starting periodic lock check', {
+    logger.info('Starting periodic lock check with live balance integration', {
       splitWalletId: splitWallet.id,
+      walletAddress: splitWallet.walletAddress,
       isLocked: state.isLocked,
       allParticipantsLocked: state.allParticipantsLocked
     }, 'DegenSplitInitialization');
 
+    // Subscribe to live balance updates for the split wallet
+    const balanceUnsubscribe = liveBalanceService.subscribe(
+      splitWallet.walletAddress,
+      (balanceUpdate) => {
+        logger.info('Live balance update received for degen split wallet', {
+          splitWalletId: splitWallet.id,
+          walletAddress: splitWallet.walletAddress,
+          usdcBalance: balanceUpdate.usdcBalance,
+          solBalance: balanceUpdate.solBalance
+        }, 'DegenSplitInitialization');
+
+        // Trigger participant lock check when balance changes
+        logic.checkAllParticipantsLocked(splitWallet, participants).catch(error => {
+          logger.error('Error in live balance triggered lock check', error, 'DegenSplitInitialization');
+        });
+      },
+      {
+        pollingIntervalMs: 2000, // Check every 2 seconds for faster updates
+        tolerance: 0.000001 // Very small tolerance to catch any balance changes
+      }
+    );
+
+    // Also keep the traditional periodic check as a fallback
     const interval = setInterval(async () => {
       try {
         await logic.checkAllParticipantsLocked(splitWallet, participants);
       } catch (error) {
         logger.error('Error in periodic lock check', error, 'DegenSplitInitialization');
       }
-    }, 5000); // Check every 5 seconds
+    }, 5000); // Check every 5 seconds as fallback
 
     return () => {
-      logger.info('Stopping periodic lock check', null, 'DegenSplitInitialization');
+      logger.info('Stopping periodic lock check and live balance subscription', {
+        splitWalletId: splitWallet.id
+      }, 'DegenSplitInitialization');
+      balanceUnsubscribe();
       clearInterval(interval);
     };
   }, [state.isLocked, state.allParticipantsLocked, logic]);

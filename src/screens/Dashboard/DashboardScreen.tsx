@@ -41,6 +41,7 @@ import { logger } from '../../services/analytics/loggingService';
 import { db } from '../../config/firebase/firebase';
 import { getDoc, doc } from 'firebase/firestore';
 import { RequestCard } from '../../components/requests';
+import { useLiveBalance } from '../../hooks/useLiveBalance';
 
 
 
@@ -246,6 +247,24 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       setUnreadNotifications(unreadCount);
     }
   }, [notifications]);
+
+  // Live balance updates
+  const { balance: liveBalance, isLoading: liveBalanceLoading, error: liveBalanceError } = useLiveBalance(
+    currentUser?.wallet_address || null,
+    {
+      enabled: !!currentUser?.wallet_address,
+      onBalanceChange: (update) => {
+        logger.info('Live balance update received', {
+          address: update.address,
+          usdcBalance: update.usdcBalance,
+          solBalance: update.solBalance
+        }, 'DashboardScreen');
+        
+        // Update the local balance state with live data
+        setLocalAppWalletBalance(update.usdcBalance);
+      }
+    }
+  );
 
   // Simplified balance loading using the new wallet service
   const loadWalletBalance = useCallback(async () => {

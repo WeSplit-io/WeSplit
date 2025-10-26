@@ -413,6 +413,30 @@ async function executeFastTransaction(
     const fromPublicKey = new PublicKey(fromAddress);
     const toPublicKey = new PublicKey(toAddress);
 
+    // For withdrawals, capture balance BEFORE transaction for verification
+    let fromBalanceBefore: number | null = null;
+    let toBalanceBefore: number | null = null;
+    
+    if (transactionType === 'withdrawal') {
+      try {
+        const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+        const fromBalanceResult = await consolidatedTransactionService.getUsdcBalance(fromAddress);
+        const toBalanceResult = await consolidatedTransactionService.getUsdcBalance(toAddress);
+        fromBalanceBefore = fromBalanceResult.balance;
+        toBalanceBefore = toBalanceResult.balance;
+        
+        logger.info('Captured balances before withdrawal transaction', {
+          fromBalanceBefore,
+          toBalanceBefore,
+          expectedAmount: amount
+        }, 'SplitWalletPayments');
+      } catch (error) {
+        logger.warn('Failed to capture balances before transaction, proceeding without balance verification', {
+          error: error instanceof Error ? error.message : String(error)
+        }, 'SplitWalletPayments');
+      }
+    }
+
     // Create transaction
     const transaction = new Transaction();
 
@@ -567,29 +591,7 @@ async function executeFastTransaction(
       transactionType
     }, 'SplitWalletPayments');
 
-    // For withdrawals, capture balance before transaction for verification
-    let fromBalanceBefore: number | null = null;
-    let toBalanceBefore: number | null = null;
-    
-    try {
-      const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
-      const fromBalanceResult = await consolidatedTransactionService.getUsdcBalance(fromAddress);
-      const toBalanceResult = await consolidatedTransactionService.getUsdcBalance(toAddress);
-      fromBalanceBefore = fromBalanceResult.balance;
-      toBalanceBefore = toBalanceResult.balance;
-      
-      logger.info('Captured balances before withdrawal transaction', {
-        signature,
-        fromBalanceBefore,
-        toBalanceBefore,
-        expectedAmount: amount
-      }, 'SplitWalletPayments');
-    } catch (error) {
-      logger.warn('Failed to capture balances before transaction, proceeding with confirmation', {
-        signature,
-        error: error instanceof Error ? error.message : String(error)
-      }, 'SplitWalletPayments');
-    }
+    // Balance capture moved to before transaction execution
 
     // For withdrawals, use proper confirmation strategy with balance verification
     let confirmed = false;

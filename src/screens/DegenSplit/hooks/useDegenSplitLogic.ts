@@ -602,18 +602,80 @@ export const useDegenSplitLogic = (
         }
         
         const totalParticipants = participants.length;
+        
+        // Enhanced balance verification: Check actual blockchain balance
+        let currentWallet = walletResult.wallet;
+        try {
+          const { SplitWalletPayments } = await import('../../../services/split/SplitWalletPayments');
+          const balanceResult = await SplitWalletPayments.verifySplitWalletBalance(currentWallet.id);
+          
+          if (balanceResult.success && balanceResult.balance !== undefined) {
+            logger.info('Blockchain balance verification for degen split', {
+              splitWalletId: currentWallet.id,
+              walletAddress: currentWallet.walletAddress,
+              blockchainBalance: balanceResult.balance,
+              expectedTotalAmount: currentWallet.totalAmount,
+              participantsCount: currentWallet.participants.length
+            }, 'DegenSplitLogic');
+            
+            // If blockchain balance is greater than 0, check if participants should be marked as locked
+            if (balanceResult.balance > 0) {
+              const expectedAmountPerParticipant = currentWallet.totalAmount / totalParticipants;
+              const totalPaidAmount = balanceResult.balance;
+              
+              // Update participant status based on actual blockchain balance
+              const updatedParticipants = currentWallet.participants.map((p: any) => {
+                // If the participant has sent funds (based on blockchain balance), mark as locked
+                if (p.status === 'pending' && totalPaidAmount >= expectedAmountPerParticipant) {
+                  logger.info('Updating participant status based on blockchain balance', {
+                    participantId: p.userId,
+                    previousStatus: p.status,
+                    newStatus: 'locked',
+                    amountPaid: expectedAmountPerParticipant
+                  }, 'DegenSplitLogic');
+                  
+                  return {
+                    ...p,
+                    status: 'locked' as const,
+                    amountPaid: expectedAmountPerParticipant,
+                    lockedAt: new Date().toISOString()
+                  };
+                }
+                return p;
+              });
+              
+              // Update the wallet with the new participant statuses
+              if (updatedParticipants.some((p, index) => p.status !== currentWallet.participants[index].status)) {
+                const { SplitWalletService } = await import('../../../services/split');
+                await SplitWalletService.updateSplitWalletParticipants(currentWallet.id, updatedParticipants);
+                
+                // Reload the wallet to get updated data
+                const reloadResult = await SplitWalletService.getSplitWallet(currentWallet.id);
+                if (reloadResult.success && reloadResult.wallet) {
+                  currentWallet = reloadResult.wallet;
+                }
+              }
+            }
+          }
+        } catch (balanceError) {
+          logger.warn('Failed to verify blockchain balance, using database status', {
+            splitWalletId: currentWallet.id,
+            error: balanceError instanceof Error ? balanceError.message : String(balanceError)
+          }, 'DegenSplitLogic');
+        }
+        
         // For degen split, check if participants have locked their funds (status 'locked' AND amountPaid >= amountOwed)
-        const lockedCount = wallet.participants.filter((p: any) => p.status === 'locked' && p.amountPaid >= p.amountOwed).length;
+        const lockedCount = currentWallet.participants.filter((p: any) => p.status === 'locked' && p.amountPaid >= p.amountOwed).length;
         
         // Update locked participants list for UI
-        const lockedParticipantIds = wallet.participants
+        const lockedParticipantIds = currentWallet.participants
           .filter((p: any) => p.status === 'locked' && p.amountPaid >= p.amountOwed)
           .map((p: any) => p.userId);
         
         setState({ 
           lockedParticipants: lockedParticipantIds,
           allParticipantsLocked: lockedCount === totalParticipants,
-          splitWallet: wallet
+          splitWallet: currentWallet
         });
         
         logger.info('Participant lock status updated', {
