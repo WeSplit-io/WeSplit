@@ -294,17 +294,65 @@ async function executeFairSplitTransaction(
     }
 
     if (!confirmed) {
-      logger.warn('Fair split transaction confirmation timed out - using likely succeeded mode', {
+      logger.warn('Fair split transaction confirmation timed out - verifying balance change', {
               signature,
         attempts
             }, 'SplitWalletPayments');
             
-      // For fair splits, if the transaction was sent successfully, assume it succeeded
-            return {
+      // For funding transactions, verify the balance actually changed before declaring success
+      try {
+        const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+        const fromBalance = await consolidatedTransactionService.getUsdcBalance(fromAddress);
+        const toBalance = await consolidatedTransactionService.getUsdcBalance(toAddress);
+        
+        logger.info('Balance verification after timeout', {
+          signature,
+          fromAddress,
+          fromBalance: fromBalance.balance,
+          toAddress,
+          toBalance: toBalance.balance,
+          expectedAmount: amount
+        }, 'SplitWalletPayments');
+        
+        // Check if the recipient balance increased by approximately the expected amount
+        const tolerance = 0.001; // 0.001 USDC tolerance
+        
+        // For funding, we expect the recipient's balance to increase by the amount
+        // Since we don't have the previous balance, we'll check if the transaction
+        // was actually confirmed on the blockchain instead
+        const transactionConfirmed = await verifyTransactionOnBlockchain(signature);
+        
+        if (transactionConfirmed) {
+          logger.info('Fair split funding verified by blockchain confirmation', {
+            signature,
+            expectedAmount: amount
+          }, 'SplitWalletPayments');
+          return {
             success: true,
-              signature,
-        error: 'Transaction confirmation timed out but likely succeeded'
-      };
+            signature
+          };
+        } else {
+          logger.error('Fair split funding verification failed - transaction not confirmed on blockchain', {
+            signature,
+            expectedAmount: amount
+          }, 'SplitWalletPayments');
+          return {
+            success: false,
+            signature,
+            error: 'Transaction confirmation timed out and blockchain verification failed'
+          };
+        }
+      } catch (balanceError) {
+        logger.error('Failed to verify fair split funding balance', {
+          signature,
+          error: balanceError instanceof Error ? balanceError.message : String(balanceError)
+        }, 'SplitWalletPayments');
+        return {
+          success: false,
+          signature,
+          error: 'Transaction confirmation timed out and balance verification failed'
+        };
+      }
     }
 
             return {
@@ -1032,17 +1080,65 @@ async function executeDegenSplitTransaction(
     }
 
     if (!confirmed) {
-      logger.warn('Degen split transaction confirmation timed out - using likely succeeded mode', {
+      logger.warn('Degen split transaction confirmation timed out - verifying balance change', {
           signature,
         attempts
         }, 'SplitWalletPayments');
         
-      // For degen splits, if the transaction was sent successfully, assume it succeeded
-        return {
-          success: true,
+      // For funding transactions, verify the balance actually changed before declaring success
+      try {
+        const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+        const fromBalance = await consolidatedTransactionService.getUsdcBalance(fromAddress);
+        const toBalance = await consolidatedTransactionService.getUsdcBalance(toAddress);
+        
+        logger.info('Balance verification after timeout', {
           signature,
-        error: 'Transaction confirmation timed out but likely succeeded'
-      };
+          fromAddress,
+          fromBalance: fromBalance.balance,
+          toAddress,
+          toBalance: toBalance.balance,
+          expectedAmount: amount
+        }, 'SplitWalletPayments');
+        
+        // Check if the recipient balance increased by approximately the expected amount
+        const tolerance = 0.001; // 0.001 USDC tolerance
+        
+        // For funding, we expect the recipient's balance to increase by the amount
+        // Since we don't have the previous balance, we'll check if the transaction
+        // was actually confirmed on the blockchain instead
+        const transactionConfirmed = await verifyTransactionOnBlockchain(signature);
+        
+        if (transactionConfirmed) {
+          logger.info('Degen split funding verified by blockchain confirmation', {
+            signature,
+            expectedAmount: amount
+          }, 'SplitWalletPayments');
+          return {
+            success: true,
+            signature
+          };
+        } else {
+          logger.error('Degen split funding verification failed - transaction not confirmed on blockchain', {
+            signature,
+            expectedAmount: amount
+          }, 'SplitWalletPayments');
+          return {
+            success: false,
+            signature,
+            error: 'Transaction confirmation timed out and blockchain verification failed'
+          };
+        }
+      } catch (balanceError) {
+        logger.error('Failed to verify degen split funding balance', {
+          signature,
+          error: balanceError instanceof Error ? balanceError.message : String(balanceError)
+        }, 'SplitWalletPayments');
+        return {
+          success: false,
+          signature,
+          error: 'Transaction confirmation timed out and balance verification failed'
+        };
+      }
     }
 
     return {
@@ -1603,10 +1699,26 @@ export class SplitWalletPayments {
 
       // Get current balance
       const balanceResult = await this.verifySplitWalletBalance(splitWalletId);
-      if (!balanceResult.success || !balanceResult.balance) {
+      
+      logger.info('Balance verification result for withdrawal', {
+        splitWalletId,
+        success: balanceResult.success,
+        balance: balanceResult.balance,
+        error: balanceResult.error,
+        walletAddress: wallet.walletAddress
+      }, 'SplitWalletPayments');
+      
+      if (!balanceResult.success) {
         return {
           success: false,
-          error: 'Failed to get split wallet balance',
+          error: `Failed to get split wallet balance: ${balanceResult.error || 'Unknown error'}`,
+        };
+      }
+      
+      if (!balanceResult.balance || balanceResult.balance <= 0) {
+        return {
+          success: false,
+          error: `Split wallet has no funds available (balance: ${balanceResult.balance || 0} USDC)`,
         };
       }
 
@@ -1647,10 +1759,22 @@ export class SplitWalletPayments {
       logger.info('💸 Fair split transaction result', {
         success: transactionResult.success,
         signature: transactionResult.signature,
-        error: transactionResult.error
+        error: transactionResult.error,
+        withdrawalAmount,
+        walletAddress: wallet.walletAddress,
+        recipientAddress
       }, 'SplitWalletPayments');
       
       if (!transactionResult.success) {
+        logger.error('Fair split withdrawal transaction failed', {
+          splitWalletId,
+          error: transactionResult.error,
+          signature: transactionResult.signature,
+          withdrawalAmount,
+          walletAddress: wallet.walletAddress,
+          recipientAddress
+        }, 'SplitWalletPayments');
+        
         return {
           success: false,
           error: transactionResult.error || 'Transaction failed',

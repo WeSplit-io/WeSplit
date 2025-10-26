@@ -106,3 +106,28 @@ export const preloadUserData = async (userIds: string[]): Promise<void> => {
     logger.error('Failed to preload user data', { userIds, error }, 'DataUtils');
   }
 };
+
+/**
+ * Remove undefined values from an object (Firebase doesn't allow undefined values)
+ */
+export const removeUndefinedValues = (obj: any): any => {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedValues(item));
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = removeUndefinedValues(value);
+      }
+    }
+    return cleaned;
+  }
+  
+  return obj;
+};
