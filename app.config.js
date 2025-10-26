@@ -4,7 +4,7 @@ module.exports = {
   expo: {
     name: "WeSplit",
     slug: "WeSplit",
-    version: "1.0.2",
+    version: "1.0.3",
     orientation: "portrait",
     icon: "./assets/android-app-icon-no-alpha.png",
     userInterfaceStyle: "light",
