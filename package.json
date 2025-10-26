@@ -208,6 +208,9 @@
         ],
         "listUnknownPackages": false
       }
+    },
+    "plugins": {
+      "@react-native-firebase/app": false
     }
   }
 }
