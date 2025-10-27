@@ -13,6 +13,7 @@ export interface DegenSplitRealtimeState {
   isRealtimeActive: boolean;
   lastRealtimeUpdate: string | null;
   realtimeError: string | null;
+  hasReceivedRealtimeData: boolean;
 }
 
 export interface DegenSplitRealtimeCallbacks {
@@ -31,6 +32,7 @@ export const useDegenSplitRealtime = (
   const [isRealtimeActive, setIsRealtimeActive] = useState(false);
   const [lastRealtimeUpdate, setLastRealtimeUpdate] = useState<string | null>(null);
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
+  const [hasReceivedRealtimeData, setHasReceivedRealtimeData] = useState(false);
   const realtimeCleanupRef = useRef<(() => void) | null>(null);
 
   // Start real-time updates
@@ -58,6 +60,7 @@ export const useDegenSplitRealtime = (
             if (update.split) {
               setLastRealtimeUpdate(update.lastUpdated);
               setRealtimeError(null);
+              setHasReceivedRealtimeData(true);
 
               // Update participants
               if (callbacks.onParticipantUpdate) {
@@ -134,6 +137,7 @@ export const useDegenSplitRealtime = (
 
       realtimeCleanupRef.current = cleanup;
       setIsRealtimeActive(true);
+      // Don't set hasReceivedRealtimeData here - only when actual data is received
       console.log('🔍 DegenSplit Realtime: Updates started successfully');
 
     } catch (error) {
@@ -194,6 +198,7 @@ export const useDegenSplitRealtime = (
     isRealtimeActive,
     lastRealtimeUpdate,
     realtimeError,
+    hasReceivedRealtimeData,
     startRealtimeUpdates,
     stopRealtimeUpdates
   };

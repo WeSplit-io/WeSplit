@@ -12,6 +12,10 @@ export type {
   PaymentResult
 } from './types';
 
+// Export atomic updates service
+export { SplitWalletAtomicUpdates } from './SplitWalletAtomicUpdates';
+export type { AtomicUpdateResult } from './SplitWalletAtomicUpdates';
+
 // Import modules using dynamic imports to avoid circular dependencies
 let SplitWalletCreation: any;
 let SplitWalletManagement: any;
@@ -57,12 +61,13 @@ export class SplitWalletService {
   static async createDegenSplitWallet(
     billId: string,
     creatorId: string,
+    creatorName: string,
     totalAmount: number,
     currency: string,
     participants: { userId: string; name: string; walletAddress: string; amountOwed: number }[]
   ) {
     await loadModules();
-    return SplitWalletCreation.createDegenSplitWallet(billId, creatorId, totalAmount, currency, participants);
+    return SplitWalletCreation.createDegenSplitWallet(billId, creatorId, creatorName, totalAmount, currency, participants);
   }
 
   static isValidWalletAddress(address: string) {

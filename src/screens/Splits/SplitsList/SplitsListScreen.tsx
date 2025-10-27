@@ -33,6 +33,12 @@ import { MockupDataService } from '../../../services/data/mockupData';
 import { priceManagementService } from '../../../services/core';
 import { useApp } from '../../../context/AppContext';
 import { firebaseDataService } from '../../../services/data';
+import { 
+  getSplitStatusDisplayText, 
+  getSplitStatusBadgeStyle, 
+  getSplitStatusTextStyle, 
+  getSplitStatusDotStyle 
+} from '../../../utils/statusUtils';
 
 
 interface SplitsListScreenProps {
@@ -406,10 +412,10 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
             </View>
           </View>
 
-          <View style={[styles.statusBadge, getStatusBadgeStyle(split.status)]}>
-            <View style={[styles.splitCardDot, getStatusDotStyle(split.status)]} />
-            <Text style={[styles.statusText, getStatusTextStyle(split.status)]}>
-              {split.status}
+          <View style={[styles.statusBadge, getSplitStatusBadgeStyle(split.status)]}>
+            <View style={[styles.splitCardDot, getSplitStatusDotStyle(split.status)]} />
+            <Text style={[styles.statusText, getSplitStatusTextStyle(split.status)]}>
+              {getSplitStatusDisplayText(split.status)}
             </Text>
           </View>
         </View>
@@ -491,51 +497,6 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         )}*/}
       </TouchableOpacity>
     );
-  };
-
-  const getStatusBadgeStyle = (status: string) => {
-    switch (status) {
-      case 'active':
-        return { backgroundColor: colors.green + '20' };
-      case 'completed':
-        return { backgroundColor: colors.success + '20' };
-      case 'pending':
-        return { backgroundColor: colors.warning + '20' };
-      case 'draft':
-        return { backgroundColor: colors.textSecondary + '20' };
-      default:
-        return { backgroundColor: colors.surface };
-    }
-  };
-
-  const getStatusTextStyle = (status: string) => {
-    switch (status) {
-      case 'active':
-        return { color: colors.green };
-      case 'completed':
-        return { color: colors.success };
-      case 'pending':
-        return { color: colors.warning };
-      case 'draft':
-        return { color: colors.textSecondary };
-      default:
-        return { color: colors.text };
-    }
-  };
-
-  const getStatusDotStyle = (status: string) => {
-    switch (status) {
-      case 'active':
-        return { backgroundColor: colors.green };
-      case 'completed':
-        return { backgroundColor: colors.success };
-      case 'pending':
-        return { backgroundColor: colors.warning };
-      case 'draft':
-        return { backgroundColor: colors.textSecondary };
-      default:
-        return { backgroundColor: colors.text };
-    }
   };
 
   const getFilteredSplits = useCallback(() => {

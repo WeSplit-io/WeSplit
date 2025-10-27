@@ -40,6 +40,10 @@ import FairSplitParticipants from './components/FairSplitParticipants';
 import { Container, Button, AppleSlider } from '../../components/shared';
 import CustomModal from '../../components/shared/Modal';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
+import { 
+  getParticipantStatusDisplayText, 
+  getParticipantStatusColor 
+} from '../../utils/statusUtils';
 
 // Remove local image mapping - now handled in FairSplitHeader component
 
@@ -88,6 +92,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   // Real-time update states
   const [isRealtimeActive, setIsRealtimeActive] = useState(false);
   const [lastRealtimeUpdate, setLastRealtimeUpdate] = useState<string | null>(null);
+  const [hasReceivedRealtimeData, setHasReceivedRealtimeData] = useState(false);
   const realtimeCleanupRef = useRef<(() => void) | null>(null);
   
   // Helper function to check if current user is the creator
@@ -653,6 +658,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             if (update.split) {
               // Update the split data
               setLastRealtimeUpdate(update.lastUpdated);
+              setHasReceivedRealtimeData(true);
               
               // Update participants if they have changed
               if (update.participants.length !== participants.length) {
@@ -668,6 +674,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               splitId: splitData.id,
               participantsCount: participants.length
             }, 'FairSplitScreen');
+            
+            setHasReceivedRealtimeData(true);
             
             // Reload split wallet data to get updated participants
             if (splitWallet?.id) {
@@ -685,6 +693,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       
       realtimeCleanupRef.current = cleanup;
       setIsRealtimeActive(true);
+      // Don't set hasReceivedRealtimeData here - only when actual data is received
       
     } catch (error) {
       logger.error('Failed to start real-time updates in FairSplit', { 
@@ -2613,46 +2622,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'locked':
-      case 'confirmed':
-        return colors.green;
-      case 'accepted':
-        return colors.info;
-      case 'pending':
-        return colors.textSecondary;
-      case 'declined':
-        return colors.red;
-      case 'ready_for_distribution':
-        return colors.greenBlue;
-      case 'completed':
-        return colors.green;
-      default:
-        return colors.textSecondary;
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'locked':
-        return 'Locked';
-      case 'confirmed':
-        return 'Confirmed';
-      case 'accepted':
-        return 'Accepted';
-      case 'pending':
-        return 'Pending';
-      case 'declined':
-        return 'Declined';
-      case 'ready_for_distribution':
-        return 'Ready to Withdraw';
-      case 'completed':
-        return 'Completed';
-      default:
-        return 'Pending';
-    }
-  };
+  // Status functions now use shared utilities
 
   // Show error state if there's an error
   if (error) {
@@ -2685,7 +2655,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           totalAmount={totalAmount}
           category={splitData?.category || processedBillData?.category || billData?.category}
           onBackPress={() => navigation.navigate('SplitsList')}
-          isRealtimeActive={isRealtimeActive}
+          isRealtimeActive={hasReceivedRealtimeData}
         />
 
         {/* Progress Indicator - Only show when split is confirmed */}

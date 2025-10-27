@@ -10,6 +10,10 @@ import { spacing } from '../../../theme/spacing';
 import Avatar from '../../../components/shared/Avatar';
 import { roundUsdcAmount, formatUsdcForDisplay } from '../../../utils/ui/format/formatUtils';
 import { styles } from './DegenSplitParticipantsStyles';
+import { 
+  getParticipantStatusDisplayText, 
+  getParticipantStatusColor 
+} from '../../../utils/statusUtils';
 
 interface Participant {
   id: string;
@@ -87,11 +91,15 @@ const DegenSplitParticipants: React.FC<DegenSplitParticipantsProps> = ({
                 <Text style={styles.participantAmount}>{formatUsdcForDisplay(totalAmount)} USDC</Text>
                 {isParticipantLocked ? (
                   <View style={styles.lockedIndicator}>
-                    <Text style={styles.lockedIndicatorText}>🔒 Locked</Text>
+                    <Text style={styles.lockedIndicatorText}>
+                      🔒 {getParticipantStatusDisplayText('locked')}
+                    </Text>
                   </View>
                 ) : (
                   <View style={styles.unlockedIndicator}>
-                    <Text style={styles.unlockedIndicatorText}>⏳ Pending</Text>
+                    <Text style={styles.unlockedIndicatorText}>
+                      ⏳ {getParticipantStatusDisplayText('pending')}
+                    </Text>
                   </View>
                 )}
               </View>

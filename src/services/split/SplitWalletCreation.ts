@@ -291,11 +291,23 @@ export class SplitWalletCreation {
   static async createDegenSplitWallet(
     billId: string,
     creatorId: string,
+    creatorName: string,
     totalAmount: number,
     currency: string,
     participants: { userId: string; name: string; walletAddress: string; amountOwed: number }[]
   ): Promise<SplitWalletResult> {
     try {
+      // Validate participants parameter
+      if (!participants || !Array.isArray(participants)) {
+        logger.error('Invalid participants parameter', {
+          billId,
+          creatorId,
+          participants: participants,
+          participantsType: typeof participants
+        }, 'SplitWalletCreation');
+        throw new Error('Participants parameter is required and must be an array');
+      }
+
       logger.info('Creating Degen Split wallet with shared private key access', {
         billId,
         creatorId,
@@ -360,6 +372,90 @@ export class SplitWalletCreation {
         participantWalletAddresses: participants.map(p => p.walletAddress),
         isDedicatedWallet: true
       }, 'SplitWalletCreation');
+
+      // CRITICAL: Update existing split document instead of creating a new one
+      // This prevents duplicate split creation
+      try {
+        const { SplitStorageService } = await import('../splits/splitStorageService');
+        
+        // First, try to find the existing split by billId
+        const existingSplitResult = await SplitStorageService.getSplitByBillId(createdSplitWallet.billId);
+        
+        if (existingSplitResult.success && existingSplitResult.split) {
+          // Update the existing split with wallet information
+          const updateResult = await SplitStorageService.updateSplit(existingSplitResult.split.id, {
+            walletId: createdSplitWallet.id,
+            walletAddress: createdSplitWallet.walletAddress,
+            status: 'active' as const
+          });
+          
+          if (updateResult.success) {
+            logger.info('Existing degen split updated with wallet information', {
+              splitWalletId: createdSplitWallet.id,
+              splitId: existingSplitResult.split.id,
+              billId: createdSplitWallet.billId
+            }, 'SplitWalletCreation');
+          } else {
+            logger.error('Failed to update existing degen split with wallet information', {
+              splitWalletId: createdSplitWallet.id,
+              billId: createdSplitWallet.billId,
+              error: updateResult.error
+            }, 'SplitWalletCreation');
+          }
+        } else {
+          // Only create a new split if none exists (fallback case)
+          logger.warn('No existing split found for degen wallet, creating fallback split', {
+            splitWalletId: createdSplitWallet.id,
+            billId: createdSplitWallet.billId
+          }, 'SplitWalletCreation');
+          
+          const splitData = {
+            billId: createdSplitWallet.billId,
+            title: `Degen Split - ${createdSplitWallet.billId}`,
+            description: `Fallback degen split for bill ${createdSplitWallet.billId}`,
+            totalAmount: createdSplitWallet.totalAmount,
+            currency: createdSplitWallet.currency,
+            splitType: 'degen' as const,
+            status: 'active' as const,
+            creatorId: createdSplitWallet.creatorId,
+            creatorName: creatorName,
+            participants: participants.map(p => ({
+              userId: p.userId,
+              name: p.name,
+              amountOwed: p.amountOwed,
+              amountPaid: 0,
+              status: 'pending' as const,
+              walletAddress: p.walletAddress
+            })),
+            date: new Date().toISOString(),
+            walletId: createdSplitWallet.id,
+            walletAddress: createdSplitWallet.walletAddress
+          };
+
+          const splitResult = await SplitStorageService.createSplit(splitData);
+          
+          if (splitResult.success) {
+            logger.info('Fallback degen split document created in splits collection', {
+              splitWalletId: createdSplitWallet.id,
+              splitId: splitResult.split?.id,
+              billId: createdSplitWallet.billId,
+              firebaseDocId: splitResult.split?.firebaseDocId
+            }, 'SplitWalletCreation');
+          } else {
+            logger.error('Failed to create fallback degen split document in splits collection', {
+              splitWalletId: createdSplitWallet.id,
+              billId: createdSplitWallet.billId,
+              error: splitResult.error
+            }, 'SplitWalletCreation');
+          }
+        }
+      } catch (splitError) {
+        logger.error('Error updating/creating degen split document in splits collection', {
+          splitWalletId: createdSplitWallet.id,
+          billId: createdSplitWallet.billId,
+          error: splitError instanceof Error ? splitError.message : String(splitError)
+        }, 'SplitWalletCreation');
+      }
 
       // Store private key for ALL participants (Degen Split feature)
       // The wallet service returns secretKey (base64), not privateKey

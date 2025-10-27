@@ -29,6 +29,7 @@ import { useDegenSplitState, useDegenSplitLogic, useDegenSplitInitialization, us
 import { DegenSplitHeader, DegenSplitProgress, DegenSplitParticipants } from './components';
 import { Container, Button, Modal, AppleSlider, PhosphorIcon } from '../../components/shared';
 import { roundUsdcAmount, formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
+import { getSplitStatusDisplayText } from '../../utils/statusUtils';
 
 
 // Category image mapping
@@ -309,8 +310,11 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       await degenInit.initializeDegenSplit(splitData, currentUser, refreshedParticipants, totalAmount);
     };
 
-    initialize();
-  }, []);
+    // Only initialize if we have the required data and haven't initialized yet
+    if (splitData && currentUser && participants && totalAmount && !degenState.splitWallet) {
+      initialize();
+    }
+  }, [splitData?.id, currentUser?.id, totalAmount]); // Add proper dependencies
 
   // Start periodic checks
   useEffect(() => {
@@ -362,7 +366,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       <DegenSplitHeader
         title="Degen Split"
         onBackPress={handleBack}
-        isRealtimeActive={realtimeState.isRealtimeActive}
+        isRealtimeActive={realtimeState.hasReceivedRealtimeData}
       />
 
       <ScrollView 
@@ -507,7 +511,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
           ) : degenState.allParticipantsLocked ? (
             // All locked - show start spinning button
             <Button
-              title={degenState.isCheckingLocks ? 'Checking...' : 'Start Spinning'}
+              title={degenState.isCheckingLocks ? `${getSplitStatusDisplayText('pending')}...` : 'Start Spinning'}
               onPress={handleRollRoulette}
               variant="primary"
               disabled={degenState.isCheckingLocks}

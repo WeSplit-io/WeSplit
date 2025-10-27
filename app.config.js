@@ -4,7 +4,7 @@ module.exports = {
   expo: {
     name: "WeSplit Beta",
     slug: "WeSplit",
-    version: "0.1.0",
+    version: "1.1.0",
     orientation: "portrait",
     icon: "./assets/android-app-icon-no-alpha.png",
     userInterfaceStyle: "light",
@@ -41,7 +41,7 @@ module.exports = {
     android: {
       package: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      versionCode: 5,
+      versionCode: 10006,
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
         backgroundColor: "#061113"

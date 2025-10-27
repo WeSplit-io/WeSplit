@@ -8,6 +8,7 @@ import { View, Text, Animated } from 'react-native';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 import { styles } from './DegenSplitProgressStyles';
+import { getParticipantStatusDisplayText } from '../../../utils/statusUtils';
 
 interface DegenSplitProgressProps {
   lockedCount: number;
@@ -72,7 +73,7 @@ const DegenSplitProgress: React.FC<DegenSplitProgressProps> = ({
             {lockedCount}/{totalCount}
           </Text>
           <Text style={styles.progressAmount}>
-            {lockedCount === totalCount ? 'Locked' : 'Locked'}
+            {lockedCount === totalCount ? getParticipantStatusDisplayText('locked') : getParticipantStatusDisplayText('pending')}
           </Text>
         </View>
       </View>

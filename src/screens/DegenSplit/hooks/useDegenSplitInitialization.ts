@@ -46,7 +46,22 @@ export const useDegenSplitInitialization = (
     participants: any[],
     totalAmount: number
   ) => {
-    if (state.isInitializingRef.current) {return;}
+    // Check if already initializing or if wallet already exists
+    if (state.isInitializingRef.current) {
+      logger.warn('Degen split initialization already in progress, skipping', {
+        splitId: splitData?.id
+      }, 'DegenSplitInitialization');
+      return;
+    }
+    
+    // Check if wallet already exists to prevent duplicate creation
+    if (state.splitWallet) {
+      logger.info('Degen split wallet already exists, skipping initialization', {
+        splitId: splitData?.id,
+        existingWalletId: state.splitWallet.id
+      }, 'DegenSplitInitialization');
+      return;
+    }
     
     state.isInitializingRef.current = true;
     setState({ error: null });
@@ -54,9 +69,21 @@ export const useDegenSplitInitialization = (
     try {
       logger.info('Initializing degen split', {
         splitId: splitData?.id,
-        participantsCount: participants.length,
+        participantsCount: participants?.length,
+        participantsType: typeof participants,
+        participants: participants,
         totalAmount
       }, 'DegenSplitInitialization');
+      
+      // Validate participants before proceeding
+      if (!participants || !Array.isArray(participants)) {
+        logger.error('Invalid participants in initialization', {
+          splitId: splitData?.id,
+          participants: participants,
+          participantsType: typeof participants
+        }, 'DegenSplitInitialization');
+        throw new Error('Participants parameter is required and must be an array');
+      }
       
       // Load or create split wallet
       const wallet = await logic.handleLoadSplitWallet(splitData, currentUser);
@@ -64,6 +91,21 @@ export const useDegenSplitInitialization = (
       if (!wallet && isCurrentUserCreator(currentUser, splitData)) {
         // Creator needs to create the wallet
         logger.info('Creator initializing degen split wallet', null, 'DegenSplitInitialization');
+        
+        // Create the split wallet for degen split
+        const createdWallet = await logic.handleCreateSplitWallet(
+          splitData,
+          currentUser,
+          totalAmount,
+          participants
+        );
+        
+        if (createdWallet) {
+          logger.info('Degen split wallet created successfully', {
+            walletId: createdWallet.id,
+            walletAddress: createdWallet.walletAddress
+          }, 'DegenSplitInitialization');
+        }
       } else if (wallet) {
         // Wallet exists, check participant lock status
         await logic.checkAllParticipantsLocked(wallet, participants);
@@ -142,7 +184,7 @@ export const useDegenSplitInitialization = (
     }, 'DegenSplitInitialization');
 
     // Subscribe to live balance updates for the split wallet
-    const balanceUnsubscribe = liveBalanceService.subscribe(
+    const balanceSubscriptionId = liveBalanceService.subscribe(
       splitWallet.walletAddress,
       (balanceUpdate) => {
         logger.info('Live balance update received for degen split wallet', {
@@ -156,10 +198,6 @@ export const useDegenSplitInitialization = (
         logic.checkAllParticipantsLocked(splitWallet, participants).catch(error => {
           logger.error('Error in live balance triggered lock check', error, 'DegenSplitInitialization');
         });
-      },
-      {
-        pollingIntervalMs: 2000, // Check every 2 seconds for faster updates
-        tolerance: 0.000001 // Very small tolerance to catch any balance changes
       }
     );
 
@@ -176,7 +214,7 @@ export const useDegenSplitInitialization = (
       logger.info('Stopping periodic lock check and live balance subscription', {
         splitWalletId: splitWallet.id
       }, 'DegenSplitInitialization');
-      balanceUnsubscribe();
+      liveBalanceService.unsubscribe(balanceSubscriptionId);
       clearInterval(interval);
     };
   }, [state.isLocked, state.allParticipantsLocked, logic]);

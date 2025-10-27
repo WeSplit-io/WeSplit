@@ -26,6 +26,7 @@ import { SplitWallet } from '../../services/split/types';
 import { notificationService } from '../../services/notifications';
 import { useApp } from '../../context/AppContext';
 import { roundUsdcAmount, formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
+import { getSplitStatusDisplayText, getParticipantStatusDisplayText } from '../../utils/statusUtils';
 
 // Import our custom hooks and components
 import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from './hooks';
@@ -409,7 +410,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
       <DegenSplitHeader
         title="Degen Result"
         onBackPress={handleBack}
-        isRealtimeActive={realtimeState.isRealtimeActive}
+        isRealtimeActive={realtimeState.hasReceivedRealtimeData}
       />
 
       {/* Main Content */}
@@ -488,7 +489,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           {isWinner ? (
             // Winner - Claim button
             <Button
-              title={degenState.isProcessing ? 'Processing...' : 'Claim'}
+              title={degenState.isProcessing ? `${getSplitStatusDisplayText('spinning')}...` : 'Claim'}
               onPress={() => degenState.setShowClaimModal(true)}
               variant="primary"
               disabled={degenState.isProcessing}
@@ -498,7 +499,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           ) : (
             // Loser - Claim button (replacing Pay with KAST)
             <Button
-              title={degenState.isProcessing ? 'Processing...' : 'Claim'}
+              title={degenState.isProcessing ? `${getSplitStatusDisplayText('spinning')}...` : 'Claim'}
               onPress={() => degenState.setShowPaymentOptionsModal(true)}
               variant="primary"
               disabled={degenState.isProcessing}
@@ -529,14 +530,14 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
           <View style={styles.claimedStatusContainer}>
             {hasValidTransaction ? (
               <>
-                <Text style={styles.claimedStatusText}>✅ Funds Claimed Successfully</Text>
+                <Text style={styles.claimedStatusText}>✅ Funds Claimed {getSplitStatusDisplayText('completed')}</Text>
                 <Text style={styles.claimedStatusSubtext}>
                   Transaction: {currentUserParticipant?.transactionSignature?.slice(0, 8)}...
                 </Text>
               </>
             ) : (
               <>
-                <Text style={styles.claimedStatusText}>⚠️ Claim Failed or Timed Out</Text>
+                <Text style={styles.claimedStatusText}>⚠️ Claim {getSplitStatusDisplayText('cancelled')} or Timed Out</Text>
                 <Text style={styles.claimedStatusSubtext}>
                   Your previous claim attempt failed. You can try again.
                 </Text>

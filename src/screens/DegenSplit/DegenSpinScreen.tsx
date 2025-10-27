@@ -24,6 +24,7 @@ import { useDegenSplitState, useDegenSplitLogic, useDegenSplitRealtime } from '.
 import { DegenSplitHeader, DegenRoulette } from './components';
 import { Container, Button } from '../../components/shared';
 import { roundUsdcAmount, formatUsdcForDisplay } from '../../utils/ui/format/formatUtils';
+import { getSplitStatusDisplayText } from '../../utils/statusUtils';
 
 // Category images mapping for dynamic icons
 const CATEGORY_IMAGES_LOCAL: { [key: string]: any } = {
@@ -259,7 +260,7 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
       <DegenSplitHeader
         title="Degen Split"
         onBackPress={handleBack}
-        isRealtimeActive={realtimeState.isRealtimeActive}
+        isRealtimeActive={realtimeState.hasReceivedRealtimeData}
       />
 
       {/* Main Content */}
@@ -313,8 +314,8 @@ const DegenSpinScreen: React.FC<DegenSpinScreenProps> = ({ navigation, route }) 
       <View style={styles.bottomButtonContainer}>
         <Button
           title={
-            degenState.isSpinning ? 'Spinning...' :
-              degenState.hasSpun ? 'Spinning Complete!' :
+            degenState.isSpinning ? `${getSplitStatusDisplayText('spinning')}...` :
+              degenState.hasSpun ? getSplitStatusDisplayText('spinning_completed') :
                 isCreator ? 'Start spinning' : 'Waiting for owner to spin...'
           }
           onPress={handleStartSpinning}

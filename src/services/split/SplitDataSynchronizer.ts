@@ -72,7 +72,7 @@ export class SplitDataSynchronizer {
       const result = await SplitStorageService.updateParticipantStatus(
         billId,
         participantId,
-        splitStorageStatus,
+        splitStorageStatus as "pending" | "locked" | "paid" | "accepted" | "invited" | "declined",
         splitWalletParticipant.amountPaid,
         splitWalletParticipant.transactionSignature
       );
@@ -268,6 +268,105 @@ export class SplitDataSynchronizer {
     }
     
     return 'pending';
+  }
+
+  /**
+   * Synchronize degen split participant with proper amount handling
+   * For degen splits, each participant pays the full bill amount
+   */
+  static async syncDegenSplitParticipant(
+    billId: string,
+    participantId: string,
+    splitWalletParticipant: SplitWalletParticipant,
+    totalBillAmount: number
+  ): Promise<SynchronizationResult> {
+    try {
+      // Synchronizing degen split participant
+
+      // For degen splits, ensure amountOwed is the full bill amount
+      const correctedParticipant = {
+        ...splitWalletParticipant,
+        amountOwed: totalBillAmount // Each participant owes the full bill amount in degen splits
+      };
+
+      // Map status appropriately for degen splits
+      const splitStorageStatus = this.mapSplitWalletStatusToSplitStorage(splitWalletParticipant.status);
+      
+      const updateData: any = {
+        status: splitStorageStatus,
+        amountPaid: splitWalletParticipant.amountPaid,
+        amountOwed: totalBillAmount, // Ensure amountOwed is correct for degen splits
+        updatedAt: new Date().toISOString()
+      };
+
+      // Add transaction signature if available
+      if (splitWalletParticipant.transactionSignature) {
+        updateData.transactionSignature = splitWalletParticipant.transactionSignature;
+      }
+
+      // Add paidAt timestamp if participant has paid
+      if (splitWalletParticipant.paidAt) {
+        updateData.paidAt = splitWalletParticipant.paidAt;
+      }
+
+      // First, find the split by billId to get the splitId
+      const splitResult = await SplitStorageService.getSplitByBillId(billId);
+      
+      if (!splitResult.success || !splitResult.split) {
+        logger.error('Split not found for degen split participant synchronization', {
+          billId,
+          participantId
+        }, 'SplitDataSynchronizer');
+        return {
+          success: false,
+          error: 'Split not found'
+        };
+      }
+      
+      const result = await SplitStorageService.updateParticipantStatus(
+        splitResult.split.id, // Use splitId instead of billId
+        participantId,
+        splitStorageStatus as "pending" | "locked" | "paid" | "accepted" | "invited" | "declined",
+        splitWalletParticipant.amountPaid,
+        splitWalletParticipant.transactionSignature
+      );
+
+      if (result.success) {
+        logger.info('Degen split participant synchronized successfully', {
+          billId,
+          participantId,
+          splitId: splitResult.split.id,
+          splitStorageStatus,
+          amountPaid: splitWalletParticipant.amountPaid,
+          amountOwed: totalBillAmount
+        }, 'SplitDataSynchronizer');
+        
+        return { success: true };
+      } else {
+        logger.error('Failed to synchronize degen split participant', {
+          billId,
+          participantId,
+          splitId: splitResult.split.id,
+          error: result.error
+        }, 'SplitDataSynchronizer');
+        
+        return {
+          success: false,
+          error: result.error
+        };
+      }
+    } catch (error) {
+      logger.error('Error synchronizing degen split participant', {
+        billId,
+        participantId,
+        error: error instanceof Error ? error.message : String(error)
+      }, 'SplitDataSynchronizer');
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
   }
 
   /**

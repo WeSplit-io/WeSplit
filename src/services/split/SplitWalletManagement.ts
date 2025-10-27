@@ -12,6 +12,10 @@ import { db } from '../../config/firebase/firebase';
 // Import shared utility function instead of duplicating
 import { removeUndefinedValues } from '../shared/dataUtils';
 
+// Import types
+import { SplitWallet, SplitWalletResult, SplitWalletParticipant } from './types';
+import { Split } from '../splits/types';
+
 /**
  * Fix data consistency issues in split wallets
  * Checks if participants marked as "paid" actually have funds on-chain
@@ -231,46 +235,24 @@ export class SplitWalletManagement {
         updatedAt: new Date().toISOString(),
       };
 
-      // Update in Firebase
+      // Use centralized atomic database update service
+      const { SplitWalletAtomicUpdates } = await import('./SplitWalletAtomicUpdates');
       const docId = currentWallet.firebaseDocId || splitWalletId;
-      
-      // Remove any undefined values from the update data
-      const cleanedUpdateData = this.removeUndefinedValues(updatedWalletData);
-      
-      await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
+      const updateResult = await SplitWalletAtomicUpdates.updateWalletData(
+        docId,
+        currentWallet.billId,
+        updatedWalletData
+      );
 
-      // CRITICAL: Also update the splits collection to keep both databases synchronized
-      try {
-        const { SplitStorageService } = await import('./splitStorageService');
-        
-        const splitUpdateResult = await SplitStorageService.updateSplitByBillId(currentWallet.billId, {
-          totalAmount: roundedAmount,
-          currency,
-          updatedAt: new Date().toISOString(),
-        });
-        
-        if (splitUpdateResult.success) {
-          logger.info('Split database synchronized successfully (amount update)', {
-            splitWalletId,
-            billId: currentWallet.billId,
-            oldAmount: currentWallet.totalAmount,
-            newAmount: roundedAmount,
-            currency
-          }, 'SplitWalletManagement');
-        } else {
-          logger.error('Failed to synchronize split database (amount update)', {
-            splitWalletId,
-            billId: currentWallet.billId,
-            error: splitUpdateResult.error
-          }, 'SplitWalletManagement');
-        }
-      } catch (syncError) {
-        logger.error('Error synchronizing split database during amount update', {
+      if (!updateResult.success) {
+        logger.error('Failed to update wallet amount atomically', {
           splitWalletId,
-          billId: currentWallet.billId,
-          error: syncError instanceof Error ? syncError.message : String(syncError)
+          error: updateResult.error
         }, 'SplitWalletManagement');
-        // Don't fail the update if sync fails, but log the error
+        return {
+          success: false,
+          error: updateResult.error || 'Database update failed'
+        };
       }
 
       const updatedWallet: SplitWallet = {
@@ -279,12 +261,7 @@ export class SplitWalletManagement {
       };
 
 
-      logger.info('Split wallet amount updated', {
-        splitWalletId,
-        oldAmount: currentWallet.totalAmount,
-        newAmount: roundedAmount,
-        currency
-      }, 'SplitWalletManagement');
+      // Amount updated successfully
 
       return {
         success: true,
@@ -342,7 +319,7 @@ export class SplitWalletManagement {
 
       // CRITICAL: Also update the splits collection to keep both databases synchronized
       try {
-        const { SplitStorageService } = await import('./splitStorageService');
+        const { SplitStorageService } = await import('../splits/splitStorageService');
         
         // Only sync relevant fields to splits collection
         const splitUpdates: Partial<Split> = {};
@@ -648,7 +625,8 @@ export class SplitWalletManagement {
       // Update wallet if repairs were made
       if (repaired) {
         const docId = wallet.firebaseDocId || splitWalletId;
-        await this.updateWalletParticipants(docId, repairedParticipants);
+        const { SplitWalletAtomicUpdates } = await import('./SplitWalletAtomicUpdates');
+        await SplitWalletAtomicUpdates.updateWalletParticipants(docId, wallet.billId, repairedParticipants);
       }
 
 
@@ -743,28 +721,7 @@ export class SplitWalletManagement {
     }
   }
 
-  private static async updateWalletParticipants(docId: string, participants: SplitWalletParticipant[]): Promise<void> {
-    const { doc, updateDoc } = await import('firebase/firestore');
-    const { db } = await import('../../config/firebase/firebase');
-    
-    // Clean participants data to remove undefined values
-    const cleanedParticipants = participants.map(p => ({
-      ...p,
-      // Convert undefined to null for Firebase compatibility
-      transactionSignature: p.transactionSignature || null,
-      paidAt: p.paidAt || null,
-    }));
-    
-    const updateData = {
-      participants: cleanedParticipants,
-      updatedAt: new Date().toISOString(),
-    };
-    
-    // Remove any undefined values from the update data
-    const cleanedUpdateData = this.removeUndefinedValues(updateData);
-    
-    await updateDoc(doc(db, 'splitWallets', docId), cleanedUpdateData);
-  }
+  // REMOVED: Deprecated updateWalletParticipants method - use SplitWalletAtomicUpdates instead
   
   /**
    * Remove undefined values from an object (Firebase doesn't allow undefined values)

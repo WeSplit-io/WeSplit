@@ -9,6 +9,12 @@ export { LinkedWalletService } from './LinkedWalletService';
 export { SolanaAppKitService } from './solanaAppKitService';
 export { solanaWalletService } from './api/solanaWalletApi';
 
+// Enhanced wallet services for fixing off-curve wallet issues
+export { walletValidationService } from './walletValidationService';
+export { enhancedWalletService } from './enhancedWalletService';
+export { walletIssueFixUtility } from './walletIssueFixUtility';
+export { walletIntegrationHelper } from './walletIntegrationHelper';
+
 // Wallet utilities
 export { generateMnemonic12, generateMnemonic24, deriveKeypairFromMnemonic, publicKeyFromMnemonic, generateWalletFromMnemonic, validateBip39Mnemonic, tryRecoverWalletFromMnemonic, verifyExportImportParity, generateWalletChecksum, validateWalletChecksum } from './derive';
 export { externalWalletLinkingService } from './linkExternal';

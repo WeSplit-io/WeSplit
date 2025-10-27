@@ -116,27 +116,62 @@ export const useDegenSplitLogic = (
     totalAmount: number,
     participants: any[]
   ): Promise<SplitWallet | null> => {
+    // Check if wallet creation is already in progress
+    if (state.isCreatingWallet) {
+      logger.warn('Wallet creation already in progress, skipping duplicate request', {
+        splitId: splitData?.id
+      }, 'DegenSplitLogic');
+      return null;
+    }
+    
+    // Check if wallet already exists
+    if (state.splitWallet) {
+      logger.info('Split wallet already exists, returning existing wallet', {
+        splitId: splitData?.id,
+        existingWalletId: state.splitWallet.id
+      }, 'DegenSplitLogic');
+      return state.splitWallet;
+    }
+    
     try {
       setState({ isCreatingWallet: true, error: null });
       
-      logger.info('Creating split wallet for degen split', null, 'DegenSplitLogic');
+      logger.info('Creating split wallet for degen split', {
+        billId: splitData.billId,
+        participantsCount: participants?.length,
+        participantsType: typeof participants,
+        participants: participants
+      }, 'DegenSplitLogic');
+      
+      // Validate participants before proceeding
+      if (!participants || !Array.isArray(participants)) {
+        throw new Error('Participants parameter is required and must be an array');
+      }
+      
+      const mappedParticipants = participants.map(p => {
+        // Import roundUsdcAmount to fix precision issues - same as fair split
+        const { roundUsdcAmount } = require('../../../utils/ui/format/formatUtils');
+        return {
+          userId: p.userId || p.id,
+          name: p.name,
+          walletAddress: p.walletAddress,
+          amountOwed: roundUsdcAmount(totalAmount), // Each participant needs to lock the full amount for degen split
+        };
+      });
+      
+      logger.info('Mapped participants for wallet creation', {
+        mappedParticipantsCount: mappedParticipants.length,
+        mappedParticipants: mappedParticipants
+      }, 'DegenSplitLogic');
       
       const { SplitWalletService } = await import('../../../services/split');
       const walletResult = await SplitWalletService.createDegenSplitWallet(
         splitData.billId, // Use billId, not split ID
         currentUser.id.toString(),
+        currentUser.name || 'Unknown User', // Add creator name
         totalAmount,
         'USDC',
-        participants.map(p => {
-          // Import roundUsdcAmount to fix precision issues - same as fair split
-          const { roundUsdcAmount } = require('../../../utils/ui/format/formatUtils');
-          return {
-            userId: p.userId || p.id,
-            name: p.name,
-            walletAddress: p.walletAddress,
-            amountOwed: roundUsdcAmount(totalAmount), // Each participant needs to lock the full amount for degen split
-          };
-        })
+        mappedParticipants
       );
       
       if (!walletResult.success || !walletResult.wallet) {

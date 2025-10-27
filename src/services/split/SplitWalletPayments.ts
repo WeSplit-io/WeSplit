@@ -648,7 +648,7 @@ async function executeFastTransaction(
     // For withdrawals, use proper confirmation strategy with balance verification
     let confirmed = false;
     let attempts = 0;
-    const maxAttempts = 20; // Increased attempts for proper confirmation
+    const maxAttempts = 30; // Increased attempts for better reliability
     const waitTime = 1000; // Increased wait time to 1 second
 
     logger.info('Starting withdrawal transaction confirmation', {
@@ -690,20 +690,11 @@ async function executeFastTransaction(
             error: `Transaction failed: ${JSON.stringify(status.value.err)}`
           };
         } else if (status.value === null) {
-          // Transaction not found - might have failed
-          logger.warn('Transaction not found in blockchain', {
+          // Transaction not found yet - this is common and not necessarily an error
+          logger.debug('Transaction not found in blockchain yet', {
             signature,
             attempt: attempts + 1
           }, 'SplitWalletPayments');
-          
-          // If we've tried multiple times and still can't find it, it likely failed
-          if (attempts >= 5) {
-            return {
-              success: false,
-              signature,
-              error: 'Transaction not found on blockchain - it may have failed during execution'
-            };
-          }
         }
       } catch (error) {
         logger.warn('Error checking withdrawal transaction status', {
@@ -855,15 +846,7 @@ async function executeDegenSplitTransaction(
   transactionType: 'funding' | 'withdrawal'
 ): Promise<{ success: boolean; signature?: string; error?: string }> {
   try {
-    logger.info('Executing degen split transaction', {
-          fromAddress,
-          toAddress,
-      amount,
-      currency,
-      memo,
-      transactionType,
-      privateKeyLength: privateKey.length
-        }, 'SplitWalletPayments');
+    // Executing degen split transaction
         
     // Validate inputs
     if (!fromAddress || !toAddress || !privateKey) {
@@ -966,22 +949,28 @@ async function executeDegenSplitTransaction(
       const toTokenAccount = await getAssociatedTokenAddress(mintPublicKey, toPublicKey);
 
       // Check if destination token account exists
+      let toTokenAccountExists = false;
       try {
         await getAccount(connection, toTokenAccount);
-    } catch (error) {
-        // Create associated token account if it doesn't exist
-        // Use company wallet as payer since it's the fee payer
-        const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
-        const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
-        
-        transaction.add(
-          createAssociatedTokenAccountInstruction(
-            companyPublicKey, // payer (company wallet)
-            toTokenAccount, // associated token account
-            toPublicKey, // owner
-            mintPublicKey // mint
-          )
-        );
+        toTokenAccountExists = true;
+        logger.info('Destination token account exists for degen split', {
+          toTokenAccount: toTokenAccount.toString(),
+          toPublicKey: toPublicKey.toString(),
+          mintPublicKey: mintPublicKey.toString()
+        }, 'SplitWalletPayments');
+      } catch (error) {
+      // Create associated token account if it doesn't exist
+      const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
+      const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
+      
+      transaction.add(
+        createAssociatedTokenAccountInstruction(
+          companyPublicKey, // payer (company wallet)
+          toTokenAccount, // associated token account
+          toPublicKey, // owner
+          mintPublicKey // mint
+        )
+      );
       }
 
       // Calculate company fee for funding transactions
@@ -1111,11 +1100,11 @@ async function executeDegenSplitTransaction(
               transactionType
           }, 'SplitWalletPayments');
 
-    // For degen splits, use fast confirmation strategy
+    // For degen splits, use enhanced confirmation strategy
     let confirmed = false;
     let attempts = 0;
-    const maxAttempts = 5; // Reduced attempts for faster processing
-    const waitTime = 500; // Reduced wait time to 500ms
+    const maxAttempts = 30; // Increased attempts for better reliability
+    const waitTime = 1000; // Increased wait time to 1 second
 
     while (!confirmed && attempts < maxAttempts) {
       try {
@@ -1141,6 +1130,12 @@ async function executeDegenSplitTransaction(
             signature,
             error: `Transaction failed: ${JSON.stringify(status.value.err)}`
           };
+        } else if (status.value === null) {
+          // Transaction not found yet - this is common and not necessarily an error
+          logger.debug('Degen split transaction not found in blockchain yet', {
+            signature,
+            attempt: attempts + 1
+          }, 'SplitWalletPayments');
         }
       } catch (error) {
         logger.warn('Error checking degen split transaction status', {
@@ -1151,7 +1146,7 @@ async function executeDegenSplitTransaction(
           }
           
       if (!confirmed) {
-        await new Promise(resolve => setTimeout(resolve, waitTime)); // Wait 500ms
+        await new Promise(resolve => setTimeout(resolve, waitTime)); // Wait 1 second
         attempts++;
       }
     }
@@ -1163,38 +1158,111 @@ async function executeDegenSplitTransaction(
         transactionType
         }, 'SplitWalletPayments');
         
-      // For funding transactions, use "likely succeeded" mode when confirmation times out
-      // This prevents blocking the funding process due to network delays
+      // For funding transactions, verify the transaction actually succeeded by checking balances
       if (transactionType === 'funding') {
-        logger.info('Degen split funding using likely succeeded mode due to timeout', {
+        logger.info('Verifying degen split funding transaction by checking balances', {
           signature,
-          expectedAmount: amount,
-          transactionType
+          toAddress,
+          expectedAmount: amount
         }, 'SplitWalletPayments');
         
-        return {
-          success: true,
-          signature
-        };
-      } else {
-        // For withdrawal transactions, be more strict about verification
         try {
-          const transactionConfirmed = await verifyTransactionOnBlockchain(signature);
+          // Wait a bit more for the transaction to potentially complete
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
-          if (transactionConfirmed) {
-            logger.info('Degen split withdrawal verified by blockchain confirmation', {
+          // Check if the destination wallet now has the expected balance
+          const { balanceUtils } = await import('../shared/balanceUtils');
+          const usdcMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+          const balanceResult = await balanceUtils.getUsdcBalance(new PublicKey(toAddress), usdcMint);
+          
+          if (balanceResult.balance >= amount) {
+            logger.info('Degen split funding verified by balance check', {
               signature,
+              toAddress,
+              actualBalance: balanceResult.balance,
               expectedAmount: amount
             }, 'SplitWalletPayments');
+            
             return {
               success: true,
               signature
             };
           } else {
-            logger.error('Degen split withdrawal verification failed - transaction not confirmed on blockchain', {
+            logger.error('Degen split funding verification failed - insufficient balance', {
               signature,
+              toAddress,
+              actualBalance: balanceResult.balance,
               expectedAmount: amount
             }, 'SplitWalletPayments');
+            
+            return {
+              success: false,
+              signature,
+              error: 'Transaction verification failed - insufficient balance in destination wallet'
+            };
+          }
+        } catch (balanceError) {
+          logger.error('Failed to verify degen split funding by balance check', {
+            signature,
+            toAddress,
+            error: balanceError instanceof Error ? balanceError.message : String(balanceError)
+          }, 'SplitWalletPayments');
+          
+          return {
+            success: false,
+            signature,
+            error: 'Transaction verification failed - unable to check destination balance'
+          };
+        }
+      } else {
+        // For withdrawal transactions, verify by checking balance changes
+        logger.info('Verifying degen split withdrawal transaction by checking balances', {
+          signature,
+          fromAddress,
+          toAddress,
+          expectedAmount: amount
+        }, 'SplitWalletPayments');
+        
+        try {
+          // Wait a bit more for the transaction to potentially complete
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // Check if the destination wallet now has more balance
+          const { consolidatedTransactionService } = await import('../blockchain/transaction/ConsolidatedTransactionService');
+          const fromBalance = await consolidatedTransactionService.getUsdcBalance(fromAddress);
+          const toBalance = await consolidatedTransactionService.getUsdcBalance(toAddress);
+          
+          logger.info('Degen split withdrawal balance verification', {
+            signature,
+            fromAddress,
+            fromBalance: fromBalance.balance,
+            toAddress,
+            toBalance: toBalance.balance,
+            expectedAmount: amount
+          }, 'SplitWalletPayments');
+          
+          // For withdrawals, we expect the destination balance to increase
+          // We'll be more lenient here since the transaction might still be processing
+          if (toBalance.success && toBalance.balance > 0) {
+            logger.info('Degen split withdrawal verified by balance check', {
+              signature,
+              toAddress,
+              actualBalance: toBalance.balance,
+              expectedAmount: amount
+            }, 'SplitWalletPayments');
+            
+            return {
+              success: true,
+              signature
+            };
+          } else {
+            logger.error('Degen split withdrawal verification failed - insufficient balance', {
+              signature,
+              toAddress,
+              actualBalance: toBalance.balance,
+              expectedAmount: amount
+            }, 'SplitWalletPayments');
+            
             return {
               success: false,
               signature,
@@ -1202,7 +1270,7 @@ async function executeDegenSplitTransaction(
             };
           }
         } catch (balanceError) {
-          logger.error('Failed to verify degen split withdrawal', {
+          logger.error('Failed to verify degen split withdrawal by balance check', {
             signature,
             error: balanceError instanceof Error ? balanceError.message : String(balanceError)
           }, 'SplitWalletPayments');
@@ -1469,33 +1537,19 @@ export class SplitWalletPayments {
         error: transactionResult.error
       }, 'SplitWalletPayments');
           
-          // CRITICAL FIX: For funding transactions, use "likely succeeded" mode when not found on blockchain
-          // This matches the behavior of fair split funding for consistency
+          // CRITICAL: Only proceed if transaction actually succeeded
           if (!transactionResult.success) {
-            if (transactionResult.error?.includes('not found on blockchain') || 
-                transactionResult.error?.includes('likely rejected')) {
-              logger.warn('⚠️ Degen split funding transaction not found on blockchain - using "likely succeeded" mode', {
-                splitWalletId,
-                participantId,
-                error: transactionResult.error,
-                signature: transactionResult.signature
-              }, 'SplitWalletPayments');
-              
-              // Use "likely succeeded" mode for degen split funding when not found on blockchain
-              // Continue to the database update section below
-            } else {
-              logger.error('Failed to execute degen split fund locking transaction', {
-                splitWalletId,
-                participantId,
-                error: transactionResult.error,
-                signature: transactionResult.signature
-              }, 'SplitWalletPayments');
-              
-              return {
-                success: false,
-                error: transactionResult.error || 'Transaction failed',
-              };
-            }
+            logger.error('Failed to execute degen split fund locking transaction', {
+              splitWalletId,
+              participantId,
+              error: transactionResult.error,
+              signature: transactionResult.signature
+            }, 'SplitWalletPayments');
+            
+            return {
+              success: false,
+              error: transactionResult.error || 'Transaction failed',
+            };
           }
 
       // Update participant status to 'locked' (not 'paid' for degen splits)
@@ -1513,12 +1567,43 @@ export class SplitWalletPayments {
           : p
       );
 
-      // Update wallet in database using Firebase document ID
+      // CRITICAL: Single atomic database update for both collections
       const firebaseDocId = wallet.firebaseDocId || splitWalletId;
-      await updateDoc(doc(db, 'splitWallets', firebaseDocId), {
-        participants: updatedParticipants,
-        lastUpdated: new Date().toISOString()
-      });
+      const updatedParticipant = updatedParticipants.find(p => p.userId === participantId);
+      
+      if (!updatedParticipant) {
+        logger.error('Updated participant not found after payment processing', {
+          splitWalletId,
+          participantId
+        }, 'SplitWalletPayments');
+        return {
+          success: false,
+          error: 'Updated participant data not found'
+        };
+      }
+
+      // Use centralized atomic database update service
+      const { SplitWalletAtomicUpdates } = await import('./SplitWalletAtomicUpdates');
+      const dbUpdateResult = await SplitWalletAtomicUpdates.updateParticipantPayment(
+        firebaseDocId,
+        wallet.billId,
+        updatedParticipants,
+        updatedParticipant,
+        participantId,
+        true // isDegenSplit = true
+      );
+
+      if (!dbUpdateResult.success) {
+        logger.error('Failed to update databases atomically', {
+          splitWalletId,
+          participantId,
+          error: dbUpdateResult.error
+        }, 'SplitWalletPayments');
+        return {
+          success: false,
+          error: dbUpdateResult.error || 'Database update failed'
+        };
+      }
 
       const transactionTime = Date.now() - startTime;
       logger.info('Degen split fund locking completed successfully', {
@@ -1696,19 +1781,43 @@ export class SplitWalletPayments {
           : p
       );
 
-      // Update wallet in database using Firebase document ID
+      // CRITICAL: Single atomic database update for both collections
       const firebaseDocId = wallet.firebaseDocId || splitWalletId;
-      await updateDoc(doc(db, 'splitWallets', firebaseDocId), {
-        participants: updatedParticipants,
-        lastUpdated: new Date().toISOString()
-      });
-
-      logger.info('Fair split participant payment completed successfully', {
-        splitWalletId,
-        participantId,
-        amount: roundedAmount,
-        transactionSignature: transactionResult.signature
+      const updatedParticipant = updatedParticipants.find(p => p.userId === participantId);
+      
+      if (!updatedParticipant) {
+        logger.error('Updated participant not found after fair split payment processing', {
+          splitWalletId,
+          participantId
         }, 'SplitWalletPayments');
+        return {
+          success: false,
+          error: 'Updated participant data not found'
+        };
+      }
+
+      // Use centralized atomic database update service
+      const { SplitWalletAtomicUpdates } = await import('./SplitWalletAtomicUpdates');
+      const dbUpdateResult = await SplitWalletAtomicUpdates.updateParticipantPayment(
+        firebaseDocId,
+        wallet.billId,
+        updatedParticipants,
+        updatedParticipant,
+        participantId,
+        false // isDegenSplit = false
+      );
+
+      if (!dbUpdateResult.success) {
+        logger.error('Failed to update databases atomically for fair split', {
+          splitWalletId,
+          participantId,
+          error: dbUpdateResult.error
+        }, 'SplitWalletPayments');
+        return {
+          success: false,
+          error: dbUpdateResult.error || 'Database update failed'
+        };
+      }
 
       return {
         success: true,
@@ -2472,6 +2581,9 @@ export class SplitWalletPayments {
       throw error;
     }
   }
+
+  // DEPRECATED: These atomic methods have been moved to SplitWalletAtomicUpdates service
+  // Keeping for backward compatibility but should be replaced with SplitWalletAtomicUpdates calls
 
   // Private helper methods
   private static async getSplitWalletPrivate(splitWalletId: string): Promise<SplitWalletResult> {

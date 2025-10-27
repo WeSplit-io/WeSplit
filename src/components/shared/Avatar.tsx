@@ -118,7 +118,7 @@ const Avatar: React.FC<AvatarProps> = ({
     } else {
       setIsLoading(false);
     }
-  }, [userId, userName, avatarUrl, loadAvatarUrl, generateInitials]);
+  }, [userId, userName, avatarUrl]); // Removed loadAvatarUrl and generateInitials from dependencies
 
   // Handle image load error
   const handleImageError = useCallback(() => {
