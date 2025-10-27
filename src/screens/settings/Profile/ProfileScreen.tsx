@@ -91,11 +91,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               }
 
               // Step 2.5: Clear wallet balance cache for current user
-              if (currentUser?.id) {
-                try {
-                  walletService.clearBalanceCache(String(currentUser.id));
-                  if (__DEV__) { logger.info('Wallet balance cache cleared for user', { userId: currentUser.id }, 'ProfileScreen'); }
-                } catch (cacheError) {
+                if (currentUser?.id) {
+                  try {
+                    walletService.clearUserCache(String(currentUser.id));
+                    if (__DEV__) { logger.info('Wallet balance cache cleared for user', { userId: currentUser.id }, 'ProfileScreen'); }
+                  } catch (cacheError) {
                   console.warn('⚠️ Failed to clear wallet balance cache:', cacheError);
                   // Continue with logout even if cache clearing fails
                 }
@@ -141,21 +141,65 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
       logger.info('Preparing secure seed phrase access', null, 'ProfileScreen');
 
-      // Initialize secure wallet (generates if needed, retrieves if exists)
-      const { address, isNew } = await walletService.initializeSecureWallet(currentUser.id.toString());
-
-      if (isNew) {
-        logger.info('New secure wallet created for user', { userId: currentUser.id }, 'ProfileScreen');
-        Alert.alert(
-          'Secure Wallet Created',
-          'Your single app wallet has been created. Your 12-word seed phrase is stored securely on your device only and can be used to export your wallet to external providers like Phantom and Solflare.',
-          [{ text: 'OK' }]
-        );
-      } else {
-        logger.info('Existing app wallet seed phrase retrieved for user', { userId: currentUser.id }, 'ProfileScreen');
+      // First, get the active wallet address (the one displayed in dashboard)
+      const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
+      
+      if (!walletResult.success || !walletResult.wallet) {
+        logger.error('Failed to get active wallet for seed phrase access', { userId: currentUser.id }, 'ProfileScreen');
+        Alert.alert('Error', 'Failed to retrieve wallet information. Please try again.');
+        return;
       }
 
-      logger.info('Secure seed phrase access prepared successfully', null, 'ProfileScreen');
+      const activeWalletAddress = walletResult.wallet.address;
+      logger.info('Active wallet address retrieved for seed phrase access', { 
+        userId: currentUser.id, 
+        walletAddress: activeWalletAddress 
+      }, 'ProfileScreen');
+
+      // Check if we have a seed phrase for this specific wallet
+      const mnemonic = await walletService.getSeedPhraseForWallet(currentUser.id.toString(), activeWalletAddress);
+      
+      if (!mnemonic) {
+        logger.warn('No seed phrase found for active wallet', { 
+          userId: currentUser.id, 
+          walletAddress: activeWalletAddress 
+        }, 'ProfileScreen');
+        
+        // Check if we have a private key instead
+        const privateKey = await walletService.getPrivateKeyForWallet(currentUser.id.toString(), activeWalletAddress);
+        
+        if (privateKey) {
+          logger.info('Private key available for wallet export', { 
+            userId: currentUser.id, 
+            walletAddress: activeWalletAddress 
+          }, 'ProfileScreen');
+          
+          Alert.alert(
+            'Export Options Available',
+            'Your wallet was created using random key generation, so no seed phrase is available. However, you can still export your wallet using the private key.\n\nWould you like to proceed to the export screen?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Continue to Export', 
+                onPress: () => navigation.navigate('SeedPhraseView')
+              }
+            ]
+          );
+          return;
+        } else {
+          Alert.alert(
+            'Export Unavailable',
+            'No export options are available for this wallet. This may be because your wallet was created externally or the necessary credentials are not available on this device.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+
+      logger.info('Secure seed phrase access prepared successfully', { 
+        userId: currentUser.id,
+        walletAddress: activeWalletAddress
+      }, 'ProfileScreen');
 
       navigation.navigate('SeedPhraseView');
     } catch (error) {

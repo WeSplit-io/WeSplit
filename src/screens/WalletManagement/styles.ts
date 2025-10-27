@@ -802,16 +802,111 @@ export const styles = StyleSheet.create({
     lineHeight: 24,
     textAlign: 'center',
   },
+
+  // Wallet address display styles
+  walletAddressContainer: {
+    marginTop: spacing.md,
+    padding: spacing.sm,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.radiusSm,
+    alignItems: 'center',
+  },
+
+  walletAddressLabel: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.xs,
+  },
+
+  walletAddressText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.normal,
+    textAlign: 'center',
+    fontFamily: 'monospace',
+  },
+
+  // No seed phrase available styles
+  noSeedPhraseContainer: {
+    padding: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 180,
+  },
+
+  noSeedPhraseTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+
+  noSeedPhraseText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.md,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+
+  noSeedPhraseSubtext: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+
+  // Private key export section styles
+  privateKeyExportSection: {
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.white5,
+    borderRadius: spacing.radiusMd,
+    borderWidth: 1,
+    borderColor: colors.white50,
+  },
+
+  privateKeyLabel: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    marginBottom: spacing.md,
+  },
+
+  privateKeyButton: {
+    backgroundColor: colors.primaryGreen,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: spacing.radiusMd,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    minWidth: 180,
+  },
+
+  privateKeyButtonText: {
+    color: colors.black,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+
+  privateKeyNote: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
   
   seedPhraseContainer: {
-    alignSelf: 'center', // centré
+    alignSelf: 'center',
     borderRadius: spacing.lg,
     paddingVertical: spacing.xl,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 200, // Increased for 24 words
-    marginTop: spacing.md, // Reduced margin
+    minHeight: 180,
+    marginTop: spacing.md,
     marginBottom: spacing.lg,
     marginHorizontal: spacing.lg,
     backgroundColor: colors.white5,
@@ -1387,12 +1482,12 @@ export const styles = StyleSheet.create({
   
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 100, // Space for fixed button
+    paddingBottom: 80,
   },
 
   // Bottom spacer to ensure content doesn't get covered
   bottomSpacer: {
-    height: 20,
+    height: 16,
   },
 
   // Fixed done button at bottom of screen

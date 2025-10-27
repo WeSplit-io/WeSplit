@@ -28,6 +28,7 @@ const SeedPhraseViewScreen: React.FC = () => {
   const [seedPhrase, setSeedPhrase] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeWalletAddress, setActiveWalletAddress] = useState<string | null>(null);
   
   const { 
     // App wallet state (for seed phrase)
@@ -52,28 +53,41 @@ const SeedPhraseViewScreen: React.FC = () => {
 
         logger.info('Retrieving seed phrase from secure device storage', null, 'SeedPhraseViewScreen');
         
-        // Initialize secure wallet if needed
-        // Initialize secure wallet
-        const { address, isNew } = await walletService.initializeSecureWallet(currentUser.id.toString());
+        // First, get the active wallet address (the one displayed in dashboard)
+        const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
         
-        if (isNew) {
-          logger.info('New secure wallet created for user', { userId: currentUser.id }, 'SeedPhraseViewScreen');
-        } else {
-          logger.info('Existing app wallet seed phrase retrieved for user', { userId: currentUser.id }, 'SeedPhraseViewScreen');
+        if (!walletResult.success || !walletResult.wallet) {
+          logger.error('Failed to get active wallet', { userId: currentUser.id }, 'SeedPhraseViewScreen');
+          setError('Failed to retrieve wallet information');
+          setLoading(false);
+          return;
         }
 
-        // Get the seed phrase from secure device storage
-        // Get seed phrase from walletService
-        const mnemonic = await walletService.getSeedPhrase(currentUser.id.toString());
+        const activeWalletAddress = walletResult.wallet.address;
+        setActiveWalletAddress(activeWalletAddress);
+        logger.info('Active wallet address retrieved', { 
+          userId: currentUser.id, 
+          walletAddress: activeWalletAddress 
+        }, 'SeedPhraseViewScreen');
+        
+        // Now get the seed phrase for this specific wallet address
+        const mnemonic = await walletService.getSeedPhraseForWallet(currentUser.id.toString(), activeWalletAddress);
         
         if (mnemonic) {
           // Format seed phrase for display
           const seedPhraseWords = mnemonic.split(' ');
           setSeedPhrase(seedPhraseWords);
-          logger.info('Seed phrase retrieved successfully from device storage', null, 'SeedPhraseViewScreen');
+          logger.info('Seed phrase retrieved successfully for active wallet', { 
+            userId: currentUser.id,
+            walletAddress: activeWalletAddress,
+            wordCount: seedPhraseWords.length
+          }, 'SeedPhraseViewScreen');
         } else {
           // Don't show error - just leave seed phrase empty for user-friendly experience
-          logger.info('No seed phrase found - user will see empty state', null, 'SeedPhraseViewScreen');
+          logger.info('No seed phrase found for active wallet - user will see empty state', { 
+            userId: currentUser.id,
+            walletAddress: activeWalletAddress
+          }, 'SeedPhraseViewScreen');
         }
       } catch (err) {
         console.error('🔐 SeedPhraseView: Error retrieving secure seed phrase:', err);
@@ -92,11 +106,7 @@ const SeedPhraseViewScreen: React.FC = () => {
 
   const handleReveal = () => {
     if (seedPhrase.length === 0) {
-      Alert.alert(
-        'No Seed Phrase Available',
-        'No seed phrase found for your wallet. This may be because:\n\n• Your wallet was created externally\n• The seed phrase is not available on this device\n\nYou can still use your wallet normally, but you won\'t be able to export it to other apps.',
-        [{ text: 'OK' }]
-      );
+      // Don't show popup - let the UI handle the empty state
       return;
     }
     
@@ -127,6 +137,43 @@ const SeedPhraseViewScreen: React.FC = () => {
       Alert.alert('Copied', 'Seed phrase copied to clipboard!');
     } catch (error) {
       Alert.alert('Error', 'Failed to copy seed phrase');
+    }
+  };
+
+  const handleExportPrivateKey = async () => {
+    if (!currentUser?.id || !activeWalletAddress) {
+      Alert.alert('Error', 'Wallet information not available');
+      return;
+    }
+
+    try {
+      const privateKey = await walletService.getPrivateKeyForWallet(currentUser.id.toString(), activeWalletAddress);
+      
+      if (privateKey) {
+        Alert.alert(
+          'Export Private Key',
+          'Your private key will be copied to clipboard. This can be used to import your wallet into external apps.\n\n⚠️ Keep your private key secure and never share it with anyone.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Copy Private Key', 
+              onPress: async () => {
+                try {
+                  await Clipboard.setString(privateKey);
+                  Alert.alert('Copied', 'Private key copied to clipboard!');
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to copy private key');
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', 'Private key not available for this wallet');
+      }
+    } catch (error) {
+      logger.error('Failed to export private key', error, 'SeedPhraseViewScreen');
+      Alert.alert('Error', 'Failed to retrieve private key');
     }
   };
 
@@ -214,11 +261,43 @@ const SeedPhraseViewScreen: React.FC = () => {
               : `This is your single app wallet's ${seedPhrase.length || 24}-word seed phrase. Write it down on a paper and keep it in a safe place. You can use this to export your wallet to other apps.`
             }
           </Text>
+          
+          {/* Display wallet address for verification */}
+          {activeWalletAddress && (
+            <View style={styles.walletAddressContainer}>
+              <Text style={styles.walletAddressLabel}>Wallet Address:</Text>
+              <Text style={styles.walletAddressText}>{activeWalletAddress}</Text>
+            </View>
+          )}
         </View>
 
         {/* Seed Phrase Display */}
         <View style={styles.seedPhraseContainer}>
-          {!isRevealed ? (
+          {seedPhrase.length === 0 ? (
+            <View style={styles.noSeedPhraseContainer}>
+              <Text style={styles.noSeedPhraseTitle}>No Seed Phrase Available</Text>
+              <Text style={styles.noSeedPhraseText}>
+                Your wallet was created using random key generation, so no seed phrase is available for export.
+              </Text>
+              <Text style={styles.noSeedPhraseSubtext}>
+                However, you can still export your wallet using the private key below.
+              </Text>
+              
+              {/* Private Key Export Section */}
+              <View style={styles.privateKeyExportSection}>
+                <Text style={styles.privateKeyLabel}>Export via Private Key:</Text>
+                <TouchableOpacity 
+                  style={styles.privateKeyButton}
+                  onPress={handleExportPrivateKey}
+                >
+                  <Text style={styles.privateKeyButtonText}>Export Private Key</Text>
+                </TouchableOpacity>
+                <Text style={styles.privateKeyNote}>
+                  ⚠️ Keep your private key secure and never share it with anyone.
+                </Text>
+              </View>
+            </View>
+          ) : !isRevealed ? (
             <TouchableOpacity 
               style={styles.blurredContainer}
               onPress={handleReveal}
