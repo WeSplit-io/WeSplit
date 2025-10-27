@@ -14,6 +14,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
+      displayName: "WeSplit - Split Bills Easily",
       deploymentTarget: "15.1",
       infoPlist: {
         LSApplicationQueriesSchemes: [
@@ -38,6 +39,7 @@ module.exports = {
     scheme: "wesplit",
     android: {
       package: "com.wesplit.app",
+      displayName: "WeSplit - Split Bills Easily",
       versionCode: 3,
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
