@@ -2,9 +2,9 @@ require('dotenv/config');
 
 module.exports = {
   expo: {
-    name: "WeSplit",
+    name: "WeSplit Beta",
     slug: "WeSplit",
-    version: "1.0.3",
+    version: "0.1.0",
     orientation: "portrait",
     icon: "./assets/android-app-icon-no-alpha.png",
     userInterfaceStyle: "light",
@@ -14,7 +14,8 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
-      displayName: "WeSplit - Split Bills Easily",
+      displayName: "WeSplit Beta",
+      buildNumber: "6",
       deploymentTarget: "15.1",
       infoPlist: {
         LSApplicationQueriesSchemes: [
@@ -39,8 +40,8 @@ module.exports = {
     scheme: "wesplit",
     android: {
       package: "com.wesplit.app",
-      displayName: "WeSplit - Split Bills Easily",
-      versionCode: 3,
+      displayName: "WeSplit Beta",
+      versionCode: 5,
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
         backgroundColor: "#061113"
