@@ -1122,6 +1122,16 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // Private key modal functions moved to FairSplit/DegenLock screens
 
   const handleSplitTypeSelection = async (type: 'fair' | 'degen') => {
+    // Block degen split selection for production
+    if (type === 'degen') {
+      Alert.alert(
+        'Degen Split Temporarily Unavailable',
+        'The Degen Split feature is currently being updated and is temporarily disabled. Please use Fair Split for now.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+    
     setSelectedSplitType(type);
   };
 

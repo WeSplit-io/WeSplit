@@ -441,6 +441,92 @@ class SimplifiedWalletService {
   async createWallet(userId: string): Promise<WalletCreationResult> {
     return this.ensureUserWallet(userId);
   }
+
+  /**
+   * Initialize secure wallet - ensures user has a wallet and returns address info
+   */
+  async initializeSecureWallet(userId: string): Promise<{ address: string; isNew: boolean }> {
+    try {
+      logger.info('Initializing secure wallet', { userId }, 'SimplifiedWalletService');
+      
+      // Check if wallet already exists
+      const existingWallet = await this.getWalletInfo(userId);
+      if (existingWallet) {
+        logger.info('Existing wallet found', { userId, address: existingWallet.address }, 'SimplifiedWalletService');
+        return { address: existingWallet.address, isNew: false };
+      }
+
+      // Create new wallet
+      const walletResult = await this.ensureUserWallet(userId);
+      if (walletResult.success && walletResult.wallet) {
+        logger.info('New wallet created', { userId, address: walletResult.wallet.address }, 'SimplifiedWalletService');
+        return { address: walletResult.wallet.address, isNew: true };
+      }
+
+      throw new Error('Failed to create wallet');
+    } catch (error) {
+      logger.error('Failed to initialize secure wallet', error, 'SimplifiedWalletService');
+      throw error;
+    }
+  }
+
+  /**
+   * Get seed phrase for a user's wallet
+   */
+  async getSeedPhrase(userId: string): Promise<string | null> {
+    try {
+      logger.info('Retrieving seed phrase', { userId }, 'SimplifiedWalletService');
+      
+      // Try to get mnemonic from secure storage
+      const mnemonic = await walletRecoveryService.getStoredMnemonic(userId);
+      if (mnemonic) {
+        logger.info('Seed phrase retrieved successfully', { userId }, 'SimplifiedWalletService');
+        return mnemonic;
+      }
+
+      logger.warn('No seed phrase found for user', { userId }, 'SimplifiedWalletService');
+      return null;
+    } catch (error) {
+      logger.error('Failed to get seed phrase', error, 'SimplifiedWalletService');
+      return null;
+    }
+  }
+
+  /**
+   * Get private key for a user's wallet
+   */
+  async getPrivateKey(userId: string): Promise<string | null> {
+    try {
+      logger.info('Retrieving private key', { userId }, 'SimplifiedWalletService');
+      
+      const walletInfo = await this.getWalletInfo(userId);
+      if (walletInfo && walletInfo.secretKey) {
+        logger.info('Private key retrieved successfully', { userId }, 'SimplifiedWalletService');
+        return walletInfo.secretKey;
+      }
+
+      logger.warn('No private key found for user', { userId }, 'SimplifiedWalletService');
+      return null;
+    } catch (error) {
+      logger.error('Failed to get private key', error, 'SimplifiedWalletService');
+      return null;
+    }
+  }
+
+  /**
+   * Get export instructions for external wallets
+   */
+  getExportInstructions(): string {
+    return `To export your wallet to external apps like Phantom or Solflare:
+
+1. Open your external wallet app
+2. Look for "Import Wallet" or "Restore Wallet" option
+3. Choose "Import from Seed Phrase" or "Restore from Mnemonic"
+4. Enter your 24-word seed phrase exactly as shown
+5. Follow the app's instructions to complete the import
+
+Your seed phrase is compatible with all BIP39-compatible wallets.`;
+  }
 }
 
 // Export singleton instance

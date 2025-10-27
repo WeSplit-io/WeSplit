@@ -1321,6 +1321,54 @@ export class WalletRecoveryService {
       return false;
     }
   }
+
+  /**
+   * Get stored mnemonic for a user
+   */
+  static async getStoredMnemonic(userId: string): Promise<string | null> {
+    try {
+      // Check for user-specific mnemonic first
+      const userMnemonicKey = `mnemonic_${userId}`;
+      const userMnemonic = await SecureStore.getItemAsync(userMnemonicKey, {
+        requireAuthentication: false,
+        keychainService: 'WeSplitWalletData'
+      });
+      
+      if (userMnemonic) {
+        logger.debug('Found user-specific mnemonic', { userId }, 'WalletRecoveryService');
+        return userMnemonic;
+      }
+
+      // Check for legacy seed phrase
+      const legacySeedPhraseKey = `seed_phrase_${userId}`;
+      const legacySeedPhrase = await SecureStore.getItemAsync(legacySeedPhraseKey, {
+        requireAuthentication: false,
+        keychainService: 'WeSplitWalletData'
+      });
+      
+      if (legacySeedPhrase) {
+        logger.debug('Found legacy seed phrase', { userId }, 'WalletRecoveryService');
+        return legacySeedPhrase;
+      }
+
+      // Check for global wallet mnemonic
+      const globalMnemonic = await SecureStore.getItemAsync('wallet_mnemonic', {
+        requireAuthentication: false,
+        keychainService: 'WeSplitWalletData'
+      });
+      
+      if (globalMnemonic) {
+        logger.debug('Found global wallet mnemonic', { userId }, 'WalletRecoveryService');
+        return globalMnemonic;
+      }
+
+      logger.debug('No mnemonic found for user', { userId }, 'WalletRecoveryService');
+      return null;
+    } catch (error) {
+      logger.error('Failed to get stored mnemonic', error, 'WalletRecoveryService');
+      return null;
+    }
+  }
 }
 
 export const walletRecoveryService = WalletRecoveryService;

@@ -810,8 +810,8 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 180,
-    marginTop: 50, // réduit l'écart avec les instructions
+    minHeight: 200, // Increased for 24 words
+    marginTop: spacing.md, // Reduced margin
     marginBottom: spacing.lg,
     marginHorizontal: spacing.lg,
     backgroundColor: colors.white5,
@@ -873,23 +873,24 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     width: '100%',
-    rowGap: spacing.sm, // espace vertical réduit
-    columnGap: spacing.sm, // espace horizontal réduit
+    rowGap: spacing.xs, // Reduced vertical spacing for 24 words
+    columnGap: spacing.xs, // Reduced horizontal spacing
   },
   
   seedWordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 10,
+    paddingHorizontal: spacing.sm, // Reduced padding
+    paddingVertical: spacing.xs, // Reduced padding
+    borderRadius: 8, // Slightly smaller radius
     marginBottom: 0, // géré par rowGap
-    width: '48%', // deux colonnes
-    marginVertical: 2,
+    width: '48%', // two columns
+    marginVertical: 1, // Minimal margin
     marginHorizontal: 0,
     justifyContent: 'flex-start',
     borderWidth: 1,
     borderColor: colors.white50,
+    minHeight: 36, // Fixed height for consistency
   },
   
   seedWordNumber: {
@@ -1378,6 +1379,21 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
   },
 
+
+  // Scrollable container styles
+  scrollContainer: {
+    flex: 1,
+  },
+  
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 100, // Space for fixed button
+  },
+
+  // Bottom spacer to ensure content doesn't get covered
+  bottomSpacer: {
+    height: 20,
+  },
 
   // Fixed done button at bottom of screen
   doneButtonFixed: {

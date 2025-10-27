@@ -6,6 +6,7 @@ import {
   Alert,
   Image,
   Clipboard,
+  ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
@@ -199,14 +200,18 @@ const SeedPhraseViewScreen: React.FC = () => {
         showBackButton={true}
       />
 
-      <View style={styles.content}>
+      <ScrollView 
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Instructions */}
         <View style={styles.instructionsContainer}>
           <Text style={styles.instructionsTitle}>Write Down Your Seed Phrase</Text>
           <Text style={styles.instructionsText}>
             {!isRevealed 
-              ? "This is your single app wallet's 12-word seed phrase. Write it down on a paper and keep it in a safe place. This seed phrase is compatible with most external wallets like Phantom and Solflare."
-              : "This is your single app wallet's 12-word seed phrase. Write it down on a paper and keep it in a safe place. You can use this to export your wallet to other apps."
+              ? `This is your single app wallet's ${seedPhrase.length || 24}-word seed phrase. Write it down on a paper and keep it in a safe place. This seed phrase is compatible with most external wallets like Phantom and Solflare.`
+              : `This is your single app wallet's ${seedPhrase.length || 24}-word seed phrase. Write it down on a paper and keep it in a safe place. You can use this to export your wallet to other apps.`
             }
           </Text>
         </View>
@@ -248,11 +253,12 @@ const SeedPhraseViewScreen: React.FC = () => {
             >
               <Text style={styles.copyButtonText}>Copy Seed Phrase</Text>
             </TouchableOpacity>
-            
           </View>
         )}
 
-      </View>
+        {/* Spacer to ensure content doesn't get covered by fixed button */}
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
       
       {/* Done Button - Fixed at bottom */}
       <TouchableOpacity 
