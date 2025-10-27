@@ -344,13 +344,24 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               if (walletResult.success && walletResult.wallet) {
                 const wallet = walletResult.wallet;
                 
-                // Check if the wallet has been burned (completed and cleaned up)
-                // Only block access if the wallet status is completed AND it's been cleaned up
+                // CRITICAL: Check if withdrawal has already been completed
                 if (wallet.status === 'completed') {
-                  // Check if the wallet still exists in Firebase (not burned yet)
-                  // If it exists, it's just completed but not burned, so allow access
-                  if (__DEV__) {
-                  }
+                  console.log('ℹ️ FairSplitScreen: Split wallet withdrawal already completed during initialization', {
+                    status: wallet.status,
+                    completedAt: wallet.completedAt
+                  });
+                  
+                  Alert.alert(
+                    'Withdrawal Already Completed',
+                    'The funds from this split have already been withdrawn. You cannot withdraw funds from this split again.',
+                    [
+                      {
+                        text: 'OK',
+                        onPress: () => navigation.navigate('SplitsList' as never)
+                      }
+                    ]
+                  );
+                  return;
                 }
                 
                 setSplitWallet(wallet);
@@ -1988,15 +1999,24 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         return;
       }
       
-      // Check if split wallet is already completed (temporarily disabled for debugging)
+      // CRITICAL: Check if withdrawal has already been completed
       if (splitWallet.status === 'completed') {
-        console.log('ℹ️ FairSplitScreen: Split wallet is marked as completed, but continuing for debugging', {
+        console.log('ℹ️ FairSplitScreen: Split wallet withdrawal already completed', {
           status: splitWallet.status,
           completedAt: splitWallet.completedAt
         });
         
-        // Continue with the withdrawal process to see what happens
-        // This will help us debug why the balance is 0
+        Alert.alert(
+          'Withdrawal Already Completed',
+          'The funds from this split have already been withdrawn. You cannot withdraw funds from this split again.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('SplitsList' as never)
+            }
+          ]
+        );
+        return;
       }
 
       // Verify actual blockchain balance before withdrawal

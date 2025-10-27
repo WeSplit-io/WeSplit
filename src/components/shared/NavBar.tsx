@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
 const navItems = [
   { icon: 'house', label: 'Home', route: 'Dashboard', IconComponent: HouseLine },
   { icon: 'piggy', label: 'Pools', route: 'SplitsList', IconComponent: PiggyBank },
-  { icon: 'split', label: 'Split', route: 'BillCamera', isSpecial: true, IconComponent: ArrowsSplit },
+  { icon: 'split', label: 'Split', route: 'ManualBillCreation', isSpecial: true, IconComponent: ArrowsSplit },
   { icon: 'crownSimple', label: 'Rewards', route: 'Rewards', IconComponent: Medal },
   { icon: 'users', label: 'Contacts', route: 'Contacts', IconComponent: Users },
 ];
@@ -152,6 +152,9 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
         navigation.navigate(route, {});
       } else if (route === 'SplitsList') {
         navigation.navigate(route, {});
+      } else if (route === 'ManualBillCreation') {
+        // Navigate to manual bill creation for split creation
+        navigation.navigate(route, {});
       } else {
         navigation.navigate(route);
       }
@@ -172,6 +175,9 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
       return true;
     }
     if (route === 'SplitsList' && currentRoute === 'SplitDetails') {
+      return true;
+    }
+    if (route === 'ManualBillCreation' && currentRoute === 'ManualBillCreation') {
       return true;
     }
     

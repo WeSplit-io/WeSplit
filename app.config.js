@@ -38,6 +38,7 @@ module.exports = {
     scheme: "wesplit",
     android: {
       package: "com.wesplit.app",
+      versionCode: 3,
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
         backgroundColor: "#061113"

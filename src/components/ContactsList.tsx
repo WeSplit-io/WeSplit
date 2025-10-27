@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, Image, Alert, Linking, Animated, RefreshControl } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -59,7 +59,6 @@ const ContactsList: React.FC<ContactsListProps> = ({
   const { contacts, loading, refreshContacts } = useContacts();
   const { addContact, isUserAlreadyContact } = useContactActions();
 
-  const [filteredContacts, setFilteredContacts] = useState<UserContact[]>([]);
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   
@@ -77,21 +76,37 @@ const ContactsList: React.FC<ContactsListProps> = ({
     limit: 20,
     includeDeleted: false,
     includeSuspended: false,
-    onUserAdded: (user) => {
-      logger.info('New user added to search results', { userId: user.id, name: user.name }, 'ContactsList');
-    },
-    onUserModified: (user) => {
-      logger.info('User modified in search results', { userId: user.id, name: user.name }, 'ContactsList');
-    },
-    onUserRemoved: (user) => {
-      logger.info('User removed from search results', { userId: user.id, name: user.name }, 'ContactsList');
-    }
+    onUserAdded: (user) => onUserAddedRef.current?.(user),
+    onUserModified: (user) => onUserModifiedRef.current?.(user),
+    onUserRemoved: (user) => onUserRemovedRef.current?.(user)
   });
   const [isAddingContact, setIsAddingContact] = useState<number | null>(null);
   const [mode, setMode] = useState<'list' | 'qr'>('list');
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isProcessingQR, setIsProcessingQR] = useState(false);
+  
+  // Use refs to store callback functions to prevent infinite loops
+  const onUserAddedRef = useRef<(user: User) => void>();
+  const onUserModifiedRef = useRef<(user: User) => void>();
+  const onUserRemovedRef = useRef<(user: User) => void>();
+  
+  // Update refs when callbacks change
+  onUserAddedRef.current = (user: User) => {
+    if (__DEV__) {
+      logger.debug('New user added to search results', { userId: user.id, name: user.name }, 'ContactsList');
+    }
+  };
+  onUserModifiedRef.current = (user: User) => {
+    if (__DEV__) {
+      logger.debug('User modified in search results', { userId: user.id, name: user.name }, 'ContactsList');
+    }
+  };
+  onUserRemovedRef.current = (user: User) => {
+    if (__DEV__) {
+      logger.debug('User removed from search results', { userId: user.id, name: user.name }, 'ContactsList');
+    }
+  };
   const [qrInputValue, setQrInputValue] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   
@@ -118,7 +133,16 @@ const ContactsList: React.FC<ContactsListProps> = ({
     handleBarCodeScanned({ type: 'qr', data: data.recipient });
   };
 
-  useEffect(() => {
+  // Use useMemo to prevent unnecessary filtering and state updates
+  const filteredContacts = useMemo(() => {
+    if (__DEV__) {
+      logger.debug('Filtering contacts', { 
+        contactsCount: contacts.length, 
+        activeTab, 
+        searchQuery: searchQuery.trim() 
+      }, 'ContactsList');
+    }
+    
     let filtered = [...contacts];
 
     if (activeTab === 'All') {
@@ -143,7 +167,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
       }
     }
 
-    setFilteredContacts(filtered);
+    return filtered;
   }, [searchQuery, contacts, activeTab]);
 
   // Handle user search with enhanced functionality
@@ -159,7 +183,9 @@ const ContactsList: React.FC<ContactsListProps> = ({
     }
 
     try {
-      logger.info('Starting enhanced user search for', { query }, 'ContactsList');
+      if (__DEV__) {
+        logger.debug('Starting enhanced user search for', { query }, 'ContactsList');
+      }
       setIsSearching(true);
       
       let results: UserSearchResult[] = [];
@@ -171,7 +197,9 @@ const ContactsList: React.FC<ContactsListProps> = ({
       
       if (isWalletAddress) {
         // Search by wallet address
-        logger.info('Searching by wallet address', { query: query.substring(0, 8) + '...' }, 'ContactsList');
+        if (__DEV__) {
+          logger.debug('Searching by wallet address', { query: query.substring(0, 8) + '...' }, 'ContactsList');
+        }
         results = await UserSearchService.searchUsersByWalletAddress(
           query.trim(),
           String(currentUser.id)
@@ -191,16 +219,18 @@ const ContactsList: React.FC<ContactsListProps> = ({
         );
       }
       
-      logger.info('Enhanced search results received', { 
-        count: results.length, 
-        searchType: isWalletAddress ? 'wallet' : 'text',
-        results: results.map(r => ({ 
-          name: r.name, 
-          email: r.email,
-          isAlreadyContact: r.isAlreadyContact,
-          relationshipType: r.relationshipType
-        })) 
-      }, 'ContactsList');
+      if (__DEV__) {
+        logger.debug('Enhanced search results received', { 
+          count: results.length, 
+          searchType: isWalletAddress ? 'wallet' : 'text',
+          results: results.map(r => ({ 
+            name: r.name, 
+            email: r.email,
+            isAlreadyContact: r.isAlreadyContact,
+            relationshipType: r.relationshipType
+          })) 
+        }, 'ContactsList');
+      }
       
       setSearchResults(results);
     } catch (error) {
@@ -213,10 +243,14 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
   // Debounced search
   useEffect(() => {
-    logger.debug('Search effect triggered', { activeTab, searchQuery: searchQuery.trim() }, 'ContactsList');
+    if (__DEV__) {
+      logger.debug('Search effect triggered', { activeTab, searchQuery: searchQuery.trim() }, 'ContactsList');
+    }
     
     if (searchQuery.trim() && searchQuery.length >= 2) {
-      logger.debug('Setting up real-time search for', { searchQuery }, 'ContactsList');
+      if (__DEV__) {
+        logger.debug('Setting up real-time search for', { searchQuery }, 'ContactsList');
+      }
       
       // Subscribe to real-time search
       subscribeRealtimeSearch(searchQuery);
@@ -231,7 +265,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
       setSearchResults([]);
       clearRealtimeResults();
     }
-  }, [searchQuery, subscribeRealtimeSearch, unsubscribeRealtimeSearch, clearRealtimeResults]);
+  }, [searchQuery]); // Remove the function dependencies that cause infinite loops
 
   // Contact loading is now handled by the useContacts hook
 

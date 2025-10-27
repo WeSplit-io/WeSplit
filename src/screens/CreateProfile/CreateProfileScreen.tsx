@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,7 @@ import { firebaseDataService } from '../../services/data';
 import { walletService } from '../../services/blockchain/wallet';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
 import { colors } from '../../theme';
-import { userImageService } from '../../services/core';
+import { AvatarUploadFallbackService } from '../../services/core/avatarUploadFallbackService';
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import * as ImagePicker from 'expo-image-picker';
 import { logger } from '../../services/analytics/loggingService';
@@ -35,6 +35,13 @@ const CreateProfileScreen: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { authenticateUser, state } = useApp();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 CreateProfileScreen: Screen mounted');
+    console.log('🔍 CreateProfileScreen: Route params:', route.params);
+    console.log('🔍 CreateProfileScreen: State:', state);
+  }, []);
 
   const handlePickImage = () => {
     const options = avatar 
@@ -193,7 +200,7 @@ const CreateProfileScreen: React.FC = () => {
         logger.warn('Could not check existing user, proceeding with profile creation', null, 'CreateProfileScreen');
       }
 
-      // Create or get user using unified service
+      // Create or update user using unified service
       try {
         const userData = {
           email,
@@ -201,27 +208,58 @@ const CreateProfileScreen: React.FC = () => {
           avatar: avatar || undefined,
         };
 
-        logger.info('Creating/getting user with firebase service', { email, name: pseudo }, 'CreateProfileScreen');
-        const user = await firebaseDataService.user.createUserIfNotExists(userData);
+        logger.info('Creating/updating user with firebase service', { email, name: pseudo }, 'CreateProfileScreen');
+        
+        // First check if user exists
+        const existingUser = await firebaseDataService.user.getUserByEmail(email);
+        let user;
+        
+        if (existingUser) {
+          // User exists, update their profile data
+          logger.info('User exists, updating profile data', { userId: existingUser.id, name: pseudo }, 'CreateProfileScreen');
+          user = await firebaseDataService.user.updateUser(existingUser.id, {
+            name: pseudo,
+            avatar: avatar || existingUser.avatar,
+            hasCompletedOnboarding: true
+          });
+        } else {
+          // User doesn't exist, create new user
+          logger.info('User does not exist, creating new user', { email, name: pseudo }, 'CreateProfileScreen');
+          user = await firebaseDataService.user.createUser({
+            ...userData,
+            hasCompletedOnboarding: true
+          });
+        }
         
         if (!user) {
-          throw new Error('Failed to create user');
+          throw new Error('Failed to create/update user');
         }
 
-        logger.info('User created/retrieved successfully', { user }, 'CreateProfileScreen');
+        logger.info('User created/updated successfully', { user }, 'CreateProfileScreen');
 
-        // Upload avatar if provided
+        // Upload avatar if provided and update user record
         let finalAvatarUrl = user.avatar;
         if (avatar && avatar.startsWith('file://')) {
           logger.info('Uploading avatar', null, 'CreateProfileScreen');
-          const uploadResult = await UserImageService.uploadUserAvatar(
+          const uploadResult = await AvatarUploadFallbackService.uploadAvatarWithFallback(
             user.id.toString(), 
             avatar
           );
           
           if (uploadResult.success && uploadResult.imageUrl) {
             finalAvatarUrl = uploadResult.imageUrl;
-            logger.info('Avatar uploaded successfully', null, 'CreateProfileScreen');
+            logger.info('Avatar uploaded successfully', { avatarUrl: finalAvatarUrl }, 'CreateProfileScreen');
+            
+            // Update user record with the uploaded avatar URL
+            try {
+              await firebaseDataService.user.updateUser(user.id, {
+                avatar: finalAvatarUrl
+              });
+              logger.info('User avatar URL updated in database', { userId: user.id, avatarUrl: finalAvatarUrl }, 'CreateProfileScreen');
+            } catch (updateError) {
+              console.warn('⚠️ Failed to update user avatar URL in database:', updateError);
+              // Continue anyway - the avatar is uploaded, just not reflected in the user record
+            }
           } else {
             console.warn('📸 CreateProfile: Failed to upload avatar:', uploadResult.error);
             // Continue with profile creation even if avatar upload fails
@@ -241,7 +279,29 @@ const CreateProfileScreen: React.FC = () => {
           hasCompletedOnboarding: true // User has completed profile creation
         };
 
+        logger.info('Final user data for authentication', { 
+          userId: appUser.id, 
+          name: appUser.name, 
+          email: appUser.email, 
+          avatar: appUser.avatar,
+          hasCompletedOnboarding: appUser.hasCompletedOnboarding 
+        }, 'CreateProfileScreen');
+
         authenticateUser(appUser, 'email');
+        
+        // Verify data was saved correctly
+        try {
+          const savedUser = await firebaseDataService.user.getCurrentUser(user.id);
+          logger.info('Verification: User data saved successfully', { 
+            userId: savedUser.id,
+            name: savedUser.name,
+            avatar: savedUser.avatar,
+            hasCompletedOnboarding: savedUser.hasCompletedOnboarding
+          }, 'CreateProfileScreen');
+        } catch (verifyError) {
+          console.warn('⚠️ Could not verify saved user data:', verifyError);
+          // Continue anyway - the user is authenticated
+        }
         
         try {
           (navigation as any).replace('Dashboard');
@@ -262,27 +322,29 @@ const CreateProfileScreen: React.FC = () => {
   };
 
   return (
-    <Container>
+    <Container style={{ backgroundColor: colors.black }}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        style={{ flex: 1 }}
       >
-        <View style={styles.mainContainer}>
+        <View style={[styles.mainContainer, { backgroundColor: colors.black }]}>
           {/* Header with Logo */}
           <Header variant="logoOnly" />
 
           {/* Main Content - Scrollable */}
           <ScrollView 
-            style={styles.scrollContent}
-            contentContainerStyle={styles.scrollContentContainer}
+            style={[styles.scrollContent, { backgroundColor: colors.black }]}
+            contentContainerStyle={[styles.scrollContentContainer, { backgroundColor: colors.black }]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.centerContent}>
-              <Text style={styles.title}>Create Your Profile</Text>
-              <Text style={styles.subtitle}>
+            <View style={[styles.centerContent, { backgroundColor: colors.black }]}>
+              <Text style={[styles.title, { color: colors.white, fontSize: 24, fontWeight: 'bold' }]}>Create Your Profile</Text>
+              <Text style={[styles.subtitle, { color: colors.white70, fontSize: 16 }]}>
                 Create your initial profile to get started, you can always edit it later.
               </Text>
+              
 
               {/* Profile Picture */}
               <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>

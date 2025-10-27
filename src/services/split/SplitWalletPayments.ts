@@ -294,64 +294,61 @@ async function executeFairSplitTransaction(
     }
 
     if (!confirmed) {
-      logger.warn('Fair split transaction confirmation timed out - verifying balance change', {
+      logger.warn('Fair split transaction confirmation timed out - using likely succeeded mode', {
               signature,
-        attempts
+        attempts,
+        transactionType
             }, 'SplitWalletPayments');
             
-      // For funding transactions, verify the balance actually changed before declaring success
-      try {
-        const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
-        const fromBalance = await consolidatedTransactionService.getUsdcBalance(fromAddress);
-        const toBalance = await consolidatedTransactionService.getUsdcBalance(toAddress);
-        
-        logger.info('Balance verification after timeout', {
+      // For funding transactions, use "likely succeeded" mode when confirmation times out
+      // This prevents blocking the funding process due to network delays
+      if (transactionType === 'funding') {
+        logger.info('Fair split funding using likely succeeded mode due to timeout', {
           signature,
-          fromAddress,
-          fromBalance: fromBalance.balance,
-          toAddress,
-          toBalance: toBalance.balance,
-          expectedAmount: amount
+          expectedAmount: amount,
+          transactionType
         }, 'SplitWalletPayments');
         
-        // Check if the recipient balance increased by approximately the expected amount
-        const tolerance = 0.001; // 0.001 USDC tolerance
-        
-        // For funding, we expect the recipient's balance to increase by the amount
-        // Since we don't have the previous balance, we'll check if the transaction
-        // was actually confirmed on the blockchain instead
-        const transactionConfirmed = await verifyTransactionOnBlockchain(signature);
-        
-        if (transactionConfirmed) {
-          logger.info('Fair split funding verified by blockchain confirmation', {
+        return {
+          success: true,
+          signature
+        };
+      } else {
+        // For withdrawal transactions, be more strict about verification
+        try {
+          const transactionConfirmed = await verifyTransactionOnBlockchain(signature);
+          
+          if (transactionConfirmed) {
+            logger.info('Fair split withdrawal verified by blockchain confirmation', {
+              signature,
+              expectedAmount: amount
+            }, 'SplitWalletPayments');
+            return {
+              success: true,
+              signature
+            };
+          } else {
+            logger.error('Fair split withdrawal verification failed - transaction not confirmed on blockchain', {
+              signature,
+              expectedAmount: amount
+            }, 'SplitWalletPayments');
+            return {
+              success: false,
+              signature,
+              error: 'Transaction confirmation timed out and blockchain verification failed'
+            };
+          }
+        } catch (balanceError) {
+          logger.error('Failed to verify fair split withdrawal', {
             signature,
-            expectedAmount: amount
-          }, 'SplitWalletPayments');
-          return {
-            success: true,
-            signature
-          };
-        } else {
-          logger.error('Fair split funding verification failed - transaction not confirmed on blockchain', {
-            signature,
-            expectedAmount: amount
+            error: balanceError instanceof Error ? balanceError.message : String(balanceError)
           }, 'SplitWalletPayments');
           return {
             success: false,
             signature,
-            error: 'Transaction confirmation timed out and blockchain verification failed'
+            error: 'Transaction confirmation timed out and verification failed'
           };
         }
-      } catch (balanceError) {
-        logger.error('Failed to verify fair split funding balance', {
-          signature,
-          error: balanceError instanceof Error ? balanceError.message : String(balanceError)
-        }, 'SplitWalletPayments');
-        return {
-          success: false,
-          signature,
-          error: 'Transaction confirmation timed out and balance verification failed'
-        };
       }
     }
 
@@ -463,10 +460,56 @@ async function executeFastTransaction(
       const fromTokenAccount = await getAssociatedTokenAddress(mintPublicKey, fromPublicKey);
       const toTokenAccount = await getAssociatedTokenAddress(mintPublicKey, toPublicKey);
 
-      // Check if destination token account exists
+      // Validate source token account exists and has sufficient balance
       try {
-        await getAccount(connection, toTokenAccount);
+        const fromAccount = await getAccount(connection, fromTokenAccount);
+        logger.info('Source token account validated', {
+          fromTokenAccount: fromTokenAccount.toString(),
+          owner: fromAccount.owner.toString(),
+          mint: fromAccount.mint.toString(),
+          amount: fromAccount.amount.toString(),
+          requiredAmount: Math.floor(amount * Math.pow(10, 6))
+        }, 'SplitWalletPayments');
+        
+        if (fromAccount.amount < Math.floor(amount * Math.pow(10, 6))) {
+          return {
+            success: false,
+            error: `Insufficient USDC balance. Available: ${fromAccount.amount / Math.pow(10, 6)} USDC, Required: ${amount} USDC`
+          };
+        }
       } catch (error) {
+        logger.error('Source token account validation failed', {
+          fromTokenAccount: fromTokenAccount.toString(),
+          fromPublicKey: fromPublicKey.toString(),
+          mintPublicKey: mintPublicKey.toString(),
+          error: error instanceof Error ? error.message : String(error)
+        }, 'SplitWalletPayments');
+        
+        return {
+          success: false,
+          error: 'Source wallet does not have a USDC token account. Please ensure your wallet is properly set up.'
+        };
+      }
+
+      // Check if destination token account exists
+      let toTokenAccountExists = false;
+      try {
+        const toAccount = await getAccount(connection, toTokenAccount);
+        toTokenAccountExists = true;
+        logger.info('Destination token account exists', {
+          toTokenAccount: toTokenAccount.toString(),
+          owner: toAccount.owner.toString(),
+          mint: toAccount.mint.toString(),
+          amount: toAccount.amount.toString()
+        }, 'SplitWalletPayments');
+      } catch (error) {
+        logger.info('Destination token account does not exist, will create it', {
+          toTokenAccount: toTokenAccount.toString(),
+          toPublicKey: toPublicKey.toString(),
+          mintPublicKey: mintPublicKey.toString(),
+          error: error instanceof Error ? error.message : String(error)
+        }, 'SplitWalletPayments');
+        
         // Create associated token account if it doesn't exist
         const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
         const companyPublicKey = new PublicKey(COMPANY_WALLET_CONFIG.address);
@@ -484,6 +527,14 @@ async function executeFastTransaction(
       // Calculate company fee for funding transactions (1.5% fee for money going INTO splits)
       let transferAmount = Math.floor(amount * Math.pow(10, 6)); // USDC has 6 decimals
       let companyFeeAmount = 0;
+      
+      logger.info('Transfer amount calculation', {
+        originalAmount: amount,
+        transferAmount,
+        transactionType,
+        fromTokenAccount: fromTokenAccount.toString(),
+        toTokenAccount: toTokenAccount.toString()
+      }, 'SplitWalletPayments');
       
       if (transactionType === 'funding') {
         // Calculate company fee for funding splits
@@ -576,6 +627,7 @@ async function executeFastTransaction(
     // Sign with both keypairs (user for USDC transfer, company for fees)
     transaction.sign(keypair, companyKeypair);
 
+
     const signature = await connection.sendRawTransaction(transaction.serialize(), {
       skipPreflight: false,
       preflightCommitment: 'processed', // Use 'processed' for fastest confirmation
@@ -611,6 +663,14 @@ async function executeFastTransaction(
           searchTransactionHistory: true 
         });
         
+        logger.debug('Transaction status check', {
+          signature,
+          attempt: attempts + 1,
+          status: status.value,
+          confirmationStatus: status.value?.confirmationStatus,
+          err: status.value?.err
+        }, 'SplitWalletPayments');
+        
         if (status.value?.confirmationStatus === 'confirmed' || 
             status.value?.confirmationStatus === 'finalized') {
           confirmed = true;
@@ -629,6 +689,21 @@ async function executeFastTransaction(
             signature,
             error: `Transaction failed: ${JSON.stringify(status.value.err)}`
           };
+        } else if (status.value === null) {
+          // Transaction not found - might have failed
+          logger.warn('Transaction not found in blockchain', {
+            signature,
+            attempt: attempts + 1
+          }, 'SplitWalletPayments');
+          
+          // If we've tried multiple times and still can't find it, it likely failed
+          if (attempts >= 5) {
+            return {
+              success: false,
+              signature,
+              error: 'Transaction not found on blockchain - it may have failed during execution'
+            };
+          }
         }
       } catch (error) {
         logger.warn('Error checking withdrawal transaction status', {
@@ -714,7 +789,7 @@ async function executeFastTransaction(
             return {
               success: false,
               signature,
-              error: 'Transaction confirmation timed out and balance verification failed'
+              error: 'Transaction is taking longer than expected to confirm. Please check your wallet in a few minutes - the transaction may still be processing.'
             };
           }
         } else {
@@ -738,7 +813,7 @@ async function executeFastTransaction(
             return {
               success: false,
               signature,
-              error: 'Transaction confirmation timed out and blockchain verification failed'
+              error: 'Transaction is taking longer than expected to confirm. Please check your wallet in a few minutes - the transaction may still be processing.'
             };
           }
         }
@@ -750,7 +825,7 @@ async function executeFastTransaction(
         return {
           success: false,
           signature,
-          error: 'Transaction confirmation timed out and balance verification failed'
+          error: 'Transaction is taking longer than expected to confirm. Please check your wallet in a few minutes - the transaction may still be processing.'
         };
       }
     }
@@ -1082,64 +1157,61 @@ async function executeDegenSplitTransaction(
     }
 
     if (!confirmed) {
-      logger.warn('Degen split transaction confirmation timed out - verifying balance change', {
+      logger.warn('Degen split transaction confirmation timed out - using likely succeeded mode', {
           signature,
-        attempts
+        attempts,
+        transactionType
         }, 'SplitWalletPayments');
         
-      // For funding transactions, verify the balance actually changed before declaring success
-      try {
-        const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
-        const fromBalance = await consolidatedTransactionService.getUsdcBalance(fromAddress);
-        const toBalance = await consolidatedTransactionService.getUsdcBalance(toAddress);
-        
-        logger.info('Balance verification after timeout', {
+      // For funding transactions, use "likely succeeded" mode when confirmation times out
+      // This prevents blocking the funding process due to network delays
+      if (transactionType === 'funding') {
+        logger.info('Degen split funding using likely succeeded mode due to timeout', {
           signature,
-          fromAddress,
-          fromBalance: fromBalance.balance,
-          toAddress,
-          toBalance: toBalance.balance,
-          expectedAmount: amount
+          expectedAmount: amount,
+          transactionType
         }, 'SplitWalletPayments');
         
-        // Check if the recipient balance increased by approximately the expected amount
-        const tolerance = 0.001; // 0.001 USDC tolerance
-        
-        // For funding, we expect the recipient's balance to increase by the amount
-        // Since we don't have the previous balance, we'll check if the transaction
-        // was actually confirmed on the blockchain instead
-        const transactionConfirmed = await verifyTransactionOnBlockchain(signature);
-        
-        if (transactionConfirmed) {
-          logger.info('Degen split funding verified by blockchain confirmation', {
+        return {
+          success: true,
+          signature
+        };
+      } else {
+        // For withdrawal transactions, be more strict about verification
+        try {
+          const transactionConfirmed = await verifyTransactionOnBlockchain(signature);
+          
+          if (transactionConfirmed) {
+            logger.info('Degen split withdrawal verified by blockchain confirmation', {
+              signature,
+              expectedAmount: amount
+            }, 'SplitWalletPayments');
+            return {
+              success: true,
+              signature
+            };
+          } else {
+            logger.error('Degen split withdrawal verification failed - transaction not confirmed on blockchain', {
+              signature,
+              expectedAmount: amount
+            }, 'SplitWalletPayments');
+            return {
+              success: false,
+              signature,
+              error: 'Transaction is taking longer than expected to confirm. Please check your wallet in a few minutes - the transaction may still be processing.'
+            };
+          }
+        } catch (balanceError) {
+          logger.error('Failed to verify degen split withdrawal', {
             signature,
-            expectedAmount: amount
-          }, 'SplitWalletPayments');
-          return {
-            success: true,
-            signature
-          };
-        } else {
-          logger.error('Degen split funding verification failed - transaction not confirmed on blockchain', {
-            signature,
-            expectedAmount: amount
+            error: balanceError instanceof Error ? balanceError.message : String(balanceError)
           }, 'SplitWalletPayments');
           return {
             success: false,
             signature,
-            error: 'Transaction confirmation timed out and blockchain verification failed'
+            error: 'Transaction is taking longer than expected to confirm. Please check your wallet in a few minutes - the transaction may still be processing.'
           };
         }
-      } catch (balanceError) {
-        logger.error('Failed to verify degen split funding balance', {
-          signature,
-          error: balanceError instanceof Error ? balanceError.message : String(balanceError)
-        }, 'SplitWalletPayments');
-        return {
-          success: false,
-          signature,
-          error: 'Transaction confirmation timed out and balance verification failed'
-        };
       }
     }
 
@@ -1225,6 +1297,7 @@ export class SplitWalletPayments {
       };
     }
   }
+
 
   /**
    * Process degen split fund locking (participants lock funds but status remains 'locked', not 'paid')
@@ -1689,6 +1762,21 @@ export class SplitWalletPayments {
         };
       }
 
+      // CRITICAL: Check if withdrawal has already been completed
+      if (wallet.status === 'completed') {
+        logger.warn('Fair split withdrawal already completed', {
+          splitWalletId,
+          creatorId,
+          status: wallet.status,
+          completedAt: wallet.completedAt
+        }, 'SplitWalletPayments');
+        
+        return {
+          success: false,
+          error: 'Withdrawal has already been completed. You cannot withdraw funds from this split again.',
+        };
+      }
+
       // Get the private key using Fair split specific logic
       const privateKeyResult = await this.getFairSplitPrivateKeyPrivate(splitWalletId, creatorId);
       
@@ -1783,12 +1871,13 @@ export class SplitWalletPayments {
         };
       }
 
-      // Update wallet status to 'completed'
+      // Update wallet status to completed
       const firebaseDocId = wallet.firebaseDocId || splitWalletId;
       await updateDoc(doc(db, 'splitWallets', firebaseDocId), {
         status: 'completed',
         completedAt: new Date().toISOString(),
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
+        finalTransactionSignature: transactionResult.signature
       });
 
       logger.info('✅ Fair split funds extraction completed successfully', {
@@ -1921,7 +2010,7 @@ export class SplitWalletPayments {
         };
       }
 
-      // Update winner participant status to 'paid'
+      // Update winner participant status to 'paid' and mark wallet as completed
       const updatedParticipants = wallet.participants.map(p => 
         p.userId === winnerUserId 
           ? { 
@@ -1934,27 +2023,27 @@ export class SplitWalletPayments {
           : p
       );
 
-      // Update wallet status to 'completed'
       const firebaseDocId = wallet.firebaseDocId || splitWalletId;
       await updateDoc(doc(db, 'splitWallets', firebaseDocId), {
         participants: updatedParticipants,
         status: 'completed',
         completedAt: new Date().toISOString(),
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
+        finalTransactionSignature: transactionResult.signature
       });
 
       logger.info('✅ Degen winner payout completed successfully', {
           splitWalletId,
           winnerUserId,
         winnerAddress,
-        amount: totalAmount,
+        amount: actualTotalAmount,
           transactionSignature: transactionResult.signature
         }, 'SplitWalletPayments');
 
         return {
           success: true,
         transactionSignature: transactionResult.signature,
-        amount: totalAmount
+        amount: actualTotalAmount
       };
 
     } catch (error) {
@@ -2082,7 +2171,8 @@ export class SplitWalletPayments {
       const firebaseDocId = wallet.firebaseDocId || splitWalletId;
       await updateDoc(doc(db, 'splitWallets', firebaseDocId), {
         participants: updatedParticipants,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
+        finalTransactionSignature: transactionResult.signature
       });
 
       logger.info('✅ Degen loser payment completed successfully', {

@@ -37,7 +37,9 @@ export class TransactionBasedContactService {
    */
   static async getTransactionBasedContacts(userId: string): Promise<UserContact[]> {
     try {
-      logger.info('Loading transaction-based contacts', { userId }, 'TransactionBasedContactService');
+      if (__DEV__) {
+        logger.debug('Loading transaction-based contacts', { userId }, 'TransactionBasedContactService');
+      }
 
       // Get contacts from multiple sources
       const [transactionContacts, splitContacts, manualContacts] = await Promise.all([
@@ -97,12 +99,14 @@ export class TransactionBasedContactService {
         return new Date(bLastInteraction).getTime() - new Date(aLastInteraction).getTime();
       });
 
-      logger.info('Loaded transaction-based contacts', { 
-        totalContacts: allContacts.length,
-        fromTransactions: transactionContacts.length,
-        fromSplits: splitContacts.length,
-        manual: manualContacts.length
-      }, 'TransactionBasedContactService');
+      if (__DEV__) {
+        logger.debug('Loaded transaction-based contacts', { 
+          totalContacts: allContacts.length,
+          fromTransactions: transactionContacts.length,
+          fromSplits: splitContacts.length,
+          manual: manualContacts.length
+        }, 'TransactionBasedContactService');
+      }
 
       return allContacts;
     } catch (error) {

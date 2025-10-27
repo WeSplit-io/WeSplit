@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { TransactionBasedContactService } from '../services/contacts';
 import { UserContact } from '../types';
@@ -23,6 +23,9 @@ export const useContacts = (): UseContactsResult => {
   const [contacts, setContacts] = useState<UserContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Track loaded user to prevent unnecessary reloads
+  const loadedUserIdRef = useRef<string | null>(null);
 
   /**
    * Load contacts from all sources (transactions, splits, manual)
@@ -32,6 +35,14 @@ export const useContacts = (): UseContactsResult => {
       logger.warn('No current user found for contact loading', null, 'useContacts');
       setLoading(false);
       setError('No current user found');
+      return;
+    }
+
+    // Prevent unnecessary reloads for the same user
+    if (!forceRefresh && loadedUserIdRef.current === currentUser.id.toString()) {
+      logger.debug('Contacts already loaded for user, skipping', { 
+        userId: currentUser.id 
+      }, 'useContacts');
       return;
     }
 
@@ -54,6 +65,7 @@ export const useContacts = (): UseContactsResult => {
       }, 'useContacts');
 
       setContacts(loadedContacts);
+      loadedUserIdRef.current = currentUser.id.toString();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load contacts';
       logger.error('Failed to load contacts', err, 'useContacts');
@@ -73,8 +85,10 @@ export const useContacts = (): UseContactsResult => {
 
   // Load contacts on mount and when currentUser changes
   useEffect(() => {
-    loadContacts();
-  }, [loadContacts]);
+    if (currentUser?.id) {
+      loadContacts();
+    }
+  }, [currentUser?.id]); // Only depend on currentUser.id, not loadContacts
 
   return {
     contacts,

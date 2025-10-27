@@ -262,7 +262,7 @@ export class UserSearchService {
         currentUserId 
       }, 'UserSearchService');
 
-      // Use the existing search function with wallet address as search term
+      // Use the improved search function that searches both name and wallet_address fields
       const searchResults = await firebaseDataService.user.searchUsers(
         walletAddress,
         20

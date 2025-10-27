@@ -342,40 +342,57 @@ export const firebaseDataService = {
 
     searchUsers: async (searchTerm: string, limitCount: number = 10): Promise<User[]> => {
       try {
-        // Note: Firestore doesn't support full-text search, so we'll search by name and email
-        const nameQuery = query(
+        logger.info('Searching users in Firebase', { searchTerm, limitCount }, 'FirebaseDataService');
+        
+        // Get all users and filter in memory since Firestore doesn't support case-insensitive search
+        const usersQuery = query(
           collection(db, 'users'),
-          where('name', '>=', searchTerm),
-          where('name', '<=', searchTerm + '\uf8ff'),
-          limit(limitCount)
+          limit(1000) // Get more users to filter in memory
         );
         
-        const emailQuery = query(
-          collection(db, 'users'),
-          where('email', '>=', searchTerm),
-          where('email', '<=', searchTerm + '\uf8ff'),
-          limit(limitCount)
-        );
+        const usersSnapshot = await getDocs(usersQuery);
+        const allUsers = usersSnapshot.docs.map(doc => firebaseDataTransformers.firestoreToUser(doc));
         
-        const [nameSnapshot, emailSnapshot] = await Promise.all([
-          getDocs(nameQuery),
-          getDocs(emailQuery)
-        ]);
-        
-        const users = new Map<string, User>();
-        
-        nameSnapshot.docs.forEach(doc => {
-          const user = firebaseDataTransformers.firestoreToUser(doc);
-          users.set(user.id, user);
+        // Filter users by name, email, and wallet address (case-insensitive, partial match)
+        const searchTermLower = searchTerm.toLowerCase();
+        const filteredUsers = allUsers.filter(user => {
+          const nameMatch = user.name?.toLowerCase().includes(searchTermLower);
+          const emailMatch = user.email?.toLowerCase().includes(searchTermLower);
+          const walletMatch = user.wallet_address?.toLowerCase().includes(searchTermLower);
+          return nameMatch || emailMatch || walletMatch;
         });
         
-        emailSnapshot.docs.forEach(doc => {
-          const user = firebaseDataTransformers.firestoreToUser(doc);
-          users.set(user.id, user);
+        // Sort by relevance (exact matches first, then partial matches)
+        const sortedUsers = filteredUsers.sort((a, b) => {
+          const aNameExact = a.name?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+          const bNameExact = b.name?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+          const aEmailExact = a.email?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+          const bEmailExact = b.email?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+          const aWalletExact = a.wallet_address?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+          const bWalletExact = b.wallet_address?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+          
+          const aScore = Math.min(aNameExact, aEmailExact, aWalletExact);
+          const bScore = Math.min(bNameExact, bEmailExact, bWalletExact);
+          
+          if (aScore !== bScore) {
+            return aScore - bScore; // Exact matches first
+          }
+          
+          // If same score, sort alphabetically by name
+          return a.name?.toLowerCase().localeCompare(b.name?.toLowerCase() || '') || 0;
         });
         
-        return Array.from(users.values());
-    } catch (error) {
+        const limitedUsers = sortedUsers.slice(0, limitCount);
+        
+        logger.info('User search completed', { 
+          searchTerm, 
+          totalUsers: allUsers.length,
+          filteredCount: filteredUsers.length,
+          returnedCount: limitedUsers.length 
+        }, 'FirebaseDataService');
+        
+        return limitedUsers;
+      } catch (error) {
         logger.error('Failed to search users', { searchTerm, error }, 'FirebaseDataService');
         throw error;
       }

@@ -84,41 +84,72 @@ class RealtimeUserSearchService {
       order = 'asc'
     } = options;
     
-    // Create Firestore queries for name and email search
-    const nameQuery = query(
+    // Create Firestore query to get all users (we'll filter in memory)
+    const usersQuery = query(
       collection(db, 'users'),
-      where('name', '>=', searchTerm),
-      where('name', '<=', searchTerm + '\uf8ff'),
-      orderBy('name', order),
-      limit(limitCount)
-    );
-    
-    const emailQuery = query(
-      collection(db, 'users'),
-      where('email', '>=', searchTerm),
-      where('email', '<=', searchTerm + '\uf8ff'),
-      orderBy('email', order),
-      limit(limitCount)
+      limit(1000) // Get more users to filter in memory
     );
     
     // Track previous results for change detection
     let previousResults = new Map<string, User>();
     
-    // Set up real-time listener for name search
-    const unsubscribeName = onSnapshot(
-      nameQuery,
+    // Set up real-time listener for all users
+    const unsubscribeUsers = onSnapshot(
+      usersQuery,
       (snapshot) => {
-        this.handleSearchSnapshot(
-          snapshot,
-          previousResults,
-          callback,
-          'name',
-          includeDeleted,
-          includeSuspended
-        );
+        try {
+          const allUsers = snapshot.docs.map(doc => firebaseDataTransformers.firestoreToUser(doc));
+          
+          // Filter users by name, email, and wallet address (case-insensitive, partial match)
+          const searchTermLower = searchTerm.toLowerCase();
+          const filteredUsers = allUsers.filter(user => {
+            const nameMatch = user.name?.toLowerCase().includes(searchTermLower);
+            const emailMatch = user.email?.toLowerCase().includes(searchTermLower);
+            const walletMatch = user.wallet_address?.toLowerCase().includes(searchTermLower);
+            return nameMatch || emailMatch || walletMatch;
+          });
+          
+          // Sort by relevance (exact matches first, then partial matches)
+          const sortedUsers = filteredUsers.sort((a, b) => {
+            const aNameExact = a.name?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+            const bNameExact = b.name?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+            const aEmailExact = a.email?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+            const bEmailExact = b.email?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+            const aWalletExact = a.wallet_address?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+            const bWalletExact = b.wallet_address?.toLowerCase().startsWith(searchTermLower) ? 0 : 1;
+            
+            const aScore = Math.min(aNameExact, aEmailExact, aWalletExact);
+            const bScore = Math.min(bNameExact, bEmailExact, bWalletExact);
+            
+            if (aScore !== bScore) {
+              return aScore - bScore; // Exact matches first
+            }
+            
+            // If same score, sort alphabetically by name
+            return a.name?.toLowerCase().localeCompare(b.name?.toLowerCase() || '') || 0;
+          });
+          
+          const limitedUsers = sortedUsers.slice(0, limitCount);
+          
+          // Process changes
+          this.handleSearchSnapshot(
+            { docs: limitedUsers.map(user => ({ id: user.id, data: () => user })) },
+            previousResults,
+            callback,
+            'name',
+            includeDeleted,
+            includeSuspended
+          );
+          
+        } catch (error) {
+          logger.error('Error processing real-time user search', {
+            searchTerm,
+            error: error instanceof Error ? error.message : String(error)
+          }, 'RealtimeUserSearchService');
+        }
       },
       (error) => {
-        logger.error('Error in name search subscription', {
+        logger.error('Real-time user search error', {
           subscriptionId,
           searchTerm,
           error: error.message
@@ -126,32 +157,9 @@ class RealtimeUserSearchService {
       }
     );
     
-    // Set up real-time listener for email search
-    const unsubscribeEmail = onSnapshot(
-      emailQuery,
-      (snapshot) => {
-        this.handleSearchSnapshot(
-          snapshot,
-          previousResults,
-          callback,
-          'email',
-          includeDeleted,
-          includeSuspended
-        );
-      },
-      (error) => {
-        logger.error('Error in email search subscription', {
-          subscriptionId,
-          searchTerm,
-          error: error.message
-        }, 'RealtimeUserSearchService');
-      }
-    );
-    
-    // Create combined unsubscribe function
+    // Create unsubscribe function
     const unsubscribe = () => {
-      unsubscribeName();
-      unsubscribeEmail();
+      unsubscribeUsers();
     };
     
     const subscription: UserSearchSubscription = {
