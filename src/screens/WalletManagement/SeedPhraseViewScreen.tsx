@@ -13,7 +13,7 @@ import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
 import { styles } from './styles';
 import { useWallet } from '../../context/WalletContext';
-import { walletService } from '../../services/blockchain/wallet';
+import { walletService, walletExportService } from '../../services/blockchain/wallet';
 import { firebaseDataService } from '../../services/data';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
@@ -51,7 +51,7 @@ const SeedPhraseViewScreen: React.FC = () => {
           return;
         }
 
-        logger.info('Retrieving seed phrase from secure device storage', null, 'SeedPhraseViewScreen');
+        logger.info('Retrieving wallet export data from secure device storage', null, 'SeedPhraseViewScreen');
         
         // First, get the active wallet address (the one displayed in dashboard)
         const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
@@ -70,28 +70,38 @@ const SeedPhraseViewScreen: React.FC = () => {
           walletAddress: activeWalletAddress 
         }, 'SeedPhraseViewScreen');
         
-        // Now get the seed phrase for this specific wallet address
-        const mnemonic = await walletService.getSeedPhraseForWallet(currentUser.id.toString(), activeWalletAddress);
+        // Use the consolidated export service to get all available export data
+        const exportResult = await walletExportService.exportWallet(currentUser.id.toString(), activeWalletAddress);
         
-        if (mnemonic) {
-          // Format seed phrase for display
-          const seedPhraseWords = mnemonic.split(' ');
-          setSeedPhrase(seedPhraseWords);
-          logger.info('Seed phrase retrieved successfully for active wallet', { 
+        if (exportResult.success) {
+          if (exportResult.seedPhrase) {
+            // Format seed phrase for display
+            const seedPhraseWords = exportResult.seedPhrase.split(' ');
+            setSeedPhrase(seedPhraseWords);
+            logger.info('Seed phrase retrieved successfully for active wallet', { 
+              userId: currentUser.id,
+              walletAddress: activeWalletAddress,
+              wordCount: seedPhraseWords.length
+            }, 'SeedPhraseViewScreen');
+          } else {
+            // No seed phrase available - user will see empty state with private key option
+            logger.info('No seed phrase available for active wallet - private key export available', { 
+              userId: currentUser.id,
+              walletAddress: activeWalletAddress,
+              hasPrivateKey: !!exportResult.privateKey
+            }, 'SeedPhraseViewScreen');
+          }
+        } else {
+          logger.error('Failed to export wallet data', { 
             userId: currentUser.id,
             walletAddress: activeWalletAddress,
-            wordCount: seedPhraseWords.length
+            error: exportResult.error
           }, 'SeedPhraseViewScreen');
-        } else {
-          // Don't show error - just leave seed phrase empty for user-friendly experience
-          logger.info('No seed phrase found for active wallet - user will see empty state', { 
-            userId: currentUser.id,
-            walletAddress: activeWalletAddress
-          }, 'SeedPhraseViewScreen');
+          setError(exportResult.error || 'Failed to retrieve wallet export data');
         }
       } catch (err) {
-        console.error('🔐 SeedPhraseView: Error retrieving secure seed phrase:', err);
-        // Don't show error to user - keep it user-friendly
+        console.error('🔐 SeedPhraseView: Error retrieving secure wallet export data:', err);
+        setError('Failed to retrieve wallet export data');
       } finally {
         setLoading(false);
       }
@@ -147,9 +157,13 @@ const SeedPhraseViewScreen: React.FC = () => {
     }
 
     try {
-      const privateKey = await walletService.getPrivateKeyForWallet(currentUser.id.toString(), activeWalletAddress);
+      // Use the consolidated export service to get private key
+      const exportResult = await walletExportService.exportWallet(currentUser.id.toString(), activeWalletAddress, {
+        includeSeedPhrase: false,
+        includePrivateKey: true
+      });
       
-      if (privateKey) {
+      if (exportResult.success && exportResult.privateKey) {
         Alert.alert(
           'Export Private Key',
           'Your private key will be copied to clipboard. This can be used to import your wallet into external apps.\n\n⚠️ Keep your private key secure and never share it with anyone.',
@@ -159,7 +173,7 @@ const SeedPhraseViewScreen: React.FC = () => {
               text: 'Copy Private Key', 
               onPress: async () => {
                 try {
-                  await Clipboard.setString(privateKey);
+                  await Clipboard.setString(exportResult.privateKey!);
                   Alert.alert('Copied', 'Private key copied to clipboard!');
                 } catch (error) {
                   Alert.alert('Error', 'Failed to copy private key');
@@ -169,17 +183,18 @@ const SeedPhraseViewScreen: React.FC = () => {
           ]
         );
       } else {
-        Alert.alert('Error', 'Private key not available for this wallet');
+        const errorMessage = exportResult.error || 'Private key not available for this wallet';
+        Alert.alert('Export Error', errorMessage);
       }
     } catch (error) {
       logger.error('Failed to export private key', error, 'SeedPhraseViewScreen');
-      Alert.alert('Error', 'Failed to retrieve private key');
+      Alert.alert('Export Error', 'Failed to retrieve private key. Please try again or contact support if the issue persists.');
     }
   };
 
   const handleShowExportInstructions = () => {
-    // Get export instructions from walletService
-    const instructions = walletService.getExportInstructions();
+    // Get export instructions from consolidated export service
+    const instructions = walletExportService.getExportInstructions();
     Alert.alert(
       'Export to External Wallets',
       instructions,

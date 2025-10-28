@@ -8,6 +8,7 @@ import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 import { logger } from '../../analytics/loggingService';
 import { firebaseDataService } from '../../data/firebaseDataService';
 import { walletRecoveryService, WalletRecoveryError } from './walletRecoveryService';
+import { walletExportService } from './walletExportService';
 import { getConfig } from '../../../config/unified';
 
 export interface WalletInfo {
@@ -494,41 +495,16 @@ class SimplifiedWalletService {
 
   /**
    * Get seed phrase for a specific wallet address
+   * Delegates to the consolidated wallet export service
    */
   async getSeedPhraseForWallet(userId: string, walletAddress: string): Promise<string | null> {
     try {
-      logger.info('Retrieving seed phrase for specific wallet', { userId, walletAddress }, 'SimplifiedWalletService');
+      const result = await walletExportService.exportWallet(userId, walletAddress, {
+        includeSeedPhrase: true,
+        includePrivateKey: false
+      });
       
-      // Get stored mnemonic and verify it matches the wallet address
-      const mnemonic = await walletRecoveryService.getStoredMnemonic(userId);
-      
-      if (mnemonic) {
-        try {
-          const bip39 = await import('bip39');
-          if (bip39.validateMnemonic(mnemonic)) {
-            const seed = await bip39.mnemonicToSeed(mnemonic);
-            const { Keypair } = await import('@solana/web3.js');
-            const keypair = Keypair.fromSeed(seed.slice(0, 32));
-            const derivedAddress = keypair.publicKey.toBase58();
-            
-            if (derivedAddress === walletAddress) {
-              logger.info('Seed phrase verified for wallet address', { userId, walletAddress }, 'SimplifiedWalletService');
-              return mnemonic;
-            } else {
-              logger.warn('Seed phrase does not match wallet address', { 
-                userId, 
-                walletAddress, 
-                derivedAddress 
-              }, 'SimplifiedWalletService');
-            }
-          }
-        } catch (verifyError) {
-          logger.warn('Failed to verify seed phrase', verifyError, 'SimplifiedWalletService');
-        }
-      }
-
-      logger.warn('No matching seed phrase found for wallet address', { userId, walletAddress }, 'SimplifiedWalletService');
-      return null;
+      return result.seedPhrase || null;
     } catch (error) {
       logger.error('Failed to get seed phrase for wallet', error, 'SimplifiedWalletService');
       return null;
@@ -558,24 +534,16 @@ class SimplifiedWalletService {
 
   /**
    * Get private key for a specific wallet address
+   * Delegates to the consolidated wallet export service
    */
   async getPrivateKeyForWallet(userId: string, walletAddress: string): Promise<string | null> {
     try {
-      logger.info('Retrieving private key for specific wallet', { userId, walletAddress }, 'SimplifiedWalletService');
+      const result = await walletExportService.exportWallet(userId, walletAddress, {
+        includeSeedPhrase: false,
+        includePrivateKey: true
+      });
       
-      // First, try to get all stored wallets for the user
-      const storedWallets = await walletRecoveryService.getStoredWallets(userId);
-      
-      // Find the wallet that matches the provided address
-      const matchingWallet = storedWallets.find(wallet => wallet.address === walletAddress);
-      
-      if (matchingWallet) {
-        logger.info('Found matching wallet for private key', { userId, walletAddress }, 'SimplifiedWalletService');
-        return matchingWallet.privateKey;
-      }
-
-      logger.warn('No matching private key found for wallet address', { userId, walletAddress }, 'SimplifiedWalletService');
-      return null;
+      return result.privateKey || null;
     } catch (error) {
       logger.error('Failed to get private key for wallet', error, 'SimplifiedWalletService');
       return null;
@@ -584,25 +552,11 @@ class SimplifiedWalletService {
 
   /**
    * Get export instructions for external wallets
+   * Delegates to the consolidated wallet export service
    */
   getExportInstructions(): string {
-    return `To export your wallet to external apps like Phantom or Solflare:
-
-SEED PHRASE EXPORT:
-1. Open your external wallet app
-2. Look for "Import Wallet" or "Restore Wallet" option
-3. Choose "Import from Seed Phrase" or "Restore from Mnemonic"
-4. Enter your 24-word seed phrase exactly as shown
-5. Follow the app's instructions to complete the import
-
-PRIVATE KEY EXPORT (if no seed phrase available):
-1. Open your external wallet app
-2. Look for "Import Wallet" or "Add Account" option
-3. Choose "Import from Private Key" or "Import from Secret Key"
-4. Paste your private key (copied from this app)
-5. Follow the app's instructions to complete the import
-
-Your credentials are compatible with all BIP39-compatible wallets.`;
+    // Use the consolidated export service for instructions
+    return walletExportService.getExportInstructions();
   }
 }
 

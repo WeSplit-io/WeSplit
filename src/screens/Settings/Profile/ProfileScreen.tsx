@@ -5,7 +5,7 @@ import Icon from '../../../components/Icon';
 import NavBar from '../../../components/shared/NavBar';
 import { useApp } from '../../../context/AppContext';
 import { useWallet } from '../../../context/WalletContext';
-import { walletService } from '../../../services/blockchain/wallet';
+import { walletService, walletExportService } from '../../../services/blockchain/wallet';
 import { styles } from './styles';
 import { DEFAULT_AVATAR_URL } from '../../../config/constants/constants';
 import UserAvatar from '../../../components/UserAvatar';
@@ -139,72 +139,52 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     try {
       if (!currentUser?.id) {return;}
 
-      logger.info('Preparing secure seed phrase access', null, 'ProfileScreen');
+      logger.info('Preparing secure wallet export access', null, 'ProfileScreen');
 
       // First, get the active wallet address (the one displayed in dashboard)
       const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
       
       if (!walletResult.success || !walletResult.wallet) {
-        logger.error('Failed to get active wallet for seed phrase access', { userId: currentUser.id }, 'ProfileScreen');
+        logger.error('Failed to get active wallet for export access', { userId: currentUser.id }, 'ProfileScreen');
         Alert.alert('Error', 'Failed to retrieve wallet information. Please try again.');
         return;
       }
 
       const activeWalletAddress = walletResult.wallet.address;
-      logger.info('Active wallet address retrieved for seed phrase access', { 
+      logger.info('Active wallet address retrieved for export access', { 
         userId: currentUser.id, 
         walletAddress: activeWalletAddress 
       }, 'ProfileScreen');
 
-      // Check if we have a seed phrase for this specific wallet
-      const mnemonic = await walletService.getSeedPhraseForWallet(currentUser.id.toString(), activeWalletAddress);
+      // Use the consolidated export service to check what's available
+      const canExport = await walletExportService.canExportWallet(currentUser.id.toString(), activeWalletAddress);
       
-      if (!mnemonic) {
-        logger.warn('No seed phrase found for active wallet', { 
+      if (!canExport.canExport) {
+        logger.warn('No export options available for wallet', { 
           userId: currentUser.id, 
-          walletAddress: activeWalletAddress 
+          walletAddress: activeWalletAddress,
+          error: canExport.error
         }, 'ProfileScreen');
         
-        // Check if we have a private key instead
-        const privateKey = await walletService.getPrivateKeyForWallet(currentUser.id.toString(), activeWalletAddress);
-        
-        if (privateKey) {
-          logger.info('Private key available for wallet export', { 
-            userId: currentUser.id, 
-            walletAddress: activeWalletAddress 
-          }, 'ProfileScreen');
-          
-          Alert.alert(
-            'Export Options Available',
-            'Your wallet was created using random key generation, so no seed phrase is available. However, you can still export your wallet using the private key.\n\nWould you like to proceed to the export screen?',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { 
-                text: 'Continue to Export', 
-                onPress: () => navigation.navigate('SeedPhraseView')
-              }
-            ]
-          );
-          return;
-        } else {
-          Alert.alert(
-            'Export Unavailable',
-            'No export options are available for this wallet. This may be because your wallet was created externally or the necessary credentials are not available on this device.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
+        Alert.alert(
+          'Export Unavailable',
+          'No export options are available for this wallet. This may be because your wallet was created externally or the necessary credentials are not available on this device.',
+          [{ text: 'OK' }]
+        );
+        return;
       }
 
-      logger.info('Secure seed phrase access prepared successfully', { 
+      logger.info('Secure wallet export access prepared successfully', { 
         userId: currentUser.id,
-        walletAddress: activeWalletAddress
+        walletAddress: activeWalletAddress,
+        hasSeedPhrase: canExport.hasSeedPhrase,
+        hasPrivateKey: canExport.hasPrivateKey
       }, 'ProfileScreen');
 
       navigation.navigate('SeedPhraseView');
     } catch (error) {
-      console.error('🔐 ProfileScreen: Error preparing secure seed phrase access:', error);
-      Alert.alert('Error', 'Failed to prepare secure seed phrase access. Please try again.');
+      console.error('🔐 ProfileScreen: Error preparing secure wallet export access:', error);
+      Alert.alert('Error', 'Failed to prepare wallet export access. Please try again.');
     }
   };
 

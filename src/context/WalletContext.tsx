@@ -7,7 +7,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { walletService, WalletInfo as ConsolidatedWalletInfo } from '../services/blockchain/wallet';
+import { walletService, WalletInfo as ConsolidatedWalletInfo, walletExportService } from '../services/blockchain/wallet';
 import { consolidatedTransactionService } from '../services/blockchain/transaction';
 import { solanaWalletService } from '../services/blockchain/wallet';
 import { logger } from '../services/analytics/loggingService';
@@ -562,15 +562,15 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   const exportAppWallet = async (userId: string) => {
     try {
-      // Import userWalletService to export app wallet
-      const { walletService } = await import('../services/blockchain/wallet');
-      const result = await walletService.exportWallet(userId);
+      // Use the consolidated wallet export service
+      const result = await walletExportService.exportWallet(userId);
       
       if (result.success) {
         logger.info('Successfully exported app wallet', {
           walletAddress: result.walletAddress,
           hasSeedPhrase: !!result.seedPhrase,
-          hasPrivateKey: !!result.privateKey
+          hasPrivateKey: !!result.privateKey,
+          exportType: result.exportType
         });
       } else {
         console.error('🔍 WalletProvider: Failed to export app wallet:', result.error);
@@ -644,51 +644,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     }
   };
 
-  // Auto-refresh balance functionality
+  // Auto-refresh balance functionality - DISABLED to prevent excessive calls
   const startBalancePolling = useCallback(async (userId: string) => {
-    if (!autoRefreshEnabled || balancePollingInterval) {return;}
-
-    logger.info('Starting balance polling for user', { userId }, 'WalletContext');
-    
-    const interval = setInterval(async () => {
-      try {
-        // Only refresh if we haven't checked recently (within last 30 seconds)
-        const now = Date.now();
-        const lastCheck = lastBalanceCheck?.getTime() || 0;
-        if (now - lastCheck < 30000) {
-          logger.debug('Skipping balance check - too recent', null, 'WalletContext');
-          return;
-        }
-
-        // Refresh app wallet balance
-        if (appWalletConnected) {
-          const { walletService } = await import('../services/blockchain/wallet');
-          const balance = await walletService.getUserWalletBalance(userId);
-          
-          if (balance) {
-            setAppWalletBalance(balance.totalUSD);
-          }
-        }
-        
-        // Refresh external wallet balance if connected
-        if (isConnected && address) {
-          await refreshBalance();
-        }
-        
-        setLastBalanceCheck(new Date());
-        
-      } catch (error) {
-        // Handle rate limiting specifically
-        if (error instanceof Error && error.message.includes('429')) {
-          console.warn('🔄 WalletProvider: Rate limited, will retry later');
-        } else {
-          console.error('❌ WalletProvider: Error during auto-refresh:', error);
-        }
-      }
-    }, 120000); // Check every 2 minutes to reduce rate limiting and excessive calls
-
-    setBalancePollingInterval(interval);
-  }, [autoRefreshEnabled, appWalletConnected, isConnected, address, appWalletBalance, appWalletAddress, lastBalanceCheck]);
+    // DISABLED: Auto-refresh is causing excessive API calls
+    // Balance updates are now handled by useWalletState hook and manual refresh
+    logger.info('Balance polling disabled - using manual refresh only', { userId }, 'WalletContext');
+    return;
+  }, []);
 
   const stopBalancePolling = useCallback(() => {
     if (balancePollingInterval) {

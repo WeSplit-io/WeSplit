@@ -602,7 +602,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       if (splitWallet?.status !== 'completed' && !isLoadingCompletionData) {
         loadCompletionData();
       }
-    }, 15000); // Update progress every 15 seconds to reduce frequency
+    }, 30000); // Update progress every 30 seconds to reduce frequency
     
     const completionInterval = setInterval(() => {
       if (splitWallet?.status !== 'completed' && !isSplitConfirmed && !isCheckingCompletion) {
@@ -612,7 +612,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           checkPaymentCompletion();
         }
       }
-    }, 60000); // Check completion every 60 seconds to reduce frequency
+    }, 120000); // Check completion every 2 minutes to reduce frequency
     
     return () => {
       clearInterval(progressInterval);

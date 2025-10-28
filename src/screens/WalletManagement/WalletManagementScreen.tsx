@@ -96,18 +96,21 @@ const WalletManagementScreen: React.FC = () => {
 
         // Initialize app wallet for the user
         logger.info('Initializing app wallet for user', { userId: currentUser.id }, 'WalletManagementScreen');
-        await ensureAppWallet(currentUser.id.toString());
-        await getAppWalletBalance(currentUser.id.toString());
-
-        // Also ensure user has a wallet for backward compatibility
+        
+        // Ensure user has a wallet (this will create one if needed or recover existing)
         const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
 
         if (walletResult.success && walletResult.wallet) {
           if (__DEV__) { logger.info('Wallet ensured for user', { address: walletResult.wallet.address }, 'WalletManagementScreen'); }
 
+          // Update app wallet state in context
+          setAppWalletAddress(walletResult.wallet.address);
+          setAppWalletConnected(true);
+
           // Load app wallet balance for local state
           const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
           setLocalAppWalletBalance(balance);
+          setAppWalletBalance(balance?.totalUSD || 0);
 
           // Load transactions using consolidated function
           await loadTransactions(false);

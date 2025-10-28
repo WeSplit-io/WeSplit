@@ -593,16 +593,20 @@ export class WalletRecoveryService {
   }
 
   /**
-   * Create a new wallet and store it securely
+   * Create a new wallet and store it securely with seed phrase
    */
   static async createAndStoreWallet(userId: string): Promise<WalletRecoveryResult> {
     try {
-      // Generate new keypair
-      const keypair = Keypair.generate();
+      logger.info('Creating new wallet with seed phrase', { userId }, 'WalletRecoveryService');
+
+      // Generate mnemonic and derive keypair from it
+      const { generateWalletFromMnemonic } = await import('./derive');
+      const walletResult = generateWalletFromMnemonic(); // Generates new mnemonic
+      
       const wallet = {
-        address: keypair.publicKey.toBase58(),
-        publicKey: keypair.publicKey.toBase58(),
-        privateKey: Buffer.from(keypair.secretKey).toString('base64')
+        address: walletResult.address,
+        publicKey: walletResult.publicKey,
+        privateKey: walletResult.secretKey
       };
 
       // Store the wallet
@@ -615,7 +619,18 @@ export class WalletRecoveryService {
         };
       }
 
-      logger.info('New wallet created and stored', { userId, address: wallet.address }, 'WalletRecoveryService');
+      // Store the mnemonic securely
+      const mnemonicStored = await this.storeMnemonic(userId, walletResult.mnemonic);
+      if (!mnemonicStored) {
+        logger.warn('Failed to store mnemonic, but wallet was created', { userId }, 'WalletRecoveryService');
+        // Don't fail the entire operation, wallet can still be used with private key
+      }
+
+      logger.info('New wallet created and stored with seed phrase', { 
+        userId, 
+        address: wallet.address,
+        mnemonicStored 
+      }, 'WalletRecoveryService');
       
       return {
         success: true,
@@ -1318,6 +1333,37 @@ export class WalletRecoveryService {
       return true;
     } catch (error) {
       logger.error('Failed to clear stored wallet', error, 'WalletRecoveryService');
+      return false;
+    }
+  }
+
+  /**
+   * Store mnemonic securely for a user
+   */
+  static async storeMnemonic(userId: string, mnemonic: string): Promise<boolean> {
+    try {
+      logger.info('Storing mnemonic for user', { userId }, 'WalletRecoveryService');
+
+      // Validate mnemonic format
+      const { validateBip39Mnemonic } = await import('./derive');
+      const validation = validateBip39Mnemonic(mnemonic);
+      
+      if (!validation.isValid) {
+        logger.error('Invalid mnemonic format', { userId, error: validation.error }, 'WalletRecoveryService');
+        return false;
+      }
+
+      // Store user-specific mnemonic
+      const userMnemonicKey = `mnemonic_${userId}`;
+      await SecureStore.setItemAsync(userMnemonicKey, mnemonic, {
+        requireAuthentication: false,
+        keychainService: 'WeSplitWalletData'
+      });
+
+      logger.info('Mnemonic stored successfully', { userId }, 'WalletRecoveryService');
+      return true;
+    } catch (error) {
+      logger.error('Failed to store mnemonic', error, 'WalletRecoveryService');
       return false;
     }
   }

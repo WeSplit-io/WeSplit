@@ -39,7 +39,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
     }
   }, [currentUser?.id]);
 
-  // Refresh card information periodically
+  // Refresh card information periodically - REDUCED FREQUENCY
   useEffect(() => {
     if (kastCards.length > 0) {
       const interval = setInterval(async () => {
@@ -63,7 +63,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
         } catch (error) {
           console.error('Error refreshing card information:', error);
         }
-      }, 30000); // Refresh every 30 seconds
+      }, 300000); // Refresh every 5 minutes to reduce API calls
       
       return () => clearInterval(interval);
     }

@@ -105,6 +105,12 @@ class SolanaWalletService {
       // Store wallet securely
       await this.storeWalletSecurely(wallet);
 
+      // Store mnemonic if generated
+      if (generatedMnemonic) {
+        await this.storeMnemonicSecurely(generatedMnemonic);
+        logger.info('Mnemonic stored securely', { address }, 'SolanaWalletService');
+      }
+
       logger.info('Wallet created successfully', { 
         address, 
         type: wallet.walletType,
@@ -148,9 +154,12 @@ class SolanaWalletService {
   }
 
   /**
-   * Export mnemonic (requires biometric authentication)
+   * Export mnemonic (DEPRECATED - use walletExportService instead)
+   * @deprecated Use walletExportService.exportWallet() instead
    */
   async exportMnemonic(): Promise<ExportResult> {
+    logger.warn('exportMnemonic is deprecated, use walletExportService.exportWallet() instead', {}, 'SolanaWalletService');
+    
     try {
       // Require biometric authentication
       const authResult = await this.requireBiometricAuth('Export Wallet Mnemonic');
@@ -183,9 +192,12 @@ class SolanaWalletService {
   }
 
   /**
-   * Export private key (requires biometric authentication)
+   * Export private key (DEPRECATED - use walletExportService instead)
+   * @deprecated Use walletExportService.exportWallet() instead
    */
   async exportSecretKeyBase58(): Promise<ExportResult> {
+    logger.warn('exportSecretKeyBase58 is deprecated, use walletExportService.exportWallet() instead', {}, 'SolanaWalletService');
+    
     try {
       // Require biometric authentication
       const authResult = await this.requireBiometricAuth('Export Private Key');

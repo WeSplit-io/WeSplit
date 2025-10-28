@@ -7,8 +7,7 @@
 import { logger } from '../../core';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { derivePath } from 'ed25519-hd-key';
-import { mnemonicToSeedSync, validateMnemonic } from '@scure/bip39';
-import { english } from '@scure/bip39/wordlists/english';
+import * as bip39 from 'bip39';
 
 export interface WalletValidationResult {
   success: boolean;
@@ -116,7 +115,7 @@ export class WalletValidationService {
       }, 'WalletValidationService');
 
       // Validate mnemonic first
-      if (!validateMnemonic(mnemonic, english)) {
+      if (!bip39.validateMnemonic(mnemonic)) {
         return {
           success: false,
           error: 'Invalid BIP39 mnemonic'
@@ -124,7 +123,7 @@ export class WalletValidationService {
       }
 
       // Convert mnemonic to seed
-      const seed = mnemonicToSeedSync(mnemonic);
+      const seed = bip39.mnemonicToSeedSync(mnemonic);
       
       // Try each derivation path
       for (const derivationPath of this.DERIVATION_PATHS) {

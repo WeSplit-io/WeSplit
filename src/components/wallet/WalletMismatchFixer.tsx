@@ -65,6 +65,7 @@ const WalletMismatchFixer: React.FC = () => {
         const message = `Wallet Address: ${result.walletAddress}\n\n` +
           (result.seedPhrase ? `Seed Phrase: ${result.seedPhrase}\n\n` : '') +
           (result.privateKey ? `Private Key: ${result.privateKey}\n\n` : '') +
+          `Export Type: ${result.exportType}\n\n` +
           '⚠️ IMPORTANT: Keep this information safe and never share it with anyone!';
         
         Alert.alert('Wallet Export', message, [

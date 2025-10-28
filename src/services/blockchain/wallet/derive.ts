@@ -5,8 +5,7 @@
  */
 
 import { Keypair } from '@solana/web3.js';
-import { mnemonicToSeedSync, generateMnemonic, validateMnemonic } from '@scure/bip39';
-import { english } from '@scure/bip39/wordlists/english';
+import * as bip39 from 'bip39';
 import { derivePath } from 'ed25519-hd-key';
 import { logger } from '../../analytics/loggingService';
 
@@ -33,7 +32,7 @@ export interface MnemonicValidationResult {
  */
 export function generateMnemonic12(): string {
   try {
-    const mnemonic = generateMnemonic(english, 128); // 12 words
+    const mnemonic = bip39.generateMnemonic(128); // 12 words
     logger.info('Generated 12-word BIP39 mnemonic', { 
       wordCount: mnemonic.split(' ').length 
     }, 'WalletDerive');
@@ -49,7 +48,7 @@ export function generateMnemonic12(): string {
  */
 export function generateMnemonic24(): string {
   try {
-    const mnemonic = generateMnemonic(english, 256); // 24 words
+    const mnemonic = bip39.generateMnemonic(256); // 24 words
     logger.info('Generated 24-word BIP39 mnemonic', { 
       wordCount: mnemonic.split(' ').length 
     }, 'WalletDerive');
@@ -69,12 +68,12 @@ export function deriveKeypairFromMnemonic(
 ): Keypair {
   try {
     // Validate the mnemonic
-    if (!validateMnemonic(mnemonic, english)) {
+    if (!bip39.validateMnemonic(mnemonic)) {
       throw new Error('Invalid BIP39 mnemonic');
     }
 
     // Convert mnemonic to seed
-    const seed = mnemonicToSeedSync(mnemonic);
+    const seed = bip39.mnemonicToSeedSync(mnemonic);
     
     // Derive the key using the derivation path
     const { key } = derivePath(derivationPath, seed.toString('hex'));
@@ -154,7 +153,7 @@ export function validateBip39Mnemonic(mnemonic: string): MnemonicValidationResul
   try {
     const words = mnemonic.trim().split(/\s+/);
     const wordCount = words.length;
-    const isValid = validateMnemonic(mnemonic, english);
+    const isValid = bip39.validateMnemonic(mnemonic);
     
     // Generate checksum for verification
     const checksum = Buffer.from(mnemonic).toString('base64').slice(0, 8);

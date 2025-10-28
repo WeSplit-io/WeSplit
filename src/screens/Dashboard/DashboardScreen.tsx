@@ -42,6 +42,7 @@ import { db } from '../../config/firebase/firebase';
 import { getDoc, doc } from 'firebase/firestore';
 import { RequestCard } from '../../components/requests';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
+import { useWalletState } from '../../hooks/useWalletState';
 
 
 
@@ -102,10 +103,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [initialRequestsLoaded, setInitialRequestsLoaded] = useState(false);
   
-  // Local wallet state (fallback when WalletContext fails)
-  const [localAppWalletBalance, setLocalAppWalletBalance] = useState<number | null>(null);
-  const [localAppWalletAddress, setLocalAppWalletAddress] = useState<string | null>(null);
-  const [localAppWalletConnected, setLocalAppWalletConnected] = useState(false);
+  // Unified wallet state
+  const { 
+    address: walletAddress, 
+    totalUSD: walletBalance, 
+    isConnected: walletConnected,
+    isLoading: walletLoading,
+    error: walletError,
+    refreshWallet
+  } = useWalletState(currentUser?.id);
 
   // Function to hash wallet address for display
   const hashWalletAddress = (address: string): string => {
@@ -260,104 +266,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           solBalance: update.solBalance
         }, 'DashboardScreen');
         
-        // Update the local balance state with live data
-        setLocalAppWalletBalance(update.usdcBalance);
+        // Live balance updates are handled by useWalletState hook
+        // No need to update local state here
       }
     }
   );
 
-  // Simplified balance loading using the new wallet service
-  const loadWalletBalance = useCallback(async () => {
-    if (!currentUser?.id || loadingBalance) return;
-    
-    const startTime = Date.now();
-    setLoadingBalance(true);
-    
-    try {
-      logger.debug('Loading wallet balance with simplified service', { userId: currentUser.id }, 'DashboardScreen');
-      
-      // Ensure the user has a wallet (recover or create)
-      const walletResult = await walletService.ensureUserWallet(currentUser.id.toString(), currentUser.wallet_address);
-      
-      if (walletResult.success && walletResult.wallet) {
-        // Check if wallet address changed and update database if needed
-        if (currentUser.wallet_address !== walletResult.wallet.address) {
-          logger.info('Wallet address changed, updating database', { 
-            userId: currentUser.id,
-            oldAddress: currentUser.wallet_address,
-            newAddress: walletResult.wallet.address
-          }, 'DashboardScreen');
-          
-          try {
-            const updateData: any = {
-              wallet_address: walletResult.wallet.address,
-              wallet_public_key: walletResult.wallet.publicKey
-            };
-            
-            // Only include defined fields to avoid Firebase errors
-            const cleanUpdateData = Object.fromEntries(
-              Object.entries(updateData).filter(([_, value]) => value !== undefined && value !== null)
-            );
-            
-            await updateUser(cleanUpdateData);
-            
-            logger.info('User wallet info updated successfully', { 
-              userId: currentUser.id,
-              walletAddress: walletResult.wallet.address
-            }, 'DashboardScreen');
-          } catch (updateError) {
-            logger.warn('Failed to update user wallet info', { 
-              userId: currentUser.id,
-              error: updateError instanceof Error ? updateError.message : String(updateError)
-            }, 'DashboardScreen');
-          }
-        }
-        
-        // Get the balance
-        const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
-        if (balance && balance.totalUSD !== undefined) {
-          const duration = Date.now() - startTime;
-          logger.debug('Balance loaded successfully', { 
-            userId: currentUser.id,
-            totalUSD: balance.totalUSD,
-            walletAddress: walletResult.wallet.address,
-            duration: `${duration}ms`
-          }, 'DashboardScreen');
-          
-          // Update the local state
-          setLocalAppWalletBalance(balance.totalUSD);
-          setLocalAppWalletAddress(walletResult.wallet.address);
-          setLocalAppWalletConnected(true);
-        } else {
-          logger.warn('Failed to get wallet balance', { userId: currentUser.id }, 'DashboardScreen');
-        }
-      } else {
-        logger.error('Failed to ensure wallet', { 
-          userId: currentUser.id,
-          error: walletResult.error
-        }, 'DashboardScreen');
-      }
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      logger.error('Error loading wallet balance', { 
-        userId: currentUser.id,
-        error: error instanceof Error ? error.message : String(error),
-        duration: `${duration}ms`
-      }, 'DashboardScreen');
-    } finally {
-      setLoadingBalance(false);
-    }
-  }, [currentUser?.id, currentUser?.wallet_address, updateUser, loadingBalance]);
+  // Wallet balance is now handled by useWalletState hook
 
-  // Consolidated data loading effect - prevents multiple simultaneous calls
-  useEffect(() => {
-    if (currentUser?.id && isAuthenticated) {
-      // Only load if not already loading to prevent concurrent calls
-      if (!loadingBalance) {
-        loadWalletBalance();
-      }
-    }
-  }, [currentUser?.id, isAuthenticated, loadWalletBalance, loadingBalance]);
+  // Wallet state is automatically managed by useWalletState hook
 
   // Removed group amount conversion logic
 
@@ -550,7 +467,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         if (shouldRefreshBalance) {
           // Clear cache and reload balance
           walletService.clearUserCache(currentUser.id);
-          loadWalletBalance();
+          refreshWallet(); // Use the refreshWallet function from useWalletState hook
           logger.info('Balance refresh triggered from navigation parameter', null, 'DashboardScreen');
         }
         
@@ -561,7 +478,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         }
       }
     }
-  }, [route?.params?.refreshBalance, route?.params?.refreshRequests, currentUser?.id, navigation, loadWalletBalance, loadPaymentRequests, refreshNotifications]);
+  }, [route?.params?.refreshBalance, route?.params?.refreshRequests, currentUser?.id, navigation, refreshWallet, loadPaymentRequests, refreshNotifications]);
 
   // Load notifications when dashboard loads
   useEffect(() => {
@@ -583,7 +500,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       walletService.clearUserCache(currentUser.id);
       
       await Promise.all([
-        loadWalletBalance(),
+        refreshWallet(),
         refreshNotifications(),
         loadTransactions(),
         loadPaymentRequests()
@@ -761,7 +678,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           <View style={styles.balanceContainer}>
             <View style={{ flex: 1, alignItems: 'flex-start' }}>
               <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
-                $ {(localAppWalletBalance || 0).toFixed(2)}
+                $ {(walletBalance || 0).toFixed(2)}
               </Text>
             </View>
           </View>
@@ -769,10 +686,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           {/* Wallet Address with Copy Button */}
           <TouchableOpacity
             style={styles.walletAddressContainer}
-            onPress={() => copyWalletAddress(localAppWalletAddress || currentUser?.wallet_address || '')}
+            onPress={() => copyWalletAddress(walletAddress || currentUser?.wallet_address || '')}
           >
             <Text style={styles.balanceLimitText}>
-              {hashWalletAddress(localAppWalletAddress || currentUser?.wallet_address || '')}
+              {hashWalletAddress(walletAddress || currentUser?.wallet_address || '')}
             </Text>
             <Image
               source={require('../../../assets/copy-icon.png')}
@@ -935,8 +852,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         <QRCodeScreen
           onBack={() => setShowQRCodeScreen(false)}
           userPseudo={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
-          userWallet={localAppWalletAddress || currentUser?.wallet_address || ''}
-          qrValue={localAppWalletAddress || currentUser?.wallet_address || ''}
+          userWallet={walletAddress || currentUser?.wallet_address || ''}
+          qrValue={walletAddress || currentUser?.wallet_address || ''}
           navigation={navigation}
         />
       </Modal>

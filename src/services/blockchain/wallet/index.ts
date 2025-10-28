@@ -5,6 +5,8 @@
 
 export { simplifiedWalletService as walletService } from './simplifiedWalletService';
 export { walletRecoveryService, WalletRecoveryError } from './walletRecoveryService';
+export { walletExportService, WalletExportService } from './walletExportService';
+export { enhancedWalletExportService, EnhancedWalletExportService } from './enhancedWalletExportService';
 export { LinkedWalletService } from './LinkedWalletService';
 export { SolanaAppKitService } from './solanaAppKitService';
 export { solanaWalletService } from './api/solanaWalletApi';

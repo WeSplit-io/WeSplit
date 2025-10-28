@@ -522,10 +522,11 @@ class AuthService {
             wallet_status: 'healthy',
             wallet_created_at: new Date().toISOString(),
             wallet_has_private_key: true,
+            wallet_has_seed_phrase: true,
             wallet_type: 'app-generated'
           });
           
-          logger.info('✅ New user wallet created', {
+          logger.info('✅ New user wallet created with seed phrase', {
             userId: consistentUser.id,
             walletAddress: walletResult.wallet.address
           }, 'AuthService');
