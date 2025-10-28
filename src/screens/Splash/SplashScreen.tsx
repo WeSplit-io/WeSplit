@@ -4,8 +4,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { styles } from './styles';
 import { colors } from '../../theme';
 import { useApp } from '../../context/AppContext';
-import { auth } from '../../config/firebase/firebase';
+import { auth, firestoreService, db } from '../../config/firebase/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { logger } from '../../services/analytics/loggingService';
+import { EmailPersistenceService } from '../../services/core/emailPersistenceService';
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
@@ -14,13 +16,12 @@ interface SplashScreenProps {
 }
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
-  const { state } = useApp();
+  const { state, authenticateUser } = useApp();
   const { isAuthenticated, currentUser } = state;
 
   // Animation states
   const [progress] = useState(new Animated.Value(0));
   const [logoOpacity] = useState(new Animated.Value(0));
-  const [isAppInitialized, setIsAppInitialized] = useState(false);
 
   useEffect(() => {
     // Start animations immediately to prevent white screen
@@ -64,15 +65,12 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
             logger.warn('Push notifications initialization failed', error, 'SplashScreen');
           });
 
-        // Mark app as initialized
-        setIsAppInitialized(true);
         logger.info('App initialized successfully', null, 'SplashScreen');
         
         // Let notifications initialize in background
         notificationPromise;
       } catch (error) {
         logger.warn('App initialization warnings (non-blocking)', error, 'SplashScreen');
-        setIsAppInitialized(true);
       }
     };
 
@@ -123,9 +121,82 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
             navigation.replace('Onboarding');
           }
         } else {
-          // User is not authenticated, go through onboarding
+          // User is not authenticated, check for stored email
+          logger.info('User not authenticated, checking for stored email', null, 'SplashScreen');
+          
+          try {
+            const storedEmail = await EmailPersistenceService.loadEmail();
+            if (storedEmail) {
+              logger.info('Found stored email, checking verification status', { email: storedEmail }, 'SplashScreen');
+              
+              // Check if user has verified within 30 days
+              const hasVerifiedRecently = await Promise.race([
+                firestoreService.hasVerifiedWithin30Days(storedEmail),
+                new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('Verification check timeout')), 10000)
+                )
+              ]) as boolean;
+
+              if (hasVerifiedRecently) {
+                logger.info('User has verified within 30 days, auto-authenticating', { email: storedEmail }, 'SplashScreen');
+                
+                // Get user data from Firestore
+                const usersRef = collection(db, 'users');
+                const q = query(usersRef, where('email', '==', storedEmail));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                  const userDoc = querySnapshot.docs[0];
+                  const userData = userDoc.data();
+
+                  // Check if existing user should skip onboarding
+                  const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
+
+                  // Transform to app user format
+                  const transformedUser = {
+                    id: userData.id,
+                    name: userData.name,
+                    email: userData.email,
+                    wallet_address: userData.wallet_address || '',
+                    wallet_public_key: userData.wallet_public_key || '',
+                    created_at: userData.created_at,
+                    avatar: userData.avatar || '',
+                    hasCompletedOnboarding: shouldSkipOnboarding
+                  };
+
+                  // Update the global app context with the authenticated user
+                  authenticateUser(transformedUser, 'email');
+
+                  // Check if user needs to create a profile (has no name/pseudo)
+                  const needsProfile = !transformedUser.name || transformedUser.name.trim() === '';
+
+                  if (needsProfile) {
+                    logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'SplashScreen');
+                    navigation.replace('CreateProfile', { email: transformedUser.email });
+                  } else if (transformedUser.hasCompletedOnboarding) {
+                    logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
+                    navigation.replace('Dashboard');
+                  } else {
+                    logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
+                    navigation.replace('Onboarding');
+                  }
+                  return;
+                }
+              } else {
+                logger.info('User needs re-verification, navigating to AuthMethods with pre-filled email', null, 'SplashScreen');
+                // Navigate to AuthMethods with the stored email pre-filled
+                navigation.replace('AuthMethods');
+                return;
+              }
+            }
+          } catch (error) {
+            logger.error('Error checking stored email', { error }, 'SplashScreen');
+            // Continue to normal flow if check fails
+          }
+
+          // No stored email or verification failed, go through onboarding
           if (__DEV__) {
-            logger.info('User not authenticated, navigating to GetStarted', null, 'SplashScreen');
+            logger.info('No stored email or verification failed, navigating to GetStarted', null, 'SplashScreen');
           }
           navigation.replace('GetStarted');
         }

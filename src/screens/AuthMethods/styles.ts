@@ -202,4 +202,18 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.green,
   },
+
+  // Loading styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  loadingText: {
+    fontSize: typography.fontSize.md,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+    textAlign: 'center',
+  },
 }); 
