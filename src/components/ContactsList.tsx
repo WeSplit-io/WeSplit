@@ -581,11 +581,11 @@ const ContactsList: React.FC<ContactsListProps> = ({
             }
             return null;
           })()}
-          {item.email && item.wallet_address && (
+          {/*{item.email && item.wallet_address && (
             <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
               {item.email}
             </Text>
-          )}
+          )}*/}
         </View>
       </View>
       {multiSelect ? (
@@ -719,7 +719,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
           {showSearch && (
             <View style={styles.searchContainer}>
               <Input
-                placeholder={activeTab === 'Search' ? "Search users by name, email, or wallet address" : placeholder}
+                placeholder={activeTab === 'Search' ? "Search users by name or wallet address" : placeholder}
                 value={searchQuery}
                 onChangeText={onSearchQueryChange}
                 leftIcon="MagnifyingGlass"
@@ -849,11 +849,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                                 }
                                 return null;
                               })()}
-                              {user.email && user.wallet_address && (
-                                <Text style={[styles.contactEmail, { fontSize: 12, marginTop: 2 }]}>
-                                  {user.email}
-                                </Text>
-                              )}
+                            
                               {/* Show relationship context */}
                               {user.relationshipType && user.relationshipType !== 'none' && (
                                 <Text style={[styles.contactEmail, { fontSize: 11, marginTop: 2, color: colors.brandGreen }]}>
@@ -862,7 +858,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                                    user.relationshipType === 'split_participant' ? '👥 Split participant' : ''}
                                 </Text>
                               )}
-                            </View>
+                            </View>*/}
                           </View>
                           {multiSelect ? (
                             <View style={styles.selectIndicator}>

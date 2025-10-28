@@ -19,13 +19,14 @@ import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/data';
 import { walletService } from '../../services/blockchain/wallet';
 import { styles, BG_COLOR, GREEN, GRAY } from './styles';
-import { colors } from '../../theme';
+import { colors, spacing } from '../../theme';
 import { AvatarUploadFallbackService } from '../../services/core/avatarUploadFallbackService';
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import * as ImagePicker from 'expo-image-picker';
 import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
+import PhosphorIcon from '../../components/shared/PhosphorIcon';
 
 const CreateProfileScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -246,9 +247,22 @@ const CreateProfileScreen: React.FC = () => {
             avatar
           );
           
-          if (uploadResult.success && uploadResult.imageUrl) {
-            finalAvatarUrl = uploadResult.imageUrl;
+          if (uploadResult.success && uploadResult.avatarUrl) {
+            finalAvatarUrl = uploadResult.avatarUrl;
             logger.info('Avatar uploaded successfully', { avatarUrl: finalAvatarUrl }, 'CreateProfileScreen');
+            
+            // Check if fallback was used
+            if (uploadResult.isFallback) {
+              logger.info('Avatar uploaded with fallback (local storage)', null, 'CreateProfileScreen');
+              // Show a gentle warning that it's stored locally
+              Alert.alert(
+                'Avatar Added', 
+                'Your avatar has been added and is stored locally. It will be uploaded to cloud storage when possible.',
+                [{ text: 'OK' }]
+              );
+            } else {
+              logger.info('Avatar uploaded successfully to Firebase', null, 'CreateProfileScreen');
+            }
             
             // Update user record with the uploaded avatar URL
             try {
@@ -261,7 +275,7 @@ const CreateProfileScreen: React.FC = () => {
               // Continue anyway - the avatar is uploaded, just not reflected in the user record
             }
           } else {
-            console.warn('📸 CreateProfile: Failed to upload avatar:', uploadResult.error);
+            Alert.alert('Error', uploadResult.error || 'Failed to upload avatar');
             // Continue with profile creation even if avatar upload fails
           }
         }
@@ -341,8 +355,8 @@ const CreateProfileScreen: React.FC = () => {
           >
             <View style={[styles.centerContent, { backgroundColor: colors.black }]}>
               <Text style={[styles.title, { color: colors.white, fontSize: 24, fontWeight: 'bold' }]}>Create Your Profile</Text>
-              <Text style={[styles.subtitle, { color: colors.white70, fontSize: 16 }]}>
-                Create your initial profile to get started, you can always edit it later.
+              <Text style={[styles.subtitle, { color: colors.white70, fontSize: 16, paddingHorizontal: spacing.lg }]}>
+                You can always edit it later.
               </Text>
               
 
@@ -352,12 +366,12 @@ const CreateProfileScreen: React.FC = () => {
                   <Image source={{ uri: avatar }} style={styles.avatarImage} />
                 ) : (
                   <View style={styles.avatarPlaceholder}>
-                    <Image source={require('../../../assets/camera-icon.png')} style={styles.avatarIcon} />
+                    <PhosphorIcon name="Camera" size={48} color={colors.white70} />
                   </View>
                 )}
                 {avatar && (
                   <View style={styles.cameraIconContainer}>
-                    <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmodify-icon-white.png?alt=media&token=4b1aa40d-4d81-4e40-9d3b-9638bc589e21' }} style={styles.cameraIcon} />
+                    <PhosphorIcon name="Pencil" size={16} color={colors.black} weight="fill" />
                   </View>
                 )}
               </TouchableOpacity>

@@ -787,9 +787,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               {walletLoading || liveBalanceLoading ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <ActivityIndicator size="small" color={colors.white} style={{ marginRight: 8 }} />
-                  <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
-                    Loading...
-                  </Text>
+                
                 </View>
               ) : (
                 <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>

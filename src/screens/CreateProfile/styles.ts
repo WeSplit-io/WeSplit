@@ -38,7 +38,7 @@ export const styles = StyleSheet.create({
     color: colors.white70,
     marginBottom: spacing.xl,
     textAlign: 'center',
-    alignSelf: 'center',
+    flexWrap: 'wrap',
   },
   avatarContainer: {
     width: 140,

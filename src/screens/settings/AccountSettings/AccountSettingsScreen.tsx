@@ -21,7 +21,7 @@ import { accountDeletionService, DeletionProgress, AccountDeletionService } from
 import { AvatarUploadFallbackService } from '../../../services/core/avatarUploadFallbackService';
 import { logger } from '../../../services/analytics/loggingService';
 import styles from './styles';
-import { Container, Button, Input } from '../../../components/shared';
+import { Container, Button, Input, PhosphorIcon } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
 
 
@@ -432,12 +432,12 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
                 <Image source={{ uri: currentUser.avatar }} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                  <Image source={require('../../../../assets/camera-icon.png')} style={styles.avatarIcon} />
+                  <PhosphorIcon name="Camera" size={48} color={colors.white70} />
                 </View>
               )}
               {(avatar || currentUser?.avatar) && (
                 <View style={styles.cameraIconContainer}>
-                  <Image source={{ uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Fmodify-icon-white.png?alt=media&token=4b1aa40d-4d81-4e40-9d3b-9638bc589e21' }} style={styles.cameraIcon} />
+                  <PhosphorIcon name="Pencil" size={16} color={colors.white} weight="fill" />
                 </View>
               )}
             </TouchableOpacity>

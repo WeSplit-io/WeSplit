@@ -39,7 +39,6 @@ const styles = StyleSheet.create({
   navItem: {
     alignItems: 'center',
     justifyContent: 'flex-end',
-    minWidth: 72,
     flex: 1,
     height: '100%',
     paddingVertical: 0,
