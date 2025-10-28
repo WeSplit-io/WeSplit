@@ -8,8 +8,8 @@ import {
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
-import { Modal, Input, Button, Tabs, Tab } from './shared';
-import { validateAddress, validateKastWalletAddress } from '../utils/ui/format';
+import { Modal, Input, Button, Tabs } from './shared';
+import { validateAddress, validateKastWalletAddress } from '../utils/network/sendUtils';
 import { colors } from '../theme';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
@@ -109,15 +109,29 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
       if (!address.trim()) {
         newErrors.address = 'Address is required';
       } else {
-        const addressValidation = validateAddress(address.trim());
-        if (!addressValidation.isValid) {
-          newErrors.address = `Please enter a valid address for ${chain}`;
+        try {
+          const addressValidation = validateAddress(address.trim());
+          if (!addressValidation.isValid) {
+            newErrors.address = addressValidation.error || `Please enter a valid address for ${chain}`;
+          }
+        } catch (error) {
+          console.error('Address validation error:', error);
+          newErrors.address = 'Invalid address format';
         }
       }
     } else if (destinationType === 'kast') {
-      const addressValidation = validateKastWalletAddress(kastAddress);
-      if (!addressValidation.isValid) {
-        newErrors.kastAddress = addressValidation.error || 'Please enter a valid Solana card wallet address';
+      if (!kastAddress.trim()) {
+        newErrors.kastAddress = 'Solana card wallet address is required';
+      } else {
+        try {
+          const addressValidation = validateKastWalletAddress(kastAddress.trim());
+          if (!addressValidation.isValid) {
+            newErrors.kastAddress = addressValidation.error || 'Please enter a valid Solana card wallet address';
+          }
+        } catch (error) {
+          console.error('KAST address validation error:', error);
+          newErrors.kastAddress = 'Invalid Solana card wallet address format';
+        }
       }
     }
 
@@ -126,8 +140,8 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   };
 
   const isFormValid = () => {
-    if (isLoading) {return false;}
-    if (!name.trim()) {return false;}
+    if (isLoading) return false;
+    if (!name.trim()) return false;
     
     if (destinationType === 'wallet') {
       return address.trim().length > 0;
@@ -161,67 +175,72 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
       return;
     }
 
-    // For SOLANA cards, validate the wallet address and get card information
-    if (destinationType === 'kast') {
-      try {
-        const { ExternalCardService } = await import('../services/integrations/external/ExternalCardService');
-        
-        // Validate SOLANA card wallet address
-        const validation = await ExternalCardService.validateKastCard(kastAddress.trim());
-        if (!validation.isValid) {
-          setErrors({ kastAddress: validation.error || 'Invalid Solana card wallet address' });
+    try {
+      // For SOLANA cards, validate the wallet address and get card information
+      if (destinationType === 'kast') {
+        try {
+          const { ExternalCardService } = await import('../../services/integrations/external/ExternalCardService');
+          
+          // Validate SOLANA card wallet address
+          const validation = await ExternalCardService.validateKastCard(kastAddress.trim());
+          if (!validation.isValid) {
+            setErrors({ kastAddress: validation.error || 'Invalid Solana card wallet address' });
+            return;
+          }
+
+          // Get full card information
+          const cardInfo = await ExternalCardService.getCardInfo(kastAddress.trim());
+          if (!cardInfo.success || !cardInfo.card) {
+            setErrors({ kastAddress: 'Failed to retrieve card information' });
+            return;
+          }
+
+          // Create destination with full card information
+          // Use 'address' field for consistency with external wallets
+          const destination = {
+            type: destinationType,
+            name: name.trim(),
+            address: kastAddress.trim(), // Use 'address' field for consistency
+            identifier: kastAddress.trim(), // Keep identifier for backward compatibility
+            cardType: cardInfo.card.cardType,
+            status: cardInfo.card.status,
+            balance: cardInfo.card.balance,
+            currency: cardInfo.card.currency,
+            expirationDate: cardInfo.card.expirationDate,
+            cardholderName: cardInfo.card.cardholderName,
+          };
+
+          onSaved(destination);
+          // Reset form after successful save
+          resetForm();
+          return;
+        } catch (error) {
+          console.error('Error validating Solana card:', error);
+          setErrors({ kastAddress: 'Failed to validate card. Please try again.' });
           return;
         }
-
-        // Get full card information
-        const cardInfo = await ExternalCardService.getCardInfo(kastAddress.trim());
-        if (!cardInfo.success || !cardInfo.card) {
-          setErrors({ kastAddress: 'Failed to retrieve card information' });
-          return;
-        }
-
-        // Create destination with full card information
-        // Use 'address' field for consistency with external wallets
-        const destination = {
-          type: destinationType,
-          name: name.trim(),
-          address: kastAddress.trim(), // Use 'address' field for consistency
-          identifier: kastAddress.trim(), // Keep identifier for backward compatibility
-          cardType: cardInfo.card.cardType,
-          status: cardInfo.card.status,
-          balance: cardInfo.card.balance,
-          currency: cardInfo.card.currency,
-          expirationDate: cardInfo.card.expirationDate,
-          cardholderName: cardInfo.card.cardholderName,
-        };
-
-        onSaved(destination);
-        // Reset form after successful save
-        resetForm();
-        return;
-      } catch (error) {
-        console.error('Error validating Solana card:', error);
-        setErrors({ kastAddress: 'Failed to validate card. Please try again.' });
-        return;
       }
+
+      // For regular wallets, use existing logic
+      const destination = {
+        type: destinationType,
+        name: name.trim(),
+        address: address.trim(),
+        chain
+      };
+
+      onSaved(destination);
+      // Reset form after successful save
+      resetForm();
+    } catch (error) {
+      console.error('Error in handleSave:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     }
-
-    // For regular wallets, use existing logic
-    const destination = {
-      type: destinationType,
-      name: name.trim(),
-      address: address.trim(),
-      chain
-    };
-
-    onSaved(destination);
-    // Reset form after successful save
-    resetForm();
   };
 
   const renderWalletForm = () => (
     <View style={styles.formSection}>
-      {/* MWA Detection Button */}
+      {/* MWA Detection Button - Only shown in development */}
       <MWADetectionButton
         onWalletDetected={handleWalletDetected}
         disabled={isLoading}
@@ -342,11 +361,6 @@ const styles = StyleSheet.create({
   },
   formSection: {
     gap: spacing.md,
-  },
-  errorText: {
-    color: colors.error || '#FF6B6B',
-    fontSize: typography.fontSize.sm,
-    marginTop: spacing.xs,
   },
   modalActions: {
     marginTop: 'auto',

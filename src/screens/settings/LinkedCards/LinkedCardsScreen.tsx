@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, Alert, TouchableWithoutFeedback } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, ScrollView, Alert, TouchableWithoutFeedback } from 'react-native';
 import { useApp } from '../../../context/AppContext';
-import { useWallet } from '../../../context/WalletContext';
 import AddDestinationSheet from '../../../components/AddDestinationSheet';
 import { LinkedWalletService, LinkedWallet } from '../../../services/blockchain/wallet/LinkedWalletService';
 import { styles } from '../../Settings/LinkedCards/styles';
@@ -14,12 +12,9 @@ import Button from '../../../components/shared/Button';
 import { colors, typography } from '@/theme';
 import ModernLoader from '@/components/shared/ModernLoader';
 
-// Interfaces are now imported from the service
-
 const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   const { state } = useApp();
   const { currentUser } = state;
-  const { availableWallets } = useWallet();
   
   const [externalWallets, setExternalWallets] = useState<LinkedWallet[]>([]);
   const [kastCards, setKastCards] = useState<LinkedWallet[]>([]);
@@ -39,65 +34,40 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
     }
   }, [currentUser?.id]);
 
-  // Refresh card information periodically - REDUCED FREQUENCY
-  useEffect(() => {
-    if (kastCards.length > 0) {
-      const interval = setInterval(async () => {
-        try {
-          const { ExternalCardService } = await import('../../../services/integrations/external/ExternalCardService');
-          
-          // Refresh each card's information
-          for (const card of kastCards) {
-            if (card.identifier) {
-              const refreshResult = await ExternalCardService.refreshCardInfo(card.id);
-              if (refreshResult.success && refreshResult.card) {
-                // Update card information in state
-                setKastCards(prev => prev.map(c => 
-                  c.id === card.id 
-                    ? { ...c, ...refreshResult.card, updatedAt: new Date().toISOString() }
-                    : c
-                ));
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error refreshing card information:', error);
-        }
-      }, 300000); // Refresh every 5 minutes to reduce API calls
-      
-      return () => clearInterval(interval);
-    }
-  }, [kastCards]);
+  // Cards are refreshed when the screen is focused or when manually triggered
 
   const loadLinkedDestinations = async () => {
     if (!currentUser?.id) {
-      console.log('LinkedCardsScreen: No current user ID available');
       setIsLoading(false);
       return;
     }
 
-    console.log('LinkedCardsScreen: Starting to load linked destinations for user:', currentUser.id);
     setIsLoading(true);
     try {
       logger.info('Loading linked destinations for user', { userId: currentUser.id }, 'LinkedCardsScreen');
       
-      // Load from the linked wallets service
-      // Get linked destinations from LinkedWalletService
       const linkedData = await LinkedWalletService.getLinkedDestinations(currentUser.id.toString());
       
-      console.log('LinkedCardsScreen: Received linked data:', linkedData);
       logger.info('Loaded linked destinations', {
         wallets: linkedData.externalWallets.length,
         cards: linkedData.kastCards.length
       });
 
-      setExternalWallets(linkedData.externalWallets);
-      setKastCards(linkedData.kastCards);
+      // Ensure we have valid arrays
+      setExternalWallets(Array.isArray(linkedData.externalWallets) ? linkedData.externalWallets : []);
+      setKastCards(Array.isArray(linkedData.kastCards) ? linkedData.kastCards : []);
     } catch (error) {
-      console.error('❌ Error loading linked destinations:', error);
-      Alert.alert('Error', 'Failed to load linked destinations');
+      logger.error('Failed to load linked destinations', error, 'LinkedCardsScreen');
+      
+      // Set empty arrays on error to prevent undefined state
+      setExternalWallets([]);
+      setKastCards([]);
+      
+      // Only show alert for unexpected errors, not for empty results
+      if (error instanceof Error && !error.message.includes('No data found')) {
+        Alert.alert('Error', 'Failed to load linked destinations. Please try again.');
+      }
     } finally {
-      console.log('LinkedCardsScreen: Setting loading to false');
       setIsLoading(false);
     }
   };
@@ -128,11 +98,19 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
         );
         
         if (result.success) {
-          const newWallet = { id: Date.now().toString(), type: 'wallet', ...destination };
+          const newWallet = { 
+            id: result.walletId || Date.now().toString(), 
+            type: 'wallet', 
+            ...destination,
+            userId: currentUser.id.toString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
           setExternalWallets(prev => [...prev, newWallet]);
-          logger.info('External wallet added successfully', null, 'LinkedCardsScreen');
+          logger.info('External wallet added successfully', { walletId: newWallet.id }, 'LinkedCardsScreen');
           Alert.alert('Success', `Wallet "${newWallet.label}" has been linked successfully!`);
         } else {
+          logger.error('Failed to add external wallet', { error: result.error }, 'LinkedCardsScreen');
           Alert.alert('Error', result.error || 'Failed to add external wallet');
         }
       } else if (destination.type === 'kast') {
@@ -156,10 +134,13 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
         
         if (result.success) {
           const newCard = { 
-            id: Date.now().toString(), 
+            id: result.walletId || Date.now().toString(), 
             type: 'kast', 
             ...destination,
-            isActive: destination.status === 'active'
+            userId: currentUser.id.toString(),
+            isActive: destination.status === 'active',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           };
           setKastCards(prev => [...prev, newCard]);
           logger.info('Solana card added successfully', { 
@@ -169,13 +150,14 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           }, 'LinkedCardsScreen');
           Alert.alert('Success', `Solana card "${newCard.label}" has been linked successfully!`);
         } else {
+          logger.error('Failed to add Solana card', { error: result.error }, 'LinkedCardsScreen');
           Alert.alert('Error', result.error || 'Failed to add Solana card');
         }
       }
       
       setShowAddModal(false);
     } catch (error) {
-      console.error('❌ Error adding destination:', error);
+      logger.error('Error adding destination', error, 'LinkedCardsScreen');
       const errorMessage = error instanceof Error ? error.message : 'Failed to save destination';
       Alert.alert('Error', errorMessage);
     } finally {
@@ -205,12 +187,22 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Linked wallets functionality moved to walletService
-              setExternalWallets(prev => prev.filter(wallet => wallet.id !== walletId));
-              setExpandedItemId(null);
-              logger.info('External wallet unlinked successfully', null, 'LinkedCardsScreen');
+              // Use LinkedWalletService to properly unlink wallet
+              const result = await LinkedWalletService.removeLinkedWallet(
+                currentUser.id.toString(),
+                walletId
+              );
+              
+              if (result.success) {
+                setExternalWallets(prev => prev.filter(wallet => wallet.id !== walletId));
+                setExpandedItemId(null);
+                logger.info('External wallet unlinked successfully', null, 'LinkedCardsScreen');
+                Alert.alert('Success', 'Wallet has been unlinked successfully!');
+              } else {
+                Alert.alert('Error', result.error || 'Failed to unlink wallet');
+              }
             } catch (error) {
-              console.error('❌ Error unlinking wallet:', error);
+              logger.error('Error unlinking wallet', error, 'LinkedCardsScreen');
               const errorMessage = error instanceof Error ? error.message : 'Failed to unlink wallet';
               Alert.alert('Error', errorMessage);
             }
@@ -236,13 +228,23 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Linked wallets functionality moved to walletService
-              setKastCards(prev => prev.filter(card => card.id !== cardId));
-              setExpandedItemId(null);
-              logger.info('Solana card unlinked successfully', null, 'LinkedCardsScreen');
+              // Use LinkedWalletService to properly unlink card
+              const result = await LinkedWalletService.removeLinkedWallet(
+                currentUser.id.toString(),
+                cardId
+              );
+              
+              if (result.success) {
+                setKastCards(prev => prev.filter(card => card.id !== cardId));
+                setExpandedItemId(null);
+                logger.info('Solana card unlinked successfully', null, 'LinkedCardsScreen');
+                Alert.alert('Success', 'Solana card has been unlinked successfully!');
+              } else {
+                Alert.alert('Error', result.error || 'Failed to unlink Solana card');
+              }
             } catch (error) {
-              console.error('❌ Error unlinking Solana card:', error);
-              const errorMessage = error instanceof Error  ? error.message : 'Failed to unlink Solana card';
+              logger.error('Error unlinking Solana card', error, 'LinkedCardsScreen');
+              const errorMessage = error instanceof Error ? error.message : 'Failed to unlink Solana card';
               Alert.alert('Error', errorMessage);
             }
           }
@@ -260,11 +262,6 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const isGlobalEmpty = externalWallets.length === 0 && kastCards.length === 0;
-
-  // Debug logging
-  console.log('LinkedCardsScreen render - isLoading:', isLoading, 'isGlobalEmpty:', isGlobalEmpty, 'externalWallets:', externalWallets.length, 'kastCards:', kastCards.length, 'currentUser:', currentUser?.id);
-  console.log('LinkedCardsScreen render - externalWallets array:', externalWallets);
-  console.log('LinkedCardsScreen render - kastCards array:', kastCards);
 
   const renderExternalWallets = () => {
     return (

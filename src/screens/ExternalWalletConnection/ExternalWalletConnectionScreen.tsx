@@ -12,12 +12,13 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
 import { colors } from '../../theme/colors';
-import { walletService, WalletProvider } from '../../services/blockchain/wallet';
+import { SolanaAppKitService, WalletProvider } from '../../services/blockchain/wallet';
 import { styles } from './styles';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
+import { getPlatformInfo } from '../../utils/core/platformDetection';
 
 interface ExternalWalletConnectionScreenProps {
   navigation: any;
@@ -35,6 +36,8 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
   const [refreshing, setRefreshing] = useState(false);
   const { state } = useApp();
   const currentUser = state.currentUser;
+  const platformInfo = getPlatformInfo();
+  const walletService = new SolanaAppKitService();
 
   useEffect(() => {
     loadProviders();
@@ -55,14 +58,21 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
     try {
       setLoading(true);
       setError(null);
-      logger.info('Loading providers', null, 'ExternalWalletConnectionScreen');
+      logger.info('Loading providers', { platform: platformInfo.environment }, 'ExternalWalletConnectionScreen');
+      
+      // In production, show a limited set of providers or empty state
+      if (platformInfo.isProduction) {
+        logger.info('Production mode: Limited provider support', null, 'ExternalWalletConnectionScreen');
+        setProviders([]);
+        return;
+      }
       
       const availableProviders = await walletService.getAvailableProviders();
       logger.info('Available providers', { providers: availableProviders.map(p => `${p.name} (${p.isAvailable ? 'Available' : 'Not Available'})`) }, 'ExternalWalletConnectionScreen');
       
       setProviders(availableProviders);
     } catch (error) {
-      console.error('❌ ExternalWalletConnection: Error loading providers:', error);
+      logger.error('Error loading providers', error, 'ExternalWalletConnectionScreen');
       setError('Failed to load wallet providers');
     } finally {
       setLoading(false);
@@ -77,6 +87,16 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
       
       if (!currentUser?.id) {
         throw new Error('User not authenticated');
+      }
+
+      // In production, show coming soon message
+      if (platformInfo.isProduction) {
+        Alert.alert(
+          'Coming Soon! 🚀',
+          'External wallet connection is coming soon! For now, you can manually add wallet addresses.',
+          [{ text: 'Got it!', style: 'default' }]
+        );
+        return;
       }
 
       // Connect to external wallet provider
@@ -103,7 +123,7 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
         );
       }
     } catch (error) {
-      console.error('❌ ExternalWalletConnection: Connection failed:', error);
+      logger.error('Connection failed', error, 'ExternalWalletConnectionScreen');
       setError(`Failed to connect to ${provider.name}: ${error}`);
       Alert.alert('Connection Failed', `Failed to connect to ${provider.name}. Please try again.`);
     } finally {
@@ -148,7 +168,10 @@ const ExternalWalletConnectionScreen: React.FC<ExternalWalletConnectionScreenPro
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Connect External Wallet</Text>
           <Text style={styles.sectionDescription}>
-            Link your external Solana wallet to your WeSplit account. This allows you to fund your app wallet and manage your funds across different wallets.
+            {platformInfo.isProduction 
+              ? 'External wallet connection is coming soon! For now, you can manually add wallet addresses in the "Link Wallet" section.'
+              : 'Link your external Solana wallet to your WeSplit account. This allows you to fund your app wallet and manage your funds across different wallets.'
+            }
           </Text>
         </View>
 

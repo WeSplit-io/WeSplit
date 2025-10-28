@@ -28,8 +28,10 @@ export interface BalanceSubscription {
 class LiveBalanceService {
   private subscriptions = new Map<string, BalanceSubscription>();
   private pollingInterval: NodeJS.Timeout | null = null;
-  private readonly POLLING_INTERVAL = 5000; // 5 seconds
+  private readonly POLLING_INTERVAL = 10000; // 10 seconds (reduced frequency)
   private readonly BALANCE_TOLERANCE = 0.000001; // Minimum change to trigger update
+  private lastPollTime = 0;
+  private readonly MIN_POLL_INTERVAL = 5000; // Minimum 5 seconds between polls
 
   /**
    * Subscribe to balance updates for a specific address
@@ -125,6 +127,15 @@ class LiveBalanceService {
    * Poll all subscribed addresses for balance updates
    */
   private async pollBalances(): Promise<void> {
+    const now = Date.now();
+    
+    // Debounce polling to prevent excessive calls
+    if (now - this.lastPollTime < this.MIN_POLL_INTERVAL) {
+      return;
+    }
+    
+    this.lastPollTime = now;
+    
     const activeSubscriptions = Array.from(this.subscriptions.values()).filter(sub => sub.isActive);
     
     if (activeSubscriptions.length === 0) {

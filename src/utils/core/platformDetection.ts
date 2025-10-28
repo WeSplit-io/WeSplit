@@ -75,9 +75,18 @@ const canUseMWA = (): boolean => {
     return false;
   }
 
-  // MWA is available if it's a development build AND native modules are available.
-  // This is a more conservative check since MWA requires specific native module setup.
-  return isDevelopmentBuild() && !!(global as any).Expo?.modules?.expo?.modules?.ExpoModulesCore;
+  // MWA is not available in Expo Go
+  if (isExpoGo()) {
+    return false;
+  }
+
+  // MWA requires a development build with native modules
+  // Check for both Expo modules and React Native native modules
+  const hasExpoModules = !!(global as any).Expo?.modules?.expo?.modules?.ExpoModulesCore;
+  const hasReactNativeModules = !!(global as any).TurboModuleRegistry;
+  
+  // MWA is available if it's a development build AND we have native module support
+  return isDevelopmentBuild() && (hasExpoModules || hasReactNativeModules);
 };
 
 /**

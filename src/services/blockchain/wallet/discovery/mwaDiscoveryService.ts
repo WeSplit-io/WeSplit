@@ -253,31 +253,44 @@ class MWADiscoveryService {
 
       logger.debug('Testing MWA availability for', { providerName: provider.name }, 'mwaDiscoveryService');
       
-      // For now, we'll use a simplified MWA test
-      // The actual MWA API requires more complex setup
-      // This is a placeholder that will be updated when we have the full MWA implementation
-      
-      logger.debug('Testing MWA availability for', { providerName: provider.name }, 'mwaDiscoveryService');
-      
-      // Simulate MWA discovery test
-      // In a real implementation, this would use the actual MWA protocol
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // For now, assume MWA is available if the provider supports it
-      const isAvailable = provider.mwaSupported || false;
-      
-      if (isAvailable) {
-        logger.info('Provider available via MWA', { providerName: provider.name }, 'mwaDiscoveryService');
-      } else {
-        logger.warn('Provider not available via MWA', { providerName: provider.name }, 'mwaDiscoveryService');
+      // Try to import MWA module to test availability
+      try {
+        const mwaModule = await import('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
+        if (!mwaModule.startRemoteScenario) {
+          throw new Error('MWA startRemoteScenario not available');
+        }
+        
+        // MWA module is available, but we can't actually test wallet availability
+        // without user interaction, so we'll return false for now
+        // In a real implementation, this would use the actual MWA protocol
+        logger.debug('MWA module available but wallet detection requires user interaction', { providerName: provider.name }, 'mwaDiscoveryService');
+        
+        return {
+          provider,
+          isAvailable: false, // Set to false since we can't detect without user interaction
+          detectionMethod: 'mwa',
+          error: 'Wallet detection requires user interaction',
+          timestamp: Date.now()
+        };
+        
+      } catch (importError) {
+        // Handle TurboModuleRegistry errors specifically
+        if (importError instanceof Error && (
+          importError.message.includes('TurboModuleRegistry') ||
+          importError.message.includes('SolanaMobileWalletAdapter')
+        )) {
+          logger.debug('MWA native module not available', { providerName: provider.name, error: importError.message }, 'mwaDiscoveryService');
+          return {
+            provider,
+            isAvailable: false,
+            detectionMethod: 'mwa',
+            error: 'MWA native module not available',
+            timestamp: Date.now()
+          };
+        }
+        
+        throw importError;
       }
-      
-      return {
-        provider,
-        isAvailable,
-        detectionMethod: 'mwa',
-        timestamp: Date.now()
-      };
       
     } catch (mwaError) {
       const errorMessage = mwaError instanceof Error ? mwaError.message : 'Unknown MWA error';

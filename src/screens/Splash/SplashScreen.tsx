@@ -21,6 +21,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
   // Animation states
   const [progress] = useState(new Animated.Value(0));
+  const [hasNavigated, setHasNavigated] = useState(false);
   const [logoOpacity] = useState(new Animated.Value(0));
 
   useEffect(() => {
@@ -80,6 +81,12 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
   useEffect(() => {
     const checkAuthAndNavigate = async () => {
       try {
+        // Prevent duplicate navigation
+        if (hasNavigated) {
+          logger.debug('Navigation already completed, skipping', null, 'SplashScreen');
+          return;
+        }
+
         // Wait for app initialization and minimum splash screen duration
         await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -95,12 +102,15 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
           if (needsProfile) {
             logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'SplashScreen');
+            setHasNavigated(true);
             navigation.replace('CreateProfile', { email: currentUser?.email || '' });
           } else if (currentUser?.hasCompletedOnboarding) {
             logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
+            setHasNavigated(true);
             navigation.replace('Dashboard');
           } else {
             logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
+            setHasNavigated(true);
             navigation.replace('Onboarding');
           }
         } else if (isAuthenticated && currentUser) {
@@ -112,12 +122,15 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
           if (needsProfile) {
             logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'SplashScreen');
+            setHasNavigated(true);
             navigation.replace('CreateProfile', { email: currentUser.email });
           } else if (currentUser.hasCompletedOnboarding) {
             logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
+            setHasNavigated(true);
             navigation.replace('Dashboard');
           } else {
             logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
+            setHasNavigated(true);
             navigation.replace('Onboarding');
           }
         } else {
@@ -172,12 +185,15 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
 
                   if (needsProfile) {
                     logger.info('User needs to create profile (no name), navigating to CreateProfile', null, 'SplashScreen');
+                    setHasNavigated(true);
                     navigation.replace('CreateProfile', { email: transformedUser.email });
                   } else if (transformedUser.hasCompletedOnboarding) {
                     logger.info('User completed onboarding, navigating to Dashboard', null, 'SplashScreen');
+                    setHasNavigated(true);
                     navigation.replace('Dashboard');
                   } else {
                     logger.info('User needs onboarding, navigating to Onboarding', null, 'SplashScreen');
+                    setHasNavigated(true);
                     navigation.replace('Onboarding');
                   }
                   return;
@@ -185,6 +201,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
               } else {
                 logger.info('User needs re-verification, navigating to AuthMethods with pre-filled email', null, 'SplashScreen');
                 // Navigate to AuthMethods with the stored email pre-filled
+                setHasNavigated(true);
                 navigation.replace('AuthMethods');
                 return;
               }
@@ -198,17 +215,19 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ navigation }) => {
           if (__DEV__) {
             logger.info('No stored email or verification failed, navigating to GetStarted', null, 'SplashScreen');
           }
+          setHasNavigated(true);
           navigation.replace('GetStarted');
         }
       } catch (error) {
         console.error('❌ SplashScreen: Error checking auth state:', error);
         // Fallback to GetStarted on error
+        setHasNavigated(true);
         navigation.replace('GetStarted');
       }
     };
 
     checkAuthAndNavigate();
-  }, [navigation, isAuthenticated, currentUser]);
+  }, [navigation, isAuthenticated, currentUser, hasNavigated]);
 
   return (
     <View style={styles.container}>

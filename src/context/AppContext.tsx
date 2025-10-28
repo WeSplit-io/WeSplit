@@ -155,7 +155,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch (error) {
       logger.error('Failed to load notifications:', error, 'AppContext');
     }
-  }, [state.currentUser?.id, state.lastNotificationsFetch]);
+  }, [state.currentUser?.id]);
 
   // Refresh notifications
   const refreshNotifications = useCallback(async () => {
@@ -292,7 +292,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (state.currentUser?.id) {
       loadNotifications();
     }
-  }, [state.currentUser?.id, loadNotifications]);
+  }, [state.currentUser?.id]);
 
   const value: AppContextType = {
     state,

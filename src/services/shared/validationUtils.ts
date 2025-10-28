@@ -6,11 +6,11 @@
 import { PublicKey } from '@solana/web3.js';
 import { logger } from '../core';
 
-// Import from unified types
-import { ValidationResult } from '../../types/unified';
-
-// Re-export for backward compatibility
-export type { ValidationResult };
+// Define ValidationResult interface for consistency
+export interface ValidationResult {
+  isValid: boolean;
+  error?: string;
+}
 
 export class ValidationUtils {
   /**

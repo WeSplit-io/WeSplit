@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -272,6 +272,29 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     }
   );
 
+  // Calculate effective balance - use live balance as fallback when wallet state fails
+  const effectiveBalance = React.useMemo(() => {
+    // If wallet state has a valid balance, use it
+    if (walletBalance && walletBalance > 0) {
+      logger.debug('Using wallet balance', { walletBalance }, 'DashboardScreen');
+      return walletBalance;
+    }
+    
+    // If wallet state failed but we have live balance data, use it
+    if (liveBalance && liveBalance.usdcBalance !== undefined) {
+      logger.debug('Using live balance as fallback', { 
+        liveBalance: liveBalance.usdcBalance, 
+        walletBalance,
+        walletError 
+      }, 'DashboardScreen');
+      return liveBalance.usdcBalance;
+    }
+    
+    // Fallback to 0
+    logger.debug('Using fallback balance of 0', { walletBalance, liveBalance }, 'DashboardScreen');
+    return 0;
+  }, [walletBalance, liveBalance, walletError]);
+
   // Wallet balance is now handled by useWalletState hook
 
   // Wallet state is automatically managed by useWalletState hook
@@ -438,25 +461,109 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     }
   }, [currentUser?.id]);
 
-  // Load data when component comes into focus
+  // Track if initial load has been completed
+  const [hasInitialLoad, setHasInitialLoad] = useState(false);
+  const isInitialLoadingRef = useRef(false);
+  const hasLoadedRef = useRef(false);
+  const lastUserIdRef = useRef<string | null>(null);
+
+  // Consolidated data loading - runs once when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      if (isAuthenticated && currentUser?.id) {
-        // Only load data once to prevent infinite loops
-        // Removed loadWalletBalance() call - it's handled by the consolidated useEffect above
-        loadTransactions();
-        loadPaymentRequests();
+      const currentUserId = currentUser?.id;
+      
+      logger.debug('useFocusEffect triggered', { 
+        isAuthenticated, 
+        userId: currentUserId, 
+        hasInitialLoad, 
+        isInitialLoading: isInitialLoadingRef.current,
+        lastUserId: lastUserIdRef.current,
+        refreshBalance: route?.params?.refreshBalance,
+        refreshRequests: route?.params?.refreshRequests
+      }, 'DashboardScreen');
+      
+      // Check if user changed (login/logout)
+      const userChanged = lastUserIdRef.current !== currentUserId;
+      if (userChanged) {
+        hasLoadedRef.current = false;
+        setHasInitialLoad(false);
+        lastUserIdRef.current = currentUserId || null;
+        logger.info('User changed, resetting load state', { 
+          previousUserId: lastUserIdRef.current, 
+          currentUserId 
+        }, 'DashboardScreen');
       }
-    }, [isAuthenticated, currentUser?.id]) // Removed function dependencies to prevent infinite loops
+      
+      if (isAuthenticated && currentUserId && !isInitialLoadingRef.current) {
+        // Only load data if it hasn't been loaded yet or if explicitly requested
+        const shouldRefreshBalance = route?.params?.refreshBalance;
+        const shouldRefreshRequests = route?.params?.refreshRequests;
+        
+        if (!hasLoadedRef.current || shouldRefreshBalance || shouldRefreshRequests) {
+          logger.info('Starting data load', { 
+            hasLoaded: hasLoadedRef.current, 
+            shouldRefreshBalance, 
+            shouldRefreshRequests,
+            userChanged
+          }, 'DashboardScreen');
+          
+          isInitialLoadingRef.current = true;
+          
+          // Load all data once when screen comes into focus
+          if (!hasLoadedRef.current) {
+            Promise.allSettled([
+              loadTransactions(),
+              loadPaymentRequests(),
+              loadNotifications()
+            ]).finally(() => {
+              setHasInitialLoad(true);
+              hasLoadedRef.current = true;
+              isInitialLoadingRef.current = false;
+              logger.info('Initial data load completed', null, 'DashboardScreen');
+            });
+          } else {
+            // Handle navigation refresh parameters
+            if (shouldRefreshBalance || shouldRefreshRequests) {
+              // Clear the parameters to prevent infinite loops
+              navigation.setParams({ 
+                refreshBalance: undefined,
+                refreshRequests: undefined 
+              });
+              
+              // Trigger appropriate refreshes
+              if (shouldRefreshBalance) {
+                walletService.clearUserCache(currentUserId);
+                refreshWallet();
+                logger.info('Balance refresh triggered from navigation parameter', null, 'DashboardScreen');
+              }
+              
+              if (shouldRefreshRequests) {
+                loadPaymentRequests();
+                refreshNotifications();
+                logger.info('Requests refresh triggered from navigation parameter', null, 'DashboardScreen');
+              }
+            }
+            isInitialLoadingRef.current = false;
+          }
+        } else {
+          logger.debug('Skipping data load - already loaded and no refresh params', null, 'DashboardScreen');
+        }
+      }
+    }, [isAuthenticated, currentUser?.id])
   );
 
-  // Handle refresh parameters from navigation
+  // Handle route parameter changes separately
   useEffect(() => {
-    if (currentUser?.id) {
+    if (isAuthenticated && currentUser?.id && hasLoadedRef.current) {
       const shouldRefreshBalance = route?.params?.refreshBalance;
       const shouldRefreshRequests = route?.params?.refreshRequests;
       
       if (shouldRefreshBalance || shouldRefreshRequests) {
+        logger.info('Route parameter refresh triggered', { 
+          shouldRefreshBalance, 
+          shouldRefreshRequests 
+        }, 'DashboardScreen');
+        
         // Clear the parameters to prevent infinite loops
         navigation.setParams({ 
           refreshBalance: undefined,
@@ -465,33 +572,25 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         
         // Trigger appropriate refreshes
         if (shouldRefreshBalance) {
-          // Clear cache and reload balance
           walletService.clearUserCache(currentUser.id);
-          refreshWallet(); // Use the refreshWallet function from useWalletState hook
-          logger.info('Balance refresh triggered from navigation parameter', null, 'DashboardScreen');
+          refreshWallet();
+          logger.info('Balance refresh triggered from route parameter', null, 'DashboardScreen');
         }
         
         if (shouldRefreshRequests) {
           loadPaymentRequests();
           refreshNotifications();
-          logger.info('Requests refresh triggered from navigation parameter', null, 'DashboardScreen');
+          logger.info('Requests refresh triggered from route parameter', null, 'DashboardScreen');
         }
       }
     }
-  }, [route?.params?.refreshBalance, route?.params?.refreshRequests, currentUser?.id, navigation, refreshWallet, loadPaymentRequests, refreshNotifications]);
-
-  // Load notifications when dashboard loads
-  useEffect(() => {
-    if (isAuthenticated && currentUser?.id) {
-      loadNotifications();
-    }
-  }, [isAuthenticated, currentUser?.id, loadNotifications]);
+  }, [route?.params?.refreshBalance, route?.params?.refreshRequests, isAuthenticated, currentUser?.id]);
 
   // Removed group loading logic
 
 
   const onRefresh = async () => {
-    if (!isAuthenticated || !currentUser?.id) {return;}
+    if (!isAuthenticated || !currentUser?.id) return;
 
     try {
       logger.info('Manual refresh triggered', null, 'DashboardScreen');
@@ -499,14 +598,22 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       // Clear cache before refresh to ensure fresh data
       walletService.clearUserCache(currentUser.id);
       
-      await Promise.all([
+      // Use Promise.allSettled to prevent one failure from stopping others
+      const results = await Promise.allSettled([
         refreshWallet(),
         refreshNotifications(),
         loadTransactions(),
         loadPaymentRequests()
       ]);
 
-      logger.info('Refresh completed successfully', null, 'DashboardScreen');
+      // Log any failures
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          logger.error(`Refresh operation ${index} failed`, result.reason, 'DashboardScreen');
+        }
+      });
+
+      logger.info('Refresh completed', null, 'DashboardScreen');
     } catch (error) {
       logger.error('Error during refresh', error, 'DashboardScreen');
     }
@@ -677,9 +784,18 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
           <View style={styles.balanceContainer}>
             <View style={{ flex: 1, alignItems: 'flex-start' }}>
-              <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
-                $ {(walletBalance || 0).toFixed(2)}
-              </Text>
+              {walletLoading || liveBalanceLoading ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={colors.white} style={{ marginRight: 8 }} />
+                  <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
+                    Loading...
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.balanceAmount, { textAlign: 'left', alignSelf: 'flex-start' }]}>
+                  $ {effectiveBalance.toFixed(2)}
+                </Text>
+              )}
             </View>
           </View>
 
