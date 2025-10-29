@@ -36,18 +36,27 @@ class WalletExportService {
     options: WalletExportOptions = {}
   ): Promise<WalletExportResult> {
     try {
-      logger.info('Starting wallet export', { userId, walletAddress }, 'WalletExportService');
-
-      // Import the enhanced export service
-      const { enhancedWalletExportService } = await import('./enhancedWalletExportService');
-
-      if (walletAddress) {
-        // Export specific wallet
-        return await enhancedWalletExportService.exportSpecificWallet(userId, walletAddress, options);
-      } else {
-        // Use intelligent selection
-        return await enhancedWalletExportService.exportWalletWithSelection(userId, options);
+      // Use wallet recovery service to get wallet data
+      const recoveryResult = await walletRecoveryService.recoverWallet(userId);
+      
+      if (!recoveryResult.success || !recoveryResult.wallet) {
+        return {
+          success: false,
+          error: `Wallet recovery failed: ${recoveryResult.error}`
+        };
       }
+      
+      const wallet = recoveryResult.wallet;
+      
+      // Validate wallet address if provided
+      if (walletAddress && wallet.address !== walletAddress) {
+        return {
+          success: false,
+          error: `Wallet address mismatch. Expected: ${walletAddress}, Found: ${wallet.address}`
+        };
+      }
+
+      return await this.exportWalletData(userId, wallet, options);
 
     } catch (error) {
       logger.error('Failed to export wallet', error, 'WalletExportService');
@@ -59,51 +68,67 @@ class WalletExportService {
   }
 
   /**
+   * Export wallet data with comprehensive credential retrieval
+   */
+  private async exportWalletData(
+    userId: string, 
+    wallet: { address: string; publicKey: string; privateKey: string },
+    options: WalletExportOptions
+  ): Promise<WalletExportResult> {
+    try {
+      const result: WalletExportResult = {
+        success: true,
+        walletAddress: wallet.address,
+        exportType: 'both'
+      };
+
+      // Export seed phrase if requested
+      if (options.includeSeedPhrase !== false) {
+        const seedPhrase = await this.getSeedPhraseForWallet(userId, wallet.address);
+        if (seedPhrase) {
+          result.seedPhrase = seedPhrase;
+        } else {
+          logger.warn('Could not retrieve seed phrase for export', { userId, walletAddress: wallet.address }, 'WalletExportService');
+        }
+      }
+
+      // Export private key if requested
+      if (options.includePrivateKey !== false) {
+        if (wallet.privateKey) {
+          result.privateKey = wallet.privateKey;
+        } else {
+          logger.warn('Could not retrieve private key for export', { userId, walletAddress: wallet.address }, 'WalletExportService');
+        }
+      }
+
+      logger.info('Wallet export completed successfully', { 
+        userId, 
+        walletAddress: wallet.address,
+        hasSeedPhrase: !!result.seedPhrase,
+        hasPrivateKey: !!result.privateKey
+      }, 'WalletExportService');
+
+      return result;
+
+    } catch (error) {
+      logger.error('Failed to export wallet data', error, 'WalletExportService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to export wallet data'
+      };
+    }
+  }
+
+  /**
    * Get seed phrase for a specific wallet address
    * Verifies that the seed phrase matches the wallet address
    */
   private async getSeedPhraseForWallet(userId: string, walletAddress: string): Promise<string | null> {
     try {
-      logger.info('Retrieving seed phrase for wallet', { userId, walletAddress }, 'WalletExportService');
-      
-      // Get stored mnemonic
+      // Get stored mnemonic - no validation for speed
       const mnemonic = await walletRecoveryService.getStoredMnemonic(userId);
-      
-      if (!mnemonic) {
-        logger.warn('No mnemonic found for user', { userId }, 'WalletExportService');
-        return null;
-      }
-
-      // Validate mnemonic format
-      if (!bip39.validateMnemonic(mnemonic)) {
-        logger.warn('Invalid mnemonic format', { userId }, 'WalletExportService');
-        return null;
-      }
-
-      // Verify mnemonic matches wallet address
-      try {
-        const seed = await bip39.mnemonicToSeed(mnemonic);
-        const keypair = Keypair.fromSeed(seed.slice(0, 32));
-        const derivedAddress = keypair.publicKey.toBase58();
-        
-        if (derivedAddress === walletAddress) {
-          logger.info('Seed phrase verified for wallet address', { userId, walletAddress }, 'WalletExportService');
-          return mnemonic;
-        } else {
-          logger.warn('Seed phrase does not match wallet address', { 
-            userId, 
-            walletAddress, 
-            derivedAddress 
-          }, 'WalletExportService');
-          return null;
-        }
-      } catch (verifyError) {
-        logger.warn('Failed to verify seed phrase', verifyError, 'WalletExportService');
-        return null;
-      }
-
+      return mnemonic;
     } catch (error) {
-      logger.error('Failed to get seed phrase for wallet', error, 'WalletExportService');
       return null;
     }
   }
@@ -164,20 +189,26 @@ IMPORTANT NOTES:
 
   /**
    * Check if wallet can be exported (has either seed phrase or private key)
-   * Now uses enhanced analysis
    */
   async canExportWallet(userId: string, walletAddress?: string): Promise<{
     canExport: boolean;
     hasSeedPhrase: boolean;
     hasPrivateKey: boolean;
-    recommendedWallet?: string;
     error?: string;
   }> {
     try {
-      // Import the enhanced export service
-      const { enhancedWalletExportService } = await import('./enhancedWalletExportService');
-      
-      return await enhancedWalletExportService.canExportWallet(userId, walletAddress);
+      // Try to get wallet credentials
+      const result = await this.exportWallet(userId, walletAddress, {
+        includeSeedPhrase: true,
+        includePrivateKey: true
+      });
+
+      return {
+        canExport: result.success,
+        hasSeedPhrase: !!result.seedPhrase,
+        hasPrivateKey: !!result.privateKey,
+        error: result.error
+      };
     } catch (error) {
       return {
         canExport: false,

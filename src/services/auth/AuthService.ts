@@ -513,22 +513,17 @@ class AuthService {
       }, 'AuthService');
       
       if (isNewUser) {
-        // Create wallet for new user
+        // Create wallet for new user using atomic creation
         const walletResult = await walletService.createWallet(consistentUser.id);
         if (walletResult.success && walletResult.wallet) {
-          await firebaseDataService.user.updateUser(consistentUser.id, {
-            wallet_address: walletResult.wallet.address,
-            wallet_public_key: walletResult.wallet.publicKey,
-            wallet_status: 'healthy',
-            wallet_created_at: new Date().toISOString(),
-            wallet_has_private_key: true,
-            wallet_has_seed_phrase: true,
-            wallet_type: 'app-generated'
-          });
-          
-          logger.info('✅ New user wallet created with seed phrase', {
+          logger.info('✅ New user wallet created atomically', {
             userId: consistentUser.id,
             walletAddress: walletResult.wallet.address
+          }, 'AuthService');
+        } else {
+          logger.error('❌ Failed to create wallet for new user', {
+            userId: consistentUser.id,
+            error: walletResult.error
           }, 'AuthService');
         }
       } else {

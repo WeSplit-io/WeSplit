@@ -11,6 +11,7 @@ export { userImageService } from './userImageService';
 export { priceManagementService } from './priceManagementService';
 export { nfcService } from './nfcService';
 export { i18nService } from './i18nService';
+export { multiSignStateService, MultiSignStateService } from './multiSignStateService';
 
 // Re-export commonly used types and utilities
 export type { 

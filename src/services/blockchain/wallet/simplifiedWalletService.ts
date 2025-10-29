@@ -239,57 +239,62 @@ class SimplifiedWalletService {
    */
   private async createNewWallet(userId: string): Promise<WalletCreationResult> {
     try {
-      const createResult = await walletRecoveryService.createAndStoreWallet(userId);
-      
-      if (createResult.success && createResult.wallet) {
-        // Update user's wallet address in database
-        try {
-          const updateData: any = {
-            wallet_address: createResult.wallet.address,
-            wallet_public_key: createResult.wallet.publicKey,
-            wallet_created_at: new Date().toISOString(),
-            wallet_status: 'healthy',
-            wallet_type: 'app-generated'
-          };
-          
-          // Only include defined fields to avoid Firebase errors
-          const cleanUpdateData = Object.fromEntries(
-            Object.entries(updateData).filter(([_, value]) => value !== undefined && value !== null)
-          );
-          
-          await firebaseDataService.user.updateUser(userId, cleanUpdateData);
-          
-          logger.info('New wallet created and database updated', { 
-            userId, 
-            walletAddress: createResult.wallet.address 
-          }, 'SimplifiedWalletService');
-        } catch (updateError) {
-          logger.warn('Failed to update user wallet in database', updateError, 'SimplifiedWalletService');
-        }
+      logger.info('Creating new wallet', { userId }, 'SimplifiedWalletService');
 
-        const result: WalletCreationResult = {
-          success: true,
-          wallet: {
-            address: createResult.wallet.address,
-            publicKey: createResult.wallet.publicKey,
-            secretKey: createResult.wallet.privateKey,
-            isConnected: true,
-            walletName: 'App Wallet',
-            walletType: 'app-generated'
-          }
-        };
+      // Generate new wallet using the derive utility
+      const { generateWalletFromMnemonic } = await import('./derive');
+      const walletResult = generateWalletFromMnemonic();
 
-        this.walletRecoveryCache.set(userId, result);
-        return result;
+      const wallet = {
+        address: walletResult.address,
+        publicKey: walletResult.publicKey,
+        privateKey: walletResult.secretKey,
+        mnemonic: walletResult.mnemonic
+      };
+
+      // Store wallet using recovery service
+      const stored = await walletRecoveryService.storeWallet(userId, {
+        address: wallet.address,
+        publicKey: wallet.publicKey,
+        privateKey: wallet.privateKey
+      });
+
+      if (!stored) {
+        throw new Error('Failed to store new wallet');
       }
 
-      const errorResult: WalletCreationResult = {
-        success: false,
-        error: createResult.errorMessage || 'Failed to create wallet'
+      // Store mnemonic
+      if (wallet.mnemonic) {
+        await walletRecoveryService.storeMnemonic(userId, wallet.mnemonic);
+      }
+
+      // Update database
+      await firebaseDataService.user.updateUser(userId, {
+        wallet_address: wallet.address,
+        wallet_public_key: wallet.publicKey,
+        wallet_created_at: new Date().toISOString(),
+        wallet_status: 'healthy',
+        wallet_has_private_key: true,
+        wallet_has_seed_phrase: true,
+        wallet_type: 'app-generated'
+      });
+
+      const result: WalletCreationResult = {
+        success: true,
+        wallet: {
+          address: wallet.address,
+          publicKey: wallet.publicKey,
+          secretKey: wallet.privateKey,
+          isConnected: true,
+          walletName: 'App Wallet',
+          walletType: 'app-generated'
+        },
+        mnemonic: wallet.mnemonic
       };
-      
-      this.walletRecoveryCache.set(userId, errorResult);
-      return errorResult;
+
+      this.walletRecoveryCache.set(userId, result);
+      logger.info('New wallet created successfully', { userId, address: wallet.address }, 'SimplifiedWalletService');
+      return result;
 
     } catch (error) {
       logger.error('Error creating new wallet', error, 'SimplifiedWalletService');
@@ -478,7 +483,6 @@ class SimplifiedWalletService {
     try {
       logger.info('Retrieving seed phrase', { userId }, 'SimplifiedWalletService');
       
-      // Try to get mnemonic from secure storage
       const mnemonic = await walletRecoveryService.getStoredMnemonic(userId);
       if (mnemonic) {
         logger.info('Seed phrase retrieved successfully', { userId }, 'SimplifiedWalletService');

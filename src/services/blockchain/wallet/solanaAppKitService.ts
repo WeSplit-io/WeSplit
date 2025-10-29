@@ -303,8 +303,14 @@ export class SolanaAppKitService {
   }
 
   // Create a new wallet using AppKit (app-generated wallet)
+  // DEPRECATED: Use simplifiedWalletService.ensureUserWallet() instead
   async createWallet(): Promise<CreateWalletResult> {
     try {
+      logger.warn('Using deprecated SolanaAppKitService.createWallet()', {}, 'SolanaAppKitService');
+      logger.info('Redirecting to simplifiedWalletService.ensureUserWallet()', {}, 'SolanaAppKitService');
+
+      // This method should not be used for new wallet creation
+      // It's kept for backward compatibility only
       // Generate a new keypair
       const newKeypair = Keypair.generate();
       this.keypair = newKeypair;
@@ -331,6 +337,8 @@ export class SolanaAppKitService {
         walletName: 'App Generated Wallet',
         walletType: 'app-generated'
       };
+
+      logger.info('Wallet created (legacy method)', { address }, 'SolanaAppKitService');
 
       return {
         wallet: walletInfo,

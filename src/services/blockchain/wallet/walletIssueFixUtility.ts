@@ -5,7 +5,8 @@
  */
 
 import { logger } from '../../core';
-import { enhancedWalletService } from './enhancedWalletService';
+import { walletRecoveryService } from './walletRecoveryService';
+import { walletService } from './simplifiedWalletService';
 import { Alert } from 'react-native';
 
 export interface WalletFixResult {
@@ -24,23 +25,32 @@ export class WalletIssueFixUtility {
     try {
       logger.info('Starting wallet fix for current user', { userId }, 'WalletIssueFixUtility');
 
-      const result = await enhancedWalletService.fixWalletIssues(userId);
+      // Use wallet recovery service to fix wallet issues
+      const result = await walletRecoveryService.recoverWallet(userId);
       
-      if (result.success && result.fixed) {
-        logger.info('Wallet issues fixed successfully', { 
+      if (result.success && result.wallet) {
+        logger.info('Wallet recovered successfully', { 
           userId, 
-          details: result.details 
+          address: result.wallet.address
         }, 'WalletIssueFixUtility');
-      } else if (result.success && !result.fixed) {
-        logger.info('No wallet issues found', { userId }, 'WalletIssueFixUtility');
+        
+        return {
+          success: true,
+          fixed: true,
+          details: `Wallet recovered: ${result.wallet.address}`
+        };
       } else {
-        logger.error('Failed to fix wallet issues', { 
+        logger.error('Failed to recover wallet', { 
           userId, 
           error: result.error 
         }, 'WalletIssueFixUtility');
+        
+        return {
+          success: false,
+          fixed: false,
+          error: result.error || 'Failed to recover wallet'
+        };
       }
-
-      return result;
     } catch (error) {
       logger.error('Error fixing wallet issues', error, 'WalletIssueFixUtility');
       return {
@@ -74,49 +84,56 @@ export class WalletIssueFixUtility {
         currency 
       }, 'WalletIssueFixUtility');
 
-      const validationResult = await enhancedWalletService.validateWalletForTransaction(
-        userId, 
-        amount || 0, 
-        currency
-      );
-
-      if (!validationResult.success) {
-        // If validation failed, try to fix the wallet
-        logger.warn('Wallet validation failed, attempting fix', { 
-          userId, 
-          error: validationResult.error 
-        }, 'WalletIssueFixUtility');
+      // Try to get wallet info first
+      const walletResult = await walletService.getWalletInfo(userId);
+      
+      if (!walletResult) {
+        // If no wallet found, try to recover
+        logger.warn('No wallet found, attempting recovery', { userId }, 'WalletIssueFixUtility');
         
         const fixResult = await this.fixCurrentUserWallet(userId);
         
         if (fixResult.success && fixResult.fixed) {
-          // Retry validation after fix
-          const retryResult = await enhancedWalletService.validateWalletForTransaction(
-            userId, 
-            amount || 0, 
-            currency
-          );
-          
           return {
-            success: retryResult.success,
-            canProceed: retryResult.canProceed,
-            error: retryResult.error,
+            success: true,
+            canProceed: true,
             shouldFix: true
           };
         } else {
           return {
             success: false,
             canProceed: false,
-            error: fixResult.error || validationResult.error,
+            error: fixResult.error || 'No wallet found',
+            shouldFix: false
+          };
+        }
+      }
+
+      // Wallet exists, check if it's valid
+      if (!walletResult.address || !walletResult.publicKey) {
+        logger.warn('Invalid wallet data, attempting recovery', { userId }, 'WalletIssueFixUtility');
+        
+        const fixResult = await this.fixCurrentUserWallet(userId);
+        
+        if (fixResult.success && fixResult.fixed) {
+          return {
+            success: true,
+            canProceed: true,
+            shouldFix: true
+          };
+        } else {
+          return {
+            success: false,
+            canProceed: false,
+            error: fixResult.error || 'Invalid wallet data',
             shouldFix: false
           };
         }
       }
 
       return {
-        success: validationResult.success,
-        canProceed: validationResult.canProceed,
-        error: validationResult.error,
+        success: true,
+        canProceed: true,
         shouldFix: false
       };
     } catch (error) {
@@ -197,30 +214,37 @@ export class WalletIssueFixUtility {
       }, 'WalletIssueFixUtility');
 
       // First try to get balance normally
-      const balanceResult = await enhancedWalletService.getValidatedWalletBalance(userId, currency);
+      const balanceResult = await walletService.getUserWalletBalance(userId);
       
-      if (balanceResult.success) {
-        return balanceResult;
+      if (balanceResult) {
+        return {
+          success: true,
+          balance: currency === 'USDC' ? balanceResult.usdcBalance : balanceResult.solBalance
+        };
       }
 
       // If that failed, try to fix the wallet
       logger.warn('Balance check failed, attempting wallet fix', { 
-        userId, 
-        error: balanceResult.error 
+        userId 
       }, 'WalletIssueFixUtility');
       
       const fixResult = await this.fixCurrentUserWallet(userId);
       
       if (fixResult.success && fixResult.fixed) {
         // Retry balance check after fix
-        const retryResult = await enhancedWalletService.getValidatedWalletBalance(userId, currency);
-        return retryResult;
-      } else {
-        return {
-          success: false,
-          error: fixResult.error || balanceResult.error
-        };
+        const retryResult = await walletService.getUserWalletBalance(userId);
+        if (retryResult) {
+          return {
+            success: true,
+            balance: currency === 'USDC' ? retryResult.usdcBalance : retryResult.solBalance
+          };
+        }
       }
+      
+      return {
+        success: false,
+        error: fixResult.error || 'Failed to get wallet balance'
+      };
     } catch (error) {
       logger.error('Error getting wallet balance with fix', error, 'WalletIssueFixUtility');
       return {
@@ -245,15 +269,15 @@ export class WalletIssueFixUtility {
       let needsFix = false;
 
       // Check if we can get wallet info
-      const walletResult = await enhancedWalletService.getUserWalletWithValidation(userId);
-      if (!walletResult.success) {
+      const walletResult = await walletService.getWalletInfo(userId);
+      if (!walletResult) {
         issues.push('Cannot access wallet');
         needsFix = true;
       }
 
       // Check if we can get balance
-      const balanceResult = await enhancedWalletService.getValidatedWalletBalance(userId, 'USDC');
-      if (!balanceResult.success) {
+      const balanceResult = await walletService.getUserWalletBalance(userId);
+      if (!balanceResult) {
         issues.push('Cannot get wallet balance');
         needsFix = true;
       }

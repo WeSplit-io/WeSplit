@@ -360,6 +360,64 @@ export const styles = StyleSheet.create({
     padding: spacing.md,
   },
 
+  // Export Wallet Section Styles
+  exportButtonsContainer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  
+  exportButton: {
+    flex: 1,
+    backgroundColor: colors.primaryGreen,
+    borderRadius: spacing.radiusMd,
+    padding: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 60,
+  },
+  
+  exportButtonSecondary: {
+    backgroundColor: colors.white10,
+    borderWidth: 1,
+    borderColor: colors.white10,
+  },
+  
+  exportButtonDisabled: {
+    opacity: 0.6,
+  },
+  
+  exportButtonContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  exportButtonIcon: {
+    width: 20,
+    height: 20,
+    marginBottom: spacing.xs,
+    tintColor: colors.white,
+  },
+  
+  exportButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    textAlign: 'center',
+  },
+  
+  exportButtonTextSecondary: {
+    color: colors.white70,
+  },
+  
+  exportDescription: {
+    color: colors.white50,
+    fontSize: typography.fontSize.sm,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
+
   // Styles pour les cartes non-connectées (design centré simple)
   externalMiniCardSimple: {
     flex: 1,
@@ -803,14 +861,6 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Wallet address display styles
-  walletAddressContainer: {
-    marginTop: spacing.md,
-    padding: spacing.sm,
-    backgroundColor: colors.white5,
-    borderRadius: spacing.radiusSm,
-    alignItems: 'center',
-  },
 
   walletAddressLabel: {
     color: colors.white70,
@@ -896,6 +946,41 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+
+  // Private Key Display Styles (matching seed phrase format)
+  privateKeyContainer: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  privateKeyTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.md,
+  },
+  privateKeyDisplay: {
+    backgroundColor: colors.white5,
+    borderRadius: spacing.radiusMd,
+    padding: spacing.lg,
+    width: '100%',
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.white10,
+  },
+  privateKeyText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontFamily: 'monospace',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  privateKeyWarning: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: spacing.sm,
   },
   
   seedPhraseContainer: {
@@ -1041,6 +1126,16 @@ export const styles = StyleSheet.create({
   
   closeButton: {
     padding: spacing.sm,
+  },
+  
+  closeButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+  },
+  
+  exportOptionsContainer: {
+    paddingVertical: spacing.lg,
   },
   
   modalContent: {
@@ -1480,10 +1575,6 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 80,
-  },
 
   // Bottom spacer to ensure content doesn't get covered
   bottomSpacer: {
@@ -1510,5 +1601,111 @@ export const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
   },
 
+  // Export All Button Styles
+  exportAllButton: {
+    backgroundColor: colors.primaryGreen,
+    marginTop: spacing.sm,
+  },
+  
+  exportAllButtonText: {
+    color: colors.white,
+    fontWeight: typography.fontWeight.semibold,
+  },
+
+  // Export Modal Styles
+  
+  exportOptionButton: {
+    backgroundColor: colors.white,
+    borderRadius: spacing.radiusMd,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  
+  exportOptionButtonSecondary: {
+    backgroundColor: colors.white10,
+    borderColor: colors.white10,
+  },
+  
+  exportOptionButtonDisabled: {
+    opacity: 0.6,
+  },
+  
+  exportOptionContent: {
+    flex: 1,
+  },
+  
+  exportOptionTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  
+  exportOptionSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  
+  warningBox: {
+    backgroundColor: colors.warning + '20',
+    borderRadius: spacing.radiusMd,
+    padding: spacing.lg,
+    marginVertical: spacing.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.warning,
+  },
+  
+  warningTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.warning,
+    marginBottom: spacing.sm,
+  },
+  
+  warningText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+
+
+  // Debug modal styles
+  debugInfoContainer: {
+    padding: spacing.md,
+  },
+
+  debugSectionTitle: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+
+  debugText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.xs,
+    fontFamily: 'monospace',
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+
+  loadingText: {
+    color: colors.white70,
+    fontSize: typography.fontSize.md,
+    marginTop: spacing.md,
+  },
 
 }); 

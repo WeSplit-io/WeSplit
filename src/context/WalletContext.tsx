@@ -11,6 +11,7 @@ import { walletService, WalletInfo as ConsolidatedWalletInfo, walletExportServic
 import { consolidatedTransactionService } from '../services/blockchain/transaction';
 import { solanaWalletService } from '../services/blockchain/wallet';
 import { logger } from '../services/analytics/loggingService';
+import WalletRecoveryModal from '../components/wallet/WalletRecoveryModal';
 
 // WalletInfo interface for backward compatibility
 interface WalletInfo {
@@ -85,6 +86,11 @@ interface WalletContextType {
   autoRefreshEnabled: boolean;
   lastBalanceCheck: Date;
   
+  // Wallet recovery state
+  showRecoveryModal: boolean;
+  recoveryUserId: string | null;
+  recoveryExpectedAddress: string | null;
+  
   // Actions
   connectWallet: () => Promise<void>; // Connect external wallet
   connectToExternalWallet: (providerKey: string) => Promise<void>;
@@ -96,8 +102,8 @@ interface WalletContextType {
   sendTransaction: (params: TransactionParams) => Promise<{ signature: string; txId: string }>;
   refreshBalance: () => Promise<void>;
   
-  // App Wallet Actions
-  ensureAppWallet: (userId: string) => Promise<void>;
+  // App Wallet Actions - Updated return type
+  ensureAppWallet: (userId: string) => Promise<{ success: boolean; wallet?: any; error?: string }>;
   getAppWalletBalance: (userId: string) => Promise<number>;
   exportAppWallet: (userId: string) => Promise<{
     success: boolean;
@@ -121,6 +127,10 @@ interface WalletContextType {
     };
     error?: string;
   }>;
+  
+  // Wallet recovery actions
+  showWalletRecovery: (userId: string, expectedAddress: string) => void;
+  hideWalletRecovery: () => void;
   
   // Auto-refresh Actions
   startBalancePolling: (userId: string) => Promise<void>;
@@ -175,6 +185,11 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false); // Disabled by default to prevent rate limiting
   const [lastBalanceCheck, setLastBalanceCheck] = useState<Date>(new Date());
   const [balancePollingInterval, setBalancePollingInterval] = useState<NodeJS.Timeout | null>(null);
+  
+  // Wallet recovery state
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [recoveryUserId, setRecoveryUserId] = useState<string | null>(null);
+  const [recoveryExpectedAddress, setRecoveryExpectedAddress] = useState<string | null>(null);
 
   useEffect(() => {
     // WalletProvider mounted
@@ -521,7 +536,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   };
 
   // App wallet methods
-  const ensureAppWallet = async (userId: string) => {
+  const ensureAppWallet = async (userId: string): Promise<{ success: boolean; wallet?: any; error?: string }> => {
     try {
       console.log('🔍 WalletProvider: Starting ensureAppWallet...');
       // Import userWalletService to ensure app wallet
@@ -534,13 +549,37 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       if (walletResult.success && walletResult.wallet) {
         setAppWalletAddress(walletResult.wallet.address);
         setAppWalletConnected(true);
+        return walletResult;
       } else {
         console.error('🔍 WalletProvider: Failed to ensure app wallet:', walletResult.error);
         setAppWalletConnected(false);
+        
+        // Check if this is a wallet data loss issue
+        if (walletResult.error && walletResult.error.includes('mismatch')) {
+          logger.warn('Wallet data loss detected, triggering recovery', { 
+            userId, 
+            error: walletResult.error 
+          }, 'WalletContext');
+          
+          // Get the expected wallet address from database
+          try {
+            const { firebaseDataService } = await import('../data/firebaseDataService');
+            const userData = await firebaseDataService.user.getCurrentUser(userId);
+            
+            if (userData?.wallet_address) {
+              // Show wallet recovery modal
+              showWalletRecovery(userId, userData.wallet_address);
+            }
+          } catch (error) {
+            logger.error('Failed to get user data for recovery', error, 'WalletContext');
+          }
+        }
+        return walletResult;
       }
     } catch (error) {
       console.error('🔍 WalletProvider: Error ensuring app wallet:', error);
       setAppWalletConnected(false);
+      return { success: false, error: error.message };
     }
   };
 
@@ -562,7 +601,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
   const exportAppWallet = async (userId: string) => {
     try {
-      // Use the consolidated wallet export service
+      // Use the consolidated wallet export service directly
       const result = await walletExportService.exportWallet(userId);
       
       if (result.success) {
@@ -643,6 +682,64 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       };
     }
   };
+
+  // Wallet recovery functions
+  const showWalletRecovery = useCallback((userId: string, expectedAddress: string) => {
+    setRecoveryUserId(userId);
+    setRecoveryExpectedAddress(expectedAddress);
+    setShowRecoveryModal(true);
+    
+    logger.info('Showing wallet recovery modal', { 
+      userId, 
+      expectedAddress 
+    }, 'WalletContext');
+  }, []);
+
+  const hideWalletRecovery = useCallback(() => {
+    setShowRecoveryModal(false);
+    setRecoveryUserId(null);
+    setRecoveryExpectedAddress(null);
+    
+    logger.info('Hiding wallet recovery modal', null, 'WalletContext');
+  }, []);
+
+  const handleRecoverySuccess = useCallback((wallet: {
+    address: string;
+    publicKey: string;
+    privateKey: string;
+    recoveryMethod: string;
+  }) => {
+    logger.info('Wallet recovery successful', {
+      address: wallet.address,
+      recoveryMethod: wallet.recoveryMethod
+    }, 'WalletContext');
+    
+    // Update app wallet state
+    setAppWalletAddress(wallet.address);
+    setAppWalletConnected(true);
+    
+    // Hide recovery modal
+    hideWalletRecovery();
+    
+    // Show success message
+    Alert.alert(
+      'Wallet Recovered! 🎉',
+      `Your wallet has been successfully recovered using ${wallet.recoveryMethod}.`
+    );
+  }, [hideWalletRecovery]);
+
+  const handleRecoveryFailed = useCallback((error: string) => {
+    logger.error('Wallet recovery failed', { error }, 'WalletContext');
+    
+    // Hide recovery modal
+    hideWalletRecovery();
+    
+    // Show error message
+    Alert.alert(
+      'Recovery Failed',
+      `Unable to recover your wallet: ${error}\n\nPlease try manual recovery or contact support.`
+    );
+  }, [hideWalletRecovery]);
 
   // Auto-refresh balance functionality - DISABLED to prevent excessive calls
   const startBalancePolling = useCallback(async (userId: string) => {
@@ -839,6 +936,10 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     // Auto-refresh state
     autoRefreshEnabled,
     lastBalanceCheck,
+    // Wallet recovery state
+    showRecoveryModal,
+    recoveryUserId,
+    recoveryExpectedAddress,
     // Actions
     connectWallet: handleConnectWallet,
     connectToExternalWallet,
@@ -886,6 +987,9 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     exportAppWallet,
     getAppWalletInfo,
     fixAppWalletMismatch,
+    // Wallet recovery actions
+    showWalletRecovery,
+    hideWalletRecovery,
     // Auto-refresh Actions
     startBalancePolling,
     stopBalancePolling,
@@ -923,6 +1027,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   return (
     <WalletContext.Provider value={value}>
       {children}
+      <WalletRecoveryModal
+        visible={showRecoveryModal}
+        userId={recoveryUserId || ''}
+        expectedWalletAddress={recoveryExpectedAddress || ''}
+        onRecoverySuccess={handleRecoverySuccess}
+        onRecoveryFailed={handleRecoveryFailed}
+        onClose={hideWalletRecovery}
+      />
     </WalletContext.Provider>
   );
 };

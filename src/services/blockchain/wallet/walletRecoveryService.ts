@@ -402,9 +402,11 @@ export class WalletRecoveryService {
     const startTime = Date.now();
     
     try {
-      logger.info('Starting wallet recovery', { userId }, 'WalletRecoveryService');
+      logger.info('Starting comprehensive wallet recovery', { userId }, 'WalletRecoveryService');
 
-      // 1. First check if wallet consistency is valid
+      // Try to recover wallet using standard method
+
+      // Check if wallet consistency is valid
       const isConsistent = await this.validateWalletConsistency(userId);
       
       if (isConsistent) {
@@ -739,7 +741,7 @@ export class WalletRecoveryService {
         expectedAddress 
       }, 'WalletRecoveryService');
       
-      // Try comprehensive recovery methods to find the database wallet
+      // 1. First try the existing comprehensive recovery
       const comprehensiveResult = await this.performComprehensiveRecovery(userId, expectedAddress);
       
       if (comprehensiveResult.success) {
@@ -751,7 +753,7 @@ export class WalletRecoveryService {
         return comprehensiveResult;
       }
       
-      // If comprehensive recovery failed, try alternative derivation paths
+      // 2. If comprehensive recovery failed, try alternative methods
       logger.warn('Comprehensive recovery failed, trying alternative methods', { 
         userId, 
         expectedAddress,
@@ -769,14 +771,15 @@ export class WalletRecoveryService {
         return alternativeResult;
       }
       
-      // If all recovery methods failed, return error
-      logger.error('Failed to recover database wallet after all attempts', { 
+      // 4. Generate recovery report for debugging
+      logger.error('WALLET RECOVERY FAILED', { 
         userId, 
         expectedAddress,
         comprehensiveError: comprehensiveResult.errorMessage,
         alternativeError: alternativeResult.errorMessage
       }, 'WalletRecoveryService');
       
+      // If all recovery methods failed, return error with detailed information
       return {
         success: false,
         error: WalletRecoveryError.DATABASE_MISMATCH,

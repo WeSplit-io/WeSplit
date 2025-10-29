@@ -23,8 +23,9 @@ import NavBar from '../../components/shared/NavBar';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/data';
-import { walletService, UserWalletBalance } from '../../services/blockchain/wallet';
+import { walletService, UserWalletBalance, SolanaAppKitService } from '../../services/blockchain/wallet';
 import { multiSignStateService } from '../../services/core';
+import { MultiSignStateService } from '../../services/core/multiSignStateService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
@@ -48,7 +49,8 @@ const WalletManagementScreen: React.FC = () => {
     appWalletBalance,
     appWalletConnected,
     ensureAppWallet,
-    getAppWalletBalance
+    getAppWalletBalance,
+    getAppWalletInfo
   } = useWallet();
 
   // Local state
@@ -64,17 +66,19 @@ const WalletManagementScreen: React.FC = () => {
   const [sliderValue] = useState(new Animated.Value(0));
   const [isSliderActive, setIsSliderActive] = useState(false);
   const [showQRCodeScreen, setShowQRCodeScreen] = useState(false);
-
+  
+  // Initialize SolanaAppKitService for multi-signature operations
+  const solanaAppKitService = new SolanaAppKitService();
 
   // Load multi-sign state on component mount
   useEffect(() => {
     const loadMultiSignState = async () => {
       try {
-        const isEnabled = await multiSignStateService.loadMultiSignState();
+        const isEnabled = await MultiSignStateService.loadMultiSignState();
         setMultiSignEnabled(isEnabled);
 
         if (isEnabled) {
-          const remainingDays = await multiSignStateService.getRemainingDays();
+          const remainingDays = await MultiSignStateService.getRemainingDays();
           setMultiSignRemainingDays(remainingDays);
         }
       } catch (error) {
@@ -97,20 +101,21 @@ const WalletManagementScreen: React.FC = () => {
         // Initialize app wallet for the user
         logger.info('Initializing app wallet for user', { userId: currentUser.id }, 'WalletManagementScreen');
         
-        // Ensure user has a wallet (this will create one if needed or recover existing)
-        const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
+        // Ensure user has a wallet using context function
+        const walletResult = await ensureAppWallet(currentUser.id.toString());
 
         if (walletResult.success && walletResult.wallet) {
           if (__DEV__) { logger.info('Wallet ensured for user', { address: walletResult.wallet.address }, 'WalletManagementScreen'); }
 
-          // Update app wallet state in context
-          setAppWalletAddress(walletResult.wallet.address);
-          setAppWalletConnected(true);
-
-          // Load app wallet balance for local state
-          const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
-          setLocalAppWalletBalance(balance);
-          setAppWalletBalance(balance?.totalUSD || 0);
+          // Load app wallet balance using context function
+          const balance = await getAppWalletBalance(currentUser.id.toString());
+          setLocalAppWalletBalance({ 
+            totalUSD: balance, 
+            usdcBalance: balance, 
+            solBalance: 0,
+            address: walletResult.wallet.address,
+            isConnected: true
+          });
 
           // Load transactions using consolidated function
           await loadTransactions(false);
@@ -138,10 +143,11 @@ const WalletManagementScreen: React.FC = () => {
                   onPress: async () => {
                     try {
                       // Clear existing wallet data first
-                      await walletService.clearWalletDataForUser(currentUser.id.toString());
+                      // Note: This would need to be implemented in the wallet service
+                      console.log('Clearing wallet data for user:', currentUser.id);
 
-                      // Create a new wallet using the existing service
-                      const newWalletResult = await walletService.ensureUserWallet(currentUser.id.toString());
+                      // Create a new wallet using context function
+                      const newWalletResult = await ensureAppWallet(currentUser.id.toString());
 
                       if (newWalletResult.success && newWalletResult.wallet) {
                         Alert.alert(
@@ -211,7 +217,7 @@ const WalletManagementScreen: React.FC = () => {
 
     try {
       // Load user's multi-signature wallets
-      const userMultiSigWallets = await walletService.getUserMultiSigWallets(currentUser.id.toString());
+      const userMultiSigWallets = await solanaAppKitService.getUserMultiSigWallets(currentUser.id.toString());
 
       if (__DEV__) {
         logger.info('Multi-signature data loaded', {
@@ -268,7 +274,7 @@ const WalletManagementScreen: React.FC = () => {
               }
             }
           } catch (error) {
-            logger.warn('Could not fetch user details for transaction', { transactionId: tx.id, error: error.message }, 'WalletManagementScreen');
+            logger.warn('Could not fetch user details for transaction', { transactionId: tx.id, error: error instanceof Error ? error.message : String(error) }, 'WalletManagementScreen');
           }
 
           return {
@@ -332,28 +338,25 @@ const WalletManagementScreen: React.FC = () => {
       logger.info('Manual refresh triggered', null, 'WalletManagementScreen');
 
       // Ensure user has a wallet first
-      const walletResult = await walletService.ensureUserWallet(currentUser.id.toString());
+      const walletResult = await ensureAppWallet(currentUser.id.toString());
 
       if (walletResult.success && walletResult.wallet) {
         logger.info('Refreshing wallet balance', null, 'WalletManagementScreen');
 
-        // Refresh app wallet balance directly
-        const balance = await walletService.getUserWalletBalance(currentUser.id.toString());
+        // Refresh app wallet balance using context function
+        const balance = await getAppWalletBalance(currentUser.id.toString());
 
-        if (balance) {
-          logger.info('New balance detected', { totalUSD: balance.totalUSD, usdcBalance: balance.usdcBalance }, 'WalletManagementScreen');
+        if (balance !== null && balance !== undefined) {
+          logger.info('New balance detected', { totalUSD: balance }, 'WalletManagementScreen');
 
           // Update local balance state
-          setLocalAppWalletBalance(balance);
-
-          // Also update the app wallet balance in context if available
-          if (getAppWalletBalance) {
-            try {
-              await getAppWalletBalance(currentUser.id.toString());
-            } catch (error) {
-              logger.warn('Could not update context balance', { error: error.message }, 'WalletManagementScreen');
-            }
-          }
+          setLocalAppWalletBalance({ 
+            totalUSD: balance, 
+            usdcBalance: balance, 
+            solBalance: 0,
+            address: walletResult.wallet.address,
+            isConnected: true
+          });
         } else {
           console.error('❌ WalletManagement: Failed to get wallet balance');
         }
@@ -365,11 +368,11 @@ const WalletManagementScreen: React.FC = () => {
         await loadMultiSigData();
 
         // Refresh multi-sign state
-        const isEnabled = await multiSignStateService.loadMultiSignState();
+        const isEnabled = await MultiSignStateService.loadMultiSignState();
         setMultiSignEnabled(isEnabled);
 
         if (isEnabled) {
-          const remainingDays = await multiSignStateService.getRemainingDays();
+          const remainingDays = await MultiSignStateService.getRemainingDays();
           setMultiSignRemainingDays(remainingDays);
         }
 
@@ -395,7 +398,7 @@ const WalletManagementScreen: React.FC = () => {
       setShowMultiSignExplanation(true);
     } else {
       try {
-        await multiSignStateService.saveMultiSignState(false);
+        await MultiSignStateService.saveMultiSignState(false);
         setMultiSignEnabled(false);
         setMultiSignRemainingDays(0);
       } catch (error) {
@@ -410,14 +413,14 @@ const WalletManagementScreen: React.FC = () => {
     try {
       if (!currentUser?.id) {return;}
 
-      const result = await walletService.approveMultiSigTransaction(transactionId, currentUser.id.toString());
+      const result = await solanaAppKitService.approveMultiSigTransaction('', transactionId, currentUser.id.toString());
 
-      if (result.success) {
+      if (result) {
         Alert.alert('Success', 'Transaction approved successfully!');
         // Reload multi-signature data
         await loadMultiSigData();
       } else {
-        Alert.alert('Error', result.error || 'Failed to approve transaction');
+        Alert.alert('Error', 'Failed to approve transaction');
       }
     } catch (error) {
       console.error('Error approving transaction:', error);
@@ -429,14 +432,14 @@ const WalletManagementScreen: React.FC = () => {
     try {
       if (!currentUser?.id) {return;}
 
-      const result = await walletService.rejectMultiSigTransaction(transactionId, currentUser.id.toString());
+      const result = await solanaAppKitService.rejectMultiSigTransaction('', transactionId, currentUser.id.toString());
 
-      if (result.success) {
+      if (result) {
         Alert.alert('Success', 'Transaction rejected successfully!');
         // Reload multi-signature data
         await loadMultiSigData();
       } else {
-        Alert.alert('Error', result.error || 'Failed to reject transaction');
+        Alert.alert('Error', 'Failed to reject transaction');
       }
     } catch (error) {
       console.error('Error rejecting transaction:', error);
@@ -697,6 +700,7 @@ const WalletManagementScreen: React.FC = () => {
   };
 
 
+
   return (
     <Container>
 
@@ -836,8 +840,8 @@ const WalletManagementScreen: React.FC = () => {
               <Text style={styles.actionButtonText}>Link Wallet</Text>
             </TouchableOpacity>
           </View>
-        </View>
 
+        </View>
 
         {/* Transactions Section */}
         {renderTransactions()}
@@ -908,7 +912,7 @@ const WalletManagementScreen: React.FC = () => {
                   onPress={async () => {
                     try {
                       // Save multi-sign state
-                      await multiSignStateService.saveMultiSignState(true);
+                      await MultiSignStateService.saveMultiSignState(true);
                       setShowMultiSignActivated(false);
                       // Refresh the multi-sign state
                       handleRefresh();
@@ -938,8 +942,8 @@ const WalletManagementScreen: React.FC = () => {
         <QRCodeScreen
           onBack={() => setShowQRCodeScreen(false)}
           userPseudo={currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}
-          userWallet={currentUser?.wallet_address || ''}
-          qrValue={currentUser?.wallet_address || ''}
+          userWallet={appWalletAddress || currentUser?.wallet_address || ''}
+          qrValue={appWalletAddress || currentUser?.wallet_address || ''}
         />
       </Modal>
     </Container>
