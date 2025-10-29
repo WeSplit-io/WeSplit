@@ -246,7 +246,7 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
     return (
       <ScrollView style={styles.walletsList} showsVerticalScrollIndicator={false}>
         {allDestinations.map((destination) => {
-          const isKastCard = 'identifier' in destination;
+          const isKastCard = destination.type === 'kast';
           
           return (
             <TouchableOpacity

@@ -7,8 +7,6 @@ import {
   Image,
   Clipboard,
   ScrollView,
-  Modal,
-  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from '../../components/Icon';
@@ -17,7 +15,7 @@ import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { styles } from './styles';
 import { useWallet } from '../../context/WalletContext';
-import { walletService, walletExportService, walletRecoveryService } from '../../services/blockchain/wallet';
+import { walletService, walletExportService } from '../../services/blockchain/wallet';
 import { firebaseDataService } from '../../services/data';
 import { useApp } from '../../context/AppContext';
 import { logger } from '../../services/analytics/loggingService';
@@ -34,10 +32,6 @@ const SeedPhraseViewScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeWalletAddress, setActiveWalletAddress] = useState<string | null>(null);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [exportLoading, setExportLoading] = useState(false);
-  const [showDebugModal, setShowDebugModal] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [hasValidSeedPhrase, setHasValidSeedPhrase] = useState(false);
   
@@ -190,129 +184,8 @@ const SeedPhraseViewScreen: React.FC = () => {
     }
   };
 
-  const handleShowExportInstructions = () => {
-    // Get export instructions from consolidated export service
-    const instructions = walletExportService.getExportInstructions();
-    Alert.alert(
-      'Export to External Wallets',
-      instructions,
-      [{ text: 'Got it' }]
-    );
-  };
-
   const handleDone = () => {
     navigation.navigate('Profile' as never);
-  };
-
-  const handleShowExportModal = () => {
-    setShowExportModal(true);
-  };
-
-  const handleExportAll = async () => {
-    if (!currentUser?.id || !activeWalletAddress) {
-      Alert.alert('Error', 'Wallet information not available');
-      return;
-    }
-
-    try {
-      setExportLoading(true);
-      
-      const result = await walletExportService.exportWallet(currentUser.id.toString(), activeWalletAddress);
-      
-      if (result.success) {
-        let message = `Wallet Address: ${result.walletAddress}\n\n`;
-        
-        if (result.seedPhrase) {
-          message += `Seed Phrase: ${result.seedPhrase}\n\n`;
-        }
-        
-        if (result.privateKey) {
-          message += `Private Key: ${result.privateKey}\n\n`;
-        }
-        
-        message += `Export Type: ${result.exportType}\n\n`;
-        message += '⚠️ IMPORTANT: Keep this information safe and never share it with anyone!';
-        
-        Alert.alert('Complete Wallet Export', message, [
-          { text: 'OK', style: 'default' }
-        ]);
-      } else {
-        Alert.alert('Export Failed', result.error || 'Failed to export wallet');
-      }
-    } catch (error) {
-      logger.error('Failed to export wallet', error, 'SeedPhraseViewScreen');
-      Alert.alert('Export Error', 'Failed to export wallet. Please try again.');
-    } finally {
-      setExportLoading(false);
-      setShowExportModal(false);
-    }
-  };
-
-  const handleDebugWallet = async () => {
-    if (!currentUser?.id) {
-      Alert.alert('Error', 'User information not available');
-      return;
-    }
-
-    try {
-      setDebugInfo(null);
-      setShowDebugModal(true);
-
-      // Get comprehensive wallet debug information
-      const debugData = {
-        userId: currentUser.id,
-        timestamp: new Date().toISOString(),
-        walletInfo: {
-          activeWalletAddress,
-          seedPhraseLength: seedPhrase.length,
-          hasSeedPhrase: seedPhrase.length > 0,
-          hasValidSeedPhrase,
-          seedPhrasePreview: seedPhrase.length > 0 ? seedPhrase.slice(0, 3).join(' ') + '...' : 'None',
-          hasPrivateKey: !!privateKey,
-          privateKeyPreview: privateKey ? privateKey.substring(0, 10) + '...' : 'None',
-          isRevealed
-        },
-        recoveryInfo: await getRecoveryDebugInfo(currentUser.id.toString()),
-        storageInfo: await getStorageDebugInfo(currentUser.id.toString())
-      };
-
-      setDebugInfo(debugData);
-    } catch (error) {
-      logger.error('Failed to get debug information', error, 'SeedPhraseViewScreen');
-      Alert.alert('Debug Error', 'Failed to retrieve debug information');
-      setShowDebugModal(false);
-    }
-  };
-
-  const getRecoveryDebugInfo = async (userId: string) => {
-    try {
-      const recoveryResult = await walletRecoveryService.recoverWallet(userId);
-      return {
-        success: recoveryResult.success,
-        error: recoveryResult.error,
-        hasWallet: !!recoveryResult.wallet,
-        walletAddress: recoveryResult.wallet?.address,
-        requiresUserAction: recoveryResult.requiresUserAction
-      };
-    } catch (error) {
-      return { error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  };
-
-  const getStorageDebugInfo = async (userId: string) => {
-    try {
-      const storedWallets = await walletRecoveryService.getStoredWallets(userId);
-      const mnemonic = await walletRecoveryService.getStoredMnemonic(userId);
-      
-      return {
-        storedWalletsCount: storedWallets.length,
-        storedWalletAddresses: storedWallets.map(w => w.address),
-        hasMnemonic: !!mnemonic,
-        mnemonicLength: mnemonic ? mnemonic.split(' ').length : 0
-      };
-    } catch (error) {
-      return { error: error instanceof Error ? error.message : 'Unknown error' };
-    }
   };
 
 
@@ -463,12 +336,6 @@ const SeedPhraseViewScreen: React.FC = () => {
                   {privateKey || 'Private key not available'}
                 </Text>
               </View>
-              <TouchableOpacity 
-                style={styles.copyButton}
-                onPress={handleExportPrivateKey}
-              >
-                <Text style={styles.copyButtonText}>Copy Private Key</Text>
-              </TouchableOpacity>
               <Text style={styles.privateKeyWarning}>
                 ⚠️ Keep your private key secure and never share it with anyone.
               </Text>
@@ -499,7 +366,7 @@ const SeedPhraseViewScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Action Buttons */}
+        {/* Action Buttons - Simplified for production */}
         {(isRevealed || !hasValidSeedPhrase) && (
           <View style={styles.actionButtonsContainer}>
             <TouchableOpacity 
@@ -510,26 +377,8 @@ const SeedPhraseViewScreen: React.FC = () => {
                 {showPrivateKey || !hasValidSeedPhrase ? 'Copy Private Key' : 'Copy Seed Phrase'}
               </Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.copyButton, styles.exportAllButton]}
-              onPress={handleShowExportModal}
-            >
-              <Text style={styles.exportAllButtonText}>Export All</Text>
-            </TouchableOpacity>
           </View>
         )}
-
-
-        {/* Debug Button - Always visible for troubleshooting */}
-        <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity 
-            style={[styles.copyButton, { backgroundColor: colors.white10, borderColor: colors.white10 }]}
-            onPress={handleDebugWallet}
-          >
-            <Text style={[styles.copyButtonText, { color: colors.white70 }]}>🔍 Debug Wallet</Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Spacer to ensure content doesn't get covered by fixed button */}
         <View style={styles.bottomSpacer} />
@@ -543,208 +392,6 @@ const SeedPhraseViewScreen: React.FC = () => {
         <Text style={styles.doneButtonText}>Done</Text>
       </TouchableOpacity>
 
-      {/* Export Modal */}
-      <Modal
-        visible={showExportModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowExportModal(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Export Wallet</Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowExportModal(false)}
-            >
-              <Text style={[styles.instructionsText, { fontSize: 18, fontWeight: 'bold' }]}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalContent}>
-            <View style={{ paddingVertical: 20 }}>
-              <Text style={styles.exportDescription}>
-                Choose how you want to export your wallet information. This will allow you to use your wallet in external apps like Phantom or Solflare.
-              </Text>
-
-              <TouchableOpacity
-                style={[styles.exportOptionButton, exportLoading && styles.exportOptionButtonDisabled]}
-                onPress={handleExportAll}
-                disabled={exportLoading}
-              >
-                <View style={styles.exportOptionContent}>
-                  <Text style={styles.exportOptionTitle}>Export Everything</Text>
-                  <Text style={styles.exportOptionSubtitle}>
-                    Get your wallet address, seed phrase, and private key
-                  </Text>
-                </View>
-                {exportLoading && (
-                  <ActivityIndicator size="small" color={colors.primaryGreen} />
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.exportOptionButton, styles.exportOptionButtonSecondary, exportLoading && styles.exportOptionButtonDisabled]}
-                onPress={() => {
-                  // Export only seed phrase
-                  const result = walletExportService.exportWallet(currentUser?.id?.toString() || '', activeWalletAddress || '', {
-                    includeSeedPhrase: true,
-                    includePrivateKey: false
-                  });
-                  result.then(exportResult => {
-                    if (exportResult.success && exportResult.seedPhrase) {
-                      Alert.alert('Seed Phrase', exportResult.seedPhrase);
-                    } else {
-                      Alert.alert('Export Failed', exportResult.error || 'Failed to export seed phrase');
-                    }
-                  });
-                }}
-                disabled={exportLoading}
-              >
-                <View style={styles.exportOptionContent}>
-                  <Text style={styles.exportOptionTitle}>Seed Phrase Only</Text>
-                  <Text style={styles.exportOptionSubtitle}>
-                    Get your 12 or 24-word seed phrase
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.exportOptionButton, styles.exportOptionButtonSecondary, exportLoading && styles.exportOptionButtonDisabled]}
-                onPress={handleExportPrivateKey}
-                disabled={exportLoading}
-              >
-                <View style={styles.exportOptionContent}>
-                  <Text style={styles.exportOptionTitle}>Private Key Only</Text>
-                  <Text style={styles.exportOptionSubtitle}>
-                    Get your wallet's private key
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.exportOptionButton, styles.exportOptionButtonSecondary]}
-                onPress={handleShowExportInstructions}
-              >
-                <View style={styles.exportOptionContent}>
-                  <Text style={styles.exportOptionTitle}>Export Instructions</Text>
-                  <Text style={styles.exportOptionSubtitle}>
-                    Learn how to import into external wallets
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.warningBox}>
-              <Text style={styles.warningTitle}>⚠️ Security Warning</Text>
-              <Text style={styles.warningText}>
-                Never share your seed phrase or private key with anyone. Anyone with access to these credentials can control your wallet and steal your funds.
-              </Text>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* Debug Modal */}
-      <Modal
-        visible={showDebugModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowDebugModal(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Wallet Debug Information</Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowDebugModal(false)}
-            >
-              <Text style={[styles.instructionsText, { fontSize: 18, fontWeight: 'bold' }]}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalContent}>
-            {debugInfo ? (
-              <View style={{ padding: 16 }}>
-                <Text style={[styles.instructionsTitle, { marginTop: 20, marginBottom: 10 }]}>Wallet Information</Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  User ID: {debugInfo.userId}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Timestamp: {debugInfo.timestamp}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Active Wallet: {debugInfo.walletInfo.activeWalletAddress || 'None'}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Seed Phrase Length: {debugInfo.walletInfo.seedPhraseLength}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Has Seed Phrase: {debugInfo.walletInfo.hasSeedPhrase ? 'Yes' : 'No'}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Has Valid Seed Phrase: {debugInfo.walletInfo.hasValidSeedPhrase ? 'Yes' : 'No'}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Seed Phrase Preview: {debugInfo.walletInfo.seedPhrasePreview}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Has Private Key: {debugInfo.walletInfo.hasPrivateKey ? 'Yes' : 'No'}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Private Key Preview: {debugInfo.walletInfo.privateKeyPreview}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Is Revealed: {debugInfo.walletInfo.isRevealed ? 'Yes' : 'No'}
-                </Text>
-
-                <Text style={[styles.instructionsTitle, { marginTop: 20, marginBottom: 10 }]}>Recovery Information</Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Recovery Success: {debugInfo.recoveryInfo.success ? 'Yes' : 'No'}
-                </Text>
-                {debugInfo.recoveryInfo.error && (
-                  <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                    Recovery Error: {debugInfo.recoveryInfo.error}
-                  </Text>
-                )}
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Has Wallet: {debugInfo.recoveryInfo.hasWallet ? 'Yes' : 'No'}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Recovered Address: {debugInfo.recoveryInfo.walletAddress || 'None'}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Requires User Action: {debugInfo.recoveryInfo.requiresUserAction ? 'Yes' : 'No'}
-                </Text>
-
-                <Text style={[styles.instructionsTitle, { marginTop: 20, marginBottom: 10 }]}>Storage Information</Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Stored Wallets Count: {debugInfo.storageInfo.storedWalletsCount}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Stored Addresses: {debugInfo.storageInfo.storedWalletAddresses?.join(', ') || 'None'}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Has Mnemonic: {debugInfo.storageInfo.hasMnemonic ? 'Yes' : 'No'}
-                </Text>
-                <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                  Mnemonic Length: {debugInfo.storageInfo.mnemonicLength}
-                </Text>
-                {debugInfo.storageInfo.error && (
-                  <Text style={[styles.instructionsText, { fontFamily: 'monospace' }]}>
-                    Storage Error: {debugInfo.storageInfo.error}
-                  </Text>
-                )}
-              </View>
-            ) : (
-              <View style={styles.loaderSeedPhraseContainer}>
-                <ActivityIndicator size="large" color={colors.primaryGreen} />
-                <Text style={styles.instructionsText}>Gathering debug information...</Text>
-              </View>
-            )}
-          </ScrollView>
-        </View>
-      </Modal>
     </Container>
   );
 };

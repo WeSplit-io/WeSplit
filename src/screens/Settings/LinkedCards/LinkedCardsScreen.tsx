@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, TouchableWithoutFeedback } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useApp } from '../../../context/AppContext';
 import AddDestinationSheet from '../../../components/AddDestinationSheet';
 import { LinkedWalletService, LinkedWallet } from '../../../services/blockchain/wallet/LinkedWalletService';
@@ -34,7 +35,15 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
     }
   }, [currentUser?.id]);
 
-  // Cards are refreshed when the screen is focused or when manually triggered
+  // Reload data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (currentUser?.id) {
+        console.log('LinkedCardsScreen: Screen focused, reloading data');
+        loadLinkedDestinations();
+      }
+    }, [currentUser?.id])
+  );
 
   const loadLinkedDestinations = async () => {
     if (!currentUser?.id) {
@@ -102,6 +111,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
             id: result.walletId || Date.now().toString(), 
             type: 'wallet', 
             ...destination,
+            label: destination.name, // Ensure label field is set for UI display
             userId: currentUser.id.toString(),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
@@ -137,6 +147,7 @@ const LinkedCardsScreen: React.FC<any> = ({ navigation }) => {
             id: result.walletId || Date.now().toString(), 
             type: 'kast', 
             ...destination,
+            label: destination.name, // Ensure label field is set for UI display
             userId: currentUser.id.toString(),
             isActive: destination.status === 'active',
             createdAt: new Date().toISOString(),

@@ -771,25 +771,25 @@ export const firebaseDataService = {
       try {
         logger.info('Getting linked wallets for user', { userId }, 'FirebaseDataService');
         
-        // Try both collection structures - first check subcollection under user
+        // Try both collection structures - first check main collection since that's where data is stored
         let querySnapshot;
         try {
-          // First try: subcollection under user document
-          const subcollectionRef = collection(db, 'users', userId, 'externalWallets');
-          querySnapshot = await getDocs(subcollectionRef);
-          console.log('Tried subcollection approach:', {
-            size: querySnapshot.size,
-            empty: querySnapshot.empty,
-            docs: querySnapshot.docs.length
-          });
-        } catch (subcollectionError) {
-          console.log('Subcollection approach failed, trying main collection:', subcollectionError);
-          // Fallback: main collection with userId filter
+          // First try: main collection with userId filter (where data is actually stored)
           const q = query(
             collection(db, 'linkedWallets'),
             where('userId', '==', userId)
           );
           querySnapshot = await getDocs(q);
+          console.log('Tried main collection approach:', {
+            size: querySnapshot.size,
+            empty: querySnapshot.empty,
+            docs: querySnapshot.docs.length
+          });
+        } catch (mainCollectionError) {
+          console.log('Main collection approach failed, trying subcollection:', mainCollectionError);
+          // Fallback: subcollection under user document
+          const subcollectionRef = collection(db, 'users', userId, 'externalWallets');
+          querySnapshot = await getDocs(subcollectionRef);
         }
         
         console.log('Firebase query snapshot:', {
