@@ -23,7 +23,7 @@ import NavBar from '../../components/shared/NavBar';
 import { useWallet } from '../../context/WalletContext';
 import { useApp } from '../../context/AppContext';
 import { firebaseDataService } from '../../services/data';
-import { walletService, UserWalletBalance, SolanaAppKitService } from '../../services/blockchain/wallet';
+import { walletService, UserWalletBalance, SolanaAppKitService, emergencyFundRecovery } from '../../services/blockchain/wallet';
 import { multiSignStateService } from '../../services/core';
 import { MultiSignStateService } from '../../services/core/multiSignStateService';
 import { colors } from '../../theme/colors';
@@ -66,6 +66,7 @@ const WalletManagementScreen: React.FC = () => {
   const [sliderValue] = useState(new Animated.Value(0));
   const [isSliderActive, setIsSliderActive] = useState(false);
   const [showQRCodeScreen, setShowQRCodeScreen] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
   
   // Initialize SolanaAppKitService for multi-signature operations
   const solanaAppKitService = new SolanaAppKitService();
@@ -699,6 +700,74 @@ const WalletManagementScreen: React.FC = () => {
     handleRefresh();
   };
 
+  const handleEmergencyFundRecovery = async () => {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    // The original wallet address with funds
+    const originalAddress = 'FjZXJEfVRdwA82gszezNgMoPZXP1btDR6AshaXA7N3Ea';
+
+    Alert.alert(
+      '🚨 Emergency Fund Recovery',
+      `This will attempt to recover your original wallet with funds:\n\n${originalAddress}\n\nCurrent wallet: ${appWalletAddress || 'N/A'}\n\nDo you want to proceed?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Recover Funds',
+          style: 'destructive',
+          onPress: async () => {
+            setIsRecovering(true);
+            try {
+              logger.info('Starting emergency fund recovery', {
+                userId: currentUser.id,
+                originalAddress,
+                currentAddress: appWalletAddress
+              }, 'WalletManagementScreen');
+
+              const result = await emergencyFundRecovery(currentUser.id, originalAddress);
+
+              if (result.success && result.wallet) {
+                Alert.alert(
+                  '✅ Recovery Successful!',
+                  `Original wallet recovered!\n\nAddress: ${result.wallet.address}\n\nYour funds should now be accessible. Please refresh the app.`,
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        handleRefresh();
+                        // Force app wallet refresh
+                        if (currentUser?.id) {
+                          ensureAppWallet(currentUser.id);
+                        }
+                      }
+                    }
+                  ]
+                );
+              } else {
+                Alert.alert(
+                  '❌ Recovery Failed',
+                  result.errorMessage || result.error || 'Could not recover original wallet. The seed phrase may not be stored on this device.\n\nYou may need to manually restore using your original 12-word seed phrase.',
+                  [{ text: 'OK' }]
+                );
+              }
+            } catch (error) {
+              logger.error('Emergency recovery error', error, 'WalletManagementScreen');
+              Alert.alert(
+                'Error',
+                `Recovery failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                [{ text: 'OK' }]
+              );
+            } finally {
+              setIsRecovering(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
 
 
   return (
@@ -840,6 +909,42 @@ const WalletManagementScreen: React.FC = () => {
               <Text style={styles.actionButtonText}>Link Wallet</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Emergency Fund Recovery Button */}
+          {appWalletAddress && appWalletAddress !== 'FjZXJEfVRdwA82gszezNgMoPZXP1btDR6AshaXA7N3Ea' && (
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#FF6B6B',
+                padding: 16,
+                borderRadius: 12,
+                marginTop: 20,
+                marginHorizontal: 20,
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 3.84,
+                elevation: 5,
+              }}
+              onPress={handleEmergencyFundRecovery}
+              disabled={isRecovering}
+            >
+              {isRecovering ? (
+                <ActivityIndicator color="#FFF" style={{ marginRight: 8 }} />
+              ) : (
+                <Text style={{ fontSize: 20, marginRight: 8 }}>🚨</Text>
+              )}
+              <Text style={{
+                color: '#FFF',
+                fontSize: 16,
+                fontWeight: '600',
+              }}>
+                {isRecovering ? 'Recovering Funds...' : 'Recover Lost Funds'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
         </View>
 

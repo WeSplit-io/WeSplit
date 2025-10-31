@@ -7,7 +7,7 @@ import { Keypair, PublicKey, Connection, LAMPORTS_PER_SOL } from '@solana/web3.j
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 import { logger } from '../../analytics/loggingService';
 import { firebaseDataService } from '../../data/firebaseDataService';
-import { walletRecoveryService, WalletRecoveryError } from './walletRecoveryService';
+import { walletRecoveryService, WalletRecoveryService, WalletRecoveryError } from './walletRecoveryService';
 import { walletExportService } from './walletExportService';
 import { getConfig } from '../../../config/unified';
 
@@ -35,6 +35,8 @@ export interface WalletCreationResult {
   wallet?: WalletInfo;
   mnemonic?: string;
   error?: string;
+  requiresUserAction?: boolean;
+  requiresSeedPhraseRestore?: boolean;
 }
 
 export interface WalletProvider {
@@ -162,11 +164,45 @@ class SimplifiedWalletService {
         }
 
         if (recoveryResult.error === WalletRecoveryError.DATABASE_MISMATCH) {
-          logger.warn('Database wallet recovery failed, checking if user action is required', { 
+          logger.warn('Database wallet recovery failed, attempting comprehensive recovery', { 
             userId,
             requiresUserAction: recoveryResult.requiresUserAction,
             errorMessage: recoveryResult.errorMessage
           }, 'SimplifiedWalletService');
+          
+          // Try comprehensive recovery as fallback
+          try {
+            const { firebaseDataService } = await import('../../data/firebaseDataService');
+            const userData = await firebaseDataService.user.getCurrentUser(userId);
+            
+            if (userData?.wallet_address) {
+              logger.info('Attempting comprehensive recovery with database address', { 
+                userId, 
+                expectedAddress: userData.wallet_address 
+              }, 'SimplifiedWalletService');
+              
+              // Use the comprehensive recovery method directly
+              const comprehensiveResult = await WalletRecoveryService.performComprehensiveRecovery(userId, userData.wallet_address);
+              
+              if (comprehensiveResult.success && comprehensiveResult.wallet) {
+                const result: WalletCreationResult = {
+                  success: true,
+                  wallet: {
+                    address: comprehensiveResult.wallet.address,
+                    publicKey: comprehensiveResult.wallet.publicKey,
+                    secretKey: comprehensiveResult.wallet.privateKey,
+                    isConnected: true,
+                    walletName: 'Recovered Wallet',
+                    walletType: 'recovered'
+                  }
+                };
+                this.walletRecoveryCache.set(userId, result);
+                return result;
+              }
+            }
+          } catch (comprehensiveError) {
+            logger.error('Comprehensive recovery failed', comprehensiveError, 'SimplifiedWalletService');
+          }
           
           if (recoveryResult.requiresUserAction) {
             // Database wallet cannot be recovered, user needs to take action
@@ -182,28 +218,32 @@ class SimplifiedWalletService {
             
             this.walletRecoveryCache.set(userId, errorResult);
             return errorResult;
-          } else {
-            // Try recovery again after mismatch resolution
-            const retryResult = await walletRecoveryService.recoverWallet(userId);
-            if (retryResult.success && retryResult.wallet) {
-              const result: WalletCreationResult = {
-                success: true,
-                wallet: {
-                  address: retryResult.wallet.address,
-                  publicKey: retryResult.wallet.publicKey,
-                  secretKey: retryResult.wallet.privateKey,
-                  isConnected: true,
-                  walletName: 'Recovered Wallet',
-                  walletType: 'recovered'
-                }
-              };
-              this.walletRecoveryCache.set(userId, result);
-              return result;
-            }
           }
         }
 
-        // If recovery failed for other reasons, create a new wallet
+        // If recovery failed for other reasons, check if this is a permanent failure
+        // where wallet exists in database but was never saved to device
+        const userData = await firebaseDataService.user.getCurrentUser(userId);
+        const hasDatabaseWallet = !!userData?.wallet_address;
+        
+        if (hasDatabaseWallet && recoveryResult.error === WalletRecoveryError.DATABASE_MISMATCH) {
+          // Wallet exists in database but not on device - this is a lost wallet scenario
+          logger.error('Wallet exists in database but credentials were never saved to device', { 
+            userId, 
+            walletAddress: userData.wallet_address,
+            error: recoveryResult.error,
+            errorMessage: recoveryResult.errorMessage
+          }, 'SimplifiedWalletService');
+
+          return {
+            success: false,
+            error: recoveryResult.errorMessage || 'Wallet credentials were never saved to this device. You will need to restore from your seed phrase. If you don\'t have your seed phrase, you may need to create a new wallet (this will create a new address and you may lose access to funds in the old wallet).',
+            requiresUserAction: true,
+            requiresSeedPhraseRestore: true
+          };
+        }
+
+        // For other errors, try creating a new wallet
         logger.info('Wallet recovery failed, creating new wallet', { 
           userId, 
           error: recoveryResult.error,
@@ -253,6 +293,13 @@ class SimplifiedWalletService {
       };
 
       // Store wallet using recovery service
+      logger.info('Storing wallet credentials', { 
+        userId, 
+        address: wallet.address,
+        hasPrivateKey: !!wallet.privateKey,
+        hasMnemonic: !!wallet.mnemonic
+      }, 'SimplifiedWalletService');
+      
       const stored = await walletRecoveryService.storeWallet(userId, {
         address: wallet.address,
         publicKey: wallet.publicKey,
@@ -260,13 +307,24 @@ class SimplifiedWalletService {
       });
 
       if (!stored) {
+        logger.error('Failed to store wallet in SecureStore', { userId, address: wallet.address }, 'SimplifiedWalletService');
         throw new Error('Failed to store new wallet');
       }
 
+      logger.info('Wallet stored in SecureStore successfully', { userId, address: wallet.address }, 'SimplifiedWalletService');
+
       // Store mnemonic
       if (wallet.mnemonic) {
-        await walletRecoveryService.storeMnemonic(userId, wallet.mnemonic);
+        const mnemonicStored = await walletRecoveryService.storeMnemonic(userId, wallet.mnemonic);
+        if (mnemonicStored) {
+          logger.info('Mnemonic stored successfully', { userId }, 'SimplifiedWalletService');
+        } else {
+          logger.warn('Failed to store mnemonic', { userId }, 'SimplifiedWalletService');
+        }
       }
+
+      // Clean up any test wallets from AsyncStorage
+      await walletRecoveryService.cleanupTestWallets(userId);
 
       // Update database
       await firebaseDataService.user.updateUser(userId, {
@@ -278,6 +336,12 @@ class SimplifiedWalletService {
         wallet_has_seed_phrase: true,
         wallet_type: 'app-generated'
       });
+
+      logger.info('Database updated with wallet info', { 
+        userId, 
+        address: wallet.address,
+        walletStatus: 'healthy'
+      }, 'SimplifiedWalletService');
 
       const result: WalletCreationResult = {
         success: true,
@@ -293,7 +357,18 @@ class SimplifiedWalletService {
       };
 
       this.walletRecoveryCache.set(userId, result);
-      logger.info('New wallet created successfully', { userId, address: wallet.address }, 'SimplifiedWalletService');
+      
+      // Verify the wallet was stored correctly
+      const verificationResult = await this.verifyWalletStorage(userId, wallet.address);
+      if (!verificationResult) {
+        logger.error('Wallet verification failed after creation', { userId, address: wallet.address }, 'SimplifiedWalletService');
+        return {
+          success: false,
+          error: 'Wallet created but verification failed. Please try again.'
+        };
+      }
+      
+      logger.info('✅ New wallet created and verified successfully', { userId, address: wallet.address }, 'SimplifiedWalletService');
       return result;
 
     } catch (error) {
@@ -551,6 +626,219 @@ class SimplifiedWalletService {
     } catch (error) {
       logger.error('Failed to get private key for wallet', error, 'SimplifiedWalletService');
       return null;
+    }
+  }
+
+  /**
+   * Emergency recovery for lost funds - attempts to recover original wallet
+   */
+  async emergencyFundRecovery(userId: string, originalAddress: string): Promise<WalletCreationResult> {
+    try {
+      logger.error('🚨 EMERGENCY FUND RECOVERY REQUESTED', { 
+        userId, 
+        originalAddress,
+        warning: 'Attempting to recover lost funds'
+      }, 'SimplifiedWalletService');
+      
+      const result = await WalletRecoveryService.emergencyFundRecovery(userId, originalAddress);
+      
+      if (result.success && result.wallet) {
+        const walletResult: WalletCreationResult = {
+          success: true,
+          wallet: {
+            address: result.wallet.address,
+            publicKey: result.wallet.publicKey,
+            secretKey: result.wallet.privateKey,
+            isConnected: true,
+            walletName: 'Recovered Original Wallet',
+            walletType: 'emergency_recovered'
+          }
+        };
+        
+        this.walletRecoveryCache.set(userId, walletResult);
+        logger.info('✅ EMERGENCY RECOVERY SUCCESSFUL - Funds recovered!', { 
+          userId, 
+          address: result.wallet.address,
+          originalAddress
+        }, 'SimplifiedWalletService');
+        
+        return walletResult;
+      } else {
+        logger.error('❌ EMERGENCY RECOVERY FAILED', { 
+          userId, 
+          originalAddress,
+          error: result.errorMessage
+        }, 'SimplifiedWalletService');
+        
+        return {
+          success: false,
+          error: result.errorMessage || 'Emergency recovery failed - funds may be permanently lost'
+        };
+      }
+    } catch (error) {
+      logger.error('Emergency fund recovery error', error, 'SimplifiedWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error during emergency recovery'
+      };
+    }
+  }
+
+  /**
+   * Restore wallet from seed phrase when recovery failed
+   */
+  async restoreWalletFromSeedPhrase(userId: string, seedPhrase: string, expectedAddress?: string): Promise<WalletCreationResult> {
+    try {
+      logger.info('Restoring wallet from seed phrase', { userId, expectedAddress }, 'SimplifiedWalletService');
+      
+      const result = await walletRecoveryService.restoreWalletFromSeedPhrase(userId, seedPhrase, expectedAddress);
+      
+      if (result.success && result.wallet) {
+        const walletResult: WalletCreationResult = {
+          success: true,
+          wallet: {
+            address: result.wallet.address,
+            publicKey: result.wallet.publicKey,
+            secretKey: result.wallet.privateKey,
+            isConnected: true,
+            walletName: 'Restored Wallet',
+            walletType: 'restored'
+          }
+        };
+        
+        this.walletRecoveryCache.set(userId, walletResult);
+        logger.info('Wallet restored from seed phrase successfully', { 
+          userId, 
+          address: result.wallet.address 
+        }, 'SimplifiedWalletService');
+        
+        return walletResult;
+      } else {
+        return {
+          success: false,
+          error: result.errorMessage || 'Failed to restore wallet from seed phrase'
+        };
+      }
+    } catch (error) {
+      logger.error('Error restoring wallet from seed phrase', error, 'SimplifiedWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Recover wallet from address (used during authentication)
+   */
+  async recoverWalletFromAddress(userId: string, expectedAddress: string): Promise<WalletCreationResult> {
+    try {
+      logger.info('Recovering wallet from address', { userId, expectedAddress }, 'SimplifiedWalletService');
+      
+      // Use the comprehensive recovery method
+      const recoveryResult = await WalletRecoveryService.performComprehensiveRecovery(userId, expectedAddress);
+      
+      if (recoveryResult.success && recoveryResult.wallet) {
+        const result: WalletCreationResult = {
+          success: true,
+          wallet: {
+            address: recoveryResult.wallet.address,
+            publicKey: recoveryResult.wallet.publicKey,
+            secretKey: recoveryResult.wallet.privateKey,
+            isConnected: true,
+            walletName: 'Recovered Wallet',
+            walletType: 'recovered'
+          }
+        };
+        
+        this.walletRecoveryCache.set(userId, result);
+        logger.info('Wallet recovered from address successfully', { 
+          userId, 
+          address: recoveryResult.wallet.address 
+        }, 'SimplifiedWalletService');
+        
+        return result;
+      } else {
+        logger.warn('Failed to recover wallet from address', { 
+          userId, 
+          expectedAddress,
+          error: recoveryResult.errorMessage
+        }, 'SimplifiedWalletService');
+        
+        return {
+          success: false,
+          error: recoveryResult.errorMessage || 'Failed to recover wallet'
+        };
+      }
+    } catch (error) {
+      logger.error('Error recovering wallet from address', error, 'SimplifiedWalletService');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Verify that wallet was stored correctly
+   */
+  private async verifyWalletStorage(userId: string, expectedAddress: string): Promise<boolean> {
+    try {
+      logger.debug('Verifying wallet storage', { userId, expectedAddress }, 'SimplifiedWalletService');
+      
+      // Try to recover the wallet we just created
+      const recoveryResult = await walletRecoveryService.recoverWallet(userId);
+      
+      if (recoveryResult.success && recoveryResult.wallet) {
+        const matches = recoveryResult.wallet.address === expectedAddress;
+        logger.debug('Wallet verification result', { 
+          userId, 
+          expectedAddress, 
+          recoveredAddress: recoveryResult.wallet.address,
+          matches
+        }, 'SimplifiedWalletService');
+        return matches;
+      }
+      
+      logger.warn('Wallet verification failed - could not recover wallet', { userId, expectedAddress }, 'SimplifiedWalletService');
+      return false;
+    } catch (error) {
+      logger.error('Error verifying wallet storage', error, 'SimplifiedWalletService');
+      return false;
+    }
+  }
+
+  /**
+   * Check if user has a wallet stored on this device
+   */
+  async hasWalletOnDevice(userId: string): Promise<boolean> {
+    try {
+      logger.debug('Checking if user has wallet on device', { userId }, 'SimplifiedWalletService');
+      
+      // Try to get stored wallets
+      const storedWallets = await walletRecoveryService.getStoredWallets(userId);
+      
+      if (storedWallets.length > 0) {
+        logger.debug('Found stored wallets on device', { 
+          userId, 
+          count: storedWallets.length,
+          addresses: storedWallets.map(w => w.address)
+        }, 'SimplifiedWalletService');
+        return true;
+      }
+      
+      // Check for mnemonic
+      const mnemonic = await walletRecoveryService.getStoredMnemonic(userId);
+      if (mnemonic) {
+        logger.debug('Found mnemonic on device', { userId }, 'SimplifiedWalletService');
+        return true;
+      }
+      
+      logger.debug('No wallet found on device', { userId }, 'SimplifiedWalletService');
+      return false;
+    } catch (error) {
+      logger.error('Error checking wallet on device', error, 'SimplifiedWalletService');
+      return false;
     }
   }
 

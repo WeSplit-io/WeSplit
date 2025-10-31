@@ -7,6 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { logger } from '../../analytics/loggingService';
 import { firebaseDataService } from '../../data/firebaseDataService';
+import { secureVault } from '../../security/secureVault';
 
 export enum WalletRecoveryError {
   NO_LOCAL_WALLETS = 'NO_LOCAL_WALLETS',
@@ -50,14 +51,18 @@ export class WalletRecoveryService {
     privateKey: string;
   }): Promise<boolean> {
     try {
-      const walletData: StoredWallet = {
-        ...wallet,
-        userId,
-        createdAt: new Date().toISOString()
-      };
-
-      const key = `${this.USER_WALLET_PREFIX}${userId}`;
-      await SecureStore.setItemAsync(key, JSON.stringify(walletData));
+      // Primary: store private key via secure vault (Keychain+MMKV)
+      const pkStored = await secureVault.store(userId, 'privateKey', wallet.privateKey);
+      if (!pkStored) {
+        // Fallback: previous behavior in SecureStore
+        const walletData: StoredWallet = {
+          ...wallet,
+          userId,
+          createdAt: new Date().toISOString()
+        };
+        const key = `${this.USER_WALLET_PREFIX}${userId}`;
+        await SecureStore.setItemAsync(key, JSON.stringify(walletData));
+      }
       
       logger.info('Wallet stored securely', { userId, address: wallet.address }, 'WalletRecoveryService');
       return true;
@@ -74,6 +79,29 @@ export class WalletRecoveryService {
     const wallets: StoredWallet[] = [];
     
     try {
+      // 0. Check secure vault (primary)
+      try {
+        const privateKey = await secureVault.get(userId, 'privateKey');
+        if (privateKey) {
+          try {
+            const keypair = Keypair.fromSecretKey(Buffer.from(privateKey, 'base64'));
+            const address = keypair.publicKey.toBase58();
+            wallets.push({
+              address,
+              publicKey: address,
+              privateKey,
+              userId,
+              createdAt: new Date().toISOString()
+            });
+            logger.debug('Found wallet in secure vault', { userId, address }, 'WalletRecoveryService');
+          } catch (e) {
+            logger.warn('Failed to parse privateKey from secure vault', e, 'WalletRecoveryService');
+          }
+        }
+      } catch (e) {
+        logger.warn('Secure vault read failed', e, 'WalletRecoveryService');
+      }
+
       // 1. Check new format: wallet_${userId}
       const newKey = `${this.USER_WALLET_PREFIX}${userId}`;
       const newStoredData = await SecureStore.getItemAsync(newKey);
@@ -147,18 +175,55 @@ export class WalletRecoveryService {
           logger.debug('Found AsyncStorage storedWallets', { count: storedWalletsArray.length }, 'WalletRecoveryService');
           
           for (const storedWallet of storedWalletsArray) {
-            if (storedWallet.secretKey && storedWallet.address) {
+            logger.debug('Processing AsyncStorage wallet', { 
+              userId, 
+              hasSecretKey: !!storedWallet.secretKey,
+              hasAddress: !!storedWallet.address,
+              hasPrivateKey: !!storedWallet.privateKey,
+              walletKeys: Object.keys(storedWallet)
+            }, 'WalletRecoveryService');
+            
+            // Check for different possible key names
+            const secretKey = storedWallet.secretKey || storedWallet.privateKey || storedWallet.secret;
+            const address = storedWallet.address || storedWallet.publicKey;
+            
+            // Skip wallets with empty secretKey (test/external wallets)
+            if (!secretKey || secretKey === '' || secretKey.length === 0) {
+              logger.debug('Skipping wallet with empty secretKey (likely test/external wallet)', { 
+                userId,
+                address,
+                walletName: storedWallet.name || 'Unknown',
+                isAppGenerated: storedWallet.isAppGenerated
+              }, 'WalletRecoveryService');
+              continue;
+            }
+            
+            if (secretKey && address) {
               try {
                 // Parse the secret key (it might be a string or array)
                 let privateKeyBuffer: Buffer;
-                if (typeof storedWallet.secretKey === 'string') {
+                if (typeof secretKey === 'string') {
                   // If it's a string, it might be base64 encoded
-                  privateKeyBuffer = Buffer.from(storedWallet.secretKey, 'base64');
-                } else if (Array.isArray(storedWallet.secretKey)) {
+                  try {
+                    privateKeyBuffer = Buffer.from(secretKey, 'base64');
+                    // Verify it's a valid 64-byte key
+                    if (privateKeyBuffer.length !== 64) {
+                      throw new Error('Invalid key length');
+                    }
+                  } catch (base64Error) {
+                    // If base64 fails, try as raw string
+                    privateKeyBuffer = Buffer.from(secretKey);
+                  }
+                } else if (Array.isArray(secretKey)) {
                   // If it's an array, convert to buffer
-                  privateKeyBuffer = Buffer.from(storedWallet.secretKey);
+                  privateKeyBuffer = Buffer.from(secretKey);
                 } else {
-                  continue; // Skip if we can't parse it
+                  logger.warn('Invalid secret key format', { 
+                    userId, 
+                    secretKeyType: typeof secretKey,
+                    isArray: Array.isArray(secretKey)
+                  }, 'WalletRecoveryService');
+                  continue;
                 }
                 
                 const keypair = Keypair.fromSecretKey(privateKeyBuffer);
@@ -173,10 +238,27 @@ export class WalletRecoveryService {
                 };
                 
                 wallets.push(asyncStorageWallet);
-                logger.debug('Found wallet in AsyncStorage format', { userId, address: asyncStorageWallet.address }, 'WalletRecoveryService');
+                logger.info('✅ Successfully parsed AsyncStorage wallet', { 
+                  userId, 
+                  address: asyncStorageWallet.address,
+                  originalAddress: address,
+                  matches: derivedAddress === address
+                }, 'WalletRecoveryService');
               } catch (error) {
-                logger.warn('Failed to parse AsyncStorage wallet', error, 'WalletRecoveryService');
+                logger.warn('Failed to parse AsyncStorage wallet', { 
+                  error: error instanceof Error ? error.message : String(error),
+                  userId,
+                  secretKeyType: typeof secretKey,
+                  address
+                }, 'WalletRecoveryService');
               }
+            } else {
+              logger.debug('Skipping AsyncStorage wallet - missing required fields', { 
+                userId,
+                hasSecretKey: !!secretKey,
+                hasAddress: !!address,
+                walletData: storedWallet
+              }, 'WalletRecoveryService');
             }
           }
         }
@@ -404,7 +486,11 @@ export class WalletRecoveryService {
     try {
       logger.info('Starting comprehensive wallet recovery', { userId }, 'WalletRecoveryService');
 
-      // Try to recover wallet using standard method
+      // Try to migrate old production wallets first
+      const migrationResult = await this.migrateOldProductionWallets(userId);
+      if (migrationResult) {
+        logger.info('Old wallet migrated, attempting recovery', { userId }, 'WalletRecoveryService');
+      }
 
       // Check if wallet consistency is valid
       const isConsistent = await this.validateWalletConsistency(userId);
@@ -558,24 +644,17 @@ export class WalletRecoveryService {
       }, 'WalletRecoveryService');
       
       // Try comprehensive recovery as fallback
-      const { solanaWalletService } = await import('./api/solanaWalletApi');
-      const comprehensiveResult = await solanaWalletService.instance.comprehensiveWalletRecovery(userId, expectedPublicKey);
+      logger.info('Attempting comprehensive recovery as fallback', { userId, expectedPublicKey }, 'WalletRecoveryService');
+      const comprehensiveResult = await this.performComprehensiveRecovery(userId, expectedPublicKey);
       
-      if (comprehensiveResult) {
+      if (comprehensiveResult.success) {
         logger.info('Comprehensive wallet recovery succeeded', {
           userId,
           expectedPublicKey,
-          recoveredAddress: comprehensiveResult.publicKey.toBase58()
+          recoveredAddress: comprehensiveResult.wallet?.address
         }, 'WalletRecoveryService');
         
-        return {
-          success: true,
-          wallet: {
-            address: comprehensiveResult.publicKey.toBase58(),
-            publicKey: comprehensiveResult.publicKey.toBase58(),
-            privateKey: Buffer.from(comprehensiveResult.secretKey).toString('base64')
-          }
-        };
+        return comprehensiveResult;
       }
       
       return {
@@ -800,11 +879,42 @@ export class WalletRecoveryService {
   /**
    * Perform comprehensive recovery using all available methods
    */
-  private static async performComprehensiveRecovery(userId: string, expectedAddress: string): Promise<WalletRecoveryResult> {
+  static async performComprehensiveRecovery(userId: string, expectedAddress: string): Promise<WalletRecoveryResult> {
     try {
       logger.debug('Starting comprehensive recovery', { userId, expectedAddress }, 'WalletRecoveryService');
       
-      // 1. Try to find wallet in all storage formats
+      // 0. Try to migrate old production wallets first
+      const migrationResult = await this.migrateOldProductionWallets(userId);
+      if (migrationResult) {
+        logger.info('Old wallet migrated successfully, proceeding with recovery', { userId, expectedAddress }, 'WalletRecoveryService');
+      } else {
+        // If migration failed, try to generate missing credentials for existing database wallet
+        const userData = await firebaseDataService.user.getCurrentUser(userId);
+        if (userData?.wallet_address && userData.wallet_address === expectedAddress) {
+          logger.warn('Migration failed but database wallet exists, generating new credentials', { 
+            userId, 
+            expectedAddress 
+          }, 'WalletRecoveryService');
+          
+          const generated = await this.generateMissingWalletCredentials(userId, expectedAddress);
+          if (generated) {
+            logger.info('Generated new wallet credentials for existing database wallet', { userId }, 'WalletRecoveryService');
+            // Return the new wallet as a successful recovery
+            const newWallet = await this.getStoredWallets(userId);
+            if (newWallet.length > 0) {
+      return {
+        success: true,
+        wallet: newWallet[0]
+      };
+            }
+          }
+        }
+      }
+      
+      // 1. Clean up test wallets
+      await this.cleanupTestWallets(userId);
+      
+      // 2. Try to find wallet in all storage formats
       const storedWallets = await this.getStoredWallets(userId);
       
       logger.info('Checking stored wallets for database address match', { 
@@ -884,7 +994,8 @@ export class WalletRecoveryService {
       return {
         success: false,
         error: WalletRecoveryError.DATABASE_MISMATCH,
-        errorMessage: `No stored wallet matches the database address ${expectedAddress}`
+        errorMessage: `No wallet credentials found for address ${expectedAddress}. This usually happens when:\n\n1. The app was reinstalled and wallet data was lost\n2. The wallet was created on a different device\n3. The wallet was never properly saved to this device\n\nPlease restore your wallet using your seed phrase or create a new wallet.`,
+        requiresUserAction: true
       };
       
     } catch (error) {
@@ -1117,37 +1228,64 @@ export class WalletRecoveryService {
    */
   private static async tryMnemonicRecovery(userId: string, expectedAddress: string): Promise<WalletRecoveryResult> {
     try {
+      logger.debug('Starting mnemonic recovery', { userId, expectedAddress }, 'WalletRecoveryService');
+      
       const keysToCheck = [
         `mnemonic_${userId}`,
-        'wallet_mnemonic'
+        'wallet_mnemonic',
+        `seed_phrase_${userId}`,
+        'wallet_seed_phrase'
       ];
       
       for (const key of keysToCheck) {
         try {
+          logger.debug('Checking mnemonic key', { userId, key }, 'WalletRecoveryService');
+          
           const mnemonicData = await SecureStore.getItemAsync(key, {
             requireAuthentication: false,
             keychainService: 'WeSplitWalletData'
           });
           
           if (mnemonicData) {
+            logger.debug('Found mnemonic data', { userId, key, dataLength: mnemonicData.length }, 'WalletRecoveryService');
+            
             let mnemonic: string;
             try {
               const parsed = JSON.parse(mnemonicData);
-              mnemonic = parsed.mnemonic || mnemonicData;
+              mnemonic = parsed.mnemonic || parsed.seedPhrase || mnemonicData;
+              logger.debug('Parsed mnemonic from JSON', { userId, key, mnemonicLength: mnemonic.length }, 'WalletRecoveryService');
             } catch {
               mnemonic = mnemonicData;
+              logger.debug('Using raw mnemonic data', { userId, key, mnemonicLength: mnemonic.length }, 'WalletRecoveryService');
             }
             
+            // Validate mnemonic format
+            const { validateBip39Mnemonic } = await import('./derive');
+      const validation = validateBip39Mnemonic(mnemonic);
+            
+      if (!validation.isValid) {
+        logger.warn('Invalid mnemonic format', { userId, key }, 'WalletRecoveryService');
+              continue;
+            }
+            
+            logger.info('Valid mnemonic found, trying derivation paths', { userId, key }, 'WalletRecoveryService');
             const derivationResult = await this.tryDerivationPaths(mnemonic, expectedAddress);
             if (derivationResult.success) {
+              logger.info('✅ Mnemonic recovery succeeded', { userId, key, address: derivationResult.wallet?.address }, 'WalletRecoveryService');
               return derivationResult;
+            } else {
+              logger.debug('Mnemonic derivation failed', { userId, key, error: derivationResult.errorMessage }, 'WalletRecoveryService');
             }
+          } else {
+            logger.debug('No mnemonic data found', { userId, key }, 'WalletRecoveryService');
           }
         } catch (error) {
+          logger.debug('Error checking mnemonic key', { userId, key, error: error instanceof Error ? error.message : String(error) }, 'WalletRecoveryService');
           // Continue to next key
         }
       }
       
+      logger.warn('No valid mnemonic found or derivation failed', { userId, expectedAddress }, 'WalletRecoveryService');
       return {
         success: false,
         error: WalletRecoveryError.DATABASE_MISMATCH,
@@ -1179,9 +1317,9 @@ export class WalletRecoveryService {
         };
       }
       
-      // Try different derivation methods
+      // Try different derivation methods for Solana
       const derivationMethods = [
-        // Standard derivation
+        // Standard Solana derivation (m/44'/501'/0'/0')
         async () => {
           const seed = await bip39.mnemonicToSeed(mnemonic);
           return Keypair.fromSeed(seed.slice(0, 32));
@@ -1190,6 +1328,16 @@ export class WalletRecoveryService {
         async () => {
           const seed = await bip39.mnemonicToSeed(mnemonic);
           return Keypair.fromSeed(seed.slice(0, 64).slice(0, 32));
+        },
+        // Try with BIP44 derivation path for Solana
+        async () => {
+          const { deriveKeypairFromMnemonic } = await import('./derive');
+          return deriveKeypairFromMnemonic(mnemonic, "m/44'/501'/0'/0'");
+        },
+        // Try with different BIP44 path
+        async () => {
+          const { deriveKeypairFromMnemonic } = await import('./derive');
+          return deriveKeypairFromMnemonic(mnemonic, "m/44'/501'/0'");
         }
       ];
       
@@ -1287,6 +1435,783 @@ export class WalletRecoveryService {
   }
 
   /**
+   * Restore wallet from seed phrase
+   */
+  static async restoreWalletFromSeedPhrase(userId: string, seedPhrase: string, expectedAddress?: string): Promise<WalletRecoveryResult> {
+    try {
+      logger.info('Restoring wallet from seed phrase', { userId, expectedAddress }, 'WalletRecoveryService');
+      
+      // Validate mnemonic
+      const { validateBip39Mnemonic, deriveKeypairFromMnemonic } = await import('./derive');
+      const validation = validateBip39Mnemonic(seedPhrase);
+      
+      if (!validation.isValid) {
+        return {
+          success: false,
+          error: WalletRecoveryError.INVALID_PRIVATE_KEY,
+          errorMessage: 'Invalid seed phrase'
+        };
+      }
+      
+      // Try different derivation paths
+      const derivationPaths = [
+        "m/44'/501'/0'/0'",  // Standard Solana
+        "m/44'/501'/0'",      // Alternative
+        "m/44'/501'"          // Fallback
+      ];
+      
+      for (const path of derivationPaths) {
+        try {
+          const keypair = deriveKeypairFromMnemonic(seedPhrase, path);
+          const derivedAddress = keypair.publicKey.toBase58();
+          
+          // If expected address provided, check if it matches
+          if (expectedAddress && derivedAddress !== expectedAddress) {
+            logger.debug('Derived address does not match expected', { 
+              derivedAddress, 
+              expectedAddress, 
+              path 
+            }, 'WalletRecoveryService');
+            continue;
+          }
+          
+          // Store the recovered wallet
+          const wallet = {
+            address: derivedAddress,
+            publicKey: derivedAddress,
+            privateKey: Buffer.from(keypair.secretKey).toString('base64')
+          };
+          
+          const stored = await this.storeWallet(userId, wallet);
+          if (stored) {
+            // Store the mnemonic
+            await this.storeMnemonic(userId, seedPhrase);
+            
+            logger.info('✅ Wallet restored from seed phrase', { 
+              userId, 
+              address: derivedAddress, 
+              path 
+            }, 'WalletRecoveryService');
+            
+            return {
+              success: true,
+              wallet
+            };
+          }
+        } catch (error) {
+          logger.debug('Derivation path failed', { path, error: error instanceof Error ? error.message : String(error) }, 'WalletRecoveryService');
+        }
+      }
+      
+      return {
+        success: false,
+        error: WalletRecoveryError.DATABASE_MISMATCH,
+        errorMessage: expectedAddress ? 
+          `Seed phrase does not generate the expected wallet address ${expectedAddress}` :
+          'Failed to derive wallet from seed phrase'
+      };
+      
+    } catch (error) {
+      logger.error('Failed to restore wallet from seed phrase', error, 'WalletRecoveryService');
+      return {
+        success: false,
+        error: WalletRecoveryError.STORAGE_CORRUPTION,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Emergency recovery for lost funds - tries to find the original wallet
+   * This is specifically for cases where funds were lost due to wallet address changes
+   */
+  static async emergencyFundRecovery(userId: string, originalAddress: string): Promise<WalletRecoveryResult> {
+    try {
+      logger.error('🚨 EMERGENCY FUND RECOVERY - Attempting to recover lost funds', { 
+        userId, 
+        originalAddress,
+        warning: 'User may have lost access to funds due to wallet address change'
+      }, 'WalletRecoveryService');
+      
+      // Get all possible mnemonic storage locations
+      const mnemonicKeys = [
+        `mnemonic_${userId}`,
+        'wallet_mnemonic',
+        `seed_phrase_${userId}`,
+        'wallet_seed_phrase',
+        'user_mnemonic',
+        'backup_phrase',
+        'wallet_backup',
+        'recovery_phrase'
+      ];
+      
+      // Try to find any stored mnemonic
+      for (const key of mnemonicKeys) {
+        try {
+          const mnemonicData = await SecureStore.getItemAsync(key, {
+            requireAuthentication: false,
+            keychainService: 'WeSplitWalletData'
+          });
+          
+          if (mnemonicData) {
+            logger.info('Found potential mnemonic for emergency recovery', { 
+              userId, 
+              key,
+              hasData: !!mnemonicData
+            }, 'WalletRecoveryService');
+            
+            // Parse mnemonic
+            let mnemonic: string;
+            try {
+              const parsed = JSON.parse(mnemonicData);
+              mnemonic = parsed.mnemonic || parsed.seedPhrase || parsed.seed_phrase || mnemonicData;
+            } catch {
+              mnemonic = mnemonicData;
+            }
+            
+            if (mnemonic && typeof mnemonic === 'string' && mnemonic.split(' ').length >= 12) {
+              logger.info('Valid mnemonic found, trying all derivation paths', { 
+                userId, 
+                key,
+                mnemonicLength: mnemonic.split(' ').length
+              }, 'WalletRecoveryService');
+              
+              // Try comprehensive derivation paths
+              const derivationPaths = [
+                "m/44'/501'/0'/0'",     // Standard Solana
+                "m/44'/501'/0'",        // Alternative Solana
+                "m/44'/501'/0'/0'/0'",  // Extended path
+                "m/44'/501'/0'/0'/1'",  // Alternative index
+                "m/44'/501'/1'/0'",     // Different account
+                "m/44'/501'/0'/1'",     // Different change
+                "m/44'/501'/0'/0'/2'",  // More indices
+                "m/44'/501'/0'/0'/3'",
+                "m/44'/501'/0'/0'/4'",
+                "m/44'/501'/0'/0'/5'",
+                "m/44'/501'/2'/0'",     // More accounts
+                "m/44'/501'/3'/0'",
+                "m/44'/501'/4'/0'",
+                "m/44'/501'/5'/0'"
+              ];
+              
+              for (const path of derivationPaths) {
+                try {
+                  const { deriveKeypairFromMnemonic } = await import('./derive');
+                  const keypair = deriveKeypairFromMnemonic(mnemonic, path);
+                  const derivedAddress = keypair.publicKey.toBase58();
+                  
+                  logger.debug('Trying derivation path', { 
+                    path, 
+                    derivedAddress, 
+                    originalAddress,
+                    matches: derivedAddress === originalAddress
+                  }, 'WalletRecoveryService');
+                  
+                  if (derivedAddress === originalAddress) {
+                    logger.info('🎉 FOUND ORIGINAL WALLET! Funds can be recovered!', { 
+                      userId, 
+                      originalAddress,
+                      derivationPath: path,
+                      key,
+                      success: true
+                    }, 'WalletRecoveryService');
+                    
+                    // Store the original wallet credentials
+                    const originalWallet = {
+                      address: derivedAddress,
+                      publicKey: derivedAddress,
+                      privateKey: Buffer.from(keypair.secretKey).toString('base64')
+                    };
+                    
+                    const stored = await this.storeWallet(userId, originalWallet);
+                    if (stored) {
+                      await this.storeMnemonic(userId, mnemonic);
+                      
+                      // Update database to restore original address
+                      await firebaseDataService.user.updateUser(userId, {
+                        wallet_address: originalAddress,
+                        wallet_public_key: originalAddress,
+                        wallet_status: 'healthy',
+                        wallet_has_private_key: true,
+                        wallet_has_seed_phrase: true,
+                        wallet_type: 'app-generated',
+                        wallet_migration_status: 'funds_recovered' as any,
+                      } as any);
+                      
+                      logger.info('✅ ORIGINAL WALLET RECOVERED AND RESTORED!', { 
+                        userId, 
+                        address: derivedAddress,
+                        fundsRecovered: true
+                      }, 'WalletRecoveryService');
+                      
+                      return {
+                        success: true,
+                        wallet: originalWallet
+                      };
+                    }
+                  }
+                } catch (derivationError) {
+                  logger.debug('Derivation path failed', { path, error: derivationError }, 'WalletRecoveryService');
+                }
+              }
+            }
+          }
+        } catch (keyError) {
+          logger.debug('Error checking mnemonic key', { key, error: keyError }, 'WalletRecoveryService');
+        }
+      }
+      
+      logger.error('❌ EMERGENCY RECOVERY FAILED - Could not find original wallet', { 
+        userId, 
+        originalAddress,
+        warning: 'User funds may be permanently lost'
+      }, 'WalletRecoveryService');
+      
+      return {
+        success: false,
+        error: WalletRecoveryError.DATABASE_MISMATCH,
+        errorMessage: 'Emergency recovery failed - no valid mnemonic found that generates the original wallet address'
+      };
+      
+    } catch (error) {
+      logger.error('Emergency fund recovery failed', error, 'WalletRecoveryService');
+      return {
+        success: false,
+        error: WalletRecoveryError.STORAGE_CORRUPTION,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Attempt to recover the original wallet by trying common derivation paths
+   * This preserves user funds by finding the original private key
+   */
+  static async attemptOriginalWalletRecovery(userId: string, expectedAddress: string): Promise<boolean> {
+    try {
+      logger.info('Attempting to recover original wallet to preserve user funds', { 
+        userId, 
+        expectedAddress 
+      }, 'WalletRecoveryService');
+      
+      // Try to find any stored mnemonic or seed phrase in various formats
+      const mnemonicKeys = [
+        `mnemonic_${userId}`,
+        'wallet_mnemonic',
+        `seed_phrase_${userId}`,
+        'wallet_seed_phrase',
+        'user_mnemonic',
+        'backup_phrase'
+      ];
+      
+      for (const key of mnemonicKeys) {
+        try {
+          const mnemonicData = await SecureStore.getItemAsync(key, {
+            requireAuthentication: false,
+            keychainService: 'WeSplitWalletData'
+          });
+          
+          if (mnemonicData) {
+            logger.debug('Found potential mnemonic data', { userId, key }, 'WalletRecoveryService');
+            
+            // Try to parse as mnemonic
+            let mnemonic: string;
+            try {
+              const parsed = JSON.parse(mnemonicData);
+              mnemonic = parsed.mnemonic || parsed.seedPhrase || parsed.seed_phrase || mnemonicData;
+            } catch {
+              mnemonic = mnemonicData;
+            }
+            
+            if (mnemonic && typeof mnemonic === 'string' && mnemonic.split(' ').length >= 12) {
+              logger.info('Found valid mnemonic, attempting to derive original wallet', { 
+                userId, 
+                key,
+                mnemonicLength: mnemonic.split(' ').length
+              }, 'WalletRecoveryService');
+              
+              // Try multiple derivation paths to find the original wallet
+              const derivationPaths = [
+                "m/44'/501'/0'/0'",  // Standard Solana
+                "m/44'/501'/0'",     // Alternative Solana
+                "m/44'/501'/0'/0'/0'", // Extended path
+                "m/44'/501'/0'/0'/1'", // Alternative index
+                "m/44'/501'/1'/0'",  // Different account
+                "m/44'/501'/0'/1'"   // Different change
+              ];
+              
+              for (const path of derivationPaths) {
+                try {
+                  const { deriveKeypairFromMnemonic } = await import('./derive');
+                  const keypair = deriveKeypairFromMnemonic(mnemonic, path);
+                  const derivedAddress = keypair.publicKey.toBase58();
+                  
+                  if (derivedAddress === expectedAddress) {
+                    logger.info('✅ FOUND ORIGINAL WALLET! Preserving user funds', { 
+                      userId, 
+                      expectedAddress,
+                      derivationPath: path,
+                      key
+                    }, 'WalletRecoveryService');
+                    
+                    // Store the original wallet credentials
+                    const originalWallet = {
+                      address: derivedAddress,
+                      publicKey: derivedAddress,
+                      privateKey: Buffer.from(keypair.secretKey).toString('base64')
+                    };
+                    
+                    const stored = await this.storeWallet(userId, originalWallet);
+                    if (stored) {
+                      await this.storeMnemonic(userId, mnemonic);
+                      
+                      logger.info('✅ Original wallet recovered and stored successfully', { 
+                        userId, 
+                        address: derivedAddress 
+                      }, 'WalletRecoveryService');
+                      
+                      return true;
+                    }
+                  }
+                } catch (derivationError) {
+                  logger.debug('Derivation path failed', { path, error: derivationError }, 'WalletRecoveryService');
+                }
+              }
+            }
+          }
+        } catch (keyError) {
+          logger.debug('Error checking mnemonic key', { key, error: keyError }, 'WalletRecoveryService');
+        }
+      }
+      
+      logger.warn('Could not recover original wallet - no valid mnemonic found', { 
+        userId, 
+        expectedAddress 
+      }, 'WalletRecoveryService');
+      
+      return false;
+      
+    } catch (error) {
+      logger.error('Failed to attempt original wallet recovery', error, 'WalletRecoveryService');
+      return false;
+    }
+  }
+
+  /**
+   * Generate wallet credentials for existing database wallets that were never saved locally
+   * This handles the case where wallet was created before proper storage was implemented
+   */
+  static async generateMissingWalletCredentials(userId: string, expectedAddress: string): Promise<boolean> {
+    try {
+      logger.info('Generating missing wallet credentials for existing database wallet', { 
+        userId, 
+        expectedAddress 
+      }, 'WalletRecoveryService');
+      
+      // Check if wallet is already in new format
+      const newFormatWallet = await SecureStore.getItemAsync(`wallet_${userId}`);
+      if (newFormatWallet) {
+        logger.debug('Wallet already in new format, skipping generation', { userId }, 'WalletRecoveryService');
+        return true;
+      }
+      
+      // First, try to recover the original wallet to preserve user funds
+      const originalRecovered = await this.attemptOriginalWalletRecovery(userId, expectedAddress);
+      if (originalRecovered) {
+        logger.info('✅ Original wallet recovered successfully - user funds preserved', { 
+          userId, 
+          expectedAddress 
+        }, 'WalletRecoveryService');
+        return true;
+      }
+      
+      // If original recovery failed, this is a critical case - we need to generate new credentials
+      // This should only happen for wallets created before proper storage was implemented
+      logger.error('CRITICAL: Cannot recover original wallet - user will lose access to funds', { 
+        userId, 
+        expectedAddress,
+        warning: 'This should not happen if wallet was created by the app'
+      }, 'WalletRecoveryService');
+      
+      // Generate new wallet credentials as last resort
+      const { generateWalletFromMnemonic } = await import('./derive');
+      const walletResult = generateWalletFromMnemonic();
+      
+      const newWallet = {
+        address: walletResult.address,
+        publicKey: walletResult.publicKey,
+        privateKey: walletResult.secretKey
+      };
+      
+      // Store the new wallet credentials
+      const stored = await this.storeWallet(userId, newWallet);
+      if (!stored) {
+        logger.error('Failed to store generated wallet credentials', { userId }, 'WalletRecoveryService');
+        return false;
+      }
+      
+      // Store the mnemonic
+      if (walletResult.mnemonic) {
+        await this.storeMnemonic(userId, walletResult.mnemonic);
+      }
+      
+      // Update the database with the new wallet address
+      await firebaseDataService.user.updateUser(userId, {
+        wallet_address: newWallet.address,
+        wallet_public_key: newWallet.publicKey,
+        wallet_status: 'healthy',
+        wallet_has_private_key: true,
+        wallet_has_seed_phrase: true,
+        wallet_type: 'app-generated',
+        wallet_migration_status: 'credentials_generated' as any,
+      } as any);
+      
+      logger.error('CRITICAL: Generated new wallet - user may lose access to original funds', { 
+        userId, 
+        oldAddress: expectedAddress,
+        newAddress: newWallet.address,
+        warning: 'User should contact support immediately'
+      }, 'WalletRecoveryService');
+      
+      return true;
+      
+    } catch (error) {
+      logger.error('Failed to generate missing wallet credentials', error, 'WalletRecoveryService');
+      return false;
+    }
+  }
+
+  /**
+   * Migrate old production wallets to new storage format
+   */
+  static async migrateOldProductionWallets(userId: string): Promise<boolean> {
+    try {
+      logger.info('Starting migration of old production wallets', { userId }, 'WalletRecoveryService');
+      
+      // Get user data from database
+      const userData = await firebaseDataService.user.getCurrentUser(userId);
+      if (!userData?.wallet_address) {
+        logger.debug('No wallet address in database, skipping migration', { userId }, 'WalletRecoveryService');
+        return false;
+      }
+      
+      const expectedAddress = userData.wallet_address;
+      
+      // Check if wallet is already in new format
+      const newFormatWallet = await SecureStore.getItemAsync(`wallet_${userId}`);
+      if (newFormatWallet) {
+        logger.debug('Wallet already in new format, skipping migration', { userId }, 'WalletRecoveryService');
+        return true;
+      }
+      
+      // Try to find wallet in old storage formats
+      const migrationKeys = [
+        'wallet_private_key',
+        `private_key_${userId}`,
+        'wallet_mnemonic',
+        `mnemonic_${userId}`,
+        `seed_phrase_${userId}`
+      ];
+      
+      let migrated = false;
+      
+      for (const key of migrationKeys) {
+        try {
+          const oldData = await SecureStore.getItemAsync(key, {
+            requireAuthentication: false,
+            keychainService: 'WeSplitWalletData'
+          });
+          
+          if (oldData) {
+            logger.debug('Found old wallet data', { userId, key }, 'WalletRecoveryService');
+            
+            // Try to parse as private key
+            try {
+              const privateKeyArray = JSON.parse(oldData);
+              const privateKeyBuffer = Buffer.from(privateKeyArray);
+              const keypair = Keypair.fromSecretKey(privateKeyBuffer);
+              const derivedAddress = keypair.publicKey.toBase58();
+              
+              if (derivedAddress === expectedAddress) {
+                logger.info('✅ Found matching old wallet, migrating to new format', { 
+                  userId, 
+                  key, 
+                  address: derivedAddress 
+                }, 'WalletRecoveryService');
+                
+                // Store in new format
+                const migrated = await this.storeWallet(userId, {
+                  address: derivedAddress,
+                  publicKey: derivedAddress,
+                  privateKey: Buffer.from(keypair.secretKey).toString('base64')
+                });
+                
+                if (migrated) {
+                  logger.info('✅ Old wallet migrated successfully', { userId, address: derivedAddress }, 'WalletRecoveryService');
+                  
+                  // Clean up old storage after successful migration
+                  await this.cleanupOldStorageAfterMigration(userId, key);
+                  
+                  return true;
+                }
+              }
+            } catch (parseError) {
+              // Try as mnemonic
+              try {
+                const mnemonic = oldData.includes('{') ? JSON.parse(oldData).mnemonic || oldData : oldData;
+                
+                if (mnemonic && typeof mnemonic === 'string' && mnemonic.split(' ').length >= 12) {
+                  const { deriveKeypairFromMnemonic } = await import('./derive');
+                  const keypair = deriveKeypairFromMnemonic(mnemonic, "m/44'/501'/0'/0'");
+                  const derivedAddress = keypair.publicKey.toBase58();
+                  
+                  if (derivedAddress === expectedAddress) {
+                    logger.info('✅ Found matching old mnemonic, migrating to new format', { 
+                      userId, 
+                      key, 
+                      address: derivedAddress 
+                    }, 'WalletRecoveryService');
+                    
+                    // Store wallet and mnemonic in new format
+                    const walletStored = await this.storeWallet(userId, {
+                      address: derivedAddress,
+                      publicKey: derivedAddress,
+                      privateKey: Buffer.from(keypair.secretKey).toString('base64')
+                    });
+                    
+                    if (walletStored) {
+                      await this.storeMnemonic(userId, mnemonic);
+                      logger.info('✅ Old mnemonic migrated successfully', { userId, address: derivedAddress }, 'WalletRecoveryService');
+                      return true;
+                    }
+                  }
+                }
+              } catch (mnemonicError) {
+                logger.debug('Failed to parse as mnemonic', { key, error: mnemonicError }, 'WalletRecoveryService');
+              }
+            }
+          }
+        } catch (error) {
+          logger.debug('Error checking old storage key', { key, error: error instanceof Error ? error.message : String(error) }, 'WalletRecoveryService');
+        }
+      }
+      
+      // Try AsyncStorage migration
+      try {
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        const storedWalletsData = await AsyncStorage.getItem('storedWallets');
+        
+        if (storedWalletsData) {
+          const storedWalletsArray = JSON.parse(storedWalletsData);
+          
+          for (const wallet of storedWalletsArray) {
+            const secretKey = wallet.secretKey || wallet.privateKey;
+            if (secretKey && secretKey !== '' && wallet.address === expectedAddress) {
+              logger.info('✅ Found matching AsyncStorage wallet, migrating to new format', { 
+                userId, 
+                address: wallet.address 
+              }, 'WalletRecoveryService');
+              
+              // Parse and store in new format
+              let privateKeyBuffer: Buffer;
+              if (typeof secretKey === 'string') {
+                privateKeyBuffer = Buffer.from(secretKey, 'base64');
+              } else if (Array.isArray(secretKey)) {
+                privateKeyBuffer = Buffer.from(secretKey);
+              } else {
+                continue;
+              }
+              
+              const keypair = Keypair.fromSecretKey(privateKeyBuffer);
+              const derivedAddress = keypair.publicKey.toBase58();
+              
+              if (derivedAddress === expectedAddress) {
+                const migrated = await this.storeWallet(userId, {
+                  address: derivedAddress,
+                  publicKey: derivedAddress,
+                  privateKey: Buffer.from(keypair.secretKey).toString('base64')
+                });
+                
+                if (migrated) {
+                  logger.info('✅ AsyncStorage wallet migrated successfully', { userId, address: derivedAddress }, 'WalletRecoveryService');
+                  return true;
+                }
+              }
+            }
+          }
+        }
+      } catch (asyncError) {
+        logger.debug('Error checking AsyncStorage for migration', { error: asyncError }, 'WalletRecoveryService');
+      }
+      
+      logger.warn('No old wallet found to migrate', { userId, expectedAddress }, 'WalletRecoveryService');
+      return false;
+      
+    } catch (error) {
+      logger.error('Failed to migrate old production wallets', error, 'WalletRecoveryService');
+      return false;
+    }
+  }
+
+  /**
+   * Clean up old storage after successful migration
+   */
+  static async cleanupOldStorageAfterMigration(userId: string, migratedKey: string): Promise<void> {
+    try {
+      logger.info('Cleaning up old storage after migration', { userId, migratedKey }, 'WalletRecoveryService');
+      
+      // List of old keys to clean up
+      const oldKeys = [
+        'wallet_private_key',
+        `private_key_${userId}`,
+        'wallet_mnemonic',
+        `mnemonic_${userId}`,
+        `seed_phrase_${userId}`
+      ];
+      
+      // Don't clean up the key that was just migrated
+      const keysToClean = oldKeys.filter(key => key !== migratedKey);
+      
+      for (const key of keysToClean) {
+        try {
+          await SecureStore.deleteItemAsync(key, {
+            requireAuthentication: false,
+            keychainService: 'WeSplitWalletData'
+          });
+          logger.debug('Cleaned up old storage key', { userId, key }, 'WalletRecoveryService');
+        } catch (error) {
+          logger.debug('Failed to clean up old storage key', { userId, key, error }, 'WalletRecoveryService');
+        }
+      }
+      
+      // Also clean up AsyncStorage if it was migrated
+      if (migratedKey.includes('AsyncStorage')) {
+        try {
+          const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+          await AsyncStorage.removeItem('storedWallets');
+          logger.debug('Cleaned up AsyncStorage after migration', { userId }, 'WalletRecoveryService');
+        } catch (error) {
+          logger.debug('Failed to clean up AsyncStorage', { userId, error }, 'WalletRecoveryService');
+        }
+      }
+      
+    } catch (error) {
+      logger.error('Failed to cleanup old storage after migration', error, 'WalletRecoveryService');
+    }
+  }
+
+  /**
+   * Clean up test/external wallets from AsyncStorage
+   */
+  static async cleanupTestWallets(userId: string): Promise<void> {
+    try {
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      const storedWalletsData = await AsyncStorage.getItem('storedWallets');
+      
+      if (storedWalletsData) {
+        const storedWalletsArray = JSON.parse(storedWalletsData);
+        const validWallets = storedWalletsArray.filter((wallet: any) => {
+          const secretKey = wallet.secretKey || wallet.privateKey || wallet.secret;
+          return secretKey && secretKey !== '' && secretKey.length > 0;
+        });
+        
+        if (validWallets.length !== storedWalletsArray.length) {
+          logger.info('Cleaning up test wallets', { 
+            userId,
+            originalCount: storedWalletsArray.length,
+            validCount: validWallets.length,
+            removedCount: storedWalletsArray.length - validWallets.length
+          }, 'WalletRecoveryService');
+          
+          await AsyncStorage.setItem('storedWallets', JSON.stringify(validWallets));
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to cleanup test wallets', error, 'WalletRecoveryService');
+    }
+  }
+
+  /**
+   * Test method to debug wallet recovery issues
+   */
+  static async debugWalletRecovery(userId: string): Promise<void> {
+    try {
+      logger.info('🔍 Starting comprehensive wallet recovery debug', { userId }, 'WalletRecoveryService');
+      
+      // Get user data from database
+      const userData = await firebaseDataService.user.getCurrentUser(userId);
+      const expectedAddress = userData?.wallet_address;
+      
+      if (!expectedAddress) {
+        logger.error('❌ No wallet address in database', { userId }, 'WalletRecoveryService');
+        return;
+      }
+      
+      logger.info('📊 Database wallet address', { userId, expectedAddress }, 'WalletRecoveryService');
+      
+      // Debug AsyncStorage
+      await this.debugAsyncStorageData(userId);
+      
+      // Try comprehensive recovery
+      const result = await this.performComprehensiveRecovery(userId, expectedAddress);
+      
+      if (result.success) {
+        logger.info('✅ Wallet recovery debug succeeded', { 
+          userId, 
+          recoveredAddress: result.wallet?.address,
+          expectedAddress,
+          matches: result.wallet?.address === expectedAddress
+        }, 'WalletRecoveryService');
+      } else {
+        logger.error('❌ Wallet recovery debug failed', { 
+          userId, 
+          expectedAddress,
+          error: result.error,
+          errorMessage: result.errorMessage
+        }, 'WalletRecoveryService');
+      }
+      
+    } catch (error) {
+      logger.error('❌ Wallet recovery debug error', error, 'WalletRecoveryService');
+    }
+  }
+
+  /**
+   * Debug method to inspect AsyncStorage data
+   */
+  static async debugAsyncStorageData(userId: string): Promise<void> {
+    try {
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      const storedWalletsData = await AsyncStorage.getItem('storedWallets');
+      
+      if (storedWalletsData) {
+        const storedWalletsArray = JSON.parse(storedWalletsData);
+        logger.info('🔍 AsyncStorage Debug Data', { 
+          userId,
+          rawDataLength: storedWalletsData.length,
+          parsedArrayLength: storedWalletsArray.length,
+          firstWallet: storedWalletsArray[0] ? {
+            keys: Object.keys(storedWalletsArray[0]),
+            hasSecretKey: !!storedWalletsArray[0].secretKey,
+            hasAddress: !!storedWalletsArray[0].address,
+            hasPrivateKey: !!storedWalletsArray[0].privateKey,
+            secretKeyType: typeof storedWalletsArray[0].secretKey,
+            addressValue: storedWalletsArray[0].address,
+            secretKeyLength: storedWalletsArray[0].secretKey ? 
+              (Array.isArray(storedWalletsArray[0].secretKey) ? 
+                storedWalletsArray[0].secretKey.length : 
+                storedWalletsArray[0].secretKey.length) : 0
+          } : null
+        }, 'WalletRecoveryService');
+      } else {
+        logger.info('🔍 AsyncStorage Debug Data - No data found', { userId }, 'WalletRecoveryService');
+      }
+    } catch (error) {
+      logger.error('Failed to debug AsyncStorage data', error, 'WalletRecoveryService');
+    }
+  }
+
+  /**
    * Clear all wallet storage locations for a user
    */
   static async clearAllWalletStorage(userId: string): Promise<void> {
@@ -1352,16 +2277,20 @@ export class WalletRecoveryService {
       const validation = validateBip39Mnemonic(mnemonic);
       
       if (!validation.isValid) {
-        logger.error('Invalid mnemonic format', { userId, error: validation.error }, 'WalletRecoveryService');
+        logger.error('Invalid mnemonic format', { userId }, 'WalletRecoveryService');
         return false;
       }
 
-      // Store user-specific mnemonic
-      const userMnemonicKey = `mnemonic_${userId}`;
-      await SecureStore.setItemAsync(userMnemonicKey, mnemonic, {
-        requireAuthentication: false,
-        keychainService: 'WeSplitWalletData'
-      });
+      // Primary: secure vault
+      const ok = await secureVault.store(userId, 'mnemonic', mnemonic);
+      if (!ok) {
+        // Fallback: SecureStore
+        const userMnemonicKey = `mnemonic_${userId}`;
+        await SecureStore.setItemAsync(userMnemonicKey, mnemonic, {
+          requireAuthentication: false,
+          keychainService: 'WeSplitWalletData'
+        });
+      }
 
       logger.info('Mnemonic stored successfully', { userId }, 'WalletRecoveryService');
       return true;
@@ -1376,7 +2305,14 @@ export class WalletRecoveryService {
    */
   static async getStoredMnemonic(userId: string): Promise<string | null> {
     try {
-      // Check for user-specific mnemonic first
+      // Primary: secure vault first
+      const fromVault = await secureVault.get(userId, 'mnemonic');
+      if (fromVault) {
+        logger.debug('Found user mnemonic in secure vault', { userId }, 'WalletRecoveryService');
+        return fromVault;
+      }
+
+      // Fallbacks: Check for user-specific mnemonic first
       const userMnemonicKey = `mnemonic_${userId}`;
       const userMnemonic = await SecureStore.getItemAsync(userMnemonicKey, {
         requireAuthentication: false,

@@ -1980,6 +1980,15 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   const executeTransfer = async () => {
     if (!selectedWallet || !splitWallet || !currentUser) {return;}
     
+    // Prevent double triggering
+    if (isSigning) {
+      logger.warn('Transfer already in progress, ignoring duplicate request', {
+        splitWalletId: splitWallet.id,
+        isSigning
+      }, 'FairSplitScreen');
+      return;
+    }
+    
     setIsSigning(true);
     
     // Temporarily disable real-time updates during withdrawal to prevent interference
@@ -2269,13 +2278,20 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         billId: splitWallet.billId
       });
       
-      // Use extractFairSplitFunds for Fair Split transfers
-      const transferResult = await SplitWalletService.extractFairSplitFunds(
+      // Use extractFairSplitFunds for Fair Split transfers with timeout
+      const transferPromise = SplitWalletService.extractFairSplitFunds(
         splitWallet.id,
         selectedWallet.address,
         currentUser.id.toString(),
         description
       );
+      
+      // Add timeout wrapper (60 seconds max)
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Transfer timeout - please try again')), 60000);
+      });
+      
+      const transferResult = await Promise.race([transferPromise, timeoutPromise]) as any;
       
       logger.info('Transfer result received', {
         success: transferResult.success,
@@ -2444,7 +2460,39 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       }
       
     } catch (error) {
-      handleError(error, 'complete transfer');
+      // Handle timeout errors specifically
+      if (error instanceof Error && error.message.includes('Transfer timeout')) {
+        logger.warn('Transfer timeout occurred', {
+          splitWalletId: splitWallet.id,
+          error: error.message
+        }, 'FairSplitScreen');
+        
+        Alert.alert(
+          'Transfer Timeout',
+          'The transfer is taking longer than expected. This can happen during high network congestion.\n\nYour transaction may still be processing. Please check your wallet balance or try again in a few minutes.',
+          [
+            {
+              text: 'Try Again',
+              onPress: () => {
+                // Reset state and allow retry
+                setShowSignatureStep(false);
+                setShowSplitModal(false);
+                setSelectedTransferMethod(null);
+                setSelectedWallet(null);
+              }
+            },
+            {
+              text: 'Check Later',
+              onPress: () => {
+                // Navigate back to splits list
+                navigation.navigate('SplitsList');
+              }
+            }
+          ]
+        );
+      } else {
+        handleError(error, 'complete transfer');
+      }
     } finally {
       setIsSigning(false);
       

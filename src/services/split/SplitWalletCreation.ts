@@ -177,12 +177,14 @@ export class SplitWalletCreation {
 
       // Create a new dedicated wallet for this split
       // This wallet will be completely independent and not tied to any user account
-      const { solanaWalletService } = await import('../blockchain/wallet/api/solanaWalletApi');
-      const walletResult = await solanaWalletService.instance.createWalletFromMnemonic();
-      if (!walletResult.success || !walletResult.wallet) {
-        throw new Error('Failed to create dedicated split wallet');
-      }
-      const wallet = walletResult.wallet;
+      const { generateWalletFromMnemonic } = await import('../blockchain/wallet/derive');
+      const walletResult = generateWalletFromMnemonic(); // Generates new mnemonic automatically
+      
+      const wallet = {
+        address: walletResult.address,
+        publicKey: walletResult.publicKey,
+        secretKey: walletResult.secretKey
+      };
       
       
       logger.info('Split wallet created with address', { 
@@ -318,12 +320,14 @@ export class SplitWalletCreation {
       }, 'SplitWalletCreation');
 
       // Create a new dedicated wallet for this Degen Split
-      const { solanaWalletService } = await import('../blockchain/wallet/api/solanaWalletApi');
-      const walletResult = await solanaWalletService.instance.createWalletFromMnemonic();
-      if (!walletResult.success || !walletResult.wallet) {
-        throw new Error('Failed to create dedicated Degen Split wallet');
-      }
-      const wallet = walletResult.wallet;
+      const { generateWalletFromMnemonic } = await import('../blockchain/wallet/derive');
+      const walletResult = generateWalletFromMnemonic(); // Generates new mnemonic automatically
+      
+      const wallet = {
+        address: walletResult.address,
+        publicKey: walletResult.publicKey,
+        secretKey: walletResult.secretKey
+      };
       
       logger.info('Degen Split wallet created with address', { 
         walletAddress: wallet.address,
@@ -528,12 +532,14 @@ export class SplitWalletCreation {
       const currentWallet = currentWalletResult.wallet;
 
       // Create a new dedicated wallet with the same ID but reset data
-      const { solanaWalletService } = await import('../blockchain/wallet/api/solanaWalletApi');
-      const newWalletResult = await solanaWalletService.instance.createWalletFromMnemonic();
-      if (!newWalletResult.success || !newWalletResult.wallet) {
-        throw new Error('Failed to create new dedicated wallet for reset');
-      }
-      const newWallet = newWalletResult.wallet;
+      const { generateWalletFromMnemonic } = await import('../blockchain/wallet/derive');
+      const newWalletResult = generateWalletFromMnemonic(); // Generates new mnemonic automatically
+      
+      const newWallet = {
+        address: newWalletResult.address,
+        publicKey: newWalletResult.publicKey,
+        secretKey: newWalletResult.secretKey
+      };
 
       // Update the wallet with new address and reset participants
       const updatedWalletData = {

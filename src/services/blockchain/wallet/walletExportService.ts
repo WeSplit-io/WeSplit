@@ -125,10 +125,60 @@ class WalletExportService {
    */
   private async getSeedPhraseForWallet(userId: string, walletAddress: string): Promise<string | null> {
     try {
-      // Get stored mnemonic - no validation for speed
+      logger.info('Retrieving seed phrase for wallet', { userId, walletAddress }, 'WalletExportService');
+      
+      // Get stored mnemonic
       const mnemonic = await walletRecoveryService.getStoredMnemonic(userId);
-      return mnemonic;
+      
+      if (!mnemonic) {
+        logger.warn('No mnemonic found for user', { userId }, 'WalletExportService');
+        return null;
+      }
+      
+      // Validate that the mnemonic can derive the expected wallet address
+      try {
+        const { deriveKeypairFromMnemonic } = await import('./derive');
+        const keypair = deriveKeypairFromMnemonic(mnemonic, "m/44'/501'/0'/0'");
+        const derivedAddress = keypair.publicKey.toBase58();
+        
+        if (derivedAddress === walletAddress) {
+          logger.info('Seed phrase validated successfully', { userId, walletAddress }, 'WalletExportService');
+          return mnemonic;
+        } else {
+          logger.warn('Seed phrase does not match wallet address', { 
+            userId, 
+            walletAddress, 
+            derivedAddress 
+          }, 'WalletExportService');
+          
+          // Try alternative derivation paths
+          const alternativePaths = ["m/44'/501'/0'", "m/44'/501'"];
+          for (const path of alternativePaths) {
+            try {
+              const altKeypair = deriveKeypairFromMnemonic(mnemonic, path);
+              const altAddress = altKeypair.publicKey.toBase58();
+              
+              if (altAddress === walletAddress) {
+                logger.info('Seed phrase validated with alternative path', { 
+                  userId, 
+                  walletAddress, 
+                  path 
+                }, 'WalletExportService');
+                return mnemonic;
+              }
+            } catch (altError) {
+              logger.debug('Alternative derivation path failed', { path, error: altError }, 'WalletExportService');
+            }
+          }
+          
+          return null;
+        }
+      } catch (validationError) {
+        logger.error('Failed to validate seed phrase', validationError, 'WalletExportService');
+        return null;
+      }
     } catch (error) {
+      logger.error('Failed to get seed phrase for wallet', error, 'WalletExportService');
       return null;
     }
   }

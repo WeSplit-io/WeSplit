@@ -645,11 +645,11 @@ async function executeFastTransaction(
 
     // Balance capture moved to before transaction execution
 
-    // For withdrawals, use proper confirmation strategy with balance verification
+    // For withdrawals, use optimized confirmation strategy
     let confirmed = false;
     let attempts = 0;
-    const maxAttempts = 30; // Increased attempts for better reliability
-    const waitTime = 1000; // Increased wait time to 1 second
+    const maxAttempts = 15; // Reduced attempts for faster response
+    const waitTime = 2000; // Increased wait time to 2 seconds for better reliability
 
     logger.info('Starting withdrawal transaction confirmation', {
       signature,
@@ -657,58 +657,74 @@ async function executeFastTransaction(
       waitTime
     }, 'SplitWalletPayments');
 
-    while (!confirmed && attempts < maxAttempts) {
-      try {
-        const status = await connection.getSignatureStatus(signature, { 
-          searchTransactionHistory: true 
-        });
-        
-        logger.debug('Transaction status check', {
-          signature,
-          attempt: attempts + 1,
-          status: status.value,
-          confirmationStatus: status.value?.confirmationStatus,
-          err: status.value?.err
-        }, 'SplitWalletPayments');
-        
-        if (status.value?.confirmationStatus === 'confirmed' || 
-            status.value?.confirmationStatus === 'finalized') {
-          confirmed = true;
-          logger.info('Withdrawal transaction confirmed', {
-            signature,
-            confirmationStatus: status.value.confirmationStatus,
-            attempts
-          }, 'SplitWalletPayments');
-        } else if (status.value?.err) {
-          logger.error('Withdrawal transaction failed', {
-            signature,
-            error: status.value.err
-          }, 'SplitWalletPayments');
-          return {
-            success: false,
-            signature,
-            error: `Transaction failed: ${JSON.stringify(status.value.err)}`
-          };
-        } else if (status.value === null) {
-          // Transaction not found yet - this is common and not necessarily an error
-          logger.debug('Transaction not found in blockchain yet', {
-            signature,
-            attempt: attempts + 1
-          }, 'SplitWalletPayments');
-        }
-      } catch (error) {
-        logger.warn('Error checking withdrawal transaction status', {
-          signature,
-          attempt: attempts + 1,
-          error
-        }, 'SplitWalletPayments');
-      }
+    // Use Promise.race for faster confirmation with timeout
+    const confirmationPromise = new Promise<boolean>((resolve) => {
+      const checkStatus = async () => {
+        try {
+          const status = await connection.getSignatureStatus(signature, { 
+            searchTransactionHistory: true 
+          });
           
-      if (!confirmed) {
-        await new Promise(resolve => setTimeout(resolve, waitTime)); // Wait 1 second
-        attempts++;
-      }
-    }
+          logger.debug('Transaction status check', {
+            signature,
+            attempt: attempts + 1,
+            status: status.value,
+            confirmationStatus: status.value?.confirmationStatus,
+            err: status.value?.err
+          }, 'SplitWalletPayments');
+          
+          if (status.value?.confirmationStatus === 'confirmed' || 
+              status.value?.confirmationStatus === 'finalized') {
+            logger.info('Withdrawal transaction confirmed', {
+              signature,
+              confirmationStatus: status.value.confirmationStatus,
+              attempts
+            }, 'SplitWalletPayments');
+            resolve(true);
+            return;
+          } else if (status.value?.err) {
+            logger.error('Withdrawal transaction failed', {
+              signature,
+              error: status.value.err
+            }, 'SplitWalletPayments');
+            resolve(false);
+            return;
+          } else if (status.value === null && attempts < maxAttempts) {
+            // Transaction not found yet - continue checking
+            logger.debug('Transaction not found in blockchain yet', {
+              signature,
+              attempt: attempts + 1
+            }, 'SplitWalletPayments');
+            attempts++;
+            setTimeout(checkStatus, waitTime);
+          } else {
+            // Max attempts reached or other condition
+            resolve(false);
+          }
+        } catch (error) {
+          logger.warn('Error checking withdrawal transaction status', {
+            signature,
+            attempt: attempts + 1,
+            error
+          }, 'SplitWalletPayments');
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(checkStatus, waitTime);
+          } else {
+            resolve(false);
+          }
+        }
+      };
+      
+      checkStatus();
+    });
+
+    // Wait for confirmation with a maximum timeout
+    const timeoutPromise = new Promise<boolean>((resolve) => {
+      setTimeout(() => resolve(false), maxAttempts * waitTime);
+    });
+
+    confirmed = await Promise.race([confirmationPromise, timeoutPromise]);
 
     if (!confirmed) {
       logger.warn('Withdrawal transaction confirmation timed out - verifying balance change', {
@@ -719,15 +735,22 @@ async function executeFastTransaction(
       // For withdrawals, verify the balance actually changed before declaring success
       try {
         const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
-        const fromBalance = await consolidatedTransactionService.getUsdcBalance(fromAddress);
-        const toBalance = await consolidatedTransactionService.getUsdcBalance(toAddress);
+        
+        // Use Promise.all for parallel balance checks
+        const [fromBalanceResult, toBalanceResult] = await Promise.all([
+          consolidatedTransactionService.getUsdcBalance(fromAddress),
+          consolidatedTransactionService.getUsdcBalance(toAddress)
+        ]);
+        
+        const fromBalance = fromBalanceResult.balance;
+        const toBalance = toBalanceResult.balance;
         
         logger.info('Balance verification after timeout', {
           signature,
           fromAddress,
-          fromBalance: fromBalance.balance,
+          fromBalance,
           toAddress,
-          toBalance: toBalance.balance,
+          toBalance,
           expectedAmount: amount
         }, 'SplitWalletPayments');
         
@@ -737,16 +760,16 @@ async function executeFastTransaction(
         
         // If we captured balances before the transaction, use them for verification
         if (fromBalanceBefore !== null && toBalanceBefore !== null) {
-          const fromBalanceDecrease = fromBalanceBefore - fromBalance.balance;
-          const toBalanceIncrease = toBalance.balance - toBalanceBefore;
+          const fromBalanceDecrease = fromBalanceBefore - fromBalance;
+          const toBalanceIncrease = toBalance - toBalanceBefore;
           
           logger.info('Balance change verification', {
             signature,
             fromBalanceBefore,
-            fromBalanceAfter: fromBalance.balance,
+            fromBalanceAfter: fromBalance,
             fromBalanceDecrease,
             toBalanceBefore,
-            toBalanceAfter: toBalance.balance,
+            toBalanceAfter: toBalance,
             toBalanceIncrease,
             expectedAmount: amount,
             tolerance

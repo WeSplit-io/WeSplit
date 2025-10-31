@@ -81,6 +81,7 @@ interface WalletContextType {
   appWalletAddress: string | null;
   appWalletBalance: number | null;
   appWalletConnected: boolean;
+  appWalletMnemonic: string | null;
   
   // Auto-refresh state
   autoRefreshEnabled: boolean;
@@ -101,6 +102,7 @@ interface WalletContextType {
   removeWallet: (walletId: string) => Promise<void>;
   sendTransaction: (params: TransactionParams) => Promise<{ signature: string; txId: string }>;
   refreshBalance: () => Promise<void>;
+  hydrateAppWalletSecrets: (userId: string) => Promise<void>;
   
   // App Wallet Actions - Updated return type
   ensureAppWallet: (userId: string) => Promise<{ success: boolean; wallet?: any; error?: string }>;
@@ -180,6 +182,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [appWalletAddress, setAppWalletAddress] = useState<string | null>(null);
   const [appWalletBalance, setAppWalletBalance] = useState<number | null>(null);
   const [appWalletConnected, setAppWalletConnected] = useState(false);
+  const [appWalletMnemonic, setAppWalletMnemonic] = useState<string | null>(null);
   
   // Auto-refresh state for balances
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false); // Disabled by default to prevent rate limiting
@@ -251,6 +254,18 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Error refreshing balance:', error);
+    }
+  };
+
+  const hydrateAppWalletSecrets = async (userId: string) => {
+    try {
+      const { walletService } = await import('../services/blockchain/wallet');
+      const mnemonic = await walletService.getSeedPhrase(userId);
+      if (mnemonic) {
+        setAppWalletMnemonic(mnemonic);
+      }
+    } catch (error) {
+      // ignore hydration failures
     }
   };
 
@@ -933,6 +948,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     appWalletAddress,
     appWalletBalance,
     appWalletConnected,
+    appWalletMnemonic,
     // Auto-refresh state
     autoRefreshEnabled,
     lastBalanceCheck,
@@ -981,6 +997,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     removeWallet,
     sendTransaction: handleSendTransaction,
     refreshBalance,
+    hydrateAppWalletSecrets,
     // App wallet actions
     ensureAppWallet,
     getAppWalletBalance,

@@ -22,6 +22,7 @@ import { walletService } from '../../services/blockchain/wallet';
 import { sendVerificationCode } from '../../services/data';
 import { logger } from '../../services/analytics/loggingService';
 import { EmailPersistenceService } from '../../services/core/emailPersistenceService';
+import { useWallet } from '../../context/WalletContext';
 
 // Background wallet creation: Automatically creates Solana wallet for new users
 // without blocking the UI or showing any modals
@@ -40,6 +41,7 @@ type RootStackParamList = {
 const AuthMethodsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { authenticateUser, updateUser } = useApp();
+  const { hydrateAppWalletSecrets } = useWallet();
 
   // State management
   const [email, setEmail] = useState('');
@@ -158,20 +160,6 @@ const AuthMethodsScreen: React.FC = () => {
         userData = await firestoreService.createUserDocument(firebaseUser);
       }
 
-      // Debug: Log the user data to understand what we're getting
-      logger.debug('Retrieved user data', {
-        id: userData.id,
-        email: userData.email,
-        wallet_address: userData.wallet_address,
-        primary_wallet: userData.primary_wallet,
-        linked_wallets: userData.linked_wallets,
-        wallet_public_key: userData.wallet_public_key,
-        wallet_status: userData.wallet_status,
-        hasWalletAddress: !!userData.wallet_address,
-        walletAddressLength: userData.wallet_address?.length || 0,
-        isPlaceholderWallet: userData.primary_wallet === '11111111111111111111111111111111'
-      });
-
       // Check if existing user should skip onboarding
       const shouldSkipOnboarding = await firestoreService.shouldSkipOnboardingForExistingUser(userData);
 
@@ -189,17 +177,6 @@ const AuthMethodsScreen: React.FC = () => {
         hasCompletedOnboarding: shouldSkipOnboarding
       };
 
-      // Debug: Log the transformed app user
-      logger.debug('Transformed app user', {
-        id: appUser.id,
-        email: appUser.email,
-        wallet_address: appUser.wallet_address,
-        wallet_public_key: appUser.wallet_public_key,
-        hasWalletAddress: !!appUser.wallet_address,
-        walletAddressLength: appUser.wallet_address?.length || 0,
-        walletSource: userData.wallet_address ? 'wallet_address' : (userData.primary_wallet ? 'primary_wallet' : 'none')
-      });
-
       // Ensure user has a wallet using the centralized wallet service
       // CRITICAL: Always call ensureUserWallet to verify wallet integrity and restore if needed
       try {
@@ -215,6 +192,8 @@ const AuthMethodsScreen: React.FC = () => {
           
           // Update user in AppContext
           updateUser(appUser);
+          // Hydrate mnemonic into app context for session use
+          try { await hydrateAppWalletSecrets(appUser.id); } catch {}
         } else {
           console.error('❌ AuthMethods: Failed to ensure user wallet:', walletResult.error);
           // Continue without wallet - user can add it later
