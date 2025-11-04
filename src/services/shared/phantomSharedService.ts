@@ -1,11 +1,22 @@
 import { Linking, Platform } from 'react-native';
+import { getConfig } from '../../config/unified';
 
 // Solana configuration
-const SOLANA_CONFIG = {
-  APP_URL: 'https://wesplit.app',
-  REDIRECT_LINK: 'wesplit://wallet/connect',
-  APP_NAME: 'WeSplit',
-  NETWORK: 'mainnet-beta'
+const getSolanaConfig = () => {
+  const config = getConfig();
+  // Map network to Phantom's expected format
+  const networkMap: Record<string, string> = {
+    'mainnet': 'mainnet-beta',
+    'devnet': 'devnet',
+    'testnet': 'testnet'
+  };
+  
+  return {
+    APP_URL: 'https://wesplit.app',
+    REDIRECT_LINK: 'wesplit://wallet/connect',
+    APP_NAME: 'WeSplit',
+    NETWORK: networkMap[config.blockchain.network] || 'devnet'
+  };
 };
 
 // Phantom configuration
@@ -71,6 +82,7 @@ class PhantomSharedService {
    * Build connection URLs for Phantom using multiple approaches
    */
   static buildConnectionUrls(): string[] {
+    const SOLANA_CONFIG = getSolanaConfig();
     const sessionId = `wesplit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // Build connection request payload
@@ -117,6 +129,7 @@ class PhantomSharedService {
    * Build simple connection URL that should work with most Phantom versions
    */
   static buildSimpleConnectionUrl(): string {
+    const SOLANA_CONFIG = getSolanaConfig();
     return `phantom://v1/connect?app_url=${encodeURIComponent(SOLANA_CONFIG.APP_URL)}&redirect_link=${encodeURIComponent(SOLANA_CONFIG.REDIRECT_LINK)}`;
   }
 
@@ -124,6 +137,7 @@ class PhantomSharedService {
    * Build signing URLs for message signing requests
    */
   static buildSigningUrls(message: string): string[] {
+    const SOLANA_CONFIG = getSolanaConfig();
     const sessionId = `wesplit_sign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const signingRequest = {

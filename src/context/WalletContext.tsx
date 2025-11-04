@@ -12,6 +12,7 @@ import { consolidatedTransactionService } from '../services/blockchain/transacti
 import { solanaWalletService } from '../services/blockchain/wallet';
 import { logger } from '../services/analytics/loggingService';
 import WalletRecoveryModal from '../components/wallet/WalletRecoveryModal';
+import { getConfig } from '../config/unified';
 
 // WalletInfo interface for backward compatibility
 interface WalletInfo {
@@ -290,7 +291,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         walletType: 'app-generated'
       });
       setWalletName(wallet.name);
-      setChainId(process.env.NODE_ENV === 'production' ? 'solana:mainnet' : 'solana:devnet');
+      const config = getConfig();
+      setChainId(`solana:${config.blockchain.network}`);
       setSecretKey(wallet.secretKey);
       setCurrentWalletId(wallet.id);
       
@@ -342,7 +344,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         walletType: walletInfo.walletType
       });
       setWalletName(walletInfo.walletName || 'External Wallet');
-      setChainId(process.env.NODE_ENV === 'production' ? 'solana:mainnet' : 'solana:devnet');
+      const config = getConfig();
+      setChainId(`solana:${config.blockchain.network}`);
       setSecretKey(null); // External wallets don't expose secret keys
       setCurrentWalletId(`external_${providerKey}`);
       
@@ -413,7 +416,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         walletType: 'app-generated'
       });
       setWalletName('Generated Wallet');
-      setChainId(process.env.NODE_ENV === 'production' ? 'solana:mainnet' : 'solana:devnet');
+      const config = getConfig();
+      setChainId(`solana:${config.blockchain.network}`);
       setCurrentWalletId(newWallet.id);
       
       // Expose secret key if available
@@ -977,7 +981,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
             walletType: 'external'
           });
           setWalletName(result.walletName || 'External Wallet');
-          setChainId(process.env.NODE_ENV === 'production' ? 'solana:mainnet' : 'solana:devnet');
+          const config = getConfig();
+      setChainId(`solana:${config.blockchain.network}`);
           setSecretKey(null); // External wallets don't expose secret keys
           setCurrentWalletId(`external_${providerName}`);
           await refreshBalance();

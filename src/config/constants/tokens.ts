@@ -1,28 +1,41 @@
 // Token Configuration
 
 import { PublicKey } from '@solana/web3.js';
+import { getConfig } from '../unified';
 
 export const USDC_DECIMALS = 6;
 export const SOL_DECIMALS = 9;
 
-// USDC Mint Address as PublicKey
-export const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // Mainnet USDC
+// USDC Mint Address as PublicKey - Network-aware
+export const getUSDC_MINT = (): PublicKey => {
+  const config = getConfig();
+  return new PublicKey(config.blockchain.usdcMintAddress);
+};
+
+// Legacy export for backward compatibility - use getUSDC_MINT() instead
+export const USDC_MINT = getUSDC_MINT();
 export const SOL_MINT = new PublicKey('So11111111111111111111111111111111111111112'); // Wrapped SOL
 
-export const TOKEN_CONFIG = {
-  USDC: {
-    decimals: USDC_DECIMALS,
-    symbol: 'USDC',
-    name: 'USD Coin',
-    mintAddress: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' // Mainnet USDC
-  },
-  SOL: {
-    decimals: SOL_DECIMALS,
-    symbol: 'SOL',
-    name: 'Solana',
-    mintAddress: 'So11111111111111111111111111111111111111112' // Wrapped SOL
-  }
+export const getTOKEN_CONFIG = () => {
+  const config = getConfig();
+  return {
+    USDC: {
+      decimals: USDC_DECIMALS,
+      symbol: 'USDC',
+      name: 'USD Coin',
+      mintAddress: config.blockchain.usdcMintAddress
+    },
+    SOL: {
+      decimals: SOL_DECIMALS,
+      symbol: 'SOL',
+      name: 'Solana',
+      mintAddress: 'So11111111111111111111111111111111111111112' // Wrapped SOL
+    }
+  };
 };
+
+// Legacy export for backward compatibility - use getTOKEN_CONFIG() instead
+export const TOKEN_CONFIG = getTOKEN_CONFIG();
 
 export const MAINNET_TOKENS = {
   USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',

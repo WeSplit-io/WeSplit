@@ -8,6 +8,7 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as SecureStore from 'expo-secure-store';
 import { logger } from '../../../analytics/loggingService';
 import { walletRecoveryService } from '../walletRecoveryService';
+import { getConfig } from '../../../../config/unified';
 
 export interface WalletInfo {
   address: string;
@@ -26,7 +27,8 @@ class SolanaWalletService {
   private keypair: Keypair | null = null;
 
   constructor() {
-    this.connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+    const config = getConfig();
+    this.connection = new Connection(config.blockchain.rpcUrl, config.blockchain.commitment);
   }
 
   /**

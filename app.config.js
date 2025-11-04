@@ -15,7 +15,7 @@ module.exports = {
       supportsTablet: true,
       bundleIdentifier: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      buildNumber: "13",
+      buildNumber: "14",
       deploymentTarget: "15.1",
       infoPlist: {
         LSApplicationQueriesSchemes: [
@@ -41,7 +41,7 @@ module.exports = {
     android: {
       package: "com.wesplit.app",
       displayName: "WeSplit Beta",
-      versionCode: 10013,
+      versionCode: 10014,
       adaptiveIcon: {
         foregroundImage: "./assets/android-app-icon-no-alpha.png",
         backgroundColor: "#061113"
@@ -130,8 +130,8 @@ module.exports = {
       
       // Solana Configuration
       EXPO_PUBLIC_HELIUS_API_KEY: process.env.EXPO_PUBLIC_HELIUS_API_KEY,
-      EXPO_PUBLIC_FORCE_MAINNET: process.env.EXPO_PUBLIC_FORCE_MAINNET || 'true',
-      EXPO_PUBLIC_DEV_NETWORK: process.env.EXPO_PUBLIC_DEV_NETWORK || 'mainnet',
+      EXPO_PUBLIC_FORCE_MAINNET: process.env.EXPO_PUBLIC_FORCE_MAINNET || 'false',
+      EXPO_PUBLIC_DEV_NETWORK: process.env.EXPO_PUBLIC_DEV_NETWORK || 'devnet',
       
       // Company Fee Structure
       EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE: process.env.EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE,

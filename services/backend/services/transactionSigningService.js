@@ -36,8 +36,25 @@ class TransactionSigningService {
         throw new Error('Company wallet public key mismatch');
       }
 
-      // Create connection
-      const rpcUrl = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
+      // Create connection - use network from environment, default to devnet for development
+      const network = process.env.DEV_NETWORK || process.env.EXPO_PUBLIC_DEV_NETWORK || 'devnet';
+      let rpcUrl = process.env.HELIUS_RPC_URL;
+      
+      if (!rpcUrl) {
+        // Determine RPC URL based on network
+        if (network === 'mainnet') {
+          const heliusApiKey = process.env.HELIUS_API_KEY || process.env.EXPO_PUBLIC_HELIUS_API_KEY;
+          rpcUrl = heliusApiKey 
+            ? `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`
+            : 'https://api.mainnet-beta.solana.com';
+        } else if (network === 'testnet') {
+          rpcUrl = 'https://api.testnet.solana.com';
+        } else {
+          // Default to devnet
+          rpcUrl = 'https://api.devnet.solana.com';
+        }
+      }
+      
       this.connection = new Connection(rpcUrl, {
         commitment: 'confirmed',
         confirmTransactionInitialTimeout: 30000,

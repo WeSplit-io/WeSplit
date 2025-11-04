@@ -14,6 +14,7 @@ import type { SplitWallet, SplitWalletParticipant, SplitWalletResult, PaymentRes
 import { KeypairUtils } from '../shared/keypairUtils';
 import { ValidationUtils } from '../shared/validationUtils';
 import { BalanceUtils } from '../shared/balanceUtils';
+import { USDC_CONFIG } from '../shared/walletConstants';
 
 // Helper function to verify transaction on blockchain
 async function verifyTransactionOnBlockchain(transactionSignature: string): Promise<boolean> {
@@ -113,7 +114,7 @@ async function executeFairSplitTransaction(
       );
           } else {
       // Token transfer (USDC, etc.)
-      const mintPublicKey = new PublicKey(currency === 'USDC' ? 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' : currency);
+      const mintPublicKey = new PublicKey(currency === 'USDC' ? USDC_CONFIG.mintAddress : currency);
       
       const fromTokenAccount = await getAssociatedTokenAddress(mintPublicKey, fromPublicKey);
       const toTokenAccount = await getAssociatedTokenAddress(mintPublicKey, toPublicKey);
@@ -455,7 +456,7 @@ async function executeFastTransaction(
       );
     } else {
       // Token transfer (USDC, etc.)
-      const mintPublicKey = new PublicKey(currency === 'USDC' ? 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' : currency);
+      const mintPublicKey = new PublicKey(currency === 'USDC' ? USDC_CONFIG.mintAddress : currency);
       
       const fromTokenAccount = await getAssociatedTokenAddress(mintPublicKey, fromPublicKey);
       const toTokenAccount = await getAssociatedTokenAddress(mintPublicKey, toPublicKey);
@@ -966,7 +967,7 @@ async function executeDegenSplitTransaction(
       );
         } else {
       // Token transfer (USDC, etc.)
-      const mintPublicKey = new PublicKey(currency === 'USDC' ? 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' : currency);
+      const mintPublicKey = new PublicKey(currency === 'USDC' ? USDC_CONFIG.mintAddress : currency);
       
       const fromTokenAccount = await getAssociatedTokenAddress(mintPublicKey, fromPublicKey);
       const toTokenAccount = await getAssociatedTokenAddress(mintPublicKey, toPublicKey);
@@ -1195,7 +1196,7 @@ async function executeDegenSplitTransaction(
           
           // Check if the destination wallet now has the expected balance
           const { balanceUtils } = await import('../shared/balanceUtils');
-          const usdcMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+          const usdcMint = new PublicKey(USDC_CONFIG.mintAddress);
           const balanceResult = await balanceUtils.getUsdcBalance(new PublicKey(toAddress), usdcMint);
           
           if (balanceResult.balance >= amount) {
@@ -1479,7 +1480,8 @@ export class SplitWalletPayments {
         const { balanceUtils } = await import('../shared/balanceUtils');
         const { PublicKey } = await import('@solana/web3.js');
         const { FeeService } = await import('../../config/constants/feeConfig');
-        const usdcMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+        const { USDC_CONFIG } = await import('../shared/walletConstants');
+        const usdcMint = new PublicKey(USDC_CONFIG.mintAddress);
         const userBalance = await balanceUtils.getUsdcBalance(new PublicKey(userWallet.address), usdcMint);
         
         // Calculate total amount user needs to pay (share + fees)

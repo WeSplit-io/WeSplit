@@ -20,15 +20,32 @@ export const FIREBASE_CONFIG = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Solana configuration
-export const SOLANA_CONFIG = {
-  rpcUrl: process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
-  devnetRpcUrl: process.env.SOLANA_DEVNET_RPC_URL || 'https://api.devnet.solana.com',
-  testnetRpcUrl: process.env.SOLANA_TESTNET_RPC_URL || 'https://api.testnet.solana.com',
-  commitment: process.env.SOLANA_COMMITMENT || 'confirmed',
-  isDevNetwork: process.env.EXPO_PUBLIC_DEV_NETWORK === 'true',
-  heliusApiKey: process.env.EXPO_PUBLIC_HELIUS_API_KEY,
-};
+// Solana configuration - use unified config if available
+export const SOLANA_CONFIG = (() => {
+  try {
+    const { getConfig } = require('./unified');
+    const config = getConfig();
+    return {
+      rpcUrl: config.blockchain.rpcUrl,
+      devnetRpcUrl: config.blockchain.network === 'devnet' ? config.blockchain.rpcUrl : 'https://api.devnet.solana.com',
+      testnetRpcUrl: config.blockchain.network === 'testnet' ? config.blockchain.rpcUrl : 'https://api.testnet.solana.com',
+      commitment: config.blockchain.commitment,
+      isDevNetwork: config.blockchain.network === 'devnet',
+      heliusApiKey: config.blockchain.heliusApiKey,
+    };
+  } catch {
+    // Fallback to environment variables with devnet as default
+    const network = process.env.EXPO_PUBLIC_DEV_NETWORK || 'devnet';
+    return {
+      rpcUrl: process.env.SOLANA_RPC_URL || (network === 'mainnet' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com'),
+      devnetRpcUrl: process.env.SOLANA_DEVNET_RPC_URL || 'https://api.devnet.solana.com',
+      testnetRpcUrl: process.env.SOLANA_TESTNET_RPC_URL || 'https://api.testnet.solana.com',
+      commitment: process.env.SOLANA_COMMITMENT || 'confirmed',
+      isDevNetwork: network === 'devnet',
+      heliusApiKey: process.env.EXPO_PUBLIC_HELIUS_API_KEY,
+    };
+  }
+})();
 
 // MoonPay configuration
 export const MOONPAY_CONFIG = {
