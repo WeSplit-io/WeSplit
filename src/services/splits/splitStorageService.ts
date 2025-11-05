@@ -139,6 +139,19 @@ export class SplitStorageServiceClass {
         participantsCount: createdSplit.participants.length
       }, 'SplitStorageService');
 
+      // Sync first split quest completion
+      try {
+        const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
+        await userActionSyncService.syncFirstSplit(createdSplit.creatorId);
+      } catch (syncError) {
+        logger.error('Failed to sync first split quest', { 
+          userId: createdSplit.creatorId, 
+          splitId: createdSplit.id,
+          syncError 
+        }, 'SplitStorageService');
+        // Don't fail split creation if sync fails
+      }
+
       return {
         success: true,
         split: createdSplit,

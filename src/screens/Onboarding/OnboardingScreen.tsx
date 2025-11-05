@@ -32,7 +32,7 @@ const { width } = Dimensions.get('window');
 
 const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { updateUser } = useApp();
+  const { updateUser, state } = useApp();
   const scrollRef = useRef<ScrollView>(null);
   const [page, setPage] = useState(0);
 
@@ -40,6 +40,18 @@ const OnboardingScreen: React.FC = () => {
     try {
       await updateUser({ hasCompletedOnboarding: true });
       logger.info('Onboarding marked as completed', null, 'OnboardingScreen');
+      
+      // Sync onboarding completion with quest system
+      try {
+        const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
+        const currentUser = state.currentUser;
+        if (currentUser?.id) {
+          await userActionSyncService.syncOnboardingCompletion(currentUser.id.toString(), true);
+        }
+      } catch (syncError) {
+        logger.error('Failed to sync onboarding quest', { syncError }, 'OnboardingScreen');
+        // Don't fail onboarding if sync fails
+      }
     } catch (error) {
       console.error('❌ Failed to mark onboarding as completed:', error);
     }

@@ -18,7 +18,9 @@ import {
   getAssociatedTokenAddress, 
   createTransferInstruction, 
   getAccount,
-  TOKEN_PROGRAM_ID
+  createAssociatedTokenAccountInstruction,
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID
 } from '@solana/spl-token';
 import { getConfig } from '../../../config/unified';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';
@@ -120,29 +122,21 @@ class ExternalTransferService {
         walletAddress: walletResult.wallet?.address 
       }, 'ExternalTransferService');
 
-      // Load the wallet for transaction signing
-      logger.info('Loading wallet for transaction signing', { userId: params.userId }, 'ExternalTransferService');
+      // Wallet is already loaded from walletService.ensureUserWallet()
+      // We can use it directly for transaction signing
       const expectedWalletAddress = walletResult.wallet?.address;
-      if (!expectedWalletAddress) {
-        logger.error('No wallet address available for loading', { userId: params.userId }, 'ExternalTransferService');
-        return {
-          success: false,
-          error: 'No wallet address available for transaction signing'
-        };
-      }
-      
-      const solanaWalletLoaded = await solanaWalletService.instance.loadWallet(params.userId, expectedWalletAddress);
-      if (!solanaWalletLoaded) {
-        logger.error('Failed to load wallet for transaction signing', { 
-          userId: params.userId, 
-          expectedAddress: expectedWalletAddress 
+      if (!expectedWalletAddress || !walletResult.wallet?.secretKey) {
+        logger.error('No wallet address or secret key available for transaction signing', { 
+          userId: params.userId,
+          hasAddress: !!expectedWalletAddress,
+          hasSecretKey: !!walletResult.wallet?.secretKey
         }, 'ExternalTransferService');
         return {
           success: false,
-          error: 'Failed to load wallet for transaction signing'
+          error: 'Wallet credentials not available for transaction signing'
         };
       }
-      logger.info('Wallet loaded successfully for transaction signing', { 
+      logger.info('Wallet ready for transaction signing', { 
         userId: params.userId, 
         walletAddress: expectedWalletAddress 
       }, 'ExternalTransferService');
@@ -150,7 +144,7 @@ class ExternalTransferService {
       // Build and send transaction - WeSplit only supports USDC transfers
       let result: ExternalTransferResult;
       if (params.currency === 'USDC') {
-        result = await this.sendUsdcTransfer(params, recipientAmount, companyFee);
+        result = await this.sendUsdcTransfer(params, recipientAmount, companyFee, expectedWalletAddress, walletResult.wallet.secretKey);
       } else {
         result = {
           success: false,
@@ -164,7 +158,7 @@ class ExternalTransferService {
         
         // Save transaction to database for history
         try {
-          const { firebaseDataService } = await import('../data');
+          const { firebaseDataService } = await import('../../data');
           
           const transactionData = {
             type: 'withdraw' as const,
@@ -172,14 +166,17 @@ class ExternalTransferService {
             currency: params.currency,
             from_user: params.userId,
             to_user: params.to, // External wallet address
-            from_wallet: '', // Will be filled by the service
+            from_wallet: expectedWalletAddress, // User's wallet address
             to_wallet: params.to,
             tx_hash: result.signature!,
             note: params.memo || 'External wallet transfer',
             status: 'completed' as const,
-            group_id: null,
             company_fee: result.companyFee || 0,
-            net_amount: result.netAmount || params.amount
+            net_amount: result.netAmount || params.amount,
+            gas_fee: result.blockchainFee || 0, // Blockchain fee (SOL)
+            blockchain_network: 'solana',
+            confirmation_count: 0, // Will be updated if needed
+            block_height: 0 // Will be updated if needed
           };
           
           await firebaseDataService.transaction.createTransaction(transactionData);
@@ -349,7 +346,9 @@ class ExternalTransferService {
   private async sendUsdcTransfer(
     params: ExternalTransferParams, 
     recipientAmount: number, 
-    companyFee: number
+    companyFee: number,
+    fromWalletAddress: string,
+    fromWalletSecretKey: string
   ): Promise<ExternalTransferResult> {
     try {
       logger.info('Starting USDC transfer', {
@@ -358,7 +357,8 @@ class ExternalTransferService {
         to: params.to
       }, 'ExternalTransferService');
 
-      const fromPublicKey = new PublicKey(solanaWalletService.instance.getPublicKey()!);
+      // Use wallet address from parameter (already loaded)
+      const fromPublicKey = new PublicKey(fromWalletAddress);
       const toPublicKey = new PublicKey(params.to);
       const usdcMint = new PublicKey(getConfig().blockchain.usdcMintAddress);
 
@@ -387,16 +387,17 @@ class ExternalTransferService {
       }, 'ExternalTransferService');
 
       // Check if recipient has USDC token account, create if needed
+      let needsTokenAccountCreation = false;
       try {
         await getAccount(this.connection, toTokenAccount);
         logger.info('Recipient USDC token account exists', { toTokenAccount: toTokenAccount.toBase58() }, 'ExternalTransferService');
       } catch (error) {
         // Token account doesn't exist, we need to create it
-        // This would require additional instructions, but for now we'll assume it exists
-        logger.warn('Recipient USDC token account does not exist', { 
+        logger.warn('Recipient USDC token account does not exist, will create it', { 
           toTokenAccount: toTokenAccount.toBase58(),
           error: error instanceof Error ? error.message : String(error)
         }, 'ExternalTransferService');
+        needsTokenAccountCreation = true;
       }
 
       // Get recent blockhash
@@ -415,6 +416,22 @@ class ExternalTransferService {
           ComputeBudgetProgram.setComputeUnitPrice({
             microLamports: priorityFee,
           })
+        );
+      }
+
+      // Add token account creation instruction if needed (must be before transfer)
+      if (needsTokenAccountCreation) {
+        logger.info('Adding token account creation instruction', { 
+          toTokenAccount: toTokenAccount.toBase58(),
+          feePayer: feePayerPublicKey.toBase58()
+        }, 'ExternalTransferService');
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            feePayerPublicKey, // Fee payer (company wallet) pays for ATA creation
+            toTokenAccount, // associated token account
+            toPublicKey, // owner
+            usdcMint // mint
+          )
         );
       }
 
@@ -494,8 +511,8 @@ class ExternalTransferService {
       const signers: Keypair[] = [];
       
       // Get wallet keypair for signing (same as internal transfers)
-      const walletInfo = await solanaWalletService.instance.getWalletInfo();
-      if (!walletInfo || !walletInfo.secretKey) {
+      // Use wallet secret key from parameter
+      if (!fromWalletSecretKey) {
         logger.error('Wallet keypair not available for signing', {}, 'ExternalTransferService');
         return {
           success: false,
@@ -503,8 +520,32 @@ class ExternalTransferService {
         };
       }
 
-      const secretKeyBuffer = Buffer.from(walletInfo.secretKey, 'base64');
-      const userKeypair = Keypair.fromSecretKey(secretKeyBuffer);
+      // Handle different secret key formats (same as sendInternal)
+      let userKeypair: Keypair;
+      try {
+        // Try base64 format first
+        const secretKeyBuffer = Buffer.from(fromWalletSecretKey, 'base64');
+        userKeypair = Keypair.fromSecretKey(secretKeyBuffer);
+        logger.debug('Successfully created keypair from base64 secret key', null, 'ExternalTransferService');
+      } catch (base64Error) {
+        try {
+          // Try JSON array format (stored in secure storage)
+          const secretKeyArray = JSON.parse(fromWalletSecretKey);
+          userKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
+          logger.debug('Successfully created keypair from JSON array secret key', null, 'ExternalTransferService');
+        } catch (jsonError) {
+          logger.error('Failed to create keypair from secret key', {
+            base64Error: (base64Error as Error).message,
+            jsonError: (jsonError as Error).message,
+            secretKeyLength: fromWalletSecretKey?.length,
+            secretKeyPreview: fromWalletSecretKey?.substring(0, 20) + '...'
+          }, 'ExternalTransferService');
+          return {
+            success: false,
+            error: 'Invalid user wallet secret key format'
+          };
+        }
+      }
       
       signers.push(userKeypair);
       logger.info('User keypair added to signers', { 

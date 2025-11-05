@@ -98,6 +98,22 @@ export const styles = StyleSheet.create({
   profileId: {
     fontSize: typography.fontSize.sm,
     color: colors.textLightSecondary,
+    marginBottom: 4,
+  },
+  pointsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  pointsLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textLightSecondary,
+    marginRight: 4,
+  },
+  pointsValue: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.brandGreen,
   },
   editIcon: {
     width: 30,

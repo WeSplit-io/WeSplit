@@ -72,7 +72,10 @@ export const firebaseDataTransformers = {
     primary_email: doc.data().primary_email || '',
     email_verified: doc.data().email_verified || false,
     migration_completed: doc.data().migration_completed ? firebaseDataTransformers.timestampToISO(doc.data().migration_completed) : undefined,
-    migration_version: doc.data().migration_version || ''
+    migration_version: doc.data().migration_version || '',
+    points: doc.data().points || 0,
+    total_points_earned: doc.data().total_points_earned || 0,
+    points_last_updated: doc.data().points_last_updated ? firebaseDataTransformers.timestampToISO(doc.data().points_last_updated) : undefined
   }),
 
   // Transform User to Firestore data
@@ -102,6 +105,9 @@ export const firebaseDataTransformers = {
     if (user.email_verified !== undefined) {data.email_verified = user.email_verified;}
     if (user.migration_completed !== undefined) {data.migration_completed = user.migration_completed ? firebaseDataTransformers.isoToTimestamp(user.migration_completed) : null;}
     if (user.migration_version !== undefined) {data.migration_version = user.migration_version;}
+    if (user.points !== undefined) {data.points = user.points;}
+    if (user.total_points_earned !== undefined) {data.total_points_earned = user.total_points_earned;}
+    if (user.points_last_updated !== undefined) {data.points_last_updated = user.points_last_updated ? firebaseDataTransformers.isoToTimestamp(user.points_last_updated) : null;}
     
     return data;
   },
@@ -248,8 +254,15 @@ export const firebaseDataService = {
 
   createUser: async (userData: Omit<User, 'id' | 'created_at'>): Promise<User> => {
       try {
+        // Ensure points are initialized to 0 if not provided
+        const userDataWithPoints = {
+          ...userData,
+          points: userData.points ?? 0,
+          total_points_earned: userData.total_points_earned ?? 0
+        };
+        
         const userRef = await addDoc(collection(db, 'users'), {
-          ...firebaseDataTransformers.userToFirestore(userData),
+          ...firebaseDataTransformers.userToFirestore(userDataWithPoints),
           created_at: serverTimestamp()
         });
         

@@ -48,6 +48,15 @@ export const useContactActions = () => {
         contactName: user.name 
       }, 'useContactActions');
 
+      // Sync first contact quest completion
+      try {
+        const { userActionSyncService } = await import('../services/rewards/userActionSyncService');
+        await userActionSyncService.syncFirstContact(currentUser.id.toString());
+      } catch (syncError) {
+        logger.error('Failed to sync first contact quest', { userId: currentUser.id, syncError }, 'useContactActions');
+        // Don't fail contact addition if sync fails
+      }
+
       return { success: true, contact: newContact };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

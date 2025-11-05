@@ -175,7 +175,10 @@ export class UserMigrationService {
         email_verified: firebaseUser.emailVerified || false,
         wallet_status: 'no_wallet',
         wallet_type: 'app-generated',
-        wallet_migration_status: 'none'
+        wallet_migration_status: 'none',
+        // Initialize points balance
+        points: 0,
+        total_points_earned: 0
       };
       
       const userRef = await addDoc(collection(db, 'users'), userData);

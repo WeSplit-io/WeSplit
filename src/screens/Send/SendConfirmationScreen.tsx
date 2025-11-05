@@ -236,7 +236,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       if (destinationType === 'external') {
         // For external wallets, use external transfer service
         const { externalTransferService } = await import('../../services/blockchain/transaction/sendExternal');
-        transactionResult = await externalTransferService.sendExternalTransfer({
+        transactionResult = await externalTransferService.instance.sendExternalTransfer({
           to: recipientAddress,
           amount: amount,
           currency: 'USDC',

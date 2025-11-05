@@ -6,6 +6,9 @@
 // Import minimal error handler first
 import './src/config/minimalErrorHandler';
 
+// Import runtime error handler early to intercept console.error and suppress WebSocket errors
+import './src/config/runtimeErrorHandler';
+
 // Import safe polyfill initialization
 import './src/config/safePolyfills';
 

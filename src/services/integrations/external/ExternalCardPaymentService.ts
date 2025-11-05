@@ -71,7 +71,7 @@ export class ExternalCardPaymentService {
 
       // Use the external wallet transfer service for KAST card payments
       const { externalTransferService } = await import('../transaction/sendExternal');
-      const transferResult = await externalTransferService.sendExternalTransfer({
+      const transferResult = await externalTransferService.instance.sendExternalTransfer({
         to: kastWalletAddress,
         amount: params.amount,
         currency: 'USDC', // KAST cards receive USDC

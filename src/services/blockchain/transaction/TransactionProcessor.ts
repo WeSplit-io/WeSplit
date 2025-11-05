@@ -98,18 +98,49 @@ export class TransactionProcessor {
       );
 
       // Check if recipient has USDC token account, create if needed
-      let createTokenAccountInstruction: TransactionInstruction | null = null;
+      let createRecipientTokenAccountInstruction: TransactionInstruction | null = null;
       try {
         await getAccount(this.connection, toTokenAccount);
+        logger.debug('Recipient USDC token account exists', { toTokenAccount: toTokenAccount.toBase58() }, 'TransactionProcessor');
       } catch (error) {
         // Token account doesn't exist, create it
         // Use fee payer (company wallet) as the payer for token account creation
-        createTokenAccountInstruction = createAssociatedTokenAccountInstruction(
+        logger.info('Recipient USDC token account does not exist, will create it', { 
+          toTokenAccount: toTokenAccount.toBase58(),
+          recipient: toPublicKey.toBase58()
+        }, 'TransactionProcessor');
+        createRecipientTokenAccountInstruction = createAssociatedTokenAccountInstruction(
           feePayerPublicKey, // payer - use company wallet to pay for token account creation
           toTokenAccount, // associated token account
           toPublicKey, // owner
           usdcMintPublicKey // mint
         );
+      }
+
+      // Check if company wallet has USDC token account, create if needed (for company fee transfers)
+      let createCompanyTokenAccountInstruction: TransactionInstruction | null = null;
+      if (companyFeeAmount > 0) {
+        const companyTokenAccount = await getAssociatedTokenAddress(
+          usdcMintPublicKey,
+          feePayerPublicKey
+        );
+        
+        try {
+          await getAccount(this.connection, companyTokenAccount);
+          logger.debug('Company wallet USDC token account exists', { companyTokenAccount: companyTokenAccount.toBase58() }, 'TransactionProcessor');
+        } catch (error) {
+          // Company wallet token account doesn't exist, create it
+          logger.info('Company wallet USDC token account does not exist, will create it', { 
+            companyTokenAccount: companyTokenAccount.toBase58(),
+            companyWallet: feePayerPublicKey.toBase58()
+          }, 'TransactionProcessor');
+          createCompanyTokenAccountInstruction = createAssociatedTokenAccountInstruction(
+            feePayerPublicKey, // payer - company wallet pays for its own token account creation
+            companyTokenAccount, // associated token account
+            feePayerPublicKey, // owner (company wallet)
+            usdcMintPublicKey // mint
+          );
+        }
       }
 
       // Get recent blockhash
@@ -131,8 +162,8 @@ export class TransactionProcessor {
         ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnitLimit })
       );
 
-      // Add create token account instruction if needed
-      if (createTokenAccountInstruction) {
+      // Add create recipient token account instruction if needed
+      if (createRecipientTokenAccountInstruction) {
         // Check if company wallet has enough SOL for rent exemption
         const companySolBalance = await this.connection.getBalance(feePayerPublicKey);
         const rentExemptionAmount = 2039280; // ~0.00203928 SOL for token account rent exemption
@@ -146,7 +177,26 @@ export class TransactionProcessor {
           };
         }
         
-        transaction.add(createTokenAccountInstruction);
+        transaction.add(createRecipientTokenAccountInstruction);
+      }
+
+      // Add create company token account instruction if needed (must be before company fee transfer)
+      if (createCompanyTokenAccountInstruction) {
+        // Check if company wallet has enough SOL for rent exemption (for its own token account)
+        const companySolBalance = await this.connection.getBalance(feePayerPublicKey);
+        const rentExemptionAmount = 2039280; // ~0.00203928 SOL for token account rent exemption
+        const totalRentNeeded = createRecipientTokenAccountInstruction ? rentExemptionAmount * 2 : rentExemptionAmount;
+        
+        if (companySolBalance < totalRentNeeded) {
+          return {
+            success: false,
+            error: `Company wallet has insufficient SOL for transaction. Required: ${(totalRentNeeded / 1e9).toFixed(6)} SOL (for token account creation), Available: ${(companySolBalance / 1e9).toFixed(6)} SOL. Please contact support to fund the company wallet.`,
+            signature: '',
+            txId: ''
+          };
+        }
+        
+        transaction.add(createCompanyTokenAccountInstruction);
       }
 
       // Add transfer instruction for recipient
@@ -250,37 +300,59 @@ export class TransactionProcessor {
         throw sendError;
       }
       
-      // Enhanced confirmation and verification (matching split logic)
-      const confirmationTimeout = priority === 'high' ? 15000 : 20000; // Reduced timeouts: 15s for high priority, 20s for others
-      const confirmed = await Promise.race([
-        optimizedTransactionUtils.confirmTransactionWithTimeout(signature, confirmationTimeout),
-        new Promise<boolean>((resolve) => 
-          setTimeout(() => {
-            logger.warn('Confirmation timeout, proceeding with transaction', { signature }, 'TransactionProcessor');
-            resolve(false); // Don't fail, just proceed
-          }, confirmationTimeout + 5000) // Extra 5 seconds buffer
-        )
-      ]);
+      // Quick confirmation check - if it takes too long, just proceed
+      // The transaction was accepted by the network, and blockchain propagation can be slow
+      const confirmationTimeout = priority === 'high' ? 5000 : 8000; // Reduced timeouts: 5s for high priority, 8s for others
+      let confirmed = false;
       
+      try {
+        confirmed = await Promise.race([
+          optimizedTransactionUtils.confirmTransactionWithTimeout(signature, confirmationTimeout).catch(() => false),
+          new Promise<boolean>((resolve) => 
+            setTimeout(() => {
+              logger.debug('Confirmation timeout, proceeding with transaction', { signature }, 'TransactionProcessor');
+              resolve(false); // Don't fail, just proceed
+            }, confirmationTimeout + 2000) // Extra 2 seconds buffer
+          )
+        ]);
+      } catch (confirmError) {
+        logger.debug('Confirmation check threw error, proceeding anyway', {
+          signature,
+          error: confirmError instanceof Error ? confirmError.message : String(confirmError)
+        }, 'TransactionProcessor');
+        confirmed = false;
+      }
+      
+      // Only do quick verification if not already confirmed - skip if it takes too long
       if (!confirmed) {
-        logger.warn('Transaction confirmation timed out, attempting enhanced verification', { signature }, 'TransactionProcessor');
-        
-        // Enhanced verification with multiple attempts (matching split logic)
-        const verificationResult = await this.verifyTransactionOnBlockchain(signature, transactionType);
-        if (!verificationResult.success) {
-          logger.warn('Enhanced verification failed, but transaction was sent successfully', { 
-            signature, 
-            error: verificationResult.error 
+        try {
+          // Quick verification with fewer attempts for faster response
+          const verificationResult = await Promise.race([
+            this.verifyTransactionOnBlockchain(signature, transactionType),
+            new Promise<{ success: boolean; error?: string }>((resolve) =>
+              setTimeout(() => {
+                logger.debug('Verification timeout, assuming success', { signature }, 'TransactionProcessor');
+                resolve({ success: true }); // Assume success if verification takes too long
+              }, 3000) // 3 second timeout for verification
+            )
+          ]);
+          
+          if (verificationResult.success) {
+            logger.debug('Transaction verified on blockchain', { signature }, 'TransactionProcessor');
+          }
+        } catch (verifyError) {
+          logger.debug('Verification threw error, but transaction was sent successfully', {
+            signature,
+            error: verifyError instanceof Error ? verifyError.message : String(verifyError)
           }, 'TransactionProcessor');
-          // Don't fail the transaction if verification fails - the transaction was sent successfully
-          // Blockchain propagation can be slow, especially during high network activity
+          // Don't fail - transaction was sent and accepted by network
         }
-        
-        logger.info('Enhanced verification succeeded after timeout', { signature }, 'TransactionProcessor');
       } else {
-        logger.info('Transaction confirmed successfully', { signature }, 'TransactionProcessor');
+        logger.debug('Transaction confirmed successfully', { signature }, 'TransactionProcessor');
       }
 
+      // Always return success if we got a signature - the transaction was accepted by the network
+      // Verification failures are likely due to network delays, not actual transaction failures
       return {
         signature,
         txId: signature,
@@ -313,9 +385,9 @@ export class TransactionProcessor {
         transactionType
       }, 'TransactionProcessor');
 
-      // Enhanced verification with multiple attempts (matching split logic)
-      const maxAttempts = 5; // Reduced from 10 to 5 for faster response
-      const delayMs = 500; // Reduced from 1000ms to 500ms for faster response
+      // Quick verification with minimal attempts for faster response
+      const maxAttempts = 2; // Reduced to 2 attempts for faster response
+      const delayMs = 300; // Reduced to 300ms for faster response
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {

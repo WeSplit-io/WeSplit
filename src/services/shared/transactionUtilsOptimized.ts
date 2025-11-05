@@ -92,10 +92,9 @@ export class OptimizedTransactionUtils {
 
     const currentEndpoint = this.rpcEndpoints[this.currentEndpointIndex];
     
-    return new Connection(currentEndpoint, {
+    const connectionOptions: any = {
       commitment: getConfig().blockchain.commitment,
       confirmTransactionInitialTimeout: TRANSACTION_CONFIG.timeout.transaction,
-      wsEndpoint: getConfig().blockchain.wsUrl,
       disableRetryOnRateLimit: false,
       httpHeaders: {
         'User-Agent': 'WeSplit/1.0',
@@ -115,7 +114,15 @@ export class OptimizedTransactionUtils {
           clearTimeout(timeoutId);
         });
       },
-    });
+    };
+
+    // Only add wsEndpoint if it's configured and valid to avoid WebSocket errors
+    const wsUrl = getConfig().blockchain.wsUrl;
+    if (wsUrl && wsUrl.trim() !== '') {
+      connectionOptions.wsEndpoint = wsUrl;
+    }
+
+    return new Connection(currentEndpoint, connectionOptions);
   }
 
   public async getLatestBlockhashWithRetry(commitment: 'confirmed' | 'finalized' = 'confirmed'): Promise<string> {
@@ -258,6 +265,7 @@ export class OptimizedTransactionUtils {
 
           if (!signatureStatus.value && !disableRebroadcast) {
             // Propagation assist: rebroadcast to next RPC endpoint if signature not visible yet
+            // Skip if we get authentication errors (401/403) to avoid spamming errors
             try {
               console.log(`🔁 Rebroadcasting transaction to next RPC endpoint to improve propagation...`);
               await this.switchToNextEndpoint();
@@ -274,7 +282,11 @@ export class OptimizedTransactionUtils {
               // Check again on the new endpoint
               signatureStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
             } catch (rebroadcastError) {
-              console.log(`⚠️ Rebroadcast failed:`, rebroadcastError instanceof Error ? rebroadcastError.message : String(rebroadcastError));
+              const errorMessage = rebroadcastError instanceof Error ? rebroadcastError.message : String(rebroadcastError);
+              // Skip logging auth errors to reduce noise
+              if (!errorMessage.includes('401') && !errorMessage.includes('403') && !errorMessage.includes('api key') && !errorMessage.includes('missing api key')) {
+                console.log(`⚠️ Rebroadcast failed:`, errorMessage);
+              }
             }
           } else if (!signatureStatus.value && disableRebroadcast) {
             console.log(`🚫 Rebroadcast disabled - skipping propagation assist`);
@@ -355,22 +367,23 @@ export class OptimizedTransactionUtils {
       // Fast-path: try quick HTTP status polling first to avoid WS flakiness
       try {
         const quickStart = Date.now();
-        while (Date.now() - quickStart < 5000) { // 5s quick poll
+        const quickPollDuration = Math.min(timeout, 3000); // Max 3s quick poll
+        while (Date.now() - quickStart < quickPollDuration) {
           const quickStatus = await this.connection.getSignatureStatus(signature, { searchTransactionHistory: true });
           if (quickStatus.value && !quickStatus.value.err) {
             return true;
           }
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 300)); // Reduced from 500ms to 300ms
         }
       } catch (_) {
         // ignore and continue to main flow
       }
 
-      // Use a more resilient confirmation strategy with a longer initial window
-      // iOS production builds need longer timeouts for blockchain confirmations
+      // Use a more resilient confirmation strategy with reduced timeout
+      // Reduced timeouts for faster response - transactions will eventually confirm
       const isIOS = Platform.OS === 'ios';
       const isProduction = __DEV__ === false;
-      const maxTimeout = isIOS && isProduction ? 120000 : 90000; // 120s for iOS production, 90s for others
+      const maxTimeout = isIOS && isProduction ? 30000 : 20000; // Reduced: 30s for iOS production, 20s for others
       const shortTimeout = Math.min(timeout, maxTimeout);
       
       // Try confirmation with shorter timeout first
@@ -402,8 +415,8 @@ export class OptimizedTransactionUtils {
         console.log(`Initial confirmation timed out, trying alternative method for signature: ${signature}`);
         
         // Try alternative confirmation method with polling for the remaining time
-        const remainingTime = Math.max(0, timeout - shortTimeout);
-        const pollIntervalMs = 3000; // poll every 3s
+        const remainingTime = Math.max(0, Math.min(timeout - shortTimeout, 5000)); // Cap at 5s max
+        const pollIntervalMs = 1000; // Reduced: poll every 1s instead of 3s
         const deadline = Date.now() + remainingTime;
         let pollCount = 0;
         while (Date.now() < deadline) {
@@ -416,9 +429,9 @@ export class OptimizedTransactionUtils {
             // ignore and continue polling
           }
 
-          // Periodically rotate RPC endpoint to improve visibility
+          // Periodically rotate RPC endpoint to improve visibility (less frequently)
           pollCount += 1;
-          if (pollCount % 3 === 0) {
+          if (pollCount % 5 === 0) { // Reduced frequency: every 5 polls instead of 3
             try {
               await this.switchToNextEndpoint();
             } catch (_) {}

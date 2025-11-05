@@ -203,6 +203,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{displayName}</Text>
             <Text style={styles.profileId}>{displayId}</Text>
+            {currentUser?.points !== undefined && (
+              <View style={styles.pointsContainer}>
+                <Text style={styles.pointsLabel}>Points:</Text>
+                <Text style={styles.pointsValue}>{currentUser.points || 0}</Text>
+              </View>
+            )}
           </View>
           <TouchableOpacity style={styles.editButton} onPress={handleAccountInfo}>
             <Image

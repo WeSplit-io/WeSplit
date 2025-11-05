@@ -189,6 +189,52 @@ class ConsolidatedTransactionService {
               recipientUserId: recipientUserId,
               amount: params.amount
             }, 'ConsolidatedTransactionService');
+
+            // Award points for wallet-to-wallet transfer (only for internal transfers)
+            try {
+              const { pointsService } = await import('../../rewards/pointsService');
+              const pointsResult = await pointsService.awardTransactionPoints(
+                params.userId,
+                params.amount,
+                result.signature,
+                'send'
+              );
+              
+              if (pointsResult.success) {
+                logger.info('✅ Points awarded for transaction', {
+                  userId: params.userId,
+                  pointsAwarded: pointsResult.pointsAwarded,
+                  totalPoints: pointsResult.totalPoints,
+                  transactionAmount: params.amount
+                }, 'ConsolidatedTransactionService');
+              } else {
+                logger.warn('⚠️ Failed to award points for transaction', {
+                  userId: params.userId,
+                  error: pointsResult.error
+                }, 'ConsolidatedTransactionService');
+              }
+            } catch (pointsError) {
+              logger.error('❌ Error awarding points for transaction', pointsError, 'ConsolidatedTransactionService');
+              // Don't fail the transaction if points award fails
+            }
+
+            // Check and complete first transaction quest
+            try {
+              const { questService } = await import('../../rewards/questService');
+              const isFirstTransaction = await questService.isQuestCompleted(params.userId, 'first_transaction');
+              if (!isFirstTransaction) {
+                const questResult = await questService.completeQuest(params.userId, 'first_transaction');
+                if (questResult.success) {
+                  logger.info('✅ First transaction quest completed', {
+                    userId: params.userId,
+                    pointsAwarded: questResult.pointsAwarded
+                  }, 'ConsolidatedTransactionService');
+                }
+              }
+            } catch (questError) {
+              logger.error('❌ Error completing first transaction quest', questError, 'ConsolidatedTransactionService');
+              // Don't fail the transaction if quest completion fails
+            }
           } else {
             logger.info('✅ Sender transaction saved to database (recipient not registered)', {
               signature: result.signature,
@@ -199,18 +245,18 @@ class ConsolidatedTransactionService {
           
         } catch (saveError) {
           logger.error('❌ Failed to save transaction to database', saveError, 'ConsolidatedTransactionService');
-          // Don't fail the transaction if database save fails
+          // Don't fail the transaction if database save fails - transaction was successful on blockchain
         }
 
         // Process payment request if this transaction was from a request
-        logger.info('🔍 Checking for payment request processing', {
-          requestId: params.requestId,
-          hasRequestId: !!params.requestId,
-          requestIdType: typeof params.requestId
-        }, 'ConsolidatedTransactionService');
-        
         if (params.requestId) {
           try {
+            logger.info('🔍 Checking for payment request processing', {
+              requestId: params.requestId,
+              hasRequestId: !!params.requestId,
+              requestIdType: typeof params.requestId
+            }, 'ConsolidatedTransactionService');
+            
             const { PaymentRequestManager } = await import('./PaymentRequestManager');
             const paymentRequestManager = new PaymentRequestManager();
             
@@ -282,7 +328,7 @@ class ConsolidatedTransactionService {
             logger.error('❌ Failed to process payment request', {
               requestId: params.requestId,
               signature: result.signature,
-              error: requestError
+              error: requestError instanceof Error ? requestError.message : String(requestError)
             }, 'ConsolidatedTransactionService');
             
             // Don't fail the transaction if request processing fails, but log for manual cleanup
@@ -290,10 +336,13 @@ class ConsolidatedTransactionService {
               requestId: params.requestId,
               signature: result.signature
             }, 'ConsolidatedTransactionService');
+            // Don't fail transaction - payment request processing is non-critical
           }
         }
       }
       
+      // Always return the result from TransactionProcessor - it already handles success/failure
+      // Even if verification fails, if we got a signature, the transaction was accepted by the network
       return result;
     } catch (error) {
       logger.error('Failed to send USDC transaction', error, 'ConsolidatedTransactionService');

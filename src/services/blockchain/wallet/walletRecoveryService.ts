@@ -65,6 +65,13 @@ export class WalletRecoveryService {
       }
       
       logger.info('Wallet stored securely', { userId, address: wallet.address }, 'WalletRecoveryService');
+      
+      // Automatically create cloud backup if user has set backup password
+      // This is done asynchronously to not block wallet storage
+      WalletRecoveryService.createCloudBackupIfEnabled(userId).catch(error => {
+        logger.warn('Failed to create automatic cloud backup', error, 'WalletRecoveryService');
+      });
+      
       return true;
     } catch (error) {
       logger.error('Failed to store wallet', error, 'WalletRecoveryService');
@@ -2297,6 +2304,25 @@ export class WalletRecoveryService {
     } catch (error) {
       logger.error('Failed to store mnemonic', error, 'WalletRecoveryService');
       return false;
+    }
+  }
+
+  /**
+   * Create cloud backup if enabled (async, non-blocking)
+   */
+  private static async createCloudBackupIfEnabled(userId: string): Promise<void> {
+    try {
+      // Check if user has enabled cloud backup
+      const userData = await firebaseDataService.user.getCurrentUser(userId);
+      if (userData?.wallet_backup_enabled && userData?.wallet_backup_password_hash) {
+        // Note: In production, we'd need to get the password from secure storage
+        // For now, we'll skip automatic backup creation
+        // User can manually create backup from settings
+        logger.debug('Cloud backup enabled but password not available for automatic backup', { userId }, 'WalletRecoveryService');
+      }
+    } catch (error) {
+      // Silent fail - backup is optional
+      logger.debug('Cloud backup check failed', error, 'WalletRecoveryService');
     }
   }
 

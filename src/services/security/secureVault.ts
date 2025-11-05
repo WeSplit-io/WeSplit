@@ -4,8 +4,44 @@ let Keychain: any;
 let MMKV: any;
 let SecureStore: any;
 
+// Check if we're in Expo Go (native modules not available)
+function isExpoGo(): boolean {
+  try {
+    // Method 1: Check Constants.appOwnership
+    const { Constants } = require('expo-constants');
+    if (Constants?.appOwnership === 'expo') {
+      return true;
+    }
+    
+    // Method 2: Check for ExpoGo module
+    // @ts-ignore
+    if (typeof expo !== 'undefined' && expo.modules?.ExpoGo !== undefined) {
+      return true;
+    }
+    
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 // Lazy-load dependencies to avoid bundler issues in web/tests
 async function loadDeps() {
+  // Skip native modules in Expo Go - they're not supported
+  if (isExpoGo()) {
+    logger.debug('secureVault: Expo Go detected, skipping native modules', {}, 'SecureVault');
+    // Only load SecureStore which works in Expo Go
+    if (!SecureStore) {
+      try {
+        SecureStore = await import('expo-secure-store');
+      } catch (e) {
+        // optional
+      }
+    }
+    return;
+  }
+
+  // Load native modules for development/production builds
   if (!Keychain) {
     try {
       Keychain = await import('react-native-keychain');
@@ -40,6 +76,11 @@ const storage = (() => {
 })();
 
 async function getStorage() {
+  // Skip MMKV in Expo Go
+  if (isExpoGo()) {
+    return null;
+  }
+  
   await loadDeps();
   try {
     if (MMKV) {
@@ -75,6 +116,11 @@ function getRandomBytes(length: number): Uint8Array {
 }
 
 async function getOrCreateAesKey(): Promise<Uint8Array | null> {
+  // Skip Keychain in Expo Go
+  if (isExpoGo()) {
+    return null;
+  }
+  
   await loadDeps();
   if (!Keychain) return null;
   try {

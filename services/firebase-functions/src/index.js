@@ -262,7 +262,10 @@ exports.verifyCode = functions.https.onCall(async (data, context) => {
         wallet_migration_status: 'none',
         // Migration tracking
         migration_completed: admin.firestore.FieldValue.serverTimestamp(),
-        migration_version: '1.0'
+        migration_version: '1.0',
+        // Initialize points balance
+        points: 0,
+        total_points_earned: 0
       });
       
       console.log(`Created new user document for ${sanitizedEmail}`);

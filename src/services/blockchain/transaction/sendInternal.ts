@@ -225,6 +225,49 @@ class InternalTransferService {
             memo: params.memo,
             groupId: params.groupId
           });
+
+          // Award points for wallet-to-wallet transfer (only for internal transfers)
+          // Check if recipient is a registered user to confirm it's an internal transfer
+          try {
+            const { firebaseDataService } = await import('../../data/firebaseDataService');
+            const recipientUser = await firebaseDataService.user.getUserByWalletAddress(params.to);
+            
+            if (recipientUser) {
+              // This is an internal wallet-to-wallet transfer, award points
+              const { pointsService } = await import('../../rewards/pointsService');
+              const pointsResult = await pointsService.awardTransactionPoints(
+                params.userId,
+                params.amount,
+                result.signature!,
+                'send'
+              );
+              
+              if (pointsResult.success) {
+                logger.info('✅ Points awarded for internal transfer', {
+                  userId: params.userId,
+                  pointsAwarded: pointsResult.pointsAwarded,
+                  totalPoints: pointsResult.totalPoints,
+                  transactionAmount: params.amount
+                }, 'InternalTransferService');
+              }
+
+              // Check and complete first transaction quest
+              const { questService } = await import('../../rewards/questService');
+              const isFirstTransaction = await questService.isQuestCompleted(params.userId, 'first_transaction');
+              if (!isFirstTransaction) {
+                const questResult = await questService.completeQuest(params.userId, 'first_transaction');
+                if (questResult.success) {
+                  logger.info('✅ First transaction quest completed', {
+                    userId: params.userId,
+                    pointsAwarded: questResult.pointsAwarded
+                  }, 'InternalTransferService');
+                }
+              }
+            }
+          } catch (pointsError) {
+            logger.error('❌ Error awarding points for internal transfer', pointsError, 'InternalTransferService');
+            // Don't fail the transaction if points award fails
+          }
         } catch (error) {
           logger.warn('Failed to save transaction to Firebase', { error, signature: result.signature }, 'InternalTransferService');
           // Don't fail the transaction if Firebase save fails

@@ -303,6 +303,19 @@ const CreateProfileScreen: React.FC = () => {
 
         authenticateUser(appUser, 'email');
         
+        // Sync onboarding and profile image quests after user is authenticated
+        try {
+          const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
+          await userActionSyncService.syncOnboardingCompletion(appUser.id, true);
+          
+          if (finalAvatarUrl && finalAvatarUrl !== DEFAULT_AVATAR_URL) {
+            await userActionSyncService.syncProfileImage(appUser.id, finalAvatarUrl);
+          }
+        } catch (syncError) {
+          logger.error('Failed to sync quests after profile creation', { userId: appUser.id, syncError }, 'CreateProfileScreen');
+          // Don't fail profile creation if sync fails
+        }
+        
         // Verify data was saved correctly
         try {
           const savedUser = await firebaseDataService.user.getCurrentUser(user.id);

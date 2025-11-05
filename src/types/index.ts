@@ -27,6 +27,11 @@ export interface User {
   email_verified?: boolean;
   migration_completed?: string; // Timestamp when migration was completed
   migration_version?: string; // Migration version
+  
+  // Reward system fields
+  points?: number; // Total points accumulated
+  total_points_earned?: number; // Lifetime points (for stats)
+  points_last_updated?: string; // Timestamp when points were last updated
 }
 
 // User contact includes relationship metadata

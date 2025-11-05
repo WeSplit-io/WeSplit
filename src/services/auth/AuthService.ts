@@ -544,14 +544,29 @@ class AuthService {
           }, 'AuthService');
           
           // Try to recover wallet using existing wallet address from database
-          const walletResult = await walletService.recoverWalletFromAddress(consistentUser.id, consistentUser.wallet_address);
-          if (walletResult.success) {
-            logger.info('✅ Wallet recovered successfully', { userId: consistentUser.id }, 'AuthService');
-          } else {
-            logger.error('❌ Failed to recover wallet, user will need to restore from seed phrase', { 
-              userId: consistentUser.id,
-              error: walletResult.error 
+          let walletResult = await walletService.recoverWalletFromAddress(consistentUser.id, consistentUser.wallet_address);
+          
+          // If local recovery failed, try cloud backup restore (requires user password)
+          if (!walletResult.success) {
+            logger.info('Local recovery failed, cloud backup restore will be attempted on next login with password', { 
+              userId: consistentUser.id 
             }, 'AuthService');
+            
+            // Note: Cloud backup restore requires user password, so we'll prompt user later
+            // For now, we'll just log that backup is available
+            const { walletCloudBackupService } = await import('../security/walletCloudBackupService');
+            const hasBackup = await walletCloudBackupService.hasBackup(consistentUser.id);
+            
+            if (hasBackup) {
+              logger.info('Cloud backup available for restore', { userId: consistentUser.id }, 'AuthService');
+              // User will be prompted to restore from backup on next screen
+            } else {
+              logger.warn('No cloud backup found, user will need to restore from seed phrase', { 
+                userId: consistentUser.id 
+              }, 'AuthService');
+            }
+          } else {
+            logger.info('✅ Wallet recovered successfully', { userId: consistentUser.id }, 'AuthService');
           }
         } else {
           // User has no wallet - create one

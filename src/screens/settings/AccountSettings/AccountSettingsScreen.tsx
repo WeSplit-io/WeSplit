@@ -234,6 +234,17 @@ const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigatio
         avatar: finalAvatarUrl
       });
       
+      // Sync profile image quest completion if avatar was added
+      if (finalAvatarUrl && finalAvatarUrl !== currentUser.avatar) {
+        try {
+          const { userActionSyncService } = await import('../../../services/rewards/userActionSyncService');
+          await userActionSyncService.syncProfileImage(currentUser.id.toString(), finalAvatarUrl);
+        } catch (syncError) {
+          logger.error('❌ Error syncing profile image quest', syncError, 'AccountSettingsScreen');
+          // Don't fail the profile update if sync fails
+        }
+      }
+      
       Alert.alert('Success', 'Profile updated successfully');
       nav.goBack();
     } catch (error) {

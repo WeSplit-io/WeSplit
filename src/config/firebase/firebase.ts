@@ -322,7 +322,10 @@ export const firestoreService = {
         emailVerified: user.emailVerified,
         lastLoginAt: new Date().toISOString(),
         lastVerifiedAt: new Date().toISOString(), // Track when user last verified
-        hasCompletedOnboarding: false // Track onboarding completion
+        hasCompletedOnboarding: false, // Track onboarding completion
+        // Initialize points balance
+        points: 0,
+        total_points_earned: 0
       };
 
       await setDoc(userRef, userData, { merge: true });
