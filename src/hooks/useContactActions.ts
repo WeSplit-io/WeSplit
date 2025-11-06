@@ -40,7 +40,8 @@ export const useContactActions = () => {
         wallet_public_key: user.wallet_public_key,
         avatar: user.avatar || '',
         mutual_groups_count: 0,
-        isFavorite: false
+        isFavorite: false,
+        first_met_at: new Date().toISOString()
       });
 
       logger.info('Contact added successfully', { 

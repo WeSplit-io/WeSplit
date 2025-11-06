@@ -141,31 +141,67 @@ export const firebaseDataTransformers = {
   }),
 
   // Transform UserContact to Firestore data
-  userContactToFirestore: (contact: Omit<UserContact, 'id' | 'created_at'>): any => ({
-    name: contact.name,
-    email: contact.email,
-    wallet_address: contact.wallet_address,
-    wallet_public_key: contact.wallet_public_key,
-    avatar: contact.avatar,
-    hasCompletedOnboarding: contact.hasCompletedOnboarding,
-    status: contact.status,
-    wallet_status: contact.wallet_status,
-    wallet_created_at: contact.wallet_created_at ? firebaseDataTransformers.isoToTimestamp(contact.wallet_created_at) : null,
-    wallet_last_fixed_at: contact.wallet_last_fixed_at ? firebaseDataTransformers.isoToTimestamp(contact.wallet_last_fixed_at) : null,
-    wallet_fix_attempts: contact.wallet_fix_attempts,
-    wallet_has_private_key: contact.wallet_has_private_key,
-    wallet_has_seed_phrase: contact.wallet_has_seed_phrase,
-    wallet_type: contact.wallet_type,
-    wallet_migration_status: contact.wallet_migration_status,
-    firebase_uid: contact.firebase_uid,
-    primary_email: contact.primary_email,
-    email_verified: contact.email_verified,
-    migration_completed: contact.migration_completed ? firebaseDataTransformers.isoToTimestamp(contact.migration_completed) : null,
-    migration_version: contact.migration_version,
-    first_met_at: firebaseDataTransformers.isoToTimestamp(contact.first_met_at),
-    isFavorite: contact.isFavorite,
+  userContactToFirestore: (contact: Omit<UserContact, 'id' | 'created_at'>): any => {
+    const data: any = {
+      name: contact.name || '',
+      email: contact.email || '',
+      wallet_address: contact.wallet_address || '',
+      wallet_public_key: contact.wallet_public_key || '',
+      avatar: contact.avatar || '',
+      first_met_at: contact.first_met_at ? firebaseDataTransformers.isoToTimestamp(contact.first_met_at) : serverTimestamp(),
+      isFavorite: contact.isFavorite || false,
+      mutual_groups_count: contact.mutual_groups_count || 0,
     updated_at: serverTimestamp()
-  }),
+    };
+    
+    // Only include optional fields if they are defined and not null
+    if (contact.status !== undefined && contact.status !== null) {
+      data.status = contact.status;
+    }
+    if (contact.wallet_status !== undefined && contact.wallet_status !== null) {
+      data.wallet_status = contact.wallet_status;
+    }
+    if (contact.wallet_created_at) {
+      data.wallet_created_at = firebaseDataTransformers.isoToTimestamp(contact.wallet_created_at);
+    }
+    if (contact.wallet_last_fixed_at) {
+      data.wallet_last_fixed_at = firebaseDataTransformers.isoToTimestamp(contact.wallet_last_fixed_at);
+    }
+    if (contact.wallet_fix_attempts !== undefined) {
+      data.wallet_fix_attempts = contact.wallet_fix_attempts;
+    }
+    if (contact.wallet_has_private_key !== undefined) {
+      data.wallet_has_private_key = contact.wallet_has_private_key;
+    }
+    if (contact.wallet_has_seed_phrase !== undefined) {
+      data.wallet_has_seed_phrase = contact.wallet_has_seed_phrase;
+    }
+    if (contact.wallet_type !== undefined && contact.wallet_type !== null) {
+      data.wallet_type = contact.wallet_type;
+    }
+    if (contact.wallet_migration_status !== undefined && contact.wallet_migration_status !== null) {
+      data.wallet_migration_status = contact.wallet_migration_status;
+    }
+    if (contact.firebase_uid) {
+      data.firebase_uid = contact.firebase_uid;
+    }
+    if (contact.primary_email) {
+      data.primary_email = contact.primary_email;
+    }
+    if (contact.email_verified !== undefined) {
+      data.email_verified = contact.email_verified;
+    }
+    if (contact.migration_completed) {
+      data.migration_completed = firebaseDataTransformers.isoToTimestamp(contact.migration_completed);
+    }
+    if (contact.migration_version) {
+      data.migration_version = contact.migration_version;
+    }
+    
+    // Never include hasCompletedOnboarding for contacts (it's a user field, not a contact field)
+    
+    return data;
+  },
 
   // Transform Firestore document to Notification
   firestoreToNotification: (doc: any): Notification => ({
@@ -446,20 +482,25 @@ export const firebaseDataService = {
 
     toggleFavorite: async (userId: string, contactId: string, isFavorite: boolean): Promise<void> => {
       try {
-        // Find the contact by user_id and contact details
-        const q = query(
-          collection(db, 'contacts'),
-          where('user_id', '==', userId),
-          where('id', '==', contactId)
-        );
-        const querySnapshot = await getDocs(q);
+        // Get the contact document directly by ID (contactId is the Firestore document ID)
+        const contactRef = doc(db, 'contacts', contactId);
+        const contactDoc = await getDoc(contactRef);
         
-        if (querySnapshot.empty) {
+        if (!contactDoc.exists()) {
           throw new Error('Contact not found');
         }
         
-        const contactDoc = querySnapshot.docs[0];
-        await updateDoc(contactDoc.ref, { isFavorite });
+        // Verify the contact belongs to the current user
+        const contactData = contactDoc.data();
+        if (contactData.user_id !== userId) {
+          throw new Error('Contact does not belong to current user');
+        }
+        
+        // Update the favorite status
+        await updateDoc(contactRef, { 
+          isFavorite,
+          updated_at: serverTimestamp()
+        });
         
         logger.info('Contact favorite status updated', { userId, contactId, isFavorite }, 'FirebaseDataService');
       } catch (error) {

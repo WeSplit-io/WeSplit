@@ -116,14 +116,39 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       if (numeric > 0) {
         setIsConverting(true);
         try {
+          // Use live market rates - throws error if conversion fails
           const usdcAmount = await convertFiatToUSDC(
             numeric,
             selectedCurrency.code
           );
+          
+          // Validate the converted amount
+          if (!usdcAmount || isNaN(usdcAmount) || usdcAmount <= 0) {
+            throw new Error('Invalid conversion result');
+          }
+          
           setConvertedAmount(usdcAmount);
+          clearValidationErrors();
+          
+          logger.info('Amount converted successfully', {
+            originalAmount: numeric,
+            originalCurrency: selectedCurrency.code,
+            convertedAmount: usdcAmount,
+            currency: 'USDC'
+          }, 'ManualBillCreationScreen');
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown conversion error';
           console.error('Error converting amount:', error);
+          logger.error('Currency conversion failed', {
+            amount: numeric,
+            currency: selectedCurrency.code,
+            error: errorMessage
+          }, 'ManualBillCreationScreen');
+          
           setConvertedAmount(null);
+          setValidationErrors({
+            amount: `Failed to convert ${selectedCurrency.code} to USDC. ${errorMessage}. Please check your internet connection and try again.`
+          });
         } finally {
           setIsConverting(false);
         }
@@ -212,9 +237,21 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       return;
     }
 
-    // Check if we have a converted amount
+    // Check if we have a converted amount from live market rates
     if (!convertedAmount || convertedAmount <= 0) {
-      Alert.alert('Conversion Error', 'Unable to convert amount to USDC. Please check your amount and try again.');
+      Alert.alert(
+        'Conversion Error', 
+        'Unable to convert amount to USDC using live market rates. Please check your internet connection and try again.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Clear validation errors to allow user to retry
+              clearValidationErrors();
+            }
+          }
+        ]
+      );
       return;
     }
 

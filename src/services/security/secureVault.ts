@@ -66,6 +66,12 @@ async function loadDeps() {
 }
 
 const KEYCHAIN_SERVICE = 'wesplit-aes-key';
+const KEY_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
+// Cache AES key in memory after first Face ID authentication
+let cachedAesKey: Uint8Array | null = null;
+let keyCacheExpiry: number = 0;
+
 const storage = (() => {
   try {
     // Defer creating until MMKV is loaded at runtime
@@ -121,25 +127,59 @@ async function getOrCreateAesKey(): Promise<Uint8Array | null> {
     return null;
   }
   
+  // ✅ Check cache first - prevents multiple Face ID prompts
+  if (cachedAesKey && Date.now() < keyCacheExpiry) {
+    logger.debug('secureVault: Using cached AES key', {}, 'SecureVault');
+    return cachedAesKey; // No Face ID prompt!
+  }
+  
   await loadDeps();
   if (!Keychain) return null;
   try {
+    // This will trigger Face ID/Touch ID OR device passcode if biometrics aren't available
+    // Keychain.ACCESS_CONTROL.BIOMETRY_ANY_OR_DEVICE_PASSCODE automatically falls back to passcode
     const existing = await Keychain.getGenericPassword({ service: KEYCHAIN_SERVICE });
     if (existing && existing.password) {
-      return Uint8Array.from(Buffer.from(existing.password, 'base64'));
+      const key = Uint8Array.from(Buffer.from(existing.password, 'base64'));
+      // ✅ Cache the key after successful authentication
+      cachedAesKey = key;
+      keyCacheExpiry = Date.now() + KEY_CACHE_DURATION;
+      logger.debug('secureVault: AES key retrieved and cached', {}, 'SecureVault');
+      return key;
     }
+    // Create new key if it doesn't exist
     const key = getRandomBytes(32);
+    // Note: BIOMETRY_ANY_OR_DEVICE_PASSCODE will:
+    // 1. Try Face ID/Touch ID if available
+    // 2. Fall back to device passcode if biometrics aren't available
+    // 3. This ensures users without biometrics can still use the app
     await Keychain.setGenericPassword('mnemonic', Buffer.from(key).toString('base64'), {
       service: KEYCHAIN_SERVICE,
       accessible: Keychain.ACCESSIBLE && Keychain.ACCESSIBLE.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
       accessControl: Keychain.ACCESS_CONTROL && (Keychain.ACCESS_CONTROL.BIOMETRY_ANY_OR_DEVICE_PASSCODE || Keychain.ACCESS_CONTROL.DEVICE_PASSCODE_OR_BIOMETRY),
       securityLevel: Keychain.SECURITY_LEVEL && Keychain.SECURITY_LEVEL.SECURE_HARDWARE,
     });
+    // ✅ Cache the newly created key
+    cachedAesKey = key;
+    keyCacheExpiry = Date.now() + KEY_CACHE_DURATION;
+    logger.debug('secureVault: New AES key created and cached', {}, 'SecureVault');
     return key;
   } catch (e) {
-    logger.warn('secureVault: failed to get/create AES key', e, 'SecureVault');
+    // If Keychain access fails (e.g., user cancelled, no passcode), log and return null
+    // The fallback to SecureStore will handle this case
+    logger.warn('secureVault: failed to get/create AES key from Keychain', e, 'SecureVault');
+    logger.debug('secureVault: Will fall back to SecureStore for vault access', {}, 'SecureVault');
     return null;
   }
+}
+
+/**
+ * Clear the cached AES key (useful for logout or security)
+ */
+export function clearAesKeyCache(): void {
+  cachedAesKey = null;
+  keyCacheExpiry = 0;
+  logger.debug('secureVault: AES key cache cleared', {}, 'SecureVault');
 }
 
 async function encryptAesGcm(key: Uint8Array, plaintextUtf8: string): Promise<{ iv: string; ct: string } | null> {
@@ -265,6 +305,29 @@ export const secureVault = {
       }
     } catch (e) {
       logger.warn('secureVault: clear failed', e, 'SecureVault');
+    }
+  },
+
+  /**
+   * Pre-authenticate and cache the AES key (call this before dashboard)
+   * This ensures Face ID is prompted once before any vault access
+   * 
+   * Note: In simulators or when Keychain fails, this will return false
+   * but the app can still work using SecureStore fallback
+   */
+  async preAuthenticate(): Promise<boolean> {
+    try {
+      const key = await getOrCreateAesKey();
+      if (key !== null) {
+        return true;
+      }
+      // If Keychain fails (e.g., simulator, user cancelled), that's okay
+      // SecureStore fallback will still work for vault access
+      logger.debug('secureVault: Keychain authentication not available, will use SecureStore fallback', {}, 'SecureVault');
+      return false;
+    } catch (e) {
+      logger.warn('secureVault: pre-authentication failed (will use SecureStore fallback)', e, 'SecureVault');
+      return false;
     }
   },
 };

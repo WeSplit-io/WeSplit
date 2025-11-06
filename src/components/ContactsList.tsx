@@ -19,7 +19,7 @@ import { useRealtimeUserSearch } from '../hooks/useRealtimeUserSearch';
 
 interface ContactsListProps {
   onContactSelect: (contact: UserContact) => void;
-  onAddContact?: (user: User) => void;
+  onAddContact?: (user: User) => void; // Callback for notification only, not for actual adding
   showAddButton?: boolean;
   showSearch?: boolean;
   showTabs?: boolean;
@@ -33,6 +33,7 @@ interface ContactsListProps {
   onNavigateToTransfer?: (recipientWalletAddress: string, userName?: string) => void;
   selectedContacts?: UserContact[];
   multiSelect?: boolean;
+  groupId?: string; // Optional groupId for context
 }
 
 const ContactsList: React.FC<ContactsListProps> = ({
@@ -51,13 +52,14 @@ const ContactsList: React.FC<ContactsListProps> = ({
   onNavigateToTransfer,
   selectedContacts = [],
   multiSelect = false,
+  groupId,
 }) => {
   const { state } = useApp();
   const { currentUser } = state;
 
   // Use the new hooks for contact management
   const { contacts, loading, refreshContacts } = useContacts();
-  const { addContact, isUserAlreadyContact } = useContactActions();
+  const { addContact, isUserAlreadyContact, toggleFavorite: toggleFavoriteAction } = useContactActions();
 
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -87,9 +89,9 @@ const ContactsList: React.FC<ContactsListProps> = ({
   const [isProcessingQR, setIsProcessingQR] = useState(false);
   
   // Use refs to store callback functions to prevent infinite loops
-  const onUserAddedRef = useRef<(user: User) => void>();
-  const onUserModifiedRef = useRef<(user: User) => void>();
-  const onUserRemovedRef = useRef<(user: User) => void>();
+  const onUserAddedRef = useRef<(user: User) => void | undefined>(undefined);
+  const onUserModifiedRef = useRef<(user: User) => void | undefined>(undefined);
+  const onUserRemovedRef = useRef<(user: User) => void | undefined>(undefined);
   
   // Update refs when callbacks change
   onUserAddedRef.current = (user: User) => {
@@ -148,10 +150,11 @@ const ContactsList: React.FC<ContactsListProps> = ({
     if (activeTab === 'All') {
       // Show all contacts in All tab
       if (searchQuery.trim() !== '') {
+        const queryLower = searchQuery.toLowerCase();
         filtered = filtered.filter(contact =>
-          (contact.wallet_address && contact.wallet_address.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (contact.name && contact.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          contact.email.toLowerCase().includes(searchQuery.toLowerCase())
+          (contact.wallet_address && contact.wallet_address.toLowerCase().includes(queryLower)) ||
+          (contact.name && contact.name.toLowerCase().includes(queryLower)) ||
+          (contact.email && contact.email.toLowerCase().includes(queryLower))
         );
       }
     } else if (activeTab === 'Favorite') {
@@ -159,10 +162,11 @@ const ContactsList: React.FC<ContactsListProps> = ({
       filtered = filtered.filter(contact => contact.isFavorite);
       // Apply search filter to favorites
       if (searchQuery.trim() !== '') {
+        const queryLower = searchQuery.toLowerCase();
         filtered = filtered.filter(contact =>
-          (contact.wallet_address && contact.wallet_address.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (contact.name && contact.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          contact.email.toLowerCase().includes(searchQuery.toLowerCase())
+          (contact.wallet_address && contact.wallet_address.toLowerCase().includes(queryLower)) ||
+          (contact.name && contact.name.toLowerCase().includes(queryLower)) ||
+          (contact.email && contact.email.toLowerCase().includes(queryLower))
         );
       }
     }
@@ -241,7 +245,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
     }
   };
 
-  // Debounced search
+  // Debounced search with proper cleanup
   useEffect(() => {
     if (__DEV__) {
       logger.debug('Search effect triggered', { activeTab, searchQuery: searchQuery.trim() }, 'ContactsList');
@@ -258,39 +262,76 @@ const ContactsList: React.FC<ContactsListProps> = ({
       // Also run traditional search as fallback
       handleUserSearch(searchQuery);
       
+      // Cleanup function
       return () => {
         unsubscribeRealtimeSearch();
+        clearRealtimeResults();
       };
     } else {
       setSearchResults([]);
       clearRealtimeResults();
+      unsubscribeRealtimeSearch();
     }
   }, [searchQuery]); // Remove the function dependencies that cause infinite loops
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      unsubscribeRealtimeSearch();
+      clearRealtimeResults();
+      // Clear any ongoing operations
+      addingContactsRef.current.clear();
+      togglingFavoritesRef.current.clear();
+    };
+  }, [unsubscribeRealtimeSearch, clearRealtimeResults]);
+
   // Contact loading is now handled by the useContacts hook
 
+  // Track ongoing additions to prevent race conditions
+  const addingContactsRef = useRef<Set<string>>(new Set());
+
   const handleAddContact = async (user: User) => {
-    if (!currentUser?.id) {return;}
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'You must be logged in to add contacts');
+      return;
+    }
+
+    const userId = String(user.id);
+    
+    // Check if already adding this contact (race condition protection)
+    if (addingContactsRef.current.has(userId)) {
+      logger.warn('Contact addition already in progress', { userId, name: user.name }, 'ContactsList');
+      return;
+    }
 
     // Check if contact already exists using the hook
     if (isUserAlreadyContact(user, contacts)) {
       logger.warn('Contact already exists', { name: user.name }, 'ContactsList');
+      Alert.alert('Info', 'This contact is already in your list');
       return;
     }
 
+    // Mark as adding
+    addingContactsRef.current.add(userId);
     setIsAddingContact(Number(user.id));
 
     try {
-      // Use the hook's addContact method
+      // Use the hook's addContact method (this is the single source of truth)
       const result = await addContact(user);
 
       if (result.success) {
-        // Refresh contacts list
+        // Refresh contacts list to get updated data
         await refreshContacts();
         
-        // Call parent's onAddContact if provided (for backward compatibility)
+        // Call parent's onAddContact callback if provided (for notification only, not for adding)
+        // This allows parent screens to react to the addition (e.g., show success message)
         if (onAddContact) {
+          try {
           await onAddContact(user);
+          } catch (callbackError) {
+            // Don't fail the operation if callback fails
+            logger.error('Error in onAddContact callback', { error: callbackError }, 'ContactsList');
+          }
         }
 
         logger.info('Contact added successfully', { userName: user.name }, 'ContactsList');
@@ -300,18 +341,71 @@ const ContactsList: React.FC<ContactsListProps> = ({
       }
     } catch (error) {
       console.error('❌ Error adding contact:', error);
-      Alert.alert('Error', 'Failed to add contact');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to add contact';
+      Alert.alert('Error', errorMessage);
     } finally {
+      // Remove from adding set and reset state
+      addingContactsRef.current.delete(userId);
       setIsAddingContact(null);
     }
   };
 
-  const toggleFavorite = (contactId: number | string) => {
-    setContacts(prev => prev.map(contact =>
-      contact.id === contactId
-        ? { ...contact, isFavorite: !contact.isFavorite }
-        : contact
-    ));
+  // Track ongoing favorite toggles to prevent race conditions
+  const togglingFavoritesRef = useRef<Set<string>>(new Set());
+
+  const toggleFavorite = async (contactId: number | string) => {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'You must be logged in to update favorites');
+      return;
+    }
+
+    const contactIdStr = String(contactId);
+    
+    // Check if already toggling this contact (race condition protection)
+    if (togglingFavoritesRef.current.has(contactIdStr)) {
+      logger.warn('Favorite toggle already in progress', { contactId: contactIdStr }, 'ContactsList');
+      return;
+    }
+
+    // Find the contact to get current favorite status
+    // Normalize IDs to strings for comparison (contactId can be number or string, c.id can be number or string)
+    const contact = contacts.find(c => String(c.id) === contactIdStr);
+    if (!contact) {
+      logger.warn('Contact not found for favorite toggle', { 
+        contactId, 
+        contactIdStr,
+        contactsCount: contacts.length,
+        contactIds: contacts.map(c => ({ id: c.id, idType: typeof c.id }))
+      }, 'ContactsList');
+      Alert.alert('Error', 'Contact not found');
+      return;
+    }
+
+    const newFavoriteStatus = !contact.isFavorite;
+
+    // Mark as toggling
+    togglingFavoritesRef.current.add(contactIdStr);
+
+    try {
+      // Update in Firebase
+      const result = await toggleFavoriteAction(contactIdStr, newFavoriteStatus);
+
+      if (result.success) {
+        // Refresh contacts to get updated favorite status
+        await refreshContacts();
+        logger.info('Favorite status updated', { contactId: contactIdStr, isFavorite: newFavoriteStatus }, 'ContactsList');
+      } else {
+        logger.error('Failed to update favorite status', { error: result.error }, 'ContactsList');
+        Alert.alert('Error', result.error || 'Failed to update favorite status');
+      }
+    } catch (error) {
+      console.error('❌ Error toggling favorite:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update favorite status';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      // Remove from toggling set
+      togglingFavoritesRef.current.delete(contactIdStr);
+    }
   };
 
   const getFriends = () => filteredContacts.filter(contact => contact.isFavorite);
@@ -420,10 +514,8 @@ const ContactsList: React.FC<ContactsListProps> = ({
             const result = await deepLinkHandler.handleJoinGroupDeepLink(linkData.inviteId!, currentUser.id.toString());
             if (result.success) {
               Alert.alert('Success', `Successfully joined group: ${result.groupName || 'Unknown Group'}`);
-              // Refresh contacts list if we're in a group context
-              if (groupId) {
+              // Refresh contacts list
                 await refreshContacts();
-              }
             } else {
               Alert.alert('Error', result.message || 'Failed to join group.');
             }
@@ -563,11 +655,11 @@ const ContactsList: React.FC<ContactsListProps> = ({
         <Text style={styles.contactName}>
           {item.name || formatWalletAddress(item.wallet_address)}
         </Text>
-        <View style={styles.contactDetails}>
+        <View>
           <Text style={styles.contactEmail}>
-            {item.wallet_address ? formatWalletAddress(item.wallet_address) : item.email}
-            {item.mutual_groups_count > 0 && (
-              <Text style={styles.mutualGroupsText}> • {item.mutual_groups_count} splits</Text>
+            {item.wallet_address ? formatWalletAddress(item.wallet_address) : (item.email || '')}
+            {(item as any).mutual_groups_count > 0 && (
+              <Text style={styles.mutualGroupsText}> • {(item as any).mutual_groups_count} splits</Text>
             )}
           </Text>
           {(() => {
@@ -797,6 +889,16 @@ const ContactsList: React.FC<ContactsListProps> = ({
                         relationshipType: user.relationshipType
                       });
 
+                      // Check if this user is already in contacts to get favorite status
+                      // Use both the search result flag and local contacts check for accuracy
+                      const existingContact = contacts.find(c => String(c.id) === String(user.id));
+                      const isFavorite = existingContact?.isFavorite || false;
+                      
+                      // Check if user is already a contact using the hook function (more reliable)
+                      const isAlreadyContactLocal = isUserAlreadyContact(user, contacts);
+                      // Use local check as primary, fallback to search result flag
+                      const isAlreadyContact = isAlreadyContactLocal || user.isAlreadyContact;
+
                       const userAsContact: UserContact = {
                         id: user.id,
                         name: user.name,
@@ -806,11 +908,10 @@ const ContactsList: React.FC<ContactsListProps> = ({
                         created_at: user.created_at,
                         first_met_at: user.created_at,
                         avatar: user.avatar,
-                        isFavorite: false
+                        isFavorite: isFavorite
                       };
 
-                      const isSelected = multiSelect && selectedContacts.some(c => c.id === user.id);
-                      const isAlreadyContact = user.isAlreadyContact;
+                      const isSelected = multiSelect && selectedContacts.some(c => String(c.id) === String(user.id));
 
                       return (
                         <TouchableOpacity
@@ -834,9 +935,9 @@ const ContactsList: React.FC<ContactsListProps> = ({
                             <Text style={styles.contactName}>
                               {user.name || formatWalletAddress(user.wallet_address)}
                             </Text>
-                            <View style={styles.contactDetails}>
+                            <View>
                               <Text style={styles.contactEmail}>
-                                {user.wallet_address ? formatWalletAddress(user.wallet_address) : user.email}
+                                {user.wallet_address ? formatWalletAddress(user.wallet_address) : (user.email || '')}
                               </Text>
                               {(() => {
                                 const walletStatus = getWalletAddressStatus(user.wallet_address);
@@ -858,7 +959,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                                    user.relationshipType === 'split_participant' ? '👥 Split participant' : ''}
                                 </Text>
                               )}
-                            </View>*/}
+                            </View>
                           </View>
                           {multiSelect ? (
                             <View style={styles.selectIndicator}>
@@ -883,8 +984,23 @@ const ContactsList: React.FC<ContactsListProps> = ({
                               )}
                             </View>
                           ) : (
-                            showAddButton && (
-                              !isAlreadyContact ? (
+                            // Show different icons based on contact status
+                            // If already a contact, show check-circle icon to indicate already added
+                            // If not a contact and showAddButton is true, show add button (user-plus)
+                            isAlreadyContact ? (
+                              // Already a contact - show check-circle icon to indicate already in contact list
+                              <TouchableOpacity
+                                style={styles.favoriteButton}
+                                onPress={() => toggleFavorite(user.id)}
+                              >
+                                <Icon
+                                  name="check-circle-fill"
+                                  size={16}
+                                  color={colors.brandGreen}
+                                />
+                              </TouchableOpacity>
+                            ) : showAddButton ? (
+                              // Not a contact and showAddButton is true - show add button
                                 <TouchableOpacity
                                   style={styles.favoriteButton}
                                   onPress={() => handleAddContact(user)}
@@ -896,16 +1012,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
                                     color={isAddingContact === Number(user.id) ? colors.brandGreen : colors.brandGreen}
                                   />
                                 </TouchableOpacity>
-                              ) : (
-                                <View style={styles.favoriteButton}>
-                                  <Icon
-                                    name="check"
-                                    size={16}
-                                    color={colors.brandGreen}
-                                  />
-                                </View>
-                              )
-                            )
+                            ) : null
                           )}
                         </TouchableOpacity>
                       );

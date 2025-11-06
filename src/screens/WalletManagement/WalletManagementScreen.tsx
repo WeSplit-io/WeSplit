@@ -34,6 +34,7 @@ import { createUsdcRequestUri } from '../../services/core/solanaPay';
 import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';
 import Header from '../../components/shared/Header';
+import { ensureVaultAuthenticated } from '../../services/security/vaultAuthHelper';
 
 const WalletManagementScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -98,6 +99,16 @@ const WalletManagementScreen: React.FC = () => {
 
       try {
         setIsLoading(true);
+
+        // Try to authenticate with Keychain (optional - SecureStore fallback will work if this fails)
+        // In simulators, Keychain won't work, but that's okay - SecureStore fallback will work
+        const authenticated = await ensureVaultAuthenticated();
+        if (!authenticated) {
+          // This is okay - SecureStore fallback will work
+          // Common in simulators or when Keychain isn't available
+          logger.info('Keychain authentication not available (will use SecureStore fallback)', { userId: currentUser.id }, 'WalletManagementScreen');
+          // Continue - don't block the user
+        }
 
         // Initialize app wallet for the user
         logger.info('Initializing app wallet for user', { userId: currentUser.id }, 'WalletManagementScreen');

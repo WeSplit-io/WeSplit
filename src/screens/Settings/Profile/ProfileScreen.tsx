@@ -73,6 +73,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               const { authService } = await import('../../../services/auth');
               const { walletService } = await import('../../../services/blockchain/wallet');
               const { EmailPersistenceService } = await import('../../../services/core/emailPersistenceService');
+              const { clearAesKeyCache } = await import('../../../services/security/secureVault');
 
               // Step 1: Sign out from Firebase Auth
               await authService.signOut();
@@ -102,7 +103,16 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                 }
               }
 
-              // Step 3: Clear wallet context state (prevents wallet data leakage between users)
+              // Step 3: Clear AES key cache (prevents Face ID bypass after logout)
+              try {
+                clearAesKeyCache();
+                if (__DEV__) { logger.info('AES key cache cleared', null, 'ProfileScreen'); }
+              } catch (cacheError) {
+                console.warn('⚠️ Failed to clear AES key cache:', cacheError);
+                // Continue with logout even if cache clearing fails
+              }
+
+              // Step 4: Clear wallet context state (prevents wallet data leakage between users)
               try {
                 clearAppWalletState();
                 if (__DEV__) { logger.info('Wallet context state cleared', null, 'ProfileScreen'); }
@@ -111,7 +121,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                 // Continue with logout even if wallet context clearing fails
               }
 
-              // Step 4: Clear stored email
+              // Step 5: Clear stored email
               try {
                 await EmailPersistenceService.clearEmail();
                 if (__DEV__) { logger.info('Stored email cleared', null, 'ProfileScreen'); }
@@ -120,7 +130,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                 // Continue with logout even if email clearing fails
               }
 
-              // Step 5: Clear app context state (this also clears listeners and cache)
+              // Step 6: Clear app context state (this also clears listeners and cache)
               logoutUser();
               if (__DEV__) { logger.info('App context cleared', null, 'ProfileScreen'); }
 

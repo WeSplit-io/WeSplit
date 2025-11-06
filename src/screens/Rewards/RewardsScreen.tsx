@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, Image } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, Image, Alert } from 'react-native';
 import { colors, spacing } from '../../theme';
 import NavBar from '../../components/shared/NavBar';
 import { Container, Header } from '../../components/shared';
@@ -11,6 +11,7 @@ import { questService, QUEST_DEFINITIONS } from '../../services/rewards/questSer
 import { pointsService } from '../../services/rewards/pointsService';
 import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { LeaderboardEntry, Quest } from '../../types/rewards';
+import { getPlatformInfo } from '../../utils/core/platformDetection';
 import { styles } from './styles';
 
 const RewardsScreen: React.FC<any> = ({ navigation }) => {
@@ -22,10 +23,6 @@ const RewardsScreen: React.FC<any> = ({ navigation }) => {
   const [userPoints, setUserPoints] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    loadData();
-  }, [currentUser?.id]);
 
   const loadData = async () => {
     try {
@@ -77,6 +74,37 @@ const RewardsScreen: React.FC<any> = ({ navigation }) => {
       setLoading(false);
     }
   };
+
+  // Block access in production
+  useEffect(() => {
+    const platformInfo = getPlatformInfo();
+    if (platformInfo.isProduction) {
+      Alert.alert(
+        'Coming Soon! 🚀',
+        'We\'re working on the Rewards feature and it will be available in a few weeks. Stay tuned!',
+        [
+          {
+            text: 'Got it!',
+            style: 'default',
+            onPress: () => {
+              // Navigate back to Dashboard
+              if (navigation) {
+                navigation.navigate('Dashboard');
+              }
+            }
+          }
+        ]
+      );
+    }
+  }, [navigation]);
+
+  useEffect(() => {
+    const platformInfo = getPlatformInfo();
+    // Only load data if not in production
+    if (!platformInfo.isProduction) {
+      loadData();
+    }
+  }, [currentUser?.id]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -190,6 +218,24 @@ const RewardsScreen: React.FC<any> = ({ navigation }) => {
       </View>
     );
   };
+
+  // Block rendering in production
+  const platformInfo = getPlatformInfo();
+  if (platformInfo.isProduction) {
+    return (
+      <Container>
+        <Header
+          title="Rewards"
+          showBackButton={false}
+          backgroundColor={colors.black}
+        />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Rewards coming soon!</Text>
+        </View>
+        <NavBar currentRoute="Rewards" navigation={navigation} />
+      </Container>
+    );
+  }
 
   if (loading) {
     return (

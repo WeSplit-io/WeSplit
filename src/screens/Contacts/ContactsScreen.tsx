@@ -81,15 +81,13 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
     }
   };
 
+  // Note: This callback is called AFTER ContactsList has already added the contact
+  // It's for notification/UI updates only, not for the actual adding logic
   const handleAddContact = async (user: User) => {
-    const result = await addContact(user);
-    
-    if (result.success) {
-      logger.info('Contact added successfully', { name: user.name }, 'ContactsScreen');
-    } else {
-      logger.error('Failed to add contact', { error: result.error }, 'ContactsScreen');
-      console.error('❌ Error adding contact:', result.error);
-    }
+    // This is just a notification callback - the actual adding is done in ContactsList
+    // We can use this to show success messages or update UI if needed
+    logger.info('Contact addition callback received', { name: user.name }, 'ContactsScreen');
+    // No need to call addContact here - ContactsList already did it
   };
 
   const handleTabChange = (tab: 'All' | 'Favorite' | 'Search') => {
@@ -194,7 +192,7 @@ const ContactsScreen: React.FC<ContactsScreenProps> = ({ navigation, route }) =>
           <ContactsList
             onContactSelect={handleSelectContact}
             onAddContact={handleAddContact}
-            showAddButton={isSplitMode}
+            showAddButton={true}
             showSearch={true}
             showTabs={!isRequestMode}
             activeTab={isRequestMode ? contactsActiveTab : activeTab}

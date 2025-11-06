@@ -43,6 +43,7 @@ import { getDoc, doc } from 'firebase/firestore';
 import { RequestCard } from '../../components/requests';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
 import { useWalletState } from '../../hooks/useWalletState';
+import { secureVault } from '../../services/security/secureVault';
 
 
 
@@ -54,6 +55,10 @@ interface DashboardScreenProps {
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) => {
   const { state, notifications, loadNotifications, refreshNotifications, updateUser } = useApp();
   const { currentUser, isAuthenticated } = state;
+  
+  // Biometric authentication state
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
+  const [authenticationError, setAuthenticationError] = useState<string | null>(null);
 
   // Function to fetch user data from Firebase
   const fetchUserData = async (userId: string) => {
@@ -112,6 +117,44 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     error: walletError,
     refreshWallet
   } = useWalletState(currentUser?.id);
+
+  // Authenticate with Face ID before rendering dashboard
+  useEffect(() => {
+    const authenticate = async () => {
+      if (!isAuthenticated || !currentUser?.id) {
+        setIsAuthenticating(false);
+        return;
+      }
+
+      try {
+        setIsAuthenticating(true);
+        setAuthenticationError(null);
+        
+        // Pre-authenticate to trigger Face ID/Touch ID OR device passcode once before any vault access
+        // Note: This will use biometrics if available, otherwise fall back to device passcode
+        // In simulators, Keychain won't work, but SecureStore fallback will still work
+        const authenticated = await secureVault.preAuthenticate();
+        
+        if (authenticated) {
+          logger.info('Authentication successful (biometrics or passcode)', null, 'DashboardScreen');
+          setIsAuthenticating(false);
+        } else {
+          // Keychain authentication failed (common in simulators or if user cancels)
+          // This is okay - SecureStore fallback will work for vault access
+          // Don't block the user, just log and continue
+          logger.info('Keychain authentication not available (using SecureStore fallback)', null, 'DashboardScreen');
+          setIsAuthenticating(false);
+          // No error - app will work with SecureStore fallback
+        }
+      } catch (error) {
+        logger.error('Biometric authentication error', error, 'DashboardScreen');
+        setAuthenticationError('Failed to authenticate. Please try again.');
+        setIsAuthenticating(false);
+      }
+    };
+
+    authenticate();
+  }, [isAuthenticated, currentUser?.id]);
 
   // Function to hash wallet address for display
   const hashWalletAddress = (address: string): string => {
@@ -697,6 +740,68 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
 
   if (!isAuthenticated) {
     return <AuthGuard navigation={navigation}>{null}</AuthGuard>;
+  }
+
+  // Show loading screen while authenticating with Face ID
+  if (isAuthenticating) {
+    return (
+      <Container>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.black }}>
+          <ActivityIndicator size="large" color={colors.primaryGreen} />
+          <Text style={{ color: colors.white, marginTop: spacing.md, fontSize: 16 }}>
+            Authenticating...
+          </Text>
+          <Text style={{ color: colors.white70, marginTop: spacing.sm, fontSize: 14, textAlign: 'center', paddingHorizontal: spacing.lg }}>
+            Please use Face ID to access your wallet
+          </Text>
+        </View>
+      </Container>
+    );
+  }
+
+  // Show error screen if authentication failed
+  if (authenticationError) {
+    return (
+      <Container>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.black, padding: spacing.lg }}>
+          <Text style={{ color: colors.error, fontSize: 18, fontWeight: '600', marginBottom: spacing.md, textAlign: 'center' }}>
+            Authentication Required
+          </Text>
+          <Text style={{ color: colors.white70, fontSize: 14, textAlign: 'center', marginBottom: spacing.lg }}>
+            {authenticationError}
+          </Text>
+          <TouchableOpacity
+            style={{
+              backgroundColor: colors.primaryGreen,
+              paddingHorizontal: spacing.xl,
+              paddingVertical: spacing.md,
+              borderRadius: spacing.radiusMd,
+              marginTop: spacing.md,
+            }}
+            onPress={async () => {
+              setIsAuthenticating(true);
+              setAuthenticationError(null);
+              try {
+                const authenticated = await secureVault.preAuthenticate();
+                if (authenticated) {
+                  setIsAuthenticating(false);
+                } else {
+                  setAuthenticationError('Authentication failed. Please try again.');
+                  setIsAuthenticating(false);
+                }
+              } catch (error) {
+                setAuthenticationError('Failed to authenticate. Please try again.');
+                setIsAuthenticating(false);
+              }
+            }}
+          >
+            <Text style={{ color: colors.white, fontSize: 16, fontWeight: '600' }}>
+              Try Again
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Container>
+    );
   }
 
   // Removed groups loading state

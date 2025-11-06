@@ -20,6 +20,13 @@ export async function getCryptoPrice(symbol: string): Promise<PriceData | null> 
     // Check if we have cached data that's still valid
     const now = Date.now();
     if (priceCache[symbol] && (now - (lastFetchTime[symbol] || 0)) < CACHE_DURATION) {
+      const cacheAge = Math.round((now - (lastFetchTime[symbol] || 0)) / 1000);
+      logger.debug('Using cached crypto price', { 
+        symbol, 
+        priceUsd: priceCache[symbol].price_usd,
+        cacheAgeSeconds: cacheAge,
+        isLiveData: false
+      }, 'priceService');
       return priceCache[symbol];
     }
 
@@ -81,65 +88,148 @@ export async function getCryptoPrice(symbol: string): Promise<PriceData | null> 
   }
 }
 
-export async function convertToUSDC(amount: number, fromCurrency: string): Promise<number> {
-  if (fromCurrency === 'USDC') {
+/**
+ * Convert amount from any currency to USDC using live market rates
+ * Throws error if conversion fails to prevent using incorrect hardcoded values
+ */
+export async function convertToUSDC(amount: number, fromCurrency: string, retries: number = 3): Promise<number> {
+  // USDC is pegged to USD, so USD = USDC
+  if (fromCurrency === 'USDC' || fromCurrency === 'USD') {
     return amount;
   }
 
-  // Handle fiat currencies (EUR, USD, GBP, etc.) with direct API call
-  const fiatCurrencies = ['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'AUD', 'JPY', 'CNY'];
+  // Handle fiat currencies (EUR, GBP, etc.) with direct API call
+  const fiatCurrencies = ['EUR', 'GBP', 'CHF', 'CAD', 'AUD', 'JPY', 'CNY'];
   if (fiatCurrencies.includes(fromCurrency)) {
-    try {
-      // Use ExchangeRate-API for fiat currency conversion
-      const response = await fetch(
-        `https://api.exchangerate-api.com/v4/latest/${fromCurrency}`
-      );
-      
-      if (!response.ok) {
-        console.warn(`Failed to fetch exchange rate for ${fromCurrency} to USD`);
-        return amount; // Fallback to 1:1 ratio
-      }
+    let lastError: Error | null = null;
+    
+    // Retry logic for API failures
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        // Use ExchangeRate-API for fiat currency conversion
+        // Create abort controller for timeout (fallback for environments without AbortSignal.timeout)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        try {
+          const response = await fetch(
+            `https://api.exchangerate-api.com/v4/latest/${fromCurrency}`,
+            {
+              method: 'GET',
+              headers: {
+                'Accept': 'application/json',
+              },
+              signal: controller.signal
+            }
+          );
+          
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: Failed to fetch exchange rate for ${fromCurrency} to USD`);
+          }
 
-      const data = await response.json();
-      const rate = data.rates['USD'];
+          const data = await response.json();
+          const rate = data.rates?.['USD'];
+          const apiTimestamp = data.time_last_updated || data.date || 'unknown';
+          const apiDate = data.date || 'unknown';
 
-      if (!rate) {
-        console.warn(`No exchange rate found for ${fromCurrency} to USD`);
-        return amount; // Fallback to 1:1 ratio
-      }
+          if (!rate || typeof rate !== 'number' || rate <= 0) {
+            throw new Error(`Invalid exchange rate received for ${fromCurrency} to USD`);
+          }
 
-      const convertedAmount = amount * rate;
-      
-      if (__DEV__) {
-        logger.info('Converting fiat currency to USDC', { 
-          amount, 
+          const convertedAmount = amount * rate;
+          
+          logger.info('Converting fiat currency to USDC - LIVE MARKET RATE', { 
+            amount, 
+            fromCurrency, 
+            rate, 
+            convertedAmount: convertedAmount.toFixed(4),
+            attempt: attempt + 1,
+            apiDate,
+            apiTimestamp,
+            source: 'ExchangeRate-API',
+            isLiveData: true
+          }, 'priceService');
+
+          return convertedAmount;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        logger.warn(`Currency conversion attempt ${attempt + 1} failed`, { 
           fromCurrency, 
-          rate, 
-          convertedAmount: convertedAmount.toFixed(2) 
+          amount, 
+          error: lastError.message 
         }, 'priceService');
+        
+        // Wait before retrying (exponential backoff)
+        if (attempt < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        }
       }
-
-      return convertedAmount;
-    } catch (error) {
-      console.warn(`Could not convert ${amount} ${fromCurrency} to USDC - using 1:1 ratio`, error);
-      return amount; // Fallback to 1:1 ratio
     }
+
+    // All retries failed - throw error instead of using hardcoded fallback
+    const errorMessage = `Failed to convert ${amount} ${fromCurrency} to USDC after ${retries} attempts. Please check your internet connection and try again.`;
+    logger.error('Currency conversion failed', { 
+      fromCurrency, 
+      amount, 
+      error: lastError?.message,
+      attempts: retries
+    }, 'priceService');
+    throw new Error(errorMessage);
   }
 
   // Handle crypto currencies with CoinGecko
-  const priceData = await getCryptoPrice(fromCurrency);
-  if (!priceData) {
-    console.warn(`Could not convert ${amount} ${fromCurrency} to USDC - using 1:1 ratio`);
-    return amount; // Fallback to 1:1 ratio
-  }
-
-  const convertedAmount = amount * priceData.price_usdc;
+  let lastCryptoError: Error | null = null;
   
-  if (__DEV__) {
-    logger.info('Converting currency to USDC', { amount, fromCurrency, priceUsdc: priceData.price_usdc, convertedAmount }, 'priceService');
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const priceData = await getCryptoPrice(fromCurrency);
+      
+      if (!priceData || !priceData.price_usdc || priceData.price_usdc <= 0) {
+        throw new Error(`Invalid price data received for ${fromCurrency}`);
+      }
+
+      const convertedAmount = amount * priceData.price_usdc;
+      
+      logger.info('Converting crypto currency to USDC - LIVE MARKET RATE', { 
+        amount, 
+        fromCurrency, 
+        priceUsdc: priceData.price_usdc, 
+        convertedAmount: convertedAmount.toFixed(4),
+        attempt: attempt + 1,
+        source: 'CoinGecko',
+        isLiveData: true
+      }, 'priceService');
+
+      return convertedAmount;
+    } catch (error) {
+      lastCryptoError = error instanceof Error ? error : new Error(String(error));
+      logger.warn(`Crypto conversion attempt ${attempt + 1} failed`, { 
+        fromCurrency, 
+        amount, 
+        error: lastCryptoError.message 
+      }, 'priceService');
+      
+      // Wait before retrying (exponential backoff)
+      if (attempt < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      }
+    }
   }
 
-  return convertedAmount;
+  // All retries failed - throw error instead of using hardcoded fallback
+  const errorMessage = `Failed to convert ${amount} ${fromCurrency} to USDC after ${retries} attempts. Please check your internet connection and try again.`;
+  logger.error('Crypto currency conversion failed', { 
+    fromCurrency, 
+    amount, 
+    error: lastCryptoError?.message,
+    attempts: retries
+  }, 'priceService');
+  throw new Error(errorMessage);
 }
 
 // Map our symbols to CoinGecko IDs

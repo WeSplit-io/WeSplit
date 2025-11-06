@@ -215,13 +215,38 @@ class ConsolidatedBillAnalysisService {
       // Convert and process data efficiently
       const billData = this.convertAIResponseToBillData(aiResponse.data);
       
-      // Convert currency to USDC if needed
+      // Convert currency to USDC if needed - convert both total and item prices
       if (billData.currency && billData.currency !== 'USDC' && billData.currency !== 'USD') {
         try {
           const { convertFiatToUSDC } = await import('../core');
-          const convertedAmount = await convertFiatToUSDC(billData.transaction.order_total, billData.currency);
+          
+          // Save original total before conversion
+          const originalTotal = billData.transaction.order_total;
+          
+          // Convert total amount using live market rates
+          const convertedAmount = await convertFiatToUSDC(originalTotal, billData.currency);
           billData.transaction.order_total = convertedAmount;
           billData.transaction.calculated_total = convertedAmount;
+          
+          // Convert item prices proportionally using live market rates
+          if (billData.transaction.items && billData.transaction.items.length > 0) {
+            const conversionRate = convertedAmount / originalTotal;
+            
+            // Convert each item price using the same conversion rate
+            billData.transaction.items = billData.transaction.items.map((item: any) => ({
+              ...item,
+              price: item.price * conversionRate
+            }));
+            
+            logger.info('Converted AI bill items to USDC', {
+              itemsCount: billData.transaction.items.length,
+              conversionRate: conversionRate.toFixed(4),
+              originalCurrency: billData.currency,
+              originalTotal,
+              convertedTotal: convertedAmount
+            }, 'BillAnalysis');
+          }
+          
           billData.currency = 'USDC';
           logger.info('Converted AI bill amount to USDC', { 
             originalAmount: aiResponse.data.total,
@@ -230,11 +255,13 @@ class ConsolidatedBillAnalysisService {
             currency: 'USDC'
           }, 'BillAnalysis');
         } catch (conversionError) {
-          logger.warn('Failed to convert AI bill amount to USDC, using original', { 
+          // For AI bills, we should throw error to prevent using incorrect values
+          logger.error('Failed to convert AI bill amount to USDC', { 
             error: conversionError,
             originalAmount: billData.transaction.order_total,
             originalCurrency: billData.currency
           }, 'BillAnalysis');
+          throw new Error(`Failed to convert ${billData.currency} to USDC: ${conversionError instanceof Error ? conversionError.message : 'Unknown error'}`);
         }
       }
       
@@ -280,13 +307,38 @@ class ConsolidatedBillAnalysisService {
 
       const billData = this.convertOCRResponseToBillData(ocrResponse);
       
-      // Convert currency to USDC if needed
+      // Convert currency to USDC if needed - convert both total and item prices
       if (billData.currency && billData.currency !== 'USDC' && billData.currency !== 'USD') {
         try {
           const { convertFiatToUSDC } = await import('../core');
-          const convertedAmount = await convertFiatToUSDC(billData.transaction.order_total, billData.currency);
+          
+          // Save original total before conversion
+          const originalTotal = billData.transaction.order_total;
+          
+          // Convert total amount using live market rates
+          const convertedAmount = await convertFiatToUSDC(originalTotal, billData.currency);
           billData.transaction.order_total = convertedAmount;
           billData.transaction.calculated_total = convertedAmount;
+          
+          // Convert item prices proportionally using live market rates
+          if (billData.transaction.items && billData.transaction.items.length > 0) {
+            const conversionRate = convertedAmount / originalTotal;
+            
+            // Convert each item price using the same conversion rate
+            billData.transaction.items = billData.transaction.items.map((item: any) => ({
+              ...item,
+              price: item.price * conversionRate
+            }));
+            
+            logger.info('Converted OCR bill items to USDC', {
+              itemsCount: billData.transaction.items.length,
+              conversionRate: conversionRate.toFixed(4),
+              originalCurrency: billData.currency,
+              originalTotal,
+              convertedTotal: convertedAmount
+            }, 'BillAnalysis');
+          }
+          
           billData.currency = 'USDC';
           logger.info('Converted OCR bill amount to USDC', { 
             originalAmount: ocrResponse.totalAmount,
@@ -295,11 +347,13 @@ class ConsolidatedBillAnalysisService {
             currency: 'USDC'
           }, 'BillAnalysis');
         } catch (conversionError) {
-          logger.warn('Failed to convert OCR bill amount to USDC, using original', { 
+          // For OCR bills, we should throw error to prevent using incorrect values
+          logger.error('Failed to convert OCR bill amount to USDC', { 
             error: conversionError,
             originalAmount: billData.transaction.order_total,
             originalCurrency: billData.currency
           }, 'BillAnalysis');
+          throw new Error(`Failed to convert ${billData.currency} to USDC: ${conversionError instanceof Error ? conversionError.message : 'Unknown error'}`);
         }
       }
       
