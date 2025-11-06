@@ -46,3 +46,67 @@ export interface QuestCompletionResult {
   error?: string;
 }
 
+/**
+ * Christmas Calendar Types
+ * Types for the advent calendar reward system (Dec 1-24)
+ */
+
+export type GiftType = 'points' | 'badge' | 'asset';
+
+export interface PointsGift {
+  type: 'points';
+  amount: number;
+}
+
+export interface BadgeGift {
+  type: 'badge';
+  badgeId: string;
+  title: string;
+  description: string;
+  icon?: string; // URL or icon identifier
+}
+
+export interface AssetGift {
+  type: 'asset';
+  assetId: string;
+  assetType: 'profile_image' | 'wallet_background';
+  assetUrl: string;
+  name: string;
+  description?: string;
+}
+
+export type Gift = PointsGift | BadgeGift | AssetGift;
+
+export interface ChristmasCalendarGift {
+  day: number; // 1-24
+  gift: Gift;
+  title: string; // Display title for the gift
+  description?: string; // Optional description
+}
+
+export interface ChristmasCalendarDay {
+  day: number; // 1-24
+  claimed: boolean;
+  claimed_at?: string; // ISO timestamp
+  gift_id?: string; // Reference to gift config
+  gift_data?: Gift; // Snapshot of gift at claim time
+}
+
+export interface ChristmasCalendarClaim {
+  id: string;
+  user_id: string;
+  year: number;
+  day: number;
+  gift: Gift;
+  claimed_at: string; // ISO timestamp
+  timezone?: string; // User's timezone at claim time
+}
+
+export interface ChristmasCalendarStatus {
+  year: number;
+  days: ChristmasCalendarDay[]; // Array of 24 days
+  totalClaimed: number;
+  canClaimToday: boolean;
+  todayDay?: number; // Current day (1-24) or null if outside calendar period
+}
+

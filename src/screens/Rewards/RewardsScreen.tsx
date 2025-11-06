@@ -13,6 +13,7 @@ import { firebaseDataService } from '../../services/data/firebaseDataService';
 import { LeaderboardEntry, Quest } from '../../types/rewards';
 import { getPlatformInfo } from '../../utils/core/platformDetection';
 import { styles } from './styles';
+import ChristmasCalendar from '../../components/rewards/ChristmasCalendar';
 
 const RewardsScreen: React.FC<any> = ({ navigation }) => {
   const { state, updateUser } = useApp();
@@ -290,6 +291,34 @@ const RewardsScreen: React.FC<any> = ({ navigation }) => {
               <Text style={styles.userPointsLabel}>points</Text>
             </View>
           </View>
+        )}
+
+        {/* Christmas Calendar Section */}
+        {currentUser && (
+          <ChristmasCalendar 
+            userId={currentUser.id}
+            onClaimSuccess={async () => {
+              // Refresh user points after claiming
+              try {
+                const freshUser = await firebaseDataService.user.getCurrentUser(currentUser.id);
+                if (freshUser.points !== undefined && freshUser.points !== currentUser.points) {
+                  await updateUser({ 
+                    points: freshUser.points, 
+                    total_points_earned: freshUser.total_points_earned,
+                    badges: freshUser.badges,
+                    active_badge: freshUser.active_badge,
+                    profile_assets: freshUser.profile_assets,
+                    active_profile_asset: freshUser.active_profile_asset,
+                    wallet_backgrounds: freshUser.wallet_backgrounds,
+                    active_wallet_background: freshUser.active_wallet_background
+                  });
+                  setUserPoints(freshUser.points || 0);
+                }
+              } catch (error) {
+                console.error('Failed to refresh user data after gift claim:', error);
+              }
+            }}
+          />
         )}
 
         {/* How to Earn Points Section */}

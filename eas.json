@@ -28,6 +28,11 @@
       },
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "NODE_ENV": "production",
+        "EXPO_PUBLIC_FORCE_MAINNET": "true",
+        "EXPO_PUBLIC_DEV_NETWORK": "mainnet"
       }
     },
     "mass-distribution": {
@@ -39,7 +44,9 @@
         "buildType": "apk"
       },
       "env": {
-        "NODE_ENV": "production"
+        "NODE_ENV": "production",
+        "EXPO_PUBLIC_FORCE_MAINNET": "true",
+        "EXPO_PUBLIC_DEV_NETWORK": "mainnet"
       }
     },
     "testflight": {
@@ -49,6 +56,11 @@
       },
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "NODE_ENV": "production",
+        "EXPO_PUBLIC_FORCE_MAINNET": "true",
+        "EXPO_PUBLIC_DEV_NETWORK": "mainnet"
       }
     },
     "internal-testing": {

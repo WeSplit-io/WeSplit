@@ -32,6 +32,14 @@ export interface User {
   points?: number; // Total points accumulated
   total_points_earned?: number; // Lifetime points (for stats)
   points_last_updated?: string; // Timestamp when points were last updated
+  
+  // Christmas calendar rewards
+  badges?: string[]; // Array of badge IDs earned
+  active_badge?: string; // Currently active badge ID
+  profile_assets?: string[]; // Array of profile asset IDs owned
+  active_profile_asset?: string; // Currently active profile asset ID
+  wallet_backgrounds?: string[]; // Array of wallet background asset IDs owned
+  active_wallet_background?: string; // Currently active wallet background asset ID
 }
 
 // User contact includes relationship metadata

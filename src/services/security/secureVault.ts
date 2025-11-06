@@ -51,7 +51,9 @@ async function loadDeps() {
   }
   if (!MMKV) {
     try {
-      MMKV = (await import('react-native-mmkv')).MMKV;
+      const mmkvModule = await import('react-native-mmkv');
+      // react-native-mmkv v4 exports MMKV class - use createMMKV or default export
+      MMKV = (mmkvModule as any).default || (mmkvModule as any).MMKV || mmkvModule.createMMKV;
     } catch (e) {
       logger.warn('secureVault: MMKV not available', e, 'SecureVault');
     }
@@ -188,9 +190,14 @@ async function encryptAesGcm(key: Uint8Array, plaintextUtf8: string): Promise<{ 
     // Prefer SubtleCrypto if available
     if (globalThis.crypto?.subtle) {
       const subtle = globalThis.crypto.subtle;
-      const cryptoKey = await subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt']);
+      // Create new Uint8Array to ensure proper ArrayBuffer backing for TypeScript
+      const keyBuffer = new Uint8Array(key);
+      const cryptoKey = await subtle.importKey('raw', keyBuffer as BufferSource, 'AES-GCM', false, ['encrypt']);
       const enc = new TextEncoder().encode(plaintextUtf8);
-      const ctBuf = await subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, enc);
+      // Create new Uint8Array to ensure proper ArrayBuffer backing for TypeScript
+      const ivBuffer = new Uint8Array(iv);
+      const encBuffer = new Uint8Array(enc);
+      const ctBuf = await subtle.encrypt({ name: 'AES-GCM', iv: ivBuffer as BufferSource }, cryptoKey, encBuffer as BufferSource);
       return { iv: Buffer.from(iv).toString('base64'), ct: Buffer.from(new Uint8Array(ctBuf)).toString('base64') };
     }
     // Fallback using Node crypto (Hermes may not have it; guarded above)
@@ -212,8 +219,14 @@ async function decryptAesGcm(key: Uint8Array, ivB64: string, ctB64: string): Pro
     const ctBuf = Uint8Array.from(Buffer.from(ctB64, 'base64'));
     if (globalThis.crypto?.subtle) {
       const subtle = globalThis.crypto.subtle;
-      const cryptoKey = await subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']);
-      const pt = await subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ctBuf);
+      // Create new Uint8Array to ensure proper ArrayBuffer backing for TypeScript
+      const keyBuffer = new Uint8Array(key);
+      const cryptoKey = await subtle.importKey('raw', keyBuffer as BufferSource, 'AES-GCM', false, ['decrypt']);
+      // Create new Uint8Array to ensure proper ArrayBuffer backing for TypeScript
+      const ivBuffer = new Uint8Array(iv);
+      // Create new Uint8Array to ensure proper ArrayBuffer backing for TypeScript
+      const ctBuffer = new Uint8Array(ctBuf);
+      const pt = await subtle.decrypt({ name: 'AES-GCM', iv: ivBuffer as BufferSource }, cryptoKey, ctBuffer as BufferSource);
       return new TextDecoder().decode(pt);
     }
     // Node fallback with tag concatenated at end (last 16 bytes)

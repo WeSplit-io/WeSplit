@@ -85,8 +85,9 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   
   // Wallet management state
   const [externalWallets, setExternalWallets] = useState<{id: string, address: string, name?: string}[]>([]);
+  const [kastCards, setKastCards] = useState<{id: string, address: string, name?: string}[]>([]);
   const [inAppWallet, setInAppWallet] = useState<{address: string} | null>(null);
-  const [selectedWallet, setSelectedWallet] = useState<{id: string, address: string, type: 'external' | 'in-app', name?: string} | null>(null);
+  const [selectedWallet, setSelectedWallet] = useState<{id: string, address: string, type: 'external' | 'in-app' | 'kast', name?: string} | null>(null);
   const [isLoadingWallets, setIsLoadingWallets] = useState(false);
   
   // Real-time update states
@@ -1322,22 +1323,30 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     
     setIsLoadingWallets(true);
     try {
-      const { collection, getDocs, doc, getDoc } = await import('firebase/firestore');
-      const { db } = await import('../../config/firebase/firebase');
+      // Use LinkedWalletService to get both external wallets and KAST cards
+      const { LinkedWalletService } = await import('../../services/blockchain/wallet/LinkedWalletService');
+      const linkedData = await LinkedWalletService.getLinkedDestinations(currentUser.id.toString());
       
-      // Load external wallets from subcollection
-      const externalWalletsRef = collection(db, 'users', currentUser.id, 'externalWallets');
-      const externalWalletsSnapshot = await getDocs(externalWalletsRef);
+      // Transform external wallets to the format expected by the UI
+      const externalWalletsData = linkedData.externalWallets.map(wallet => ({
+        id: wallet.id,
+        address: wallet.address || wallet.identifier || '',
+        name: wallet.label || `External Wallet ${wallet.id.slice(-4)}`
+      }));
       
-      const externalWalletsData = externalWalletsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        address: doc.data().address,
-        name: doc.data().name || `External Wallet ${doc.id.slice(-4)}`
+      // Transform KAST cards to the format expected by the UI
+      const kastCardsData = linkedData.kastCards.map(card => ({
+        id: card.id,
+        address: card.address || card.identifier || '',
+        name: card.label || `KAST Card ${card.id.slice(-4)}`
       }));
       
       setExternalWallets(externalWalletsData);
+      setKastCards(kastCardsData);
       
       // Load in-app wallet from user document
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('../../config/firebase/firebase');
       const userDocRef = doc(db, 'users', currentUser.id);
       const userDocSnapshot = await getDoc(userDocRef);
       
@@ -1350,6 +1359,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       
       logger.debug('Loaded user wallets', {
         externalWalletsCount: externalWalletsData.length,
+        kastCardsCount: kastCardsData.length,
         hasInAppWallet: userDocSnapshot.exists() && userDocSnapshot.data().wallet_address
       }, 'FairSplitScreen');
       
@@ -1951,9 +1961,9 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     setShowSplitModal(true);
   };
 
-  const handleSelectWallet = (wallet: {id: string, address: string, type: 'external' | 'in-app', name?: string}) => {
+  const handleSelectWallet = (wallet: {id: string, address: string, type: 'external' | 'in-app' | 'kast', name?: string}) => {
     setSelectedWallet(wallet);
-    setSelectedTransferMethod(wallet.type === 'external' ? 'external-wallet' : 'in-app-wallet');
+    setSelectedTransferMethod(wallet.type === 'external' || wallet.type === 'kast' ? 'external-wallet' : 'in-app-wallet');
     setShowSignatureStep(true);
   };
 
@@ -1962,9 +1972,14 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     if (!selectedWallet || !splitWallet || !currentUser) {return;}
     
     // Show confirmation dialog before transfer
+    const walletTypeLabel = selectedWallet.type === 'external' 
+      ? 'external wallet' 
+      : selectedWallet.type === 'kast' 
+        ? 'KAST card' 
+        : 'in-app wallet';
     Alert.alert(
       'Confirm Transfer',
-      `Are you sure you want to transfer ${splitWallet.totalAmount.toFixed(2)} USDC to ${selectedWallet.name || (selectedWallet.type === 'external' ? 'external wallet' : 'in-app wallet')}?\n\nThis action cannot be undone.`,
+      `Are you sure you want to transfer ${splitWallet.totalAmount.toFixed(2)} USDC to ${selectedWallet.name || walletTypeLabel}?\n\nThis action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -2263,7 +2278,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       }
 
       // Process the transfer - both external and in-app use the same method
-      const description = `Split funds transfer to ${selectedWallet.name || (selectedWallet.type === 'external' ? 'external wallet' : 'in-app wallet')}`;
+      const walletTypeLabel = selectedWallet.type === 'external' 
+        ? 'external wallet' 
+        : selectedWallet.type === 'kast' 
+          ? 'KAST card' 
+          : 'in-app wallet';
+      const description = `Split funds transfer to ${selectedWallet.name || walletTypeLabel}`;
       
       logger.info('Initiating blockchain transfer', {
         splitWalletId: splitWallet.id,
@@ -2343,9 +2363,14 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             } : null);
             
             // Show success message with verification
+            const successWalletTypeLabel = selectedWallet.type === 'external' 
+              ? 'external wallet' 
+              : selectedWallet.type === 'kast' 
+                ? 'KAST card' 
+                : 'in-app wallet';
             Alert.alert(
               '✅ Transfer Verified!', 
-              `Successfully transferred ${transferResult.amount.toFixed(6)} USDC to ${selectedWallet.name || (selectedWallet.type === 'external' ? 'external wallet' : 'in-app wallet')}!\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...\n\n✅ Balance verification confirmed the transfer.`,
+              `Successfully transferred ${transferResult.amount.toFixed(6)} USDC to ${selectedWallet.name || successWalletTypeLabel}!\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...\n\n✅ Balance verification confirmed the transfer.`,
               [
                 {
                   text: 'OK',
@@ -2375,9 +2400,14 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             } : null);
             
             // Show success message without verification
+            const submittedWalletTypeLabel = selectedWallet.type === 'external' 
+              ? 'external wallet' 
+              : selectedWallet.type === 'kast' 
+                ? 'KAST card' 
+                : 'in-app wallet';
             Alert.alert(
               'Transfer Submitted!', 
-              `Transfer of ${transferResult.amount.toFixed(6)} USDC to ${selectedWallet.name || (selectedWallet.type === 'external' ? 'external wallet' : 'in-app wallet')} has been submitted.\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...\n\nPlease check your wallet to confirm receipt.`,
+              `Transfer of ${transferResult.amount.toFixed(6)} USDC to ${selectedWallet.name || submittedWalletTypeLabel} has been submitted.\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...\n\nPlease check your wallet to confirm receipt.`,
               [
                 {
                   text: 'OK',
@@ -3137,6 +3167,31 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   </TouchableOpacity>
                 ))}
 
+                {/* KAST Cards */}
+                {kastCards.map((card) => (
+                  <TouchableOpacity 
+                    key={card.id}
+                    style={styles.splitOptionButton}
+                    onPress={() => handleSelectWallet({
+                      id: card.id,
+                      address: card.address,
+                      type: 'kast',
+                      name: card.name
+                    })}
+                  >
+                    <View style={styles.splitOptionIcon}>
+                      <PhosphorIcon name="CreditCard" size={24} color={colors.white} weight="fill" />
+                    </View>
+                    <View style={styles.splitOptionContent}>
+                      <Text style={styles.splitOptionTitle}>{card.name}</Text>
+                      <Text style={styles.splitOptionDescription}>
+                        {card.address.slice(0, 8)}...{card.address.slice(-8)}
+                      </Text>
+                    </View>
+                    <PhosphorIcon name="CaretRight" size={20} color={colors.white} weight="bold" />
+                  </TouchableOpacity>
+                ))}
+
                 {/* In-App Wallet */}
                 {inAppWallet && (
                   <TouchableOpacity 
@@ -3161,8 +3216,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   </TouchableOpacity>
                 )}
 
-                {/* Add External Wallet Button - Show when no external wallets */}
-                {externalWallets.length === 0 && (
+                {/* Add External Wallet Button - Show when no external wallets AND no KAST cards */}
+                {externalWallets.length === 0 && kastCards.length === 0 && (
                   <TouchableOpacity 
                     style={styles.addWalletButton}
                     onPress={() => {
@@ -3174,11 +3229,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                       <PhosphorIcon name="Plus" size={24} color={colors.white} weight="bold" />
                     </View>
                     <View style={styles.addWalletContent}>
-                      <Text style={styles.addWalletTitle}>Add External Wallet</Text>
+                      <Text style={styles.addWalletTitle}>Add External Wallet or Card</Text>
                       <Text style={styles.addWalletDescription}>
                         {inAppWallet 
-                          ? 'Link a Kast card or external wallet for more transfer options'
-                          : 'Link a Kast card or external wallet to receive funds'
+                          ? 'Link a KAST card or external wallet for more transfer options'
+                          : 'Link a KAST card or external wallet to receive funds'
                         }
                       </Text>
                     </View>
@@ -3186,11 +3241,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                   </TouchableOpacity>
                 )}
 
-                {/* No wallets available - only show if no external wallets AND no in-app wallet */}
-                {externalWallets.length === 0 && !inAppWallet && (
+                {/* No wallets available - only show if no external wallets, no KAST cards, AND no in-app wallet */}
+                {externalWallets.length === 0 && kastCards.length === 0 && !inAppWallet && (
                   <View style={styles.noWalletsContainer}>
                     <Text style={styles.noWalletsText}>
-                      No wallets found. Please add a wallet to your profile first.
+                      No wallets found. Please add a wallet or card to your profile first.
                     </Text>
                   </View>
                 )}

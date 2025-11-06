@@ -75,7 +75,13 @@ export const firebaseDataTransformers = {
     migration_version: doc.data().migration_version || '',
     points: doc.data().points || 0,
     total_points_earned: doc.data().total_points_earned || 0,
-    points_last_updated: doc.data().points_last_updated ? firebaseDataTransformers.timestampToISO(doc.data().points_last_updated) : undefined
+    points_last_updated: doc.data().points_last_updated ? firebaseDataTransformers.timestampToISO(doc.data().points_last_updated) : undefined,
+    badges: doc.data().badges || [],
+    active_badge: doc.data().active_badge || undefined,
+    profile_assets: doc.data().profile_assets || [],
+    active_profile_asset: doc.data().active_profile_asset || undefined,
+    wallet_backgrounds: doc.data().wallet_backgrounds || [],
+    active_wallet_background: doc.data().active_wallet_background || undefined
   }),
 
   // Transform User to Firestore data
@@ -108,6 +114,12 @@ export const firebaseDataTransformers = {
     if (user.points !== undefined) {data.points = user.points;}
     if (user.total_points_earned !== undefined) {data.total_points_earned = user.total_points_earned;}
     if (user.points_last_updated !== undefined) {data.points_last_updated = user.points_last_updated ? firebaseDataTransformers.isoToTimestamp(user.points_last_updated) : null;}
+    if (user.badges !== undefined) {data.badges = user.badges;}
+    if (user.active_badge !== undefined) {data.active_badge = user.active_badge;}
+    if (user.profile_assets !== undefined) {data.profile_assets = user.profile_assets;}
+    if (user.active_profile_asset !== undefined) {data.active_profile_asset = user.active_profile_asset;}
+    if (user.wallet_backgrounds !== undefined) {data.wallet_backgrounds = user.wallet_backgrounds;}
+    if (user.active_wallet_background !== undefined) {data.active_wallet_background = user.active_wallet_background;}
     
     return data;
   },
