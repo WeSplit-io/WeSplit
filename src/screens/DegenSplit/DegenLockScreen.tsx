@@ -153,9 +153,11 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     let lockedCount = 0;
     
     if (degenState.splitWallet?.participants) {
-      // Use wallet participants for accurate count - check if they've paid their full amount AND are locked
+      // CRITICAL FIX: Use wallet participants for accurate count - check if they've paid their full amount AND are locked AND have transaction signature
       lockedCount = degenState.splitWallet.participants.filter((p: any) => 
-        p.amountPaid >= p.amountOwed && p.status === 'locked'
+        p.status === 'locked' && 
+        p.amountPaid >= p.amountOwed &&
+        p.transactionSignature // Ensure they have a valid transaction signature
       ).length;
     } else {
       // Fallback to local state
@@ -300,6 +302,7 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
   };
 
   // Initialize the degen split when component mounts
+  // CRITICAL FIX: Also reload wallet when participants change (e.g., after inviting users)
   useEffect(() => {
     const initialize = async () => {
       // Refresh participant data first
@@ -310,11 +313,44 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
       await degenInit.initializeDegenSplit(splitData, currentUser, refreshedParticipants, totalAmount);
     };
 
+    // CRITICAL FIX: Reload wallet if participants change (e.g., after inviting users)
+    // This ensures wallet is refreshed when new participants are added
+    const reloadWallet = async () => {
+      if (degenState.splitWallet && splitData && currentUser) {
+        try {
+          const { SplitWalletService } = await import('../../services/split');
+          const walletResult = await SplitWalletService.getSplitWallet(degenState.splitWallet.id);
+          if (walletResult.success && walletResult.wallet) {
+            degenState.setSplitWallet(walletResult.wallet);
+            console.log('🔍 DegenLockScreen: Wallet reloaded after participant change:', {
+              walletId: walletResult.wallet.id,
+              participantsCount: walletResult.wallet.participants.length
+            });
+          }
+        } catch (error) {
+          console.error('🔍 DegenLockScreen: Error reloading wallet:', error);
+        }
+      }
+    };
+
     // Only initialize if we have the required data and haven't initialized yet
     if (splitData && currentUser && participants && totalAmount && !degenState.splitWallet) {
       initialize();
+    } else if (degenState.splitWallet && participants && participants.length > 0) {
+      // CRITICAL FIX: Reload wallet when participants change (e.g., after inviting users)
+      // Check if wallet participants count differs from current participants count
+      const walletParticipantsCount = degenState.splitWallet.participants?.length || 0;
+      const currentParticipantsCount = participants.length;
+      
+      if (currentParticipantsCount !== walletParticipantsCount) {
+        console.log('🔍 DegenLockScreen: Participant count changed, reloading wallet:', {
+          walletParticipantsCount,
+          currentParticipantsCount
+        });
+        reloadWallet();
+      }
     }
-  }, [splitData?.id, currentUser?.id, totalAmount]); // Add proper dependencies
+  }, [splitData?.id, currentUser?.id, totalAmount, participants?.length]); // CRITICAL FIX: Add participants.length dependency
 
   // Start periodic checks
   useEffect(() => {
@@ -335,14 +371,18 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     };
   }, [degenState.splitWallet, degenState.isLocked, degenState.allParticipantsLocked]);
 
-    // Calculate progress - check if participants have locked their funds (status 'locked' or amountPaid >= amountOwed)
-    // Only count participants who have actually sent their share, not just locked status
+    // Calculate progress - check if participants have locked their funds
+    // CRITICAL FIX: Only count participants who have actually sent their share
+    // Must have: status 'locked' AND amountPaid >= amountOwed AND transactionSignature
+    // This ensures we only count participants who have valid transaction signatures
     let lockedCount = 0;
     
     if (degenState.splitWallet?.participants) {
-      // Use wallet participants for accurate count - check if they've paid their full amount AND are locked
+      // Use wallet participants for accurate count - check if they've paid their full amount AND are locked AND have transaction signature
       lockedCount = degenState.splitWallet.participants.filter((p: any) => 
-        p.amountPaid >= p.amountOwed && p.status === 'locked'
+        p.status === 'locked' && 
+        p.amountPaid >= p.amountOwed &&
+        p.transactionSignature // Ensure they have a valid transaction signature
       ).length;
     } else {
       // Fallback to local state - but ensure it's accurate
@@ -352,7 +392,13 @@ const DegenLockScreen: React.FC<DegenLockScreenProps> = ({ navigation, route }) 
     // Debug logging to understand the issue
     console.log('🔍 DegenLockScreen lockedCount calculation:', {
       hasSplitWallet: !!degenState.splitWallet,
-      splitWalletParticipants: degenState.splitWallet?.participants,
+      splitWalletParticipants: degenState.splitWallet?.participants?.map((p: any) => ({
+        userId: p.userId,
+        status: p.status,
+        amountPaid: p.amountPaid,
+        amountOwed: p.amountOwed,
+        hasTransactionSignature: !!p.transactionSignature
+      })),
       lockedParticipantsLength: degenState.lockedParticipants.length,
       finalLockedCount: lockedCount,
       totalParticipants: participants.length

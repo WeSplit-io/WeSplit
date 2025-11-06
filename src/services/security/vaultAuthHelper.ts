@@ -7,7 +7,7 @@
  * but vault access will still work using SecureStore fallback
  */
 
-import { secureVault } from './secureVault';
+import { secureVault, isVaultAuthenticated } from './secureVault';
 import { logger } from '../analytics/loggingService';
 
 /**
@@ -18,11 +18,19 @@ import { logger } from '../analytics/loggingService';
  * Note: Returning false doesn't mean vault access will fail - SecureStore fallback will work.
  * 
  * In simulators: Returns false (Keychain doesn't work), but SecureStore fallback works fine.
+ * 
+ * This function is idempotent - if already authenticated, it returns immediately without prompting.
  */
-export async function ensureVaultAuthenticated(): Promise<boolean> {
+export async function ensureVaultAuthenticated(forceReauth: boolean = false): Promise<boolean> {
   try {
+    // Check if already authenticated first
+    if (!forceReauth && isVaultAuthenticated()) {
+      logger.debug('Vault already authenticated, skipping re-authentication', {}, 'VaultAuthHelper');
+      return true;
+    }
+
     // Pre-authenticate to ensure AES key is cached (if Keychain is available)
-    const authenticated = await secureVault.preAuthenticate();
+    const authenticated = await secureVault.preAuthenticate(forceReauth);
     
     if (authenticated) {
       logger.debug('Vault authentication successful (Keychain)', {}, 'VaultAuthHelper');

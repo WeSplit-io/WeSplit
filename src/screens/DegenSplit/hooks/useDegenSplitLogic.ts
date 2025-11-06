@@ -3,7 +3,7 @@
  * Contains all the business logic and calculations for Degen Split screens
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 import { SplitWallet } from '../../../services/split';
 import { DegenSplitState } from './useDegenSplitState';
@@ -93,6 +93,10 @@ export const useDegenSplitLogic = (
   state: DegenSplitState,
   setState: (updates: Partial<DegenSplitState>) => void
 ): DegenSplitLogic => {
+  // Ref to prevent concurrent calls to checkAllParticipantsLocked
+  const checkInProgressRef = useRef(false);
+  const lastCheckTimeRef = useRef(0);
+  const CHECK_DEBOUNCE_MS = 2000; // 2 seconds debounce
   
   // Helper functions
   const isCurrentUserCreator = useCallback((currentUser: any, splitData: any) => {
@@ -593,6 +597,26 @@ export const useDegenSplitLogic = (
   ): Promise<boolean> => {
     if (!splitWallet) {return false;}
 
+    // CRITICAL FIX: Prevent race conditions with debouncing
+    const now = Date.now();
+    if (checkInProgressRef.current) {
+      logger.debug('Participant lock check already in progress, skipping duplicate call', {
+        splitWalletId: splitWallet.id
+      }, 'DegenSplitLogic');
+      return false;
+    }
+    
+    // Debounce: Don't check too frequently
+    if (now - lastCheckTimeRef.current < CHECK_DEBOUNCE_MS) {
+      logger.debug('Participant lock check debounced, too soon since last check', {
+        splitWalletId: splitWallet.id,
+        timeSinceLastCheck: now - lastCheckTimeRef.current
+      }, 'DegenSplitLogic');
+      return false;
+    }
+
+    checkInProgressRef.current = true;
+    lastCheckTimeRef.current = now;
     setState({ isCheckingLocks: true });
     try {
       const { SplitWalletService } = await import('../../../services/split');
@@ -638,59 +662,27 @@ export const useDegenSplitLogic = (
         
         const totalParticipants = participants.length;
         
-        // Enhanced balance verification: Check actual blockchain balance
+        // CRITICAL FIX: This function should only CHECK status, not UPDATE it
+        // The processDegenFundLocking function already handles updates correctly
+        // We should not update participants here to avoid race conditions and data inconsistencies
         let currentWallet = walletResult.wallet;
+        
+        // Optional: Verify blockchain balance for logging/debugging (but don't update based on it)
         try {
           const { SplitWalletPayments } = await import('../../../services/split/SplitWalletPayments');
           const balanceResult = await SplitWalletPayments.verifySplitWalletBalance(currentWallet.id);
           
           if (balanceResult.success && balanceResult.balance !== undefined) {
-            logger.info('Blockchain balance verification for degen split', {
+            logger.info('Blockchain balance verification for degen split (read-only)', {
               splitWalletId: currentWallet.id,
               walletAddress: currentWallet.walletAddress,
               blockchainBalance: balanceResult.balance,
               expectedTotalAmount: currentWallet.totalAmount,
-              participantsCount: currentWallet.participants.length
+              participantsCount: currentWallet.participants.length,
+              lockedParticipantsCount: currentWallet.participants.filter((p: any) => 
+                p.status === 'locked' && p.amountPaid >= p.amountOwed
+              ).length
             }, 'DegenSplitLogic');
-            
-            // If blockchain balance is greater than 0, check if participants should be marked as locked
-            if (balanceResult.balance > 0) {
-              const expectedAmountPerParticipant = currentWallet.totalAmount / totalParticipants;
-              const totalPaidAmount = balanceResult.balance;
-              
-              // Update participant status based on actual blockchain balance
-              const updatedParticipants = currentWallet.participants.map((p: any) => {
-                // If the participant has sent funds (based on blockchain balance), mark as locked
-                if (p.status === 'pending' && totalPaidAmount >= expectedAmountPerParticipant) {
-                  logger.info('Updating participant status based on blockchain balance', {
-                    participantId: p.userId,
-                    previousStatus: p.status,
-                    newStatus: 'locked',
-                    amountPaid: expectedAmountPerParticipant
-                  }, 'DegenSplitLogic');
-                  
-                  return {
-                    ...p,
-                    status: 'locked' as const,
-                    amountPaid: expectedAmountPerParticipant,
-                    lockedAt: new Date().toISOString()
-                  };
-                }
-                return p;
-              });
-              
-              // Update the wallet with the new participant statuses
-              if (updatedParticipants.some((p, index) => p.status !== currentWallet.participants[index].status)) {
-                const { SplitWalletService } = await import('../../../services/split');
-                await SplitWalletService.updateSplitWalletParticipants(currentWallet.id, updatedParticipants);
-                
-                // Reload the wallet to get updated data
-                const reloadResult = await SplitWalletService.getSplitWallet(currentWallet.id);
-                if (reloadResult.success && reloadResult.wallet) {
-                  currentWallet = reloadResult.wallet;
-                }
-              }
-            }
           }
         } catch (balanceError) {
           logger.warn('Failed to verify blockchain balance, using database status', {
@@ -699,8 +691,14 @@ export const useDegenSplitLogic = (
           }, 'DegenSplitLogic');
         }
         
-        // For degen split, check if participants have locked their funds (status 'locked' AND amountPaid >= amountOwed)
-        const lockedCount = currentWallet.participants.filter((p: any) => p.status === 'locked' && p.amountPaid >= p.amountOwed).length;
+        // CRITICAL FIX: Only CHECK status, don't UPDATE it
+        // Count participants who have actually locked their funds (status 'locked' AND amountPaid >= amountOwed)
+        // This ensures we only count participants who have valid transaction signatures and have paid
+        const lockedCount = currentWallet.participants.filter((p: any) => 
+          p.status === 'locked' && 
+          p.amountPaid >= p.amountOwed &&
+          p.transactionSignature // Ensure they have a valid transaction signature
+        ).length;
         
         // Update locked participants list for UI
         const lockedParticipantIds = currentWallet.participants
@@ -724,7 +722,9 @@ export const useDegenSplitLogic = (
       }
     } catch (error) {
       console.error('Error checking participant locks:', error);
+      logger.error('Error checking participant locks', error, 'DegenSplitLogic');
     } finally {
+      checkInProgressRef.current = false;
       setState({ isCheckingLocks: false });
     }
     

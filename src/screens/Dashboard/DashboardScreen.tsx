@@ -43,7 +43,7 @@ import { getDoc, doc } from 'firebase/firestore';
 import { RequestCard } from '../../components/requests';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
 import { useWalletState } from '../../hooks/useWalletState';
-import { secureVault } from '../../services/security/secureVault';
+import { secureVault, isVaultAuthenticated } from '../../services/security/secureVault';
 
 
 
@@ -59,6 +59,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // Biometric authentication state
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [authenticationError, setAuthenticationError] = useState<string | null>(null);
+  const hasAuthenticatedRef = useRef(false);
 
   // Function to fetch user data from Firebase
   const fetchUserData = async (userId: string) => {
@@ -118,10 +119,18 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
     refreshWallet
   } = useWalletState(currentUser?.id);
 
-  // Authenticate with Face ID before rendering dashboard
+  // Authenticate with Face ID before rendering dashboard (only once per session)
   useEffect(() => {
     const authenticate = async () => {
       if (!isAuthenticated || !currentUser?.id) {
+        setIsAuthenticating(false);
+        hasAuthenticatedRef.current = false;
+        return;
+      }
+
+      // If already authenticated, skip re-authentication
+      if (hasAuthenticatedRef.current && isVaultAuthenticated()) {
+        logger.debug('Dashboard: Already authenticated, skipping re-authentication', null, 'DashboardScreen');
         setIsAuthenticating(false);
         return;
       }
@@ -133,22 +142,26 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         // Pre-authenticate to trigger Face ID/Touch ID OR device passcode once before any vault access
         // Note: This will use biometrics if available, otherwise fall back to device passcode
         // In simulators, Keychain won't work, but SecureStore fallback will still work
+        // preAuthenticate() is idempotent - it won't prompt again if already authenticated
         const authenticated = await secureVault.preAuthenticate();
         
         if (authenticated) {
           logger.info('Authentication successful (biometrics or passcode)', null, 'DashboardScreen');
+          hasAuthenticatedRef.current = true;
           setIsAuthenticating(false);
         } else {
           // Keychain authentication failed (common in simulators or if user cancels)
           // This is okay - SecureStore fallback will work for vault access
           // Don't block the user, just log and continue
           logger.info('Keychain authentication not available (using SecureStore fallback)', null, 'DashboardScreen');
+          hasAuthenticatedRef.current = true; // Mark as done even if Keychain failed
           setIsAuthenticating(false);
           // No error - app will work with SecureStore fallback
         }
       } catch (error) {
         logger.error('Biometric authentication error', error, 'DashboardScreen');
         setAuthenticationError('Failed to authenticate. Please try again.');
+        hasAuthenticatedRef.current = false; // Allow retry on error
         setIsAuthenticating(false);
       }
     };
@@ -781,9 +794,12 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
             onPress={async () => {
               setIsAuthenticating(true);
               setAuthenticationError(null);
+              hasAuthenticatedRef.current = false; // Reset to allow retry
               try {
-                const authenticated = await secureVault.preAuthenticate();
+                // Force re-authentication on retry
+                const authenticated = await secureVault.preAuthenticate(true);
                 if (authenticated) {
+                  hasAuthenticatedRef.current = true;
                   setIsAuthenticating(false);
                 } else {
                   setAuthenticationError('Authentication failed. Please try again.');
@@ -791,6 +807,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                 }
               } catch (error) {
                 setAuthenticationError('Failed to authenticate. Please try again.');
+                hasAuthenticatedRef.current = false;
                 setIsAuthenticating(false);
               }
             }}
