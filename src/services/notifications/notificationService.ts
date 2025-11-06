@@ -956,7 +956,9 @@ class NotificationServiceClass {
                 notificationId: notification.id
               });
             } else if (notification.data.splitType === 'degen') {
-              navigation.navigate('DegenLock', {
+              // Degen Split is disabled - redirect to FairSplit instead
+              console.warn('Degen Split is disabled, redirecting to FairSplit');
+              navigation.navigate('FairSplit', {
                 splitData: { id: notification.data.splitId },
                 isFromNotification: true,
                 notificationId: notification.id
