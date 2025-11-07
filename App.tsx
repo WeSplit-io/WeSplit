@@ -45,9 +45,10 @@ import SplitsListScreen from './src/screens/Splits/SplitsList/SplitsListScreen';
 import FairSplitScreen from './src/screens/FairSplit/FairSplitScreen';
 import PaymentConfirmationScreen from './src/screens/PaymentConfirmation/PaymentConfirmationScreen';
 import KastAccountLinkingScreen from './src/screens/KastAccountLinking/KastAccountLinkingScreen';
-import DegenLockScreen from './src/screens/DegenSplit/DegenLockScreen';
-import DegenSpinScreen from './src/screens/DegenSplit/DegenSpinScreen';
-import DegenResultScreen from './src/screens/DegenSplit/DegenResultScreen';
+// Degen Split screens disabled
+// import DegenLockScreen from './src/screens/DegenSplit/DegenLockScreen';
+// import DegenSpinScreen from './src/screens/DegenSplit/DegenSpinScreen';
+// import DegenResultScreen from './src/screens/DegenSplit/DegenResultScreen';
 import SplitPaymentScreen from './src/screens/SplitPayment/SplitPaymentScreen';
 import WithdrawAmountScreen from './src/screens/Withdraw/WithdrawAmountScreen';
 import WithdrawConfirmationScreen from './src/screens/Withdraw/WithdrawConfirmationScreen';
@@ -160,9 +161,10 @@ export default function App() {
                     <Stack.Screen name="FairSplit" component={FairSplitScreen} />
                     <Stack.Screen name="PaymentConfirmation" component={PaymentConfirmationScreen} />
                     <Stack.Screen name="KastAccountLinking" component={KastAccountLinkingScreen} />
-                    <Stack.Screen name="DegenLock" component={DegenLockScreen} />
-                    <Stack.Screen name="DegenSpin" component={DegenSpinScreen} />
-                    <Stack.Screen name="DegenResult" component={DegenResultScreen} />
+                    {/* Degen Split screens disabled */}
+                    {/* <Stack.Screen name="DegenLock" component={DegenLockScreen} /> */}
+                    {/* <Stack.Screen name="DegenSpin" component={DegenSpinScreen} /> */}
+                    {/* <Stack.Screen name="DegenResult" component={DegenResultScreen} /> */}
                     <Stack.Screen name="SplitPayment" component={SplitPaymentScreen} />
                     <Stack.Screen name="WithdrawAmount" component={WithdrawAmountScreen} />
                     <Stack.Screen name="WithdrawConfirmation" component={WithdrawConfirmationScreen} />

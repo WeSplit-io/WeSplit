@@ -84,16 +84,34 @@ export const useDegenSplitRealtime = (
                 callbacks.onLockStatusUpdate(lockedParticipants, allLocked);
               }
 
-              // OPTIMIZED: Only fetch wallet data if participants have meaningful status changes
+              // CRITICAL FIX: Fetch wallet data if participants have meaningful status changes OR participant count changes
+              // This ensures wallet is refreshed when participants are added, not just when status changes
               const hasMeaningfulStatusChanges = update.participants.some(p => 
                 p.status === 'paid' || p.status === 'locked' || p.status === 'accepted'
               );
               
+              // Track previous participant count to detect additions
+              // Note: We can't track this perfectly without state, but we can check if there are new participants
+              // by checking if any participant has status 'invited' or 'accepted' (newly added)
+              const hasNewParticipants = update.participants.some(p => 
+                p.status === 'invited' || p.status === 'accepted'
+              );
+              
+              // CRITICAL FIX: Also fetch wallet if participant count might have changed
+              // This ensures wallet is refreshed when participants are added
+              const shouldFetchWallet = hasMeaningfulStatusChanges || hasNewParticipants || update.hasChanges;
+              
               // Also check if we have a split wallet ID and the callback exists
-              if (splitWalletId && callbacks.onSplitWalletUpdate && hasMeaningfulStatusChanges) {
+              if (splitWalletId && callbacks.onSplitWalletUpdate && shouldFetchWallet) {
                 try {
                   const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
                   if (walletResult.success && walletResult.wallet) {
+                    console.log('🔍 DegenSplit Realtime: Fetching wallet due to update:', {
+                      hasMeaningfulStatusChanges,
+                      hasNewParticipants,
+                      hasChanges: update.hasChanges,
+                      participantsCount: update.participants.length
+                    });
                     callbacks.onSplitWalletUpdate(walletResult.wallet);
                   }
                 } catch (error) {
@@ -102,7 +120,7 @@ export const useDegenSplitRealtime = (
               }
             }
           },
-          onParticipantUpdate: (participants) => {
+          onParticipantUpdate: async (participants) => {
             console.log('🔍 DegenSplit Realtime: Participant update received:', {
               splitId,
               participantsCount: participants.length,
@@ -123,6 +141,23 @@ export const useDegenSplitRealtime = (
 
             if (callbacks.onLockStatusUpdate) {
               callbacks.onLockStatusUpdate(lockedParticipants, allLocked);
+            }
+
+            // CRITICAL FIX: Also fetch wallet when participants are updated
+            // This ensures wallet is refreshed when participants are added or updated
+            if (splitWalletId && callbacks.onSplitWalletUpdate) {
+              try {
+                const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
+                if (walletResult.success && walletResult.wallet) {
+                  console.log('🔍 DegenSplit Realtime: Fetching wallet due to participant update:', {
+                    participantsCount: participants.length,
+                    walletParticipantsCount: walletResult.wallet.participants.length
+                  });
+                  callbacks.onSplitWalletUpdate(walletResult.wallet);
+                }
+              } catch (error) {
+                console.error('🔍 DegenSplit Realtime: Error fetching wallet on participant update:', error);
+              }
             }
           },
           onError: (error) => {

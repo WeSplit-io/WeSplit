@@ -291,49 +291,17 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
               currentUserId: currentUser?.id?.toString()
             });
 
-            // If the degen split is completed and has a winner, navigate to result screen
+            // Degen Split is disabled - redirect to FairSplit instead
             if ((wallet.status === 'completed' || wallet.status === 'spinning_completed') && wallet.degenWinner) {
-              logger.info('Navigating to DegenResult for completed split', null, 'SplitsListScreen');
-
-              // Find the winner participant
-              const winnerParticipant = split.participants.find(p => p.userId === wallet.degenWinner?.userId);
-
-              if (winnerParticipant) {
-                // Convert participants to unified format
-                const unifiedParticipants = split.participants.map((p: any) => ({
-                  id: p.userId,
-                  name: p.name,
-                  walletAddress: p.walletAddress,
-                  status: p.status,
-                  amountOwed: p.amountOwed,
-                  amountPaid: p.amountPaid || 0,
-                  userId: p.userId,
-                  email: p.email || '',
-                  items: [],
-                }));
-
-                // Create unified bill data
-                const unifiedBillData = {
-                  id: split.billId || split.id,
-                  title: split.title,
-                  totalAmount: split.totalAmount,
-                  currency: split.currency || 'USDC',
-                  date: split.date,
-                  merchant: split.merchant?.name || 'Unknown Merchant',
-                  location: split.merchant?.address || 'Unknown Location',
-                  participants: unifiedParticipants,
-                };
-
-                navigation.navigate('DegenResult', {
-                  billData: unifiedBillData,
-                  participants: unifiedParticipants,
-                  totalAmount: split.totalAmount,
-                  selectedParticipant: winnerParticipant,
-                  splitWallet: wallet,
-                  splitData: split,
-                });
-                return;
-              }
+              logger.info('Degen Split is disabled, redirecting to FairSplit', null, 'SplitsListScreen');
+              console.warn('Degen Split is disabled, redirecting to FairSplit');
+              
+              // Redirect to FairSplit instead
+              navigation.navigate('FairSplit', {
+                splitData: split,
+                splitWallet: wallet,
+              });
+              return;
             }
           }
         } catch (walletError) {

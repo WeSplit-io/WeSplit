@@ -121,13 +121,69 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
     }
   );
 
-  // Determine if current user is the winner (selectedParticipant is the winner from the roulette)
-  const isWinner = currentUser && selectedParticipant && 
-    (selectedParticipant.userId || selectedParticipant.id) === currentUser.id.toString();
+  // CRITICAL FIX: Determine winner from wallet degenWinner (source of truth), fallback to selectedParticipant
+  // This ensures winner information is consistent even if navigation happened before save completed
+  const winnerUserId = currentSplitWallet?.degenWinner?.userId || 
+                       degenState.splitWallet?.degenWinner?.userId || 
+                       selectedParticipant?.userId || 
+                       selectedParticipant?.id;
+  
+  const isWinner = currentUser && winnerUserId && 
+    winnerUserId === currentUser.id.toString();
   const isLoser = !isWinner;
+  
+  // Use degenWinner from wallet as source of truth for selectedParticipant
+  const effectiveSelectedParticipant = currentSplitWallet?.degenWinner ? {
+    id: currentSplitWallet.degenWinner.userId,
+    name: currentSplitWallet.degenWinner.name,
+    userId: currentSplitWallet.degenWinner.userId
+  } : selectedParticipant;
 
   // State to track current split wallet data
-  const [currentSplitWallet, setCurrentSplitWallet] = React.useState<SplitWallet | null>(null);
+  // CRITICAL FIX: Initialize from route params, but reload if degenWinner is missing
+  const [currentSplitWallet, setCurrentSplitWallet] = React.useState<SplitWallet | null>(splitWallet || null);
+
+  // CRITICAL FIX: Reload wallet on mount if degenWinner is missing or doesn't match selectedParticipant
+  React.useEffect(() => {
+    const initializeWallet = async () => {
+      if (!splitWallet?.id) {return;}
+
+      // If wallet doesn't have degenWinner, reload it
+      if (!splitWallet.degenWinner) {
+        try {
+          const { SplitWalletService } = await import('../../services/split');
+          const result = await SplitWalletService.getSplitWallet(splitWallet.id);
+          if (result.success && result.wallet) {
+            console.log('🔍 DegenResultScreen: Reloaded wallet on mount (degenWinner missing):', {
+              hasDegenWinner: !!result.wallet.degenWinner,
+              degenWinner: result.wallet.degenWinner
+            });
+            setCurrentSplitWallet(result.wallet);
+            degenState.setSplitWallet(result.wallet);
+          }
+        } catch (error) {
+          console.error('🔍 DegenResultScreen: Error reloading wallet:', error);
+        }
+      } else {
+        // Verify selectedParticipant matches degenWinner
+        const winnerUserId = splitWallet.degenWinner.userId;
+        const selectedUserId = selectedParticipant?.userId || selectedParticipant?.id;
+        
+        if (winnerUserId !== selectedUserId) {
+          console.warn('🔍 DegenResultScreen: selectedParticipant mismatch, using degenWinner:', {
+            winnerUserId,
+            selectedUserId,
+            degenWinner: splitWallet.degenWinner
+          });
+          // Use degenWinner from wallet as source of truth
+        }
+        
+        setCurrentSplitWallet(splitWallet);
+      }
+    };
+
+    initializeWallet();
+  }, [splitWallet?.id]); // Only run once on mount
 
   // OPTIMIZED: Efficient state reset with proper dependency management
   React.useEffect(() => {
@@ -452,7 +508,7 @@ const DegenResultScreen: React.FC<DegenResultScreenProps> = ({ navigation, route
         <View style={styles.messageContainer}>
           <Text style={styles.messageText}>
             {isWinner 
-              ? `You're safe @${selectedParticipant.name} is paying for you`
+              ? `You're safe @${effectiveSelectedParticipant?.name || selectedParticipant?.name || 'the winner'} is paying for you`
               : `You covered the total bill: ${formatUsdcForDisplay(totalAmount)} USDC.`
             }
           </Text>

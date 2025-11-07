@@ -7,7 +7,7 @@
  * but vault access will still work using SecureStore fallback
  */
 
-import { secureVault } from './secureVault';
+import { secureVault, isVaultAuthenticated } from './secureVault';
 import { logger } from '../analytics/loggingService';
 
 /**
@@ -18,11 +18,26 @@ import { logger } from '../analytics/loggingService';
  * Note: Returning false doesn't mean vault access will fail - SecureStore fallback will work.
  * 
  * In simulators: Returns false (Keychain doesn't work), but SecureStore fallback works fine.
+ * 
+ * This function is idempotent - if already authenticated, it returns immediately without prompting.
+ * 
+ * IMPORTANT: On Android, Keychain.getGenericPassword() ALWAYS prompts for biometrics,
+ * so we MUST check the cache first to avoid multiple prompts during navigation.
+ * The cache is shared across the entire app, so once authenticated, all screens
+ * can use the cached key without triggering biometrics again.
  */
-export async function ensureVaultAuthenticated(): Promise<boolean> {
+export async function ensureVaultAuthenticated(forceReauth: boolean = false): Promise<boolean> {
   try {
+    // ✅ CRITICAL: Check cache FIRST before any Keychain access
+    // On Android, this prevents multiple Face ID prompts during navigation
+    if (!forceReauth && isVaultAuthenticated()) {
+      logger.debug('Vault already authenticated (using cached key), skipping re-authentication', {}, 'VaultAuthHelper');
+      return true;
+    }
+
     // Pre-authenticate to ensure AES key is cached (if Keychain is available)
-    const authenticated = await secureVault.preAuthenticate();
+    // This will only trigger biometrics if cache is empty/expired
+    const authenticated = await secureVault.preAuthenticate(forceReauth);
     
     if (authenticated) {
       logger.debug('Vault authentication successful (Keychain)', {}, 'VaultAuthHelper');

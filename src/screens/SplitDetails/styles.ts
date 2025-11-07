@@ -366,6 +366,10 @@ export const styles = StyleSheet.create({
     borderColor: colors.white80,
     backgroundColor: colors.white10,
   },
+  splitOptionDisabled: {
+    opacity: 0.8,
+    backgroundColor: colors.white5,
+  },
 
   splitOptionIconImage: {
     width: 50,
