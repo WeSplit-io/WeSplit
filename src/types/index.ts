@@ -32,6 +32,9 @@ export interface User {
   points?: number; // Total points accumulated
   total_points_earned?: number; // Lifetime points (for stats)
   points_last_updated?: string; // Timestamp when points were last updated
+  is_partnership?: boolean; // Partnership status for enhanced rewards
+  referral_code?: string; // User's referral code
+  referred_by?: string; // User ID who referred this user
   
   // Christmas calendar rewards
   badges?: string[]; // Array of badge IDs earned

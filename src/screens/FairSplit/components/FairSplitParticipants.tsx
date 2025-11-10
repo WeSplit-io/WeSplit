@@ -3,7 +3,7 @@
  * Displays participant list with amounts and edit functionality
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import Avatar from '../../../components/shared/Avatar';
 import { colors } from '../../../theme/colors';
@@ -11,6 +11,8 @@ import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
 import { styles } from '../styles';
 import { Participant } from '../../../services/payments/amountCalculationService';
+import BadgeDisplay from '../../../components/profile/BadgeDisplay';
+import { firebaseDataService } from '../../../services/data/firebaseDataService';
 
 interface FairSplitParticipantsProps {
   participants: Participant[];
@@ -27,30 +29,71 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
   splitMethod,
   onEditParticipantAmount
 }) => {
+  const [participantBadges, setParticipantBadges] = useState<Record<string, { badges: string[]; active_badge?: string }>>({});
+
+  // Fetch badges for all participants
+  useEffect(() => {
+    const fetchBadges = async () => {
+      const badgesMap: Record<string, { badges: string[]; active_badge?: string }> = {};
+      
+      await Promise.all(
+        participants.map(async (participant) => {
+          try {
+            const userData = await firebaseDataService.user.getCurrentUser(participant.id);
+            if (userData.badges && userData.badges.length > 0) {
+              badgesMap[participant.id] = {
+                badges: userData.badges,
+                active_badge: userData.active_badge
+              };
+            }
+          } catch (error) {
+            // Silently fail - badges are optional
+          }
+        })
+      );
+      
+      setParticipantBadges(badgesMap);
+    };
+
+    if (participants.length > 0) {
+      fetchBadges();
+    }
+  }, [participants]);
+
   return (
     <View style={styles.participantsContainer}>
-      {participants.map((participant) => (
-        <View key={participant.id} style={styles.participantCard}>
-          <Avatar
-            userId={participant.id}
-            userName={participant.name}
-            size={40}
-            avatarUrl={participant.avatar}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: colors.white10,
-            }}
-          />
-          <View style={styles.participantInfo}>
-            <Text style={styles.participantName}>{participant.name}</Text>
-            <Text style={styles.participantWallet}>
-              {participant.walletAddress && participant.walletAddress.length > 10 
-                ? `${participant.walletAddress.slice(0, 4)}...${participant.walletAddress.slice(-4)}`
-                : participant.walletAddress || 'No wallet address'
-              }
-            </Text>
+      {participants.map((participant) => {
+        const badges = participantBadges[participant.id];
+        
+        return (
+          <View key={participant.id} style={styles.participantCard}>
+            <Avatar
+              userId={participant.id}
+              userName={participant.name}
+              size={40}
+              avatarUrl={participant.avatar}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: colors.white10,
+              }}
+            />
+            <View style={styles.participantInfo}>
+              <Text style={styles.participantName}>{participant.name}</Text>
+              {badges && badges.badges.length > 0 && badges.active_badge && (
+                <BadgeDisplay
+                  badges={badges.badges}
+                  activeBadge={badges.active_badge}
+                  showAll={false}
+                />
+              )}
+              <Text style={styles.participantWallet}>
+                {participant.walletAddress && participant.walletAddress.length > 10 
+                  ? `${participant.walletAddress.slice(0, 4)}...${participant.walletAddress.slice(-4)}`
+                  : participant.walletAddress || 'No wallet address'
+                }
+              </Text>
             {/* Payment Status */}
             {participant.amountPaid > 0 && (
               <View style={styles.paymentStatusContainer}>
@@ -86,7 +129,8 @@ const FairSplitParticipants: React.FC<FairSplitParticipantsProps> = ({
             )}
           </View>
         </View>
-      ))}
+        );
+      })}
     </View>
   );
 };

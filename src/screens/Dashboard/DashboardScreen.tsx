@@ -44,6 +44,8 @@ import { RequestCard } from '../../components/requests';
 import { useLiveBalance } from '../../hooks/useLiveBalance';
 import { useWalletState } from '../../hooks/useWalletState';
 import { secureVault, isVaultAuthenticated } from '../../services/security/secureVault';
+import BadgeDisplay from '../../components/profile/BadgeDisplay';
+import ProfileAssetDisplay from '../../components/profile/ProfileAssetDisplay';
 
 
 
@@ -825,6 +827,20 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               <Text style={styles.userName}>
                 {currentUser?.name || currentUser?.email?.split('@')[0] || 'User'}!
               </Text>
+              {currentUser?.badges && currentUser.badges.length > 0 && (
+                <BadgeDisplay
+                  badges={currentUser.badges}
+                  activeBadge={currentUser.active_badge}
+                  showAll={false}
+                />
+              )}
+              {currentUser?.active_profile_asset && (
+                <ProfileAssetDisplay
+                  profileAssets={currentUser.profile_assets}
+                  activeProfileAsset={currentUser.active_profile_asset}
+                  showProfileAsset={true}
+                />
+              )}
             </View>
           </TouchableOpacity>
 

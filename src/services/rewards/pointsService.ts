@@ -8,12 +8,14 @@ import { doc, getDoc, updateDoc, collection, addDoc, serverTimestamp, increment 
 import { logger } from '../analytics/loggingService';
 import { PointsAwardResult, PointsTransaction } from '../../types/rewards';
 import { firebaseDataService } from '../data/firebaseDataService';
-import { calculateTransactionPoints, MIN_TRANSACTION_AMOUNT_FOR_POINTS } from './rewardsConfig';
+import { MIN_TRANSACTION_AMOUNT_FOR_POINTS } from './rewardsConfig';
+import { seasonService, Season } from './seasonService';
+import { getSeasonReward, calculateRewardPoints, RewardTask } from './seasonRewardsConfig';
 
 class PointsService {
   /**
    * Award points for a wallet-to-wallet transaction
-   * Awards 10% of the transaction amount as points (see TRANSACTION_POINTS_PERCENTAGE in rewardsConfig.ts)
+   * Uses season-based percentage rewards (All or Partnership)
    * Only awards points for internal wallet-to-wallet transfers (not external)
    * Only awards points for 'send' transactions (sender gets points)
    */
@@ -50,9 +52,16 @@ class PointsService {
         };
       }
 
-      // Calculate points: 10% of transaction amount (rounded, minimum 1 point for transactions >= $1)
-      // Example: $1 transfer = 1 point, $10 transfer = 1 point, $100 transfer = 10 points
-      const pointsAwarded = calculateTransactionPoints(transactionAmount);
+      // Get user to check partnership status
+      const user = await firebaseDataService.user.getCurrentUser(userId);
+      const isPartnership = user.is_partnership || false;
+      
+      // Get current season
+      const season = seasonService.getCurrentSeason();
+      
+      // Get season-based reward for transaction
+      const reward = getSeasonReward('transaction_1_1_request', season, isPartnership);
+      const pointsAwarded = calculateRewardPoints(reward, transactionAmount);
 
       if (pointsAwarded <= 0) {
         logger.warn('Calculated points are zero or negative', {
@@ -60,7 +69,9 @@ class PointsService {
           transactionAmount,
           pointsAwarded,
           transactionId,
-          calculatedPercentage: transactionAmount * 0.10
+          season,
+          isPartnership,
+          reward
         }, 'PointsService');
         return {
           success: false,
@@ -74,16 +85,22 @@ class PointsService {
         userId,
         transactionAmount,
         pointsAwarded,
-        transactionId
+        transactionId,
+        season,
+        isPartnership,
+        rewardType: reward.type,
+        rewardValue: reward.value
       }, 'PointsService');
 
-      // Award points to user
-      const result = await this.awardPoints(
+      // Award points to user with season info
+      const result = await this.awardSeasonPoints(
         userId,
         pointsAwarded,
         'transaction_reward',
         transactionId,
-        `Points for ${transactionAmount} USDC transaction`
+        `Points for ${transactionAmount} USDC transaction (Season ${season})`,
+        season,
+        'transaction_1_1_request'
       );
 
       return result;
@@ -99,12 +116,97 @@ class PointsService {
   }
 
   /**
-   * Award points to a user
+   * Award season-based points to a user
+   */
+  async awardSeasonPoints(
+    userId: string,
+    amount: number,
+    source: 'transaction_reward' | 'quest_completion' | 'admin_adjustment' | 'season_reward' | 'referral_reward',
+    sourceId?: string,
+    description?: string,
+    season?: Season,
+    taskType?: string
+  ): Promise<PointsAwardResult> {
+    try {
+      if (amount <= 0) {
+        return {
+          success: false,
+          pointsAwarded: 0,
+          totalPoints: await this.getUserPoints(userId),
+          error: 'Points amount must be greater than 0'
+        };
+      }
+
+      // Get current user points
+      const currentPoints = await this.getUserPoints(userId);
+
+      // Update user document with new points
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        return {
+          success: false,
+          pointsAwarded: 0,
+          totalPoints: 0,
+          error: 'User not found'
+        };
+      }
+
+      const newPoints = (userDoc.data().points || 0) + amount;
+      const totalEarned = (userDoc.data().total_points_earned || 0) + amount;
+
+      // Update user points atomically
+      await updateDoc(userRef, {
+        points: newPoints,
+        total_points_earned: totalEarned,
+        points_last_updated: serverTimestamp()
+      });
+
+      // Record points transaction with season info
+      await this.recordPointsTransaction(
+        userId,
+        amount,
+        source,
+        sourceId || '',
+        description || `Awarded ${amount} points`,
+        season,
+        taskType
+      );
+
+      logger.info('Season points awarded successfully', {
+        userId,
+        amount,
+        currentPoints,
+        newPoints,
+        source,
+        season,
+        taskType
+      }, 'PointsService');
+
+      return {
+        success: true,
+        pointsAwarded: amount,
+        totalPoints: newPoints
+      };
+    } catch (error) {
+      logger.error('Failed to award season points', error, 'PointsService');
+      return {
+        success: false,
+        pointsAwarded: 0,
+        totalPoints: await this.getUserPoints(userId),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Award points to a user (legacy method, now uses season-based)
    */
   async awardPoints(
     userId: string,
     amount: number,
-    source: 'transaction_reward' | 'quest_completion' | 'admin_adjustment',
+    source: 'transaction_reward' | 'quest_completion' | 'admin_adjustment' | 'season_reward' | 'referral_reward',
     sourceId?: string,
     description?: string
   ): Promise<PointsAwardResult> {
@@ -144,7 +246,7 @@ class PointsService {
         points_last_updated: serverTimestamp()
       });
 
-      // Record points transaction
+      // Record points transaction (without season info for legacy compatibility)
       await this.recordPointsTransaction(
         userId,
         amount,
@@ -196,9 +298,11 @@ class PointsService {
   async recordPointsTransaction(
     userId: string,
     amount: number,
-    source: 'transaction_reward' | 'quest_completion' | 'admin_adjustment',
+    source: 'transaction_reward' | 'quest_completion' | 'admin_adjustment' | 'season_reward' | 'referral_reward',
     sourceId: string,
-    description: string
+    description: string,
+    season?: Season,
+    taskType?: string
   ): Promise<void> {
     try {
       const transactionData: Omit<PointsTransaction, 'id' | 'created_at'> = {
@@ -206,7 +310,9 @@ class PointsService {
         amount,
         source,
         source_id: sourceId,
-        description
+        description,
+        ...(season !== undefined && { season }),
+        ...(taskType && { task_type: taskType })
       };
 
       await addDoc(collection(db, 'points_transactions'), {
@@ -218,7 +324,9 @@ class PointsService {
         userId,
         amount,
         source,
-        sourceId
+        sourceId,
+        season,
+        taskType
       }, 'PointsService');
     } catch (error) {
       logger.error('Failed to record points transaction', error, 'PointsService');
@@ -251,7 +359,9 @@ class PointsService {
           source: data.source,
           source_id: data.source_id,
           description: data.description,
-          created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString()
+          created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
+          season: data.season,
+          task_type: data.task_type
         });
       });
 

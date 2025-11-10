@@ -29,6 +29,12 @@ import AccountSettingsScreen from './src/screens/Settings/AccountSettings/Accoun
 import PremiumScreen from './src/screens/Settings/Premium/PremiumScreen';
 import NotificationsScreen from './src/screens/Notifications/NotificationsScreen';
 import LanguageScreen from './src/screens/Settings/Language/LanguageScreen';
+import RewardsScreen from './src/screens/Rewards/RewardsScreen';
+import LeaderboardDetailScreen from './src/screens/Rewards/LeaderboardDetailScreen';
+import HowToEarnPointsScreen from './src/screens/Rewards/HowToEarnPointsScreen';
+import ReferralScreen from './src/screens/Rewards/ReferralScreen';
+import PointsHistoryScreen from './src/screens/Rewards/PointsHistoryScreen';
+import ChristmasCalendarScreen from './src/screens/Rewards/ChristmasCalendarScreen';
 import SendScreen from './src/screens/Send/SendScreen';
 import SendAmountScreen from './src/screens/Send/SendAmountScreen';
 import SendConfirmationScreen from './src/screens/Send/SendConfirmationScreen';
@@ -53,7 +59,6 @@ import WithdrawAmountScreen from './src/screens/Withdraw/WithdrawAmountScreen';
 import WithdrawConfirmationScreen from './src/screens/Withdraw/WithdrawConfirmationScreen';
 import WithdrawSuccessScreen from './src/screens/Withdraw/WithdrawSuccessScreen';
 import WalletManagementScreen from './src/screens/WalletManagement/WalletManagementScreen';
-import RewardsScreen from './src/screens/Rewards/RewardsScreen';
 import SeedPhraseViewScreen from './src/screens/WalletManagement/SeedPhraseViewScreen';
 import SeedPhraseVerifyScreen from './src/screens/WalletManagement/SeedPhraseVerifyScreen';
 import { ContactsScreen } from './src/screens/Contacts';
@@ -160,6 +165,12 @@ export default function App() {
                     <Stack.Screen name="FairSplit" component={FairSplitScreen} />
                     <Stack.Screen name="PaymentConfirmation" component={PaymentConfirmationScreen} />
                     <Stack.Screen name="KastAccountLinking" component={KastAccountLinkingScreen} />
+                    <Stack.Screen name="Rewards" component={RewardsScreen} />
+                    <Stack.Screen name="LeaderboardDetail" component={LeaderboardDetailScreen} />
+                    <Stack.Screen name="HowToEarnPoints" component={HowToEarnPointsScreen} />
+                    <Stack.Screen name="Referral" component={ReferralScreen} />
+                    <Stack.Screen name="PointsHistory" component={PointsHistoryScreen} />
+                    <Stack.Screen name="ChristmasCalendar" component={ChristmasCalendarScreen} />
                     {/* Degen Split screens disabled */}
                     {/* <Stack.Screen name="DegenLock" component={DegenLockScreen} /> */}
                     {/* <Stack.Screen name="DegenSpin" component={DegenSpinScreen} /> */}
@@ -169,7 +180,6 @@ export default function App() {
                     <Stack.Screen name="WithdrawConfirmation" component={WithdrawConfirmationScreen} />
                     <Stack.Screen name="WithdrawSuccess" component={WithdrawSuccessScreen} />
                     <Stack.Screen name="WalletManagement" component={WalletManagementScreen} />
-                    <Stack.Screen name="Rewards" component={RewardsScreen} />
                     <Stack.Screen name="SeedPhraseView" component={SeedPhraseViewScreen} />
                     <Stack.Screen name="SeedPhraseVerify" component={SeedPhraseVerifyScreen} />
                     <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />

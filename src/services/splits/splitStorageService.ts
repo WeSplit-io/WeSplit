@@ -152,6 +152,39 @@ export class SplitStorageServiceClass {
         // Don't fail split creation if sync fails
       }
 
+      // Award split creation rewards (owner bonus + first split with friends)
+      try {
+        const { splitRewardsService } = await import('../../services/rewards/splitRewardsService');
+        const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
+        
+        // Award owner bonus for creating split
+        if (createdSplit.splitType === 'fair') {
+          await splitRewardsService.awardFairSplitParticipation({
+            userId: createdSplit.creatorId,
+            splitId: createdSplit.id,
+            splitType: 'fair',
+            splitAmount: createdSplit.totalAmount,
+            isOwner: true
+          });
+        }
+        
+        // Check for first split with friends (multiple participants)
+        if (createdSplit.participants.length > 1) {
+          await userActionSyncService.syncFirstSplitWithFriends(
+            createdSplit.creatorId,
+            createdSplit.id,
+            createdSplit.participants.length
+          );
+        }
+      } catch (rewardError) {
+        logger.error('Failed to award split creation rewards', { 
+          userId: createdSplit.creatorId, 
+          splitId: createdSplit.id,
+          rewardError 
+        }, 'SplitStorageService');
+        // Don't fail split creation if rewards fail
+      }
+
       return {
         success: true,
         split: createdSplit,

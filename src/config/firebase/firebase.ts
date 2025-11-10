@@ -327,6 +327,32 @@ export const firestoreService = {
       };
 
       await setDoc(userRef, userData, { merge: true });
+      
+      // Generate referral code and track referrals (non-blocking, fire and forget)
+      (async () => {
+        try {
+          const { referralService } = await import('../services/rewards/referralService');
+          const { userActionSyncService } = await import('../services/rewards/userActionSyncService');
+          const { updateDoc } = await import('firebase/firestore');
+          
+          // Generate referral code
+          const referralCode = referralService.generateReferralCode(user.uid);
+          await updateDoc(userRef, {
+            referral_code: referralCode
+          });
+          
+          // Track referral if provided (check route params or query params)
+          // Note: This would need to be passed from the signup flow
+          // For now, we'll handle it in the signup screen
+          
+          // Sync account setup reward
+          await userActionSyncService.syncAccountSetupPP(user.uid);
+        } catch (rewardError) {
+          console.error('Error setting up rewards for new user:', rewardError);
+          // Don't fail user creation if rewards setup fails
+        }
+      })().catch(() => {}); // Swallow errors - non-blocking
+      
       return userData;
     } catch (error) {
       console.error('Error creating user document:', error);

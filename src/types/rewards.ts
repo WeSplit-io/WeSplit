@@ -5,7 +5,9 @@
 
 export interface Quest {
   id: string;
-  type: 'profile_image' | 'first_transaction' | 'refer_friend' | 'complete_onboarding' | 'add_first_contact' | 'create_first_split';
+  type: 'profile_image' | 'first_transaction' | 'refer_friend' | 'complete_onboarding' | 'add_first_contact' | 'create_first_split' 
+    | 'export_seed_phrase' | 'setup_account_pp' | 'first_split_with_friends' | 'first_external_wallet_linked'
+    | 'invite_friends_create_account' | 'friend_do_first_split_over_10';
   title: string;
   description: string;
   points: number;
@@ -17,10 +19,12 @@ export interface PointsTransaction {
   id: string;
   user_id: string;
   amount: number;
-  source: 'transaction_reward' | 'quest_completion' | 'admin_adjustment';
+  source: 'transaction_reward' | 'quest_completion' | 'admin_adjustment' | 'season_reward' | 'referral_reward';
   source_id?: string; // transaction_id or quest_id
   description: string;
   created_at: string;
+  season?: number; // Season when points were awarded
+  task_type?: string; // Task type that triggered the reward
 }
 
 export interface LeaderboardEntry {
@@ -29,6 +33,10 @@ export interface LeaderboardEntry {
   avatar?: string;
   points: number;
   rank: number;
+  badges?: string[];
+  active_badge?: string;
+  profile_assets?: string[];
+  active_profile_asset?: string;
 }
 
 export interface PointsAwardResult {

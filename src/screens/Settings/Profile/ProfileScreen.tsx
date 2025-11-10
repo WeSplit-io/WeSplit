@@ -12,6 +12,8 @@ import UserAvatar from '../../../components/UserAvatar';
 import { logger } from '../../../services/analytics/loggingService';
 import { Container } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
+import BadgeDisplay from '../../../components/profile/BadgeDisplay';
+import ProfileAssetDisplay from '../../../components/profile/ProfileAssetDisplay';
 
 // Helper function to safely load images with fallback
 const SafeImage = ({ source, style, fallbackSource }: any) => {
@@ -218,6 +220,20 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                 <Text style={styles.pointsLabel}>Points:</Text>
                 <Text style={styles.pointsValue}>{currentUser.points || 0}</Text>
               </View>
+            )}
+            {currentUser?.badges && currentUser.badges.length > 0 && (
+              <BadgeDisplay
+                badges={currentUser.badges}
+                activeBadge={currentUser.active_badge}
+                showAll={false}
+              />
+            )}
+            {currentUser?.active_profile_asset && (
+              <ProfileAssetDisplay
+                profileAssets={currentUser.profile_assets}
+                activeProfileAsset={currentUser.active_profile_asset}
+                showProfileAsset={true}
+              />
             )}
           </View>
           <TouchableOpacity style={styles.editButton} onPress={handleAccountInfo}>

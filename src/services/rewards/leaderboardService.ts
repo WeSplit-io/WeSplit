@@ -33,7 +33,11 @@ class LeaderboardService {
           name: data.name || 'Unknown',
           avatar: data.avatar,
           points: data.points || 0,
-          rank: rank++
+          rank: rank++,
+          badges: data.badges || [],
+          active_badge: data.active_badge,
+          profile_assets: data.profile_assets || [],
+          active_profile_asset: data.active_profile_asset
         });
       });
 
@@ -132,7 +136,11 @@ class LeaderboardService {
         name: user.name,
         avatar: user.avatar,
         points: user.points || 0,
-        rank
+        rank,
+        badges: user.badges || [],
+        active_badge: user.active_badge,
+        profile_assets: user.profile_assets || [],
+        active_profile_asset: user.active_profile_asset
       };
     } catch (error) {
       logger.error('Failed to get user leaderboard entry', error, 'LeaderboardService');
@@ -195,7 +203,11 @@ class LeaderboardService {
           name: data.name || 'Unknown',
           avatar: data.avatar,
           points: data.points || 0,
-          rank: rank++
+          rank: rank++,
+          badges: data.badges || [],
+          active_badge: data.active_badge,
+          profile_assets: data.profile_assets || [],
+          active_profile_asset: data.active_profile_asset
         });
       });
 

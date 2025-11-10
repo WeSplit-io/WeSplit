@@ -136,6 +136,21 @@ export class LinkedWalletService {
 
       if (result.success) {
         logger.info('Linked wallet added successfully', { userId, type: walletData.type }, 'LinkedWalletService');
+        
+        // Track external wallet linking reward (non-blocking)
+        if (walletData.type === 'external') {
+          try {
+            const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
+            await userActionSyncService.syncExternalWalletLinking(userId);
+          } catch (rewardError) {
+            logger.error('Failed to track external wallet linking reward', {
+              userId,
+              rewardError
+            }, 'LinkedWalletService');
+            // Don't fail wallet linking if reward tracking fails
+          }
+        }
+        
         return {
           success: true,
           walletId: result.walletId

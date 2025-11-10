@@ -8,6 +8,8 @@ import { doc, getDoc, setDoc, collection, serverTimestamp } from 'firebase/fires
 import { logger } from '../analytics/loggingService';
 import { Quest, QuestCompletionResult } from '../../types/rewards';
 import { pointsService } from './pointsService';
+import { seasonService } from './seasonService';
+import { getSeasonReward, calculateRewardPoints } from './seasonRewardsConfig';
 
 // Quest definitions
 export const QUEST_DEFINITIONS: Record<string, Quest> = {
@@ -57,6 +59,55 @@ export const QUEST_DEFINITIONS: Record<string, Quest> = {
     title: 'Refer a Friend',
     description: 'Invite a friend to join WeSplit',
     points: 200,
+    completed: false
+  },
+  // New season-based quests
+  export_seed_phrase: {
+    id: 'export_seed_phrase',
+    type: 'export_seed_phrase',
+    title: 'Export Seed Phrase',
+    description: 'Export your seed phrase for backup',
+    points: 100, // Will be updated based on season
+    completed: false
+  },
+  setup_account_pp: {
+    id: 'setup_account_pp',
+    type: 'setup_account_pp',
+    title: 'Setup Account Privacy Policy',
+    description: 'Complete account setup with privacy policy',
+    points: 100, // Will be updated based on season
+    completed: false
+  },
+  first_split_with_friends: {
+    id: 'first_split_with_friends',
+    type: 'first_split_with_friends',
+    title: 'First Split with Friends',
+    description: 'Create your first split with friends',
+    points: 500, // Will be updated based on season
+    completed: false
+  },
+  first_external_wallet_linked: {
+    id: 'first_external_wallet_linked',
+    type: 'first_external_wallet_linked',
+    title: 'Link External Wallet',
+    description: 'Link your first external wallet',
+    points: 100, // Will be updated based on season
+    completed: false
+  },
+  invite_friends_create_account: {
+    id: 'invite_friends_create_account',
+    type: 'invite_friends_create_account',
+    title: 'Invite Friends - Create Account',
+    description: 'Invite friends who create an account',
+    points: 500, // Will be updated based on season
+    completed: false
+  },
+  friend_do_first_split_over_10: {
+    id: 'friend_do_first_split_over_10',
+    type: 'friend_do_first_split_over_10',
+    title: 'Friend Does First Split > $10',
+    description: 'A friend you referred does their first split over $10',
+    points: 1000, // Will be updated based on season
     completed: false
   }
 };
@@ -130,14 +181,48 @@ class QuestService {
         completed_at: serverTimestamp()
       }, { merge: true });
 
-      // Award points for quest completion
-      const pointsResult = await pointsService.awardPoints(
+      // Check if this is a season-based quest
+      const seasonBasedQuests = [
+        'export_seed_phrase',
+        'setup_account_pp',
+        'first_split_with_friends',
+        'first_external_wallet_linked',
+        'invite_friends_create_account',
+        'friend_do_first_split_over_10'
+      ];
+
+      let pointsResult;
+      
+      if (seasonBasedQuests.includes(questType)) {
+        // Use season-based rewards for new quest types
+        const season = seasonService.getCurrentSeason();
+        const reward = getSeasonReward(questType as any, season, false);
+        const pointsAwarded = calculateRewardPoints(reward, 0);
+        
+        // Update quest definition with actual season-based points
+        await setDoc(questRef, {
+          points: pointsAwarded
+        }, { merge: true });
+        
+        pointsResult = await pointsService.awardSeasonPoints(
+          userId,
+          pointsAwarded,
+          'quest_completion',
+          questType,
+          `Quest completed: ${questDef.title} (Season ${season})`,
+          season,
+          questType
+        );
+      } else {
+        // Use legacy fixed points for old quest types
+        pointsResult = await pointsService.awardPoints(
         userId,
         questDef.points,
         'quest_completion',
         questType,
         `Quest completed: ${questDef.title}`
       );
+      }
 
       if (!pointsResult.success) {
         logger.error('Failed to award points for quest', {

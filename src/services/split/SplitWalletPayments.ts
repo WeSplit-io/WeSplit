@@ -1806,6 +1806,36 @@ export class SplitWalletPayments {
           : p
       );
 
+      // Award Fair Split participation reward (non-blocking)
+      try {
+        const { splitRewardsService } = await import('../../services/rewards/splitRewardsService');
+        const { SplitStorageService } = await import('../splits/splitStorageService');
+        
+        // Get split data to determine split type and amount
+        const splitResult = await SplitStorageService.getSplitByBillId(wallet.billId);
+        if (splitResult.success && splitResult.split) {
+          const split = splitResult.split;
+          
+          if (split.splitType === 'fair') {
+            // Award participant reward (non-owner)
+            await splitRewardsService.awardFairSplitParticipation({
+              userId: participantId,
+              splitId: split.id,
+              splitType: 'fair',
+              splitAmount: roundedAmount,
+              isOwner: false
+            });
+          }
+        }
+      } catch (rewardError) {
+        logger.error('Failed to award Fair Split participation reward', {
+          participantId,
+          splitWalletId,
+          rewardError
+        }, 'SplitWalletPayments');
+        // Don't fail payment if reward fails
+      }
+
       // CRITICAL: Single atomic database update for both collections
       const firebaseDocId = wallet.firebaseDocId || splitWalletId;
       const updatedParticipant = updatedParticipants.find(p => p.userId === participantId);
@@ -2091,6 +2121,38 @@ export class SplitWalletPayments {
       // Calculate the actual total amount from all participants' locked funds
       // For degen splits, the winner gets all the money that was locked by all participants
       const actualTotalAmount = wallet.participants.reduce((sum, p) => sum + (p.amountPaid || 0), 0);
+      
+      // Award Degen Split completion rewards (non-blocking)
+      try {
+        const { splitRewardsService } = await import('../../services/rewards/splitRewardsService');
+        const { SplitStorageService } = await import('../splits/splitStorageService');
+        
+        // Get split data
+        const splitResult = await SplitStorageService.getSplitByBillId(wallet.billId);
+        if (splitResult.success && splitResult.split) {
+          const split = splitResult.split;
+          
+          // Award rewards for all participants (winner and losers)
+          for (const participant of wallet.participants) {
+            const isWinner = participant.userId === winnerUserId;
+            await splitRewardsService.awardDegenSplitParticipation({
+              userId: participant.userId,
+              splitId: split.id,
+              splitType: 'degen',
+              splitAmount: participant.amountPaid || 0,
+              isOwner: false,
+              isWinner
+            });
+          }
+        }
+      } catch (rewardError) {
+        logger.error('Failed to award Degen Split completion rewards', {
+          winnerUserId,
+          splitWalletId,
+          rewardError
+        }, 'SplitWalletPayments');
+        // Don't fail payout if rewards fail
+      }
       
       logger.info('Degen winner payout amount calculation', {
         splitWalletId,

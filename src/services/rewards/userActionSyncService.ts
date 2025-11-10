@@ -7,6 +7,10 @@
 import { logger } from '../analytics/loggingService';
 import { questService } from './questService';
 import { firebaseDataService } from '../data/firebaseDataService';
+import { seasonService } from './seasonService';
+import { getSeasonReward, calculateRewardPoints } from './seasonRewardsConfig';
+import { pointsService } from './pointsService';
+import { referralService } from './referralService';
 
 class UserActionSyncService {
   /**
@@ -344,6 +348,22 @@ class UserActionSyncService {
         errors.push(`Failed to sync first split: ${error instanceof Error ? error.message : String(error)}`);
       }
 
+      // 6. Check seed phrase export
+      try {
+        await this.syncSeedPhraseExport(userId);
+        synced.push('seed_phrase_export');
+      } catch (error) {
+        errors.push(`Failed to sync seed phrase export: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      // 7. Check external wallet linking
+      try {
+        await this.syncExternalWalletLinking(userId);
+        synced.push('external_wallet_linking');
+      } catch (error) {
+        errors.push(`Failed to sync external wallet linking: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
       logger.info('User actions verified and synced', {
         userId,
         synced: synced.length,
@@ -356,6 +376,177 @@ class UserActionSyncService {
     }
 
     return { synced, errors };
+  }
+
+  /**
+   * Sync seed phrase export
+   * Should be called when user exports their seed phrase
+   */
+  async syncSeedPhraseExport(userId: string): Promise<void> {
+    try {
+      const isCompleted = await questService.isQuestCompleted(userId, 'export_seed_phrase');
+      if (!isCompleted) {
+        // Check if user has seed phrase (indicates they've exported it)
+        const user = await firebaseDataService.user.getCurrentUser(userId);
+        if (user.wallet_has_seed_phrase) {
+          const season = seasonService.getCurrentSeason();
+          const reward = getSeasonReward('export_seed_phrase', season, false);
+          const pointsAwarded = calculateRewardPoints(reward, 0);
+
+          // Award season-based points
+          await pointsService.awardSeasonPoints(
+            userId,
+            pointsAwarded,
+            'season_reward',
+            'export_seed_phrase',
+            `Seed phrase export reward (Season ${season})`,
+            season,
+            'export_seed_phrase'
+          );
+
+          // Mark quest as completed
+          await questService.completeQuest(userId, 'export_seed_phrase');
+          
+          logger.info('✅ Seed phrase export quest completed', {
+            userId,
+            pointsAwarded,
+            season
+          }, 'UserActionSyncService');
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to sync seed phrase export', { userId, error }, 'UserActionSyncService');
+      // Don't throw - quest completion failure shouldn't break flow
+    }
+  }
+
+  /**
+   * Sync account setup with privacy policy
+   * Should be called when user completes account setup with privacy policy acceptance
+   */
+  async syncAccountSetupPP(userId: string): Promise<void> {
+    try {
+      const isCompleted = await questService.isQuestCompleted(userId, 'setup_account_pp');
+      if (!isCompleted) {
+        // Check if user has completed onboarding (indicates they've set up account)
+        const user = await firebaseDataService.user.getCurrentUser(userId);
+        if (user.hasCompletedOnboarding) {
+          const season = seasonService.getCurrentSeason();
+          const reward = getSeasonReward('setup_account_pp', season, false);
+          const pointsAwarded = calculateRewardPoints(reward, 0);
+
+          // Award season-based points
+          await pointsService.awardSeasonPoints(
+            userId,
+            pointsAwarded,
+            'season_reward',
+            'setup_account_pp',
+            `Account setup reward (Season ${season})`,
+            season,
+            'setup_account_pp'
+          );
+
+          // Mark quest as completed
+          await questService.completeQuest(userId, 'setup_account_pp');
+          
+          logger.info('✅ Account setup PP quest completed', {
+            userId,
+            pointsAwarded,
+            season
+          }, 'UserActionSyncService');
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to sync account setup PP', { userId, error }, 'UserActionSyncService');
+      // Don't throw - quest completion failure shouldn't break flow
+    }
+  }
+
+  /**
+   * Sync first split with friends
+   * Should be called when user creates their first split with friends
+   */
+  async syncFirstSplitWithFriends(userId: string, splitId: string, participantCount: number): Promise<void> {
+    try {
+      const isCompleted = await questService.isQuestCompleted(userId, 'first_split_with_friends');
+      if (!isCompleted) {
+        // Check if split has multiple participants (friends)
+        if (participantCount > 1) {
+          const season = seasonService.getCurrentSeason();
+          const reward = getSeasonReward('first_split_with_friends', season, false);
+          const pointsAwarded = calculateRewardPoints(reward, 0);
+
+          // Award season-based points
+          await pointsService.awardSeasonPoints(
+            userId,
+            pointsAwarded,
+            'season_reward',
+            splitId,
+            `First split with friends reward (Season ${season})`,
+            season,
+            'first_split_with_friends'
+          );
+
+          // Mark quest as completed
+          await questService.completeQuest(userId, 'first_split_with_friends');
+          
+          logger.info('✅ First split with friends quest completed', {
+            userId,
+            splitId,
+            participantCount,
+            pointsAwarded,
+            season
+          }, 'UserActionSyncService');
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to sync first split with friends', { userId, error }, 'UserActionSyncService');
+      // Don't throw - quest completion failure shouldn't break split creation
+    }
+  }
+
+  /**
+   * Sync external wallet linking
+   * Should be called when user links their first external wallet
+   */
+  async syncExternalWalletLinking(userId: string): Promise<void> {
+    try {
+      const isCompleted = await questService.isQuestCompleted(userId, 'first_external_wallet_linked');
+      if (!isCompleted) {
+        // Check if user has linked external wallets
+        const linkedWallets = await firebaseDataService.linkedWallet.getLinkedWallets(userId);
+        const externalWallets = linkedWallets.filter(w => w.type === 'external');
+        
+        if (externalWallets.length > 0) {
+          const season = seasonService.getCurrentSeason();
+          const reward = getSeasonReward('first_external_wallet_linked', season, false);
+          const pointsAwarded = calculateRewardPoints(reward, 0);
+
+          // Award season-based points
+          await pointsService.awardSeasonPoints(
+            userId,
+            pointsAwarded,
+            'season_reward',
+            externalWallets[0].id,
+            `External wallet linking reward (Season ${season})`,
+            season,
+            'first_external_wallet_linked'
+          );
+
+          // Mark quest as completed
+          await questService.completeQuest(userId, 'first_external_wallet_linked');
+          
+          logger.info('✅ External wallet linking quest completed', {
+            userId,
+            pointsAwarded,
+            season
+          }, 'UserActionSyncService');
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to sync external wallet linking', { userId, error }, 'UserActionSyncService');
+      // Don't throw - quest completion failure shouldn't break flow
+    }
   }
 }
 

@@ -65,7 +65,14 @@ export const NAVIGATION_ROUTES = {
   DEGEN_LOCK: 'DegenLock',
   DEGEN_SPIN: 'DegenSpin',
   DEGEN_RESULT: 'DegenResult',
-  SPLIT_PAYMENT: 'SplitPayment'
+  SPLIT_PAYMENT: 'SplitPayment',
+  // Reward screens
+  REWARDS: 'Rewards',
+  LEADERBOARD_DETAIL: 'LeaderboardDetail',
+  HOW_TO_EARN_POINTS: 'HowToEarnPoints',
+  REFERRAL: 'Referral',
+  POINTS_HISTORY: 'PointsHistory',
+  CHRISTMAS_CALENDAR: 'ChristmasCalendar'
 } as const;
 
 /**
@@ -147,5 +154,90 @@ export class SplitNavigationHelper {
    */
   goToSplitPayment(params: any) {
     this.navigation.navigate(NAVIGATION_ROUTES.SPLIT_PAYMENT, params);
+  }
+}
+
+/**
+ * Navigation helper for reward screens
+ * Provides consistent navigation patterns
+ */
+export class RewardNavigationHelper {
+  private navigation: NavigationProp<any>;
+
+  constructor(navigation: NavigationProp<any>) {
+    this.navigation = navigation;
+  }
+
+  /**
+   * Navigate to rewards main screen
+   */
+  goToRewards() {
+    try {
+      this.navigation.navigate(NAVIGATION_ROUTES.REWARDS);
+    } catch (error) {
+      // Navigation error handled silently - screen might already be active
+    }
+  }
+
+  /**
+   * Navigate to leaderboard detail screen
+   */
+  goToLeaderboardDetail() {
+    try {
+      this.navigation.navigate(NAVIGATION_ROUTES.LEADERBOARD_DETAIL);
+    } catch (error) {
+      // Navigation error handled silently
+    }
+  }
+
+  /**
+   * Navigate to how to earn points screen
+   */
+  goToHowToEarnPoints() {
+    try {
+      this.navigation.navigate(NAVIGATION_ROUTES.HOW_TO_EARN_POINTS);
+    } catch (error) {
+      // Navigation error handled silently
+    }
+  }
+
+  /**
+   * Navigate to referral screen
+   */
+  goToReferral() {
+    try {
+      this.navigation.navigate(NAVIGATION_ROUTES.REFERRAL);
+    } catch (error) {
+      // Navigation error handled silently
+    }
+  }
+
+  /**
+   * Navigate to points history screen
+   */
+  goToPointsHistory() {
+    try {
+      this.navigation.navigate(NAVIGATION_ROUTES.POINTS_HISTORY);
+    } catch (error) {
+      // Navigation error handled silently
+    }
+  }
+
+  /**
+   * Navigate back
+   */
+  goBack() {
+    try {
+      this.navigation.goBack();
+    } catch (error) {
+      // Navigation error handled silently
+    }
+  }
+  goToChristmasCalendar() {
+    try {
+      this.navigation.navigate(NAVIGATION_ROUTES.CHRISTMAS_CALENDAR);
+    } catch (error) {
+      // Navigation error handled silently
+    }
   }
 }

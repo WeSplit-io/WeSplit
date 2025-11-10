@@ -1,63 +1,51 @@
 /**
- * Rewards Configuration
- * Centralized configuration for points and rewards system
+ * Rewards Configuration (Legacy)
  * 
- * POINTS CALCULATION FLAGS:
- * ========================
+ * ⚠️ DEPRECATED: This file is kept for backward compatibility only.
  * 
- * 1. Transaction Points (10% of transaction amount)
- *    - Trigger: Internal wallet-to-wallet transfers (send type only)
- *    - Location: ConsolidatedTransactionService.sendUSDCTransaction()
- *                 sendInternal.ts.sendInternalTransfer()
- *                 userActionSyncService.checkAndBackfillTransactionPoints()
- *                 pointsMigrationService.backfillTransactionPoints()
- *    - Calculation: calculateTransactionPoints(transactionAmount)
- *    - Minimum: $1 transaction = 1 point
+ * All reward values have been moved to the season-based system.
  * 
- * 2. Quest Completion Points:
- *    - complete_onboarding: 25 points
- *      Trigger: OnboardingScreen.markOnboardingCompleted()
- *               CreateProfileScreen (after profile creation)
- *               userActionSyncService.syncOnboardingCompletion()
+ * NEW SYSTEM: Use `src/services/rewards/seasonRewardsConfig.ts`
  * 
- *    - profile_image: 50 points
- *      Trigger: CreateProfileScreen (after avatar upload)
- *               AccountSettingsScreen (after avatar update)
- *               userActionSyncService.syncProfileImage()
+ * To modify reward amounts or percentages:
+ * 1. Edit `src/services/rewards/seasonRewardsConfig.ts`
+ * 2. This is the SINGLE SOURCE OF TRUTH for all reward values
+ * 3. All changes automatically apply across the entire codebase
  * 
- *    - first_transaction: 100 points
- *      Trigger: ConsolidatedTransactionService.sendUSDCTransaction()
- *               sendInternal.ts.sendInternalTransfer()
- *               userActionSyncService.syncFirstTransaction()
- * 
- *    - add_first_contact: 30 points
- *      Trigger: useContactActions.addContact()
- *               userActionSyncService.syncFirstContact()
- * 
- *    - create_first_split: 75 points
- *      Trigger: SplitStorageService.createSplit()
- *               userActionSyncService.syncFirstSplit()
- * 
- * 3. All flags are automatically synced when:
- *    - RewardsScreen loads (verifyAndSyncUserActions)
- *    - User actions occur (via userActionSyncService)
- *    - Points migration runs (pointsMigrationService)
+ * See: `docs/guides/REWARDS_MAINTENANCE_GUIDE.md` for detailed instructions
  */
 
 /**
- * Transaction points percentage
- * Users earn 10% of transaction amount as points
- * Example: $10 transfer = 1 point (10 * 0.10 = 1)
+ * Minimum transaction amount to earn points
+ * Transactions below this amount won't earn points
+ * 
+ * This is a system constant and should remain at $1 minimum
  */
-export const TRANSACTION_POINTS_PERCENTAGE = 0.10; // 10%
+export const MIN_TRANSACTION_AMOUNT_FOR_POINTS = 1; // $1 minimum
 
 /**
- * Calculate points for a transaction amount
+ * Calculate points for a transaction amount (Legacy)
+ * 
+ * ⚠️ DEPRECATED: This function is kept for backward compatibility.
+ * 
+ * New code should use the season-based reward system:
+ * - Use `getSeasonReward()` from `seasonRewardsConfig.ts`
+ * - Use `calculateRewardPoints()` from `seasonRewardsConfig.ts`
+ * 
+ * This function is only used for:
+ * - Backfilling old transaction points
+ * - Migration scripts
+ * - Legacy code that hasn't been updated yet
+ * 
+ * @deprecated Use season-based rewards instead
  * @param transactionAmount The transaction amount in USDC
  * @returns Points awarded (rounded to nearest integer, minimum 1 point for transactions >= $1)
  */
 export function calculateTransactionPoints(transactionAmount: number): number {
-  const calculatedPoints = Math.round(transactionAmount * TRANSACTION_POINTS_PERCENTAGE);
+  // This uses a fixed 10% for legacy compatibility
+  // New transactions use season-based percentages from seasonRewardsConfig.ts
+  const LEGACY_TRANSACTION_POINTS_PERCENTAGE = 0.10; // 10%
+  const calculatedPoints = Math.round(transactionAmount * LEGACY_TRANSACTION_POINTS_PERCENTAGE);
   
   // Ensure minimum 1 point for any transaction >= $1 (to avoid 0 points for $1-$9 transactions)
   // For transactions < $1, use rounded calculation (may be 0)
@@ -67,10 +55,4 @@ export function calculateTransactionPoints(transactionAmount: number): number {
   
   return calculatedPoints;
 }
-
-/**
- * Minimum transaction amount to earn points
- * Transactions below this amount won't earn points
- */
-export const MIN_TRANSACTION_AMOUNT_FOR_POINTS = 1; // $1 minimum
 

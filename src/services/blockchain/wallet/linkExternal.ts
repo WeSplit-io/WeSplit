@@ -79,6 +79,18 @@ class ExternalWalletLinkingService {
         walletType: params.walletType
       }, 'ExternalWalletLinkingService');
 
+      // Track external wallet linking reward (non-blocking)
+      try {
+        const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
+        await userActionSyncService.syncExternalWalletLinking(params.userId);
+      } catch (rewardError) {
+        logger.error('Failed to track external wallet linking reward', {
+          userId: params.userId,
+          rewardError
+        }, 'ExternalWalletLinkingService');
+        // Don't fail wallet linking if reward tracking fails
+      }
+
       return {
         success: true,
         verifiedAddress: params.address,

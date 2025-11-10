@@ -33,15 +33,29 @@ const CreateProfileScreen: React.FC = () => {
   const route = useRoute();
   const [pseudo, setPseudo] = useState('');
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { authenticateUser, state } = useApp();
 
-  // Debug logging
+  // Initialize referral code from route params if provided (e.g., from deep link)
   useEffect(() => {
-    console.log('🔍 CreateProfileScreen: Screen mounted');
-    console.log('🔍 CreateProfileScreen: Route params:', route.params);
-    console.log('🔍 CreateProfileScreen: State:', state);
+    const params = route.params as any;
+    if (params?.referralCode) {
+      const code = String(params.referralCode).toUpperCase().replace(/\s/g, '');
+      setReferralCode(code);
+      logger.info('Referral code loaded from route params', { referralCode: code }, 'CreateProfileScreen');
+    }
+  }, [route.params]);
+
+  // Debug logging (only in dev mode)
+  useEffect(() => {
+    if (__DEV__) {
+      logger.debug('CreateProfileScreen mounted', { 
+        hasReferralCode: !!referralCode,
+        routeParams: route.params 
+      }, 'CreateProfileScreen');
+    }
   }, []);
 
   const handlePickImage = () => {
@@ -314,6 +328,41 @@ const CreateProfileScreen: React.FC = () => {
           logger.error('Failed to sync quests after profile creation', { userId: appUser.id, syncError }, 'CreateProfileScreen');
           // Don't fail profile creation if sync fails
         }
+
+        // Track referral if referral code was provided (non-blocking)
+        if (referralCode && referralCode.trim()) {
+          (async () => {
+            try {
+              const { referralService } = await import('../../services/rewards/referralService');
+              const trimmedCode = referralCode.trim().toUpperCase();
+              
+              logger.info('Tracking referral', { userId: appUser.id, referralCode: trimmedCode }, 'CreateProfileScreen');
+              
+              const result = await referralService.trackReferral(appUser.id, trimmedCode);
+              
+              if (result.success) {
+                logger.info('Referral tracked successfully', { 
+                  userId: appUser.id, 
+                  referrerId: result.referrerId 
+                }, 'CreateProfileScreen');
+              } else {
+                logger.warn('Referral tracking failed', { 
+                  userId: appUser.id, 
+                  referralCode: trimmedCode,
+                  error: result.error 
+                }, 'CreateProfileScreen');
+                // Don't show error to user - referral is optional
+              }
+            } catch (referralError) {
+              logger.error('Error tracking referral', { 
+                userId: appUser.id, 
+                referralCode: referralCode.trim(),
+                error: referralError 
+              }, 'CreateProfileScreen');
+              // Don't fail account creation if referral tracking fails
+            }
+          })().catch(() => {}); // Swallow errors - non-blocking
+        }
         
         // Verify data was saved correctly
         try {
@@ -404,6 +453,34 @@ const CreateProfileScreen: React.FC = () => {
                   autoCorrect={false}
                 />
                 {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              </View>
+
+              {/* Referral Code Input (Optional) */}
+              <View style={styles.inputSection}>
+                <View style={styles.referralCodeHeader}>
+                  <Text style={styles.inputLabel}>Referral Code</Text>
+                  <Text style={styles.optionalLabel}>(Optional)</Text>
+                </View>
+                <View style={styles.referralCodeContainer}>
+                  <PhosphorIcon name="Handshake" size={20} color={colors.white50} weight="regular" style={styles.referralCodeIcon} />
+                  <TextInput
+                    style={styles.referralCodeInput}
+                    placeholder="Enter referral code"
+                    placeholderTextColor={colors.white50}
+                    value={referralCode}
+                    onChangeText={(text) => {
+                      // Auto-uppercase and remove spaces
+                      const cleaned = text.toUpperCase().replace(/\s/g, '');
+                      setReferralCode(cleaned);
+                    }}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={12}
+                  />
+                </View>
+                <Text style={styles.referralCodeHint}>
+                  Have a referral code? Enter it to earn bonus points for you and your friend!
+                </Text>
               </View>
             </View>
           </ScrollView>
