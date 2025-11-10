@@ -42,8 +42,10 @@ export const testEnvironmentVariables = (): boolean => {
     { key: 'DEV_NETWORK', name: 'Dev Network', critical: false },
     
     // Company Wallet Configuration
+    // SECURITY: Secret key is NOT stored in client-side code
+    // All secret key operations must be performed on backend services
     { key: 'COMPANY_WALLET_ADDRESS', name: 'Company Wallet Address', critical: true },
-    { key: 'COMPANY_WALLET_SECRET_KEY', name: 'Company Wallet Secret Key', critical: true },
+    // COMPANY_WALLET_SECRET_KEY removed - must be handled by backend services only
     { key: 'COMPANY_MIN_SOL_RESERVE', name: 'Company Min SOL Reserve', critical: false },
     { key: 'COMPANY_GAS_FEE_ESTIMATE', name: 'Company Gas Fee Estimate', critical: false },
     
@@ -215,18 +217,21 @@ export const testSolanaConfiguration = (): boolean => {
 export const testCompanyWalletConfiguration = (): boolean => {
   console.log('🏦 Testing Company Wallet Configuration...');
   
+  // SECURITY: Secret key is NOT stored in client-side code
+  // All secret key operations must be performed on backend services
   const address = getEnvVar('COMPANY_WALLET_ADDRESS');
-  const secretKey = getEnvVar('COMPANY_WALLET_SECRET_KEY');
+  // COMPANY_WALLET_SECRET_KEY removed - must be handled by backend services only
   const minSolReserve = getEnvVar('COMPANY_MIN_SOL_RESERVE');
   const gasFeeEstimate = getEnvVar('COMPANY_GAS_FEE_ESTIMATE');
   
   console.log(`Wallet Address: ${address ? '✅ SET' : '❌ MISSING'}`);
-  console.log(`Secret Key: ${secretKey ? '✅ SET' : '❌ MISSING'}`);
+  // SECURITY: Secret key is not available in client-side code
   console.log(`Min SOL Reserve: ${minSolReserve ? '✅ SET' : '⚠️  Using default'}`);
   console.log(`Gas Fee Estimate: ${gasFeeEstimate ? '✅ SET' : '⚠️  Using default'}`);
   
-  if (address && secretKey) {
+  if (address) {
     console.log('✅ Company wallet configuration is ready!');
+    console.log('ℹ️  Note: Secret key operations must be performed on backend services');
     return true;
   } else {
     console.error('❌ Company wallet configuration is incomplete!');
