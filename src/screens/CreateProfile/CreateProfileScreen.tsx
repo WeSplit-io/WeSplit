@@ -24,7 +24,7 @@ import { AvatarUploadFallbackService } from '../../services/core/avatarUploadFal
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import * as ImagePicker from 'expo-image-picker';
 import { logger } from '../../services/analytics/loggingService';
-import { Container } from '../../components/shared';
+import { Container, Input, Button } from '../../components/shared';
 import Header from '../../components/shared/Header';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 
@@ -319,11 +319,14 @@ const CreateProfileScreen: React.FC = () => {
         // Sync onboarding and profile image quests after user is authenticated
         try {
           const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
-          await userActionSyncService.syncOnboardingCompletion(appUser.id, true);
+          // DISABLED: Legacy quest completion (complete_onboarding, profile_image)
+          // These quests have been replaced by the new season-based quest system
+          // Database flags are still updated via setup_account_pp quest
+          // await userActionSyncService.syncOnboardingCompletion(appUser.id, true);
           
-          if (finalAvatarUrl && finalAvatarUrl !== DEFAULT_AVATAR_URL) {
-            await userActionSyncService.syncProfileImage(appUser.id, finalAvatarUrl);
-          }
+          // if (finalAvatarUrl && finalAvatarUrl !== DEFAULT_AVATAR_URL) {
+          //   await userActionSyncService.syncProfileImage(appUser.id, finalAvatarUrl);
+          // }
         } catch (syncError) {
           logger.error('Failed to sync quests after profile creation', { userId: appUser.id, syncError }, 'CreateProfileScreen');
           // Don't fail profile creation if sync fails
@@ -438,22 +441,18 @@ const CreateProfileScreen: React.FC = () => {
               </TouchableOpacity>
               
               {/* Pseudo Input */}
-              <View style={styles.inputSection}>
-                <Text style={styles.inputLabel}>Pseudo *</Text>
-                <TextInput
-                  style={styles.input}
+              <Input
+                label="Pseudo *"
                   placeholder="Enter your pseudo"
-                  placeholderTextColor={colors.white50}
                   value={pseudo}
                   onChangeText={(text) => {
                     setPseudo(text);
                     setError(''); // Clear error when user types
                   }}
+                error={error || undefined}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                {error ? <Text style={styles.errorText}>{error}</Text> : null}
-              </View>
 
               {/* Referral Code Input (Optional) */}
               <View style={styles.inputSection}>
@@ -461,23 +460,20 @@ const CreateProfileScreen: React.FC = () => {
                   <Text style={styles.inputLabel}>Referral Code</Text>
                   <Text style={styles.optionalLabel}>(Optional)</Text>
                 </View>
-                <View style={styles.referralCodeContainer}>
-                  <PhosphorIcon name="Handshake" size={20} color={colors.white50} weight="regular" style={styles.referralCodeIcon} />
-                  <TextInput
-                    style={styles.referralCodeInput}
+                <Input
+                  label=""
                     placeholder="Enter referral code"
-                    placeholderTextColor={colors.white50}
                     value={referralCode}
                     onChangeText={(text) => {
                       // Auto-uppercase and remove spaces
                       const cleaned = text.toUpperCase().replace(/\s/g, '');
                       setReferralCode(cleaned);
                     }}
+                  leftIcon="Handshake"
                     autoCapitalize="characters"
                     autoCorrect={false}
                     maxLength={12}
                   />
-                </View>
                 <Text style={styles.referralCodeHint}>
                   Have a referral code? Enter it to earn bonus points for you and your friend!
                 </Text>
@@ -487,24 +483,14 @@ const CreateProfileScreen: React.FC = () => {
 
           {/* Next Button - Fixed at bottom */}
           <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.nextButton}
+            <Button
+              title="Next"
               onPress={handleNext}
+              variant="primary"
               disabled={!pseudo || isLoading}
-            >
-              <LinearGradient
-                colors={(!pseudo || isLoading) ? [colors.white10, colors.white10] : [colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientButton}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="white" size="small" />
-                ) : (
-                  <Text style={styles.nextButtonText}>Next</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+              loading={isLoading}
+              fullWidth={true}
+            />
           </View>
 
           {/* Help Link - Fixed at bottom */}

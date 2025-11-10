@@ -226,9 +226,8 @@ export class WalletRecoveryService {
                   privateKeyBuffer = Buffer.from(secretKey);
                 } else {
                   logger.warn('Invalid secret key format', { 
-                    userId, 
-                    secretKeyType: typeof secretKey,
-                    isArray: Array.isArray(secretKey)
+                    userId
+                    // SECURITY: Do not log secret key metadata (type, length, etc.)
                   }, 'WalletRecoveryService');
                   continue;
                 }
@@ -255,8 +254,8 @@ export class WalletRecoveryService {
                 logger.warn('Failed to parse AsyncStorage wallet', { 
                   error: error instanceof Error ? error.message : String(error),
                   userId,
-                  secretKeyType: typeof secretKey,
                   address
+                  // SECURITY: Do not log secret key metadata (type, length, etc.)
                 }, 'WalletRecoveryService');
               }
             } else {
@@ -2117,17 +2116,33 @@ export class WalletRecoveryService {
       
       if (storedWalletsData) {
         const storedWalletsArray = JSON.parse(storedWalletsData);
-        const validWallets = storedWalletsArray.filter((wallet: any) => {
-          const secretKey = wallet.secretKey || wallet.privateKey || wallet.secret;
-          return secretKey && secretKey !== '' && secretKey.length > 0;
+        // SECURITY: Remove secret keys from wallets before storing in AsyncStorage
+        // Secret keys should NEVER be stored in AsyncStorage
+        const sanitizedWallets = storedWalletsArray.map((wallet: any) => {
+          const { secretKey, privateKey, secret, ...sanitizedWallet } = wallet;
+          return sanitizedWallet; // Only keep non-sensitive metadata
+        });
+        
+        // Filter out wallets without addresses (invalid)
+        const validWallets = sanitizedWallets.filter((wallet: any) => {
+          return wallet.address && wallet.address !== '';
         });
         
         if (validWallets.length !== storedWalletsArray.length) {
-          logger.info('Cleaning up test wallets', { 
+          logger.info('Cleaning up test wallets and removing secret keys from AsyncStorage', { 
             userId,
             originalCount: storedWalletsArray.length,
             validCount: validWallets.length,
             removedCount: storedWalletsArray.length - validWallets.length
+          }, 'WalletRecoveryService');
+          
+          // SECURITY: Only store non-sensitive wallet metadata in AsyncStorage
+          await AsyncStorage.setItem('storedWallets', JSON.stringify(validWallets));
+        } else if (storedWalletsArray.some((w: any) => w.secretKey || w.privateKey || w.secret)) {
+          // If wallets have secret keys, sanitize them
+          logger.info('Removing secret keys from wallets in AsyncStorage', { 
+            userId,
+            walletCount: validWallets.length
           }, 'WalletRecoveryService');
           
           await AsyncStorage.setItem('storedWallets', JSON.stringify(validWallets));
@@ -2199,15 +2214,10 @@ export class WalletRecoveryService {
           parsedArrayLength: storedWalletsArray.length,
           firstWallet: storedWalletsArray[0] ? {
             keys: Object.keys(storedWalletsArray[0]),
-            hasSecretKey: !!storedWalletsArray[0].secretKey,
             hasAddress: !!storedWalletsArray[0].address,
-            hasPrivateKey: !!storedWalletsArray[0].privateKey,
-            secretKeyType: typeof storedWalletsArray[0].secretKey,
             addressValue: storedWalletsArray[0].address,
-            secretKeyLength: storedWalletsArray[0].secretKey ? 
-              (Array.isArray(storedWalletsArray[0].secretKey) ? 
-                storedWalletsArray[0].secretKey.length : 
-                storedWalletsArray[0].secretKey.length) : 0
+            // SECURITY: Do not log secret key metadata (hasSecretKey, secretKeyType, secretKeyLength)
+            // This information could be useful to attackers
           } : null
         }, 'WalletRecoveryService');
       } else {

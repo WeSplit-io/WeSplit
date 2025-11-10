@@ -331,13 +331,10 @@ const SeedPhraseVerifyScreen: React.FC = () => {
   if (error || originalSeedPhrase.length === 0) {
     return (
       <Container>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Icon name="arrow-left" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Verify Seed Phrase</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <Header
+          title="Verify Seed Phrase"
+          onBackPress={handleBack}
+        />
         <View style={styles.content}>
           <View style={styles.instructionsContainer}>
             <Text style={styles.instructionsTitle}>Seed Phrase Unavailable</Text>
@@ -353,13 +350,10 @@ const SeedPhraseVerifyScreen: React.FC = () => {
   return (
     <Container>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Icon name="arrow-left" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Verify Seed Phrase</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="Verify Seed Phrase"
+        onBackPress={handleBack}
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Instructions */}

@@ -4,8 +4,27 @@ import { spacing } from '../../../theme/spacing';
 import { typography } from '../../../theme/typography';
 
 export const styles = StyleSheet.create({
+  scrollContainer: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
+  },
+  scrollViewContent: {
+    paddingBottom: spacing.lg,
+  },
+  pageIndicatorContainer: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.white10,
+  },
+  pageIndicatorText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    opacity: 0.7,
   },
   header: {
     flexDirection: 'row',
@@ -394,5 +413,35 @@ export const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.fontSize.xs,
     fontWeight: '600',
+  },
+  loadMoreContainer: {
+    padding: spacing.lg,
+    alignItems: 'center',
+  },
+  loadMoreButton: {
+    minWidth: 120,
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.lg,
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.white10,
+    backgroundColor: colors.black, // Ensure it has a background
+    minHeight: 60, // Ensure minimum height for visibility
+  },
+  paginationButton: {
+    minWidth: 100,
+  },
+  pageInfo: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  pageText: {
+    color: colors.white,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
   },
 });

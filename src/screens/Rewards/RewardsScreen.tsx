@@ -18,7 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
 import NavBar from '../../components/shared/NavBar';
-import { Container, Header } from '../../components/shared';
+import { Container, Header, LoadingScreen, Button } from '../../components/shared';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { useApp } from '../../context/AppContext';
 import { pointsService } from '../../services/rewards/pointsService';
@@ -182,18 +182,10 @@ const RewardsScreen: React.FC = () => {
 
   if (loading && !refreshing) {
     return (
-      <Container>
-        <Header
-          title="Rewards"
-          showBackButton={false}
-          backgroundColor={colors.black}
-        />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.green} />
-          <Text style={styles.loadingText}>Loading rewards...</Text>
-        </View>
-        <NavBar currentRoute="Rewards" navigation={navigation} />
-      </Container>
+      <LoadingScreen
+        message="Loading rewards..."
+        showSpinner={true}
+      />
     );
   }
  
@@ -279,18 +271,30 @@ const RewardsScreen: React.FC = () => {
             <Text style={styles.featureCardTitle}>How to Earn Points</Text>
             <Text style={styles.featureCardSubtitle}>Do more, earn more.</Text>
           </TouchableOpacity>
-
-          {/* Christmas Calendar Card */}
-          <TouchableOpacity
-            style={styles.featureCard}
-            onPress={() => rewardNav.goToChristmasCalendar()}
-            activeOpacity={0.7}
-          >
-            <PhosphorIcon name="Calendar" size={32} color={colors.green} weight="fill" />
-            <Text style={styles.featureCardTitle}>Christmas Calendar</Text>
-            <Text style={styles.featureCardSubtitle}>Claim daily gifts and earn rewards.</Text>
-          </TouchableOpacity>
         </View>
+
+        {/* Christmas Calendar Button - Matches Referral Button Style */}
+        <TouchableOpacity
+          style={styles.inviteButton}
+          onPress={() => rewardNav.goToChristmasCalendar()}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={[colors.gradientStart, colors.gradientEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.inviteButtonGradient}
+          >
+            <PhosphorIcon name="Calendar" size={24} color={colors.black} weight="fill" />
+            <View style={styles.inviteButtonContent}>
+              <Text style={styles.inviteButtonTitle}>Christmas Calendar</Text>
+              <Text style={styles.inviteButtonSubtitle}>
+                Claim daily gifts and earn rewards.
+              </Text>
+            </View>
+            <PhosphorIcon name="ArrowRight" size={20} color={colors.black} weight="regular" />
+          </LinearGradient>
+        </TouchableOpacity>
 
         {/* Points History Section */}
         <View style={styles.historySection}>

@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, Image, Alert, Linking, Animat
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from './Icon';
-import { Input, PhosphorIcon } from './shared';
+import { Input, PhosphorIcon, Tabs, Tab, ModernLoader } from './shared';
 import { useApp } from '../context/AppContext';
 import { useContacts, useContactActions } from '../hooks';
 import { deepLinkHandler } from '../services/core';
@@ -253,30 +253,27 @@ const ContactsList: React.FC<ContactsListProps> = ({
 
   // Debounced search with proper cleanup - only depend on searchQuery and activeTab
   useEffect(() => {
-    if (__DEV__) {
-      logger.debug('Search effect triggered', { activeTab, searchQuery: searchQuery.trim() }, 'ContactsList');
-    }
+    const subscribeRef = subscribeRealtimeSearchRef.current;
+    const unsubscribeRef = unsubscribeRealtimeSearchRef.current;
+    const clearRef = clearRealtimeResultsRef.current;
+    const handleSearchRef = handleUserSearchRef.current;
     
     if (searchQuery.trim() && searchQuery.length >= 2) {
-      if (__DEV__) {
-        logger.debug('Setting up real-time search for', { searchQuery }, 'ContactsList');
-      }
-      
       // Subscribe to real-time search using ref
-      subscribeRealtimeSearchRef.current(searchQuery);
+      subscribeRef(searchQuery);
       
       // Also run traditional search as fallback using ref
-      handleUserSearchRef.current(searchQuery);
+      handleSearchRef(searchQuery);
     } else {
       setSearchResults([]);
-      clearRealtimeResultsRef.current();
-      unsubscribeRealtimeSearchRef.current();
+      clearRef();
+      unsubscribeRef();
     }
     
     // Cleanup function for all cases
     return () => {
-      unsubscribeRealtimeSearchRef.current();
-      clearRealtimeResultsRef.current();
+      unsubscribeRef();
+      clearRef();
     };
   }, [searchQuery, activeTab]); // Only depend on searchQuery and activeTab
 
@@ -284,10 +281,17 @@ const ContactsList: React.FC<ContactsListProps> = ({
   useEffect(() => {
     const addingRef = addingContactsRef.current;
     const togglingRef = togglingFavoritesRef.current;
+    const unsubscribeRef = unsubscribeRealtimeSearchRef.current;
+    const clearRef = clearRealtimeResultsRef.current;
     
     return () => {
-      unsubscribeRealtimeSearch();
-      clearRealtimeResults();
+      // Always cleanup realtime subscriptions on unmount
+      if (unsubscribeRef) {
+        unsubscribeRef();
+      }
+      if (clearRef) {
+        clearRef();
+      }
       // Clear any ongoing operations using refs captured in closure
       if (addingRef) {
         addingRef.clear();
@@ -296,7 +300,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
         togglingRef.clear();
       }
     };
-  }, [unsubscribeRealtimeSearch, clearRealtimeResults]);
+  }, []); // Empty deps - only run on mount/unmount
 
   // Contact loading is now handled by the useContacts hook
 
@@ -751,7 +755,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading contacts...</Text>
+        <ModernLoader size="large" text="Loading contacts..." />
       </View>
     );
   }
@@ -778,64 +782,18 @@ const ContactsList: React.FC<ContactsListProps> = ({
       {/* Affichage selon le mode */}
       {(hideToggleBar || mode === 'list') ? (
         <>
-          {/* Tabs All/Favorite/Search (design arrondi/fond) */}
+          {/* Tabs All/Favorite/Search */}
           {showTabs && (
-            <View style={styles.tabsContainer}>
-              <TouchableOpacity
-                style={styles.tab}
-                onPress={() => animateTabChange(() => onTabChange?.('All'))}
-                disabled={isAnimating}
-              >
-                {activeTab === 'All' ? (
-                  <LinearGradient
-                    colors={[colors.gradientStart, colors.gradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.tabGradient}
-                  >
-                    <Text style={styles.tabTextActive}>All</Text>
-                  </LinearGradient>
-                ) : (
-                  <Text style={styles.tabText}>All</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.tab}
-                onPress={() => animateTabChange(() => onTabChange?.('Favorite'))}
-                disabled={isAnimating}
-              >
-                {activeTab === 'Favorite' ? (
-                  <LinearGradient
-                    colors={[colors.gradientStart, colors.gradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.tabGradient}
-                  >
-                    <Text style={styles.tabTextActive}>Favorite</Text>
-                  </LinearGradient>
-                ) : (
-                  <Text style={styles.tabText}>Favorite</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.tab}
-                onPress={() => animateTabChange(() => onTabChange?.('Search'))}
-                disabled={isAnimating}
-              >
-                {activeTab === 'Search' ? (
-                  <LinearGradient
-                    colors={[colors.gradientStart, colors.gradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.tabGradient}
-                  >
-                    <Text style={styles.tabTextActive}>Search</Text>
-                  </LinearGradient>
-                ) : (
-                  <Text style={styles.tabText}>Search</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            <Tabs
+              tabs={[
+                { label: 'All', value: 'All' },
+                { label: 'Favorite', value: 'Favorite' },
+                { label: 'Search', value: 'Search' }
+              ]}
+              activeTab={activeTab}
+              onTabChange={(tab) => animateTabChange(() => onTabChange?.(tab as 'All' | 'Favorite' | 'Search'))}
+              enableAnimation={true}
+            />
           )}
           {/* Search Input */}
           {showSearch && (
@@ -902,7 +860,7 @@ const ContactsList: React.FC<ContactsListProps> = ({
               <>
                 {isSearching && (
                   <View style={styles.loadingContainer}>
-                    <Text style={styles.loadingText}>Searching users...</Text>
+                    <ModernLoader size="medium" text="Searching users..." />
                   </View>
                 )}
                 {!isSearching && searchResults.length > 0 && (

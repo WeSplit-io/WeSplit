@@ -11,12 +11,15 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  Modal,
-  ScrollView
+  ScrollView,
+  Image
 } from 'react-native';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
 import PhosphorIcon from '../shared/PhosphorIcon';
+import Modal from '../shared/Modal';
+import ModernLoader from '../shared/ModernLoader';
+import ErrorScreen from '../shared/ErrorScreen';
 import { christmasCalendarService } from '../../services/rewards/christmasCalendarService';
 import { getGiftForDay } from '../../services/rewards/christmasCalendarConfig';
 import {
@@ -230,36 +233,29 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
 
     const gift = isClaimed && dayData.gift_data ? dayData.gift_data : giftConfig.gift;
 
+    const handleCloseModal = () => {
+      setShowGiftModal(false);
+      setSelectedDay(null);
+    };
+
     return (
       <Modal
         visible={showGiftModal}
-        transparent
+        onClose={handleCloseModal}
         animationType="fade"
-        onRequestClose={() => {
-          setShowGiftModal(false);
-          setSelectedDay(null);
-        }}
+        transparent={true}
+        closeOnBackdrop={true}
+        title={selectedDay ? `Day ${selectedDay}` : 'Gift'}
+        showHandle={false}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.modalClose}
-              onPress={() => {
-                setShowGiftModal(false);
-                setSelectedDay(null);
-              }}
-            >
-              <PhosphorIcon name="X" size={24} color={colors.textLight} />
-            </TouchableOpacity>
-
-            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-              <View style={styles.giftHeader}>
-                <Text style={styles.giftDayText}>Day {selectedDay}</Text>
-                <Text style={styles.giftTitle}>{giftConfig.title}</Text>
-                {giftConfig.description && (
-                  <Text style={styles.giftDescription}>{giftConfig.description}</Text>
-                )}
-              </View>
+        <View style={styles.modalContent}>
+          <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+            <View style={styles.giftHeader}>
+              <Text style={styles.giftTitle}>{giftConfig.title}</Text>
+              {giftConfig.description && (
+                <Text style={styles.giftDescription}>{giftConfig.description}</Text>
+              )}
+            </View>
 
               <View style={styles.giftContent}>
                 {gift.type === 'points' && (
@@ -283,13 +279,33 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
 
                 {gift.type === 'asset' && (
                   <View style={styles.giftTypeContainer}>
-                    <PhosphorIcon name="Image" size={48} color={colors.brandGreen} weight="fill" />
+                    {(gift as AssetGift).assetUrl ? (
+                      <Image
+                        source={{ uri: (gift as AssetGift).assetUrl }}
+                        style={styles.assetPreview}
+                        resizeMode="cover"
+                      />
+                    ) : (gift as AssetGift).nftMetadata?.imageUrl ? (
+                      <Image
+                        source={{ uri: (gift as AssetGift).nftMetadata!.imageUrl! }}
+                        style={styles.assetPreview}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <PhosphorIcon name="Image" size={48} color={colors.brandGreen} weight="fill" />
+                    )}
                     <Text style={styles.giftTypeTitle}>{(gift as AssetGift).name}</Text>
                     <Text style={styles.giftTypeDescription}>
                       {(gift as AssetGift).assetType === 'profile_image' 
                         ? 'Profile Image' 
                         : 'Wallet Background'}
                     </Text>
+                    {(gift as AssetGift).nftMetadata && (
+                      <View style={styles.nftBadge}>
+                        <PhosphorIcon name="Cube" size={14} color={colors.brandGreen} weight="fill" />
+                        <Text style={styles.nftBadgeText}>NFT</Text>
+                      </View>
+                    )}
                     {(gift as AssetGift).description && (
                       <Text style={styles.giftTypeSubDescription}>
                         {(gift as AssetGift).description}
@@ -330,7 +346,6 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
                 </View>
               )}
             </ScrollView>
-          </View>
         </View>
       </Modal>
     );
@@ -339,18 +354,18 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.brandGreen} />
-        <Text style={styles.loadingText}>Loading calendar...</Text>
+        <ModernLoader size="large" text="Loading calendar..." />
       </View>
     );
   }
 
   if (!status) {
     return (
-      <View style={styles.errorContainer}>
-        <PhosphorIcon name="Warning" size={48} color={colors.textLightSecondary} />
-        <Text style={styles.errorText}>Failed to load calendar</Text>
-      </View>
+      <ErrorScreen
+        title="Failed to Load Calendar"
+        message="Failed to load calendar"
+        showIcon={true}
+      />
     );
   }
 
@@ -677,6 +692,29 @@ const styles = StyleSheet.create({
   giftIcon: {
     fontSize: 48,
     marginTop: spacing.md,
+  },
+  assetPreview: {
+    width: 120,
+    height: 120,
+    borderRadius: 12,
+    marginBottom: spacing.md,
+    backgroundColor: colors.white10,
+  },
+  nftBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs / 2,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: colors.green10,
+    borderRadius: 8,
+    alignSelf: 'center',
+  },
+  nftBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.brandGreen,
   },
   claimedBadge: {
     flexDirection: 'row',

@@ -207,161 +207,37 @@ async function executeFairSplitTransaction(
     transaction.recentBlockhash = blockhash;
     
     // Use company wallet as fee payer
+    // SECURITY: Company wallet secret key is not available in client-side code
+    // All secret key operations must be performed on backend services
     const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
     const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
-    const companyWalletSecretKey = COMPANY_WALLET_CONFIG.secretKey;
     
-    if (!companyWalletAddress || !companyWalletSecretKey) {
+    if (!companyWalletAddress) {
       return {
         success: false,
-        error: 'Company wallet not configured for fee payment'
+        error: 'Company wallet address is not configured'
       };
     }
     
     const companyPublicKey = new PublicKey(companyWalletAddress);
     transaction.feePayer = companyPublicKey;
     
-    // Create company keypair for signing
-    const companyKeypairResult = KeypairUtils.createKeypairFromSecretKey(companyWalletSecretKey);
-    if (!companyKeypairResult.success || !companyKeypairResult.keypair) {
-      return {
-        success: false,
-        error: 'Failed to create company wallet keypair for fee payment'
-      };
-    }
-    const companyKeypair = companyKeypairResult.keypair;
+    // SECURITY: Company wallet secret key operations must be performed on backend services
+    // Client-side code cannot sign transactions with company wallet
+    return {
+      success: false,
+      error: 'Company wallet secret key operations must be performed on backend services. ' +
+             'Client-side code cannot sign transactions with company wallet. ' +
+             'Please use backend API endpoint for transaction signing.'
+    };
 
-    // Sign with both keypairs (user for USDC transfer, company for fees)
-    transaction.sign(keypair, companyKeypair);
-
-    const signature = await connection.sendRawTransaction(transaction.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'processed', // Use 'processed' for faster confirmation
-      maxRetries: 2 // Reduced retries for faster processing
-    });
-
-    logger.info('Fair split transaction sent successfully', {
-      signature,
-            fromAddress,
-            toAddress,
-            amount,
-      currency,
-      transactionType
-    }, 'SplitWalletPayments');
-    
-    // For fair splits, use fast confirmation strategy
-    let confirmed = false;
-    let attempts = 0;
-    const maxAttempts = 5; // Reduced attempts for faster processing
-    const waitTime = 500; // Reduced wait time to 500ms
-
-    while (!confirmed && attempts < maxAttempts) {
-      try {
-        const status = await connection.getSignatureStatus(signature, { 
-          searchTransactionHistory: true 
-        });
-        
-        if (status.value?.confirmationStatus === 'confirmed' || 
-            status.value?.confirmationStatus === 'finalized') {
-          confirmed = true;
-          logger.info('Fair split transaction confirmed', {
-            signature,
-            confirmationStatus: status.value.confirmationStatus,
-            attempts
-          }, 'SplitWalletPayments');
-        } else if (status.value?.err) {
-          logger.error('Fair split transaction failed', {
-                signature,
-            error: status.value.err
-              }, 'SplitWalletPayments');
-            return {
-              success: false,
-                  signature,
-            error: `Transaction failed: ${JSON.stringify(status.value.err)}`
-          };
-        }
-      } catch (error) {
-        logger.warn('Error checking fair split transaction status', {
-                signature,
-          attempt: attempts + 1,
-          error
-              }, 'SplitWalletPayments');
-            }
-      
-      if (!confirmed) {
-        await new Promise(resolve => setTimeout(resolve, waitTime)); // Wait 500ms
-        attempts++;
-      }
-    }
-
-    if (!confirmed) {
-      logger.warn('Fair split transaction confirmation timed out - using likely succeeded mode', {
-              signature,
-        attempts,
-        transactionType
-            }, 'SplitWalletPayments');
-            
-      // For funding transactions, use "likely succeeded" mode when confirmation times out
-      // This prevents blocking the funding process due to network delays
-      if (transactionType === 'funding') {
-        logger.info('Fair split funding using likely succeeded mode due to timeout', {
-          signature,
-          expectedAmount: amount,
-          transactionType
-        }, 'SplitWalletPayments');
-        
-        return {
-          success: true,
-          signature
-        };
-      } else {
-        // For withdrawal transactions, be more strict about verification
-        try {
-          const transactionConfirmed = await verifyTransactionOnBlockchain(signature);
-          
-          if (transactionConfirmed) {
-            logger.info('Fair split withdrawal verified by blockchain confirmation', {
-              signature,
-              expectedAmount: amount
-            }, 'SplitWalletPayments');
-            return {
-              success: true,
-              signature
-            };
-          } else {
-            logger.error('Fair split withdrawal verification failed - transaction not confirmed on blockchain', {
-              signature,
-              expectedAmount: amount
-            }, 'SplitWalletPayments');
-            return {
-              success: false,
-              signature,
-              error: 'Transaction confirmation timed out and blockchain verification failed'
-            };
-          }
-        } catch (balanceError) {
-          logger.error('Failed to verify fair split withdrawal', {
-            signature,
-            error: balanceError instanceof Error ? balanceError.message : String(balanceError)
-          }, 'SplitWalletPayments');
-          return {
-            success: false,
-            signature,
-            error: 'Transaction confirmation timed out and verification failed'
-          };
-        }
-      }
-    }
-
-            return {
-              success: true,
-            signature
-          };
-
+    // Code below is unreachable - secret key operations must be performed on backend
+    // This function now returns early with an error message
+    // The original transaction signing code has been removed for security
   } catch (error) {
     logger.error('Fair split transaction failed', error, 'SplitWalletPayments');
-            return {
-              success: false,
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
@@ -601,41 +477,38 @@ async function executeFastTransaction(
     transaction.recentBlockhash = blockhash;
     
     // Use company wallet as fee payer
+    // SECURITY: Company wallet secret key is not available in client-side code
+    // All secret key operations must be performed on backend services
     const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
     const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
-    const companyWalletSecretKey = COMPANY_WALLET_CONFIG.secretKey;
     
-    if (!companyWalletAddress || !companyWalletSecretKey) {
+    if (!companyWalletAddress) {
       return {
         success: false,
-        error: 'Company wallet not configured for fee payment'
+        error: 'Company wallet address is not configured'
       };
     }
     
     const companyPublicKey = new PublicKey(companyWalletAddress);
     transaction.feePayer = companyPublicKey;
     
-    // Create company keypair for signing
-    const companyKeypairResult = KeypairUtils.createKeypairFromSecretKey(companyWalletSecretKey);
-    if (!companyKeypairResult.success || !companyKeypairResult.keypair) {
-      return {
-        success: false,
-        error: 'Failed to create company wallet keypair for fee payment'
-      };
-    }
-    const companyKeypair = companyKeypairResult.keypair;
+    // SECURITY: Company wallet secret key operations must be performed on backend services
+    // Client-side code cannot sign transactions with company wallet
+    return {
+      success: false,
+      error: 'Company wallet secret key operations must be performed on backend services. ' +
+             'Client-side code cannot sign transactions with company wallet. ' +
+             'Please use backend API endpoint for transaction signing.'
+    };
 
-    // Sign with both keypairs (user for USDC transfer, company for fees)
-    transaction.sign(keypair, companyKeypair);
+    // Code below is unreachable - kept for reference
+    // const signature = await connection.sendRawTransaction(transaction.serialize(), {
+    //   skipPreflight: false,
+    //   preflightCommitment: 'processed', // Use 'processed' for fastest confirmation
+    //   maxRetries: 1 // Minimal retries for speed
+    // });
 
-
-    const signature = await connection.sendRawTransaction(transaction.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'processed', // Use 'processed' for fastest confirmation
-      maxRetries: 1 // Minimal retries for speed
-    });
-
-    logger.info('Fast transaction sent successfully', {
+    // logger.info('Fast transaction sent successfully', {
       signature,
       fromAddress,
       toAddress,
@@ -1066,42 +939,40 @@ async function executeDegenSplitTransaction(
     transaction.recentBlockhash = blockhash;
     
     // Use company wallet as fee payer
+    // SECURITY: Company wallet secret key is not available in client-side code
+    // All secret key operations must be performed on backend services
     const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
     const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
-    const companyWalletSecretKey = COMPANY_WALLET_CONFIG.secretKey;
     
-    if (!companyWalletAddress || !companyWalletSecretKey) {
-            return {
+    if (!companyWalletAddress) {
+      return {
         success: false,
-        error: 'Company wallet not configured for fee payment'
+        error: 'Company wallet address is not configured'
       };
     }
     
     const companyPublicKey = new PublicKey(companyWalletAddress);
     transaction.feePayer = companyPublicKey;
     
-    // Create company keypair for signing
-    const companyKeypairResult = KeypairUtils.createKeypairFromSecretKey(companyWalletSecretKey);
-    if (!companyKeypairResult.success || !companyKeypairResult.keypair) {
-        return {
-        success: false,
-        error: 'Failed to create company wallet keypair for fee payment'
-      };
-    }
-    const companyKeypair = companyKeypairResult.keypair;
+    // SECURITY: Company wallet secret key operations must be performed on backend services
+    // Client-side code cannot sign transactions with company wallet
+    return {
+      success: false,
+      error: 'Company wallet secret key operations must be performed on backend services. ' +
+             'Client-side code cannot sign transactions with company wallet. ' +
+             'Please use backend API endpoint for transaction signing.'
+    };
 
-    // Sign with both keypairs (user for USDC transfer, company for fees)
-    transaction.sign(keypair, companyKeypair);
-
-    let signature;
-    try {
-      signature = await connection.sendRawTransaction(transaction.serialize(), {
-        skipPreflight: false,
-        preflightCommitment: 'processed', // Use 'processed' for faster confirmation
-        maxRetries: 2 // Reduced retries for faster processing
-      });
-    } catch (sendError) {
-      logger.error('Failed to send degen split transaction', {
+    // Code below is unreachable - kept for reference
+    // let signature;
+    // try {
+    //   signature = await connection.sendRawTransaction(transaction.serialize(), {
+    //     skipPreflight: false,
+    //     preflightCommitment: 'processed', // Use 'processed' for faster confirmation
+    //     maxRetries: 2 // Reduced retries for faster processing
+    //   });
+    // } catch (sendError) {
+    //   logger.error('Failed to send degen split transaction', {
         fromAddress,
         toAddress,
         amount,

@@ -14,7 +14,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
-import { Container, Header } from '../../components/shared';
+import { Container, Header, LoadingScreen } from '../../components/shared';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { useApp } from '../../context/AppContext';
 import { questService, QUEST_DEFINITIONS } from '../../services/rewards/questService';
@@ -225,10 +225,10 @@ const HowToEarnPointsScreen: React.FC = () => {
           onBackPress={() => rewardNav.goBack()}
           backgroundColor={colors.black}
         />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.green} />
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
+        <LoadingScreen
+          message="Loading..."
+          showSpinner={true}
+        />
       </Container>
     );
   }

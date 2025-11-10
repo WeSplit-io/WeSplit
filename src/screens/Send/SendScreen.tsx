@@ -13,9 +13,10 @@ import { colors } from '../../theme';
 import { styles } from './styles';
 import { logger } from '../../services/analytics/loggingService';
 import type { LinkedWallet } from '../../services/blockchain/wallet/LinkedWalletService';
-import { Container, Button } from '../../components/shared';
+import { Container, Button, Tabs } from '../../components/shared';
 import Header from '../../components/shared/Header';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
+import type { Tab } from '../../components/shared/Tabs';
 
 const SendScreen: React.FC<any> = ({ navigation, route }) => {
   const { 
@@ -298,48 +299,15 @@ const SendScreen: React.FC<any> = ({ navigation, route }) => {
       />
 
       {/* Tab Selector */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'friends' && styles.activeTab]}
-          onPress={() => setActiveTab('friends')}
-        >
-          <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
-            Friends
-          </Text>
-          {activeTab === 'friends' ? (
-            <View style={styles.tabIndicatorContainer}>
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{ height: 2, width: '100%' }}
-              />
-            </View>
-          ) : (
-            <View style={styles.tabIndicatorPlaceholder} />
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'external' && styles.activeTab]}
-          onPress={() => setActiveTab('external')}
-        >
-          <Text style={[styles.tabText, activeTab === 'external' && styles.activeTabText]}>
-            External Wallet
-          </Text>
-          {activeTab === 'external' ? (
-            <View style={styles.tabIndicatorContainer}>
-              <LinearGradient
-                colors={[colors.gradientStart, colors.gradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{ height: 2, width: '100%' }}
-              />
-            </View>
-          ) : (
-            <View style={styles.tabIndicatorPlaceholder} />
-          )}
-        </TouchableOpacity>
-      </View>
+      <Tabs
+        tabs={[
+          { label: 'Friends', value: 'friends' },
+          { label: 'External Wallet', value: 'external' }
+        ]}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as 'friends' | 'external')}
+        enableAnimation={true}
+      />
 
       {/* Content */}
       <View style={styles.content}>

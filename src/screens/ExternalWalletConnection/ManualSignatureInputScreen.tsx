@@ -7,8 +7,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   Alert,
   StyleSheet,
   ScrollView,
@@ -18,6 +16,7 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { colors, typography, spacing } from '../../theme';
 import { logger } from '../../services/analytics/loggingService';
+import { Input, Button, Container, Header } from '../../components/shared';
 
 interface RouteParams {
   challenge: {
@@ -93,7 +92,7 @@ export const ManualSignatureInputScreen: React.FC = () => {
         );
       }
     } catch (error) {
-      logger.error('Manual signature input failed', error, 'ManualSignatureInput');
+      logger.error('Manual signature input failed', { error: error instanceof Error ? error.message : String(error) }, 'ManualSignatureInput');
       Alert.alert(
         'Error',
         'Failed to verify signature. Please check your input and try again.'
@@ -108,17 +107,21 @@ export const ManualSignatureInputScreen: React.FC = () => {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Enter Signature</Text>
-          <Text style={styles.subtitle}>
-            Please enter the signature and public key you received from {providerDisplayName}
-          </Text>
-        </View>
+    <Container>
+      <Header
+        title="Enter Signature"
+        onBackPress={handleCancel}
+      />
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          <View style={{ marginBottom: spacing.lg }}>
+            <Text style={styles.subtitle}>
+              Please enter the signature and public key you received from {providerDisplayName}
+            </Text>
+          </View>
 
         <View style={styles.challengeSection}>
           <Text style={styles.sectionTitle}>Message You Signed:</Text>
@@ -127,35 +130,27 @@ export const ManualSignatureInputScreen: React.FC = () => {
           </View>
         </View>
 
-        <View style={styles.inputSection}>
-          <Text style={styles.inputLabel}>Public Key:</Text>
-          <TextInput
-            style={styles.textInput}
-            value={publicKey}
-            onChangeText={setPublicKey}
-            placeholder="Enter the public key from your wallet"
-            placeholderTextColor={colors.textSecondary}
-            multiline
-            numberOfLines={3}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+        <Input
+          label="Public Key"
+          placeholder="Enter the public key from your wallet"
+          value={publicKey}
+          onChangeText={setPublicKey}
+          multiline
+          numberOfLines={3}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
 
-        <View style={styles.inputSection}>
-          <Text style={styles.inputLabel}>Signature:</Text>
-          <TextInput
-            style={styles.textInput}
-            value={signature}
-            onChangeText={setSignature}
-            placeholder="Enter the signature from your wallet"
-            placeholderTextColor={colors.textSecondary}
-            multiline
-            numberOfLines={4}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+        <Input
+          label="Signature"
+          placeholder="Enter the signature from your wallet"
+          value={signature}
+          onChangeText={setSignature}
+          multiline
+          numberOfLines={4}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
 
         <View style={styles.instructionsSection}>
           <Text style={styles.instructionsTitle}>Instructions:</Text>
@@ -168,26 +163,26 @@ export const ManualSignatureInputScreen: React.FC = () => {
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.cancelButton]}
+          <Button
+            title="Cancel"
             onPress={handleCancel}
+            variant="secondary"
             disabled={isSubmitting}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
+            style={{ flex: 1, marginRight: spacing.sm }}
+          />
 
-          <TouchableOpacity
-            style={[styles.button, styles.submitButton, isSubmitting && styles.disabledButton]}
+          <Button
+            title={isSubmitting ? 'Verifying...' : 'Verify & Link Wallet'}
             onPress={handleSubmit}
+            variant="primary"
             disabled={isSubmitting}
-          >
-            <Text style={styles.submitButtonText}>
-              {isSubmitting ? 'Verifying...' : 'Verify & Link Wallet'}
-            </Text>
-          </TouchableOpacity>
+            loading={isSubmitting}
+            style={{ flex: 1, marginLeft: spacing.sm }}
+          />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </Container>
   );
 };
 

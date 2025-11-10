@@ -30,6 +30,7 @@ import {
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { initializeFirebaseAuth } from './firebasePersistence';
 import { logger } from '../../services/analytics/loggingService';
@@ -155,7 +156,10 @@ export const firebaseAuth = {
       await sendSignInLinkToEmail(auth, email, settings);
       
       // Save the email for later use
-      await AsyncStorage.setItem('emailForSignIn', email);
+      // SECURITY: Use SecureStore instead of AsyncStorage for email storage
+      await SecureStore.setItemAsync('emailForSignIn', email, {
+        requireAuthentication: false, // Email is less sensitive than private keys
+      });
       
       return { success: true };
     } catch (error) {
@@ -284,9 +288,10 @@ export const firebaseAuth = {
   },
 
   // Get stored email for sign-in
+  // SECURITY: Uses SecureStore instead of AsyncStorage for email storage
   async getStoredEmail(): Promise<string | null> {
     try {
-      return await AsyncStorage.getItem('emailForSignIn');
+      return await SecureStore.getItemAsync('emailForSignIn');
     } catch (error) {
       console.error('Error getting stored email:', error);
       return null;
@@ -294,9 +299,10 @@ export const firebaseAuth = {
   },
 
   // Clear stored email
+  // SECURITY: Uses SecureStore instead of AsyncStorage for email storage
   async clearStoredEmail() {
     try {
-      await AsyncStorage.removeItem('emailForSignIn');
+      await SecureStore.deleteItemAsync('emailForSignIn');
     } catch (error) {
       console.error('Error clearing stored email:', error);
     }

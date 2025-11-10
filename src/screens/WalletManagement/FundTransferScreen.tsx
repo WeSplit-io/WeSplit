@@ -13,7 +13,7 @@ import { useApp } from '../../context/AppContext';
 import { walletService } from '../../services/blockchain/wallet';
 import { colors, spacing, typography } from '../../theme';
 import { logger } from '../../services/analytics/loggingService';
-import { Container } from '../../components/shared';
+import { Container, LoadingScreen } from '../../components/shared';
 import Header from '../../components/shared/Header';
 
 interface FundTransferScreenProps {
@@ -126,10 +126,10 @@ const FundTransferScreen: React.FC<FundTransferScreenProps> = ({ navigation, rou
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.green} />
-        <Text style={styles.loadingText}>Loading linked wallets...</Text>
-      </View>
+      <LoadingScreen
+        message="Loading linked wallets..."
+        showSpinner={true}
+      />
     );
   }
 

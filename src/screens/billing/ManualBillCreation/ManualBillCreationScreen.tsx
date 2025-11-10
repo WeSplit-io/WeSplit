@@ -12,7 +12,6 @@ import {
   ScrollView,
   Alert,
   StatusBar,
-  Modal,
   ActivityIndicator,
   Image,
 } from 'react-native';  
@@ -27,7 +26,7 @@ import { convertFiatToUSDC } from '../../../services/core';
 import { parseAmount } from '../../../utils/ui/format';
 import { styles } from './styles';
 import { logger } from '../../../services/analytics/loggingService';
-import { Container, Modal as CustomModal, Header, Button, Input, PhosphorIcon } from '../../../components/shared';
+import { Container, Modal, Header, Button, Input, PhosphorIcon } from '../../../components/shared';
 
 // Category options with images
 const CATEGORIES = [
@@ -529,7 +528,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
       </View>
 
       {/* Date Picker Modal */}
-      <CustomModal
+      <Modal
         visible={showDatePicker}
         onClose={handleDatePickerClose}
         showHandle={true}
@@ -555,10 +554,10 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
           disabled={!isDateModified}
           fullWidth={true}
         />
-      </CustomModal>
+      </Modal>
 
       {/* Currency Picker Modal */}
-      <CustomModal
+      <Modal
         visible={showCurrencyPicker}
         onClose={() => setShowCurrencyPicker(false)}
         showHandle={true}
@@ -581,7 +580,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
           </TouchableOpacity>
         ))}
       
-      </CustomModal>
+      </Modal>
     </Container>
   );
 };

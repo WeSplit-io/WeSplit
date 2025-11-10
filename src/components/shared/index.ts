@@ -12,6 +12,7 @@ export { default as Header } from './Header';
 export { default as Input } from './Input';
 export { default as PhosphorIcon } from './PhosphorIcon';
 export { default as AppleSlider } from './AppleSlider';
+export { default as ModernLoader } from './ModernLoader';
 export type { PhosphorIconName, PhosphorIconProps } from './PhosphorIcon';
 export { default as Tabs } from './Tabs';
 export type { Tab } from './Tabs';

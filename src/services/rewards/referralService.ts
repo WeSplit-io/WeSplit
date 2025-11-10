@@ -159,33 +159,17 @@ class ReferralService {
         return;
       }
 
-      const season = seasonService.getCurrentSeason();
-      const reward = getSeasonReward('invite_friends_create_account', season, false);
-      const pointsAwarded = calculateRewardPoints(reward, 0);
-
-      // Award points
-      const result = await pointsService.awardSeasonPoints(
-        referrerId,
-        pointsAwarded,
-        'referral_reward',
-        `ref_${referredUserId}`,
-        `Friend created account reward (Season ${season})`,
-        season,
-        'invite_friends_create_account'
-      );
-
-      if (result.success) {
-        // Mark quest as completed
-        await questService.completeQuest(referrerId, 'invite_friends_create_account');
-        
+      // completeQuest will handle awarding points (no need to call awardSeasonPoints separately)
+      const questResult = await questService.completeQuest(referrerId, 'invite_friends_create_account');
+      
+      if (questResult.success) {
         // Update referral record
         await this.updateReferralReward(referrerId, referredUserId, 'accountCreated', true);
         
         logger.info('Invite friend reward awarded', {
           referrerId,
           referredUserId,
-          pointsAwarded,
-          season
+          pointsAwarded: questResult.pointsAwarded
         }, 'ReferralService');
       }
     } catch (error) {

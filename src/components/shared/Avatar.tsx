@@ -4,7 +4,7 @@
  * Handles both local file URLs and Firebase Storage URLs
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -67,38 +67,49 @@ const Avatar: React.FC<AvatarProps> = ({
     return (words[0]?.charAt(0) || '') + (words[words.length - 1]?.charAt(0) || '') || '?';
   }, []);
 
+  // Track if component is mounted to prevent state updates on unmounted components
+  const isMountedRef = useRef(true);
+
   // Load avatar URL
   const loadAvatarUrl = useCallback(async () => {
     if (!userId) { return; }
+
+    if (!isMountedRef.current) return; // Don't proceed if unmounted
 
     setIsLoading(true);
     setHasError(false);
 
     try {
-      logger.debug('Loading avatar for user', { userId }, 'Avatar');
-      
       // Use AvatarService to get the avatar URL
       const avatarService = AvatarService.getInstance();
       const url = await avatarService.getAvatarUrl(userId);
       
+      // Check if component is still mounted before setting state
+      if (!isMountedRef.current) return;
+      
       if (url) {
         setImageUrl(url);
-        logger.debug('Avatar URL loaded successfully', { userId, url }, 'Avatar');
       } else {
         setImageUrl(null);
-        logger.debug('No avatar found for user', { userId }, 'Avatar');
       }
     } catch (error) {
-      logger.error('Failed to load avatar URL', { userId, error }, 'Avatar');
+      // Check if component is still mounted before setting state
+      if (!isMountedRef.current) return;
+      
       setHasError(true);
       setImageUrl(null);
     } finally {
-      setIsLoading(false);
+      // Check if component is still mounted before setting state
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [userId]);
 
   // Initialize component
   useEffect(() => {
+    isMountedRef.current = true;
+    
     // Set initials
     if (userName) {
       setInitials(generateInitials(userName));
@@ -117,6 +128,11 @@ const Avatar: React.FC<AvatarProps> = ({
     } else {
       setIsLoading(false);
     }
+    
+    // Cleanup on unmount
+    return () => {
+      isMountedRef.current = false;
+    };
     // generateInitials is stable (useCallback with empty deps), loadAvatarUrl is stable (useCallback with userId deps)
   }, [userId, userName, avatarUrl, loadAvatarUrl, generateInitials]);
 

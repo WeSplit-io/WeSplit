@@ -56,11 +56,15 @@ interface ExtendedWalletInfo extends WalletInfo {
   walletType?: 'app-generated' | 'external';
 }
 
+// SECURITY: StoredWallet does NOT include secretKey
+// Secret keys must NEVER be stored in AsyncStorage
+// Only store non-sensitive wallet metadata
 interface StoredWallet {
   id: string;
   name: string;
   address: string;
-  secretKey: string;
+  // secretKey removed - must NEVER be stored in AsyncStorage
+  // Secret keys should only be stored in SecureStore
   isAppGenerated: boolean;
   createdAt: string;
   lastUsed: string;
@@ -216,11 +220,12 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         }
         
         // Add test external wallet for design testing
+        // SECURITY: StoredWallet does NOT include secretKey
         const testExternalWallet: StoredWallet = {
           id: 'test_external_wallet_001',
           name: 'Test Phantom Wallet',
           address: '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM',
-          secretKey: '', // External wallets don't expose secret keys
+          // secretKey removed - must NEVER be stored in AsyncStorage
           isAppGenerated: false,
           createdAt: new Date().toISOString(),
           lastUsed: new Date().toISOString()
@@ -428,11 +433,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       }
       
       // Create a new stored wallet entry
+      // SECURITY: Do NOT store secretKey in AsyncStorage
+      // Secret keys must only be stored in SecureStore
       const newWallet: StoredWallet = {
         id: `wallet_${Date.now()}`,
         name: 'Generated Wallet',
         address: wallet.address,
-        secretKey: wallet.secretKey || '',
+        // secretKey removed - must NEVER be stored in AsyncStorage
         isAppGenerated: true,
         createdAt: new Date().toISOString(),
         lastUsed: new Date().toISOString()
@@ -557,11 +564,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       }
       
       // Create new stored wallet entry
+      // SECURITY: Do NOT store secretKey in AsyncStorage
+      // Secret keys must only be stored in SecureStore
       const newWallet: StoredWallet = {
         id: `wallet_${Date.now()}`,
         name: name || 'Imported Wallet',
         address: walletInfo.address,
-        secretKey: secretKey,
+        // secretKey removed - must NEVER be stored in AsyncStorage
         isAppGenerated: false,
         createdAt: new Date().toISOString(),
         lastUsed: new Date().toISOString()

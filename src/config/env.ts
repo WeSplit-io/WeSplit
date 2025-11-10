@@ -56,9 +56,11 @@ export const MOONPAY_CONFIG = {
 };
 
 // Company wallet configuration
+// SECURITY: Secret key is NOT stored in client-side code
+// All secret key operations must be performed on backend services
 export const COMPANY_WALLET_CONFIG = {
   address: process.env.EXPO_PUBLIC_COMPANY_WALLET_ADDRESS,
-  secretKey: process.env.EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY,
+  // secretKey removed - must be handled by backend services only
   minSolReserve: parseFloat(process.env.EXPO_PUBLIC_COMPANY_MIN_SOL_RESERVE || '0.1'),
   gasFeeEstimate: parseFloat(process.env.EXPO_PUBLIC_COMPANY_GAS_FEE_ESTIMATE || '0.00025'),
   feePercentage: parseFloat(process.env.EXPO_PUBLIC_COMPANY_FEE_PERCENTAGE || '0.025'),
@@ -67,10 +69,12 @@ export const COMPANY_WALLET_CONFIG = {
 };
 
 // OAuth configuration
+// SECURITY: Client secrets must NOT be in client-side code
+// OAuth client secrets should only be used on backend services
 export const OAUTH_CONFIG = {
   google: {
     clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-    clientSecret: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_SECRET,
+    // clientSecret removed - must be handled by backend services only
     androidClientId: process.env.ANDROID_GOOGLE_CLIENT_ID,
     iosClientId: process.env.IOS_GOOGLE_CLIENT_ID,
   },
@@ -82,13 +86,27 @@ export const OAUTH_CONFIG = {
   },
   twitter: {
     clientId: process.env.EXPO_PUBLIC_TWITTER_CLIENT_ID,
-    clientSecret: process.env.EXPO_PUBLIC_TWITTER_CLIENT_SECRET,
+    // clientSecret removed - must be handled by backend services only
   },
 };
 
 // JWT configuration
+// SECURITY: JWT secret must be configured - no default value allowed
+// This should only be used on backend services, not in client-side code
+const getJwtSecret = (): string => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (__DEV__) {
+      console.warn('⚠️ JWT_SECRET is not configured. This should only be used in development.');
+      return 'dev-secret-only-do-not-use-in-production';
+    }
+    throw new Error('JWT_SECRET is required and must be configured. This is a security requirement.');
+  }
+  return secret;
+};
+
 export const JWT_CONFIG = {
-  secret: process.env.JWT_SECRET || 'default-secret',
+  secret: getJwtSecret(),
   expiresIn: process.env.JWT_EXPIRES_IN || '24h',
   refreshExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
 };

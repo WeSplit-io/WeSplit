@@ -18,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 // LinearGradient not needed for this screen
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
-import { Container, Header } from '../../components/shared';
+import { Container, Header, LoadingScreen } from '../../components/shared';
 import Avatar from '../../components/shared/Avatar';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { useApp } from '../../context/AppContext';
@@ -310,10 +310,10 @@ const LeaderboardDetailScreen: React.FC = () => {
           onBackPress={() => rewardNav.goBack()}
           backgroundColor={colors.black}
         />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.green} />
-          <Text style={styles.loadingText}>Loading leaderboard...</Text>
-        </View>
+        <LoadingScreen
+          message="Loading leaderboard..."
+          showSpinner={true}
+        />
       </Container>
     );
   }

@@ -12,55 +12,59 @@ import { seasonService } from './seasonService';
 import { getSeasonReward, calculateRewardPoints } from './seasonRewardsConfig';
 
 // Quest definitions
+// NOTE: Legacy quests (profile_image, first_transaction, complete_onboarding, add_first_contact, create_first_split, refer_friend)
+// have been disabled as they are replaced by the new season-based quest system.
+// Only season-based quests are active.
 export const QUEST_DEFINITIONS: Record<string, Quest> = {
-  profile_image: {
-    id: 'profile_image',
-    type: 'profile_image',
-    title: 'Update Your Profile Picture',
-    description: 'Add a profile picture to personalize your account',
-    points: 50,
-    completed: false
-  },
-  first_transaction: {
-    id: 'first_transaction',
-    type: 'first_transaction',
-    title: 'Make Your First Transaction',
-    description: 'Send your first wallet-to-wallet transfer',
-    points: 100,
-    completed: false
-  },
-  complete_onboarding: {
-    id: 'complete_onboarding',
-    type: 'complete_onboarding',
-    title: 'Complete Onboarding',
-    description: 'Finish setting up your account',
-    points: 25,
-    completed: false
-  },
-  add_first_contact: {
-    id: 'add_first_contact',
-    type: 'add_first_contact',
-    title: 'Add Your First Contact',
-    description: 'Add a friend to your contacts list',
-    points: 30,
-    completed: false
-  },
-  create_first_split: {
-    id: 'create_first_split',
-    type: 'create_first_split',
-    title: 'Create Your First Split',
-    description: 'Create a bill split with friends',
-    points: 75,
-    completed: false
-  },
-  refer_friend: {
-    id: 'refer_friend',
-    type: 'refer_friend',
-    title: 'Refer a Friend',
-    description: 'Invite a friend to join WeSplit',
-    points: 200,
-    completed: false
-  },
+  // DISABLED: Legacy quests - replaced by season-based system
+  // profile_image: {
+  //   id: 'profile_image',
+  //   type: 'profile_image',
+  //   title: 'Update Your Profile Picture',
+  //   description: 'Add a profile picture to personalize your account',
+  //   points: 50,
+  //   completed: false
+  // },
+  // first_transaction: {
+  //   id: 'first_transaction',
+  //   type: 'first_transaction',
+  //   title: 'Make Your First Transaction',
+  //   description: 'Send your first wallet-to-wallet transfer',
+  //   points: 100,
+  //   completed: false
+  // },
+  // complete_onboarding: {
+  //   id: 'complete_onboarding',
+  //   type: 'complete_onboarding',
+  //   title: 'Complete Onboarding',
+  //   description: 'Finish setting up your account',
+  //   points: 25,
+  //   completed: false
+  // },
+  // add_first_contact: {
+  //   id: 'add_first_contact',
+  //   type: 'add_first_contact',
+  //   title: 'Add Your First Contact',
+  //   description: 'Add a friend to your contacts list',
+  //   points: 30,
+  //   completed: false
+  // },
+  // create_first_split: {
+  //   id: 'create_first_split',
+  //   type: 'create_first_split',
+  //   title: 'Create Your First Split',
+  //   description: 'Create a bill split with friends',
+  //   points: 75,
+  //   completed: false
+  // },
+  // refer_friend: {
+  //   id: 'refer_friend',
+  //   type: 'refer_friend',
+  //   title: 'Refer a Friend',
+  //   description: 'Invite a friend to join WeSplit',
+  //   points: 200,
+  //   completed: false
+  // },
   // New season-based quests
   export_seed_phrase: {
     id: 'export_seed_phrase',
@@ -141,6 +145,30 @@ class QuestService {
     questType: string
   ): Promise<QuestCompletionResult> {
     try {
+      // DISABLED: Old legacy quests are no longer supported
+      const disabledQuests = [
+        'profile_image',
+        'first_transaction',
+        'complete_onboarding',
+        'add_first_contact',
+        'create_first_split',
+        'refer_friend'
+      ];
+      
+      if (disabledQuests.includes(questType)) {
+        logger.warn('Attempted to complete disabled legacy quest', {
+          userId,
+          questType
+        }, 'QuestService');
+        return {
+          success: false,
+          questId: questType,
+          pointsAwarded: 0,
+          totalPoints: await pointsService.getUserPoints(userId),
+          error: `Quest type '${questType}' has been disabled and replaced by the season-based system`
+        };
+      }
+
       // Check if quest definition exists
       const questDef = QUEST_DEFINITIONS[questType];
       if (!questDef) {

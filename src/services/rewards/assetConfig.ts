@@ -15,11 +15,21 @@
  * - rarity: Rarity level (e.g., 'common', 'rare', 'epic', 'legendary')
  */
 
+export interface NFTMetadata {
+  contractAddress: string;
+  tokenId: string;
+  chain: 'ethereum' | 'polygon' | 'arbitrum' | 'optimism' | 'base' | string;
+  imageUrl?: string; // NFT image preview URL
+  metadataUrl?: string; // IPFS or other metadata URL
+}
+
 export interface AssetInfo {
   assetId: string;
   name: string;
   description: string;
-  url: string;
+  // Support both image URLs and NFTs
+  url?: string; // For image URLs (HTTP/HTTPS)
+  nftMetadata?: NFTMetadata; // For NFTs
   assetType: 'profile_image' | 'wallet_background';
   category?: string;
   rarity?: 'common' | 'rare' | 'epic' | 'legendary';

@@ -348,6 +348,19 @@ class ChristmasCalendarService {
         } else if (giftConfig.gift.type === 'asset') {
           const assetGift = giftConfig.gift as AssetGift;
           
+          // Store asset metadata in subcollection for easy retrieval
+          const assetRef = doc(db, 'users', userId, 'assets', assetGift.assetId);
+          transaction.set(assetRef, {
+            assetId: assetGift.assetId,
+            assetType: assetGift.assetType,
+            name: assetGift.name,
+            description: assetGift.description || '',
+            assetUrl: assetGift.assetUrl || null,
+            nftMetadata: assetGift.nftMetadata || null,
+            claimed_at: now,
+            claimed_from: `christmas_calendar_${this.YEAR}_day_${day}`
+          }, { merge: true });
+          
           if (assetGift.assetType === 'profile_image') {
             const profileAssets = userData.profile_assets || [];
             if (!profileAssets.includes(assetGift.assetId)) {
@@ -378,10 +391,13 @@ class ChristmasCalendarService {
       });
 
       // Record points transaction if points were awarded (outside transaction)
+      // NOTE: We only record the transaction here, NOT award points again
+      // Points were already added in the Firestore transaction above (line 323-330)
       if (result.success && giftConfig.gift.type === 'points') {
         const pointsGift = giftConfig.gift as PointsGift;
         try {
-          await pointsService.awardPoints(
+          // Only record the transaction, don't award points again (they're already added)
+          await pointsService.recordPointsTransaction(
             userId,
             pointsGift.amount,
             'quest_completion',

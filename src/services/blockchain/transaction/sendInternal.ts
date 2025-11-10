@@ -251,18 +251,9 @@ class InternalTransferService {
                 }, 'InternalTransferService');
               }
 
-              // Check and complete first transaction quest
-              const { questService } = await import('../../rewards/questService');
-              const isFirstTransaction = await questService.isQuestCompleted(params.userId, 'first_transaction');
-              if (!isFirstTransaction) {
-                const questResult = await questService.completeQuest(params.userId, 'first_transaction');
-                if (questResult.success) {
-                  logger.info('✅ First transaction quest completed', {
-                    userId: params.userId,
-                    pointsAwarded: questResult.pointsAwarded
-                  }, 'InternalTransferService');
-                }
-              }
+              // DISABLED: Old quest (first_transaction) - replaced by season-based system
+              // Transaction points are now awarded via awardTransactionPoints() which uses season-based rewards
+              // No need to complete old quest
             }
           } catch (pointsError) {
             logger.error('❌ Error awarding points for internal transfer', pointsError, 'InternalTransferService');
@@ -546,104 +537,23 @@ class InternalTransferService {
       // Prepare signers array
       const signers: Keypair[] = [];
       
-      // Company wallet always pays SOL fees - we need company wallet keypair
+      // Company wallet always pays SOL fees
+      // SECURITY: Secret key operations must be performed on backend services
+      // Client-side code should not have access to company wallet secret key
       logger.info('Company wallet configuration check', {
         companyWalletRequired: true,
-        hasCompanySecretKey: !!COMPANY_WALLET_CONFIG.secretKey,
         companyWalletAddress: COMPANY_WALLET_CONFIG.address,
         feePayerAddress: feePayerPublicKey.toBase58()
       }, 'InternalTransferService');
 
-      if (COMPANY_WALLET_CONFIG.secretKey) {
-        try {
-          logger.info('Processing company wallet secret key', {
-            secretKeyLength: COMPANY_WALLET_CONFIG.secretKey.length,
-            secretKeyPreview: COMPANY_WALLET_CONFIG.secretKey.substring(0, 10) + '...',
-            secretKeyFormat: 'base64'
-          }, 'InternalTransferService');
-
-          // Try different formats for the secret key
-          let companySecretKeyBuffer: Buffer;
-          
-          // Check if it looks like a comma-separated array first
-          if (COMPANY_WALLET_CONFIG.secretKey.includes(',') || COMPANY_WALLET_CONFIG.secretKey.includes('[')) {
-            try {
-              // Remove square brackets if present and split by comma
-              const cleanKey = COMPANY_WALLET_CONFIG.secretKey.replace(/[\[\]]/g, '');
-              const keyArray = cleanKey.split(',').map(num => parseInt(num.trim(), 10));
-              
-              // Validate that all elements are valid numbers
-              if (keyArray.some(num => isNaN(num))) {
-                throw new Error('Invalid comma-separated array format - contains non-numeric values');
-              }
-              
-              companySecretKeyBuffer = Buffer.from(keyArray);
-              logger.info('Successfully decoded secret key as comma-separated array', {
-                bufferLength: companySecretKeyBuffer.length,
-                arrayLength: keyArray.length
-              }, 'InternalTransferService');
-            } catch (arrayError) {
-              throw new Error(`Failed to parse comma-separated array: ${arrayError instanceof Error ? arrayError.message : String(arrayError)}`);
-            }
-          } else {
-            try {
-              // Try base64 first for other formats
-              companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'base64');
-              
-              // Check if the length is reasonable for Solana (64 or 65 bytes)
-              if (companySecretKeyBuffer.length === 64 || companySecretKeyBuffer.length === 65) {
-                logger.info('Successfully decoded secret key as base64', {
-                  bufferLength: companySecretKeyBuffer.length
-                }, 'InternalTransferService');
-              } else {
-                throw new Error(`Base64 decoded to unexpected length: ${companySecretKeyBuffer.length}`);
-              }
-            } catch (base64Error) {
-              try {
-                // Try hex format
-                companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'hex');
-                logger.info('Successfully decoded secret key as hex', {
-                  bufferLength: companySecretKeyBuffer.length
-                }, 'InternalTransferService');
-              } catch (hexError) {
-                throw new Error('Unable to decode secret key in any supported format');
-              }
-            }
-          }
-
-          // Validate the secret key length (should be 64 or 65 bytes for Solana)
-          if (companySecretKeyBuffer.length === 65) {
-            // Remove the last byte (public key) to get the 64-byte secret key
-            companySecretKeyBuffer = companySecretKeyBuffer.slice(0, 64);
-            logger.info('Trimmed 65-byte keypair to 64-byte secret key', {
-              originalLength: 65,
-              trimmedLength: companySecretKeyBuffer.length
-            }, 'InternalTransferService');
-          } else if (companySecretKeyBuffer.length !== 64) {
-            throw new Error(`Invalid secret key length: ${companySecretKeyBuffer.length} bytes (expected 64 or 65)`);
-          }
-
-          const companyKeypair = Keypair.fromSecretKey(companySecretKeyBuffer);
-          
-        logger.info('Using company wallet for fees', {
-          companyWalletAddress: COMPANY_WALLET_CONFIG.address,
-          userWalletAddress: userKeypair.publicKey.toBase58(),
-          companyKeypairAddress: companyKeypair.publicKey.toBase58()
-        }, 'InternalTransferService');
-
-        // Add both keypairs to signers array
-        signers.push(userKeypair, companyKeypair);
-        logger.info('Added both keypairs to signers array', {
-          signersCount: signers.length,
-          signers: signers.map(signer => signer.publicKey.toBase58())
-        }, 'InternalTransferService');
-        } catch (error) {
-          logger.error('Failed to load company wallet keypair', { error }, 'InternalTransferService');
-          throw new Error('Company wallet keypair not available for signing');
-        }
-      } else {
-        throw new Error('Company wallet secret key is required for SOL fee coverage');
-      }
+      // SECURITY: Company wallet secret key is not available in client-side code
+      // All secret key operations must be performed on backend services
+      // This is a security requirement - secret keys should never be in client bundles
+      throw new Error(
+        'Company wallet secret key operations must be performed on backend services. ' +
+        'Client-side code cannot sign transactions with company wallet. ' +
+        'Please use backend API endpoint for transaction signing.'
+      );
 
       // Debug transaction before serialization
       logger.info('Transaction ready for signing', {
@@ -946,9 +856,8 @@ class InternalTransferService {
         } catch (jsonError) {
           console.error('❌ Failed to create keypair from secret key:', {
             base64Error: (base64Error as Error).message,
-            jsonError: (jsonError as Error).message,
-            secretKeyLength: userWallet.secretKey?.length,
-            secretKeyPreview: userWallet.secretKey?.substring(0, 20) + '...'
+            jsonError: (jsonError as Error).message
+            // SECURITY: Do not log secret key metadata (length, previews, etc.)
           });
           return {
             success: false,
@@ -1140,48 +1049,19 @@ class InternalTransferService {
       // Prepare signers array
       const signers: Keypair[] = [fromKeypair]; // User always signs for token transfers
       
-      // Company wallet always pays SOL fees - we need company wallet keypair
-      if (COMPANY_WALLET_CONFIG.secretKey) {
-        try {
-          // Try different formats for the company secret key
-          let companySecretKeyBuffer: Buffer;
-          
-          // Check if it looks like a comma-separated array first
-          if (COMPANY_WALLET_CONFIG.secretKey.includes(',') || COMPANY_WALLET_CONFIG.secretKey.includes('[')) {
-            try {
-              // Remove square brackets if present and split by comma
-              const cleanKey = COMPANY_WALLET_CONFIG.secretKey.replace(/[\[\]]/g, '');
-              const keyArray = cleanKey.split(',').map(num => parseInt(num.trim(), 10));
-              
-              // Validate that all elements are valid numbers
-              if (keyArray.some(num => isNaN(num))) {
-                throw new Error('Invalid comma-separated array format - contains non-numeric values');
-              }
-              
-              companySecretKeyBuffer = Buffer.from(keyArray);
-            } catch (arrayError) {
-              throw new Error(`Failed to parse comma-separated array: ${arrayError instanceof Error ? arrayError.message : String(arrayError)}`);
-            }
-          } else {
-            try {
-              // Try base64 first for other formats
-              companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'base64');
-            } catch (base64Error) {
-              throw new Error(`Failed to decode base64 secret key: ${base64Error instanceof Error ? base64Error.message : String(base64Error)}`);
-            }
-          }
-          
-          const companyKeypair = Keypair.fromSecretKey(companySecretKeyBuffer);
-          signers.push(companyKeypair);
-          logger.info('Company wallet keypair added to signers', null, 'sendInternal');
-        } catch (error) {
-          console.error('❌ Failed to create company wallet keypair:', error);
-          return {
-            success: false,
-            error: 'Failed to load company wallet for fee payment'
-          };
-        }
-      }
+      // SECURITY: Company wallet secret key is not available in client-side code
+      // All secret key operations must be performed on backend services
+      // This is a security requirement - secret keys should never be in client bundles
+      logger.error('Company wallet secret key operations must be performed on backend services', {
+        companyWalletAddress: COMPANY_WALLET_CONFIG.address
+      }, 'InternalTransferService');
+      
+      return {
+        success: false,
+        error: 'Company wallet secret key operations must be performed on backend services. ' +
+               'Client-side code cannot sign transactions with company wallet. ' +
+               'Please use backend API endpoint for transaction signing.'
+      };
 
       // Send transaction with retry logic for blockhash expiration
       logger.info('Sending transaction', null, 'sendInternal');

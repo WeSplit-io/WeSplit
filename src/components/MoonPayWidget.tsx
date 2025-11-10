@@ -6,8 +6,7 @@ import { useWallet } from '../context/WalletContext';
 import { firebaseMoonPayService } from '../services/integrations/external';
 import { colors } from '../theme/colors';
 import { logger } from '../services/core';
-import CustomModal from './shared/Modal';
-import { Input, Button } from './shared';
+import { Input, Button, Modal } from './shared';
 
 interface MoonPayWidgetProps {
   isVisible: boolean;
@@ -156,7 +155,7 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
   };
 
   return (
-    <CustomModal
+      <Modal
       visible={isVisible}
       onClose={handleClose}
       title="Deposit Crypto"
@@ -199,7 +198,7 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
           By proceeding, you agree to MoonPay&apos;s terms of service and privacy policy.
         </Text>
       </View>
-    </CustomModal>
+      </Modal>
   );
 };
 

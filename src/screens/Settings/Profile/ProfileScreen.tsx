@@ -8,7 +8,7 @@ import { useWallet } from '../../../context/WalletContext';
 import { walletService, walletExportService } from '../../../services/blockchain/wallet';
 import { styles } from './styles';
 import { DEFAULT_AVATAR_URL } from '../../../config/constants/constants';
-import UserAvatar from '../../../components/UserAvatar';
+import Avatar from '../../../components/shared/Avatar';
 import { logger } from '../../../services/analytics/loggingService';
 import { Container } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
@@ -31,9 +31,9 @@ const SafeImage = ({ source, style, fallbackSource }: any) => {
 // Avatar component wrapper for backward compatibility
 const AvatarComponent = ({ avatar, displayName, style }: { avatar?: string, displayName: string, style: any }) => {
   return (
-    <UserAvatar
+    <Avatar
       avatarUrl={avatar}
-      displayName={displayName}
+      userName={displayName}
       style={style}
     />
   );
@@ -230,6 +230,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             )}
             {currentUser?.active_profile_asset && (
               <ProfileAssetDisplay
+                userId={currentUser.id}
                 profileAssets={currentUser.profile_assets}
                 activeProfileAsset={currentUser.active_profile_asset}
                 showProfileAsset={true}

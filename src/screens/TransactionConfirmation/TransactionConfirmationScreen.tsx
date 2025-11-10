@@ -8,14 +8,14 @@ import {
   TextInput,
 } from 'react-native';
 import Icon from '../../components/Icon';
-import UserAvatar from '../../components/UserAvatar';
+import Avatar from '../../components/shared/Avatar';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 // formatCryptoAmount exists in cryptoUtils - import from there
 import { formatCryptoAmount } from '../../utils/crypto/wallet/cryptoUtils';
 import styles from './styles';
 import { logger } from '../../services/analytics/loggingService';
-import { Container } from '../../components/shared';
+import { Container, ModernLoader } from '../../components/shared';
 import Header from '../../components/shared/Header';
 
 interface TransactionParams {
@@ -104,8 +104,8 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
       <View style={styles.content}>
         {/* Recipient Info */}
         <View style={styles.recipientCard}>
-          <UserAvatar
-            displayName={params.recipient.name}
+          <Avatar
+            userName={params.recipient.name}
             size={50}
             style={styles.recipientAvatar}
           />
@@ -184,8 +184,7 @@ const TransactionConfirmationScreen: React.FC<any> = ({ navigation, route }) => 
 
   const renderProcessingStep = () => (
     <View style={styles.statusContainer}>
-      <ActivityIndicator size="large" color="#A5EA15" />
-      <Text style={styles.statusTitle}>Processing Transaction</Text>
+      <ModernLoader size="large" text="Processing Transaction" />
       <Text style={styles.statusSubtitle}>
         Sending {formatCryptoAmount(parseFloat(customAmount), params.currency)} to {params.recipient.name}
       </Text>

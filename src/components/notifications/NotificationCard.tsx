@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
+import { Button } from '../shared';
 import { 
   CheckCircle, 
   User, 

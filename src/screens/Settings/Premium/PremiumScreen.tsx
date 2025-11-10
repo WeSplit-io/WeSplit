@@ -6,7 +6,7 @@ import { useWallet } from '../../../context/WalletContext';
 import { subscriptionService, SubscriptionPlan, UserSubscription, PaymentMethod, SubscriptionService } from '../../../services/core';
 import { consolidatedTransactionService } from '../../../services/blockchain/transaction';
 import styles from './styles';
-import { Container } from '../../../components/shared';
+import { Container, LoadingScreen } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
 
 interface PremiumScreenProps {
@@ -112,7 +112,11 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
             onPress: async () => {
               try {
                 // Use company wallet address for premium payments
-                const companyWalletAddress = process.env.EXPO_PUBLIC_COMPANY_WALLET_ADDRESS || 'HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH';
+                const companyWalletAddress = process.env.EXPO_PUBLIC_COMPANY_WALLET_ADDRESS;
+                
+                if (!companyWalletAddress) {
+                  throw new Error('Company wallet address is not configured. Please contact support.');
+                }
                 
                 // Send payment transaction to company wallet
                 const transactionResult = await sendTransaction({
@@ -217,10 +221,10 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
           onBackPress={() => navigation.goBack()}
           showBackButton={true}
         />
-        <View style={[styles.content, { justifyContent: 'center', alignItems: 'center' }]}>
-          <ActivityIndicator size="large" color="#A5EA15" />
-          <Text style={{ color: '#FFF', marginTop: 16 }}>Loading premium features...</Text>
-        </View>
+        <LoadingScreen
+          message="Loading premium features..."
+          showSpinner={true}
+        />
       </Container>
     );
   }

@@ -23,7 +23,7 @@ import { consolidatedBillAnalysisService } from '../../../services/billing';
 import { useApp } from '../../../context/AppContext';
 import { SplitStorageService } from '../../../services/splits/splitStorageService';
 import { notificationService } from '../../../services/notifications';
-import { Container } from '../../../components/shared';
+import { Container, LoadingScreen } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
 import { logger } from '../../../services/analytics/loggingService';
 
@@ -742,28 +742,17 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
   };
 
   if (isProcessing) {
+    const processingMessage = isAIProcessing 
+      ? '🤖 AI is analyzing your receipt...' 
+      : currentProcessedBillData 
+        ? '✅ Creating your split with wallet...' 
+        : 'Analyzing your image...';
+    
     return (
-      <Container>
-        <StatusBar barStyle="light-content" backgroundColor={colors.black} />
-        
-        <View style={styles.processingContainer}>
-          <ActivityIndicator size="large" color={colors.green} />
-          <Text style={styles.processingSubtitle}>
-            {isAIProcessing ? '🤖 AI is analyzing your receipt...' : 
-             currentProcessedBillData ? '✅ Creating your split with wallet...' : 'Analyzing your image...'}
-          </Text>
-          {processingMethod && (
-            <Text style={styles.processingMethod}>
-              {processingMethod === 'ai' ? '✅ AI analysis complete' : '📝 Using sample data'}
-            </Text>
-          )}
-          {currentProcessedBillData && !isAIProcessing && (
-            <Text style={styles.processingMethod}>
-              🚀 Auto-creating split and redirecting...
-            </Text>
-          )}
-        </View>
-      </Container>
+      <LoadingScreen
+        message={processingMessage}
+        showSpinner={true}
+      />
     );
   }
 

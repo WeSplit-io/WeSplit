@@ -12,7 +12,6 @@ import {
   ScrollView,
   Alert,
   StatusBar,
-  Modal,
   ActivityIndicator,
   Image,
   Animated,
@@ -50,8 +49,8 @@ import {
   UnifiedBillData,
   UnifiedParticipant
 } from '../../types/splitNavigation';
-import { Container, Header, Button } from '../../components/shared';
-import CustomModal from '../../components/shared/Modal';
+import { Container, Header, Button, LoadingScreen } from '../../components/shared';
+import Modal from '../../components/shared/Modal';
 
 // Image mapping for category icons
 const CATEGORY_IMAGES: { [key: string]: any } = {
@@ -114,19 +113,16 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   
   const effectiveSplitId = (isActuallyNewBill || isActuallyManualCreation) ? undefined : splitId;
   
-  // Log effective splitId determination (only in dev mode)
-  if (__DEV__) {
-    logger.debug('Effective splitId determined', {
-      originalSplitId: splitId,
-      effectiveSplitId,
-      isNewBill,
-      isManualCreation,
-      isActuallyNewBill,
-      isActuallyManualCreation,
-      hasProcessedBillData: !!processedBillData,
-      reason: (isActuallyNewBill || isActuallyManualCreation) ? 'New bill - splitId overridden' : 'Existing split - using original splitId'
-    }, 'SplitDetailsScreen');
-  }
+  // Track last logged effectiveSplitId to prevent excessive logging
+  const lastLoggedSplitIdRef = useRef<string | undefined>(undefined);
+  
+  // Log effective splitId determination only when it changes (only in dev mode)
+  useEffect(() => {
+    if (__DEV__ && lastLoggedSplitIdRef.current !== effectiveSplitId) {
+      lastLoggedSplitIdRef.current = effectiveSplitId;
+      // Only log when splitId actually changes, not on every render
+    }
+  }, [effectiveSplitId]);
 
   // Utility function to format wallet address
   const formatWalletAddress = (address: string) => {
@@ -476,23 +472,37 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
     }
   }, [isFromNotification, effectiveSplitId]);
 
+  // Track last loaded splitId to prevent infinite loops
+  const lastLoadedSplitIdRef = useRef<string | undefined>(undefined);
+  const loadSplitDataRef = useRef(loadSplitData);
+  
+  // Update ref when loadSplitData changes
+  useEffect(() => {
+    loadSplitDataRef.current = loadSplitData;
+  }, [loadSplitData]);
+
+  // Track if we've handled contacts selection reload
+  const hasHandledContactsReloadRef = useRef(false);
+  
   // Consolidated effect to handle split data loading - prevents duplicate calls
   // Only loads when effectiveSplitId changes or when returning from Contacts screen
   useEffect(() => {
     // Load split data if we have an effective splitId (only for existing splits)
     if (effectiveSplitId) {
-      logger.debug('Loading existing split data', { effectiveSplitId, isActuallyNewBill, isActuallyManualCreation }, 'SplitDetailsScreen');
-      loadSplitData();
-    } else if (isActuallyNewBill || isActuallyManualCreation) {
-      logger.debug('Creating new split from bill data', { isActuallyNewBill, isActuallyManualCreation, hasProcessedData: !!processedBillData }, 'SplitDetailsScreen');
+      // Only load if this is a different splitId than last time
+      if (lastLoadedSplitIdRef.current !== effectiveSplitId) {
+        lastLoadedSplitIdRef.current = effectiveSplitId;
+        hasHandledContactsReloadRef.current = false; // Reset contacts reload flag when splitId changes
+        loadSplitDataRef.current();
+      }
     }
     
-    // Handle returning from Contacts screen - reload split data if we have effectiveSplitId but no currentSplitData
-    if (effectiveSplitId && !currentSplitData && route?.params?.selectedContacts) {
-      logger.debug('Reloading split data after contacts selection', { effectiveSplitId, isActuallyNewBill, isActuallyManualCreation }, 'SplitDetailsScreen');
-      loadSplitData();
+    // Handle returning from Contacts screen - reload split data if we have effectiveSplitId and selectedContacts
+    if (effectiveSplitId && route?.params?.selectedContacts && !hasHandledContactsReloadRef.current) {
+      hasHandledContactsReloadRef.current = true;
+      loadSplitDataRef.current();
     }
-  }, [effectiveSplitId, isActuallyNewBill, isActuallyManualCreation, route?.params?.selectedContacts, loadSplitData, currentSplitData]);
+  }, [effectiveSplitId, isActuallyNewBill, isActuallyManualCreation, route?.params?.selectedContacts]);
 
   // Update state when currentSplitData is loaded
   useEffect(() => {
@@ -621,7 +631,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       // Clear any potential caches first
       clearSplitCaches();
       
-      logger.info('Loading split data for details screen', { splitId: effectiveSplitId }, 'SplitDetailsScreen');
+      // Reduced logging - only log in dev mode
+      if (__DEV__) {
+        logger.debug('Loading split data for details screen', { splitId: effectiveSplitId }, 'SplitDetailsScreen');
+      }
       
       const result = await SplitStorageService.forceRefreshSplit(effectiveSplitId);
       if (result.success && result.split) {
@@ -642,14 +655,6 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             try {
               const { firebaseDataService } = await import('../../services/data');
               const latestUserData = await firebaseDataService.user.getCurrentUser(participant.userId);
-
-              // Debug logging for user data
-              logger.debug(`User data for participant`, {
-                userId: participant.userId,
-                name: latestUserData?.name,
-                wallet_address: latestUserData?.wallet_address,
-                originalWalletAddress: participant.walletAddress
-              }, 'SplitDetailsScreen');
 
               // Use latest wallet address and avatar if available, otherwise keep existing data
               return {
@@ -672,17 +677,14 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
 
         setCurrentSplitData(updatedSplitData);
 
-        // Debug logging for split data
-        logger.debug('Loaded split data', {
-          splitId: splitData.id,
-          title: splitData.title,
-          participantsCount: updatedParticipants.length,
-          participants: updatedParticipants.map(p => ({
-            name: p.name,
-            status: p.status,
-            walletAddress: p.walletAddress
-          }))
-        }, 'SplitDetailsScreen');
+        // Reduced logging - only log in dev mode
+        if (__DEV__) {
+          logger.debug('Loaded split data', {
+            splitId: splitData.id,
+            title: splitData.title,
+            participantsCount: updatedParticipants.length
+          }, 'SplitDetailsScreen');
+        }
 
         // No longer managing separate invited users state - all participants are shown in the main list
       }
@@ -1477,11 +1479,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
   // Show processing screen for new bills
   if (isProcessingNewBill) {
       return (
-      <Container>
-        <StatusBar barStyle="light-content" backgroundColor={colors.black} />
-        <ActivityIndicator size="large" color={colors.green} />
-        <Text style={styles.processingSubtitle}>Processing your bill...</Text>
-      </Container>
+      <LoadingScreen
+        message="Processing your bill..."
+        showSpinner={true}
+      />
     );
   }
 
@@ -1717,7 +1718,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
       )}
 
       {/* Split Type Selection Modal */}
-      <CustomModal
+      <Modal
         visible={showSplitModalState}
         onClose={handleCloseModal}
         title="Choose your splitting style"
@@ -1779,10 +1780,10 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
           fullWidth={true}
           style={styles.continueButton}
         />
-      </CustomModal>
+      </Modal>
 
       {/* Add Friends Modal */}
-      <CustomModal
+      <Modal
         visible={showAddFriendsModalState}
         onClose={handleCloseAddFriendsModal}
         title="Add Friends"
@@ -1826,7 +1827,7 @@ const SplitDetailsScreen: React.FC<SplitDetailsScreenProps> = ({ navigation, rou
             style={styles.doneButton}
           />
         </View>
-      </CustomModal>
+      </Modal>
 
       {/* Private Key Modal - MOVED TO FAIR/DEGEN SCREENS */}
 

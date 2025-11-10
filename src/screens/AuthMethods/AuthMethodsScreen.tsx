@@ -13,7 +13,7 @@ import {
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { styles } from './styles';
 import { colors } from '../../theme';
-import { Container, Header, Button, Input } from '../../components/shared';
+import { Container, Header, Button, Input, LoadingScreen } from '../../components/shared';
 import { useApp } from '../../context/AppContext';
 import { firebaseAuth, firestoreService, auth } from '../../config/firebase/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -732,10 +732,10 @@ const AuthMethodsScreen: React.FC = () => {
       <Container>
         <View style={styles.contentContainer}>
           <Header variant="logoOnly" />
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.green} />
-            <Text style={styles.loadingText}>Checking authentication...</Text>
-          </View>
+          <LoadingScreen
+            message="Checking authentication..."
+            showSpinner={true}
+          />
         </View>
       </Container>
     );

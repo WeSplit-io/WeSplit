@@ -71,14 +71,25 @@ export interface BadgeGift {
   badgeId: string;
   title: string;
   description: string;
-  icon?: string; // URL or icon identifier
+  icon?: string; // Emoji or icon identifier
+  iconUrl?: string; // Optional image URL for badge icon
+}
+
+export interface NFTMetadata {
+  contractAddress: string;
+  tokenId: string;
+  chain: 'ethereum' | 'polygon' | 'arbitrum' | 'optimism' | 'base' | string;
+  imageUrl?: string; // NFT image preview URL
+  metadataUrl?: string; // IPFS or other metadata URL
 }
 
 export interface AssetGift {
   type: 'asset';
   assetId: string;
   assetType: 'profile_image' | 'wallet_background';
-  assetUrl: string;
+  // Support both image URLs and NFTs
+  assetUrl?: string; // For image URLs (HTTP/HTTPS)
+  nftMetadata?: NFTMetadata; // For NFTs
   name: string;
   description?: string;
 }

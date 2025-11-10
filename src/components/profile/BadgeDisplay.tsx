@@ -52,9 +52,15 @@ const BadgeDisplay: React.FC<BadgeDisplayProps> = ({
             activeOpacity={0.7}
           >
             <View style={styles.badgeContent}>
-              {badgeInfo.icon && (
+              {badgeInfo.iconUrl ? (
+                <Image
+                  source={{ uri: badgeInfo.iconUrl }}
+                  style={styles.badgeIconImage}
+                  resizeMode="cover"
+                />
+              ) : badgeInfo.icon ? (
                 <Text style={styles.badgeIcon}>{badgeInfo.icon}</Text>
-              )}
+              ) : null}
               <Text style={[styles.badgeTitle, isActive && styles.badgeTitleActive]}>
                 {badgeInfo.title || badgeId}
               </Text>
@@ -97,6 +103,12 @@ const styles = StyleSheet.create({
   },
   badgeIcon: {
     fontSize: 16,
+  },
+  badgeIconImage: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    marginRight: spacing.xs / 2,
   },
   badgeTitle: {
     fontSize: typography.fontSize.sm,

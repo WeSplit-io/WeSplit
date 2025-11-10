@@ -798,33 +798,21 @@ export class SolanaAppKitService {
         signers.push(this.keypair);
       }
       
-      // Add company wallet keypair for fee payment
+      // SECURITY: Company wallet secret key is not available in client-side code
+      // All secret key operations must be performed on backend services
+      // This is a security requirement - secret keys should never be in client bundles
       const { COMPANY_WALLET_CONFIG } = await import('../../../config/constants/feeConfig');
-      if (COMPANY_WALLET_CONFIG.secretKey) {
-        try {
-          let companySecretKeyBuffer: Buffer;
-          
-          // Handle different secret key formats
-          if (COMPANY_WALLET_CONFIG.secretKey.includes(',') || COMPANY_WALLET_CONFIG.secretKey.includes('[')) {
-            const cleanKey = COMPANY_WALLET_CONFIG.secretKey.replace(/[\[\]]/g, '');
-            const keyArray = cleanKey.split(',').map(num => parseInt(num.trim(), 10));
-            companySecretKeyBuffer = Buffer.from(keyArray);
-          } else {
-            companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'base64');
-          }
-          
-          // Validate and trim if needed
-          if (companySecretKeyBuffer.length === 65) {
-            companySecretKeyBuffer = companySecretKeyBuffer.slice(0, 64);
-          }
-          
-          const companyKeypair = Keypair.fromSecretKey(companySecretKeyBuffer);
-          signers.push(companyKeypair);
-        } catch (error) {
-          console.error('Failed to load company wallet keypair:', error);
-          throw new Error('Company wallet keypair not available for signing');
-        }
+      
+      if (!COMPANY_WALLET_CONFIG.address) {
+        throw new Error('Company wallet address is not configured');
       }
+      
+      // Company wallet secret key operations must be performed on backend services
+      throw new Error(
+        'Company wallet secret key operations must be performed on backend services. ' +
+        'Client-side code cannot sign transactions with company wallet. ' +
+        'Please use backend API endpoint for transaction signing.'
+      );
 
       // Sign transaction
       if (this.connectedProvider) {

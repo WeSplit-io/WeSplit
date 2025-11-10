@@ -536,9 +536,8 @@ class ExternalTransferService {
         } catch (jsonError) {
           logger.error('Failed to create keypair from secret key', {
             base64Error: (base64Error as Error).message,
-            jsonError: (jsonError as Error).message,
-            secretKeyLength: fromWalletSecretKey?.length,
-            secretKeyPreview: fromWalletSecretKey?.substring(0, 20) + '...'
+            jsonError: (jsonError as Error).message
+            // SECURITY: Do not log secret key metadata (length, previews, etc.)
           }, 'ExternalTransferService');
           return {
             success: false,
@@ -553,89 +552,28 @@ class ExternalTransferService {
       }, 'ExternalTransferService');
 
       // Add company wallet keypair for fee payment (required - same as internal transfers)
+      // SECURITY: Company wallet secret key is not available in client-side code
       // COMPANY_WALLET_CONFIG is already imported at the top of the file
       logger.info('Company wallet configuration check', {
         companyWalletRequired: true,
-        hasCompanySecretKey: !!COMPANY_WALLET_CONFIG.secretKey,
         companyWalletAddress: COMPANY_WALLET_CONFIG.address,
         feePayerAddress: feePayerPublicKey.toBase58()
       }, 'ExternalTransferService');
 
-      if (COMPANY_WALLET_CONFIG.secretKey) {
-        try {
-          logger.info('Processing company wallet secret key', {
-            secretKeyLength: COMPANY_WALLET_CONFIG.secretKey.length,
-            secretKeyPreview: COMPANY_WALLET_CONFIG.secretKey.substring(0, 20) + '...',
-            hasCommas: COMPANY_WALLET_CONFIG.secretKey.includes(','),
-            hasBrackets: COMPANY_WALLET_CONFIG.secretKey.includes('[') || COMPANY_WALLET_CONFIG.secretKey.includes(']'),
-            secretKeyFormat: COMPANY_WALLET_CONFIG.secretKey.includes(',') ? 'comma-separated' : 'base64'
-          }, 'ExternalTransferService');
-
-          let companySecretKeyBuffer: Buffer;
-          
-          // Handle different secret key formats
-          if (COMPANY_WALLET_CONFIG.secretKey.includes(',') || COMPANY_WALLET_CONFIG.secretKey.includes('[')) {
-            logger.info('Processing comma-separated secret key format', {}, 'ExternalTransferService');
-            const cleanKey = COMPANY_WALLET_CONFIG.secretKey.replace(/[\[\]]/g, '');
-            const keyArray = cleanKey.split(',').map(num => parseInt(num.trim(), 10));
-            
-            logger.info('Secret key array processing', {
-              cleanKeyLength: cleanKey.length,
-              keyArrayLength: keyArray.length,
-              firstFewNumbers: keyArray.slice(0, 5),
-              lastFewNumbers: keyArray.slice(-5)
-            }, 'ExternalTransferService');
-            
-            companySecretKeyBuffer = Buffer.from(keyArray);
-          } else {
-            logger.info('Processing base64 secret key format', {}, 'ExternalTransferService');
-            companySecretKeyBuffer = Buffer.from(COMPANY_WALLET_CONFIG.secretKey, 'base64');
-          }
-          
-          // Validate and trim if needed
-          logger.info('Secret key buffer validation', {
-            bufferLength: companySecretKeyBuffer.length,
-            expectedLength: 64,
-            isValidLength: companySecretKeyBuffer.length === 64 || companySecretKeyBuffer.length === 65
-          }, 'ExternalTransferService');
-          
-          if (companySecretKeyBuffer.length === 65) {
-            companySecretKeyBuffer = companySecretKeyBuffer.slice(0, 64);
-            logger.info('Trimmed 65-byte keypair to 64-byte secret key', {
-              originalLength: 65,
-              trimmedLength: companySecretKeyBuffer.length
-            }, 'ExternalTransferService');
-          } else if (companySecretKeyBuffer.length !== 64) {
-            throw new Error(`Invalid secret key length: ${companySecretKeyBuffer.length} bytes (expected 64 or 65)`);
-          }
-          
-          const companyKeypair = Keypair.fromSecretKey(companySecretKeyBuffer);
-          
-          logger.info('Company keypair created successfully', {
-            companyWalletAddress: COMPANY_WALLET_CONFIG.address,
-            companyKeypairAddress: companyKeypair.publicKey.toBase58(),
-            addressesMatch: companyKeypair.publicKey.toBase58() === COMPANY_WALLET_CONFIG.address
-          }, 'ExternalTransferService');
-          
-          signers.push(companyKeypair);
-          logger.info('Company keypair added to signers', { 
-            companyAddress: companyKeypair.publicKey.toBase58(),
-            totalSigners: signers.length
-          }, 'ExternalTransferService');
-        } catch (error) {
-          logger.error('Failed to load company wallet keypair', { error }, 'ExternalTransferService');
-          return {
-            success: false,
-            error: 'Company wallet keypair not available for signing'
-          };
-        }
-      } else {
-        logger.error('Company wallet secret key is required for SOL fee coverage', {}, 'ExternalTransferService');
-        return {
-          success: false,
-          error: 'Company wallet secret key is required for SOL fee coverage. Please contact support.'
-        };
-      }
+      // SECURITY: Company wallet secret key is not available in client-side code
+      // All secret key operations must be performed on backend services
+      // This is a security requirement - secret keys should never be in client bundles
+      logger.error('Company wallet secret key operations must be performed on backend services', {
+        companyWalletAddress: COMPANY_WALLET_CONFIG.address,
+        feePayerAddress: feePayerPublicKey.toBase58()
+      }, 'ExternalTransferService');
+      
+      return {
+        success: false,
+        error: 'Company wallet secret key operations must be performed on backend services. ' +
+               'Client-side code cannot sign transactions with company wallet. ' +
+               'Please use backend API endpoint for transaction signing.'
+      };
 
       // Sign and send transaction with enhanced confirmation (matching split logic)
       logger.info('Sending enhanced USDC transfer transaction', {

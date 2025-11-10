@@ -218,23 +218,9 @@ class ConsolidatedTransactionService {
               // Don't fail the transaction if points award fails
             }
 
-            // Check and complete first transaction quest
-            try {
-              const { questService } = await import('../../rewards/questService');
-              const isFirstTransaction = await questService.isQuestCompleted(params.userId, 'first_transaction');
-              if (!isFirstTransaction) {
-                const questResult = await questService.completeQuest(params.userId, 'first_transaction');
-                if (questResult.success) {
-                  logger.info('✅ First transaction quest completed', {
-                    userId: params.userId,
-                    pointsAwarded: questResult.pointsAwarded
-                  }, 'ConsolidatedTransactionService');
-                }
-              }
-            } catch (questError) {
-              logger.error('❌ Error completing first transaction quest', questError, 'ConsolidatedTransactionService');
-              // Don't fail the transaction if quest completion fails
-            }
+            // DISABLED: Old quest (first_transaction) - replaced by season-based system
+            // Transaction points are now awarded via awardTransactionPoints() which uses season-based rewards
+            // No need to complete old quest
           } else {
             logger.info('✅ Sender transaction saved to database (recipient not registered)', {
               signature: result.signature,

@@ -28,7 +28,7 @@ import { AuthGuard } from '../../components/auth';
 import NavBar from '../../components/shared/NavBar';
 import Avatar from '../../components/shared/Avatar';
 import { WalletSelectorModal } from '../../components/wallet';
-import { Container } from '../../components/shared';
+import { Container, ModernLoader, ErrorScreen, Button } from '../../components/shared';
 import { QRCodeScreen } from '../QRCode';
 import { TransactionModal, TransactionItem } from '../../components/transactions';
 import { useApp } from '../../context/AppContext';
@@ -558,12 +558,10 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         const shouldRefreshRequests = route?.params?.refreshRequests;
         
         if (!hasLoadedRef.current || shouldRefreshBalance || shouldRefreshRequests) {
-          logger.info('Starting data load', { 
-            hasLoaded: hasLoadedRef.current, 
-            shouldRefreshBalance, 
-            shouldRefreshRequests,
-            userChanged
-          }, 'DashboardScreen');
+          // Only log if actually loading for the first time
+          if (!hasLoadedRef.current && __DEV__) {
+            logger.debug('Starting initial data load', null, 'DashboardScreen');
+          }
           
           isInitialLoadingRef.current = true;
           
@@ -577,7 +575,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               setHasInitialLoad(true);
               hasLoadedRef.current = true;
               isInitialLoadingRef.current = false;
-              logger.info('Initial data load completed', null, 'DashboardScreen');
+              // Removed excessive logging
             });
           } else {
             // Handle navigation refresh parameters
@@ -592,19 +590,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               if (shouldRefreshBalance) {
                 walletService.clearUserCache(currentUserId);
                 refreshWallet();
-                logger.info('Balance refresh triggered from navigation parameter', null, 'DashboardScreen');
               }
               
               if (shouldRefreshRequests) {
                 loadPaymentRequests();
                 refreshNotifications();
-                logger.info('Requests refresh triggered from navigation parameter', null, 'DashboardScreen');
               }
             }
             isInitialLoadingRef.current = false;
           }
-        } else {
-          logger.debug('Skipping data load - already loaded and no refresh params', null, 'DashboardScreen');
         }
       }
     }, [isAuthenticated, currentUser?.id, route?.params?.refreshBalance, route?.params?.refreshRequests])
@@ -729,40 +723,20 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
   // Show loading screen while authenticating with Face ID
   if (isAuthenticating) {
     return (
-      <Container>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.black }}>
-          <ActivityIndicator size="large" color={colors.primaryGreen} />
-          <Text style={{ color: colors.white, marginTop: spacing.md, fontSize: 16 }}>
-            Authenticating...
-          </Text>
-          <Text style={{ color: colors.white70, marginTop: spacing.sm, fontSize: 14, textAlign: 'center', paddingHorizontal: spacing.lg }}>
-            Please use Face ID to access your wallet
-          </Text>
-        </View>
-      </Container>
+      <ModernLoader
+        size="large"
+        text="Authenticating..."
+      />
     );
   }
 
   // Show error screen if authentication failed
   if (authenticationError) {
     return (
-      <Container>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.black, padding: spacing.lg }}>
-          <Text style={{ color: colors.error, fontSize: 18, fontWeight: '600', marginBottom: spacing.md, textAlign: 'center' }}>
-            Authentication Required
-          </Text>
-          <Text style={{ color: colors.white70, fontSize: 14, textAlign: 'center', marginBottom: spacing.lg }}>
-            {authenticationError}
-          </Text>
-          <TouchableOpacity
-            style={{
-              backgroundColor: colors.primaryGreen,
-              paddingHorizontal: spacing.xl,
-              paddingVertical: spacing.md,
-              borderRadius: spacing.radiusMd,
-              marginTop: spacing.md,
-            }}
-            onPress={async () => {
+      <ErrorScreen
+        title="Authentication Required"
+        message={authenticationError}
+        onRetry={async () => {
               setIsAuthenticating(true);
               setAuthenticationError(null);
               hasAuthenticatedRef.current = false; // Reset to allow retry
@@ -782,13 +756,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                 setIsAuthenticating(false);
               }
             }}
-          >
-            <Text style={{ color: colors.white, fontSize: 16, fontWeight: '600' }}>
-              Try Again
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </Container>
+        retryText="Try Again"
+      />
     );
   }
 
@@ -836,6 +805,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               )}
               {currentUser?.active_profile_asset && (
                 <ProfileAssetDisplay
+                  userId={currentUser.id}
                   profileAssets={currentUser.profile_assets}
                   activeProfileAsset={currentUser.active_profile_asset}
                   showProfileAsset={true}
@@ -1015,8 +985,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
               </View>
             ) : (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={colors.primaryGreen} />
-                <Text style={styles.loadingText}>Loading...</Text>
+                <ModernLoader size="small" text="Loading..." />
               </View>
             )
           ) : (

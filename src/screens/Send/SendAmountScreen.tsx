@@ -8,7 +8,6 @@ import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
 import { colors } from '../../theme';
 import { styles } from './styles';
-import UserAvatar from '../../components/UserAvatar';
 import Avatar from '../../components/shared/Avatar';
 import { DEFAULT_AVATAR_URL } from '../../config/constants/constants';
 import { logger } from '../../services/analytics/loggingService';

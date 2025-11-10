@@ -7,21 +7,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   Alert,
   StatusBar,
-  ActivityIndicator,
   Image,
-  Animated,
-  PanResponder,
-  Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
 import Input from '../../components/shared/Input';
 import { SplitWalletService, SplitWallet, SplitWalletParticipant } from '../../services/split';
@@ -37,12 +30,11 @@ import { splitRealtimeService, SplitRealtimeUpdate } from '../../services/splits
 import FairSplitHeader from './components/FairSplitHeader';
 import FairSplitProgress from './components/FairSplitProgress';
 import FairSplitParticipants from './components/FairSplitParticipants';
-import { Container, Button, AppleSlider } from '../../components/shared';
-import CustomModal from '../../components/shared/Modal';
+import { Container, Button, AppleSlider, ErrorScreen, ModernLoader } from '../../components/shared';
+import Modal from '../../components/shared/Modal';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { 
-  getParticipantStatusDisplayText, 
-  getParticipantStatusColor 
+  getParticipantStatusDisplayText
 } from '../../utils/statusUtils';
 
 // Remove local image mapping - now handled in FairSplitHeader component
@@ -2728,19 +2720,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   // Show error state if there's an error
   if (error) {
     return (
-      <Container>
-        <StatusBar barStyle="light-content" backgroundColor={colors.black} />
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Something went wrong</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={() => setError(null)}
-          >
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      </Container>
+      <ErrorScreen
+        title="Something went wrong"
+        message={error}
+        onRetry={() => setError(null)}
+        retryText="Try Again"
+      />
     );
   }
 
@@ -3063,7 +3048,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       </View>
 
       {/* Edit Amount Modal */}
-      <CustomModal
+      <Modal
         visible={showEditModal && !!editingParticipant}
         onClose={handleCancelEdit}
         title={`Edit Amount for ${editingParticipant?.name}`}
@@ -3097,10 +3082,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             style={{flex: 1}}
           />
         </View>
-      </CustomModal>
+      </Modal>
 
       {/* Payment Modal */}
-      <CustomModal
+      <Modal
         visible={showPaymentModal}
         onClose={handlePaymentModalClose}
         title="Pay Your Share"
@@ -3141,10 +3126,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             style={{flex: 1}}
           />
         </View>
-      </CustomModal>
+      </Modal>
 
       {/* Split Modal */}
-      <CustomModal
+      <Modal
         visible={showSplitModal}
         onClose={() => setShowSplitModal(false)}
         title={!showSignatureStep ? 'Transfer Funds' : `Transfer ${totalAmount.toFixed(2)} USDC to ${selectedWallet?.name || 'Selected Wallet'}`}
@@ -3160,8 +3145,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           <>
             {isLoadingWallets ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator color={colors.green} size="large" />
-                <Text style={styles.loadingText}>Loading your wallets...</Text>
+                <ModernLoader size="large" text="Loading your wallets..." />
               </View>
             ) : (
               <View style={styles.splitOptionsContainer}>
@@ -3305,10 +3289,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             
           </>
         )}
-      </CustomModal>
+      </Modal>
 
       {/* Wallet Recap Modal */}
-      <CustomModal
+      <Modal
         visible={showWalletRecapModal}
         onClose={() => setShowWalletRecapModal(false)}
         title="🎉 Split Wallet Created!"
@@ -3353,10 +3337,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           fullWidth={true}
           style={styles.walletRecapButton}
         />
-      </CustomModal>
+      </Modal>
 
       {/* Private Key Modal */}
-      <CustomModal
+      <Modal
         visible={showPrivateKeyModal && !!privateKey}
         onClose={handleClosePrivateKeyModal}
         title="Private Key"
@@ -3389,7 +3373,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             style={{flex: 1}}
           />
         </View>
-      </CustomModal>
+      </Modal>
     </Container>
   );
 };

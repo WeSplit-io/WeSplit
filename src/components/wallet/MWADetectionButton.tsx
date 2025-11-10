@@ -18,6 +18,7 @@ import {
   StyleProp
 } from 'react-native';
 import PhosphorIcon from '../shared/PhosphorIcon';
+import Button from '../shared/Button';
 import { colors } from '../../theme';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -374,34 +375,16 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
 
   return (
     <>
-      <TouchableOpacity
-        style={[
-          styles.detectButton,
-          isButtonDisabled && styles.detectButtonDisabled,
-          style
-        ]}
+      <Button
+        title={isDetecting ? 'Detecting...' : 'Detect Wallets'}
         onPress={handleButtonPress}
-        accessibilityRole="button"
-        accessibilityLabel={isDetecting ? "Detecting wallets" : "Detect wallets"}
-        accessibilityState={{ disabled: isButtonDisabled }}
-        accessibilityHint="Scans for available mobile wallet adapters"
-        // Remove disabled prop so button always responds to clicks
-      >
-        <View style={styles.detectButtonContent}>
-          {isDetecting ? (
-            <ActivityIndicator size="small" color={colors.white} />
-          ) : (
-            <PhosphorIcon
-              name="Wallet"
-              size={20}
-              color={colors.white}
-            />
-          )}
-          <Text style={styles.detectButtonText}>
-            {isDetecting ? 'Detecting...' : 'Detect Wallets'}
-          </Text>
-        </View>
-      </TouchableOpacity>
+        variant="secondary"
+        disabled={isButtonDisabled}
+        loading={isDetecting}
+        icon="Wallet"
+        iconPosition="left"
+        style={style}
+      />
 
       <Modal
         visible={showWalletModal}

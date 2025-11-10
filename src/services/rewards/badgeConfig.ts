@@ -18,7 +18,8 @@ export interface BadgeInfo {
   badgeId: string;
   title: string;
   description: string;
-  icon: string;
+  icon: string; // Emoji or icon identifier
+  iconUrl?: string; // Optional image URL for badge icon
   category?: string;
   rarity?: 'common' | 'rare' | 'epic' | 'legendary';
 }

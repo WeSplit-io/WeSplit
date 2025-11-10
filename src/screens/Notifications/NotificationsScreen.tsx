@@ -22,7 +22,7 @@ import { colors } from '../../theme/colors';
 import { collection, doc, getDoc, getDocs, query, where, serverTimestamp, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase/firebase';
 import { getReceivedPaymentRequests } from '../../services/payments/firebasePaymentRequestService';
-import { Container } from '../../components/shared';
+import { Container, LoadingScreen } from '../../components/shared';
 import Header from '../../components/shared/Header';
 import PhosphorIcon from '../../components/shared/PhosphorIcon';
 import { 
@@ -732,12 +732,10 @@ const NotificationsScreen: React.FC<any> = ({ navigation }) => {
 
   if (loading) {
     return (
-      <Container>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#A5EA15" />
-          <Text style={styles.loadingText}>Loading notifications...</Text>
-        </View>
-      </Container>
+      <LoadingScreen
+        message="Loading notifications..."
+        showSpinner={true}
+      />
     );
   }
 

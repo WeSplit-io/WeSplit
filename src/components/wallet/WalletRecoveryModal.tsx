@@ -10,15 +10,15 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  ActivityIndicator,
   StyleSheet,
-  Modal,
 } from 'react-native';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { logger } from '../../services/analytics/loggingService';
 import { walletRecoveryService } from '../../services/blockchain/wallet';
+import Modal from '../shared/Modal';
+import ModernLoader from '../shared/ModernLoader';
 
 interface WalletRecoveryModalProps {
   visible: boolean;
@@ -195,17 +195,14 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
   return (
     <Modal
       visible={visible}
+      onClose={onClose}
       animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      transparent={false}
+      title="Wallet Recovery"
+      showHandle={true}
+      closeOnBackdrop={true}
     >
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Wallet Recovery</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>✕</Text>
-          </TouchableOpacity>
-        </View>
 
         <ScrollView style={styles.content}>
           <View style={styles.warningContainer}>
@@ -218,8 +215,7 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
 
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primaryGreen} />
-              <Text style={styles.loadingText}>Analyzing wallet data...</Text>
+              <ModernLoader size="large" text="Analyzing wallet data..." />
             </View>
           ) : (
             renderRecoveryReport()
@@ -227,8 +223,7 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
 
           {isRecovering && (
             <View style={styles.recoveryContainer}>
-              <ActivityIndicator size="large" color={colors.primaryGreen} />
-              <Text style={styles.recoveryText}>{recoveryStep}</Text>
+              <ModernLoader size="large" text={recoveryStep} />
             </View>
           )}
 

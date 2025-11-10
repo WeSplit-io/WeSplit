@@ -20,7 +20,8 @@ import styles from './styles';
 import { colors } from '../../theme/colors';
 import { logger } from '../../services/analytics/loggingService';
 
-import { Container, Header } from '../../components/shared';
+import { Container, Header, Tabs, ModernLoader } from '../../components/shared';
+import type { Tab } from '../../components/shared/Tabs';
 
 type TabType = 'all' | 'income' | 'expenses';
 
@@ -277,25 +278,11 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
     </View>
   );
 
-  const renderTabButton = (tab: TabType, label: string) => (
-    <TouchableOpacity
-      style={styles.tabButton}
-      onPress={() => setActiveTab(tab)}
-    >
-      {activeTab === tab ? (
-        <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.tabGradient}
-        >
-          <Text style={styles.activeTabButtonText}>{label}</Text>
-        </LinearGradient>
-      ) : (
-        <Text style={styles.tabButtonText}>{label}</Text>
-      )}
-    </TouchableOpacity>
-  );
+  const tabs: Tab[] = [
+    { label: 'All', value: 'all' },
+    { label: 'Income', value: 'income' },
+    { label: 'Expenses', value: 'expenses' }
+  ];
 
   return (
     <Container>
@@ -306,11 +293,12 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
       />
       
       {/* Filter Tabs */}
-      <View style={styles.tabContainer}>
-        {renderTabButton('all', 'All')}
-        {renderTabButton('income', 'Income')}
-        {renderTabButton('expenses', 'Expenses')}
-      </View>
+      <Tabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as TabType)}
+        enableAnimation={true}
+      />
 
       {/* Transactions List */}
       <ScrollView
@@ -326,8 +314,7 @@ const TransactionHistoryScreen: React.FC<any> = ({ navigation, route }) => {
       >
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primaryGreen} />
-            <Text style={styles.loadingText}>Loading transactions...</Text>
+            <ModernLoader size="large" text="Loading transactions..." />
           </View>
         ) : getFilteredTransactions().length > 0 ? (
           <View style={styles.transactionsList}>

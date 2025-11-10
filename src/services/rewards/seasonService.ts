@@ -18,40 +18,43 @@ export interface SeasonConfig {
 /**
  * Season configuration
  * Define when each season starts and ends
+ * 
+ * NOTE: Season 1 starts from December 19, 2024 (current launch date)
+ * All seasons are configured to start from Season 1
  */
 const SEASON_CONFIGS: SeasonConfig[] = [
   {
     season: 1,
-    startDate: '2024-01-01T00:00:00Z',
-    endDate: '2024-03-31T23:59:59Z',
+    startDate: '2024-12-19T00:00:00Z', // Season 1 starts from launch date
+    endDate: '2025-03-18T23:59:59Z', // 3 months from start
     name: 'Season 1',
     description: 'Launch Season'
   },
   {
     season: 2,
-    startDate: '2024-04-01T00:00:00Z',
-    endDate: '2024-06-30T23:59:59Z',
+    startDate: '2025-03-19T00:00:00Z',
+    endDate: '2025-06-17T23:59:59Z', // 3 months from start
     name: 'Season 2',
     description: 'Growth Season'
   },
   {
     season: 3,
-    startDate: '2024-07-01T00:00:00Z',
-    endDate: '2024-09-30T23:59:59Z',
+    startDate: '2025-06-18T00:00:00Z',
+    endDate: '2025-09-16T23:59:59Z', // 3 months from start
     name: 'Season 3',
     description: 'Expansion Season'
   },
   {
     season: 4,
-    startDate: '2024-10-01T00:00:00Z',
-    endDate: '2024-12-31T23:59:59Z',
+    startDate: '2025-09-17T00:00:00Z',
+    endDate: '2025-12-16T23:59:59Z', // 3 months from start
     name: 'Season 4',
     description: 'Maturity Season'
   },
   {
     season: 5,
-    startDate: '2025-01-01T00:00:00Z',
-    endDate: '2025-12-31T23:59:59Z',
+    startDate: '2025-12-17T00:00:00Z',
+    endDate: '2026-12-16T23:59:59Z', // 1 year from start
     name: 'Season 5',
     description: 'Long-term Season'
   }
