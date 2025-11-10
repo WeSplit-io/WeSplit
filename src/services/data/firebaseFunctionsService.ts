@@ -181,7 +181,7 @@ export async function sendVerificationCode(email: string): Promise<{ success: bo
       throw new Error(response.message || 'Failed to send verification code');
     }
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (__DEV__) { console.error('❌ Error sending verification code via Firebase Functions:', error); }
     
     // Handle Firebase Functions specific errors
@@ -247,7 +247,7 @@ export async function verifyCode(email: string, code: string): Promise<FirebaseV
       throw new Error(response.message || 'Failed to verify code');
     }
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (__DEV__) { console.error('❌ Error verifying code via Firebase Functions:', error); }
     
     // Handle Firebase Functions specific errors
@@ -271,7 +271,7 @@ export async function checkFirebaseFunctionsAvailability(): Promise<boolean> {
     // Try to call a simple function to check if Firebase Functions are available
     await sendVerificationEmailFunction({ email: 'test@example.com', code: '1234' });
     return true;
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (__DEV__) { console.warn('⚠️ Firebase Functions not available:', error.message); }
     return false;
   }

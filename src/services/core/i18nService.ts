@@ -70,11 +70,11 @@ class I18nService {
 
   private getTranslation(key: string): string | null {
     const keys = key.split('.');
-    let current: any = this.translations.get(this.currentLanguage);
+    let current: TranslationData | undefined = this.translations.get(this.currentLanguage);
 
     for (const k of keys) {
       if (current && typeof current === 'object' && k in current) {
-        current = current[k];
+        current = current[k] as TranslationData | string;
       } else {
         return null;
       }
@@ -101,13 +101,28 @@ class I18nService {
   public getSupportedLanguages(): SupportedLanguage[] {
     return Array.from(this.translations.keys());
   }
+
+  // Get language metadata for UI display
+  public getLanguageMetadata(): Array<{ code: SupportedLanguage; name: string; nativeName: string; flag: string }> {
+    return [
+      { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
+      { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸' },
+      { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷' },
+      { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪' },
+      { code: 'zh', name: 'Chinese', nativeName: '中文', flag: '🇨🇳' },
+      { code: 'ja', name: 'Japanese', nativeName: '日本語', flag: '🇯🇵' },
+      { code: 'ko', name: 'Korean', nativeName: '한국어', flag: '🇰🇷' }
+    ];
+  }
 }
 
 export const i18nService = I18nService.getInstance();
 export const useTranslation = () => ({
   t: i18nService.translate.bind(i18nService),
   setLanguage: i18nService.setLanguage.bind(i18nService),
-  currentLanguage: i18nService.getCurrentLanguage()
+  currentLanguage: i18nService.getCurrentLanguage(),
+  language: i18nService.getCurrentLanguage(), // Alias for currentLanguage
+  availableLanguages: i18nService.getLanguageMetadata() // Return language metadata with code, name, nativeName, flag
 });
 
 export const translate = i18nService.translate.bind(i18nService);

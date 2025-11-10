@@ -6,10 +6,20 @@
 
 import React from 'react';
 import { ViewStyle, TextStyle } from 'react-native';
+import { logger } from '../../services/analytics/loggingService';
+// eslint-disable-next-line import/namespace
 import * as PhosphorIcons from 'phosphor-react-native';
 
 // Type for all available Phosphor icon names
 type PhosphorIconName = keyof typeof PhosphorIcons;
+
+// Icon component props interface
+interface IconComponentProps {
+  size?: number;
+  color?: string;
+  weight?: 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone';
+  style?: ViewStyle | TextStyle;
+}
 
 interface PhosphorIconProps {
   name: PhosphorIconName;
@@ -26,10 +36,10 @@ const PhosphorIcon: React.FC<PhosphorIconProps> = ({
   weight = 'regular',
   style,
 }) => {
-  const IconComponent = PhosphorIcons[name] as React.ComponentType<any>;
+  const IconComponent = PhosphorIcons[name] as React.ComponentType<IconComponentProps>;
 
   if (!IconComponent) {
-    console.warn(`PhosphorIcon: Icon "${name}" not found`);
+    logger.warn('PhosphorIcon: Icon not found', { iconName: name }, 'PhosphorIcon');
     return null;
   }
 

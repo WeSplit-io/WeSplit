@@ -1,10 +1,10 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, Alert, Clipboard, Dimensions, Linking, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Alert, Clipboard, Linking, StyleSheet } from 'react-native';
+import { NavigationContainerRef } from '@react-navigation/native';
 import { useApp } from '../context/AppContext';
 import { useWallet } from '../context/WalletContext';
 import { firebaseMoonPayService } from '../services/integrations/external';
 import { colors } from '../theme/colors';
-import { typography } from '../theme/typography';
 import { logger } from '../services/core';
 import CustomModal from './shared/Modal';
 import { Input, Button } from './shared';
@@ -15,21 +15,18 @@ interface MoonPayWidgetProps {
   onSuccess?: () => void;
   onError?: (error: string) => void;
   amount?: number;
-  navigation?: any; // Add navigation prop for WebView navigation
+  navigation?: NavigationContainerRef<Record<string, object | undefined>> | { navigate: (route: string, params?: object) => void };
 }
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
   isVisible,
   onClose,
-  onSuccess,
   onError,
   amount: initialAmount,
   navigation
 }) => {
   const { state } = useApp();
-  const { appWalletAddress, getAppWalletBalance } = useWallet();
+  const { appWalletAddress } = useWallet();
   const [isLoading, setIsLoading] = useState(false);
   const [amount, setAmount] = useState(initialAmount?.toString() || '100');
 
@@ -199,7 +196,7 @@ const MoonPayWidget: React.FC<MoonPayWidgetProps> = ({
         />
 
         <Text style={styles.disclaimer}>
-          By proceeding, you agree to MoonPay's terms of service and privacy policy.
+          By proceeding, you agree to MoonPay&apos;s terms of service and privacy policy.
         </Text>
       </View>
     </CustomModal>

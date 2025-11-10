@@ -24,7 +24,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { styles } from './styles';
 import Input from '../../components/shared/Input';
-import { SplitWalletService, SplitWallet } from '../../services/split';
+import { SplitWalletService, SplitWallet, SplitWalletParticipant } from '../../services/split';
 import { notificationService } from '../../services/notifications';
 import { priceManagementService } from '../../services/core';
 import { useApp } from '../../context/AppContext';
@@ -120,7 +120,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           Alert.alert('Error', 'Could not retrieve private key');
         }
       } catch (error) {
-        console.error('Error getting private key:', error);
+        logger.error('Error getting private key', error as Record<string, unknown>, 'FairSplitScreen');
         Alert.alert('Error', 'Could not retrieve private key');
       }
     }
@@ -220,7 +220,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                       avatar: latestUserData?.avatar || p.avatar || '', // Include avatar from latest user data
                     };
                   } catch (error) {
-                    console.warn(`Could not fetch latest data for participant ${p.userId}:`, error);
+                    logger.warn('Could not fetch latest data for participant', { userId: p.userId, error: error as Record<string, unknown> }, 'FairSplitScreen');
                     return p; // Return original participant data if fetch fails
                   }
                 })
@@ -258,8 +258,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 }
                     
                     // Check if wallet participants match split participants
-                    const splitParticipantIds = fullSplitData.participants.map(p => p.userId);
-                    const walletParticipantIds = wallet.participants.map(p => p.userId);
+                    const splitParticipantIds = fullSplitData.participants.map((p: { userId: string }) => p.userId);
+                    const walletParticipantIds = wallet.participants.map((p: SplitWalletParticipant) => p.userId);
                     
                     // If participants don't match, we need to sync them
                     if (splitParticipantIds.length !== walletParticipantIds.length || 
@@ -273,8 +273,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                       const amountPerPerson = totalAmount / fullSplitData.participants.length;
                       
                       
-                      const updatedWalletParticipants = fullSplitData.participants.map(p => {
-                        const existingWalletParticipant = wallet.participants.find(wp => wp.userId === p.userId);
+                      const updatedWalletParticipants = fullSplitData.participants.map((p: { userId: string; name: string; walletAddress: string; amountOwed: number }) => {
+                        const existingWalletParticipant = wallet.participants.find((wp: SplitWalletParticipant) => wp.userId === p.userId);
                         return {
                           userId: p.userId,
                           name: p.name,
@@ -305,7 +305,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                         }
                       } else {
                         if (__DEV__) {
-                          console.error('🔍 FairSplitScreen: Failed to sync wallet participants:', updateResult.error);
+                          logger.error('Failed to sync wallet participants', { error: updateResult.error }, 'FairSplitScreen');
                         }
                         setSplitWallet(wallet); // Use original wallet data
                       }
@@ -314,12 +314,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                     }
                   } else {
                     if (__DEV__) {
-                      console.error('🔍 FairSplitScreen: Failed to load split wallet:', walletResult.error);
+                      logger.error('Failed to load split wallet', { error: walletResult.error }, 'FairSplitScreen');
                     }
                   }
                 } catch (error) {
                   if (__DEV__) {
-                    console.error('🔍 FairSplitScreen: Error loading split wallet:', error);
+                    logger.error('Error loading split wallet', error as Record<string, unknown>, 'FairSplitScreen');
                   }
                 }
               }
@@ -327,7 +327,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             }
           } catch (error) {
             if (__DEV__) {
-              console.error('🔍 FairSplitScreen: Error loading split data:', error);
+              logger.error('Error loading split data', error as Record<string, unknown>, 'FairSplitScreen');
             }
             setIsInitializing(false);
             isInitializingRef.current = false;
@@ -352,10 +352,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 
                 // CRITICAL: Check if withdrawal has already been completed
                 if (wallet.status === 'completed') {
-                  console.log('ℹ️ FairSplitScreen: Split wallet withdrawal already completed during initialization', {
-                    status: wallet.status,
-                    completedAt: wallet.completedAt
-                  });
+                  if (__DEV__) {
+                    logger.debug('Split wallet withdrawal already completed during initialization', {
+                      status: wallet.status,
+                      completedAt: wallet.completedAt
+                    }, 'FairSplitScreen');
+                  }
                   
                   Alert.alert(
                     'Withdrawal Already Completed',
@@ -373,12 +375,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                 setSplitWallet(wallet);
               } else {
                 if (__DEV__) {
-                  console.error('🔍 FairSplitScreen: Failed to load split wallet from full data:', walletResult.error);
+                  logger.error('Failed to load split wallet from full data', { error: walletResult.error }, 'FairSplitScreen');
                 }
               }
             } catch (error) {
               if (__DEV__) {
-                console.error('🔍 FairSplitScreen: Error loading split wallet from full data:', error);
+                logger.error('Error loading split wallet from full data', error as Record<string, unknown>, 'FairSplitScreen');
               }
               setIsInitializing(false);
               isInitializingRef.current = false;
@@ -583,20 +585,24 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
 
 
   // Load completion data when split wallet is available
+  // Consolidated to prevent overlapping interval calls
   useEffect(() => {
-    if (splitWallet?.id && !isLoadingCompletionData) {
-      // Add a small delay to prevent rapid successive calls
-      const timeoutId = setTimeout(() => {
+    // Only set up intervals if we have a split wallet
+    if (!splitWallet?.id) {
+      return;
+    }
+    
+    // Add a small delay to prevent rapid successive calls
+    const timeoutId = setTimeout(() => {
+      if (!isLoadingCompletionData) {
         loadCompletionData();
         checkAndRepairData();
         // Only check completion if not already confirmed or completed
         if (!isSplitConfirmed && splitWallet.status !== 'completed') {
           checkPaymentCompletion();
         }
-      }, 100); // 100ms delay to prevent rapid successive calls
-      
-      return () => clearTimeout(timeoutId);
-    }
+      }
+    }, 100); // 100ms delay to prevent rapid successive calls
     
     // Set up periodic progress updates (only if not completed to avoid infinite loops)
     const progressInterval = setInterval(() => {
@@ -616,10 +622,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     }, 120000); // Check completion every 2 minutes to reduce frequency
     
     return () => {
+      clearTimeout(timeoutId);
       clearInterval(progressInterval);
       clearInterval(completionInterval);
     };
-  }, [splitWallet?.id]); // Removed isSplitConfirmed dependency to prevent unnecessary resets
+  }, [splitWallet?.id, isLoadingCompletionData, isSplitConfirmed, isCheckingCompletion]); // Include all dependencies to prevent stale closures
 
   // Load user wallets when component mounts
   useEffect(() => {
@@ -733,7 +740,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       // Add a small delay to prevent excessive real-time updates
       const timeoutId = setTimeout(() => {
         startRealtimeUpdates().catch(error => {
-          console.error('Failed to start real-time updates in FairSplit:', error);
+          logger.error('Failed to start real-time updates in FairSplit', error as Record<string, unknown>, 'FairSplitScreen');
         });
       }, 1000); // 1 second delay
       
@@ -894,7 +901,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         return; // Don't proceed with automatic completion
       }
     } catch (error) {
-      console.error('❌ Error checking payment completion:', error);
+      logger.error('Error checking payment completion', error as Record<string, unknown>, 'FairSplitScreen');
     } finally {
       setIsCheckingCompletion(false);
     }
@@ -905,11 +912,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
     
     // Add validation to prevent processing invalid wallets
     if (!splitWallet.billId || !splitWallet.creatorId || !splitWallet.walletAddress) {
-      console.warn('🔧 FairSplitScreen: Skipping data repair due to missing critical data', {
+      logger.warn('Skipping data repair due to missing critical data', {
         billId: splitWallet.billId,
         creatorId: splitWallet.creatorId,
         walletAddress: splitWallet.walletAddress
-      });
+      }, 'FairSplitScreen');
       return;
     }
     
@@ -943,7 +950,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       );
       
       if (criticalIssues.length > 0) {
-        console.warn('🔧 FairSplitScreen: Critical data validation issues found:', criticalIssues);
+        logger.warn('Critical data validation issues found', { criticalIssues }, 'FairSplitScreen');
         
         // Try to repair the data only for critical issues
         const repairResult = await SplitWalletService.repairSplitWalletData(splitWallet.id);
@@ -957,7 +964,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           const summary = SplitDataValidationService.getValidationSummary(validationResult);
           logger.debug('Validation summary', { summary }, 'FairSplitScreen');
         } else {
-          console.error('🔧 FairSplitScreen: Data repair failed:', repairResult.error);
+          logger.error('Data repair failed', { error: repairResult.error }, 'FairSplitScreen');
         }
       } else {
         // Log non-critical issues for debugging but don't repair
@@ -969,7 +976,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         }
       }
     } catch (error) {
-      console.error('🔧 FairSplitScreen: Error checking data corruption:', error);
+      logger.error('Error checking data corruption', error as Record<string, unknown>, 'FairSplitScreen');
     }
   };
 
@@ -987,15 +994,19 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       // Then, fix any data consistency issues (participants marked as paid but no funds on-chain)
       const consistencyResult = await fixSplitWalletDataConsistency(splitWallet.id);
       if (consistencyResult.success && consistencyResult.fixed) {
-        console.log('🔧 Fixed data consistency issues in split wallet');
+        if (__DEV__) {
+          logger.debug('Fixed data consistency issues in split wallet', null, 'FairSplitScreen');
+        }
         logger.info('Data consistency fix applied', {
           splitWalletId: splitWallet.id,
           fixed: consistencyResult.fixed
         }, 'FairSplitScreen');
       } else if (consistencyResult.success && !consistencyResult.fixed) {
-        console.log('✅ No data consistency issues found in split wallet');
+        if (__DEV__) {
+          logger.debug('No data consistency issues found in split wallet', null, 'FairSplitScreen');
+        }
       } else {
-        console.warn('⚠️ Data consistency fix failed:', consistencyResult.error);
+        logger.warn('Data consistency fix failed', { error: consistencyResult.error }, 'FairSplitScreen');
       }
       
       const result = await SplitWalletService.getSplitWallet(splitWallet.id);
@@ -1027,7 +1038,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         loadCompletionData();
       }
     } catch (error) {
-      console.error('Failed to reload split wallet data:', error);
+      logger.error('Failed to reload split wallet data', error as Record<string, unknown>, 'FairSplitScreen');
     } finally {
       setIsLoadingCompletionData(false);
     }
@@ -1063,7 +1074,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         }
       } else {
         if (__DEV__) {
-          console.error('❌ FairSplitScreen: Failed to load completion data:', result.error);
+          logger.error('Failed to load completion data', { error: result.error }, 'FairSplitScreen');
         }
         // Set default completion data on error
         setCompletionData({
@@ -1077,7 +1088,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       }
     } catch (error) {
       if (__DEV__) {
-        console.error('❌ FairSplitScreen: Error loading completion data:', error);
+        logger.error('Error loading completion data', error as Record<string, unknown>, 'FairSplitScreen');
       }
       // Set default completion data on error
       setCompletionData({
@@ -1364,7 +1375,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       }, 'FairSplitScreen');
       
     } catch (error) {
-      console.error('❌ FairSplitScreen: Error loading user wallets:', error);
+      logger.error('Error loading user wallets', error as Record<string, unknown>, 'FairSplitScreen');
       Alert.alert('Error', 'Failed to load wallet information');
     } finally {
       setIsLoadingWallets(false);
@@ -1377,8 +1388,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
   };
 
   // Helper function for common error handling
-  const handleError = (error: any, context: string, showAlert: boolean = true) => {
-    console.error(`❌ FairSplitScreen: ${context}:`, error);
+  const handleError = (error: unknown, context: string, showAlert: boolean = true) => {
+    logger.error(`${context}`, error as Record<string, unknown>, 'FairSplitScreen');
     setError(error instanceof Error ? error.message : 'An unexpected error occurred');
     setIsLoading(false);
     setIsSendingPayment(false);
@@ -1447,7 +1458,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         Alert.alert('Debug Failed', debugResult.error || 'Failed to debug USDC balance');
       }
     } catch (error) {
-      console.error('❌ FairSplitScreen: Error debugging USDC balance:', error);
+      logger.error('Error debugging USDC balance', error as Record<string, unknown>, 'FairSplitScreen');
       Alert.alert('Error', 'Failed to debug USDC balance');
     }
   };
@@ -1490,7 +1501,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to fix participant status');
-      console.error('Error fixing participant status:', error);
+      logger.error('Error fixing participant status', error as Record<string, unknown>, 'FairSplitScreen');
     } finally {
       setIsLoading(false);
     }
@@ -1550,7 +1561,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         );
       }
     } catch (error) {
-      console.error('❌ FairSplitScreen: Error repairing split wallet:', error);
+      logger.error('Error repairing split wallet', error as Record<string, unknown>, 'FairSplitScreen');
       Alert.alert('Error', 'Failed to repair split wallet. Please contact support.');
     }
   };
@@ -1756,7 +1767,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               );
               logger.info('Notification sent to participant', { participantName: participant.name }, 'FairSplitScreen');
             } catch (notificationError) {
-              console.error(`❌ Failed to send notification to ${participant.name}:`, notificationError);
+              logger.error('Failed to send notification to participant', { participantName: participant.name, error: notificationError as Record<string, unknown> }, 'FairSplitScreen');
             }
           });
 
@@ -1837,7 +1848,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         );
         
         if (!updateResult.success) {
-          console.error('Failed to update participant amounts in database:', updateResult.error);
+          logger.error('Failed to update participant amounts in database', { error: updateResult.error }, 'FairSplitScreen');
           Alert.alert('Error', 'Failed to save changes. Please try again.');
           // Revert local changes if database update failed
           setParticipants(participants);
@@ -1848,7 +1859,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         await loadCompletionData();
       }
     } catch (error) {
-      console.error('Error updating participant amounts:', error);
+      logger.error('Error updating participant amounts', error as Record<string, unknown>, 'FairSplitScreen');
       Alert.alert('Error', 'Failed to save changes. Please try again.');
       // Revert local changes if database update failed
       setParticipants(participants);
@@ -2024,20 +2035,22 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       
       // Validate that only the creator can withdraw funds
       if (currentUser.id.toString() !== splitWallet.creatorId) {
-        console.error('❌ FairSplitScreen: Non-creator attempted to withdraw funds:', {
+        logger.error('Non-creator attempted to withdraw funds', {
           currentUserId: currentUser.id.toString(),
           creatorId: splitWallet.creatorId
-        });
+        }, 'FairSplitScreen');
         Alert.alert('Error', 'Only the split creator can withdraw funds.');
         return;
       }
       
       // CRITICAL: Check if withdrawal has already been completed
       if (splitWallet.status === 'completed') {
-        console.log('ℹ️ FairSplitScreen: Split wallet withdrawal already completed', {
-          status: splitWallet.status,
-          completedAt: splitWallet.completedAt
-        });
+        if (__DEV__) {
+          logger.debug('Split wallet withdrawal already completed', {
+            status: splitWallet.status,
+            completedAt: splitWallet.completedAt
+          }, 'FairSplitScreen');
+        }
         
         Alert.alert(
           'Withdrawal Already Completed',
@@ -2058,11 +2071,11 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
         const balanceResult = await consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress);
         
         if (!balanceResult.success || balanceResult.balance <= 0) {
-          console.error('❌ FairSplitScreen: Split wallet has no funds on blockchain:', {
+          logger.error('Split wallet has no funds on blockchain', {
             totalAmount: splitWallet.totalAmount,
             onChainBalance: balanceResult.balance,
             walletAddress: splitWallet.walletAddress
-          });
+          }, 'FairSplitScreen');
           Alert.alert(
             'No Funds Available', 
             'The split wallet has no funds available for withdrawal. Please ensure all participants have completed their payments.'
@@ -2143,12 +2156,12 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           }
         }
       } else if (totalPaid < (splitWallet.totalAmount - tolerance)) {
-        console.error('❌ FairSplitScreen: Insufficient funds collected:', {
+        logger.error('Insufficient funds collected', {
           required: splitWallet.totalAmount,
           collected: totalPaid,
           missing: splitWallet.totalAmount - totalPaid,
           tolerance
-        });
+        }, 'FairSplitScreen');
         Alert.alert(
           'Insufficient Funds', 
           `Not all participants have paid their shares. Required: ${splitWallet.totalAmount} USDC, Collected: ${totalPaid} USDC. Please ensure all participants have paid before withdrawing funds.`
@@ -2165,9 +2178,10 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       }, 'FairSplitScreen');
       
       // Debug: Check if the split wallet address is correct
-      console.log('🔍 Split wallet details:', {
-        id: splitWallet.id,
-        address: splitWallet.walletAddress,
+      if (__DEV__) {
+        logger.debug('Split wallet details', {
+          id: splitWallet.id,
+          address: splitWallet.walletAddress,
         publicKey: splitWallet.publicKey,
         totalAmount: splitWallet.totalAmount,
         status: splitWallet.status,
@@ -2178,7 +2192,8 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           status: p.status,
           transactionSignature: p.transactionSignature
         }))
-      });
+        }, 'FairSplitScreen');
+      }
       
       try {
         const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
@@ -2221,7 +2236,9 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           
           // Debug: Check transaction history if balance is 0 but expected > 0
           if (balanceResult.balance === 0 && splitWallet.totalAmount > 0) {
-            console.log('🔍 Balance is 0 but expected > 0, checking transaction history...');
+            if (__DEV__) {
+              logger.debug('Balance is 0 but expected > 0, checking transaction history', null, 'FairSplitScreen');
+            }
             try {
               const { Connection, PublicKey } = await import('@solana/web3.js');
               const { getConfig } = await import('../../config/unified');
@@ -2230,29 +2247,31 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
               
               // Get recent signatures to see if there were any outgoing transactions
               const signatures = await connection.getSignaturesForAddress(publicKey, { limit: 10 });
-              console.log('🔍 Recent transactions for split wallet:', {
-                address: splitWallet.walletAddress,
-                signatureCount: signatures.length,
-                signatures: signatures.map(sig => ({
-                  signature: sig.signature,
-                  blockTime: sig.blockTime,
-                  err: sig.err,
-                  memo: sig.memo
-                }))
-              });
+              if (__DEV__) {
+                logger.debug('Recent transactions for split wallet', {
+                  address: splitWallet.walletAddress,
+                  signatureCount: signatures.length,
+                  signatures: signatures.map(sig => ({
+                    signature: sig.signature,
+                    blockTime: sig.blockTime,
+                    err: sig.err,
+                    memo: sig.memo
+                  }))
+                }, 'FairSplitScreen');
+              }
             } catch (error) {
-              console.error('❌ Error checking transaction history:', error);
+              logger.error('Error checking transaction history', error as Record<string, unknown>, 'FairSplitScreen');
             }
           }
           
           // Check if on-chain balance is sufficient (with tolerance)
           if (balanceResult.balance < (splitWallet.totalAmount - tolerance)) {
-            console.error('❌ FairSplitScreen: On-chain balance insufficient for withdrawal:', {
+            logger.error('On-chain balance insufficient for withdrawal', {
               onChainBalance: balanceResult.balance,
               expectedBalance: splitWallet.totalAmount,
               difference: splitWallet.totalAmount - balanceResult.balance,
               tolerance
-            });
+            }, 'FairSplitScreen');
             
             Alert.alert(
               'Insufficient On-Chain Balance', 
@@ -2261,7 +2280,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
             return;
           }
         } else {
-          console.warn('⚠️ FairSplitScreen: Could not verify on-chain balance:', balanceResult.error);
+          logger.warn('Could not verify on-chain balance', { error: balanceResult.error }, 'FairSplitScreen');
           Alert.alert(
             'Balance Verification Failed', 
             'Could not verify the actual balance in the split wallet. Please try again or contact support if the issue persists.'
@@ -2269,7 +2288,7 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
           return;
         }
       } catch (error) {
-        console.error('❌ FairSplitScreen: Error checking on-chain balance:', error);
+        logger.error('Error checking on-chain balance', error as Record<string, unknown>, 'FairSplitScreen');
         Alert.alert(
           'Balance Check Error', 
           'Failed to verify the split wallet balance. Please try again or contact support if the issue persists.'
@@ -2321,112 +2340,114 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
       });
       
       // Debug: Log detailed transfer result for troubleshooting
-      console.log('🔍 Detailed transfer result:', {
-        success: transferResult.success,
-        transactionSignature: transferResult.transactionSignature,
-        amount: transferResult.amount,
-        error: transferResult.error,
-        splitWalletId: splitWallet.id,
-        destinationAddress: selectedWallet.address,
-        creatorId: currentUser.id.toString()
-      });
+      if (__DEV__) {
+        logger.debug('Detailed transfer result', {
+          success: transferResult.success,
+          transactionSignature: transferResult.transactionSignature,
+          amount: transferResult.amount,
+          error: transferResult.error,
+          splitWalletId: splitWallet.id,
+          destinationAddress: selectedWallet.address,
+          creatorId: currentUser.id.toString()
+        }, 'FairSplitScreen');
+      }
       
-        if (transferResult.success) {
-          logger.info('Transfer successful', {
-            transactionSignature: transferResult.transactionSignature,
-            amount: transferResult.amount,
-            destination: selectedWallet.address
+      if (transferResult.success) {
+        logger.info('Transfer successful', {
+          transactionSignature: transferResult.transactionSignature,
+          amount: transferResult.amount,
+          destination: selectedWallet.address
+        }, 'FairSplitScreen');
+        
+        // Verify the transfer actually happened by checking balances
+        try {
+          const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
+          
+          // Wait a moment for blockchain to update
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          const splitBalance = await consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress);
+          const recipientBalance = await consolidatedTransactionService.getUsdcBalance(selectedWallet.address);
+          
+          logger.info('Post-transfer balance verification', {
+            splitWalletBalance: splitBalance.balance,
+            recipientBalance: recipientBalance.balance,
+            expectedAmount: transferResult.amount,
+            transactionSignature: transferResult.transactionSignature
           }, 'FairSplitScreen');
           
-          // Verify the transfer actually happened by checking balances
-          try {
-            const { consolidatedTransactionService } = await import('../../services/blockchain/transaction/ConsolidatedTransactionService');
-            
-            // Wait a moment for blockchain to update
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            
-            const splitBalance = await consolidatedTransactionService.getUsdcBalance(splitWallet.walletAddress);
-            const recipientBalance = await consolidatedTransactionService.getUsdcBalance(selectedWallet.address);
-            
-            logger.info('Post-transfer balance verification', {
-              splitWalletBalance: splitBalance.balance,
-              recipientBalance: recipientBalance.balance,
-              expectedAmount: transferResult.amount,
-              transactionSignature: transferResult.transactionSignature
-            }, 'FairSplitScreen');
-            
-            // Update local state to reflect completion
-            setSplitWallet(prev => prev ? { 
-              ...prev, 
-              status: 'completed' as const,
-              completedAt: new Date().toISOString()
-            } : null);
-            
-            // Show success message with verification
-            const successWalletTypeLabel = selectedWallet.type === 'external' 
-              ? 'external wallet' 
-              : selectedWallet.type === 'kast' 
-                ? 'KAST card' 
-                : 'in-app wallet';
-            Alert.alert(
-              '✅ Transfer Verified!', 
-              `Successfully transferred ${transferResult.amount.toFixed(6)} USDC to ${selectedWallet.name || successWalletTypeLabel}!\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...\n\n✅ Balance verification confirmed the transfer.`,
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    // Close modals and reset state
-                    setShowSignatureStep(false);
-                    setShowSplitModal(false);
-                    setSelectedTransferMethod(null);
-                    setSelectedWallet(null);
-                    
-                    // Navigate back to splits list
-                    navigation.navigate('SplitsList');
-                  }
+          // Update local state to reflect completion
+          setSplitWallet(prev => prev ? { 
+            ...prev, 
+            status: 'completed' as const,
+            completedAt: new Date().toISOString()
+          } : null);
+          
+          // Show success message with verification
+          const successWalletTypeLabel = selectedWallet.type === 'external' 
+            ? 'external wallet' 
+            : selectedWallet.type === 'kast' 
+              ? 'KAST card' 
+              : 'in-app wallet';
+          Alert.alert(
+            '✅ Transfer Verified!', 
+            `Successfully transferred ${transferResult.amount.toFixed(6)} USDC to ${selectedWallet.name || successWalletTypeLabel}!\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...\n\n✅ Balance verification confirmed the transfer.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Close modals and reset state
+                  setShowSignatureStep(false);
+                  setShowSplitModal(false);
+                  setSelectedTransferMethod(null);
+                  setSelectedWallet(null);
+                  
+                  // Navigate back to splits list
+                  navigation.navigate('SplitsList');
                 }
-              ]
-            );
-          } catch (verificationError) {
-            logger.warn('Failed to verify transfer balances', {
-              error: verificationError instanceof Error ? verificationError.message : String(verificationError)
-            }, 'FairSplitScreen');
-            
-            // Update local state to reflect completion
-            setSplitWallet(prev => prev ? { 
-              ...prev, 
-              status: 'completed' as const,
-              completedAt: new Date().toISOString()
-            } : null);
-            
-            // Show success message without verification
-            const submittedWalletTypeLabel = selectedWallet.type === 'external' 
-              ? 'external wallet' 
-              : selectedWallet.type === 'kast' 
-                ? 'KAST card' 
-                : 'in-app wallet';
-            Alert.alert(
-              'Transfer Submitted!', 
-              `Transfer of ${transferResult.amount.toFixed(6)} USDC to ${selectedWallet.name || submittedWalletTypeLabel} has been submitted.\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...\n\nPlease check your wallet to confirm receipt.`,
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    // Close modals and reset state
-                    setShowSignatureStep(false);
-                    setShowSplitModal(false);
-                    setSelectedTransferMethod(null);
-                    setSelectedWallet(null);
-                    
-                    // Navigate back to splits list
-                    navigation.navigate('SplitsList');
-                  }
+              }
+            ]
+          );
+        } catch (verificationError) {
+          logger.warn('Failed to verify transfer balances', {
+            error: verificationError instanceof Error ? verificationError.message : String(verificationError)
+          }, 'FairSplitScreen');
+          
+          // Update local state to reflect completion
+          setSplitWallet(prev => prev ? { 
+            ...prev, 
+            status: 'completed' as const,
+            completedAt: new Date().toISOString()
+          } : null);
+          
+          // Show success message without verification
+          const submittedWalletTypeLabel = selectedWallet.type === 'external' 
+            ? 'external wallet' 
+            : selectedWallet.type === 'kast' 
+              ? 'KAST card' 
+              : 'in-app wallet';
+          Alert.alert(
+            'Transfer Submitted!', 
+            `Transfer of ${transferResult.amount.toFixed(6)} USDC to ${selectedWallet.name || submittedWalletTypeLabel} has been submitted.\n\nTransaction: ${transferResult.transactionSignature?.slice(0, 8)}...\n\nPlease check your wallet to confirm receipt.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Close modals and reset state
+                  setShowSignatureStep(false);
+                  setShowSplitModal(false);
+                  setSelectedTransferMethod(null);
+                  setSelectedWallet(null);
+                  
+                  // Navigate back to splits list
+                  navigation.navigate('SplitsList');
                 }
-              ]
-            );
-          }
-        } else {
-        console.error('❌ FairSplitScreen: Transfer failed:', transferResult.error);
+              }
+            ]
+          );
+        }
+      } else {
+        logger.error('Transfer failed', { error: transferResult.error }, 'FairSplitScreen');
         
         // Check if this is a timeout issue - transaction might have succeeded
         if (transferResult.error?.includes('Transaction confirmation timed out') || 
@@ -2449,7 +2470,9 @@ const FairSplitScreen: React.FC<FairSplitScreenProps> = ({ navigation, route }) 
                     // Open transaction in explorer
                     const explorerUrl = `https://solscan.io/tx/${transferResult.transactionSignature}`;
                     // You might want to use Linking.openURL(explorerUrl) here
-                    console.log('Transaction URL:', explorerUrl);
+                    if (__DEV__) {
+                      logger.debug('Transaction URL', { url: explorerUrl }, 'FairSplitScreen');
+                    }
                   }
                 },
                 {

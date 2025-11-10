@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, StyleSheet } from 'react-native';
+import { View, Text, Animated, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme';
 
@@ -7,7 +7,7 @@ interface ModernLoaderProps {
   size?: 'small' | 'medium' | 'large';
   text?: string;
   color?: 'primary' | 'secondary' | 'white';
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }
 
 const ModernLoader: React.FC<ModernLoaderProps> = ({ 
@@ -52,6 +52,8 @@ const ModernLoader: React.FC<ModernLoaderProps> = ({
       spinAnimation.stop();
       pulseAnimation.stop();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // pulseValue and spinValue are Animated.Value objects that shouldn't be in dependencies
   }, []);
 
   const getSizeStyles = () => {

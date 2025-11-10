@@ -5,13 +5,14 @@
 
 // Core Configuration
 export { getConfig } from './unified';
-export { envConfig } from './env';
+// envConfig doesn't exist as named export - use default export instead
+export { default as envConfig } from './env';
 
 // Categorized Configuration
 export * from './firebase';
 export * from './network';
 export * from './constants';
 
-// Platform Configuration
-export { platformConstants } from './platform-constants';
-export { cryptoStub } from './crypto-stub';
+// Platform Configuration - CommonJS modules, import dynamically if needed
+// export { platformConstants } from './platform-constants';
+// export { cryptoStub } from './crypto-stub';

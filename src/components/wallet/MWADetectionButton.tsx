@@ -3,7 +3,7 @@
  * Provides wallet detection and connection functionality
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,17 +13,19 @@ import {
   Alert,
   Modal,
   ScrollView,
-  StyleSheet
+  StyleSheet,
+  ViewStyle,
+  StyleProp
 } from 'react-native';
 import PhosphorIcon from '../shared/PhosphorIcon';
 import { colors } from '../../theme';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import { mwaDiscoveryService, MWADiscoveryResult } from '../../services/blockchain/wallet/discovery/mwaDiscoveryService';
-import { mockMWAService, MockWalletInfo } from '../../services/blockchain/wallet/mockMWAService';
-import { getPlatformInfo } from '../../utils/core/platformDetection';
+import { mwaDiscoveryService } from '../../services/blockchain/wallet/discovery/mwaDiscoveryService';
+import { mockMWAService } from '../../services/blockchain/wallet/mockMWAService';
 import { logger } from '../../services/analytics/loggingService';
 import { safeMWAImport, handleMWAError, isMWAError } from '../../utils/mwaErrorHandler';
+import { getPlatformInfo } from '../../utils/core/platformDetection';
 
 interface MWADetectionButtonProps {
   onWalletDetected: (walletInfo: {
@@ -33,7 +35,7 @@ interface MWADetectionButtonProps {
     isMock?: boolean;
   }) => void;
   disabled?: boolean;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }
 
 interface WalletOption {
@@ -74,63 +76,63 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
   
   useEffect(() => {
     const checkMWAAvailability = async () => {
-      console.log('🔍 Checking MWA availability:', {
+      logger.debug('Checking MWA availability', {
         isExpoGo: platformInfo.isExpoGo,
         environment: platformInfo.environment,
         canUseMWA: platformInfo.canUseMWA
-      });
+      }, 'MWADetectionButton');
       
       // MWA is not available in Expo Go
       if (platformInfo.isExpoGo) {
-        console.log('❌ Expo Go detected, MWA not available');
+        logger.debug('Expo Go detected, MWA not available', null, 'MWADetectionButton');
         setMwaActuallyAvailable(false);
         return;
       }
       
       // Check if platform supports MWA
       if (!platformInfo.canUseMWA) {
-        console.log('❌ Platform does not support MWA');
+        logger.debug('Platform does not support MWA', null, 'MWADetectionButton');
         setMwaActuallyAvailable(false);
         return;
       }
       
       try {
-        console.log('🔄 Attempting to import MWA module...');
+        logger.debug('Attempting to import MWA module', null, 'MWADetectionButton');
         const result = await safeMWAImport();
         
         if (result.success) {
-          console.log('✅ MWA module imported successfully:', {
+          logger.debug('MWA module imported successfully', {
             hasStartRemoteScenario: !!result.module?.startRemoteScenario,
             isAvailable: result.success
-          });
+          }, 'MWADetectionButton');
           setMwaActuallyAvailable(true);
         } else {
-          console.log('❌ MWA module not available:', result.error);
+          logger.debug('MWA module not available', { error: result.error }, 'MWADetectionButton');
           setMwaActuallyAvailable(false);
         }
       } catch (error) {
         handleMWAError(error, 'MWADetectionButton.checkMWAAvailability');
-        console.log('❌ MWA module not available:', error);
+        logger.debug('MWA module not available', { error: error as Record<string, unknown> }, 'MWADetectionButton');
         setMwaActuallyAvailable(false);
       }
     };
     
     checkMWAAvailability();
-  }, [platformInfo.isExpoGo, platformInfo.canUseMWA]);
+  }, [platformInfo.isExpoGo, platformInfo.canUseMWA, platformInfo.environment]);
 
   // Load available wallets when component mounts
   useEffect(() => {
     loadAvailableWallets();
-  }, []);
+  }, [loadAvailableWallets]);
 
-  const loadAvailableWallets = async () => {
+  const loadAvailableWallets = useCallback(async () => {
     try {
       setIsDetecting(true);
       
       if (platformInfo.isExpoGo) {
         // Use mock service for Expo Go
         const mockWallets = mockMWAService.getAvailableWallets();
-        console.log('🔍 Mock wallets from service:', mockWallets);
+        logger.debug('Mock wallets from service', { mockWallets }, 'MWADetectionButton');
         
         const walletOptions: WalletOption[] = mockWallets.map(wallet => ({
           name: wallet.name,
@@ -142,11 +144,11 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
           publicKey: wallet.publicKey
         }));
         
-        console.log('🔍 Mapped wallet options:', walletOptions);
+        logger.debug('Mapped wallet options', { walletOptions }, 'MWADetectionButton');
         setAvailableWallets(walletOptions);
       } else if (mwaActuallyAvailable === false) {
         // MWA not available, show empty state with helpful message
-        console.log('❌ MWA not available, showing empty state');
+        logger.debug('MWA not available, showing empty state', null, 'MWADetectionButton');
         setAvailableWallets([]);
       } else {
         // Use real MWA discovery for development builds
@@ -161,7 +163,7 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
         }));
           setAvailableWallets(walletOptions);
         } catch (discoveryError) {
-          console.error('❌ MWA discovery failed:', discoveryError);
+          logger.error('MWA discovery failed', discoveryError as Record<string, unknown>, 'MWADetectionButton');
           // Fallback to empty state if discovery fails
           setAvailableWallets([]);
         }
@@ -175,7 +177,7 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
       
     } catch (error) {
       handleMWAError(error, 'MWADetectionButton.loadAvailableWallets');
-      logger.error('Failed to load available wallets', error, 'MWADetectionButton');
+      logger.error('Failed to load available wallets', error as Record<string, unknown>, 'MWADetectionButton');
       // Don't show alert for MWA unavailability, just log it
       if (!isMWAError(error)) {
         Alert.alert('Error', 'Failed to detect available wallets');
@@ -183,24 +185,24 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
     } finally {
       setIsDetecting(false);
     }
-  };
+  }, [platformInfo.isExpoGo, platformInfo.environment, mwaActuallyAvailable, availableWallets.length]);
 
   const handleDetectWallets = async () => {
-    console.log('🔍 MWA Detection Button Pressed:', {
+    logger.debug('MWA Detection Button Pressed', {
       disabled,
       mwaActuallyAvailable,
       isDetecting,
       platformInfo: platformInfo.environment
-    });
+    }, 'MWADetectionButton');
     
     if (disabled) {
-      console.log('❌ Button is disabled');
+      logger.debug('Button is disabled', null, 'MWADetectionButton');
       return;
     }
     
     // Check if MWA is available before attempting detection
     if (mwaActuallyAvailable === false && !platformInfo.isExpoGo) {
-      console.log('❌ MWA not available in dev build, showing coming soon message');
+      logger.debug('MWA not available in dev build, showing coming soon message', null, 'MWADetectionButton');
       Alert.alert(
         'Coming Soon! 🚀',
         'Automatic wallet detection is coming soon! For now, you can manually enter your wallet address below.',
@@ -211,17 +213,17 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
     
     // In Expo Go, we always show mock wallets for design purposes
     if (platformInfo.isExpoGo) {
-      console.log('✅ Expo Go detected, showing mock wallets for design');
+      logger.debug('Expo Go detected, showing mock wallets for design', null, 'MWADetectionButton');
     }
     
     try {
-      console.log('✅ Starting wallet detection...');
+      logger.debug('Starting wallet detection', null, 'MWADetectionButton');
       setIsDetecting(true);
       await loadAvailableWallets();
       setShowWalletModal(true);
     } catch (error) {
       handleMWAError(error, 'MWADetectionButton.handleDetectWallets');
-      logger.error('Failed to detect wallets', error, 'MWADetectionButton');
+      logger.error('Failed to detect wallets', error as Record<string, unknown>, 'MWADetectionButton');
       // Only show alert for non-MWA related errors
       if (!isMWAError(error)) {
         Alert.alert('Error', 'Failed to detect wallets. Please try again.');
@@ -302,7 +304,7 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
                       );
                       
                     } catch (mwaError) {
-                      console.error('MWA connection error:', mwaError);
+                      logger.error('MWA connection error', mwaError as Record<string, unknown>, 'MWADetectionButton');
                       
                       // Check if it's a native module error
                       if (mwaError instanceof Error && (
@@ -324,7 +326,7 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
                   }
       
     } catch (error) {
-      logger.error('Failed to connect wallet', error, 'MWADetectionButton');
+      logger.error('Failed to connect wallet', error as Record<string, unknown>, 'MWADetectionButton');
       Alert.alert('Error', 'Failed to connect wallet. Please try again.');
     } finally {
       setIsConnecting(null);
@@ -379,6 +381,10 @@ const MWADetectionButton: React.FC<MWADetectionButtonProps> = ({
           style
         ]}
         onPress={handleButtonPress}
+        accessibilityRole="button"
+        accessibilityLabel={isDetecting ? "Detecting wallets" : "Detect wallets"}
+        accessibilityState={{ disabled: isButtonDisabled }}
+        accessibilityHint="Scans for available mobile wallet adapters"
         // Remove disabled prop so button always responds to clicks
       >
         <View style={styles.detectButtonContent}>

@@ -1186,7 +1186,7 @@ class InternalTransferService {
       // Send transaction with retry logic for blockhash expiration
       logger.info('Sending transaction', null, 'sendInternal');
       let signature: string | undefined;
-      let lastError: any;
+      let lastError: unknown;
       
       try {
         // Try up to 3 times with fresh blockhashes and exponential backoff

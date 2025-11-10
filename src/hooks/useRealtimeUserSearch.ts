@@ -50,7 +50,7 @@ export const useRealtimeUserSearch = (
   
   const subscriptionIdRef = useRef<string | null>(null);
   const isSubscribedRef = useRef(false);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const usersMapRef = useRef<Map<string, User>>(new Map());
   
   // Subscribe to real-time user search updates
@@ -217,12 +217,12 @@ export const useMultipleRealtimeUserSearches = (
   } = options;
   
   const [searchResults, setSearchResults] = useState<Map<string, User[]>>(new Map());
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, _setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Map<string, string>>(new Map());
   
   const subscriptionIdsRef = useRef<Map<string, string>>(new Map());
   const usersMapsRef = useRef<Map<string, Map<string, User>>>(new Map());
-  const debounceTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const debounceTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   
   // Subscribe to all search terms
   const subscribeAll = useCallback(() => {
@@ -312,7 +312,7 @@ export const useMultipleRealtimeUserSearches = (
   
   // Unsubscribe from all search terms
   const unsubscribeAll = useCallback(() => {
-    subscriptionIdsRef.current.forEach((subscriptionId, searchTerm) => {
+    subscriptionIdsRef.current.forEach((subscriptionId, _searchTerm) => {
       realtimeUserSearchService.unsubscribe(subscriptionId);
     });
     subscriptionIdsRef.current.clear();

@@ -37,7 +37,7 @@ import { logger } from '../analytics/loggingService';
 // Data transformation utilities
 export const firebaseDataTransformers = {
   // Transform Firestore timestamp to ISO string
-  timestampToISO: (timestamp: Timestamp | null | any): string => {
+  timestampToISO: (timestamp: Timestamp | null | unknown): string => {
     if (!timestamp) {return new Date().toISOString();}
     if (timestamp.toDate) {return timestamp.toDate().toISOString();}
     if (timestamp.seconds) {return new Date(timestamp.seconds * 1000).toISOString();}
@@ -50,7 +50,7 @@ export const firebaseDataTransformers = {
   },
 
   // Transform Firestore document to User
-  firestoreToUser: (doc: any): User => ({
+  firestoreToUser: (doc: DocumentData): User => ({
     id: doc.id,
     name: doc.data().name || '',
     email: doc.data().email || '',
@@ -85,8 +85,8 @@ export const firebaseDataTransformers = {
   }),
 
   // Transform User to Firestore data
-  userToFirestore: (user: Omit<User, 'id' | 'created_at'>): any => {
-    const data: any = {
+  userToFirestore: (user: Omit<User, 'id' | 'created_at'>): DocumentData => {
+    const data: DocumentData = {
       updated_at: serverTimestamp()
     };
     
@@ -125,7 +125,7 @@ export const firebaseDataTransformers = {
   },
 
   // Transform Firestore document to UserContact
-  firestoreToUserContact: (doc: any): UserContact => ({
+  firestoreToUserContact: (doc: DocumentData): UserContact => ({
     id: doc.id,
     name: doc.data().name || '',
     email: doc.data().email || '',
@@ -153,8 +153,8 @@ export const firebaseDataTransformers = {
   }),
 
   // Transform UserContact to Firestore data
-  userContactToFirestore: (contact: Omit<UserContact, 'id' | 'created_at'>): any => {
-    const data: any = {
+  userContactToFirestore: (contact: Omit<UserContact, 'id' | 'created_at'>): DocumentData => {
+    const data: DocumentData = {
       name: contact.name || '',
       email: contact.email || '',
       wallet_address: contact.wallet_address || '',
@@ -216,7 +216,7 @@ export const firebaseDataTransformers = {
   },
 
   // Transform Firestore document to Notification
-  firestoreToNotification: (doc: any): Notification => ({
+  firestoreToNotification: (doc: DocumentData): Notification => ({
     id: doc.id,
     type: doc.data().type || 'general',
     title: doc.data().title || '',
@@ -228,7 +228,7 @@ export const firebaseDataTransformers = {
   }),
 
   // Transform Notification to Firestore data
-  notificationToFirestore: (notification: Omit<Notification, 'id' | 'created_at'>): any => ({
+  notificationToFirestore: (notification: Omit<Notification, 'id' | 'created_at'>): DocumentData => ({
     type: notification.type,
     title: notification.title,
     message: notification.message,
@@ -239,7 +239,7 @@ export const firebaseDataTransformers = {
   }),
 
   // Transform Firestore document to Transaction
-  firestoreToTransaction: (doc: any): Transaction => ({
+  firestoreToTransaction: (doc: DocumentData): Transaction => ({
     id: doc.id,
     type: doc.data().type || 'send',
     amount: doc.data().amount || 0,
@@ -262,7 +262,7 @@ export const firebaseDataTransformers = {
   }),
 
   // Transform Transaction to Firestore data
-  transactionToFirestore: (transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>): any => ({
+  transactionToFirestore: (transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>): DocumentData => ({
     type: transaction.type,
     amount: transaction.amount,
     currency: transaction.currency,
@@ -897,7 +897,7 @@ export const firebaseDataService = {
       }
     },
 
-    addLinkedWallet: async (userId: string, walletData: any): Promise<{ success: boolean; walletId?: string; error?: string }> => {
+    addLinkedWallet: async (userId: string, walletData: Record<string, unknown>): Promise<{ success: boolean; walletId?: string; error?: string }> => {
       try {
         logger.info('Adding linked wallet', { userId, type: walletData.type }, 'FirebaseDataService');
         
@@ -939,7 +939,7 @@ export const firebaseDataService = {
       }
     },
 
-    updateLinkedWallet: async (walletId: string, updates: any): Promise<{ success: boolean; error?: string }> => {
+    updateLinkedWallet: async (walletId: string, updates: Record<string, unknown>): Promise<{ success: boolean; error?: string }> => {
       try {
         logger.info('Updating linked wallet', { walletId }, 'FirebaseDataService');
         

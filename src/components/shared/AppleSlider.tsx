@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Animated, StyleSheet, Dimensions, Platform, PanResponder } from 'react-native';
+import { View, Animated, StyleSheet, Dimensions, Platform, PanResponder, ViewStyle, StyleProp } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import PhosphorIcon from './PhosphorIcon';
@@ -11,7 +11,7 @@ interface AppleSliderProps {
   disabled?: boolean;
   loading?: boolean;
   text?: string;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }
 
 const AppleSlider: React.FC<AppleSliderProps> = ({ 
@@ -29,8 +29,8 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
   const maxSlideDistance = screenWidth - horizontalPadding - sliderPadding - thumbWidth/2;
   
   const sliderValue = useRef(new Animated.Value(0)).current;
-  const [isSliderActive, setIsSliderActive] = useState(false);
   const [dots, setDots] = useState('');
+  const [_isSliderActive, setIsSliderActive] = useState(false);
 
   // Animation for loading dots
   useEffect(() => {
@@ -45,6 +45,8 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
     } else {
       setDots('');
     }
+    // Return undefined if no cleanup needed
+    return undefined;
   }, [loading]);
 
   // Debug logging for slider props
@@ -63,7 +65,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
     [{ nativeEvent: { translationX: sliderValue } }],
     { 
       useNativeDriver: false,
-      listener: (event: any) => {
+      listener: (event: { nativeEvent: { translationX: number } }) => {
         const translationX = event.nativeEvent.translationX;
         const newValue = Math.max(0, Math.min(translationX, maxSlideDistance));
         sliderValue.setValue(newValue);
@@ -244,7 +246,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
           pointerEvents="none"
           style={{
             ...StyleSheet.absoluteFillObject,
-            opacity: getTrackOpacity() as any,
+            opacity: getTrackOpacity(),
             borderRadius: 28,
           }}
         >

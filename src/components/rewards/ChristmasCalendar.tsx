@@ -3,7 +3,7 @@
  * Displays the advent calendar (24 days) with gift claiming functionality
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,6 @@ import { christmasCalendarService } from '../../services/rewards/christmasCalend
 import { getGiftForDay } from '../../services/rewards/christmasCalendarConfig';
 import {
   ChristmasCalendarStatus,
-  ChristmasCalendarDay,
   Gift,
   PointsGift,
   BadgeGift,
@@ -44,12 +43,26 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [bypassMode, setBypassMode] = useState(false);
 
+  // Load calendar status function
+  const loadCalendarStatus = useCallback(async () => {
+    try {
+      setLoading(true);
+      const userTimezone = christmasCalendarService.getUserTimezone();
+      const status = await christmasCalendarService.getUserCalendarStatus(userId, userTimezone);
+      setStatus(status);
+    } catch (error) {
+      console.error('Failed to load calendar status:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
   useEffect(() => {
     // Check if bypass mode is enabled
     const isBypassEnabled = christmasCalendarService.isBypassModeEnabled();
     setBypassMode(isBypassEnabled);
     loadCalendarStatus();
-  }, [userId]);
+  }, [loadCalendarStatus]);
 
   const toggleBypassMode = () => {
     const newBypassState = !bypassMode;
@@ -59,27 +72,15 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
     loadCalendarStatus();
   };
 
-  const loadCalendarStatus = async () => {
-    try {
-      setLoading(true);
-      const userTimezone = christmasCalendarService.getUserTimezone();
-      const calendarStatus = await christmasCalendarService.getUserCalendarStatus(
-        userId,
-        userTimezone
-      );
-      setStatus(calendarStatus);
-    } catch (error) {
-      console.error('Failed to load calendar status:', error);
-      Alert.alert('Error', 'Failed to load Christmas calendar. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDayPress = async (day: number) => {
-    if (!status) return;
+    if (!status) { return; }
 
     const dayData = status.days[day - 1];
+    
+    // If dayData is undefined, return early
+    if (!dayData) {
+      return;
+    }
     
     // If already claimed, show what was claimed
     if (dayData.claimed) {
@@ -106,7 +107,7 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   };
 
   const handleClaimGift = async () => {
-    if (!selectedDay || !status) return;
+    if (!selectedDay || !status) { return; }
 
     try {
       setClaiming(selectedDay);
@@ -151,9 +152,11 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   };
 
   const renderDay = (day: number) => {
-    if (!status) return null;
+    if (!status) { return null; }
 
     const dayData = status.days[day - 1];
+    if (!dayData) { return null; }
+    
     const isToday = status.todayDay === day;
     const isClaimed = dayData.claimed;
     const userTimezone = christmasCalendarService.getUserTimezone();
@@ -167,21 +170,21 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
     let iconColor = colors.textLightSecondary;
 
     if (isClaimed) {
-      dayStyle = [styles.day, styles.dayClaimed];
-      dayTextStyle = [styles.dayText, styles.dayTextClaimed];
+      dayStyle = [styles.day, styles.dayClaimed] as any;
+      dayTextStyle = [styles.dayText, styles.dayTextClaimed] as any;
       iconName = 'CheckCircle';
       iconColor = colors.brandGreen;
     } else if (isToday) {
-      dayStyle = [styles.day, styles.dayToday];
-      dayTextStyle = [styles.dayText, styles.dayTextToday];
+      dayStyle = [styles.day, styles.dayToday] as any;
+      dayTextStyle = [styles.dayText, styles.dayTextToday] as any;
       iconName = 'Gift';
       iconColor = colors.brandGreen;
     } else if (isAvailable) {
-      dayStyle = [styles.day, styles.dayAvailable];
+      dayStyle = [styles.day, styles.dayAvailable] as any;
       iconName = 'Gift';
       iconColor = colors.textLight;
     } else {
-      dayStyle = [styles.day, styles.dayLocked];
+      dayStyle = [styles.day, styles.dayLocked] as any;
       iconName = 'Lock';
       iconColor = colors.textLightSecondary;
     }
@@ -213,15 +216,17 @@ const ChristmasCalendar: React.FC<ChristmasCalendarProps> = ({
   };
 
   const renderGiftModal = () => {
-    if (!selectedDay || !status) return null;
+    if (!selectedDay || !status) { return null; }
 
     const dayData = status.days[selectedDay - 1];
+    if (!dayData) { return null; }
+    
     const giftConfig = getGiftForDay(selectedDay);
     const isClaimed = dayData.claimed;
     const userTimezone = christmasCalendarService.getUserTimezone();
     const canClaim = christmasCalendarService.canClaimDay(selectedDay, userTimezone);
 
-    if (!giftConfig) return null;
+    if (!giftConfig) { return null; }
 
     const gift = isClaimed && dayData.gift_data ? dayData.gift_data : giftConfig.gift;
 
@@ -471,7 +476,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.white20,
+    borderColor: colors.white10,
     marginTop: spacing.md,
   },
   bypassButtonActive: {

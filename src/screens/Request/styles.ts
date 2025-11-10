@@ -370,5 +370,71 @@ export const styles = StyleSheet.create({
     width: '100%',
     marginBottom: spacing.md,
   },
+  // Request QR Code styles
+  requestQRContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  requestQRTitle: {
+    ...typography.textStyles.h3,
+    color: colors.textLight,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  requestQRCodeContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  requestQRCodeContainerWrapper: {
+    backgroundColor: colors.white,
+    borderRadius: spacing.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  requestQRCodeContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  requestQRCodePlaceholder: {
+    width: 160,
+    height: 160,
+    backgroundColor: colors.white10,
+    borderRadius: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  requestQRCodePlaceholderText: {
+    ...typography.textStyles.caption,
+    color: colors.textLightSecondary,
+  },
+  requestQRUserInfo: {
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  requestQRUserName: {
+    ...typography.textStyles.body,
+    color: colors.textLight,
+    fontWeight: typography.fontWeight.semibold,
+    marginBottom: spacing.xs,
+  },
+  requestQRUserWallet: {
+    ...typography.textStyles.caption,
+    color: colors.textLightSecondary,
+  },
+  requestDoneButton: {
+    backgroundColor: colors.primaryGreen,
+    borderRadius: spacing.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  requestDoneButtonText: {
+    ...typography.textStyles.body,
+    color: colors.white,
+    fontWeight: typography.fontWeight.semibold,
+  },
 
 }); 

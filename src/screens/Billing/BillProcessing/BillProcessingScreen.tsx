@@ -8,27 +8,24 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   Alert,
   ScrollView,
   ActivityIndicator,
-  Image,
   StatusBar,
   TextInput,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { colors } from '../../../theme/colors';
-import { spacing } from '../../../theme/spacing';
-import { typography } from '../../../theme/typography';
 import { styles } from './BillProcessingStyles';
-import { BillItem, OCRProcessingResult, BillSplitCreationData } from '../../../types/billSplitting';
-import { BillAnalysisData, BillAnalysisResult, ProcessedBillData } from '../../../types/billAnalysis';
+import { BillItem, BillSplitCreationData } from '../../../types/billSplitting';
+import { BillAnalysisResult, ProcessedBillData } from '../../../types/billAnalysis';
 import { consolidatedBillAnalysisService } from '../../../services/billing';
 import { useApp } from '../../../context/AppContext';
 import { SplitStorageService } from '../../../services/splits/splitStorageService';
 import { notificationService } from '../../../services/notifications';
 import { Container } from '../../../components/shared';
 import Header from '../../../components/shared/Header';
+import { logger } from '../../../services/analytics/loggingService';
 
 interface RouteParams {
   imageUri: string;
@@ -46,13 +43,7 @@ interface BillProcessingScreenProps {
 
 const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation }) => {
   const route = useRoute();
-  const { imageUri, billData, processedBillData, analysisResult, isEditing, existingSplitId, existingSplitData } = route.params as RouteParams;
-  
-  console.log('🔍 BillProcessingScreen: Component mounted', {
-    routeParams: route.params,
-    hasImageUri: !!imageUri,
-    isNewBill: (route.params as any)?.isNewBill
-  });
+  const { imageUri, processedBillData, analysisResult, isEditing, existingSplitId, existingSplitData } = route.params as RouteParams;
   
   const { state } = useApp();
   const { currentUser } = state;
@@ -98,7 +89,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
     isEditing && existingSplitData ? existingSplitData.totalAmount.toString() :
     isEditing && processedBillData ? processedBillData.totalAmount.toString() : '61.95'
   );
-  const [currency, setCurrency] = useState('EUR');
+  const [currency] = useState('EUR');
   const [convertedAmount, setConvertedAmount] = useState('65.6');
 
   // Category options with icons
@@ -118,19 +109,21 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
 
   // Auto-proceed to split creation when OCR AI processing is complete - ENHANCED ERROR HANDLING
   useEffect(() => {
-    console.log('🔍 BillProcessingScreen: Auto-proceed useEffect triggered', {
-      hasCurrentProcessedBillData: !!currentProcessedBillData,
-      isEditing,
-      processingResultSuccess: processingResult?.success,
-      processingResult: processingResult
-    });
+    if (__DEV__) {
+      logger.debug('Auto-proceed useEffect triggered', {
+        hasCurrentProcessedBillData: !!currentProcessedBillData,
+        isEditing,
+        processingResultSuccess: processingResult?.success,
+        processingResult: processingResult
+      }, 'BillProcessingScreen');
+    }
     
     if (currentProcessedBillData && !isEditing && processingResult?.success) {
       // Validate processed data before auto-proceeding
       const validation = consolidatedBillAnalysisService.validateProcessedBillData(currentProcessedBillData);
       
       if (!validation.isValid) {
-        console.error('❌ BillProcessingScreen: Validation failed before auto-proceed', validation.errors);
+        logger.error('Validation failed before auto-proceed', { errors: validation.errors }, 'BillProcessingScreen');
         setIsProcessing(false);
         Alert.alert(
           'Data Validation Error', 
@@ -145,23 +138,25 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
       }
 
       // OCR AI processing complete and validated, auto-proceeding to split creation
-      console.log('🚀 BillProcessingScreen: Auto-proceeding to split creation', {
-        hasProcessedData: !!currentProcessedBillData,
-        totalAmount: currentProcessedBillData.totalAmount,
-        currency: currentProcessedBillData.currency,
-        itemCount: currentProcessedBillData.items.length,
-        participantsCount: currentProcessedBillData.participants.length
-      });
+      if (__DEV__) {
+        logger.debug('Auto-proceeding to split creation', {
+          hasProcessedData: !!currentProcessedBillData,
+          totalAmount: currentProcessedBillData.totalAmount,
+          currency: currentProcessedBillData.currency,
+          itemCount: currentProcessedBillData.items.length,
+          participantsCount: currentProcessedBillData.participants.length
+        }, 'BillProcessingScreen');
+      }
       
       // Add timeout to prevent infinite loading
       const timeoutId = setTimeout(() => {
-        console.error('❌ BillProcessingScreen: Auto-proceed timeout');
+        logger.error('Auto-proceed timeout', null, 'BillProcessingScreen');
         setIsProcessing(false);
         Alert.alert('Timeout', 'Processing is taking too long. Please try again.');
       }, 10000); // 10 second timeout
       
       proceedToSplitDetails().catch(error => {
-        console.error('❌ BillProcessingScreen: Auto-proceed failed:', error);
+        logger.error('Auto-proceed failed', error as Record<string, unknown>, 'BillProcessingScreen');
         clearTimeout(timeoutId);
         setIsProcessing(false);
         Alert.alert('Error', 'Failed to create split automatically. Please try again.');
@@ -233,7 +228,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         }
         
         // For other errors, show user options instead of automatic fallback
-        console.error('❌ BillProcessingScreen: AI analysis failed', analysisResult.error);
+        logger.error('AI analysis failed', { error: analysisResult.error }, 'BillProcessingScreen');
         setIsProcessing(false);
         setIsAIProcessing(false);
         
@@ -268,7 +263,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         
         // Handle case where total amount is 0 (common with simulator/black images)
         if (processedData.totalAmount === 0 || processedData.items.length === 0) {
-          console.log('⚠️ BillProcessingScreen: Total amount is 0 or no items, using fallback values');
+          // Total amount is 0 or no items, using fallback values
           processedData.totalAmount = 25.50; // Fallback amount for testing
           
           // Ensure we have at least one item with proper structure
@@ -289,14 +284,16 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
             processedData.totalAmount = processedData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             if (processedData.totalAmount === 0) {
               processedData.totalAmount = 25.50;
-              processedData.items[0].price = 25.50;
+              if (processedData.items && processedData.items.length > 0) {
+                processedData.items[0].price = 25.50;
+              }
             }
           }
         }
 
         // ENHANCED: Ensure participants array is properly populated for OCR AI flow
         if (!processedData.participants || processedData.participants.length === 0) {
-          console.log('⚠️ BillProcessingScreen: No participants found, adding current user');
+          // No participants found, adding current user
           processedData.participants = [
             {
               id: currentUser?.id || `${processedData.id}_participant_1`,
@@ -312,7 +309,9 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
 
         // ENHANCED: Ensure settings are properly set
         if (!processedData.settings) {
-          console.log('⚠️ BillProcessingScreen: No settings found, adding default settings');
+          if (__DEV__) {
+            logger.debug('No settings found, adding default settings', null, 'BillProcessingScreen');
+          }
           processedData.settings = {
             allowPartialPayments: true,
             requireAllAccept: false,
@@ -327,11 +326,13 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
       
         // Set the authoritative price in the price management service immediately
         const { priceManagementService } = await import('../../../services/core');
-        console.log('💰 BillProcessingScreen: Setting bill price', {
-          billId: processedData.id,
-          totalAmount: processedData.totalAmount,
-          currency: processedData.currency || 'USDC'
-        });
+        if (__DEV__) {
+          logger.debug('Setting bill price', {
+            billId: processedData.id,
+            totalAmount: processedData.totalAmount,
+            currency: processedData.currency || 'USDC'
+          }, 'BillProcessingScreen');
+        }
         priceManagementService.setBillPrice(
           processedData.id,
           processedData.totalAmount,
@@ -340,7 +341,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         
         // Final safety check - ensure we have valid data
         if (processedData.items.length === 0 || processedData.totalAmount <= 0) {
-          console.log('🔧 BillProcessingScreen: Final safety check - adding fallback data');
+          // Final safety check - adding fallback data
           processedData.items = [
             {
               id: `${processedData.id}_item_0`,
@@ -356,14 +357,26 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         }
         
         // Update form fields with processed data - OPTIMIZED
-        updateFormWithProcessedData(processedData);
+        // Convert BillAnalysisData to ProcessedBillData format
+        const processedBillData: ProcessedBillData = {
+          id: processedData.id,
+          title: processedData.title,
+          totalAmount: processedData.totalAmount,
+          currency: processedData.currency,
+          date: processedData.time || new Date().toISOString().split('T')[0],
+          merchant: processedData.location || '',
+          items: processedData.items,
+          participants: processedData.participants,
+          settings: processedData.settings
+        };
+        updateFormWithProcessedData(processedBillData);
       } else {
         Alert.alert('Processing Failed', analysisResult.error || 'Failed to process bill image');
         setIsProcessing(false); // Set to false when processing fails
       }
       
     } catch (error) {
-      console.error('Error processing bill:', error);
+      logger.error('Error processing bill', error as Record<string, unknown>, 'BillProcessingScreen');
       const errorResult: BillAnalysisResult = {
         success: false,
         error: 'Failed to process bill image. Please try again.',
@@ -382,7 +395,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
   /**
    * Update form fields with processed bill data
    */
-  const updateFormWithProcessedData = (processedData: any) => {
+  const updateFormWithProcessedData = (processedData: ProcessedBillData) => {
     // Update legacy state for backward compatibility
     setExtractedItems(processedData.items.map(item => ({
       id: item.id,
@@ -406,45 +419,45 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
   };
 
 
-  const extractMerchantName = (rawText: string): string => {
-    // Simple merchant extraction - replace with more sophisticated logic
-    const lines = rawText.split('\n');
-    const firstLine = lines[0]?.trim();
-    return firstLine || 'Unknown Merchant';
-  };
-
-  const addItem = () => {
-    const newItem: BillItem = {
-      id: Date.now().toString(),
-      name: '',
-      price: 0,
-      quantity: 1,
-      category: 'Other',
-      total: 0,
-      participants: [],
-    };
-    setExtractedItems([...extractedItems, newItem]);
-  };
-
-  const updateItem = (id: string, field: keyof BillItem, value: any) => {
-    setExtractedItems(items =>
-      items.map(item =>
-        item.id === id ? { ...item, [field]: value } : item
-      )
-    );
-  };
-
-  const removeItem = (id: string) => {
-    setExtractedItems(items => items.filter(item => item.id !== id));
-  };
-
-  const recalculateTotal = () => {
-    const newTotal = extractedItems.reduce(
-      (sum, item) => sum + (item.price * (item.quantity || 1)),
-      0
-    );
-    setTotalAmount(newTotal);
-  };
+  // Legacy functions - not currently used but may be needed for future features
+  // const extractMerchantName = (rawText: string): string => {
+  //   const lines = rawText.split('\n');
+  //   const firstLine = lines[0]?.trim();
+  //   return firstLine || 'Unknown Merchant';
+  // };
+  // 
+  // const addItem = () => {
+  //   const newItem: BillItem = {
+  //     id: Date.now().toString(),
+  //     name: '',
+  //     price: 0,
+  //     quantity: 1,
+  //     category: 'Other',
+  //     total: 0,
+  //     participants: [],
+  //   };
+  //   setExtractedItems([...extractedItems, newItem]);
+  // };
+  // 
+  // const updateItem = (id: string, field: keyof BillItem, value: any) => {
+  //   setExtractedItems(items =>
+  //     items.map(item =>
+  //       item.id === id ? { ...item, [field]: value } : item
+  //     )
+  //   );
+  // };
+  // 
+  // const removeItem = (id: string) => {
+  //   setExtractedItems(items => items.filter(item => item.id !== id));
+  // };
+  // 
+  // const recalculateTotal = () => {
+  //   const newTotal = extractedItems.reduce(
+  //     (sum, item) => sum + (item.price * (item.quantity || 1)),
+  //     0
+  //   );
+  //   setTotalAmount(newTotal);
+  // };
 
   /**
    * OPTIMIZED: Create Split without Wallet - Navigate to Split Details
@@ -507,24 +520,28 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
 
       // Validate the processed data
       if (currentProcessedData) {
-        console.log('🔍 BillProcessingScreen: Validating processed data', {
-          totalAmount: currentProcessedData.totalAmount,
-          itemCount: currentProcessedData.items.length,
-          items: currentProcessedData.items.map(item => ({
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity
-          }))
-        });
+        if (__DEV__) {
+          logger.debug('Validating processed data', {
+            totalAmount: currentProcessedData.totalAmount,
+            itemCount: currentProcessedData.items.length,
+            items: currentProcessedData.items.map(item => ({
+              name: item.name,
+              price: item.price,
+              quantity: item.quantity
+            }))
+          }, 'BillProcessingScreen');
+        }
         
         const validation = consolidatedBillAnalysisService.validateProcessedBillData(currentProcessedData);
         if (!validation.isValid) {
-          console.error('❌ BillProcessingScreen: Validation failed', validation.errors);
+          logger.error('Validation failed', { errors: validation.errors }, 'BillProcessingScreen');
           Alert.alert('Validation Error', validation.errors.join('\n'));
           return;
         }
         
-        console.log('✅ BillProcessingScreen: Validation passed');
+        if (__DEV__) {
+          logger.debug('Validation passed', null, 'BillProcessingScreen');
+        }
       }
 
       // Data validated, creating split - NO WALLET CREATION
@@ -604,7 +621,7 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
             Alert.alert('Error', updateResult.error || 'Failed to update split');
           }
         } catch (error) {
-          console.error('🔍 BillProcessingScreen: Error updating split:', error);
+          logger.error('Error updating split', error as Record<string, unknown>, 'BillProcessingScreen');
           Alert.alert('Error', 'Failed to update split');
         }
         return;
@@ -616,24 +633,28 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
         throw new Error('No processed bill data available for split creation');
       }
 
-      console.log('🔍 BillProcessingScreen: Navigating to SplitDetails for OCR bill', {
-        title: currentProcessedData.title,
-        totalAmount: currentProcessedData.totalAmount,
-        participantsCount: currentProcessedData.participants?.length || 0,
-        participants: currentProcessedData.participants,
-        itemsCount: currentProcessedData.items?.length || 0,
-        currency: currentProcessedData.currency,
-        merchant: currentProcessedData.merchant
-      });
+      if (__DEV__) {
+        logger.debug('Navigating to SplitDetails for OCR bill', {
+          title: currentProcessedData.title,
+          totalAmount: currentProcessedData.totalAmount,
+          participantsCount: currentProcessedData.participants?.length || 0,
+          participants: currentProcessedData.participants,
+          itemsCount: currentProcessedData.items?.length || 0,
+          currency: currentProcessedData.currency,
+          merchant: currentProcessedData.merchant
+        }, 'BillProcessingScreen');
+      }
 
       // Navigate to SplitDetails with processed data - no split creation here
       try {
-        console.log('🔍 BillProcessingScreen: Navigating to SplitDetails with new bill data', {
-          splitId: undefined,
-          isNewBill: true,
-          isManualCreation: false,
-          hasProcessedBillData: !!currentProcessedData
-        });
+        if (__DEV__) {
+          logger.debug('Navigating to SplitDetails with new bill data', {
+            splitId: undefined,
+            isNewBill: true,
+            isManualCreation: false,
+            hasProcessedBillData: !!currentProcessedData
+          }, 'BillProcessingScreen');
+        }
         
         // Use replace to ensure clean navigation state
         const navigationParams = {
@@ -679,33 +700,39 @@ const BillProcessingScreen: React.FC<BillProcessingScreenProps> = ({ navigation 
           // splitWallet removed - will be created in FairSplit/DegenLock screens
         };
         
-        console.log('🔍 BillProcessingScreen: Navigation params prepared', {
-          isNewBill: navigationParams.isNewBill,
-          isManualCreation: navigationParams.isManualCreation,
-          splitId: navigationParams.splitId,
-          hasBillData: !!navigationParams.billData,
-          hasProcessedBillData: !!navigationParams.processedBillData
-        });
+        if (__DEV__) {
+          logger.debug('Navigation params prepared', {
+            isNewBill: navigationParams.isNewBill,
+            isManualCreation: navigationParams.isManualCreation,
+            splitId: navigationParams.splitId,
+            hasBillData: !!navigationParams.billData,
+            hasProcessedBillData: !!navigationParams.processedBillData
+          }, 'BillProcessingScreen');
+        }
         
         // Navigate directly to SplitDetailsScreen - let it handle split creation
         // This prevents duplicate split creation (same as manual flow)
-        console.log('🔍 BillProcessingScreen: Navigating to SplitDetails for OCR bill', {
-          title: currentProcessedData.title,
-          totalAmount: currentProcessedData.totalAmount,
-          participantsCount: currentProcessedData.participants?.length || 0
-        });
+        if (__DEV__) {
+          logger.debug('Navigating to SplitDetails for OCR bill', {
+            title: currentProcessedData.title,
+            totalAmount: currentProcessedData.totalAmount,
+            participantsCount: currentProcessedData.participants?.length || 0
+          }, 'BillProcessingScreen');
+        }
         
         // Use the same navigation method as manual flow
         navigation.navigate('SplitDetails', navigationParams);
         
-        console.log('✅ BillProcessingScreen: Successfully navigated to SplitDetails');
+        if (__DEV__) {
+          logger.debug('Successfully navigated to SplitDetails', null, 'BillProcessingScreen');
+        }
       } catch (navigationError) {
-        console.error('❌ BillProcessingScreen: Navigation failed:', navigationError);
+        logger.error('Navigation failed', navigationError as Record<string, unknown>, 'BillProcessingScreen');
         throw new Error('Failed to navigate to split details');
       }
       
     } catch (error) {
-      console.error('❌ BillProcessingScreen: Error creating OCR AI split:', error);
+      logger.error('Error creating OCR AI split', error as Record<string, unknown>, 'BillProcessingScreen');
       Alert.alert('Error', 'Failed to create split. Please try again.');
     }
   };

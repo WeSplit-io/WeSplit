@@ -172,7 +172,7 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       // Save withdrawal transaction to database for history
       if (currentUser?.id && transactionResult?.signature) {
         try {
-          const { firebaseTransactionService } = await import('../../services/data');
+          const { firebaseDataService } = await import('../../services/data');
           
           const transactionData = {
             type: 'withdraw' as const,
@@ -190,7 +190,7 @@ const WithdrawConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
             net_amount: safeTotalWithdraw
           };
           
-          await firebaseTransactionService.createTransaction(transactionData);
+          await firebaseDataService.transaction.createTransaction(transactionData);
           logger.info('✅ Withdrawal transaction saved to database', {
             signature: transactionResult.signature,
             userId: currentUser.id,

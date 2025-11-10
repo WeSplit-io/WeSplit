@@ -3,7 +3,7 @@
  * Provides user interface for wallet recovery when data loss is detected
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -56,13 +56,7 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
   const [recoveryStep, setRecoveryStep] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (visible) {
-      loadRecoveryReport();
-    }
-  }, [visible]);
-
-  const loadRecoveryReport = async () => {
+  const loadRecoveryReport = useCallback(async () => {
     try {
       setLoading(true);
       // Get basic recovery information
@@ -77,11 +71,17 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
       };
       setRecoveryReport(report);
     } catch (error) {
-      logger.error('Failed to load recovery report', error, 'WalletRecoveryModal');
+      logger.error('Failed to load recovery report', error as Record<string, unknown>, 'WalletRecoveryModal');
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, expectedWalletAddress]);
+
+  useEffect(() => {
+    if (visible) {
+      loadRecoveryReport();
+    }
+  }, [visible, loadRecoveryReport]);
 
   const handleAutomaticRecovery = async () => {
     try {
@@ -104,7 +104,10 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
             {
               text: 'Continue',
               onPress: () => {
-                onRecoverySuccess(result.wallet!);
+                onRecoverySuccess({
+                  ...result.wallet!,
+                  recoveryMethod: 'automatic' // Default recovery method
+                });
                 onClose();
               }
             }
@@ -118,7 +121,7 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
     } catch (error) {
       setRecoveryStep('Recovery failed');
       const errorMessage = error instanceof Error ? error.message : 'Recovery failed';
-      logger.error('Wallet recovery failed via UI', error, 'WalletRecoveryModal');
+      logger.error('Wallet recovery failed via UI', error as Record<string, unknown>, 'WalletRecoveryModal');
       onRecoveryFailed(errorMessage);
     } finally {
       setIsRecovering(false);
@@ -208,7 +211,7 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
           <View style={styles.warningContainer}>
             <Text style={styles.warningTitle}>⚠️ Wallet Data Issue Detected</Text>
             <Text style={styles.warningText}>
-              We detected that your wallet data in local storage doesn't match your database wallet. 
+              We detected that your wallet data in local storage doesn&apos;t match your database wallet. 
               This can happen after app updates or device changes.
             </Text>
           </View>
@@ -397,7 +400,7 @@ const styles = StyleSheet.create({
   secondaryButton: {
     backgroundColor: colors.white10,
     borderWidth: 1,
-    borderColor: colors.white30,
+    borderColor: colors.white10,
   },
   buttonText: {
     fontSize: typography.fontSize.md,

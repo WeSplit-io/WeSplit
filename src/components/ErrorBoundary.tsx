@@ -61,7 +61,7 @@ class ErrorBoundary extends Component<Props, State> {
               textAlign: 'center',
               marginBottom: 20 
             }}>
-              We're sorry, but something unexpected happened. Please try again.
+              We&apos;re sorry, but something unexpected happened. Please try again.
             </Text>
             <TouchableOpacity
               style={{

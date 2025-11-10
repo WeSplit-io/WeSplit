@@ -48,7 +48,7 @@ const AuthMethodsScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [hasHandledAuthState, setHasHandledAuthState] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
-  const [emailSaveTimeout, setEmailSaveTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [emailSaveTimeout, setEmailSaveTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   // Email validation function
   const isValidEmail = (email: string): boolean => {
@@ -288,6 +288,9 @@ const AuthMethodsScreen: React.FC = () => {
           if (!querySnapshot.empty) {
             // User exists in Firestore, get the user data
             const userDoc = querySnapshot.docs[0];
+            if (!userDoc) {
+              throw new Error('User document not found');
+            }
             const userData = userDoc.data();
 
             if (__DEV__) { logger.debug('Found existing user in Firestore', { userData }, 'AuthMethodsScreen'); }
@@ -531,6 +534,9 @@ const AuthMethodsScreen: React.FC = () => {
           if (!querySnapshot.empty) {
             // User exists in Firestore, get the user data
             const userDoc = querySnapshot.docs[0];
+            if (!userDoc) {
+              throw new Error('User document not found');
+            }
             const userData = userDoc.data();
 
             if (__DEV__) { logger.debug('Found existing user in Firestore', { userData }, 'AuthMethodsScreen'); }

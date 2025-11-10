@@ -40,10 +40,13 @@ export class TransactionWalletManager {
         }
       }
       
-      console.warn('🔗 TransactionWalletManager: Failed to load wallet');
+      logger.warn('Failed to load wallet', { userId }, 'TransactionWalletManager');
       return false;
     } catch (error) {
-      console.error('🔗 TransactionWalletManager: Error loading wallet:', error);
+      logger.error('Error loading wallet', { 
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, 'TransactionWalletManager');
       return false;
     }
   }

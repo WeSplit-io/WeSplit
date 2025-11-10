@@ -10,7 +10,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { 
   CheckCircle, 
-  ArrowsClockwise, 
   User, 
   HandCoins, 
   PiggyBank, 
@@ -30,7 +29,7 @@ interface NotificationCardProps {
 
 const NotificationCard: React.FC<NotificationCardProps> = ({
   notification,
-  onPress,
+  onPress: _onPress,
   onActionPress,
   actionState,
   fadeAnimation

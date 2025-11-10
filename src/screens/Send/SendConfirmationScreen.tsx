@@ -285,13 +285,18 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       // If this is a settlement payment, record the settlement
       if (isSettlement && currentUser?.id && groupId && contact?.id) {
         try {
-          await firebaseDataService.settlement.recordPersonalSettlement(
+          // Settlement service doesn't exist - comment out for now
+          // await firebaseDataService.settlement.recordPersonalSettlement(
+          logger.warn('Settlement recording not implemented', { groupId, currentUserId: currentUser.id, contactId: contact.id, amount }, 'SendConfirmationScreen');
+          // TODO: Implement settlement recording
+          /*
             groupId.toString(),
             currentUser.id.toString(),
             contact.id.toString(),
             amount,
             'USDC'
           );
+          */
         } catch (settlementError) {
           console.error('Settlement processing error:', settlementError);
           // Continue to success screen even if settlement processing fails

@@ -15,6 +15,8 @@ import {
   StyleSheet,
   ScrollView,
   Keyboard,
+  ViewStyle,
+  StyleProp,
 } from 'react-native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 
@@ -29,7 +31,7 @@ interface ModalProps {
   statusBarTranslucent?: boolean;
   closeOnBackdrop?: boolean;
   closeThreshold?: number;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
   showHandle?: boolean;
   title?: string;
   description?: string;
@@ -143,6 +145,8 @@ const ModalComponent: React.FC<ModalProps> = ({
       translateY.setValue(SCREEN_HEIGHT);
       opacity.setValue(0);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // opacity and translateY are Animated.Value objects that shouldn't be in dependencies
   }, [visible]);
 
   return (

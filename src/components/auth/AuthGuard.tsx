@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { NavigationContainerRef } from '@react-navigation/native';
 import { colors, spacing, typography } from '../../theme';
 import { useApp } from '../../context/AppContext';
 
 interface AuthGuardProps {
   children: React.ReactNode;
-  navigation: any;
+  navigation: NavigationContainerRef<Record<string, object | undefined>> | { replace: (route: string) => void } | { navigate: (route: string) => void };
 }
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ children, navigation }) => {
@@ -19,7 +20,13 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, navigation }) => {
         <Text style={styles.subtitle}>Please sign in to access this feature</Text>
         <TouchableOpacity 
           style={styles.button}
-          onPress={() => navigation.replace('AuthMethods')}
+          onPress={() => {
+            if ('replace' in navigation) {
+              navigation.replace('AuthMethods');
+            } else if ('navigate' in navigation) {
+              navigation.navigate('AuthMethods');
+            }
+          }}
         >
           <Text style={styles.buttonText}>Go to Sign In</Text>
         </TouchableOpacity>
@@ -46,7 +53,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: typography.fontSize.md,
-    color: colors.gray,
+    color: colors.GRAY,
     textAlign: 'center',
     marginBottom: spacing.xl,
   },

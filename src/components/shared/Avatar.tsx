@@ -9,7 +9,6 @@ import {
   View,
   Text,
   Image,
-  StyleSheet,
   ViewStyle,
   TextStyle,
   ActivityIndicator,
@@ -46,7 +45,7 @@ const Avatar: React.FC<AvatarProps> = ({
   showBorder = false,
   borderColor = colors.green,
   avatarUrl,
-  loadingTimeout = 5000,
+  loadingTimeout: _loadingTimeout = 5000,
   showLoading = true,
   dynamicSize = false,
 }) => {
@@ -61,16 +60,16 @@ const Avatar: React.FC<AvatarProps> = ({
       return 'U';
     }
     
-    const words = name.trim().split(' ');
+    const words = name?.trim().split(' ') || [];
     if (words.length === 1) {
-      return words[0].charAt(0).toUpperCase();
+      return words[0]?.charAt(0).toUpperCase() || '?';
     }
-    return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
+    return (words[0]?.charAt(0) || '') + (words[words.length - 1]?.charAt(0) || '') || '?';
   }, []);
 
   // Load avatar URL
   const loadAvatarUrl = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) { return; }
 
     setIsLoading(true);
     setHasError(false);
@@ -118,7 +117,8 @@ const Avatar: React.FC<AvatarProps> = ({
     } else {
       setIsLoading(false);
     }
-  }, [userId, userName, avatarUrl]); // Removed loadAvatarUrl and generateInitials from dependencies
+    // generateInitials is stable (useCallback with empty deps), loadAvatarUrl is stable (useCallback with userId deps)
+  }, [userId, userName, avatarUrl, loadAvatarUrl, generateInitials]);
 
   // Handle image load error
   const handleImageError = useCallback(() => {

@@ -4,8 +4,10 @@
  */
 
 import { Linking, Alert } from 'react-native';
+import { NavigationContainerRef, ParamListBase } from '@react-navigation/native';
 import { FirebaseDataService } from './firebaseDataService';
 import { logger } from '../analytics/loggingService';
+import { User } from '../../types';
 
 export interface DeepLinkData {
   action: 'join' | 'invite' | 'profile' | 'send' | 'transfer' | 'moonpay-success' | 'moonpay-failure' | 'oauth-callback' | 'join-split';
@@ -257,7 +259,10 @@ export async function handleAddContactFromProfile(linkData: DeepLinkData, curren
 /**
  * Set up deep link listeners
  */
-export function setupDeepLinkListeners(navigation: any, currentUser: any) {
+export function setupDeepLinkListeners(
+  navigation: NavigationContainerRef<ParamListBase> | { navigate: (route: string, params?: Record<string, unknown>) => void },
+  currentUser: User | null
+) {
   const handleDeepLink = async (url: string) => {
     logger.info('Received deep link', { url }, 'deepLinkHandler');
     

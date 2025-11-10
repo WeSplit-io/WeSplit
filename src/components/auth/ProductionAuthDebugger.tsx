@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
-import { logger } from '../../services/analytics/loggingService';
 
 interface ProductionAuthDebuggerProps {
   onClose: () => void;
@@ -12,10 +11,6 @@ export const ProductionAuthDebugger: React.FC<ProductionAuthDebuggerProps> = ({ 
   const [debugInfo, setDebugInfo] = useState<any>({});
   const [isLoading, setIsLoading] = useState(false);
   const [testResults, setTestResults] = useState<any>({});
-
-  useEffect(() => {
-    gatherDebugInfo();
-  }, []);
 
   const getEnvVar = (key: string): string => {
     if (process.env[key]) {return process.env[key]!;}
@@ -27,7 +22,7 @@ export const ProductionAuthDebugger: React.FC<ProductionAuthDebuggerProps> = ({ 
     return '';
   };
 
-  const gatherDebugInfo = async () => {
+  const gatherDebugInfo = useCallback(async () => {
     try {
       const info = {
         // App Info
@@ -76,10 +71,15 @@ export const ProductionAuthDebugger: React.FC<ProductionAuthDebuggerProps> = ({ 
       
       setDebugInfo(info);
     } catch (error) {
-      console.error('Error gathering debug info:', error);
-      setDebugInfo({ error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Error gathering debug info', error as Record<string, unknown>, 'ProductionAuthDebugger');
+      setDebugInfo({ error: errorMessage });
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    gatherDebugInfo();
+  }, [gatherDebugInfo]);
 
   const runTests = async () => {
     setIsLoading(true);
@@ -87,14 +87,15 @@ export const ProductionAuthDebugger: React.FC<ProductionAuthDebuggerProps> = ({ 
     
     try {
       // Test Firebase connection
-      const { auth, db } = await import('../../config/firebase/firebase');
+      const { auth } = await import('../../config/firebase/firebase');
       if (auth) {
         results.firebase = { success: true, message: 'Firebase auth initialized' };
       } else {
         results.firebase = { success: false, message: 'Firebase auth not initialized' };
       }
     } catch (error) {
-      results.firebase = { success: false, error: error.message };
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      results.firebase = { success: false, error: errorMessage };
     }
     
     try {
@@ -102,7 +103,8 @@ export const ProductionAuthDebugger: React.FC<ProductionAuthDebuggerProps> = ({ 
       const response = await fetch('https://www.google.com', { method: 'HEAD' });
       results.network = { success: response.ok, status: response.status };
     } catch (error) {
-      results.network = { success: false, error: error.message };
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      results.network = { success: false, error: errorMessage };
     }
     
     try {
@@ -110,7 +112,8 @@ export const ProductionAuthDebugger: React.FC<ProductionAuthDebuggerProps> = ({ 
       const response = await fetch(`https://${getEnvVar('FIREBASE_PROJECT_ID')}.firebaseapp.com`, { method: 'HEAD' });
       results.firebaseProject = { success: response.ok, status: response.status };
     } catch (error) {
-      results.firebaseProject = { success: false, error: error.message };
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      results.firebaseProject = { success: false, error: errorMessage };
     }
     
     setTestResults(results);
@@ -119,12 +122,16 @@ export const ProductionAuthDebugger: React.FC<ProductionAuthDebuggerProps> = ({ 
 
   const testEmailAuth = async () => {
     try {
-      const { signInWithEmail } = await import('../../services/auth');
+      // Removed unused import - signInWithEmail doesn't exist in auth service
+      await import('../../services/auth');
       // Test with a dummy email to see if the service is working
       Alert.alert('Email Auth Test', 'This will test the email authentication service. Check console for results.');
-      console.log('Testing email auth service...');
+      if (__DEV__) {
+        logger.debug('Testing email auth service', null, 'ProductionAuthDebugger');
+      }
     } catch (error) {
-      Alert.alert('Error', `Email auth test failed: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', `Email auth test failed: ${errorMessage}`);
     }
   };
 
@@ -149,7 +156,8 @@ export const ProductionAuthDebugger: React.FC<ProductionAuthDebuggerProps> = ({ 
               
               Alert.alert('Success', 'App data cleared. Please restart the app.');
             } catch (error) {
-              Alert.alert('Error', `Failed to clear app data: ${error.message}`);
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              Alert.alert('Error', `Failed to clear app data: ${errorMessage}`);
             }
           }
         }

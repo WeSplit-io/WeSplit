@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ViewStyle, StyleProp } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 import PhosphorIcon from './PhosphorIcon';
 
@@ -13,7 +13,7 @@ interface HeaderProps {
   backgroundColor?: string;
   titleColor?: string;
   backButtonColor?: string;
-  customStyle?: any;
+  customStyle?: StyleProp<ViewStyle>;
   variant?: HeaderVariant;
 }
 

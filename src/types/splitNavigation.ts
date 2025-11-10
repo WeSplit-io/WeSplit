@@ -16,12 +16,16 @@ export interface UnifiedBillData {
   totalAmount: number;
   currency: string;
   date: string;
+  time?: string;
+  subtotal?: number;
+  tax?: number;
   merchant?: string;
   location?: string;
   items?: any[];
   participants?: any[];
   billImageUrl?: string;
   settings?: any;
+  originalAnalysis?: any;
 }
 
 /**

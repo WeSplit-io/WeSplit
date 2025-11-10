@@ -14,6 +14,7 @@ import { LeaderboardEntry, Quest } from '../../types/rewards';
 import { getPlatformInfo } from '../../utils/core/platformDetection';
 import { styles } from './styles';
 import ChristmasCalendar from '../../components/rewards/ChristmasCalendar';
+import { logger } from '../../services/core';
 
 const RewardsScreen: React.FC<any> = ({ navigation }) => {
   const { state, updateUser } = useApp();
@@ -41,7 +42,7 @@ const RewardsScreen: React.FC<any> = ({ navigation }) => {
           const { userActionSyncService } = await import('../../services/rewards/userActionSyncService');
           await userActionSyncService.verifyAndSyncUserActions(currentUser.id);
         } catch (syncError) {
-          console.error('Failed to sync user actions:', syncError);
+          logger.error('Failed to sync user actions', syncError, 'RewardsScreen');
           // Continue loading even if sync fails
         }
 
@@ -65,12 +66,12 @@ const RewardsScreen: React.FC<any> = ({ navigation }) => {
             setUserPoints(freshUser.points || 0);
           }
         } catch (error) {
-          console.error('Failed to refresh user data:', error);
+          logger.error('Failed to refresh user data', error, 'RewardsScreen');
           // Use points from service if user refresh fails
         }
       }
     } catch (error) {
-      console.error('Error loading rewards data:', error);
+      logger.error('Error loading rewards data', error, 'RewardsScreen');
     } finally {
       setLoading(false);
     }
@@ -180,7 +181,19 @@ const RewardsScreen: React.FC<any> = ({ navigation }) => {
   };
 
   const renderQuestCard = (quest: Quest) => {
-    const isCompleted = quest.completed;
+    // Ensure completed status is properly checked - handle both boolean and undefined
+    const isCompleted = quest.completed === true;
+    
+    // Debug logging to help identify display issues
+    if (__DEV__) {
+      logger.debug('Rendering quest card', {
+        questId: quest.id,
+        questTitle: quest.title,
+        completed: quest.completed,
+        isCompleted,
+        hasCompletedAt: !!quest.completed_at
+      }, 'RewardsScreen');
+    }
     
     return (
       <View 
@@ -206,6 +219,11 @@ const RewardsScreen: React.FC<any> = ({ navigation }) => {
               {quest.title}
             </Text>
             <Text style={styles.questDescription}>{quest.description}</Text>
+            {isCompleted && quest.completed_at && (
+              <Text style={[styles.questDescription, { marginTop: 4, fontSize: 11 }]}>
+                Completed {new Date(quest.completed_at).toLocaleDateString()}
+              </Text>
+            )}
           </View>
           <View style={styles.questPoints}>
             <Text style={[
@@ -315,7 +333,7 @@ const RewardsScreen: React.FC<any> = ({ navigation }) => {
                   setUserPoints(freshUser.points || 0);
                 }
               } catch (error) {
-                console.error('Failed to refresh user data after gift claim:', error);
+                logger.error('Failed to refresh user data after gift claim', error, 'RewardsScreen');
               }
             }}
           />
@@ -325,9 +343,35 @@ const RewardsScreen: React.FC<any> = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>How to Earn Points</Text>
           <View style={styles.questsContainer}>
-            {Object.values(QUEST_DEFINITIONS).map(quest => {
-              const userQuest = userQuests.find(q => q.id === quest.id);
-              return renderQuestCard(userQuest || quest);
+            {Object.values(QUEST_DEFINITIONS).map(questDef => {
+              // Find the user's quest data (which includes completion status)
+              const userQuest = userQuests.find(q => q.id === questDef.id || q.type === questDef.type);
+              
+              // Merge quest definition with user quest data, prioritizing user quest data
+              const quest: Quest = userQuest 
+                ? {
+                    ...questDef,
+                    ...userQuest, // User quest data overrides definition
+                    // Ensure we preserve the completed status from user quest
+                    completed: userQuest.completed === true,
+                    completed_at: userQuest.completed_at
+                  }
+                : {
+                    ...questDef,
+                    completed: false // Default to incomplete if no user quest found
+                  };
+              
+              // Debug logging in development
+              if (__DEV__ && userQuest) {
+                logger.debug('Quest merge', {
+                  questId: quest.id,
+                  hasUserQuest: !!userQuest,
+                  userQuestCompleted: userQuest.completed,
+                  finalCompleted: quest.completed
+                }, 'RewardsScreen');
+              }
+              
+              return renderQuestCard(quest);
             })}
           </View>
         </View>

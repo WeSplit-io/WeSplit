@@ -59,7 +59,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
       // Load current subscription if user is logged in
       if (currentUser) {
         try {
-          const subscription = await subscriptionService.getUserSubscription(parseInt(currentUser.id));
+          const subscription = await subscriptionService.getUserSubscription(currentUser.id);
           setCurrentSubscription(subscription);
         } catch (error) {
           // No subscription found, which is fine
@@ -124,14 +124,11 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
                 });
                 
                 // Process the crypto payment on backend
-                const paymentResult = await subscriptionService.processPayment({
-                  userId: currentUser.id,
-                  planId: plan.id,
-                  paymentMethod: selectedPaymentMethod,
-                  amount: currency === 'USDC' ? plan.price : cryptoAmount,
-                  currency: currency,
-                  transactionSignature: transactionResult.signature
-                });
+                const paymentResult = await subscriptionService.processPayment(
+                  currentUser.id,
+                  plan.id.toString(),
+                  selectedPaymentMethod || 'crypto'
+                );
                 
                 if (paymentResult.success) {
                   Alert.alert(
@@ -140,7 +137,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
                     [{ text: 'OK', onPress: () => loadPremiumData() }]
                   );
                 } else {
-                  throw new Error(paymentResult.message);
+                  throw new Error(paymentResult.error || 'Payment processing failed');
                 }
               } catch (paymentError) {
                 console.error('Payment error:', paymentError);
@@ -172,7 +169,7 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
           onPress: async () => {
             try {
               setLoading(true);
-              await subscriptionService.cancelSubscription(parseInt(currentUser.id));
+              await subscriptionService.cancelSubscription(currentSubscription?.id || '');
               Alert.alert('Subscription Cancelled', 'Your subscription will end at the current period end.');
               loadPremiumData();
             } catch (error) {
@@ -195,7 +192,8 @@ const PremiumScreen: React.FC<PremiumScreenProps> = ({ navigation }) => {
 
     try {
       setLoading(true);
-      const subscription = await subscriptionService.validateSubscription(parseInt(currentUser.id));
+      const subscriptionResult = await subscriptionService.validateSubscription(currentSubscription?.id || '');
+      const subscription = subscriptionResult.subscription;
       
       if (subscription) {
         Alert.alert('Subscription Restored', 'Your premium subscription has been restored!');

@@ -9,6 +9,8 @@ import {
   View,
   Text,
   StyleSheet,
+  ViewStyle,
+  StyleProp,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PhosphorIcon from './PhosphorIcon';
@@ -23,7 +25,7 @@ interface ErrorScreenProps {
   onRetry?: () => void;
   retryText?: string;
   showIcon?: boolean;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }
 
 const ErrorScreen: React.FC<ErrorScreenProps> = ({

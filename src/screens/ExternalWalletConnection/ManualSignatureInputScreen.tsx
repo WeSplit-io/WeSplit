@@ -51,7 +51,7 @@ export const ManualSignatureInputScreen: React.FC = () => {
 
     try {
       // Import the signature link service
-      const { signatureLinkService } = await import('../../wallets/linking/signatureLinkService');
+      const { signatureLinkService } = await import('../../services/blockchain/wallet/linking/signatureLinkService');
       
       // Verify the signature
       const verificationResult = await signatureLinkService.verifySignature(
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textPrimary,
+    color: colors.textLight,
     marginBottom: spacing.sm,
   },
   subtitle: {
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textPrimary,
+    color: colors.textLight,
     marginBottom: spacing.sm,
   },
   messageContainer: {
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: typography.fontSize.sm,
-    color: colors.textPrimary,
+    color: colors.textLight,
     fontFamily: 'monospace',
     lineHeight: 20,
   },
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textPrimary,
+    color: colors.textLight,
     marginBottom: spacing.sm,
   },
   textInput: {
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     borderRadius: spacing.radiusMd,
     padding: spacing.md,
     fontSize: typography.fontSize.md,
-    color: colors.textPrimary,
+    color: colors.textLight,
     minHeight: 80,
     textAlignVertical: 'top',
   },
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   instructionsTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textPrimary,
+    color: colors.textLight,
     marginBottom: spacing.sm,
   },
   instructionsText: {
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.medium,
-    color: colors.textPrimary,
+    color: colors.textLight,
   },
   submitButton: {
     backgroundColor: colors.primaryGreen,

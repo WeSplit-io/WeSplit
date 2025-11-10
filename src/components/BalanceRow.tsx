@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { colors, spacing, typography } from '../theme';
+// eslint-disable-next-line import/no-unresolved
 import { DEFAULT_AVATAR_URL } from '../../config/constants';
 
 interface BalanceRowProps {
@@ -12,13 +13,28 @@ interface BalanceRowProps {
 }
 
 const BalanceRow: React.FC<BalanceRowProps> = ({ avatar, name, amount, status, positive = false }) => (
-  <View style={styles.row}>
-    <Image source={{ uri: avatar || DEFAULT_AVATAR_URL }} style={styles.avatar} />
+  <View 
+    style={styles.row}
+    accessibilityRole="none"
+    accessibilityLabel={`${name}, ${status} ${amount}`}
+  >
+    <Image 
+      source={{ uri: avatar || DEFAULT_AVATAR_URL }} 
+      style={styles.avatar}
+      accessibilityRole="image"
+      accessibilityLabel={`${name}'s avatar`}
+    />
     <Text style={styles.name}>{name}</Text>
-    <Text style={[styles.amount, { color: positive ? colors.green : colors.red }]}>
+    <Text 
+      style={[styles.amount, { color: positive ? colors.green : colors.red }]}
+      accessibilityRole="text"
+    >
       {amount}
     </Text>
-    <Text style={[styles.status, { color: positive ? colors.green : colors.red }]}>
+    <Text 
+      style={[styles.status, { color: positive ? colors.green : colors.red }]}
+      accessibilityRole="text"
+    >
       {status}
     </Text>
   </View>
@@ -43,7 +59,7 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     marginRight: spacing.md,
-    backgroundColor: colors.lightGray,
+    backgroundColor: colors.GRAY,
   },
   name: {
     flex: 1,
@@ -62,4 +78,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default BalanceRow; 
+export default React.memo(BalanceRow); 

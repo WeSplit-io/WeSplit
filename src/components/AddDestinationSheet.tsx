@@ -3,26 +3,40 @@ import {
   View, 
   Alert,
   Keyboard,
-  Dimensions,
   StyleSheet,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
 import { Modal, Input, Button, Tabs } from './shared';
 import { validateAddress, validateKastWalletAddress } from '../utils/network/sendUtils';
-import { colors } from '../theme';
+// Removed unused imports: colors, typography
 import { spacing } from '../theme/spacing';
-import { typography } from '../theme/typography';
 import MWADetectionButton from './wallet/MWADetectionButton';
+
+// Destination type for wallet or card
+export interface Destination {
+  type: 'wallet' | 'kast';
+  name: string;
+  address: string;
+  identifier?: string; // For backward compatibility
+  chain?: string;
+  // Card-specific fields (optional)
+  cardType?: string;
+  status?: string;
+  balance?: number;
+  currency?: string;
+  expirationDate?: string;
+  cardholderName?: string;
+}
 
 interface AddDestinationSheetProps {
   visible: boolean;
   onClose: () => void;
-  onSaved: (destination: any) => void;
+  onSaved: (destination: Destination) => void;
   isLoading?: boolean;
 }
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+// Removed unused SCREEN_HEIGHT
 
 const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   visible,
@@ -140,8 +154,12 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
   };
 
   const isFormValid = () => {
-    if (isLoading) return false;
-    if (!name.trim()) return false;
+    if (isLoading) {
+      return false;
+    }
+    if (!name.trim()) {
+      return false;
+    }
     
     if (destinationType === 'wallet') {
       return address.trim().length > 0;
@@ -179,7 +197,16 @@ const AddDestinationSheet: React.FC<AddDestinationSheetProps> = ({
       // For SOLANA cards, validate the wallet address and get card information
       if (destinationType === 'kast') {
         try {
-          const { ExternalCardService } = await import('../../services/integrations/external/ExternalCardService');
+          // Dynamic import for ExternalCardService to handle module resolution
+          // eslint-disable-next-line import/no-unresolved
+          const ExternalCardServiceModule = await import('../../services/integrations/external/ExternalCardService');
+          // ExternalCardService is a class with static methods
+          const ExternalCardService = ExternalCardServiceModule.ExternalCardService || 
+            (ExternalCardServiceModule.default as typeof ExternalCardServiceModule.ExternalCardService);
+          
+          if (!ExternalCardService) {
+            throw new Error('ExternalCardService not found');
+          }
           
           // Validate SOLANA card wallet address
           const validation = await ExternalCardService.validateKastCard(kastAddress.trim());

@@ -181,7 +181,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       await Clipboard.setStringAsync(address);
       Alert.alert('Copied', 'Wallet address copied to clipboard');
     } catch (error) {
-      console.error('Failed to copy wallet address:', error);
+      logger.error('Failed to copy wallet address', error as Record<string, unknown>, 'DashboardScreen');
       Alert.alert('Error', 'Failed to copy wallet address');
     }
   };
@@ -247,7 +247,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
       // Get the sender ID from the request data
       const senderId = request.data?.senderId || request.data?.requester || request.data?.sender;
       if (!senderId) {
-        console.error('🔍 Dashboard: No sender ID found in request data:', request.data);
+        logger.error('No sender ID found in request data', { requestData: request.data }, 'DashboardScreen');
         Alert.alert('Error', 'Unable to find sender information');
         return;
       }
@@ -295,7 +295,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
         requestId: request.data?.requestId || request.id
       });
     } catch (error) {
-      console.error('🔍 Dashboard: Error handling send payment:', error);
+      logger.error('Error handling send payment', error as Record<string, unknown>, 'DashboardScreen');
       Alert.alert('Error', 'Failed to process payment request. Please try again.');
     }
   };
@@ -605,42 +605,11 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           logger.debug('Skipping data load - already loaded and no refresh params', null, 'DashboardScreen');
         }
       }
-    }, [isAuthenticated, currentUser?.id])
+    }, [isAuthenticated, currentUser?.id, route?.params?.refreshBalance, route?.params?.refreshRequests])
   );
 
-  // Handle route parameter changes separately
-  useEffect(() => {
-    if (isAuthenticated && currentUser?.id && hasLoadedRef.current) {
-      const shouldRefreshBalance = route?.params?.refreshBalance;
-      const shouldRefreshRequests = route?.params?.refreshRequests;
-      
-      if (shouldRefreshBalance || shouldRefreshRequests) {
-        logger.info('Route parameter refresh triggered', { 
-          shouldRefreshBalance, 
-          shouldRefreshRequests 
-        }, 'DashboardScreen');
-        
-        // Clear the parameters to prevent infinite loops
-        navigation.setParams({ 
-          refreshBalance: undefined,
-          refreshRequests: undefined 
-        });
-        
-        // Trigger appropriate refreshes
-        if (shouldRefreshBalance) {
-          walletService.clearUserCache(currentUser.id);
-          refreshWallet();
-          logger.info('Balance refresh triggered from route parameter', null, 'DashboardScreen');
-        }
-        
-        if (shouldRefreshRequests) {
-          loadPaymentRequests();
-          refreshNotifications();
-          logger.info('Requests refresh triggered from route parameter', null, 'DashboardScreen');
-        }
-      }
-    }
-  }, [route?.params?.refreshBalance, route?.params?.refreshRequests, isAuthenticated, currentUser?.id]);
+  // Removed separate useEffect for route parameter changes - now handled in useFocusEffect
+  // This prevents duplicate calls when both useFocusEffect and useEffect trigger
 
   // Removed group loading logic
 
@@ -948,7 +917,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
                   // The wallet connection will be handled by the WalletContext
                   // and the UI will update automatically
                 } catch (error) {
-                  console.error('Error connecting wallet:', error);
+                  logger.error('Error connecting wallet', error as Record<string, unknown>, 'DashboardScreen');
                   // Error handling is already done in the WalletContext
                 } finally {
                   setConnectingWallet(false);

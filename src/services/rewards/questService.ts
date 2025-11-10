@@ -198,13 +198,15 @@ class QuestService {
 
       questsSnapshot.forEach((doc) => {
         const data = doc.data();
+        // Ensure completed is explicitly boolean - handle Firestore boolean and undefined
+        const completed = data.completed === true;
         quests.push({
           id: data.id || doc.id,
           type: data.type,
           title: data.title,
           description: data.description,
           points: data.points,
-          completed: data.completed || false,
+          completed, // Explicitly set to boolean
           completed_at: data.completed_at?.toDate?.()?.toISOString()
         });
       });

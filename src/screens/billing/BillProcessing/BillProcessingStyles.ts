@@ -161,6 +161,6 @@ export const styles = StyleSheet.create({
   totalLabel: {
     fontSize: typography.fontSize.lg,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: colors.textLight,
   },
 });

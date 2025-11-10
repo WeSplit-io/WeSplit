@@ -22,6 +22,7 @@ interface Participant {
   walletAddress?: string;
   amountPaid?: number;
   status?: string;
+  avatar?: string; // Add avatar property
 }
 
 interface DegenSplitParticipantsProps {

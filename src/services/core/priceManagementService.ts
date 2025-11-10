@@ -80,6 +80,42 @@ class PriceManagementService {
     }
   }
 
+  public validatePriceConsistency(billId: string, totalAmount: number, source: string): { isValid: boolean; message?: string } {
+    try {
+      const storedPrice = this.billPrices.get(billId);
+      if (!storedPrice) {
+        // Store the price for future validation
+        this.billPrices.set(billId, {
+          billId,
+          amount: totalAmount,
+          currency: 'USDC',
+          timestamp: new Date().toISOString()
+        });
+        return { isValid: true };
+      }
+      
+      // Check if the amount matches (allow small floating point differences)
+      const difference = Math.abs(storedPrice.amount - totalAmount);
+      if (difference > 0.01) {
+        logger.warn('Price inconsistency detected', { billId, storedPrice: storedPrice.amount, currentPrice: totalAmount, source }, 'PriceManagementService');
+        return { 
+          isValid: false, 
+          message: `Price mismatch: stored ${storedPrice.amount} vs current ${totalAmount}` 
+        };
+      }
+      
+      return { isValid: true };
+    } catch (error) {
+      logger.error('Price validation failed', { billId, totalAmount, source, error }, 'PriceManagementService');
+      return { isValid: true }; // Fail open
+    }
+  }
+
+  public getParticipantAmount(totalAmount: number, participantCount: number): number {
+    if (participantCount <= 0) {return 0;}
+    return totalAmount / participantCount;
+  }
+
   public formatPrice(amount: number, currency: string): string {
     // Handle special cases for non-standard currency codes
     if (currency === 'USDC') {

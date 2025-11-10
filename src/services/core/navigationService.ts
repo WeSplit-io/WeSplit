@@ -1,13 +1,16 @@
-import { NavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainerRef, ParamListBase } from '@react-navigation/native';
 import { logger } from '../analytics/loggingService';
 
+// Navigation params type - can be any object
+type NavigationParams = Record<string, unknown> | undefined;
+
 class NavigationServiceClass {
-  private navigationRef: NavigationContainerRef<any> | null = null;
+  private navigationRef: NavigationContainerRef<ParamListBase> | null = null;
 
   /**
    * Set the navigation reference
    */
-  setNavigationRef(ref: NavigationContainerRef<any> | null) {
+  setNavigationRef(ref: NavigationContainerRef<ParamListBase> | null) {
     this.navigationRef = ref;
     logger.info('Navigation reference set', { hasRef: !!ref }, 'NavigationService');
   }
@@ -15,7 +18,7 @@ class NavigationServiceClass {
   /**
    * Navigate to a screen
    */
-  navigate(screen: string, params?: any) {
+  navigate(screen: string, params?: NavigationParams) {
     if (!this.navigationRef) {
       logger.warn('Navigation reference not set, cannot navigate', { screen, params }, 'NavigationService');
       return;
@@ -49,7 +52,7 @@ class NavigationServiceClass {
   /**
    * Reset navigation stack
    */
-  reset(routeName: string, params?: any) {
+  reset(routeName: string, params?: NavigationParams) {
     if (!this.navigationRef) {
       logger.warn('Navigation reference not set, cannot reset', { routeName, params }, 'NavigationService');
       return;

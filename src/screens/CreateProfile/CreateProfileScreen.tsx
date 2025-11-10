@@ -201,14 +201,8 @@ const CreateProfileScreen: React.FC = () => {
         logger.warn('Could not check existing user, proceeding with profile creation', null, 'CreateProfileScreen');
       }
 
-      // Create or update user using unified service
+        // Create or update user using unified service
       try {
-        const userData = {
-          email,
-          name: pseudo,
-          avatar: avatar || undefined,
-        };
-
         logger.info('Creating/updating user with firebase service', { email, name: pseudo }, 'CreateProfileScreen');
         
         // First check if user exists
@@ -225,9 +219,14 @@ const CreateProfileScreen: React.FC = () => {
           });
         } else {
           // User doesn't exist, create new user
+          // Note: wallet_address is required by User type, but may not exist during onboarding
+          // We'll use an empty string as placeholder - wallet will be created later
           logger.info('User does not exist, creating new user', { email, name: pseudo }, 'CreateProfileScreen');
           user = await firebaseDataService.user.createUser({
-            ...userData,
+            email,
+            name: pseudo,
+            wallet_address: '', // Placeholder - will be set when wallet is created
+            avatar: avatar || undefined,
             hasCompletedOnboarding: true
           });
         }

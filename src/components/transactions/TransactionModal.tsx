@@ -1,27 +1,25 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
   Modal,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   ScrollView,
   Dimensions,
   Linking,
 } from 'react-native';
+import { NavigationContainerRef } from '@react-navigation/native';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import { Animated } from 'react-native';
-import { colors } from '../../theme/colors';
 import { logger } from '../../services/analytics/loggingService';
-import { FeeService, TransactionType } from '../../config/constants/feeConfig';
-import { Transaction } from '../../types';
 import { styles } from './TransactionModal.styles';
+import type { Transaction as TransactionType } from '../../types';
 
 interface TransactionModalProps {
   visible: boolean;
-  transaction: Transaction | null;
+  transaction: TransactionType | null;
   onClose: () => void;
-  navigation?: any; // Add navigation prop
+  navigation?: NavigationContainerRef<Record<string, object | undefined>> | { navigate: (route: string, params?: object) => void };
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -101,49 +99,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         }),
       ]).start();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // opacity and translateY are Animated.Value objects that shouldn't be in dependencies
   }, [visible]);
 
   if (!transaction) {return null;}
-
-  const getTransactionIcon = (transaction: Transaction) => {
-    switch (transaction.type) {
-      case 'send':
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
-      case 'receive':
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-receive.png?alt=media&token=c55d7c97-b027-4841-859e-38c46c2f36c5' };
-      case 'deposit':
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-deposit.png?alt=media&token=d832bae5-dc8e-4347-bab5-cfa9621a5c55' };
-      case 'withdraw':
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-withdraw.png?alt=media&token=8c0da99e-287c-4d19-8515-ba422430b71b' };
-      default:
-        return { uri: 'https://firebasestorage.googleapis.com/v0/b/wesplit-35186.firebasestorage.app/o/visuals-app%2Ficon-send.png?alt=media&token=d733fbce-e383-4cae-bd93-2fc16c36a2d9' };
-    }
-  };
-
-  const getTransactionTitle = (transaction: Transaction) => {
-    switch (transaction.type) {
-      case 'send':
-        return `Send to ${transaction.to_user || 'Unknown'}`;
-      case 'receive':
-        return `Received from ${transaction.from_user || 'Unknown'}`;
-      case 'deposit':
-        return 'Top Up Wallet';
-      case 'withdraw':
-        return 'Withdraw';
-      default:
-        return 'Transaction';
-    }
-  };
-
-  const getTransactionAmount = (transaction: Transaction) => {
-    const amount = transaction.amount || 0;
-    const isIncome = transaction.type === 'receive' || transaction.type === 'deposit';
-    
-    return {
-      amount: amount.toFixed(2),
-      color: isIncome ? colors.green : colors.white
-    };
-  };
 
   const formatDate = (dateString: string) => {
     if (!dateString) {return 'N/A';}

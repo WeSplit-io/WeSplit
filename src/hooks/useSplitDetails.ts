@@ -5,11 +5,9 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useApp } from '../context/AppContext';
-import { consolidatedBillAnalysisService } from '../services/billing';
-import { splitStorageService } from '../services/splits';
-import { splitRealtimeService } from '../services/splits';
-import { UnifiedBillData } from '../types/unified';
+import { splitRealtimeService, SplitStorageService, SplitRealtimeUpdate } from '../services/splits';
+// UnifiedBillData doesn't exist in unified.ts, import from splitNavigation instead
+import { UnifiedBillData } from '../types/splitNavigation';
 import { logger } from '../services/core';
 
 interface UseSplitDetailsParams {
@@ -55,8 +53,7 @@ interface UseSplitDetailsResult {
   stopRealtimeUpdates: () => void;
 }
 
-export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsParams): UseSplitDetailsResult => {
-  const { state } = useApp();
+export const useSplitDetails = ({ routeParams, currentUser: _currentUser }: UseSplitDetailsParams): UseSplitDetailsResult => {
   
   // State management
   const [loading, setLoading] = useState(false);
@@ -179,7 +176,7 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
         totalAmount,
         splitMethod,
         updatedAt: new Date().toISOString()
-      };
+      } as Partial<import('../services/splits').Split>;
       
       const result = await SplitStorageService.updateSplit(routeParams.splitId, updateData);
       
@@ -193,15 +190,6 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
       setLoading(false);
     }
   }, [participants, totalAmount, splitMethod, routeParams?.splitId]);
-
-  // Share data
-  const shareData = useCallback(() => {
-    if (unifiedBillData) {
-      const shareText = `Check out this split: ${unifiedBillData.title} - $${totalAmount}`;
-      setShareableLink(shareText);
-      setShowShareModal(true);
-    }
-  }, [unifiedBillData, totalAmount]);
 
   // QR Code actions
   const showQRCode = useCallback(() => {
@@ -231,8 +219,12 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
 
   // Share actions
   const showShare = useCallback(() => {
-    setShowShareModal(true);
-  }, []);
+    if (unifiedBillData) {
+      const shareText = `Check out this split: ${unifiedBillData.title} - $${totalAmount}`;
+      setShareableLink(shareText);
+      setShowShareModal(true);
+    }
+  }, [unifiedBillData, totalAmount]);
 
   const hideShare = useCallback(() => {
     setShowShareModal(false);
@@ -303,11 +295,12 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
             setParticipants(participants);
           },
           onError: (error) => {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             logger.error('Real-time update error', { 
               splitId: routeParams.splitId,
-              error: error.message 
+              error: errorMessage 
             }, 'useSplitDetails');
-            setError(`Real-time update error: ${error.message}`);
+            setError(`Real-time update error: ${errorMessage}`);
           }
         }
       );
@@ -316,11 +309,12 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
       setIsRealtimeActive(true);
       
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Failed to start real-time updates', { 
         splitId: routeParams.splitId,
-        error: error.message 
+        error: errorMessage 
       }, 'useSplitDetails');
-      setError(`Failed to start real-time updates: ${error.message}`);
+      setError(`Failed to start real-time updates: ${errorMessage}`);
     }
   }, [routeParams?.splitId, isRealtimeActive]);
 
@@ -340,9 +334,10 @@ export const useSplitDetails = ({ routeParams, currentUser }: UseSplitDetailsPar
       setLastRealtimeUpdate(null);
       
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Failed to stop real-time updates', { 
         splitId: routeParams?.splitId,
-        error: error.message 
+        error: errorMessage 
       }, 'useSplitDetails');
     }
   }, [routeParams?.splitId, isRealtimeActive]);

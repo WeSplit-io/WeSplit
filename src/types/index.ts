@@ -137,7 +137,7 @@ export interface AppState {
   lastDataFetch: Record<string, number>;
   
   // Notifications
-  notifications: Notification[];
+  notifications: NotificationData[];
   lastNotificationsFetch: number;
 }
 
@@ -150,7 +150,7 @@ export type AppAction =
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'CLEAR_ERROR' }
   | { type: 'UPDATE_CACHE_TIMESTAMP'; payload: { type: string; timestamp: number } }
-  | { type: 'SET_NOTIFICATIONS'; payload: { notifications: Notification[]; timestamp: number } };
+  | { type: 'SET_NOTIFICATIONS'; payload: { notifications: NotificationData[]; timestamp: number } };
 
 // Re-export unified notification types
 export { NotificationType, NotificationData as Notification, NotificationPayload } from './notifications';

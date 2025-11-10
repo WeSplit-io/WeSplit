@@ -18,7 +18,7 @@ export interface BillData {
     name?: string;
     address?: string;
   };
-  participants?: any[];
+  participants?: Array<Record<string, unknown>>;
 }
 
 export interface SplitData {
@@ -31,7 +31,7 @@ export interface SplitData {
     name?: string;
     address?: string;
   };
-  participants?: any[];
+  participants?: Array<Record<string, unknown>>;
   status?: string;
   splitType?: string;
 }

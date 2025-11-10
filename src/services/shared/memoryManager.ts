@@ -19,7 +19,7 @@ class MemoryManager {
   private readonly MAX_CACHE_SIZE = 10;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
   private readonly CLEANUP_INTERVAL = 2 * 60 * 1000; // 2 minutes
-  private cleanupTimer: NodeJS.Timeout | null = null;
+  private cleanupTimer: ReturnType<typeof setTimeout> | null = null;
 
   private constructor() {
     this.startPeriodicCleanup();

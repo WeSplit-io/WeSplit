@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Platform, Dimensions, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ViewStyle, StyleProp, Dimensions } from 'react-native';
+import { NavigationContainerRef } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HouseLine, PiggyBank, ArrowsSplit, Medal, Users } from 'phosphor-react-native';
 import { colors, spacing, typography } from '../../theme';
@@ -120,9 +121,9 @@ const navItems = [
 ];
 
 interface NavBarProps {
-  navigation: any;
+  navigation: NavigationContainerRef<Record<string, object | undefined>> | { navigate: (route: string) => void };
   currentRoute?: string;
-  customStyle?: any;
+  customStyle?: StyleProp<ViewStyle>;
 }
 
 const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }) => {
@@ -146,7 +147,7 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
     }
 
     try {
-      logger.info('Navigating to route', { route }, 'NavBar');
+      logger.info('Navigating to route', { route: String(route) }, 'NavBar');
       
       // Block Rewards access in production
       if (route === 'Rewards') {
@@ -162,17 +163,17 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
       }
       
       if (route === 'Contacts') {
-        navigation.navigate(route, {});
+        navigation.navigate('Contacts' as never, {} as never);
       } else if (route === 'SplitsList') {
-        navigation.navigate(route, {});
+        navigation.navigate('SplitsList' as never, {} as never);
       } else if (route === 'ManualBillCreation') {
         // Navigate to manual bill creation for split creation
-        navigation.navigate(route, {});
+        navigation.navigate('ManualBillCreation' as never, {} as never);
       } else {
-        navigation.navigate(route);
+        navigation.navigate(route as never);
       }
     } catch (error) {
-      console.error(`NavBar: Error navigating to ${route}:`, error);
+      logger.error(`NavBar: Error navigating to ${String(route)}`, { error: error as Record<string, unknown> }, 'NavBar');
     }
   };
 
@@ -197,7 +198,20 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
     return false;
   };
 
-  const renderPhosphorIcon = (item: any, isActive: boolean) => {
+  interface NavItem {
+    icon: string;
+    label: string;
+    route: string;
+    isSpecial?: boolean;
+    IconComponent: React.ComponentType<{ 
+      size?: number; 
+      color?: string; 
+      weight?: 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone';
+      style?: ViewStyle;
+    }>;
+  }
+
+  const renderPhosphorIcon = (item: NavItem, isActive: boolean) => {
     const { IconComponent, icon } = item;
     const iconSize = isCompactMode ? 20 : 24;
     
@@ -208,7 +222,7 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
       iconColor = isActive ? colors.green : colors.white70;
     }
     
-    const rotationStyle = icon === 'split' ? { transform: [{ rotate: '180deg' }] } : {};
+    const rotationStyle: ViewStyle = icon === 'split' ? { transform: [{ rotate: '180deg' }] } : {};
     
     return (
       <IconComponent
@@ -236,6 +250,10 @@ const NavBar: React.FC<NavBarProps> = ({ navigation, currentRoute, customStyle }
               ]} 
               onPress={() => handleNavigation(item.route)}
               activeOpacity={platformUtils.touchFeedback.activeOpacity}
+              accessibilityRole="button"
+              accessibilityLabel={`Navigate to ${item.label}`}
+              accessibilityState={{ selected: isActive }}
+              accessibilityHint={`Opens the ${item.label} screen`}
             >
               {item.isSpecial ? (
                 <LinearGradient

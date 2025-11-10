@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WalletProvider } from './src/context/WalletContext';
@@ -6,7 +6,6 @@ import { AppProvider } from './src/context/AppContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import NavigationWrapper from './src/components/NavigationWrapper';
 import ErrorBoundary from './src/components/ErrorBoundary';
-import { logger } from './src/services/analytics/loggingService';
 import { View, StatusBar } from 'react-native';
 import { colors } from './src/theme';
 
@@ -77,8 +76,8 @@ export default function App() {
       <ErrorBoundary>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
-            <WalletProvider>
-              <AppProvider>
+            <AppProvider>
+              <WalletProvider>
                 <NavigationWrapper>
                   <Stack.Navigator
                     initialRouteName="Splash"
@@ -105,7 +104,7 @@ export default function App() {
                           },
                         },
                       },
-                      cardStyleInterpolator: ({ current, next, layouts }) => {
+                      cardStyleInterpolator: ({ current }) => {
                         return {
                           cardStyle: {
                             opacity: current.progress.interpolate({
@@ -180,8 +179,8 @@ export default function App() {
                     {/* <Stack.Screen name="AuthDebug" component={AuthDebugScreen} /> */}
                   </Stack.Navigator>
                 </NavigationWrapper>
-              </AppProvider>
-            </WalletProvider>
+              </WalletProvider>
+            </AppProvider>
           </QueryClientProvider>
         </SafeAreaProvider>
       </ErrorBoundary>

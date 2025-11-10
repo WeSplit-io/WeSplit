@@ -743,7 +743,12 @@ class ConsolidatedBillAnalysisService {
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64 = reader.result as string;
-          resolve(base64.split(',')[1]);
+          const base64Data = base64.split(',')[1];
+          if (!base64Data) {
+            reject(new Error('Failed to extract base64 data'));
+            return;
+          }
+          resolve(base64Data);
         };
         reader.onerror = reject;
         reader.readAsDataURL(blob);

@@ -27,7 +27,7 @@ export interface BalanceSubscription {
 
 class LiveBalanceService {
   private subscriptions = new Map<string, BalanceSubscription>();
-  private pollingInterval: NodeJS.Timeout | null = null;
+  private pollingInterval: ReturnType<typeof setInterval> | null = null;
   private readonly POLLING_INTERVAL = 10000; // 10 seconds (reduced frequency)
   private readonly BALANCE_TOLERANCE = 0.000001; // Minimum change to trigger update
   private lastPollTime = 0;

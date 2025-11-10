@@ -1,13 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { 
-  getAuth,
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
   onAuthStateChanged, 
   User as FirebaseUser,
   signOut,
-  updateProfile,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
@@ -366,6 +364,9 @@ export const firestoreService = {
       }
       
       const userDoc = querySnapshot.docs[0];
+      if (!userDoc) {
+        return false; // No user document found
+      }
       const userData = userDoc.data();
       const lastVerifiedAt = userData.lastVerifiedAt;
       
@@ -408,6 +409,9 @@ export const firestoreService = {
       
       if (!querySnapshot.empty) {
         const userDoc = querySnapshot.docs[0];
+        if (!userDoc) {
+          return; // No user document found
+        }
         await updateDoc(userDoc.ref, {
           lastVerifiedAt: new Date().toISOString(),
           lastLoginAt: new Date().toISOString()
@@ -636,6 +640,9 @@ export const firestoreService = {
       }
 
       const doc = querySnapshot.docs[0];
+      if (!doc) {
+        return false; // No document found
+      }
       const data = doc.data();
       
       if (__DEV__) { logger.debug('Document data', { data }, 'firebase'); }
@@ -652,6 +659,9 @@ export const firestoreService = {
       }
 
       // Mark code as used
+      if (!doc) {
+        return false; // No document found
+      }
       await updateDoc(doc.ref, { used: true });
       
       if (__DEV__) { logger.info('Code verified successfully', null, 'firebase'); }

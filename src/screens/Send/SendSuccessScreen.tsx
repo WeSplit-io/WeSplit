@@ -23,14 +23,14 @@ const SendSuccessScreen: React.FC<any> = ({ navigation, route }) => {
           }, 'SendSuccessScreen');
           
           // Mark notification as read using the notification service
-          await notificationService.markAsRead(notificationId);
+          await notificationService.instance.markAsRead(notificationId);
           
           // If we have a requestId, also mark payment request notifications as completed
           const requestId = route.params?.requestId;
           if (requestId) {
             // Get current user ID from route params or context
             const currentUserId = route.params?.currentUserId || 'current_user_id';
-            await notificationService.markPaymentRequestCompleted(requestId, currentUserId);
+            await notificationService.instance.markPaymentRequestCompleted(requestId, currentUserId);
           }
           
           logger.info('Notification process completed successfully', {

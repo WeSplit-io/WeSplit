@@ -68,7 +68,7 @@ export const useContacts = (): UseContactsResult => {
       loadedUserIdRef.current = currentUser.id.toString();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load contacts';
-      logger.error('Failed to load contacts', err, 'useContacts');
+      logger.error('Failed to load contacts', err as Record<string, unknown>, 'useContacts');
       setError(errorMessage);
       setContacts([]);
     } finally {

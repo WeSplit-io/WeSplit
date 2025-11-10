@@ -214,14 +214,18 @@ export class OptimizedTransactionUtils {
         // Sign the transaction
         transaction.sign(...signers);
 
+        // Get logger for logging
+        const loggerModule = await loadModule('logger');
+        const logger = loggerModule.logger;
+
         // Log transaction details before sending
-        console.log(`📋 Transaction details:`, {
+        logger.debug('Transaction details', {
           instructionCount: transaction.instructions.length,
           recentBlockhash: transaction.recentBlockhash,
           feePayer: transaction.feePayer?.toBase58(),
           signersCount: signers.length,
-          signerAddresses: signers.map(s => s.publicKey.toBase58())
-        });
+          signerAddresses: signers.map((s: any) => s.publicKey.toBase58())
+        }, 'OptimizedTransactionUtils');
 
         if (!this.connection) {
           this.connection = await this.createConnection();
@@ -229,12 +233,12 @@ export class OptimizedTransactionUtils {
 
         // Log which RPC endpoint we're using
         const currentEndpoint = this.rpcEndpoints[this.currentEndpointIndex];
-        console.log(`🌐 Using RPC endpoint: ${currentEndpoint}`);
+        logger.debug('Using RPC endpoint', { endpoint: currentEndpoint }, 'OptimizedTransactionUtils');
 
         // Send transaction
-        console.log(`🚀 Attempting to send transaction to blockchain...`);
+        logger.debug('Attempting to send transaction to blockchain', null, 'OptimizedTransactionUtils');
         const serializedTransaction = transaction.serialize();
-        console.log(`📦 Serialized transaction size: ${serializedTransaction.length} bytes`);
+        logger.debug('Serialized transaction size', { size: serializedTransaction.length }, 'OptimizedTransactionUtils');
         
         let signature: string;
         try {

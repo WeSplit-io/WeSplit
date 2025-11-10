@@ -221,7 +221,7 @@ export class FeeService {
    * Get fee payer public key for SOL gas fees
    * Company wallet ALWAYS pays SOL gas fees - no exceptions
    */
-  static getFeePayerPublicKey(userPublicKey: PublicKey): PublicKey {
+  static getFeePayerPublicKey(_userPublicKey: PublicKey): PublicKey {
     if (!this.isCompanyWalletConfigured()) {
       throw new Error('Company wallet not configured. SOL gas fees must be paid by company wallet.');
     }

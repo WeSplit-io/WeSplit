@@ -182,11 +182,10 @@ const SplitPaymentScreen: React.FC = () => {
             finalBillId: billId
           }, 'SplitPaymentScreen');
           
+          // getParticipantAmount takes totalAmount and participantCount
           const participantAmount = priceManagementService.getParticipantAmount(
-            billId,
-            currentUser.id.toString(),
-            walletResult.wallet.participants.length,
-            'equal'
+            totalAmount || 0, // Ensure totalAmount is defined
+            participants.length
           );
           
           // If no authoritative price found, use the split wallet's totalAmount as fallback

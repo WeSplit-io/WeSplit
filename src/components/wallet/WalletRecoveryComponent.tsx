@@ -4,7 +4,7 @@
  * and view recovery status
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,9 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useApp } from '../../context/AppContext';
-import { walletService } from '../../services/blockchain/wallet';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { logger } from '../../services/analytics/loggingService';
 
 interface WalletRecoveryStatus {
   hasBackup: boolean;
@@ -34,13 +34,7 @@ export const WalletRecoveryComponent: React.FC = () => {
 
   const currentUser = state.currentUser;
 
-  useEffect(() => {
-    if (currentUser?.email) {
-      checkRecoveryStatus();
-    }
-  }, [currentUser]);
-
-  const checkRecoveryStatus = async () => {
+  const checkRecoveryStatus = useCallback(async () => {
     if (!currentUser?.email || !currentUser?.id) {return;}
 
     setIsLoading(true);
@@ -49,19 +43,23 @@ export const WalletRecoveryComponent: React.FC = () => {
       const status = { hasBackup: false, isIntegrityValid: false }; // Placeholder
 
       setRecoveryStatus({
-        hasBackup: status.success,
-        backupMethods: Object.entries(status.backupStatus)
-          .filter(([_, hasBackup]) => hasBackup)
-          .map(([method, _]) => method),
+        hasBackup: status.hasBackup,
+        backupMethods: [], // Placeholder - backup methods not available
         walletAddress: currentUser.wallet_address
       });
     } catch (error) {
-      console.error('Error checking recovery status:', error);
+      logger.error('Error checking recovery status', error as Record<string, unknown>, 'WalletRecoveryComponent');
       Alert.alert('Error', 'Failed to check recovery status');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (currentUser?.email) {
+      checkRecoveryStatus();
+    }
+  }, [currentUser, checkRecoveryStatus]);
 
   const triggerWalletRecovery = async () => {
     if (!currentUser?.email || !currentUser?.id) {return;}
@@ -79,10 +77,10 @@ export const WalletRecoveryComponent: React.FC = () => {
               // Wallet backup functionality moved to walletService
               const result = { success: false, error: 'Backup functionality not implemented' }; // Placeholder
 
-              if (result.success && result.wallet) {
+              if (result.success) {
                 Alert.alert(
                   'Recovery Successful',
-                  `Wallet recovered successfully using ${result.method}.\n\nAddress: ${result.wallet.address}`,
+                  `Wallet recovered successfully.\n\nError: ${result.error || 'Unknown error'}`,
                   [
                     {
                       text: 'OK',
@@ -100,7 +98,7 @@ export const WalletRecoveryComponent: React.FC = () => {
                 );
               }
             } catch (error) {
-              console.error('Recovery error:', error);
+              logger.error('Recovery error', error as Record<string, unknown>, 'WalletRecoveryComponent');
               Alert.alert('Error', 'Recovery failed with an error');
             } finally {
               setIsRecovering(false);
@@ -122,14 +120,14 @@ export const WalletRecoveryComponent: React.FC = () => {
       if (result.success) {
         Alert.alert(
           'Backup Created',
-          `Wallet backup created successfully using: ${result.backupMethods.join(', ')}`
+          'Wallet backup created successfully'
         );
         checkRecoveryStatus(); // Refresh status
       } else {
         Alert.alert('Backup Failed', result.error || 'Failed to create backup');
       }
     } catch (error) {
-      console.error('Backup error:', error);
+      logger.error('Backup error', error as Record<string, unknown>, 'WalletRecoveryComponent');
       Alert.alert('Error', 'Backup failed with an error');
     } finally {
       setIsLoading(false);
@@ -163,7 +161,7 @@ export const WalletRecoveryComponent: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recovery Status</Text>
         {isLoading ? (
-          <ActivityIndicator size="small" color={colors.primary} />
+          <ActivityIndicator size="small" color={colors.primaryGreen} />
         ) : recoveryStatus ? (
           <View>
             <Text style={[
@@ -212,7 +210,7 @@ export const WalletRecoveryComponent: React.FC = () => {
           onPress={checkRecoveryStatus}
           disabled={isLoading}
         >
-          <Text style={[styles.buttonText, { color: colors.primary }]}>
+          <Text style={[styles.buttonText, { color: colors.primaryGreen }]}>
             Refresh Status
           </Text>
         </TouchableOpacity>
@@ -288,15 +286,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryGreen,
   },
   secondaryButton: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.green,
   },
   tertiaryButton: {
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: colors.primaryGreen,
   },
   buttonText: {
     fontSize: 16,

@@ -38,24 +38,23 @@ export const useDegenSplitRealtime = (
   // Start real-time updates
   const startRealtimeUpdates = useCallback(async () => {
     if (!splitId || isRealtimeActive) {
-      console.log('🔍 DegenSplit Realtime: Not starting updates:', { splitId, isRealtimeActive });
+      logger.debug('Not starting updates', { splitId, isRealtimeActive }, 'useDegenSplitRealtime');
       return;
     }
 
     try {
-      console.log('🔍 DegenSplit Realtime: Starting updates for split:', splitId);
       logger.info('Starting DegenSplit real-time updates', { splitId }, 'useDegenSplitRealtime');
 
       const cleanup = await splitRealtimeService.startListening(
         splitId,
         {
           onSplitUpdate: async (update: SplitRealtimeUpdate) => {
-            console.log('🔍 DegenSplit Realtime: Split update received:', {
+            logger.debug('Split update received', {
               splitId,
               hasChanges: update.hasChanges,
               participantsCount: update.participants.length,
               splitStatus: update.split?.status
-            });
+            }, 'useDegenSplitRealtime');
 
             if (update.split) {
               setLastRealtimeUpdate(update.lastUpdated);
@@ -106,26 +105,25 @@ export const useDegenSplitRealtime = (
                 try {
                   const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
                   if (walletResult.success && walletResult.wallet) {
-                    console.log('🔍 DegenSplit Realtime: Fetching wallet due to update:', {
+                    logger.debug('Fetching wallet due to update', {
                       hasMeaningfulStatusChanges,
                       hasNewParticipants,
                       hasChanges: update.hasChanges,
                       participantsCount: update.participants.length
-                    });
+                    }, 'useDegenSplitRealtime');
                     callbacks.onSplitWalletUpdate(walletResult.wallet);
                   }
                 } catch (error) {
-                  console.error('🔍 DegenSplit Realtime: Error fetching wallet:', error);
+                  logger.error('Error fetching wallet', error as Record<string, unknown>, 'useDegenSplitRealtime');
                 }
               }
             }
           },
           onParticipantUpdate: async (participants) => {
-            console.log('🔍 DegenSplit Realtime: Participant update received:', {
+            logger.debug('Participant update received', {
               splitId,
-              participantsCount: participants.length,
-              participants: participants.map(p => ({ name: p.name, status: p.status }))
-            });
+              participantsCount: participants.length
+            }, 'useDegenSplitRealtime');
 
             if (callbacks.onParticipantUpdate) {
               callbacks.onParticipantUpdate(participants);
@@ -149,19 +147,19 @@ export const useDegenSplitRealtime = (
               try {
                 const walletResult = await SplitWalletService.getSplitWallet(splitWalletId);
                 if (walletResult.success && walletResult.wallet) {
-                  console.log('🔍 DegenSplit Realtime: Fetching wallet due to participant update:', {
+                  logger.debug('Fetching wallet due to participant update', {
                     participantsCount: participants.length,
                     walletParticipantsCount: walletResult.wallet.participants.length
-                  });
+                  }, 'useDegenSplitRealtime');
                   callbacks.onSplitWalletUpdate(walletResult.wallet);
                 }
               } catch (error) {
-                console.error('🔍 DegenSplit Realtime: Error fetching wallet on participant update:', error);
+                logger.error('Error fetching wallet on participant update', error as Record<string, unknown>, 'useDegenSplitRealtime');
               }
             }
           },
           onError: (error) => {
-            console.error('🔍 DegenSplit Realtime: Error:', error);
+            logger.error('Real-time update error', error as Record<string, unknown>, 'useDegenSplitRealtime');
             setRealtimeError(error.message);
             if (callbacks.onError) {
               callbacks.onError(error);
@@ -173,10 +171,10 @@ export const useDegenSplitRealtime = (
       realtimeCleanupRef.current = cleanup;
       setIsRealtimeActive(true);
       // Don't set hasReceivedRealtimeData here - only when actual data is received
-      console.log('🔍 DegenSplit Realtime: Updates started successfully');
+      logger.debug('Updates started successfully', null, 'useDegenSplitRealtime');
 
     } catch (error) {
-      console.error('🔍 DegenSplit Realtime: Failed to start updates:', error);
+      logger.error('Failed to start updates', error as Record<string, unknown>, 'useDegenSplitRealtime');
       setRealtimeError(error instanceof Error ? error.message : 'Unknown error');
       if (callbacks.onError) {
         callbacks.onError(error as Error);
@@ -189,7 +187,6 @@ export const useDegenSplitRealtime = (
     if (!isRealtimeActive) {return;}
 
     try {
-      console.log('🔍 DegenSplit Realtime: Stopping updates for split:', splitId);
       logger.info('Stopping DegenSplit real-time updates', { splitId }, 'useDegenSplitRealtime');
 
       if (realtimeCleanupRef.current) {
@@ -206,19 +203,24 @@ export const useDegenSplitRealtime = (
       setRealtimeError(null);
 
     } catch (error) {
-      console.error('🔍 DegenSplit Realtime: Failed to stop updates:', error);
+      logger.error('Failed to stop updates', error as Record<string, unknown>, 'useDegenSplitRealtime');
       setRealtimeError(error instanceof Error ? error.message : 'Unknown error');
     }
   }, [splitId, isRealtimeActive]);
 
-  // Auto-start real-time updates when splitId is available
+  // Auto-start real-time updates when splitId is available - use ref to prevent duplicate calls
+  const startRealtimeUpdatesRef = useRef(startRealtimeUpdates);
+  useEffect(() => {
+    startRealtimeUpdatesRef.current = startRealtimeUpdates;
+  }, [startRealtimeUpdates]);
+  
   useEffect(() => {
     if (splitId && !isRealtimeActive) {
-      startRealtimeUpdates().catch((error: any) => {
-        console.error('🔍 DegenSplit Realtime: Auto-start failed:', error);
+      startRealtimeUpdatesRef.current().catch((error: unknown) => {
+        logger.error('Auto-start failed', error as Record<string, unknown>, 'useDegenSplitRealtime');
       });
     }
-  }, [splitId, isRealtimeActive, startRealtimeUpdates]);
+  }, [splitId, isRealtimeActive]);
 
   // Cleanup on unmount
   useEffect(() => {

@@ -11,7 +11,8 @@ import Icon from '../../components/Icon';
 import UserAvatar from '../../components/UserAvatar';
 import { useApp } from '../../context/AppContext';
 import { useWallet } from '../../context/WalletContext';
-import { formatCryptoAmount } from '../../utils/crypto/wallet';
+// formatCryptoAmount exists in cryptoUtils - import from there
+import { formatCryptoAmount } from '../../utils/crypto/wallet/cryptoUtils';
 import styles from './styles';
 import { logger } from '../../services/analytics/loggingService';
 import { Container } from '../../components/shared';

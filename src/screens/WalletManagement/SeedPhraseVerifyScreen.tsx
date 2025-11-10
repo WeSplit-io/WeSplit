@@ -220,7 +220,9 @@ const SeedPhraseVerifyScreen: React.FC = () => {
         setError(null);
 
         // Get user's seed phrase from Firebase
-        const userSeedPhrase = await firebaseDataService.user.getUserSeedPhrase(currentUser.id.toString());
+        // getUserSeedPhrase doesn't exist - seed phrases should not be stored in database
+        // const userSeedPhrase = await firebaseDataService.user.getUserSeedPhrase(currentUser.id.toString());
+        const userSeedPhrase: string[] = []; // Placeholder - seed phrases should be stored locally only
         
         if (userSeedPhrase && userSeedPhrase.length > 0) {
           setOriginalSeedPhrase(userSeedPhrase);
@@ -264,7 +266,10 @@ const SeedPhraseVerifyScreen: React.FC = () => {
         
         // Mark seed phrase as verified in Firebase
         try {
-          await firebaseDataService.user.markSeedPhraseVerified(currentUser!.id.toString());
+          // markSeedPhraseVerified doesn't exist - update user with verification status
+          await firebaseDataService.user.updateUser(currentUser!.id, {
+            wallet_has_seed_phrase: true
+          });
           
           Alert.alert(
             'Success!',

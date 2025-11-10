@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,6 @@ import {
 } from 'react-native';
 import Icon from '../Icon';
 import { useWallet } from '../../context/WalletContext';
-import { colors } from '../../theme';
-import { walletService } from '../../services/blockchain/wallet';
 
 interface WalletSelectorModalProps {
   visible: boolean;
@@ -30,22 +28,21 @@ const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
     connectToExternalWallet,
     getAvailableProviders,
     isProviderAvailable,
-    isLoading,
   } = useWallet();
 
   const [availableProviders, setAvailableProviders] = useState<any[]>([]);
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
 
+  const loadAvailableProviders = useCallback(() => {
+    const providers = getAvailableProviders();
+    setAvailableProviders(providers);
+  }, [getAvailableProviders]);
+
   useEffect(() => {
     if (visible) {
       loadAvailableProviders();
     }
-  }, [visible]);
-
-  const loadAvailableProviders = () => {
-    const providers = getAvailableProviders();
-    setAvailableProviders(providers);
-  };
+  }, [visible, loadAvailableProviders]);
 
   const handleConnectToProvider = async (providerKey: string, providerName: string) => {
     if (!isProviderAvailable(providerKey)) {
@@ -59,7 +56,7 @@ const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
       Alert.alert('Success', `Connected to ${providerName}!`);
       onClose();
     } catch (error) {
-      console.error(`Error connecting to ${providerName}:`, error);
+      logger.error('Error connecting to provider', { providerName, error: error as Record<string, unknown> }, 'WalletSelectorModal');
       Alert.alert(
         'Connection Failed',
         `Failed to connect to ${providerName}. Please try again.`

@@ -197,7 +197,7 @@ function createDebouncedValidator(
   validator: (value: any) => ValidationResult,
   delay: number = 300
 ) {
-  let timeoutId: NodeJS.Timeout;
+  let timeoutId: ReturnType<typeof setTimeout>;
   
   return (value: any, callback: (result: ValidationResult) => void) => {
     clearTimeout(timeoutId);
