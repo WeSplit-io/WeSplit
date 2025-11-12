@@ -27,7 +27,9 @@ import { FeeService, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG, TransactionType 
 import { solanaWalletService } from '../wallet';
 import { logger } from '../../analytics/loggingService';
 import type { LinkedWallet } from '../wallet/LinkedWalletService';
-import { signTransaction as signTransactionWithCompanyWallet, submitTransaction as submitTransactionToBlockchain } from './transactionSigningService';
+import { signTransaction as signTransactionWithCompanyWallet, submitTransaction as submitTransactionToBlockchain, processUsdcTransfer } from './transactionSigningService';
+import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS, type BlockhashWithTimestamp } from '../../shared/blockhashUtils';
+import { verifyTransactionOnBlockchain } from '../../shared/transactionVerificationUtils';
 
 export interface ExternalTransferParams {
   to: string;
@@ -400,10 +402,23 @@ class ExternalTransferService {
         needsTokenAccountCreation = true;
       }
 
-      // Get recent blockhash
-      const { blockhash } = await this.connection.getLatestBlockhash();
+      // IMPORTANT: Get fresh blockhash RIGHT BEFORE creating the transaction
+      // Blockhashes expire after ~60 seconds, so we get it as late as possible
+      // to minimize the time between creation and submission
+      // Use 'confirmed' commitment for faster response and better reliability
+      // CRITICAL: Get blockhash immediately before transaction creation to minimize expiration risk
+      // Best practice: Use shared utility for consistent blockhash handling
+      const blockhashData = await getFreshBlockhash(this.connection, 'confirmed');
+      const blockhash = blockhashData.blockhash;
+      const blockhashTimestamp = blockhashData.timestamp;
+      logger.info('Got fresh blockhash right before transaction creation', {
+        blockhash: blockhash.substring(0, 8) + '...',
+        lastValidBlockHeight: blockhashData.lastValidBlockHeight,
+        blockhashTimestamp,
+        note: 'Blockhash will expire after approximately 60 seconds'
+      }, 'ExternalTransferService');
 
-      // Create transaction with proper fee payer
+      // Create transaction with proper fee payer (using fresh blockhash)
       const transaction = new Transaction({
         recentBlockhash: blockhash,
         feePayer: feePayerPublicKey // Company pays SOL gas fees, user pays company fees
@@ -591,69 +606,317 @@ class ExternalTransferService {
       const txArray = serializedTransaction instanceof Uint8Array 
         ? serializedTransaction 
         : new Uint8Array(serializedTransaction);
+      
+      // CRITICAL: Get fresh blockhash RIGHT before Firebase call to minimize expiration risk
+      // Even if blockhash was fresh when transaction was built, it might be expired by now
+      // Best practice: Always get fresh blockhash immediately before submission
+      logger.info('Getting fresh blockhash immediately before Firebase call', {
+        originalBlockhashAge: Date.now() - blockhashTimestamp,
+        note: 'Getting fresh blockhash to ensure it\'s valid when Firebase submits to Solana'
+      }, 'ExternalTransferService');
+      
+      const freshBlockhashData = await getFreshBlockhash(this.connection, 'confirmed');
+      const freshBlockhash = freshBlockhashData.blockhash;
+      let currentBlockhashTimestamp = freshBlockhashData.timestamp;
+      
+      // CRITICAL: Always rebuild transaction with fresh blockhash before Firebase call
+      // Even if blockhash is the same, we need to ensure the transaction uses the latest timestamp
+      // This minimizes the time between blockhash creation and Solana submission
+      let currentTxArray = txArray;
+      
+      // Always rebuild to ensure we have the freshest possible transaction
+      {
+        logger.info('Rebuilding transaction with fresh blockhash before Firebase call', {
+          oldBlockhash: blockhash.substring(0, 8) + '...',
+          newBlockhash: freshBlockhash.substring(0, 8) + '...',
+          blockhashAge: Date.now() - blockhashTimestamp
+        }, 'ExternalTransferService');
+        
+        // Rebuild transaction with fresh blockhash
+        const freshTransaction = new Transaction({
+          recentBlockhash: freshBlockhash,
+          feePayer: feePayerPublicKey
+        });
+        
+        // Re-add all instructions
+        const priorityFee = this.getPriorityFee(params.priority || 'medium');
+        if (priorityFee > 0) {
+          freshTransaction.add(
+            ComputeBudgetProgram.setComputeUnitPrice({
+              microLamports: priorityFee,
+            })
+          );
+        }
+        
+        if (needsTokenAccountCreation) {
+          freshTransaction.add(
+            createAssociatedTokenAccountInstruction(
+              feePayerPublicKey,
+              toTokenAccount,
+              toPublicKey,
+              usdcMint
+            )
+          );
+        }
+        
+        const transferAmount = Math.floor(recipientAmount * Math.pow(10, 6) + 0.5);
+        freshTransaction.add(
+          createTransferInstruction(
+            fromTokenAccount,
+            toTokenAccount,
+            fromPublicKey,
+            transferAmount,
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+        
+        if (companyFee > 0) {
+          const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6) + 0.5);
+          const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, feePayerPublicKey);
+          freshTransaction.add(
+            createTransferInstruction(
+              fromTokenAccount,
+              companyTokenAccount,
+              fromPublicKey,
+              companyFeeAmount,
+              [],
+              TOKEN_PROGRAM_ID
+            )
+          );
+        }
+        
+        if (params.memo) {
+          freshTransaction.add(
+            new TransactionInstruction({
+              keys: [{ pubkey: fromPublicKey, isSigner: true, isWritable: true }],
+              data: Buffer.from(params.memo, 'utf8'),
+              programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
+            })
+          );
+        }
+        
+        // Re-sign with fresh transaction
+        const { VersionedTransaction } = await import('@solana/web3.js');
+        let userKeypair: Keypair;
+        try {
+          const secretKeyBuffer = Buffer.from(fromWalletSecretKey, 'base64');
+          userKeypair = Keypair.fromSecretKey(secretKeyBuffer);
+        } catch {
+          const secretKeyArray = JSON.parse(fromWalletSecretKey);
+          userKeypair = Keypair.fromSecretKey(new Uint8Array(secretKeyArray));
+        }
+        
+        const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+        freshVersionedTransaction.sign([userKeypair]);
+        currentTxArray = freshVersionedTransaction.serialize();
+        
+        logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+          transactionSize: currentTxArray.length,
+          newBlockhashTimestamp: currentBlockhashTimestamp,
+          timeSinceNewBlockhash: Date.now() - currentBlockhashTimestamp,
+          blockhashChanged: freshBlockhash !== blockhash
+        }, 'ExternalTransferService');
+      }
             
       logger.info('Transaction serialized, requesting company wallet signature', {
-        transactionSize: txArray.length,
-        transactionType: typeof serializedTransaction,
-        isUint8Array: txArray instanceof Uint8Array,
+        transactionSize: currentTxArray.length,
+        transactionType: typeof currentTxArray,
+        isUint8Array: currentTxArray instanceof Uint8Array,
         from: fromPublicKey.toBase58(),
         to: toPublicKey.toBase58(),
         amount: recipientAmount,
         companyFee,
-        totalAmount: params.amount
+        totalAmount: params.amount,
+        blockhashAge: Date.now() - currentBlockhashTimestamp
             }, 'ExternalTransferService');
             
-      // Use Firebase Function to add company wallet signature
-      let fullySignedTransaction: Uint8Array;
-      try {
-        fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
-        logger.info('Company wallet signature added successfully', {
-          transactionSize: fullySignedTransaction.length
+      // Use processUsdcTransfer which combines signing and submission in one Firebase call
+      // This minimizes the time between getting blockhash and submission
+      // If blockhash expires, we'll rebuild and retry
+      let signature: string;
+      let submissionAttempts = 0;
+      const maxSubmissionAttempts = 3; // Increased to 3 attempts for better reliability
+      
+      while (submissionAttempts < maxSubmissionAttempts) {
+        try {
+          logger.info('Processing USDC transfer (sign and submit)', {
+            connectionEndpoint: this.connection.rpcEndpoint,
+            commitment: getConfig().blockchain.commitment,
+            attempt: submissionAttempts + 1,
+            transactionSize: currentTxArray.length
           }, 'ExternalTransferService');
-      } catch (signingError) {
-        logger.error('Failed to add company wallet signature', { 
-          error: signingError,
-          errorMessage: signingError instanceof Error ? signingError.message : String(signingError)
+            
+          // Use processUsdcTransfer which does both signing and submission in one call
+          // This minimizes delay and reduces chance of blockhash expiration
+          const result = await processUsdcTransfer(currentTxArray);
+          signature = result.signature;
+          
+          logger.info('Transaction processed successfully', { signature }, 'ExternalTransferService');
+          break; // Success, exit retry loop
+        } catch (submissionError) {
+          const errorMessage = submissionError instanceof Error ? submissionError.message : String(submissionError);
+          const isBlockhashExpired = 
+            errorMessage.includes('blockhash has expired') ||
+            errorMessage.includes('blockhash expired') ||
+            errorMessage.includes('Blockhash not found');
+          
+          if (isBlockhashExpired && submissionAttempts < maxSubmissionAttempts - 1) {
+            // Blockhash expired - rebuild the entire transaction with fresh blockhash
+            logger.warn('Transaction blockhash expired, rebuilding transaction with fresh blockhash', {
+              attempt: submissionAttempts + 1,
+              maxAttempts: maxSubmissionAttempts
             }, 'ExternalTransferService');
+            
+            try {
+              // Get fresh blockhash RIGHT before rebuilding using shared utility
+              // Best practice: Use shared utility for consistent blockhash handling
+              const freshBlockhashData = await getFreshBlockhash(this.connection, 'confirmed');
+              const freshBlockhash = freshBlockhashData.blockhash;
+              const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+              logger.info('Got fresh blockhash for transaction rebuild', {
+                blockhash: freshBlockhash.substring(0, 8) + '...',
+                timestamp: freshBlockhashTimestamp
+              }, 'ExternalTransferService');
+              
+              // Recreate transaction with fresh blockhash
+              const freshTransaction = new Transaction({
+                recentBlockhash: freshBlockhash,
+                feePayer: feePayerPublicKey
+              });
+              
+              // Re-add all instructions in the same order
+              const priorityFee = this.getPriorityFee(params.priority || 'medium');
+              if (priorityFee > 0) {
+                freshTransaction.add(
+                  ComputeBudgetProgram.setComputeUnitPrice({
+                    microLamports: priorityFee,
+                  })
+                );
+              }
+              
+              if (needsTokenAccountCreation) {
+                freshTransaction.add(
+                  createAssociatedTokenAccountInstruction(
+                    feePayerPublicKey,
+                    toTokenAccount,
+                    toPublicKey,
+                    usdcMint
+                  )
+                );
+              }
+              
+              // Add USDC transfer for recipient
+              const transferAmount = Math.floor(recipientAmount * Math.pow(10, 6) + 0.5);
+              freshTransaction.add(
+                createTransferInstruction(
+                  fromTokenAccount,
+                  toTokenAccount,
+                  fromPublicKey,
+                  transferAmount,
+                  [],
+                  TOKEN_PROGRAM_ID
+                )
+              );
+              
+              // Add company fee transfer
+              if (companyFee > 0) {
+                const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6) + 0.5);
+                const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, feePayerPublicKey);
+                freshTransaction.add(
+                  createTransferInstruction(
+                    fromTokenAccount,
+                    companyTokenAccount,
+                    fromPublicKey,
+                    companyFeeAmount,
+                    [],
+                    TOKEN_PROGRAM_ID
+                  )
+                );
+              }
+              
+              // Add memo if provided
+              if (params.memo) {
+                freshTransaction.add(
+                  new TransactionInstruction({
+                    keys: [{ pubkey: fromPublicKey, isSigner: true, isWritable: true }],
+                    data: Buffer.from(params.memo, 'utf8'),
+                    programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
+                  })
+                );
+              }
+              
+              // Convert to VersionedTransaction and sign with user
+              const { VersionedTransaction } = await import('@solana/web3.js');
+              const secretKeyBuffer = Buffer.from(fromWalletSecretKey, 'base64');
+              const userKeypair = Keypair.fromSecretKey(secretKeyBuffer);
+              
+              const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+              freshVersionedTransaction.sign([userKeypair]);
+              
+              // Serialize for processUsdcTransfer (which will sign and submit)
+              const freshTxArray = freshVersionedTransaction.serialize();
+              
+              logger.info('Transaction rebuilt with fresh blockhash', {
+                transactionSize: freshTxArray.length,
+                blockhashTimestamp: freshBlockhashTimestamp,
+                timeSinceBlockhash: Date.now() - freshBlockhashTimestamp
+              }, 'ExternalTransferService');
+              
+              // Use the rebuilt transaction for next attempt
+              currentTxArray = freshTxArray;
+              currentBlockhashTimestamp = freshBlockhashTimestamp;
+              submissionAttempts++;
+              continue; // Retry with fresh transaction
+            } catch (rebuildError) {
+              logger.error('Failed to rebuild transaction', {
+                error: rebuildError instanceof Error ? rebuildError.message : String(rebuildError)
+              }, 'ExternalTransferService');
+              return {
+                success: false,
+                error: 'Transaction blockhash expired and could not be rebuilt. Please try again.'
+              };
+            }
+          } else {
+            // Other error or max attempts reached
+            logger.error('Transaction submission failed', { 
+              error: submissionError,
+              errorMessage,
+              attempt: submissionAttempts + 1,
+              maxAttempts: maxSubmissionAttempts
+            }, 'ExternalTransferService');
+            return {
+              success: false,
+              error: `Failed to submit transaction: ${errorMessage}`
+            };
+          }
+        }
+        
+        submissionAttempts++;
+      }
+      
+      if (!signature) {
         return {
           success: false,
-          error: `Failed to sign transaction with company wallet: ${signingError instanceof Error ? signingError.message : String(signingError)}`
-        };
-          }
-          
-      // Submit the fully signed transaction
-      let signature: string;
-      try {
-        logger.info('Submitting fully signed transaction', {
-          connectionEndpoint: this.connection.rpcEndpoint,
-          commitment: getConfig().blockchain.commitment
-          }, 'ExternalTransferService');
-          
-        const result = await submitTransactionToBlockchain(fullySignedTransaction);
-        signature = result.signature;
-        
-        logger.info('Transaction submitted successfully', { signature }, 'ExternalTransferService');
-      } catch (submissionError) {
-        logger.error('Transaction submission failed', { 
-          error: submissionError,
-          errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
-          }, 'ExternalTransferService');
-          return {
-            success: false,
-          error: `Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`
+          error: 'Failed to submit transaction after multiple attempts'
         };
       }
 
-      // Enhanced verification (matching split logic)
-      const verificationResult = await this.verifyTransactionOnBlockchain(signature);
+      // Enhanced verification using shared utility
+      // CRITICAL: Don't return success until transaction is actually confirmed
+      // Best practice: Use shared verification utility for consistent behavior
+      const verificationResult = await verifyTransactionOnBlockchain(this.connection, signature);
       if (!verificationResult.success) {
         logger.error('External transfer verification failed', {
           signature,
-          error: verificationResult.error
+          error: verificationResult.error,
+          note: 'Transaction was submitted but not confirmed. It may have failed or expired.'
         }, 'ExternalTransferService');
         return {
           success: false,
-          error: verificationResult.error || 'Transaction verification failed'
+          signature, // Include signature so user can check on Solana Explorer
+          error: verificationResult.error || 'Transaction verification failed. Please check transaction status on Solana Explorer.',
+          txId: signature
         };
       }
 
@@ -748,90 +1011,16 @@ class ExternalTransferService {
   }
 
   /**
-   * Enhanced transaction verification (matching split logic)
+   * @deprecated Use shared verifyTransactionOnBlockchain from transactionVerificationUtils instead
+   * This method is kept for backward compatibility but will be removed
    */
   private async verifyTransactionOnBlockchain(signature: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      logger.info('Verifying external transfer transaction on blockchain', {
-        signature
-      }, 'ExternalTransferService');
-
-      // Enhanced verification with multiple attempts (matching split logic)
-      const maxAttempts = 10;
-      const delayMs = 1000; // 1 second delay between attempts
-
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-          const status = await this.connection.getSignatureStatus(signature, {
-            searchTransactionHistory: true
-          });
-
-          if (status.value) {
-            if (status.value.err) {
-              logger.error('External transfer failed on blockchain', {
-                signature,
-                error: status.value.err,
-                attempt
-              }, 'ExternalTransferService');
+    // Use shared verification utility for consistent behavior
+    const result = await verifyTransactionOnBlockchain(this.connection, signature);
               return {
-                success: false,
-                error: `Transaction failed: ${status.value.err.toString()}`
-              };
-            }
-
-            const confirmations = status.value.confirmations || 0;
-            if (confirmations > 0) {
-              logger.info('External transfer confirmed on blockchain', {
-                signature,
-                confirmations,
-                attempt
-              }, 'ExternalTransferService');
-              return { success: true };
-            }
-          }
-
-          if (attempt < maxAttempts) {
-            logger.info('External transfer not yet confirmed, retrying', {
-              signature,
-              attempt,
-              maxAttempts
-            }, 'ExternalTransferService');
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-          }
-        } catch (error) {
-          logger.warn('External transfer verification attempt failed', {
-            signature,
-            attempt,
-            error: error instanceof Error ? error.message : String(error)
-          }, 'ExternalTransferService');
-          
-          if (attempt < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-          }
-        }
-      }
-
-      // If we reach here, all verification attempts failed
-      logger.warn('External transfer verification timeout', {
-        signature,
-        maxAttempts
-      }, 'ExternalTransferService');
-
-      // For external transfers, be strict about verification
-      return {
-        success: false,
-        error: 'Transaction verification timeout - transaction may have failed'
-      };
-    } catch (error) {
-      logger.error('External transfer verification failed', {
-        signature,
-        error: error instanceof Error ? error.message : String(error)
-      }, 'ExternalTransferService');
-      return {
-        success: false,
-        error: 'Transaction verification failed'
-      };
-    }
+      success: result.success,
+      error: result.error
+    };
   }
 
   /**

@@ -30,6 +30,8 @@ import { optimizedTransactionUtils } from '../../shared/transactionUtilsOptimize
 import { logger } from '../../analytics/loggingService';
 import { TransactionParams, TransactionResult } from './types';
 import { signTransaction as signTransactionWithCompanyWallet, submitTransaction as submitTransactionToBlockchain } from './transactionSigningService';
+import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS } from '../../shared/blockhashUtils';
+import { verifyTransactionOnBlockchain } from '../../shared/transactionVerificationUtils';
 
 export class TransactionProcessor {
   private connection: Connection;
@@ -145,22 +147,23 @@ export class TransactionProcessor {
         }
       }
 
-      // Get recent blockhash
-      const blockhashResult = await TransactionUtils.getLatestBlockhashWithRetry(this.connection, 'confirmed');
-      const blockhash = typeof blockhashResult === 'string' ? blockhashResult : blockhashResult.blockhash;
+      // IMPORTANT: Get fresh blockhash RIGHT BEFORE creating the transaction
+      // Blockhashes expire after ~60 seconds, so we get it as late as possible
+      // to minimize the time between creation and submission
+      // Best practice: Use shared utility for consistent blockhash handling
+      const blockhashData = await getFreshBlockhash(this.connection, 'confirmed');
+      const blockhash = blockhashData.blockhash;
+      const blockhashTimestamp = blockhashData.timestamp;
       
-      // Validate blockhash is a string
-      if (!blockhash || typeof blockhash !== 'string') {
-        throw new Error(`Invalid blockhash: expected string, got ${typeof blockhash}`);
-      }
-      
-      logger.info('Got recent blockhash', {
+      logger.info('Got fresh blockhash right before transaction creation', {
         blockhash: blockhash.substring(0, 8) + '...',
         blockhashType: typeof blockhash,
-        blockhashLength: blockhash.length
+        blockhashLength: blockhash.length,
+        blockhashTimestamp,
+        lastValidBlockHeight: blockhashData.lastValidBlockHeight
       }, 'TransactionProcessor');
       
-      // Create the transaction with proper setup
+      // Create the transaction with proper setup (using fresh blockhash)
       const transaction = new Transaction({
         recentBlockhash: blockhash,
         feePayer: feePayerPublicKey
@@ -358,22 +361,59 @@ export class TransactionProcessor {
         throw new Error(`Failed to convert transaction to Uint8Array: ${conversionError instanceof Error ? conversionError.message : String(conversionError)}`);
       }
 
+      // CRITICAL: Check blockhash age before sending to Firebase
+      // Best practice: Use shared utility for consistent blockhash age checking
+      let currentTxArray = txArray;
+      
+      if (isBlockhashTooOld(blockhashTimestamp)) {
+        logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+          blockhashAge: Date.now() - blockhashTimestamp,
+          maxAge: BLOCKHASH_MAX_AGE_MS
+        }, 'TransactionProcessor');
+        
+        // Get fresh blockhash and rebuild transaction using shared utility
+        const freshBlockhashData = await getFreshBlockhash(this.connection, 'confirmed');
+        const freshBlockhash = freshBlockhashData.blockhash;
+        const freshBlockhashTimestamp = freshBlockhashData.timestamp;
+        
+        // Rebuild transaction with fresh blockhash
+        const freshTransaction = new Transaction({
+          recentBlockhash: freshBlockhash,
+          feePayer: feePayerPublicKey
+        });
+        
+        // Re-add all instructions
+        transaction.instructions.forEach(ix => freshTransaction.add(ix));
+        
+        // Re-sign with fresh transaction
+        const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+        freshVersionedTransaction.sign([keypair]);
+        currentTxArray = freshVersionedTransaction.serialize();
+        
+        logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+          transactionSize: currentTxArray.length,
+          blockhashAge: Date.now() - blockhashTimestamp,
+          newBlockhashTimestamp: freshBlockhashTimestamp
+        }, 'TransactionProcessor');
+      }
+
       logger.info('Transaction ready for Firebase Function', {
-        transactionSize: txArray.length,
-        transactionType: typeof txArray,
-        isUint8Array: txArray instanceof Uint8Array,
-        txArrayConstructor: txArray.constructor.name,
-        firstBytes: Array.from(txArray.slice(0, 10))
+        transactionSize: currentTxArray.length,
+        transactionType: typeof currentTxArray,
+        isUint8Array: currentTxArray instanceof Uint8Array,
+        txArrayConstructor: currentTxArray.constructor.name,
+        firstBytes: Array.from(currentTxArray.slice(0, 10)),
+        blockhashAge: Date.now() - blockhashTimestamp
       }, 'TransactionProcessor');
 
       // Use Firebase Function to add company wallet signature
       let fullySignedTransaction: Uint8Array;
       try {
         logger.info('Calling signTransactionWithCompanyWallet', {
-          txArrayLength: txArray.length,
-          txArrayType: typeof txArray
+          txArrayLength: currentTxArray.length,
+          txArrayType: typeof currentTxArray
         }, 'TransactionProcessor');
-        fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+        fullySignedTransaction = await signTransactionWithCompanyWallet(currentTxArray);
         logger.info('Company wallet signature added successfully', {
           transactionSize: fullySignedTransaction.length
         }, 'TransactionProcessor');
@@ -407,7 +447,58 @@ export class TransactionProcessor {
         throw submissionError;
       }
 
-      // Confirm transaction with optimized timeout handling
+      // CRITICAL: On mainnet, we need to properly verify the transaction succeeded
+      // Don't assume success just because we got a signature - verify it actually confirmed
+      const config = getConfig();
+      const isMainnet = config.blockchain.network === 'mainnet';
+      
+      if (isMainnet) {
+        // On mainnet, use proper verification with delayed check
+        logger.info('Mainnet transaction submitted, verifying confirmation', {
+          signature,
+          transactionType,
+          note: 'Will verify transaction status on mainnet'
+        }, 'TransactionProcessor');
+        
+        // Wait a moment for transaction to be processed
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Verify transaction with proper mainnet-aware logic using shared utility
+        const verificationResult = await verifyTransactionOnBlockchain(this.connection, signature);
+        
+        if (!verificationResult.success) {
+          logger.error('Transaction verification failed on mainnet', {
+            signature,
+            error: verificationResult.error,
+            transactionType,
+            note: 'Transaction may have failed or is still processing'
+          }, 'TransactionProcessor');
+          
+          // Don't return success if verification explicitly failed (not just timeout)
+          if (verificationResult.error && !verificationResult.error.includes('timeout')) {
+            return {
+              signature,
+              txId: signature,
+              success: false,
+              error: verificationResult.error || 'Transaction verification failed on mainnet',
+              companyFee,
+              netAmount: recipientAmount
+            };
+          }
+          
+          // If it's just a timeout, assume success (transaction was accepted by network)
+          logger.warn('Transaction verification timed out on mainnet, assuming success', {
+            signature,
+            note: 'Transaction was accepted by network, verification timeout likely due to RPC rate limits'
+          }, 'TransactionProcessor');
+        } else {
+          logger.info('Transaction verified successfully on mainnet', {
+            signature,
+            transactionType
+          }, 'TransactionProcessor');
+        }
+      } else {
+        // On devnet, use faster confirmation
       try {
         const confirmed = await optimizedTransactionUtils.confirmTransactionWithTimeout(signature);
         if (!confirmed) {
@@ -416,12 +507,6 @@ export class TransactionProcessor {
             note: 'Transaction may still be processing on the blockchain'
           }, 'TransactionProcessor');
         }
-        
-        logger.info('Transaction sent successfully', {
-          signature,
-          transactionType,
-          priority
-        }, 'TransactionProcessor');
       } catch (sendError) {
         logger.error('Transaction confirmation failed', {
           error: sendError instanceof Error ? sendError.message : String(sendError),
@@ -430,60 +515,9 @@ export class TransactionProcessor {
         }, 'TransactionProcessor');
         // Don't throw - transaction was already submitted
       }
-      
-      // Quick confirmation check - if it takes too long, just proceed
-      // The transaction was accepted by the network, and blockchain propagation can be slow
-      const confirmationTimeout = priority === 'high' ? 5000 : 8000; // Reduced timeouts: 5s for high priority, 8s for others
-      let confirmed = false;
-      
-      try {
-        confirmed = await Promise.race([
-          optimizedTransactionUtils.confirmTransactionWithTimeout(signature, confirmationTimeout).catch(() => false),
-          new Promise<boolean>((resolve) => 
-            setTimeout(() => {
-              logger.debug('Confirmation timeout, proceeding with transaction', { signature }, 'TransactionProcessor');
-              resolve(false); // Don't fail, just proceed
-            }, confirmationTimeout + 2000) // Extra 2 seconds buffer
-          )
-        ]);
-      } catch (confirmError) {
-        logger.debug('Confirmation check threw error, proceeding anyway', {
-          signature,
-          error: confirmError instanceof Error ? confirmError.message : String(confirmError)
-        }, 'TransactionProcessor');
-        confirmed = false;
-      }
-      
-      // Only do quick verification if not already confirmed - skip if it takes too long
-      if (!confirmed) {
-        try {
-          // Quick verification with fewer attempts for faster response
-          const verificationResult = await Promise.race([
-            this.verifyTransactionOnBlockchain(signature, transactionType),
-            new Promise<{ success: boolean; error?: string }>((resolve) =>
-              setTimeout(() => {
-                logger.debug('Verification timeout, assuming success', { signature }, 'TransactionProcessor');
-                resolve({ success: true }); // Assume success if verification takes too long
-              }, 3000) // 3 second timeout for verification
-            )
-          ]);
-          
-          if (verificationResult.success) {
-            logger.debug('Transaction verified on blockchain', { signature }, 'TransactionProcessor');
-          }
-        } catch (verifyError) {
-          logger.debug('Verification threw error, but transaction was sent successfully', {
-            signature,
-            error: verifyError instanceof Error ? verifyError.message : String(verifyError)
-          }, 'TransactionProcessor');
-          // Don't fail - transaction was sent and accepted by network
-        }
-      } else {
-        logger.debug('Transaction confirmed successfully', { signature }, 'TransactionProcessor');
       }
 
-      // Always return success if we got a signature - the transaction was accepted by the network
-      // Verification failures are likely due to network delays, not actual transaction failures
+      // Return success - transaction was submitted and verified (or assumed successful on timeout)
       return {
         signature,
         txId: signature,
@@ -504,101 +538,21 @@ export class TransactionProcessor {
   }
 
   /**
-   * Enhanced transaction verification (matching split logic)
+   * @deprecated Use shared verifyTransactionOnBlockchain from transactionVerificationUtils instead
+   * This method is kept for backward compatibility but will be removed
    */
   private async verifyTransactionOnBlockchain(
     signature: string, 
     transactionType: string
   ): Promise<{ success: boolean; error?: string }> {
-    try {
-      logger.info('Verifying transaction on blockchain', {
-        signature,
-        transactionType
-      }, 'TransactionProcessor');
-
-      // Quick verification with minimal attempts for faster response
-      const maxAttempts = 2; // Reduced to 2 attempts for faster response
-      const delayMs = 300; // Reduced to 300ms for faster response
-
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-          const status = await this.connection.getSignatureStatus(signature, {
-            searchTransactionHistory: true
-          });
-
-          if (status.value) {
-            if (status.value.err) {
-              logger.error('Transaction failed on blockchain', {
-                signature,
-                error: status.value.err,
-                attempt
-              }, 'TransactionProcessor');
+    // Use shared verification utility for consistent behavior
+    const result = await verifyTransactionOnBlockchain(this.connection, signature);
               return {
-                success: false,
-                error: `Transaction failed: ${status.value.err.toString()}`
-              };
-            }
-
-            const confirmations = status.value.confirmations || 0;
-            if (confirmations > 0) {
-              logger.info('Transaction confirmed on blockchain', {
-                signature,
-                confirmations,
-                attempt
-              }, 'TransactionProcessor');
-              return { success: true };
-            }
+      success: result.success,
+      error: result.error
+    };
           }
-
-          if (attempt < maxAttempts) {
-            logger.info('Transaction not yet confirmed, retrying', {
-              signature,
-              attempt,
-              maxAttempts
-            }, 'TransactionProcessor');
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-          }
-        } catch (error) {
-          logger.warn('Verification attempt failed', {
-            signature,
-            attempt,
-            error: error instanceof Error ? error.message : String(error)
-          }, 'TransactionProcessor');
-          
-          if (attempt < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-          }
-        }
-      }
-
-      // If we reach here, all verification attempts failed
-      logger.warn('Transaction verification timeout', {
-        signature,
-        maxAttempts
-      }, 'TransactionProcessor');
-
-      // More lenient handling - if transaction was sent successfully, assume it succeeded
-      // Blockchain propagation can be slow, especially during high network activity
-      logger.warn('Transaction verification timeout, but transaction was sent successfully', {
-        signature,
-        transactionType,
-        maxAttempts
-      }, 'TransactionProcessor');
-      
-      // For all transaction types, assume success if we got a signature
-      // The transaction was accepted by the network, verification timeout is likely due to network delays
-      return { success: true };
-    } catch (error) {
-      logger.error('Transaction verification failed', {
-        signature,
-        error: error instanceof Error ? error.message : String(error)
-      }, 'TransactionProcessor');
-      return {
-        success: false,
-        error: 'Transaction verification failed'
-      };
-    }
-  }
+  
 
   /**
    * Get transaction fee estimate

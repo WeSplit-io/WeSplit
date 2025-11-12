@@ -17,6 +17,7 @@ import { BalanceUtils } from '../shared/balanceUtils';
 import { USDC_CONFIG } from '../shared/walletConstants';
 import { signTransaction as signTransactionWithCompanyWallet, submitTransaction as submitTransactionToBlockchain } from '../blockchain/transaction/transactionSigningService';
 import { VersionedTransaction } from '@solana/web3.js';
+import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS } from '../shared/blockhashUtils';
 
 // Helper function to verify transaction on blockchain
 async function verifyTransactionOnBlockchain(transactionSignature: string): Promise<boolean> {
@@ -204,7 +205,9 @@ async function executeFairSplitTransaction(
       }
     }
 
-    // Get recent blockhash
+    // IMPORTANT: Get fresh blockhash RIGHT BEFORE finalizing the transaction
+    // Blockhashes expire after ~60 seconds, so we get it as late as possible
+    // to minimize the time between creation and submission
     const { blockhash } = await connection.getLatestBlockhash('confirmed');
     transaction.recentBlockhash = blockhash;
     
@@ -256,16 +259,52 @@ async function executeFairSplitTransaction(
       ? serializedTransaction 
       : new Uint8Array(serializedTransaction);
 
+    // CRITICAL: Check blockhash age before sending to Firebase
+    // Best practice: Use shared utility for consistent blockhash age checking
+    let currentTxArray = txArray;
+    
+    if (isBlockhashTooOld(blockhashTimestamp)) {
+      logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+        blockhashAge,
+        maxAge: BLOCKHASH_MAX_AGE_MS
+      }, 'SplitWalletPayments');
+      
+      // Get fresh blockhash and rebuild transaction
+      const { blockhash: freshBlockhash } = await connection.getLatestBlockhash('confirmed');
+      const freshBlockhashTimestamp = Date.now();
+      
+      // Rebuild transaction with fresh blockhash
+      const freshTransaction = new Transaction({
+        recentBlockhash: freshBlockhash,
+        feePayer: companyPublicKey
+      });
+      
+      // Re-add all instructions
+      transaction.instructions.forEach(ix => freshTransaction.add(ix));
+      
+      // Re-sign with fresh transaction
+      const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+      freshVersionedTransaction.sign([keypair]);
+      currentTxArray = freshVersionedTransaction.serialize();
+      
+      logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+        transactionSize: currentTxArray.length,
+        blockhashAge: blockhashAge,
+        newBlockhashTimestamp: freshBlockhashTimestamp
+      }, 'SplitWalletPayments');
+    }
+
     logger.info('Transaction serialized, requesting company wallet signature', {
-      transactionSize: txArray.length,
-      transactionType: typeof serializedTransaction,
-      isUint8Array: txArray instanceof Uint8Array
+      transactionSize: currentTxArray.length,
+      transactionType: typeof currentTxArray,
+      isUint8Array: currentTxArray instanceof Uint8Array,
+      blockhashAge: Date.now() - blockhashTimestamp
     }, 'SplitWalletPayments');
     
     // Use Firebase Function to add company wallet signature
     let fullySignedTransaction: Uint8Array;
     try {
-      fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+      fullySignedTransaction = await signTransactionWithCompanyWallet(currentTxArray);
       logger.info('Company wallet signature added successfully', {
         transactionSize: fullySignedTransaction.length
           }, 'SplitWalletPayments');
@@ -620,8 +659,12 @@ async function executeFastTransaction(
       }
     }
 
-    // Get recent blockhash
-    const { blockhash } = await connection.getLatestBlockhash('processed'); // Use 'processed' for speed
+    // IMPORTANT: Get fresh blockhash RIGHT BEFORE finalizing the transaction
+    // Blockhashes expire after ~60 seconds, so we get it as late as possible
+    // to minimize the time between creation and submission
+    // Use 'confirmed' commitment for mainnet reliability (consistent with other transaction paths)
+    const { blockhash } = await connection.getLatestBlockhash('confirmed');
+    const blockhashTimestamp = Date.now(); // Track when we got the blockhash
     transaction.recentBlockhash = blockhash;
     
     // Use company wallet as fee payer
@@ -672,16 +715,52 @@ async function executeFastTransaction(
       ? serializedTransaction 
       : new Uint8Array(serializedTransaction);
 
+    // CRITICAL: Check blockhash age before sending to Firebase
+    // Best practice: Use shared utility for consistent blockhash age checking
+    let currentTxArray = txArray;
+    
+    if (isBlockhashTooOld(blockhashTimestamp)) {
+      logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+        blockhashAge,
+        maxAge: BLOCKHASH_MAX_AGE_MS
+      }, 'SplitWalletPayments');
+      
+      // Get fresh blockhash and rebuild transaction
+      const { blockhash: freshBlockhash } = await connection.getLatestBlockhash('confirmed');
+      const freshBlockhashTimestamp = Date.now();
+      
+      // Rebuild transaction with fresh blockhash
+      const freshTransaction = new Transaction({
+        recentBlockhash: freshBlockhash,
+        feePayer: companyPublicKey
+      });
+      
+      // Re-add all instructions
+      transaction.instructions.forEach(ix => freshTransaction.add(ix));
+      
+      // Re-sign with fresh transaction
+      const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+      freshVersionedTransaction.sign([keypair]);
+      currentTxArray = freshVersionedTransaction.serialize();
+      
+      logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+        transactionSize: currentTxArray.length,
+        blockhashAge: blockhashAge,
+        newBlockhashTimestamp: freshBlockhashTimestamp
+      }, 'SplitWalletPayments');
+    }
+
     logger.info('Transaction serialized, requesting company wallet signature', {
-      transactionSize: txArray.length,
-      transactionType: typeof serializedTransaction,
-      isUint8Array: txArray instanceof Uint8Array
+      transactionSize: currentTxArray.length,
+      transactionType: typeof currentTxArray,
+      isUint8Array: currentTxArray instanceof Uint8Array,
+      blockhashAge: Date.now() - blockhashTimestamp
     }, 'SplitWalletPayments');
 
     // Use Firebase Function to add company wallet signature
     let fullySignedTransaction: Uint8Array;
     try {
-      fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+      fullySignedTransaction = await signTransactionWithCompanyWallet(currentTxArray);
       logger.info('Company wallet signature added successfully', {
         transactionSize: fullySignedTransaction.length
       }, 'SplitWalletPayments');
@@ -725,10 +804,16 @@ async function executeFastTransaction(
     // Balance capture moved to before transaction execution
 
     // For withdrawals, use optimized confirmation strategy
+    // Mainnet-aware: Use longer timeouts for mainnet since it's slower
+    const { getConfig } = await import('../../config/unified');
+    const config = getConfig();
+    const isMainnet = config.blockchain.network === 'mainnet';
+    
     let confirmed = false;
     let attempts = 0;
-    const maxAttempts = 15; // Reduced attempts for faster response
-    const waitTime = 2000; // Increased wait time to 2 seconds for better reliability
+    // Mainnet needs more time - transactions can take 30+ seconds
+    const maxAttempts = isMainnet ? 30 : 15; // 30 attempts for mainnet (60 seconds), 15 for devnet (30 seconds)
+    const waitTime = isMainnet ? 2000 : 2000; // 2 seconds for both (mainnet needs more attempts, not longer waits)
 
     logger.info('Starting withdrawal transaction confirmation', {
       signature,
@@ -1139,8 +1224,11 @@ async function executeDegenSplitTransaction(
       }
     }
 
-    // Get recent blockhash
+    // IMPORTANT: Get fresh blockhash RIGHT BEFORE finalizing the transaction
+    // Blockhashes expire after ~60 seconds, so we get it as late as possible
+    // to minimize the time between creation and submission
     const { blockhash } = await connection.getLatestBlockhash('confirmed');
+    const blockhashTimestamp = Date.now(); // Track when we got the blockhash
     transaction.recentBlockhash = blockhash;
     
     // Use company wallet as fee payer
@@ -1191,16 +1279,52 @@ async function executeDegenSplitTransaction(
       ? serializedTransaction 
       : new Uint8Array(serializedTransaction);
 
+    // CRITICAL: Check blockhash age before sending to Firebase
+    // Best practice: Use shared utility for consistent blockhash age checking
+    let currentTxArray = txArray;
+    
+    if (isBlockhashTooOld(blockhashTimestamp)) {
+      logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+        blockhashAge,
+        maxAge: BLOCKHASH_MAX_AGE_MS
+      }, 'SplitWalletPayments');
+      
+      // Get fresh blockhash and rebuild transaction
+      const { blockhash: freshBlockhash } = await connection.getLatestBlockhash('confirmed');
+      const freshBlockhashTimestamp = Date.now();
+      
+      // Rebuild transaction with fresh blockhash
+      const freshTransaction = new Transaction({
+        recentBlockhash: freshBlockhash,
+        feePayer: companyPublicKey
+      });
+      
+      // Re-add all instructions
+      transaction.instructions.forEach(ix => freshTransaction.add(ix));
+      
+      // Re-sign with fresh transaction
+      const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+      freshVersionedTransaction.sign([keypair]);
+      currentTxArray = freshVersionedTransaction.serialize();
+      
+      logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+        transactionSize: currentTxArray.length,
+        blockhashAge: blockhashAge,
+        newBlockhashTimestamp: freshBlockhashTimestamp
+      }, 'SplitWalletPayments');
+    }
+
     logger.info('Transaction serialized, requesting company wallet signature', {
-      transactionSize: txArray.length,
-      transactionType: typeof serializedTransaction,
-      isUint8Array: txArray instanceof Uint8Array
+      transactionSize: currentTxArray.length,
+      transactionType: typeof currentTxArray,
+      isUint8Array: currentTxArray instanceof Uint8Array,
+      blockhashAge: Date.now() - blockhashTimestamp
     }, 'SplitWalletPayments');
 
     // Use Firebase Function to add company wallet signature
     let fullySignedTransaction: Uint8Array;
     try {
-      fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+      fullySignedTransaction = await signTransactionWithCompanyWallet(currentTxArray);
       logger.info('Company wallet signature added successfully', {
         transactionSize: fullySignedTransaction.length
       }, 'SplitWalletPayments');
@@ -1244,8 +1368,13 @@ async function executeDegenSplitTransaction(
     // For degen splits, use enhanced confirmation strategy
     let confirmed = false;
     let attempts = 0;
-    const maxAttempts = 30; // Increased attempts for better reliability
-    const waitTime = 1000; // Increased wait time to 1 second
+    // Mainnet-aware: Use longer timeouts for mainnet since it's slower
+    const { getConfig: getConfigForDegen } = await import('../../config/unified');
+    const degenConfig = getConfigForDegen();
+    const isMainnetDegen = degenConfig.blockchain.network === 'mainnet';
+    
+    const maxAttempts = isMainnetDegen ? 40 : 30; // 40 attempts for mainnet (40 seconds), 30 for devnet (30 seconds)
+    const waitTime = isMainnetDegen ? 2000 : 1000; // 2 seconds for mainnet, 1 second for devnet
 
     while (!confirmed && attempts < maxAttempts) {
       try {

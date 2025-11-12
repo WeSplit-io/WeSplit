@@ -441,50 +441,6 @@ class ConsolidatedTransactionService {
     return this.balanceManager.hasSufficientSolForGas(userId);
   }
 
-  // ===== LEGACY COMPATIBILITY METHODS =====
-
-  /**
-   * Legacy method for sending USDC transactions
-   * @deprecated Use sendUSDCTransaction instead
-   */
-  async sendUsdcTransaction(
-    to: string,
-    amount: number,
-    userId: string,
-    memo?: string
-  ): Promise<TransactionResult> {
-    logger.warn('Using deprecated sendUsdcTransaction method', null, 'ConsolidatedTransactionService');
-    
-    return this.sendUSDCTransaction({
-      to,
-      amount,
-      currency: 'USDC',
-      userId,
-      memo
-    });
-  }
-
-  /**
-   * Legacy method for sending USDC to address
-   * @deprecated Use sendUSDCTransaction instead
-   */
-  async sendUsdcToAddress(
-    to: string,
-    amount: number,
-    userId: string,
-    memo?: string
-  ): Promise<TransactionResult> {
-    logger.warn('Using deprecated sendUsdcToAddress method', null, 'ConsolidatedTransactionService');
-    
-    return this.sendUSDCTransaction({
-      to,
-      amount,
-      currency: 'USDC',
-      userId,
-      memo
-    });
-  }
-
   /**
    * Get user wallet address by userId
    */
@@ -504,28 +460,6 @@ class ConsolidatedTransactionService {
       logger.error('Failed to get user wallet address', { userId, error }, 'ConsolidatedTransactionService');
       return null;
     }
-  }
-
-  /**
-   * Legacy method for sending USDC from specific wallet
-   * @deprecated Use sendUSDCTransaction instead
-   */
-  async sendUsdcFromSpecificWallet(
-    fromWalletAddress: string,
-    to: string,
-    amount: number,
-    userId: string,
-    memo?: string
-  ): Promise<TransactionResult> {
-    logger.warn('Using deprecated sendUsdcFromSpecificWallet method', null, 'ConsolidatedTransactionService');
-    
-    // This method would need to be implemented if specific wallet functionality is required
-    return {
-      signature: '',
-      txId: '',
-      success: false,
-      error: 'sendUsdcFromSpecificWallet is deprecated and not implemented in the new architecture'
-    };
   }
 }
 

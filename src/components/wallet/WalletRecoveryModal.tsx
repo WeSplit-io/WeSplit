@@ -59,8 +59,18 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
   const loadRecoveryReport = useCallback(async () => {
     try {
       setLoading(true);
-      // Get basic recovery information
-      const recoveryResult = await walletRecoveryService.recoverWallet(userId);
+      // Get user email for email-based recovery
+      let userEmail: string | undefined;
+      try {
+        const { firebaseDataService } = await import('../../services/data/firebaseDataService');
+        const userData = await firebaseDataService.user.getCurrentUser(userId);
+        userEmail = userData?.email;
+      } catch (emailError) {
+        logger.debug('Failed to get user email for recovery', emailError as Record<string, unknown>, 'WalletRecoveryModal');
+      }
+      
+      // Get basic recovery information (with email-based fallback)
+      const recoveryResult = await walletRecoveryService.recoverWallet(userId, userEmail);
       const report = {
         hasLocalWallet: recoveryResult.success,
         localWallets: recoveryResult.wallet ? [recoveryResult.wallet.address] : [],
@@ -88,7 +98,17 @@ const WalletRecoveryModal: React.FC<WalletRecoveryModalProps> = ({
       setIsRecovering(true);
       setRecoveryStep('Starting automatic recovery...');
 
-      const result = await walletRecoveryService.recoverWallet(userId);
+      // Get user email for email-based recovery
+      let userEmail: string | undefined;
+      try {
+        const { firebaseDataService } = await import('../../services/data/firebaseDataService');
+        const userData = await firebaseDataService.user.getCurrentUser(userId);
+        userEmail = userData?.email;
+      } catch (emailError) {
+        logger.debug('Failed to get user email for recovery', emailError as Record<string, unknown>, 'WalletRecoveryModal');
+      }
+
+      const result = await walletRecoveryService.recoverWallet(userId, userEmail);
 
       if (result.success && result.wallet) {
         setRecoveryStep('Recovery successful!');

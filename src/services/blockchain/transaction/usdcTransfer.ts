@@ -163,10 +163,12 @@ export async function buildUsdcTransfer({
       throw new Error('Transfer amount must be greater than 0');
     }
 
-    // Get recent blockhash
+    // IMPORTANT: Get fresh blockhash RIGHT BEFORE creating the transaction
+    // Blockhashes expire after ~60 seconds, so we get it as late as possible
+    // to minimize the time between creation and submission
     const { blockhash } = await connection.getLatestBlockhash();
 
-    // Create transaction with proper fee payer
+    // Create transaction with proper fee payer (using fresh blockhash)
     const transaction = new Transaction({
       recentBlockhash: blockhash,
       feePayer: feePayerPublicKey // Company pays SOL gas fees, user pays company fees

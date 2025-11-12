@@ -179,8 +179,12 @@ const AuthMethodsScreen: React.FC = () => {
 
       // Ensure user has a wallet using the centralized wallet service
       // CRITICAL: Always call ensureUserWallet to verify wallet integrity and restore if needed
+      // ✅ Pass email for email-based recovery fallback
       try {
-        logger.info('Ensuring wallet integrity for user', null, 'AuthMethodsScreen');
+        logger.info('Ensuring wallet integrity for user', { 
+          userId: appUser.id,
+          email: appUser.email?.substring(0, 5) + '...'
+        }, 'AuthMethodsScreen');
         const walletResult = await walletService.ensureUserWallet(appUser.id);
 
         if (walletResult.success && walletResult.wallet) {

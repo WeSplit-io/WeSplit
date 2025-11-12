@@ -716,6 +716,7 @@ export class SolanaAppKitService {
       // Get recent blockhash
       const connection = await optimizedTransactionUtils.getConnection();
       const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
+      const blockhashTimestamp = Date.now(); // Track when we got the blockhash
 
       // Use centralized fee payer logic - Company pays SOL gas fees
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
@@ -847,16 +848,59 @@ export class SolanaAppKitService {
         ? serializedTransaction 
         : new Uint8Array(serializedTransaction);
 
+      // CRITICAL: Check blockhash age before sending to Firebase
+      // If blockhash is more than 45 seconds old, get a fresh one and rebuild
+      const blockhashAge = Date.now() - blockhashTimestamp;
+      const BLOCKHASH_MAX_AGE_MS = 45000; // 45 seconds - rebuild if older
+      
+      let currentTxArray = txArray;
+      
+      if (blockhashAge > BLOCKHASH_MAX_AGE_MS) {
+        logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+          blockhashAge,
+          maxAge: BLOCKHASH_MAX_AGE_MS
+        }, 'SolanaAppKitService');
+        
+        // Get fresh blockhash and rebuild transaction
+        const freshBlockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
+        const freshBlockhashTimestamp = Date.now();
+        
+        // Rebuild transaction with fresh blockhash
+        const freshTransaction = new Transaction({
+          recentBlockhash: freshBlockhash,
+          feePayer: feePayerPublicKey
+        });
+        
+        // Re-add all instructions
+        transaction.instructions.forEach(ix => freshTransaction.add(ix));
+        
+        // Re-sign with fresh transaction
+        const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+        if (this.connectedProvider) {
+          freshVersionedTransaction.sign([this.keypair!]);
+        } else if (this.keypair) {
+          freshVersionedTransaction.sign([this.keypair]);
+        }
+        currentTxArray = freshVersionedTransaction.serialize();
+        
+        logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+          transactionSize: currentTxArray.length,
+          blockhashAge: blockhashAge,
+          newBlockhashTimestamp: freshBlockhashTimestamp
+        }, 'SolanaAppKitService');
+      }
+
       logger.info('Transaction serialized, requesting company wallet signature', {
-        transactionSize: txArray.length,
-        transactionType: typeof serializedTransaction,
-        isUint8Array: txArray instanceof Uint8Array
+        transactionSize: currentTxArray.length,
+        transactionType: typeof currentTxArray,
+        isUint8Array: currentTxArray instanceof Uint8Array,
+        blockhashAge: Date.now() - blockhashTimestamp
       }, 'SolanaAppKitService');
 
       // Use Firebase Function to add company wallet signature
       let fullySignedTransaction: Uint8Array;
       try {
-        fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+        fullySignedTransaction = await signTransactionWithCompanyWallet(currentTxArray);
         logger.info('Company wallet signature added successfully', {
           transactionSize: fullySignedTransaction.length
         }, 'SolanaAppKitService');

@@ -69,6 +69,16 @@ import ManualSignatureInputScreen from './src/screens/ExternalWalletConnection/M
 import ManualBillCreationScreen from './src/screens/Billing/ManualBillCreation/ManualBillCreationScreen';
 // import AuthDebugScreen from './src/screens/Debug/AuthDebugScreen';
 
+// Development-only test screen
+let WalletPersistenceTestScreen: any = null;
+if (__DEV__) {
+  try {
+    WalletPersistenceTestScreen = require('./src/screens/Testing/WalletPersistenceTestScreen').default;
+  } catch (e) {
+    // Screen not available
+  }
+}
+
 
 const Stack = createStackNavigator();
 const queryClient = new QueryClient();
@@ -187,6 +197,9 @@ export default function App() {
                     <Stack.Screen name="ManualSignatureInput" component={ManualSignatureInputScreen} />
                     <Stack.Screen name="ManualBillCreation" component={ManualBillCreationScreen} />
                     {/* <Stack.Screen name="AuthDebug" component={AuthDebugScreen} /> */}
+                    {__DEV__ && WalletPersistenceTestScreen && (
+                      <Stack.Screen name="WalletPersistenceTest" component={WalletPersistenceTestScreen} />
+                    )}
                   </Stack.Navigator>
                 </NavigationWrapper>
               </WalletProvider>

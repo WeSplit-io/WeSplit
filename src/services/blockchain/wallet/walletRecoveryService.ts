@@ -8,6 +8,7 @@ import { Keypair, PublicKey } from '@solana/web3.js';
 import { logger } from '../../analytics/loggingService';
 import { firebaseDataService } from '../../data/firebaseDataService';
 import { secureVault } from '../../security/secureVault';
+import * as Crypto from 'expo-crypto';
 
 export enum WalletRecoveryError {
   NO_LOCAL_WALLETS = 'NO_LOCAL_WALLETS',
@@ -41,20 +42,41 @@ export interface StoredWallet {
 export class WalletRecoveryService {
   private static readonly WALLET_STORAGE_KEY = 'user_wallets';
   private static readonly USER_WALLET_PREFIX = 'wallet_';
+  
+  /**
+   * Hash email for use as storage identifier (fallback when userId changes)
+   * Uses SHA-256 to create consistent identifier from email
+   */
+  private static async hashEmail(email: string): Promise<string> {
+    try {
+      const normalizedEmail = email.toLowerCase().trim();
+      const hash = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        normalizedEmail
+      );
+      return hash.substring(0, 16); // Use first 16 chars as identifier
+    } catch (error) {
+      logger.error('Failed to hash email', error, 'WalletRecoveryService');
+      // Fallback: use base64 encoded email (less secure but works)
+      return Buffer.from(email.toLowerCase().trim()).toString('base64').substring(0, 16);
+    }
+  }
 
   /**
    * Store a wallet securely on the device
+   * Also stores by email hash as backup identifier (for recovery when userId changes)
    */
   static async storeWallet(userId: string, wallet: {
     address: string;
     publicKey: string;
     privateKey: string;
-  }): Promise<boolean> {
+  }, userEmail?: string): Promise<boolean> {
     try {
-      // Primary: store private key via secure vault (Keychain+MMKV)
+      // Primary: store private key via secure vault (Keychain+MMKV) using userId
       const pkStored = await secureVault.store(userId, 'privateKey', wallet.privateKey);
       if (!pkStored) {
-        // Fallback: previous behavior in SecureStore
+        // Fallback: previous behavior in SecureStore (LAST RESORT - has issues in production)
+        try {
         const walletData: StoredWallet = {
           ...wallet,
           userId,
@@ -62,6 +84,33 @@ export class WalletRecoveryService {
         };
         const key = `${this.USER_WALLET_PREFIX}${userId}`;
         await SecureStore.setItemAsync(key, JSON.stringify(walletData));
+          logger.warn('Wallet stored in SecureStore fallback (Keychain+MMKV failed)', { userId, address: wallet.address }, 'WalletRecoveryService');
+        } catch (secureStoreError) {
+          logger.error('SecureStore fallback also failed', secureStoreError, 'WalletRecoveryService');
+          return false;
+        }
+      }
+      
+      // ✅ CRITICAL: Also store by email hash as backup identifier
+      // This allows recovery even if userId changes after app update
+      if (userEmail) {
+        try {
+          const emailHash = await this.hashEmail(userEmail);
+          const emailStored = await secureVault.store(emailHash, 'privateKey', wallet.privateKey);
+          if (emailStored) {
+            logger.info('Wallet also stored by email hash (backup identifier)', { 
+              emailHash: emailHash.substring(0, 8) + '...',
+              address: wallet.address 
+            }, 'WalletRecoveryService');
+          } else {
+            logger.warn('Failed to store wallet by email hash (non-critical)', { 
+              emailHash: emailHash.substring(0, 8) + '...' 
+            }, 'WalletRecoveryService');
+          }
+        } catch (emailError) {
+          // Non-critical - email-based storage is backup only
+          logger.warn('Email-based wallet storage failed (non-critical)', emailError, 'WalletRecoveryService');
+        }
       }
       
       logger.info('Wallet stored securely', { userId, address: wallet.address }, 'WalletRecoveryService');
@@ -485,12 +534,13 @@ export class WalletRecoveryService {
 
   /**
    * Recover wallet by comparing database public key with local private keys
+   * Also attempts email-based recovery as fallback when userId-based recovery fails
    */
-  static async recoverWallet(userId: string): Promise<WalletRecoveryResult> {
+  static async recoverWallet(userId: string, userEmail?: string): Promise<WalletRecoveryResult> {
     const startTime = Date.now();
     
     try {
-      logger.info('Starting comprehensive wallet recovery', { userId }, 'WalletRecoveryService');
+      logger.info('Starting comprehensive wallet recovery', { userId, hasEmail: !!userEmail }, 'WalletRecoveryService');
 
       // Try to migrate old production wallets first
       const migrationResult = await this.migrateOldProductionWallets(userId);
@@ -501,14 +551,96 @@ export class WalletRecoveryService {
       // Check if wallet consistency is valid
       const isConsistent = await this.validateWalletConsistency(userId);
       
+      let recoveryResult: WalletRecoveryResult;
       if (isConsistent) {
         // Wallet is consistent, proceed with normal recovery
-        return await this.performConsistentWalletRecovery(userId);
+        recoveryResult = await this.performConsistentWalletRecovery(userId);
       } else {
         // Wallet is inconsistent, resolve the mismatch
         logger.warn('Wallet inconsistency detected, resolving mismatch', { userId }, 'WalletRecoveryService');
-        return await this.resolveWalletMismatch(userId);
+        recoveryResult = await this.resolveWalletMismatch(userId);
       }
+
+      // ✅ CRITICAL: If userId-based recovery failed, try email-based recovery
+      // This handles cases where userId changed after app update but email is the same
+      if (!recoveryResult.success && userEmail) {
+        logger.info('UserId-based recovery failed, attempting email-based recovery', { 
+          userId,
+          emailHash: (await this.hashEmail(userEmail)).substring(0, 8) + '...'
+        }, 'WalletRecoveryService');
+        
+        try {
+          const emailHash = await this.hashEmail(userEmail);
+          const emailPrivateKey = await secureVault.get(emailHash, 'privateKey');
+          
+          if (emailPrivateKey) {
+            logger.info('Found wallet by email hash, attempting recovery', { 
+              emailHash: emailHash.substring(0, 8) + '...'
+            }, 'WalletRecoveryService');
+            
+            try {
+              const keypair = Keypair.fromSecretKey(Buffer.from(emailPrivateKey, 'base64'));
+              const recoveredAddress = keypair.publicKey.toBase58();
+              
+              // Get user data to verify address matches
+              const userData = await firebaseDataService.user.getCurrentUser(userId);
+              const expectedAddress = userData?.wallet_address;
+              
+              if (expectedAddress && recoveredAddress === expectedAddress) {
+                logger.info('✅ Email-based wallet recovery successful', { 
+                  userId,
+                  address: recoveredAddress
+                }, 'WalletRecoveryService');
+                
+                // Re-store wallet using current userId for future recovery
+                await secureVault.store(userId, 'privateKey', emailPrivateKey);
+                
+                return {
+                  success: true,
+                  wallet: {
+                    address: recoveredAddress,
+                    publicKey: recoveredAddress,
+                    privateKey: emailPrivateKey
+                  }
+                };
+              } else if (!expectedAddress) {
+                // No expected address in database, but we found wallet by email
+                logger.info('Email-based wallet found but no database address to verify', { 
+                  userId,
+                  address: recoveredAddress
+                }, 'WalletRecoveryService');
+                
+                // Re-store wallet using current userId
+                await secureVault.store(userId, 'privateKey', emailPrivateKey);
+                
+                return {
+                  success: true,
+                  wallet: {
+                    address: recoveredAddress,
+                    publicKey: recoveredAddress,
+                    privateKey: emailPrivateKey
+                  }
+                };
+              } else {
+                logger.warn('Email-based wallet address mismatch', { 
+                  expectedAddress,
+                  recoveredAddress
+                }, 'WalletRecoveryService');
+              }
+            } catch (parseError) {
+              logger.error('Failed to parse email-based wallet private key', parseError, 'WalletRecoveryService');
+            }
+          } else {
+            logger.debug('No wallet found by email hash', { 
+              emailHash: emailHash.substring(0, 8) + '...'
+            }, 'WalletRecoveryService');
+          }
+        } catch (emailRecoveryError) {
+          logger.warn('Email-based recovery attempt failed', emailRecoveryError, 'WalletRecoveryService');
+        }
+      }
+
+      return recoveryResult;
 
     } catch (error) {
       const duration = Date.now() - startTime;

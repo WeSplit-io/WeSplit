@@ -132,8 +132,17 @@ class SimplifiedWalletService {
       this.recoveryInProgress.add(userId);
 
       try {
-        // First, try to recover existing wallet
-        const recoveryResult = await walletRecoveryService.recoverWallet(userId);
+        // Get user email for email-based recovery fallback
+        let userEmail: string | undefined;
+        try {
+          const userData = await firebaseDataService.user.getCurrentUser(userId);
+          userEmail = userData?.email;
+        } catch (emailError) {
+          logger.debug('Failed to get user email for recovery', emailError, 'SimplifiedWalletService');
+        }
+        
+        // First, try to recover existing wallet (with email-based fallback)
+        const recoveryResult = await walletRecoveryService.recoverWallet(userId, userEmail);
         
         if (recoveryResult.success && recoveryResult.wallet) {
           logger.info('Wallet recovered successfully', { 
@@ -300,11 +309,20 @@ class SimplifiedWalletService {
         hasMnemonic: !!wallet.mnemonic
       }, 'SimplifiedWalletService');
       
+      // Get user email for email-based backup storage
+      let userEmail: string | undefined;
+      try {
+        const userData = await firebaseDataService.user.getCurrentUser(userId);
+        userEmail = userData?.email;
+      } catch (emailError) {
+        logger.warn('Failed to get user email for backup storage', emailError, 'SimplifiedWalletService');
+      }
+      
       const stored = await walletRecoveryService.storeWallet(userId, {
         address: wallet.address,
         publicKey: wallet.publicKey,
         privateKey: wallet.privateKey
-      });
+      }, userEmail);
 
       if (!stored) {
         logger.error('Failed to store wallet in SecureStore', { userId, address: wallet.address }, 'SimplifiedWalletService');
@@ -358,14 +376,34 @@ class SimplifiedWalletService {
 
       this.walletRecoveryCache.set(userId, result);
       
-      // Verify the wallet was stored correctly
+      // ✅ CRITICAL: Verify the wallet was stored correctly and can be recovered
+      // This ensures credentials persist across app updates
       const verificationResult = await this.verifyWalletStorage(userId, wallet.address);
       if (!verificationResult) {
         logger.error('Wallet verification failed after creation', { userId, address: wallet.address }, 'SimplifiedWalletService');
+        
+        // Try one more time to store the wallet
+        logger.info('Retrying wallet storage after verification failure', { userId, address: wallet.address }, 'SimplifiedWalletService');
+        const retryStored = await walletRecoveryService.storeWallet(userId, {
+          address: wallet.address,
+          publicKey: wallet.publicKey,
+          privateKey: wallet.privateKey
+        }, userEmail);
+        
+        if (retryStored) {
+          const retryVerification = await this.verifyWalletStorage(userId, wallet.address);
+          if (!retryVerification) {
         return {
           success: false,
-          error: 'Wallet created but verification failed. Please try again.'
+              error: 'Wallet created but verification failed after retry. Please try again.'
+            };
+          }
+        } else {
+          return {
+            success: false,
+            error: 'Wallet created but storage failed. Please try again.'
         };
+        }
       }
       
       logger.info('✅ New wallet created and verified successfully', { userId, address: wallet.address }, 'SimplifiedWalletService');

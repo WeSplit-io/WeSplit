@@ -65,13 +65,19 @@ export const QUEST_DEFINITIONS: Record<string, Quest> = {
   //   points: 200,
   //   completed: false
   // },
-  // New season-based quests
+  // Season-based quests
+  // NOTE: The 'points' field here is a placeholder and NOT used for actual reward calculation.
+  // All quest rewards are dynamically calculated based on the current season using:
+  // - seasonService.getCurrentSeason() to get the current season
+  // - getSeasonReward(questType, season, isPartnership) to get the reward configuration
+  // - calculateRewardPoints(reward, amount) to calculate the actual points
+  // The actual points awarded are stored in the quest document when completed.
   export_seed_phrase: {
     id: 'export_seed_phrase',
     type: 'export_seed_phrase',
     title: 'Export Seed Phrase',
     description: 'Export your seed phrase for backup',
-    points: 100, // Will be updated based on season
+    points: 0, // Placeholder - actual points calculated dynamically from seasonRewardsConfig
     completed: false
   },
   setup_account_pp: {
@@ -79,7 +85,7 @@ export const QUEST_DEFINITIONS: Record<string, Quest> = {
     type: 'setup_account_pp',
     title: 'Setup Account Privacy Policy',
     description: 'Complete account setup with privacy policy',
-    points: 100, // Will be updated based on season
+    points: 0, // Placeholder - actual points calculated dynamically from seasonRewardsConfig
     completed: false
   },
   first_split_with_friends: {
@@ -87,7 +93,7 @@ export const QUEST_DEFINITIONS: Record<string, Quest> = {
     type: 'first_split_with_friends',
     title: 'First Split with Friends',
     description: 'Create your first split with friends',
-    points: 500, // Will be updated based on season
+    points: 0, // Placeholder - actual points calculated dynamically from seasonRewardsConfig
     completed: false
   },
   first_external_wallet_linked: {
@@ -95,7 +101,7 @@ export const QUEST_DEFINITIONS: Record<string, Quest> = {
     type: 'first_external_wallet_linked',
     title: 'Link External Wallet',
     description: 'Link your first external wallet',
-    points: 100, // Will be updated based on season
+    points: 0, // Placeholder - actual points calculated dynamically from seasonRewardsConfig
     completed: false
   },
   invite_friends_create_account: {
@@ -103,7 +109,7 @@ export const QUEST_DEFINITIONS: Record<string, Quest> = {
     type: 'invite_friends_create_account',
     title: 'Invite Friends - Create Account',
     description: 'Invite friends who create an account',
-    points: 500, // Will be updated based on season
+    points: 0, // Placeholder - actual points calculated dynamically from seasonRewardsConfig
     completed: false
   },
   friend_do_first_split_over_10: {
@@ -111,7 +117,7 @@ export const QUEST_DEFINITIONS: Record<string, Quest> = {
     type: 'friend_do_first_split_over_10',
     title: 'Friend Does First Split > $10',
     description: 'A friend you referred does their first split over $10',
-    points: 1000, // Will be updated based on season
+    points: 0, // Placeholder - actual points calculated dynamically from seasonRewardsConfig
     completed: false
   }
 };
@@ -220,21 +226,22 @@ class QuestService {
       ];
 
       let pointsResult;
+      let actualPointsAwarded: number;
       
       if (seasonBasedQuests.includes(questType)) {
         // Use season-based rewards for new quest types
         const season = seasonService.getCurrentSeason();
         const reward = getSeasonReward(questType as any, season, false);
-        const pointsAwarded = calculateRewardPoints(reward, 0);
+        actualPointsAwarded = calculateRewardPoints(reward, 0);
         
         // Update quest definition with actual season-based points
         await setDoc(questRef, {
-          points: pointsAwarded
+          points: actualPointsAwarded
         }, { merge: true });
         
         pointsResult = await pointsService.awardSeasonPoints(
           userId,
-          pointsAwarded,
+          actualPointsAwarded,
           'quest_completion',
           questType,
           `Quest completed: ${questDef.title} (Season ${season})`,
@@ -243,6 +250,7 @@ class QuestService {
         );
       } else {
         // Use legacy fixed points for old quest types
+        actualPointsAwarded = questDef.points;
         pointsResult = await pointsService.awardPoints(
         userId,
         questDef.points,
@@ -276,14 +284,14 @@ class QuestService {
       logger.info('Quest completed successfully', {
         userId,
         questType,
-        pointsAwarded: questDef.points,
+        pointsAwarded: actualPointsAwarded,
         totalPoints: pointsResult.totalPoints
       }, 'QuestService');
 
       return {
         success: true,
         questId: questType,
-        pointsAwarded: questDef.points,
+        pointsAwarded: actualPointsAwarded,
         totalPoints: pointsResult.totalPoints
       };
     } catch (error) {

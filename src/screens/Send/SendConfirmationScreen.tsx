@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Alert, ScrollView, Image, Animated, PanResponder, StyleSheet } from 'react-native';
 import { Header } from '../../components/shared';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '../../components/Icon';
 import { useApp } from '../../context/AppContext';
-import { firebaseDataService } from '../../services/data';
 import { consolidatedTransactionService } from '../../services/blockchain/transaction';
 import { FeeService, TransactionType } from '../../config/constants/feeConfig';
 import { colors } from '../../theme';
@@ -26,7 +25,7 @@ interface AppleSliderProps {
 const AppleSlider: React.FC<AppleSliderProps> = ({ onSlideComplete, disabled, loading, text = 'Sign transaction' }) => {
   const maxSlideDistance = 300;
   const sliderValue = useRef(new Animated.Value(0)).current;
-  const [isSliderActive, setIsSliderActive] = useState(false);
+  const [, setIsSliderActive] = useState(false);
 
   // Debug logging for slider props
   if (__DEV__) {
@@ -181,10 +180,10 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
       contactAvatar: contact?.avatar,
       contactId: contact?.id
     });
-  }, [destinationType, recipientName, recipientAddress, amount, description, groupId, isSettlement, contact, requestId]);
+  }, [destinationType, recipientName, recipientAddress, amount, description, groupId, isSettlement, contact, requestId, recipient?.id]);
   const [sending, setSending] = useState(false);
 
-  const handleConfirmSend = async () => {
+  const handleConfirmSend = useCallback(async () => {
     try {
       if (!currentUser?.id) {
         Alert.alert('Wallet Error', 'User not authenticated');
@@ -329,6 +328,13 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     } catch (error) {
       console.error('Send error:', error);
       
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const isBlockhashExpired = 
+        errorMessage.includes('blockhash has expired') ||
+        errorMessage.includes('blockhash expired') ||
+        errorMessage.includes('Blockhash not found') ||
+        errorMessage.includes('Please try again');
+      
       // Send payment failed notification (non-blocking)
       if (currentUser?.id) {
         notificationService.instance.sendPaymentStatusNotification(
@@ -338,15 +344,32 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
           `Payment to ${contact?.name || 'External Wallet'}`,
           undefined, // splitId
           'failed',
-          error instanceof Error ? error.message : 'Unknown error'
+          errorMessage
         );
       }
       
-      Alert.alert('Transaction Failed', error instanceof Error ? error.message : 'Failed to send money. Please try again.');
+      // Show user-friendly error message
+      if (isBlockhashExpired) {
+        Alert.alert(
+          'Transaction Timed Out', 
+          'The transaction took too long to process and the blockhash expired. This usually happens when the network is slow.\n\nPlease try again - a new transaction will be created with a fresh blockhash.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Reset sending state so user can retry
+                setSending(false);
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Transaction Failed', errorMessage);
+      }
     } finally {
       setSending(false);
     }
-  };
+  }, [currentUser?.id, recipientAddress, amount, description, groupId, isSettlement, requestId, destinationType, contact, wallet, navigation, route.params]);
 
   // Fee calculation now handled by useMemo hook above
 
@@ -361,7 +384,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
 
   const companyFee = feeCalculation.fee;
   const blockchainFee = 0.00001; // Company covers blockchain fees
-  const totalFee = companyFee + blockchainFee;
+  // const totalFee = companyFee + blockchainFee; // Not used currently
   const netAmount = feeCalculation.recipientAmount; // Recipient gets full amount
   const totalAmount = feeCalculation.totalAmount; // Sender pays amount + fees
   const destinationAccount = contact?.wallet_address || '';
@@ -369,7 +392,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
   // Check if user has existing wallet and sufficient balance
   const [hasExistingWallet, setHasExistingWallet] = useState(false);
   const [existingWalletBalance, setExistingWalletBalance] = useState<{ sol: number; usdc: number } | null>(null);
-  const [hasSufficientSol, setHasSufficientSol] = useState(false);
+  // const [hasSufficientSol, setHasSufficientSol] = useState(false); // Not used currently
   const [walletLoading, setWalletLoading] = useState(true);
   const [walletError, setWalletError] = useState<string | null>(null);
 
@@ -408,7 +431,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         // Set states
         setHasExistingWallet(true);
         setExistingWalletBalance(balance);
-        setHasSufficientSol(solCheck.hasSufficient);
+        // setHasSufficientSol(solCheck.hasSufficient); // Not used currently
         setWalletError(null);
         
         logger.info('Wallet validation completed successfully', {
@@ -425,7 +448,7 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
         setWalletError(errorMessage);
         setHasExistingWallet(false);
         setExistingWalletBalance(null);
-        setHasSufficientSol(false);
+        // setHasSufficientSol(false); // Not used currently
         
         // Show user-friendly error message
         Alert.alert(
@@ -439,7 +462,8 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
     };
 
     checkExistingWallet();
-  }, [currentUser?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]); // consolidatedTransactionService is a singleton, no need to include
 
   // Check if user has sufficient balance using existing wallet balance - check total amount including fees
   const transactionType: TransactionType = isSettlement ? 'settlement' : 'send';
@@ -648,13 +672,13 @@ const SendConfirmationScreen: React.FC<any> = ({ navigation, route }) => {
                       throw new Error(walletResult.error || 'Failed to create or access user wallet');
                     }
                     
-                    const walletAddress = walletResult.wallet.address;
+                    // const walletAddress = walletResult.wallet.address; // Not used currently
                     const balance = await consolidatedTransactionService.getUserWalletBalance(currentUser.id);
                     const solCheck = await consolidatedTransactionService.hasSufficientSolForGas(currentUser.id);
                     
                     setHasExistingWallet(true);
                     setExistingWalletBalance(balance);
-                    setHasSufficientSol(solCheck.hasSufficient);
+                    // setHasSufficientSol(solCheck.hasSufficient); // Not used currently
                     setWalletError(null);
                   } catch (error) {
                     setWalletError(error instanceof Error ? error.message : 'Unknown error');

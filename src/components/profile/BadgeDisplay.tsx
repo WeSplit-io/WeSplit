@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { colors, spacing } from '../../theme';
 import { typography } from '../../theme/typography';
 import PhosphorIcon from '../shared/PhosphorIcon';

@@ -34,14 +34,14 @@ interface ExternalWalletAuthResult {
   error?: string;
 }
 
-// Solana transaction parameters interface
-interface SolanaTransactionParams {
-  to: string;
-  amount: number;
-  currency: string;
-  memo?: string;
-  groupId?: string;
-}
+// Solana transaction parameters interface (not used currently)
+// interface SolanaTransactionParams {
+//   to: string;
+//   amount: number;
+//   currency: string;
+//   memo?: string;
+//   groupId?: string;
+// }
 
 interface TransactionParams {
   to: string;
@@ -878,66 +878,60 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('❌ WalletProvider: Error during manual balance refresh:', error);
     }
-  }, [isConnected, address]);
+  }, [isConnected, address, refreshBalance]);
 
-  const handleSendTransaction = async (params: TransactionParams): Promise<{ signature: string; txId: string }> => {
+  const handleSendTransaction = useCallback(async (params: TransactionParams): Promise<{ signature: string; txId: string }> => {
     try {
-      if (!isConnected || !address) {
-        throw new Error('External wallet not connected');
+      if (!state?.currentUser?.id) {
+        throw new Error('User not authenticated');
       }
 
       if (__DEV__) { logger.info('Sending transaction', { params }, 'WalletContext'); }
       
-      // Try to use real Solana blockchain transaction
-      try {
-        // Check if Solana service is connected
-        // solanaWalletService doesn't have getPublicKey or importWallet
-        // Use loadWallet instead if needed
-        if (walletInfo && (walletInfo as any).secretKey && state?.currentUser?.id) {
-          try {
-            await solanaWalletService.loadWallet(state.currentUser.id, walletInfo.address);
-          } catch (loadError) {
-            // If loadWallet fails, continue anyway
-            logger.warn('Failed to load wallet in Solana service', { error: loadError }, 'WalletContext');
-          }
-          } else {
-            throw new Error('No wallet secret key available for blockchain transaction');
-        }
-        
-        // Convert params to Solana format
-        const solanaParams: SolanaTransactionParams = {
+      // Use consolidated transaction service for all transactions
+      // Determine transaction type based on currency
+      const isUSDC = params.currency === 'USDC' || params.currency === 'usdc';
+      
+      let result;
+      if (isUSDC) {
+        // Use USDC transaction service (most common case)
+        result = await consolidatedTransactionService.sendUSDCTransaction({
           to: params.to,
           amount: params.amount,
-          currency: params.currency,
+          currency: 'USDC',
+          userId: state.currentUser.id.toString(),
           memo: params.memo,
+          priority: 'medium',
+          transactionType: 'send',
           groupId: params.groupId
-        };
-        
-        // Send real blockchain transaction using consolidated transaction service
-        // consolidatedTransactionService doesn't have sendTransaction, use sendSolTransaction instead
-        const result = await consolidatedTransactionService.sendSolTransaction({
-          to: solanaParams.to,
-          amount: solanaParams.amount,
-          currency: solanaParams.currency as 'SOL' | 'USDC',
-          memo: solanaParams.memo,
-          userId: undefined // Will be set by the service
         });
+      } else {
+        // Use SOL transaction service for SOL transfers
+        result = await consolidatedTransactionService.sendSolTransaction({
+          to: params.to,
+          amount: params.amount,
+          currency: params.currency as 'SOL' | 'USDC',
+          memo: params.memo,
+          userId: state.currentUser.id.toString(),
+          groupId: params.groupId
+        });
+      }
         
-        if (__DEV__) { logger.info('Real blockchain transaction sent successfully', { result }, 'WalletContext'); }
+      if (__DEV__) { logger.info('Transaction sent successfully', { result }, 'WalletContext'); }
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Transaction failed');
+      }
         
         return { 
-          signature: result.signature, 
-          txId: result.txId 
+        signature: result.signature || '', 
+        txId: result.txId || result.signature || '' 
         };
-      } catch (blockchainError) {
-        console.error('Blockchain transaction failed:', blockchainError);
-        throw new Error(`Transaction failed: ${blockchainError instanceof Error ? blockchainError.message : 'Unknown error'}`);
-      }
     } catch (error) {
-      console.error('Transaction failed:', error);
+      logger.error('Transaction failed', error, 'WalletContext');
       throw error;
     }
-  };
+  }, [state?.currentUser?.id]);
 
   // Clear all wallet state for user logout (but preserve wallet creation state)
   const clearAppWalletState = useCallback(() => {
@@ -1117,7 +1111,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       // Cleanup polling on unmount
       stopBalancePolling();
     };
-  }, []); // Empty dependency array to run only once
+  }, [stopBalancePolling]); // Include stopBalancePolling in dependencies
 
   // Cleanup polling when wallet disconnects
   useEffect(() => {

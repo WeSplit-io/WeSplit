@@ -649,12 +649,14 @@ export async function submitTransaction(serializedTransaction: Uint8Array): Prom
     }
 
     logger.info('Transaction submitted successfully', {
-      signature: response.signature
+      signature: response.signature,
+      hasConfirmation: !!response.confirmation
     }, 'TransactionSigningService');
 
+    // Confirmation may be null - client will handle confirmation asynchronously
     return {
       signature: response.signature,
-      confirmation: response.confirmation
+      confirmation: response.confirmation || null
     };
   } catch (error) {
     logger.error('Failed to submit transaction', {

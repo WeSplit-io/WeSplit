@@ -31,6 +31,7 @@ import { notificationUtils } from '../../shared/notificationUtils';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';
 import { signTransaction as signTransactionWithCompanyWallet, submitTransaction as submitTransactionToBlockchain } from './transactionSigningService';
 import { VersionedTransaction } from '@solana/web3.js';
+import { getFreshBlockhash, isBlockhashTooOld, BLOCKHASH_MAX_AGE_MS } from '../../shared/blockhashUtils';
 
 export interface InternalTransferParams {
   to: string;
@@ -411,15 +412,21 @@ class InternalTransferService {
         needsTokenAccountCreation = true;
       }
 
-      // Get recent blockhash with retry logic
+      // IMPORTANT: Get fresh blockhash RIGHT BEFORE creating the transaction
+      // Blockhashes expire after ~60 seconds, so we get it as late as possible
+      // to minimize the time between creation and submission
       const connection = await optimizedTransactionUtils.getConnection();
       const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
-      logger.info('Got recent blockhash', { blockhash }, 'InternalTransferService');
+      const blockhashTimestamp = Date.now(); // Track when we got the blockhash
+      logger.info('Got fresh blockhash right before transaction creation', { 
+        blockhash,
+        blockhashTimestamp
+      }, 'InternalTransferService');
 
       // Use company wallet for fees if configured, otherwise use user wallet
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromPublicKey);
       
-      // Create transaction
+      // Create transaction (using fresh blockhash)
       const transaction = new Transaction({
         recentBlockhash: blockhash,
         feePayer: feePayerPublicKey // User or company pays fees based on configuration
@@ -579,16 +586,107 @@ class InternalTransferService {
         ? serializedTransaction 
         : new Uint8Array(serializedTransaction);
 
+      // CRITICAL: Check blockhash age before sending to Firebase
+      // Best practice: Use shared utility for consistent blockhash age checking
+      let currentTxArray = txArray;
+      
+      if (isBlockhashTooOld(blockhashTimestamp)) {
+        logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+          blockhashAge,
+          maxAge: BLOCKHASH_MAX_AGE_MS
+        }, 'InternalTransferService');
+        
+        // Get fresh blockhash and rebuild transaction
+        const freshBlockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
+        const freshBlockhashTimestamp = Date.now();
+        
+        // Rebuild transaction with fresh blockhash
+        const freshTransaction = new Transaction({
+          recentBlockhash: freshBlockhash,
+          feePayer: feePayerPublicKey
+        });
+        
+        // Re-add all instructions
+        const priorityFee = transactionUtils.getPriorityFee(params.priority || 'medium');
+        if (priorityFee > 0) {
+          freshTransaction.add(
+            ComputeBudgetProgram.setComputeUnitPrice({
+              microLamports: priorityFee,
+            })
+          );
+        }
+        
+        if (needsTokenAccountCreation) {
+          freshTransaction.add(
+            createAssociatedTokenAccountInstruction(
+              feePayerPublicKey,
+              toTokenAccount,
+              toPublicKey,
+              usdcMint
+            )
+          );
+        }
+        
+        const transferAmount = Math.floor(recipientAmount * Math.pow(10, 6) + 0.5);
+        freshTransaction.add(
+          createTransferInstruction(
+            fromTokenAccount,
+            toTokenAccount,
+            fromPublicKey,
+            transferAmount,
+            [],
+            TOKEN_PROGRAM_ID
+          )
+        );
+        
+        if (companyFee > 0) {
+          const companyFeeAmount = Math.floor(companyFee * Math.pow(10, 6) + 0.5);
+          const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, new PublicKey(COMPANY_WALLET_CONFIG.address));
+          freshTransaction.add(
+            createTransferInstruction(
+              fromTokenAccount,
+              companyTokenAccount,
+              fromPublicKey,
+              companyFeeAmount,
+              [],
+              TOKEN_PROGRAM_ID
+            )
+          );
+        }
+        
+        if (params.memo) {
+          freshTransaction.add(
+            new TransactionInstruction({
+              keys: [{ pubkey: feePayerPublicKey, isSigner: true, isWritable: true }],
+              data: Buffer.from(params.memo, 'utf8'),
+              programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
+            })
+          );
+        }
+        
+        // Re-sign with fresh transaction
+        const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+        freshVersionedTransaction.sign([userKeypair]);
+        currentTxArray = freshVersionedTransaction.serialize();
+        
+        logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+          transactionSize: currentTxArray.length,
+          blockhashAge: blockhashAge,
+          newBlockhashTimestamp: freshBlockhashTimestamp
+        }, 'InternalTransferService');
+      }
+
       logger.info('Transaction serialized, requesting company wallet signature', {
-        transactionSize: txArray.length,
-        transactionType: typeof serializedTransaction,
-        isUint8Array: txArray instanceof Uint8Array
+        transactionSize: currentTxArray.length,
+        transactionType: typeof currentTxArray,
+        isUint8Array: currentTxArray instanceof Uint8Array,
+        blockhashAge: Date.now() - blockhashTimestamp
               }, 'InternalTransferService');
 
       // Use Firebase Function to add company wallet signature
       let fullySignedTransaction: Uint8Array;
       try {
-        fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+        fullySignedTransaction = await signTransactionWithCompanyWallet(currentTxArray);
         logger.info('Company wallet signature added successfully', {
           transactionSize: fullySignedTransaction.length
                 }, 'InternalTransferService');
@@ -882,6 +980,7 @@ class InternalTransferService {
       // Get recent blockhash with retry logic
       const connection = await optimizedTransactionUtils.getConnection();
       const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
+      const blockhashTimestamp = Date.now(); // Track when we got the blockhash
 
       // Use company wallet for fees if configured, otherwise use user wallet
       const feePayerPublicKey = FeeService.getFeePayerPublicKey(fromKeypair.publicKey);
@@ -1091,10 +1190,46 @@ class InternalTransferService {
         ? serializedTransaction 
         : new Uint8Array(serializedTransaction);
 
+      // CRITICAL: Check blockhash age before sending to Firebase
+      // Best practice: Use shared utility for consistent blockhash age checking
+      let currentTxArray = txArray;
+      
+      if (isBlockhashTooOld(blockhashTimestamp)) {
+        logger.warn('Blockhash too old before Firebase call, rebuilding transaction', {
+          blockhashAge,
+          maxAge: BLOCKHASH_MAX_AGE_MS
+        }, 'InternalTransferService');
+        
+        // Get fresh blockhash and rebuild transaction
+        const freshBlockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection);
+        const freshBlockhashTimestamp = Date.now();
+        
+        // Rebuild transaction with fresh blockhash
+        const freshTransaction = new Transaction({
+          recentBlockhash: freshBlockhash,
+          feePayer: feePayerPublicKey
+        });
+        
+        // Re-add all instructions
+        transaction.instructions.forEach(ix => freshTransaction.add(ix));
+        
+        // Re-sign with fresh transaction
+        const freshVersionedTransaction = new VersionedTransaction(freshTransaction.compileMessage());
+        freshVersionedTransaction.sign([fromKeypair]);
+        currentTxArray = freshVersionedTransaction.serialize();
+        
+        logger.info('Transaction rebuilt with fresh blockhash before Firebase call', {
+          transactionSize: currentTxArray.length,
+          blockhashAge: blockhashAge,
+          newBlockhashTimestamp: freshBlockhashTimestamp
+        }, 'InternalTransferService');
+      }
+
       logger.info('Transaction serialized, requesting company wallet signature', {
-        transactionSize: txArray.length,
-        transactionType: typeof serializedTransaction,
-        isUint8Array: txArray instanceof Uint8Array
+        transactionSize: currentTxArray.length,
+        transactionType: typeof currentTxArray,
+        isUint8Array: currentTxArray instanceof Uint8Array,
+        blockhashAge: Date.now() - blockhashTimestamp
       }, 'InternalTransferService');
 
       // SECURITY: Company wallet secret key is not available in client-side code
@@ -1105,7 +1240,7 @@ class InternalTransferService {
       // Use Firebase Function to add company wallet signature
       let fullySignedTransaction: Uint8Array;
       try {
-        fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+        fullySignedTransaction = await signTransactionWithCompanyWallet(currentTxArray);
         logger.info('Company wallet signature added successfully', {
           transactionSize: fullySignedTransaction.length
         }, 'InternalTransferService');

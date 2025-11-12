@@ -46,6 +46,7 @@ import { useWalletState } from '../../hooks/useWalletState';
 import { secureVault, isVaultAuthenticated } from '../../services/security/secureVault';
 import BadgeDisplay from '../../components/profile/BadgeDisplay';
 import ProfileAssetDisplay from '../../components/profile/ProfileAssetDisplay';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 
@@ -832,7 +833,112 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation, route }) 
           </TouchableOpacity>
         </View>
 
+        {/* Development Test Buttons - Wallet Persistence */}
+        {__DEV__ && (
+          <>
+            <TouchableOpacity
+              onPress={async () => {
+                Alert.alert(
+                  '🧪 Test 1: App Update Scenario',
+                  'This will clear AsyncStorage to simulate an app update.\n\nYour wallet should persist via Keychain/SecureStore.\n\nAfter clearing:\n1. Close app completely\n2. Reopen app\n3. Log in with same email\n4. Check if wallet address is the same',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Clear AsyncStorage',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await AsyncStorage.clear();
+                          Alert.alert(
+                            '✅ AsyncStorage Cleared',
+                            'AsyncStorage has been cleared.\n\nNow:\n1. Close the app completely\n2. Reopen the app\n3. Log in with the same email\n4. Check if your wallet address is the same\n\nIf the wallet address matches, the test PASSED! ✅',
+                            [{ text: 'OK' }]
+                          );
+                        } catch (error) {
+                          Alert.alert('Error', error instanceof Error ? error.message : 'Failed to clear AsyncStorage');
+                        }
+                      }
+                    }
+                  ]
+                );
+              }}
+              style={{
+                backgroundColor: '#FF9500',
+                padding: 12,
+                marginHorizontal: 20,
+                marginTop: 10,
+                borderRadius: 8,
+                alignItems: 'center',
+                borderWidth: 2,
+                borderColor: '#FF6B00',
+              }}
+            >
+              <Text style={{ color: 'white', fontWeight: '600', fontSize: 14 }}>
+                🧪 Test 1: Simulate App Update (Clear AsyncStorage)
+              </Text>
+            </TouchableOpacity>
 
+            <TouchableOpacity
+              onPress={async () => {
+                Alert.alert(
+                  '⚠️ Test 2: App Deletion Scenario',
+                  'This simulates app deletion/reinstallation:\n• Clears ALL data (AsyncStorage, Keychain, MMKV)\n• Wallet will be LOST\n• Requires cloud backup or seed phrase to recover\n\n⚠️ WARNING: This will delete your wallet from this device!\n\nYou will need:\n• Cloud backup (with password), OR\n• Seed phrase to restore\n\nContinue?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Simulate App Deletion',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          const { WalletPersistenceTester } = await import('../../utils/testing/walletPersistenceTester');
+                          const userId = currentUser?.id || '';
+                          const userEmail = currentUser?.email || '';
+                          
+                          if (!userId) {
+                            Alert.alert('Error', 'User not logged in');
+                            return;
+                          }
+
+                          const result = await WalletPersistenceTester.testCompleteDataClear(userId, userEmail);
+                          
+                          Alert.alert(
+                            result.success ? '✅ All Data Cleared' : '⚠️ Partial Clear',
+                            result.message + '\n\n' + 
+                            'Now:\n' +
+                            '1. Close the app completely\n' +
+                            '2. Reopen the app\n' +
+                            '3. Log in with same email\n' +
+                            '4. Try to recover wallet:\n' +
+                            '   • From cloud backup (if available)\n' +
+                            '   • From seed phrase (if saved)\n\n' +
+                            '⚠️ If no backup exists, wallet is LOST!',
+                            [{ text: 'OK' }]
+                          );
+                        } catch (error) {
+                          Alert.alert('Error', error instanceof Error ? error.message : 'Failed to clear all data');
+                        }
+                      }
+                    }
+                  ]
+                );
+              }}
+              style={{
+                backgroundColor: '#FF3B30',
+                padding: 12,
+                marginHorizontal: 20,
+                marginTop: 10,
+                borderRadius: 8,
+                alignItems: 'center',
+                borderWidth: 2,
+                borderColor: '#CC0000',
+              }}
+            >
+              <Text style={{ color: 'white', fontWeight: '600', fontSize: 14 }}>
+                ⚠️ Test 2: Simulate App Deletion (Clear ALL Data)
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* Balance Card */}
         <ImageBackground
