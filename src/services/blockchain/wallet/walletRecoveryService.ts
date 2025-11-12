@@ -1025,35 +1025,71 @@ export class WalletRecoveryService {
       const migrationResult = await this.migrateOldProductionWallets(userId);
       if (migrationResult) {
         logger.info('Old wallet migrated successfully, proceeding with recovery', { userId, expectedAddress }, 'WalletRecoveryService');
-      } else {
-        // If migration failed, try to generate missing credentials for existing database wallet
-        const userData = await firebaseDataService.user.getCurrentUser(userId);
-        if (userData?.wallet_address && userData.wallet_address === expectedAddress) {
-          logger.warn('Migration failed but database wallet exists, generating new credentials', { 
-            userId, 
-            expectedAddress 
-          }, 'WalletRecoveryService');
-          
-          const generated = await this.generateMissingWalletCredentials(userId, expectedAddress);
-          if (generated) {
-            logger.info('Generated new wallet credentials for existing database wallet', { userId }, 'WalletRecoveryService');
-            // Return the new wallet as a successful recovery
-            const newWallet = await this.getStoredWallets(userId);
-            if (newWallet.length > 0) {
-      return {
-        success: true,
-        wallet: newWallet[0]
-      };
-            }
-          }
-        }
       }
       
       // 1. Clean up test wallets
       await this.cleanupTestWallets(userId);
       
-      // 2. Try to find wallet in all storage formats
-      const storedWallets = await this.getStoredWallets(userId);
+      // 2. ⚠️ CRITICAL: Search for existing wallet FIRST before generating new one
+      // Try to find wallet in all storage formats (including legacy formats without userId)
+      // First, try current userId
+      let storedWallets = await this.getStoredWallets(userId);
+      
+      // Also check legacy storage formats that might contain the wallet (no userId in key)
+      logger.info('Searching legacy storage formats for wallet', { expectedAddress }, 'WalletRecoveryService');
+      try {
+        // Check legacy format: wallet_private_key (no userId)
+        const legacyPrivateKey = await SecureStore.getItemAsync('wallet_private_key', {
+          requireAuthentication: false,
+          keychainService: 'WeSplitWalletData'
+        });
+        
+        if (legacyPrivateKey) {
+          try {
+            const privateKeyArray = JSON.parse(legacyPrivateKey);
+            const privateKeyBuffer = Buffer.from(privateKeyArray);
+            const keypair = Keypair.fromSecretKey(privateKeyBuffer);
+            const derivedAddress = keypair.publicKey.toBase58();
+            
+            if (derivedAddress === expectedAddress) {
+              logger.info('✅ Found wallet in legacy format matching database address!', { 
+                userId, 
+                derivedAddress,
+                expectedAddress
+              }, 'WalletRecoveryService');
+              
+              // Store this wallet with current userId for future use
+              await this.storeWallet(userId, {
+                address: derivedAddress,
+                publicKey: derivedAddress,
+                privateKey: Buffer.from(keypair.secretKey).toString('base64')
+              });
+              
+              return {
+                success: true,
+                wallet: {
+                  address: derivedAddress,
+                  publicKey: derivedAddress,
+                  privateKey: Buffer.from(keypair.secretKey).toString('base64')
+                }
+              };
+            }
+            
+            // Add to stored wallets list for checking
+            storedWallets.push({
+              address: derivedAddress,
+              publicKey: derivedAddress,
+              privateKey: Buffer.from(keypair.secretKey).toString('base64'),
+              userId,
+              createdAt: new Date().toISOString()
+            });
+          } catch (e) {
+            logger.warn('Failed to parse legacy private key', e, 'WalletRecoveryService');
+          }
+        }
+      } catch (e) {
+        logger.debug('Legacy storage check failed', e, 'WalletRecoveryService');
+      }
       
       logger.info('Checking stored wallets for database address match', { 
         userId, 
@@ -1127,6 +1163,32 @@ export class WalletRecoveryService {
       const legacyResult = await this.tryLegacyStorageRecovery(userId, expectedAddress);
       if (legacyResult.success) {
         return legacyResult;
+      }
+      
+      // 4. ⚠️ CRITICAL: Before giving up, check if wallet exists in database but not in storage
+      // This should only happen if wallet was created on different device or storage was cleared
+      const userData = await firebaseDataService.user.getCurrentUser(userId);
+      if (userData?.wallet_address && userData.wallet_address === expectedAddress) {
+        // Try one more comprehensive search - check ALL possible storage locations
+        logger.warn('⚠️ Wallet not found in any storage format, but exists in database - attempting final recovery', { 
+          userId, 
+          expectedAddress 
+        }, 'WalletRecoveryService');
+        
+        // Try mnemonic recovery one more time (might be stored with different key)
+        const finalMnemonicAttempt = await this.tryMnemonicRecovery(userId, expectedAddress);
+        if (finalMnemonicAttempt.success) {
+          logger.info('✅ Recovered wallet from mnemonic on final attempt', { userId, expectedAddress }, 'WalletRecoveryService');
+          return finalMnemonicAttempt;
+        }
+        
+        // ⚠️ LAST RESORT: Only generate new wallet if absolutely no wallet found
+        // This should NOT happen if wallet was created on this device
+        logger.error('CRITICAL: No wallet found in storage for database wallet - this should not happen', { 
+          userId, 
+          expectedAddress,
+          warning: 'Wallet may have been created on different device or storage was cleared'
+        }, 'WalletRecoveryService');
       }
       
       return {
@@ -1946,11 +2008,40 @@ export class WalletRecoveryService {
         expectedAddress 
       }, 'WalletRecoveryService');
       
+      // ⚠️ CRITICAL: Check if wallet already exists BEFORE generating new one
       // Check if wallet is already in new format
       const newFormatWallet = await SecureStore.getItemAsync(`wallet_${userId}`);
       if (newFormatWallet) {
-        logger.debug('Wallet already in new format, skipping generation', { userId }, 'WalletRecoveryService');
-        return true;
+        try {
+          const walletData = JSON.parse(newFormatWallet);
+          if (walletData.address === expectedAddress) {
+            logger.info('✅ Wallet already exists in new format with matching address - skipping generation', { 
+              userId, 
+              address: walletData.address 
+            }, 'WalletRecoveryService');
+            return true;
+          }
+        } catch (e) {
+          // Continue if parse fails
+        }
+      }
+      
+      // Check secureVault for existing wallet
+      const vaultPrivateKey = await secureVault.get(userId, 'privateKey');
+      if (vaultPrivateKey) {
+        try {
+          const keypair = Keypair.fromSecretKey(Buffer.from(vaultPrivateKey, 'base64'));
+          const derivedAddress = keypair.publicKey.toBase58();
+          if (derivedAddress === expectedAddress) {
+            logger.info('✅ Wallet already exists in secureVault with matching address - skipping generation', { 
+              userId, 
+              address: derivedAddress 
+            }, 'WalletRecoveryService');
+            return true;
+          }
+        } catch (e) {
+          // Continue if parse fails
+        }
       }
       
       // First, try to recover the original wallet to preserve user funds
