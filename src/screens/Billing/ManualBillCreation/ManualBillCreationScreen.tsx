@@ -20,13 +20,17 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../../../theme/colors';
 import { useApp } from '../../../context/AppContext';
 import { consolidatedBillAnalysisService, ManualBillInput } from '../../../services/billing';
-import { ManualSplitCreationService } from '../../../services/billing';
-import { BillAnalysisData } from '../../../types/billAnalysis';
+// ManualSplitCreationService removed - split creation now handled in SplitDetailsScreen for consistency
+import { BillAnalysisData, ProcessedBillData, BillAnalysisResult } from '../../../types/billAnalysis';
 import { convertFiatToUSDC } from '../../../services/core';
 import { parseAmount } from '../../../utils/ui/format';
 import { styles } from './styles';
 import { logger } from '../../../services/analytics/loggingService';
 import { Container, Modal, Header, Button, Input, PhosphorIcon } from '../../../components/shared';
+import { 
+  createSplitDetailsNavigationParams, 
+  validateProcessedBillDataForNavigation 
+} from '../../../utils/navigation/splitNavigationHelpers';
 
 // Category options with images
 const CATEGORIES = [
@@ -52,9 +56,16 @@ interface ManualBillCreationScreenProps {
       onBillCreated?: (billData: any) => void;
       // Edit mode parameters
       isEditing?: boolean;
-      existingBillData?: any;
-      existingSplitId?: string;
-      onBillUpdated?: (billData: any) => void;
+      existingBillData?: ProcessedBillData; // Bill data to edit
+      existingSplitId?: string; // Split ID to update
+      existingSplitData?: any; // Full split data for editing
+      onBillUpdated?: (billData: any) => void; // Callback for updates
+      // OCR data parameters
+      ocrData?: ProcessedBillData; // Pre-filled data from OCR
+      isFromOCR?: boolean; // Whether this screen was opened from OCR flow
+      imageUri?: string; // Original image URI from OCR
+      ocrError?: string; // Error message if OCR failed
+      analysisResult?: BillAnalysisResult; // Full OCR analysis result
     };
   };
 }
@@ -63,39 +74,79 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
   const { state } = useApp();
   const { currentUser } = state;
 
-  // Extract edit mode parameters
+  // Extract parameters
   const { 
     isEditing = false, 
     existingBillData, 
     existingSplitId, 
-    onBillUpdated 
+    existingSplitData,
+    onBillUpdated,
+    ocrData,
+    isFromOCR = false,
+    ocrError,
+    analysisResult
   } = route?.params || {};
 
-  // Form state - initialize with existing data if editing
-  const [selectedCategory, setSelectedCategory] = useState(
-    isEditing && existingBillData?.category 
-      ? existingBillData.category.toLowerCase()
-      : 'trip'
+  // Determine initial values - priority: OCR data > existing data > defaults
+  const getInitialCategory = () => {
+    // Use OCR-provided category if available
+    if (ocrData?.ocrCategory) {
+      return ocrData.ocrCategory;
+    }
+    if (isEditing && existingBillData?.category) {
+      return existingBillData.category.toLowerCase();
+    }
+    return 'trip'; // Default
+  };
+
+  const getInitialBillName = () => {
+    if (ocrData?.title) return ocrData.title;
+    if (isEditing && existingBillData?.title) return existingBillData.title;
+    return '';
+  };
+
+  const getInitialDate = () => {
+    if (ocrData?.date) return new Date(ocrData.date);
+    if (isEditing && existingBillData?.date) return new Date(existingBillData.date);
+    return new Date();
+  };
+
+  const getInitialAmount = () => {
+    // OCR data is already in USDC, so we need to show it differently
+    if (ocrData?.totalAmount) {
+      // OCR data is in USDC, show as USDC amount
+      return ocrData.totalAmount.toString();
+    }
+    if (isEditing && existingBillData?.totalAmount) {
+      return existingBillData.totalAmount.toString();
+    }
+    return '';
+  };
+
+  const getInitialCurrency = () => {
+    // OCR data is always in USDC, show as USD (closest equivalent)
+    if (ocrData?.currency === 'USDC') {
+      return CURRENCIES.find(c => c.code === 'USD') || CURRENCIES[0];
+    }
+    if (isEditing && existingBillData?.currency) {
+      // Map USDC to USD for display
+      const currencyCode = existingBillData.currency === 'USDC' ? 'USD' : existingBillData.currency;
+      return CURRENCIES.find(c => c.code === currencyCode) || CURRENCIES[0];
+    }
+    return CURRENCIES[0];
+  };
+
+  // Form state - initialize with OCR data, existing data, or defaults
+  const [selectedCategory, setSelectedCategory] = useState(getInitialCategory());
+  const [billName, setBillName] = useState(getInitialBillName());
+  const [selectedDate, setSelectedDate] = useState(getInitialDate());
+  const [amount, setAmount] = useState(getInitialAmount());
+  const [selectedCurrency, setSelectedCurrency] = useState(getInitialCurrency());
+  
+  // If OCR data is in USDC, set converted amount immediately
+  const [convertedAmount, setConvertedAmount] = useState<number | null>(
+    ocrData?.currency === 'USDC' ? ocrData.totalAmount : null
   );
-  const [billName, setBillName] = useState(
-    isEditing && existingBillData?.title ? existingBillData.title : ''
-  );
-  const [selectedDate, setSelectedDate] = useState(
-    isEditing && existingBillData?.date 
-      ? new Date(existingBillData.date)
-      : new Date()
-  );
-  const [amount, setAmount] = useState(
-    isEditing && existingBillData?.totalAmount 
-      ? existingBillData.totalAmount.toString()
-      : ''
-  );
-  const [selectedCurrency, setSelectedCurrency] = useState(
-    isEditing && existingBillData?.currency
-      ? CURRENCIES.find(c => c.code === existingBillData.currency) || CURRENCIES[0]
-      : CURRENCIES[0]
-  );
-  const [convertedAmount, setConvertedAmount] = useState<number | null>(null);
   const [isConverting, setIsConverting] = useState(false);
 
   // UI state
@@ -108,8 +159,25 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
   // Validation state
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
 
-  // Convert amount to USDC when amount or currency changes
+  // Show OCR error message if OCR failed
   useEffect(() => {
+    if (isFromOCR && ocrError) {
+      Alert.alert(
+        'OCR Analysis Failed',
+        `${ocrError}\n\nYou can manually enter the bill details below.`,
+        [{ text: 'OK' }]
+      );
+    }
+  }, [isFromOCR, ocrError]);
+
+  // Convert amount to USDC when amount or currency changes
+  // Skip conversion if OCR data is already in USDC
+  useEffect(() => {
+    // If OCR data is in USDC and amount matches, don't convert again
+    if (ocrData?.currency === 'USDC' && ocrData.totalAmount && amount === ocrData.totalAmount.toString()) {
+      return;
+    }
+
     const convertAmount = async () => {
       const numeric = amount ? parseAmount(amount) : 0;
       if (numeric > 0) {
@@ -273,7 +341,7 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
         amount: convertedAmount, // Use the converted USDC amount
         currency: 'USDC', // Always use USDC for the final amount
         date: selectedDate,
-        location: '', // Could be enhanced with location input
+        location: ocrData?.location || '', // Preserve OCR location if available
         description: isEditing 
           ? `Manual bill updated on ${selectedDate.toLocaleDateString()}`
           : `Manual bill created on ${selectedDate.toLocaleDateString()} (${amount} ${selectedCurrency.code} converted to ${convertedAmount.toFixed(4)} USDC)`,
@@ -289,28 +357,105 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
         return;
       }
 
-      // Create the bill analysis data from manual input
+      // CRITICAL FIX: If OCR data exists, merge user edits with OCR data
+      // This preserves OCR-extracted items, merchant, location, subtotal, tax
+      let processedBillData: ProcessedBillData;
+      
+      if (ocrData && isFromOCR) {
+        // Merge OCR data with user edits - preserve OCR items/merchant/location
+        logger.info('Merging OCR data with user edits', {
+          ocrItemsCount: ocrData.items?.length || 0,
+          ocrMerchant: ocrData.merchant,
+          ocrLocation: ocrData.location,
+          userEditedName: billName.trim(),
+          userEditedAmount: convertedAmount,
+          userEditedDate: selectedDate.toISOString().split('T')[0]
+        }, 'ManualBillCreationScreen');
+
+        processedBillData = {
+          ...ocrData, // Preserve all OCR data: items, merchant, location, subtotal, tax, time, participants
+          // Allow user to edit these fields:
+          title: billName.trim() || ocrData.title,
+          totalAmount: convertedAmount || ocrData.totalAmount,
+          date: selectedDate.toISOString().split('T')[0] || ocrData.date,
+          // If user changed amount significantly, we might need to adjust item prices proportionally
+          // For now, keep OCR items as-is (user can review in SplitDetails)
+        };
+
+        // If user changed the total amount significantly, warn them
+        if (ocrData.totalAmount && convertedAmount && 
+            Math.abs(convertedAmount - ocrData.totalAmount) > 0.01) {
+          logger.info('User edited total amount', {
+            originalOCR: ocrData.totalAmount,
+            newAmount: convertedAmount,
+            difference: convertedAmount - ocrData.totalAmount
+          }, 'ManualBillCreationScreen');
+          // Note: Items keep their OCR prices - user can adjust in SplitDetails if needed
+        }
+      } else {
+        // Manual entry (no OCR data): create new data from form
       const manualBillData = await consolidatedBillAnalysisService.processManualBill(
         manualBillInput,
         currentUser
       );
 
-      logger.info('Bill analysis data created', {
+        logger.info('Bill analysis data created from manual input', {
         storeName: manualBillData.merchant,
         totalAmount: manualBillData.totalAmount,
         currency: manualBillData.currency,
         category: manualBillData.title
-      });
+        }, 'ManualBillCreationScreen');
 
-      // Process the manual bill data using the same processor as OCR
-      const processedBillData = manualBillData;
+        processedBillData = manualBillData;
+      }
 
-      if (isEditing) {
-        logger.info('Bill updated successfully', {
+      if (isEditing && existingSplitId) {
+        // Update existing split in the database
+        logger.info('Updating existing split', {
+          splitId: existingSplitId,
           title: processedBillData.title,
           totalAmount: processedBillData.totalAmount,
+        }, 'ManualBillCreationScreen');
+
+        const updatedSplitData = {
+          billId: processedBillData.id,
+          title: processedBillData.title,
+          description: `Split for ${processedBillData.title}`,
+          totalAmount: processedBillData.totalAmount,
           currency: processedBillData.currency,
-        });
+          splitType: existingSplitData?.splitType || 'fair',
+          status: existingSplitData?.status || 'draft',
+          creatorId: currentUser?.id?.toString() || '',
+          creatorName: currentUser?.name || 'Unknown',
+          participants: existingSplitData?.participants || [], // Keep existing participants
+          items: processedBillData.items.map(item => ({
+            id: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity || 1,
+            category: item.category || 'Other',
+            participants: item.participants || [],
+          })),
+          merchant: {
+            name: processedBillData.merchant,
+            address: processedBillData.location || '',
+            phone: processedBillData.merchantPhone || '',
+          },
+          date: processedBillData.date,
+          // OCR-extracted data
+          subtotal: processedBillData.subtotal,
+          tax: processedBillData.tax,
+          receiptNumber: processedBillData.receiptNumber,
+          updatedAt: new Date().toISOString(),
+        };
+
+        const updateResult = await SplitStorageService.updateSplit(existingSplitId, updatedSplitData);
+
+        if (updateResult.success) {
+          logger.info('Split updated successfully', {
+            splitId: existingSplitId,
+            title: processedBillData.title,
+          }, 'ManualBillCreationScreen');
 
         // Call the update callback if provided
         if (onBillUpdated) {
@@ -321,8 +466,41 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
           });
         }
 
-        // Navigate back or to appropriate screen
-        navigation.goBack();
+          // Navigate back to SplitDetails with updated data
+          navigation.replace('SplitDetails', {
+            splitId: existingSplitId,
+            splitData: updateResult.split,
+            currentSplitData: updateResult.split,
+            billData: {
+              id: processedBillData.id,
+              title: processedBillData.title,
+              totalAmount: processedBillData.totalAmount,
+              currency: processedBillData.currency,
+              date: processedBillData.date,
+              merchant: processedBillData.merchant,
+              items: processedBillData.items.map(item => ({
+                id: item.id,
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity,
+                category: item.category,
+                participants: item.participants || [],
+              })),
+              participants: processedBillData.participants.map(p => ({
+                id: p.id,
+                name: p.name,
+                walletAddress: p.walletAddress || p.wallet_address || '',
+                status: p.status,
+                amountOwed: p.amountOwed || 0,
+                items: p.items || [],
+              })),
+              settings: processedBillData.settings,
+            },
+            processedBillData: processedBillData,
+          });
+        } else {
+          throw new Error(updateResult.error || 'Failed to update split');
+        }
       } else {
         logger.info('Bill processed successfully', {
           title: processedBillData.title,
@@ -332,48 +510,37 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
           itemsCount: processedBillData.items.length
         });
 
-        // Create the split and wallet directly
-        const splitCreationResult = await ManualSplitCreationService.createManualSplit({
-          processedBillData,
-          currentUser,
-          billName: processedBillData.title,
-          totalAmount: processedBillData.totalAmount.toString(),
-          participants: processedBillData.participants,
-          selectedSplitType: undefined // Let user choose in SplitDetails
-        });
-
-        if (!splitCreationResult.success) {
-          throw new Error(splitCreationResult.error || 'Failed to create split');
+        // Validate processed bill data before navigation
+        const validation = validateProcessedBillDataForNavigation(processedBillData);
+        if (!validation.isValid) {
+          throw new Error(validation.error || 'Invalid bill data');
         }
 
-        logger.info('Split created successfully', {
-          splitId: splitCreationResult.split?.id,
-          title: splitCreationResult.split?.title
-        });
-
-        // Navigate to split details with the created split data
-        navigation.navigate('SplitDetails', {
-          splitData: splitCreationResult.split,
-          splitId: splitCreationResult.split?.id,
-          currentSplitData: splitCreationResult.split, // Pass as currentSplitData for proper loading
-          billData: {
-            title: processedBillData.title,
-            totalAmount: processedBillData.totalAmount,
-            currency: processedBillData.currency,
-            merchant: processedBillData.merchant,
-            date: processedBillData.date,
-          },
-          processedBillData: processedBillData,
+        // Navigate to SplitDetails with processedBillData - let SplitDetails handle split creation
+        // This ensures consistent flow with OCR and prevents duplicate split creation
+        // Split will be created when user selects split type in SplitDetailsScreen
+        // Only pass essential data to optimize performance
+        const navigationParams = createSplitDetailsNavigationParams(processedBillData, {
           analysisResult: {
             success: true,
-            data: manualBillData,
-            processingTime: 0,
             confidence: 1.0,
-            rawText: `Manual bill: ${billName} - ${amount} ${selectedCurrency.code} (${convertedAmount.toFixed(4)} USDC)`,
+            processingTime: 0,
           },
-          isNewBill: true, // This is a new bill/split
-          isManualCreation: true, // This is a manual creation
+          isManualCreation: true,
         });
+
+        if (__DEV__) {
+          logger.debug('Navigating to SplitDetails for manual bill', {
+            title: processedBillData.title,
+            totalAmount: processedBillData.totalAmount,
+            participantsCount: processedBillData.participants?.length || 0,
+            isNewBill: navigationParams.isNewBill,
+            isManualCreation: navigationParams.isManualCreation
+          }, 'ManualBillCreationScreen');
+        }
+
+        // Use replace to prevent screen stacking and ensure clean navigation state
+        navigation.replace('SplitDetails', navigationParams);
       }
 
     } catch (error) {
@@ -396,10 +563,49 @@ const ManualBillCreationScreen: React.FC<ManualBillCreationScreenProps> = ({ nav
     <Container>
       <StatusBar barStyle="light-content" backgroundColor={colors.black} />
       <Header
-        title={isEditing ? 'Edit Bill' : 'Create Bill'}
+        title={
+          isFromOCR 
+            ? (ocrData ? 'Review OCR Bill' : 'Create Bill (OCR Failed)')
+            : (isEditing ? 'Edit Bill' : 'Create Bill')
+        }
         onBackPress={() => navigation.goBack()}
         showBackButton={true}
       />
+      
+      {/* OCR Success Indicator */}
+      {isFromOCR && ocrData && (
+        <View style={styles.ocrSuccessBanner}>
+          <Text style={styles.ocrSuccessText}>
+            ✓ OCR data extracted successfully. Please review and edit if needed.
+          </Text>
+        </View>
+      )}
+
+      {/* Low Confidence Warning */}
+      {isFromOCR && analysisResult && analysisResult.confidence !== undefined && analysisResult.confidence < 0.7 && (
+        <View style={styles.confidenceWarningBanner}>
+          <Text style={styles.confidenceWarningText}>
+            ⚠️ Low confidence ({Math.round(analysisResult.confidence * 100)}%). Please verify all extracted data carefully.
+          </Text>
+        </View>
+      )}
+
+      {/* Validation Warnings */}
+      {ocrData?.validationWarnings && (
+        <View style={styles.validationWarningBanner}>
+          <Text style={styles.validationWarningTitle}>⚠️ Data Validation Warnings:</Text>
+          {ocrData.validationWarnings.itemsSumMismatch && (
+            <Text style={styles.validationWarningText}>
+              • Items sum doesn't match total amount. Please verify item prices.
+            </Text>
+          )}
+          {ocrData.validationWarnings.subtotalTaxMismatch && (
+            <Text style={styles.validationWarningText}>
+              • Subtotal + tax doesn't match total. Please verify amounts.
+            </Text>
+          )}
+        </View>
+      )}
      
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

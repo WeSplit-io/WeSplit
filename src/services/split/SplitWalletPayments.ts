@@ -15,6 +15,8 @@ import { KeypairUtils } from '../shared/keypairUtils';
 import { ValidationUtils } from '../shared/validationUtils';
 import { BalanceUtils } from '../shared/balanceUtils';
 import { USDC_CONFIG } from '../shared/walletConstants';
+import { signTransaction as signTransactionWithCompanyWallet, submitTransaction as submitTransactionToBlockchain } from '../blockchain/transaction/transactionSigningService';
+import { VersionedTransaction } from '@solana/web3.js';
 
 // Helper function to verify transaction on blockchain
 async function verifyTransactionOnBlockchain(transactionSignature: string): Promise<boolean> {
@@ -222,22 +224,87 @@ async function executeFairSplitTransaction(
     const companyPublicKey = new PublicKey(companyWalletAddress);
     transaction.feePayer = companyPublicKey;
     
-    // SECURITY: Company wallet secret key operations must be performed on backend services
-    // Client-side code cannot sign transactions with company wallet
-    return {
-      success: false,
-      error: 'Company wallet secret key operations must be performed on backend services. ' +
-             'Client-side code cannot sign transactions with company wallet. ' +
-             'Please use backend API endpoint for transaction signing.'
-    };
+    // Convert Transaction to VersionedTransaction for Firebase Functions
+    // Firebase Functions expect VersionedTransaction format
+    // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+    // This avoids double signing and ensures clean signature handling
+    let versionedTransaction: VersionedTransaction;
+    try {
+      versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+      // Sign the versioned transaction with user keypair (only sign once)
+      versionedTransaction.sign([keypair]);
+      logger.info('Transaction converted to VersionedTransaction and signed', {
+        userAddress: keypair.publicKey.toBase58(),
+        feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+      }, 'SplitWalletPayments');
+    } catch (versionError) {
+      logger.error('Failed to convert transaction to VersionedTransaction', {
+        error: versionError,
+        errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+      }, 'SplitWalletPayments');
+      return {
+        success: false,
+        error: `Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`
+      };
+    }
 
-    // Code below is unreachable - secret key operations must be performed on backend
-    // This function now returns early with an error message
-    // The original transaction signing code has been removed for security
+    // Serialize the partially signed transaction
+    const serializedTransaction = versionedTransaction.serialize();
+
+    // Ensure we have a proper Uint8Array
+    const txArray = serializedTransaction instanceof Uint8Array 
+      ? serializedTransaction 
+      : new Uint8Array(serializedTransaction);
+
+    logger.info('Transaction serialized, requesting company wallet signature', {
+      transactionSize: txArray.length,
+      transactionType: typeof serializedTransaction,
+      isUint8Array: txArray instanceof Uint8Array
+    }, 'SplitWalletPayments');
+    
+    // Use Firebase Function to add company wallet signature
+    let fullySignedTransaction: Uint8Array;
+    try {
+      fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+      logger.info('Company wallet signature added successfully', {
+        transactionSize: fullySignedTransaction.length
+          }, 'SplitWalletPayments');
+    } catch (signingError) {
+      logger.error('Failed to add company wallet signature', { 
+        error: signingError,
+        errorMessage: signingError instanceof Error ? signingError.message : String(signingError)
+              }, 'SplitWalletPayments');
+            return {
+              success: false,
+        error: `Failed to sign transaction with company wallet: ${signingError instanceof Error ? signingError.message : String(signingError)}`
+      };
+    }
+
+    // Submit the fully signed transaction
+    let signature: string;
+        try {
+      const result = await submitTransactionToBlockchain(fullySignedTransaction);
+      signature = result.signature;
+      logger.info('Transaction submitted successfully', { signature }, 'SplitWalletPayments');
+    } catch (submissionError) {
+      logger.error('Transaction submission failed', { 
+        error: submissionError,
+        errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
+            }, 'SplitWalletPayments');
+            return {
+              success: false,
+        error: `Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`
+      };
+    }
+
+            return {
+              success: true,
+            signature
+          };
   } catch (error) {
     logger.error('Fair split transaction failed', error, 'SplitWalletPayments');
-    return {
-      success: false,
+            return {
+              success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
@@ -337,35 +404,93 @@ async function executeFastTransaction(
       const fromTokenAccount = await getAssociatedTokenAddress(mintPublicKey, fromPublicKey);
       const toTokenAccount = await getAssociatedTokenAddress(mintPublicKey, toPublicKey);
 
-      // Validate source token account exists and has sufficient balance
+      // Validate source token account exists and get actual balance
+      // CRITICAL: Use fallback method if getAccount fails (account might exist but getAccount throws)
+      let actualAccountBalance: number | null = null;
+      let fromAccount: any = null;
+      let actualFromTokenAccount = fromTokenAccount;
+      
       try {
-        const fromAccount = await getAccount(connection, fromTokenAccount);
-        logger.info('Source token account validated', {
+        // Try primary method: getAccount with associated token address
+        fromAccount = await getAccount(connection, fromTokenAccount);
+        actualAccountBalance = fromAccount.amount / Math.pow(10, 6); // Convert to USDC (6 decimals)
+        
+        logger.info('Source token account validated (primary method)', {
           fromTokenAccount: fromTokenAccount.toString(),
           owner: fromAccount.owner.toString(),
           mint: fromAccount.mint.toString(),
-          amount: fromAccount.amount.toString(),
-          requiredAmount: Math.floor(amount * Math.pow(10, 6))
+          actualBalance: actualAccountBalance,
+          requestedAmount: amount,
+          rawAmount: fromAccount.amount.toString()
+        }, 'SplitWalletPayments');
+      } catch (primaryError) {
+        // Fallback: Try to find USDC account using getTokenAccountsByOwner
+        logger.warn('Primary token account validation failed, trying fallback method', {
+          fromTokenAccount: fromTokenAccount.toString(),
+          fromAddress,
+          error: primaryError instanceof Error ? primaryError.message : String(primaryError)
         }, 'SplitWalletPayments');
         
-        if (fromAccount.amount < Math.floor(amount * Math.pow(10, 6))) {
+        try {
+          const { TOKEN_PROGRAM_ID } = await memoryManager.loadModule('solana-spl-token');
+          const tokenAccounts = await connection.getTokenAccountsByOwner(
+            fromPublicKey,
+            { mint: mintPublicKey },
+            { commitment: 'confirmed' }
+          );
+          
+          if (tokenAccounts.value.length > 0) {
+            // Found USDC account using fallback method
+            const usdcAccount = tokenAccounts.value[0];
+            fromAccount = await getAccount(connection, usdcAccount.pubkey);
+            actualAccountBalance = Number(fromAccount.amount) / Math.pow(10, 6);
+            
+            // Update to use the found account
+            actualFromTokenAccount = usdcAccount.pubkey;
+            
+            logger.info('Source token account found using fallback method', {
+              originalTokenAccount: fromTokenAccount.toString(),
+              foundTokenAccount: actualFromTokenAccount.toString(),
+              actualBalance: actualAccountBalance,
+              rawAmount: fromAccount.amount.toString()
+            }, 'SplitWalletPayments');
+          } else {
+            throw new Error('No USDC token account found using fallback method');
+          }
+        } catch (fallbackError) {
+          logger.error('Source token account validation failed (both methods)', {
+            fromTokenAccount: fromTokenAccount.toString(),
+            fromPublicKey: fromPublicKey.toString(),
+            fromAddress,
+            mintPublicKey: mintPublicKey.toString(),
+            primaryError: primaryError instanceof Error ? primaryError.message : String(primaryError),
+            fallbackError: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+          }, 'SplitWalletPayments');
+          
           return {
             success: false,
-            error: `Insufficient USDC balance. Available: ${fromAccount.amount / Math.pow(10, 6)} USDC, Required: ${amount} USDC`
+            error: 'Source wallet does not have a USDC token account. Please ensure your wallet is properly set up.'
           };
         }
-      } catch (error) {
-        logger.error('Source token account validation failed', {
-          fromTokenAccount: fromTokenAccount.toString(),
-          fromPublicKey: fromPublicKey.toString(),
-          mintPublicKey: mintPublicKey.toString(),
-          error: error instanceof Error ? error.message : String(error)
-        }, 'SplitWalletPayments');
-        
-        return {
-          success: false,
-          error: 'Source wallet does not have a USDC token account. Please ensure your wallet is properly set up.'
-        };
+      }
+      
+      // Validate balance for withdrawals and funding
+      if (transactionType === 'withdrawal') {
+        // For withdrawals, use the actual balance from the account to withdraw everything
+        if (!fromAccount || fromAccount.amount <= 0) {
+          return {
+            success: false,
+            error: `Split wallet has no USDC balance available`
+          };
+        }
+      } else {
+        // For funding, check if we have sufficient balance
+        if (!fromAccount || fromAccount.amount < Math.floor(amount * Math.pow(10, 6))) {
+          return {
+            success: false,
+            error: `Insufficient USDC balance. Available: ${actualAccountBalance || 0} USDC, Required: ${amount} USDC`
+          };
+        }
       }
 
       // Check if destination token account exists
@@ -402,14 +527,20 @@ async function executeFastTransaction(
       }
 
       // Calculate company fee for funding transactions (1.5% fee for money going INTO splits)
-      let transferAmount = Math.floor(amount * Math.pow(10, 6)); // USDC has 6 decimals
+      // For withdrawals, use the actual balance from the account to withdraw everything
+      const amountToUse = transactionType === 'withdrawal' && actualAccountBalance !== null 
+        ? actualAccountBalance 
+        : amount;
+      let transferAmount = Math.floor(amountToUse * Math.pow(10, 6)); // USDC has 6 decimals
       let companyFeeAmount = 0;
       
       logger.info('Transfer amount calculation', {
         originalAmount: amount,
+        amountToUse: amountToUse,
+        actualAccountBalance: actualAccountBalance,
         transferAmount,
         transactionType,
-        fromTokenAccount: fromTokenAccount.toString(),
+        fromTokenAccount: actualFromTokenAccount.toString(),
         toTokenAccount: toTokenAccount.toString()
       }, 'SplitWalletPayments');
       
@@ -424,9 +555,10 @@ async function executeFastTransaction(
           const { COMPANY_WALLET_CONFIG } = await import('../../config/constants/feeConfig');
           const companyTokenAccount = await getAssociatedTokenAddress(mintPublicKey, new PublicKey(COMPANY_WALLET_CONFIG.address));
           
+          // CRITICAL: Use actualFromTokenAccount (might be different if fallback method was used)
           transaction.add(
             createTransferInstruction(
-              fromTokenAccount,
+              actualFromTokenAccount,
               companyTokenAccount,
               fromPublicKey,
               companyFeeAmount,
@@ -443,18 +575,34 @@ async function executeFastTransaction(
             companyFee,
             companyFeeAmount,
             recipientAmount,
-            transferAmount
+            transferAmount,
+            fromTokenAccount: actualFromTokenAccount.toString()
           }, 'SplitWalletPayments');
         }
       }
 
+      // For withdrawals, use the exact raw amount from the account to withdraw everything
+      // This ensures no residual balance is left (0.000001 USDC or similar)
+      let finalTransferAmount = transferAmount;
+      if (transactionType === 'withdrawal' && fromAccount) {
+        // Use the exact raw amount from the account we already fetched
+        finalTransferAmount = fromAccount.amount; // Use exact raw amount (already in 6 decimal format)
+        logger.info('Using exact account balance for withdrawal (no residual)', {
+          actualBalance: actualAccountBalance,
+          rawAmount: fromAccount.amount.toString(),
+          finalTransferAmount: finalTransferAmount.toString(),
+          tokenAccount: actualFromTokenAccount.toString()
+        }, 'SplitWalletPayments');
+      }
+      
       // Add transfer instruction (recipient gets the full amount they expect)
+      // CRITICAL: Use actualFromTokenAccount (might be different if fallback method was used)
       transaction.add(
         createTransferInstruction(
-          fromTokenAccount,
+          actualFromTokenAccount,
           toTokenAccount,
           fromPublicKey,
-          transferAmount
+          finalTransferAmount
         )
       );
     }
@@ -492,23 +640,80 @@ async function executeFastTransaction(
     const companyPublicKey = new PublicKey(companyWalletAddress);
     transaction.feePayer = companyPublicKey;
     
-    // SECURITY: Company wallet secret key operations must be performed on backend services
-    // Client-side code cannot sign transactions with company wallet
-    return {
-      success: false,
-      error: 'Company wallet secret key operations must be performed on backend services. ' +
-             'Client-side code cannot sign transactions with company wallet. ' +
-             'Please use backend API endpoint for transaction signing.'
-    };
+    // Convert Transaction to VersionedTransaction for Firebase Functions
+    // Firebase Functions expect VersionedTransaction format
+    // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+    // This avoids double signing and ensures clean signature handling
+    let versionedTransaction: VersionedTransaction;
+    try {
+      versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+      // Sign the versioned transaction with user keypair (only sign once)
+      versionedTransaction.sign([keypair]);
+      logger.info('Transaction converted to VersionedTransaction and signed', {
+        userAddress: keypair.publicKey.toBase58(),
+        feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+      }, 'SplitWalletPayments');
+    } catch (versionError) {
+      logger.error('Failed to convert transaction to VersionedTransaction', {
+        error: versionError,
+        errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+      }, 'SplitWalletPayments');
+      return {
+        success: false,
+        error: `Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`
+      };
+    }
 
-    // Code below is unreachable - kept for reference
-    // const signature = await connection.sendRawTransaction(transaction.serialize(), {
-    //   skipPreflight: false,
-    //   preflightCommitment: 'processed', // Use 'processed' for fastest confirmation
-    //   maxRetries: 1 // Minimal retries for speed
-    // });
+    // Serialize the partially signed transaction
+    const serializedTransaction = versionedTransaction.serialize();
 
-    // logger.info('Fast transaction sent successfully', {
+    // Ensure we have a proper Uint8Array
+    const txArray = serializedTransaction instanceof Uint8Array 
+      ? serializedTransaction 
+      : new Uint8Array(serializedTransaction);
+
+    logger.info('Transaction serialized, requesting company wallet signature', {
+      transactionSize: txArray.length,
+      transactionType: typeof serializedTransaction,
+      isUint8Array: txArray instanceof Uint8Array
+    }, 'SplitWalletPayments');
+
+    // Use Firebase Function to add company wallet signature
+    let fullySignedTransaction: Uint8Array;
+    try {
+      fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+      logger.info('Company wallet signature added successfully', {
+        transactionSize: fullySignedTransaction.length
+      }, 'SplitWalletPayments');
+    } catch (signingError) {
+      logger.error('Failed to add company wallet signature', { 
+        error: signingError,
+        errorMessage: signingError instanceof Error ? signingError.message : String(signingError)
+      }, 'SplitWalletPayments');
+      return {
+        success: false,
+        error: `Failed to sign transaction with company wallet: ${signingError instanceof Error ? signingError.message : String(signingError)}`
+      };
+    }
+
+    // Submit the fully signed transaction
+    let signature: string;
+    try {
+      const result = await submitTransactionToBlockchain(fullySignedTransaction);
+      signature = result.signature;
+      logger.info('Transaction submitted successfully', { signature }, 'SplitWalletPayments');
+    } catch (submissionError) {
+      logger.error('Transaction submission failed', { 
+        error: submissionError,
+        errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
+      }, 'SplitWalletPayments');
+      return {
+        success: false,
+        error: `Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`
+      };
+    }
+
+    logger.info('Fast transaction sent successfully', {
       signature,
       fromAddress,
       toAddress,
@@ -945,7 +1150,7 @@ async function executeDegenSplitTransaction(
     const companyWalletAddress = COMPANY_WALLET_CONFIG.address;
     
     if (!companyWalletAddress) {
-      return {
+            return {
         success: false,
         error: 'Company wallet address is not configured'
       };
@@ -954,35 +1159,76 @@ async function executeDegenSplitTransaction(
     const companyPublicKey = new PublicKey(companyWalletAddress);
     transaction.feePayer = companyPublicKey;
     
-    // SECURITY: Company wallet secret key operations must be performed on backend services
-    // Client-side code cannot sign transactions with company wallet
-    return {
-      success: false,
-      error: 'Company wallet secret key operations must be performed on backend services. ' +
-             'Client-side code cannot sign transactions with company wallet. ' +
-             'Please use backend API endpoint for transaction signing.'
-    };
-
-    // Code below is unreachable - kept for reference
-    // let signature;
-    // try {
-    //   signature = await connection.sendRawTransaction(transaction.serialize(), {
-    //     skipPreflight: false,
-    //     preflightCommitment: 'processed', // Use 'processed' for faster confirmation
-    //     maxRetries: 2 // Reduced retries for faster processing
-    //   });
-    // } catch (sendError) {
-    //   logger.error('Failed to send degen split transaction', {
-        fromAddress,
-        toAddress,
-        amount,
-        currency,
-        error: sendError instanceof Error ? sendError.message : String(sendError)
+    // Convert Transaction to VersionedTransaction for Firebase Functions
+    // Firebase Functions expect VersionedTransaction format
+    // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+    // This avoids double signing and ensures clean signature handling
+    let versionedTransaction: VersionedTransaction;
+    try {
+      versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+      // Sign the versioned transaction with user keypair (only sign once)
+      versionedTransaction.sign([keypair]);
+      logger.info('Transaction converted to VersionedTransaction and signed', {
+        userAddress: keypair.publicKey.toBase58(),
+        feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
       }, 'SplitWalletPayments');
-      
+    } catch (versionError) {
+      logger.error('Failed to convert transaction to VersionedTransaction', {
+        error: versionError,
+        errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+      }, 'SplitWalletPayments');
       return {
         success: false,
-        error: `Transaction failed to send: ${sendError instanceof Error ? sendError.message : 'Unknown error'}`
+        error: `Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`
+      };
+    }
+
+    // Serialize the partially signed transaction
+    const serializedTransaction = versionedTransaction.serialize();
+
+    // Ensure we have a proper Uint8Array
+    const txArray = serializedTransaction instanceof Uint8Array 
+      ? serializedTransaction 
+      : new Uint8Array(serializedTransaction);
+
+    logger.info('Transaction serialized, requesting company wallet signature', {
+      transactionSize: txArray.length,
+      transactionType: typeof serializedTransaction,
+      isUint8Array: txArray instanceof Uint8Array
+    }, 'SplitWalletPayments');
+
+    // Use Firebase Function to add company wallet signature
+    let fullySignedTransaction: Uint8Array;
+    try {
+      fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+      logger.info('Company wallet signature added successfully', {
+        transactionSize: fullySignedTransaction.length
+      }, 'SplitWalletPayments');
+    } catch (signingError) {
+      logger.error('Failed to add company wallet signature', { 
+        error: signingError,
+        errorMessage: signingError instanceof Error ? signingError.message : String(signingError)
+      }, 'SplitWalletPayments');
+        return {
+        success: false,
+        error: `Failed to sign transaction with company wallet: ${signingError instanceof Error ? signingError.message : String(signingError)}`
+      };
+    }
+
+    // Submit the fully signed transaction
+    let signature: string;
+    try {
+      const result = await submitTransactionToBlockchain(fullySignedTransaction);
+      signature = result.signature;
+      logger.info('Transaction submitted successfully', { signature }, 'SplitWalletPayments');
+    } catch (submissionError) {
+      logger.error('Transaction submission failed', { 
+        error: submissionError,
+        errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
+      }, 'SplitWalletPayments');
+      return {
+        success: false,
+        error: `Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`
       };
     }
 
@@ -1849,9 +2095,10 @@ export class SplitWalletPayments {
 
       const availableBalance = balanceResult.balance;
       
-      // For fair split withdrawals, leave a small buffer to prevent transaction rejection
-      const minimumBuffer = 0.000001; // 0.000001 USDC buffer
-      const withdrawalAmount = Math.max(0, availableBalance - minimumBuffer);
+      // CRITICAL: Withdraw the FULL balance - no buffer needed for USDC token transfers
+      // Transaction fees are paid in SOL, not USDC, so we can withdraw the entire USDC balance
+      // Round to 6 decimal places to match USDC precision
+      const withdrawalAmount = Math.floor(availableBalance * Math.pow(10, 6)) / Math.pow(10, 6);
       
       if (withdrawalAmount <= 0) {
         return {
@@ -1859,6 +2106,13 @@ export class SplitWalletPayments {
           error: 'Insufficient balance for withdrawal',
         };
       }
+      
+      logger.info('Withdrawing full balance from split wallet', {
+        splitWalletId,
+        availableBalance,
+        withdrawalAmount,
+        walletAddress: wallet.walletAddress
+      }, 'SplitWalletPayments');
 
       // Execute transaction using fast or standard method based on fastMode
       const transactionResult = fastMode 

@@ -9,7 +9,6 @@ import {
   Transaction, 
   SystemProgram,
   TransactionInstruction,
-  sendAndConfirmTransaction,
   LAMPORTS_PER_SOL,
   ComputeBudgetProgram,
   Keypair
@@ -28,6 +27,7 @@ import { FeeService, COMPANY_FEE_CONFIG, COMPANY_WALLET_CONFIG, TransactionType 
 import { solanaWalletService } from '../wallet';
 import { logger } from '../../analytics/loggingService';
 import type { LinkedWallet } from '../wallet/LinkedWalletService';
+import { signTransaction as signTransactionWithCompanyWallet, submitTransaction as submitTransactionToBlockchain } from './transactionSigningService';
 
 export interface ExternalTransferParams {
   to: string;
@@ -551,50 +551,98 @@ class ExternalTransferService {
         userAddress: userKeypair.publicKey.toBase58() 
       }, 'ExternalTransferService');
 
-      // Add company wallet keypair for fee payment (required - same as internal transfers)
-      // SECURITY: Company wallet secret key is not available in client-side code
-      // COMPANY_WALLET_CONFIG is already imported at the top of the file
+      // Company wallet always pays SOL fees
+      // SECURITY: Secret key operations must be performed on backend services via Firebase Functions
       logger.info('Company wallet configuration check', {
         companyWalletRequired: true,
         companyWalletAddress: COMPANY_WALLET_CONFIG.address,
         feePayerAddress: feePayerPublicKey.toBase58()
       }, 'ExternalTransferService');
 
-      // SECURITY: Company wallet secret key is not available in client-side code
-      // All secret key operations must be performed on backend services
-      // This is a security requirement - secret keys should never be in client bundles
-      logger.error('Company wallet secret key operations must be performed on backend services', {
-        companyWalletAddress: COMPANY_WALLET_CONFIG.address,
-        feePayerAddress: feePayerPublicKey.toBase58()
-      }, 'ExternalTransferService');
-      
-      return {
-        success: false,
-        error: 'Company wallet secret key operations must be performed on backend services. ' +
-               'Client-side code cannot sign transactions with company wallet. ' +
-               'Please use backend API endpoint for transaction signing.'
-      };
+      // Convert Transaction to VersionedTransaction for Firebase Functions
+      // Firebase Functions expect VersionedTransaction format
+      // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+      // This avoids double signing and ensures clean signature handling
+      const { VersionedTransaction } = await import('@solana/web3.js');
+      let versionedTransaction: VersionedTransaction;
+      try {
+        versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+        // Sign the versioned transaction with user keypair (only sign once)
+        versionedTransaction.sign([userKeypair]);
+        logger.info('Transaction converted to VersionedTransaction and signed', {
+          userAddress: userKeypair.publicKey.toBase58(),
+          feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+        }, 'ExternalTransferService');
+      } catch (versionError) {
+        logger.error('Failed to convert transaction to VersionedTransaction', {
+          error: versionError,
+          errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+        }, 'ExternalTransferService');
+        return {
+          success: false,
+          error: `Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`
+        };
+      }
 
-      // Sign and send transaction with enhanced confirmation (matching split logic)
-      logger.info('Sending enhanced USDC transfer transaction', {
+      // Serialize the partially signed transaction
+      const serializedTransaction = versionedTransaction.serialize();
+
+      // Ensure we have a proper Uint8Array
+      const txArray = serializedTransaction instanceof Uint8Array 
+        ? serializedTransaction 
+        : new Uint8Array(serializedTransaction);
+            
+      logger.info('Transaction serialized, requesting company wallet signature', {
+        transactionSize: txArray.length,
+        transactionType: typeof serializedTransaction,
+        isUint8Array: txArray instanceof Uint8Array,
         from: fromPublicKey.toBase58(),
         to: toPublicKey.toBase58(),
         amount: recipientAmount,
         companyFee,
-        totalAmount: params.amount,
-        signersCount: signers.length
-      }, 'ExternalTransferService');
-
-      const signature = await sendAndConfirmTransaction(
-        this.connection,
-        transaction,
-        signers, // Use proper signers array
-        {
-          commitment: getConfig().blockchain.commitment,
-          preflightCommitment: getConfig().blockchain.commitment,
-          maxRetries: 15 // Enhanced confirmation attempts (matching split logic)
-        }
-      );
+        totalAmount: params.amount
+            }, 'ExternalTransferService');
+            
+      // Use Firebase Function to add company wallet signature
+      let fullySignedTransaction: Uint8Array;
+      try {
+        fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+        logger.info('Company wallet signature added successfully', {
+          transactionSize: fullySignedTransaction.length
+          }, 'ExternalTransferService');
+      } catch (signingError) {
+        logger.error('Failed to add company wallet signature', { 
+          error: signingError,
+          errorMessage: signingError instanceof Error ? signingError.message : String(signingError)
+            }, 'ExternalTransferService');
+        return {
+          success: false,
+          error: `Failed to sign transaction with company wallet: ${signingError instanceof Error ? signingError.message : String(signingError)}`
+        };
+          }
+          
+      // Submit the fully signed transaction
+      let signature: string;
+      try {
+        logger.info('Submitting fully signed transaction', {
+          connectionEndpoint: this.connection.rpcEndpoint,
+          commitment: getConfig().blockchain.commitment
+          }, 'ExternalTransferService');
+          
+        const result = await submitTransactionToBlockchain(fullySignedTransaction);
+        signature = result.signature;
+        
+        logger.info('Transaction submitted successfully', { signature }, 'ExternalTransferService');
+      } catch (submissionError) {
+        logger.error('Transaction submission failed', { 
+          error: submissionError,
+          errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
+          }, 'ExternalTransferService');
+          return {
+            success: false,
+          error: `Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`
+        };
+      }
 
       // Enhanced verification (matching split logic)
       const verificationResult = await this.verifyTransactionOnBlockchain(signature);

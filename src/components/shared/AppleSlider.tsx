@@ -266,7 +266,7 @@ const AppleSlider: React.FC<AppleSliderProps> = ({
             { color: loading ? colors.black : colors.white }
           ]}
         >
-          {loading ? `Signing${dots}` : text}
+          {loading ? (text || `Signing${dots}`) : text}
         </Animated.Text>
       </Animated.View>
       <Animated.View

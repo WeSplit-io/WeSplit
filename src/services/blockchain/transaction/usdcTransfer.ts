@@ -23,7 +23,7 @@ import {
 import { logger } from '../../analytics/loggingService';
 import { getConfig } from '../../../config/unified';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';
-import { FeeService, COMPANY_WALLET_CONFIG } from '../../../config/constants/feeConfig';
+import { FeeService, COMPANY_WALLET_CONFIG, TransactionType } from '../../../config/constants/feeConfig';
 
 export interface UsdcTransferParams {
   fromOwnerPubkey: PublicKey;
@@ -32,6 +32,7 @@ export interface UsdcTransferParams {
   cluster: 'mainnet' | 'devnet';
   memo?: string;
   priority?: 'low' | 'medium' | 'high';
+  transactionType?: TransactionType; // Optional transaction type for fee calculation
 }
 
 export interface UsdcTransferResult {
@@ -117,7 +118,8 @@ export async function buildUsdcTransfer({
   amountUi,
   cluster,
   memo,
-  priority = 'medium'
+  priority = 'medium',
+  transactionType = 'send'
 }: UsdcTransferParams): Promise<UsdcTransferResult> {
   try {
     // Validate cluster matches current network
@@ -143,14 +145,21 @@ export async function buildUsdcTransfer({
       confirmTransactionInitialTimeout: getConfig().blockchain.timeout,
     });
 
+    // Calculate company fee using centralized service
+    const { fee: companyFee, recipientAmount } = FeeService.calculateCompanyFee(amountUi, transactionType);
+    
     // Get associated token addresses
     const fromTokenAccount = await getAssociatedTokenAddress(usdcMint, fromOwnerPubkey);
     const toTokenAccount = await getAssociatedTokenAddress(usdcMint, toOwnerPubkey);
-
-    // Convert amount to raw units (USDC has 6 decimals)
-    const transferAmount = Math.floor(amountUi * Math.pow(10, 6));
     
-    if (transferAmount <= 0) {
+    // Company token account for fee collection
+    const companyTokenAccount = await getAssociatedTokenAddress(usdcMint, feePayerPublicKey);
+
+    // Convert amounts to raw units (USDC has 6 decimals)
+    const recipientAmountRaw = Math.floor(recipientAmount * Math.pow(10, 6));
+    const companyFeeAmountRaw = Math.floor(companyFee * Math.pow(10, 6));
+    
+    if (recipientAmountRaw <= 0) {
       throw new Error('Transfer amount must be greater than 0');
     }
 
@@ -181,20 +190,48 @@ export async function buildUsdcTransfer({
       connection
     });
 
-    // Add ATA creation instructions if needed
-    transaction.add(...toAtaResult.instructions);
+    // Ensure company ATA exists for fee collection (if fees are collected)
+    let companyAtaResult: AtaCreationResult | null = null;
+    if (companyFeeAmountRaw > 0) {
+      companyAtaResult = await ensureAtaIx({
+        owner: feePayerPublicKey,
+        mint: usdcMint,
+        payer: companyPublicKey, // Company pays for its own ATA
+        connection
+      });
+    }
 
-    // Add USDC transfer instruction
+    // Add ATA creation instructions if needed (recipient first, then company)
+    transaction.add(...toAtaResult.instructions);
+    if (companyAtaResult) {
+      transaction.add(...companyAtaResult.instructions);
+    }
+
+    // Add USDC transfer instruction for recipient (full amount)
     transaction.add(
       createTransferInstruction(
         fromTokenAccount,
         toTokenAccount,
         fromOwnerPubkey, // User signs as owner of source tokens
-        transferAmount,
+        recipientAmountRaw,
         [],
         TOKEN_PROGRAM_ID
       )
     );
+
+    // Add company fee transfer instruction if applicable
+    if (companyFeeAmountRaw > 0) {
+      transaction.add(
+        createTransferInstruction(
+          fromTokenAccount,
+          companyTokenAccount,
+          fromOwnerPubkey, // User signs as owner of source tokens
+          companyFeeAmountRaw,
+          [],
+          TOKEN_PROGRAM_ID
+        )
+      );
+    }
 
     // Add memo if provided
     if (memo) {
@@ -217,12 +254,17 @@ export async function buildUsdcTransfer({
       from: fromOwnerPubkey.toBase58(),
       to: toOwnerPubkey.toBase58(),
       amount: amountUi,
-      transferAmount,
+      recipientAmount: recipientAmount,
+      companyFee: companyFee,
+      recipientAmountRaw,
+      companyFeeAmountRaw,
       fromTokenAccount: fromTokenAccount.toBase58(),
       toTokenAccount: toTokenAccount.toBase58(),
-      needsAtaCreation: toAtaResult.needsCreation,
+      companyTokenAccount: companyTokenAccount.toBase58(),
+      needsAtaCreation: toAtaResult.needsCreation || (companyAtaResult?.needsCreation ?? false),
       estimatedFees: estimatedFeesSol,
       feePayer: feePayerPublicKey.toBase58(),
+      transactionType,
       cluster
     }, 'UsdcTransfer');
 
@@ -230,9 +272,9 @@ export async function buildUsdcTransfer({
       transaction: versionedTransaction,
       fromTokenAccount,
       toTokenAccount,
-      transferAmount,
+      transferAmount: recipientAmountRaw,
       estimatedFees: estimatedFeesSol,
-      needsAtaCreation: toAtaResult.needsCreation
+      needsAtaCreation: toAtaResult.needsCreation || (companyAtaResult?.needsCreation ?? false)
     };
   } catch (error) {
     logger.error('Failed to build USDC transfer', error, 'UsdcTransfer');

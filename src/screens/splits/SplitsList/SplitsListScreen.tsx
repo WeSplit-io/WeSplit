@@ -154,7 +154,7 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     // loadSplits is stable and doesn't need to be in deps
   }, [currentUser?.id]);
 
-  // Refresh splits when screen comes into focus (e.g., after joining a split)
+  // Refresh splits when screen comes into focus (e.g., after joining a split or creating a new one)
   useFocusEffect(
     useCallback(() => {
       if (!currentUser?.id) {
@@ -172,8 +172,8 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         setLastDoc(null);
       }
       
-      // Only reload if we haven't loaded on this focus yet, or if user changed
-      if (!hasLoadedOnFocusRef.current || userChanged) {
+      // Always reload on focus to ensure we have the latest splits
+      // This is important when user creates a new split and navigates back
         if (__DEV__) {
           logger.debug('Screen focused, loading splits for user', { userId: currentUser.id }, 'SplitsListScreen');
         }
@@ -182,7 +182,6 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
         // Load page 1 on focus (user might have created a new split)
         loadSplits(1, undefined);
         hasLoadedOnFocusRef.current = true;
-      }
     }, [currentUser?.id])
   );
 
@@ -414,11 +413,11 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
   const handleCreateSplit = useCallback(() => {
     try {
-      // Temporarily disabled OCR access - navigate to manual creation instead
-      navigation.navigate('ManualBillCreation');
+      // Navigate to camera screen for OCR-based split creation
+      navigation.navigate('BillCamera');
     } catch (err) {
-      console.error('❌ SplitsListScreen: Error navigating to manual creation:', err);
-      Alert.alert('Navigation Error', 'Failed to open manual creation');
+      console.error('❌ SplitsListScreen: Error navigating to camera:', err);
+      Alert.alert('Navigation Error', 'Failed to open camera');
     }
   }, [navigation]);
 
@@ -489,10 +488,13 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
 
       // Always navigate to SplitDetails first for consistent behavior
       // This ensures all splits (OCR and manual) follow the same flow
+      // CRITICAL: Explicitly set isNewBill and isManualCreation to false for existing splits
       navigation.navigate('SplitDetails', {
         splitId: split.id,
         splitData: split,
-        isEditing: false
+        isEditing: false,
+        isNewBill: false, // Explicitly mark as existing split
+        isManualCreation: false, // Explicitly mark as existing split
       });
     } catch (err) {
       console.error('❌ SplitsListScreen: Error navigating to split details:', err);
@@ -634,7 +636,8 @@ const SplitsListScreen: React.FC<SplitsListScreenProps> = ({ navigation }) => {
     }
     return splits.filter(split => {
       if (activeFilter === 'active') {
-        return split.status === 'active';
+        // Include active, pending, and draft splits in "active" filter
+        return split.status === 'active' || split.status === 'pending' || split.status === 'draft';
       }
       if (activeFilter === 'closed') {
         return split.status === 'completed' || split.status === 'cancelled';

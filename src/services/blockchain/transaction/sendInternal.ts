@@ -9,7 +9,6 @@ import {
   Transaction, 
   SystemProgram,
   TransactionInstruction,
-  sendAndConfirmTransaction,
   LAMPORTS_PER_SOL,
   ComputeBudgetProgram,
   Keypair
@@ -30,6 +29,8 @@ import { optimizedTransactionUtils } from '../../shared/transactionUtilsOptimize
 import { TransactionUtils as transactionUtils } from '../../shared/transactionUtils';
 import { notificationUtils } from '../../shared/notificationUtils';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';
+import { signTransaction as signTransactionWithCompanyWallet, submitTransaction as submitTransactionToBlockchain } from './transactionSigningService';
+import { VersionedTransaction } from '@solana/web3.js';
 
 export interface InternalTransferParams {
   to: string;
@@ -534,78 +535,90 @@ class InternalTransferService {
       const secretKeyBuffer = Buffer.from(walletInfo.secretKey, 'base64');
       const userKeypair = Keypair.fromSecretKey(secretKeyBuffer);
 
-      // Prepare signers array
-      const signers: Keypair[] = [];
-      
       // Company wallet always pays SOL fees
-      // SECURITY: Secret key operations must be performed on backend services
-      // Client-side code should not have access to company wallet secret key
+      // SECURITY: Secret key operations must be performed on backend services via Firebase Functions
       logger.info('Company wallet configuration check', {
         companyWalletRequired: true,
         companyWalletAddress: COMPANY_WALLET_CONFIG.address,
         feePayerAddress: feePayerPublicKey.toBase58()
       }, 'InternalTransferService');
 
-      // SECURITY: Company wallet secret key is not available in client-side code
-      // All secret key operations must be performed on backend services
-      // This is a security requirement - secret keys should never be in client bundles
-      throw new Error(
-        'Company wallet secret key operations must be performed on backend services. ' +
-        'Client-side code cannot sign transactions with company wallet. ' +
-        'Please use backend API endpoint for transaction signing.'
-      );
-
       // Debug transaction before serialization
       logger.info('Transaction ready for signing', {
         signerPublicKey: userKeypair.publicKey.toBase58(),
         feePayer: feePayerPublicKey.toBase58(),
-        signersCount: signers.length,
-        signers: signers.map(signer => signer.publicKey.toBase58()),
         instructionsCount: transaction.instructions.length
-      }, 'InternalTransferService');
+          }, 'InternalTransferService');
 
-      logger.info('Signing and sending transaction', {
-        signerPublicKey: userKeypair.publicKey.toBase58(),
-        feePayer: feePayerPublicKey.toBase58(),
-        signersCount: signers.length,
-        signers: signers.map(signer => signer.publicKey.toBase58())
-      }, 'InternalTransferService');
+      // Convert Transaction to VersionedTransaction for Firebase Functions
+      // Firebase Functions expect VersionedTransaction format
+      // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+      // This avoids double signing and ensures clean signature handling
+      let versionedTransaction: VersionedTransaction;
+      try {
+        versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+        // Sign the versioned transaction with user keypair (only sign once)
+        versionedTransaction.sign([userKeypair]);
+        logger.info('Transaction converted to VersionedTransaction and signed', {
+          userAddress: userKeypair.publicKey.toBase58(),
+          feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+        }, 'InternalTransferService');
+      } catch (versionError) {
+        logger.error('Failed to convert transaction to VersionedTransaction', {
+          error: versionError,
+          errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+        }, 'InternalTransferService');
+        throw new Error(`Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`);
+      }
 
-      // Debug transaction structure
-      logger.info('Transaction structure debug', {
-        instructionsCount: transaction.instructions.length,
-        instructions: transaction.instructions.map((ix, index) => ({
-          index,
-          programId: ix.programId.toBase58(),
-          keys: ix.keys.map(key => ({
-            pubkey: key.pubkey.toBase58(),
-            isSigner: key.isSigner,
-            isWritable: key.isWritable
-          }))
-        }))
-      }, 'InternalTransferService');
+      // Serialize the partially signed transaction
+      const serializedTransaction = versionedTransaction.serialize();
+              
+      // Ensure we have a proper Uint8Array
+      const txArray = serializedTransaction instanceof Uint8Array 
+        ? serializedTransaction 
+        : new Uint8Array(serializedTransaction);
 
-      // Sign and send transaction with optimized approach
+      logger.info('Transaction serialized, requesting company wallet signature', {
+        transactionSize: txArray.length,
+        transactionType: typeof serializedTransaction,
+        isUint8Array: txArray instanceof Uint8Array
+              }, 'InternalTransferService');
+
+      // Use Firebase Function to add company wallet signature
+      let fullySignedTransaction: Uint8Array;
+      try {
+        fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+        logger.info('Company wallet signature added successfully', {
+          transactionSize: fullySignedTransaction.length
+                }, 'InternalTransferService');
+      } catch (signingError) {
+        logger.error('Failed to add company wallet signature', { 
+          error: signingError,
+          errorMessage: signingError instanceof Error ? signingError.message : String(signingError)
+            }, 'InternalTransferService');
+        throw new Error(`Failed to sign transaction with company wallet: ${signingError instanceof Error ? signingError.message : String(signingError)}`);
+      }
+
+      // Submit the fully signed transaction
       let signature: string;
       try {
-        logger.info('Attempting to sign and send transaction', {
+        logger.info('Submitting fully signed transaction', {
           connectionEndpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint,
           commitment: getConfig().blockchain.commitment,
           priority: params.priority || 'medium'
         }, 'InternalTransferService');
         
-        // Use sendTransaction for faster response, then confirm separately
-        signature = await optimizedTransactionUtils.sendTransactionWithRetry(transaction, signers, params.priority || 'medium');
+        const result = await submitTransactionToBlockchain(fullySignedTransaction);
+        signature = result.signature;
         
-        logger.info('Transaction signed and sent successfully', { signature }, 'InternalTransferService');
-      } catch (signingError) {
-        logger.error('Transaction signing failed', { 
-          error: signingError,
-          errorMessage: signingError instanceof Error ? signingError.message : String(signingError),
-          signersCount: signers.length,
-          signers: signers.map(signer => signer.publicKey.toBase58())
+        logger.info('Transaction submitted successfully', { signature }, 'InternalTransferService');
+      } catch (submissionError) {
+        logger.error('Transaction submission failed', { 
+          error: submissionError,
+          errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
         }, 'InternalTransferService');
-        throw signingError;
+        throw submissionError;
       }
 
       logger.info('Transaction sent successfully', { signature }, 'InternalTransferService');
@@ -1046,132 +1059,88 @@ class InternalTransferService {
         logger.debug('Skipping simulation due to token account creation - proceeding with transaction', null, 'sendInternal');
       }
 
-      // Prepare signers array
-      const signers: Keypair[] = [fromKeypair]; // User always signs for token transfers
-      
-      // SECURITY: Company wallet secret key is not available in client-side code
-      // All secret key operations must be performed on backend services
-      // This is a security requirement - secret keys should never be in client bundles
-      logger.error('Company wallet secret key operations must be performed on backend services', {
-        companyWalletAddress: COMPANY_WALLET_CONFIG.address
-      }, 'InternalTransferService');
-      
-      return {
-        success: false,
-        error: 'Company wallet secret key operations must be performed on backend services. ' +
-               'Client-side code cannot sign transactions with company wallet. ' +
-               'Please use backend API endpoint for transaction signing.'
-      };
-
-      // Send transaction with retry logic for blockhash expiration
-      logger.info('Sending transaction', null, 'sendInternal');
-      let signature: string | undefined;
-      let lastError: unknown;
-      
+      // Convert Transaction to VersionedTransaction for Firebase Functions
+      // Firebase Functions expect VersionedTransaction format
+      // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+      // This avoids double signing and ensures clean signature handling
+      let versionedTransaction: VersionedTransaction;
       try {
-        // Try up to 3 times with fresh blockhashes and exponential backoff
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          try {
-            logger.info('Transaction attempt', { 
-              attempt, 
-              maxAttempts: 3, 
-              details: {
-                instructionCount: transaction.instructions.length,
-                feePayer: transaction.feePayer?.toBase58(),
-                signerCount: signers.length,
-                signers: signers.map(s => s.publicKey.toBase58())
-              }
-            }, 'sendInternal');
-            
-            // Get fresh blockhash for each attempt with retry
-            const connection = await optimizedTransactionUtils.getConnection();
-            const freshBlockhash = await TransactionUtils.getLatestBlockhashWithRetry(connection, 'confirmed');
-            
-            // Update blockhash and re-sign transaction for each attempt
-            transaction.recentBlockhash = freshBlockhash;
-            
-            // Clear previous signatures and re-sign with fresh blockhash
-            transaction.signatures = [];
-            transaction.sign(...signers);
-            logger.info('Transaction re-signed with fresh blockhash', { freshBlockhash }, 'sendInternal');
-            
-            logger.info('Attempting sendAndConfirmTransaction with fresh blockhash', { freshBlockhash }, 'sendInternal');
-            
-            // Use optimized transaction sending approach
-            try {
-              logger.info('Sending transaction with optimized approach', null, 'sendInternal');
-              
-              // Transaction is already signed above with fresh blockhash
-              
-              // Send transaction first (faster response)
-              signature = await (await optimizedTransactionUtils.getConnection()).sendRawTransaction(transaction.serialize(), {
-                skipPreflight: false,
-                preflightCommitment: 'confirmed',
-                maxRetries: 0, // We handle retries ourselves
-              });
-              
-              logger.info('Transaction sent with signature, waiting for confirmation', { signature }, 'sendInternal');
-              
-              // Confirm transaction with timeout using centralized configuration
-              const confirmPromise = (await optimizedTransactionUtils.getConnection()).confirmTransaction(signature, 'confirmed');
-              const confirmTimeoutPromise = new Promise<never>((_, reject) => {
-                const timeout = TRANSACTION_CONFIG.timeout.confirmation;
-                setTimeout(() => reject(new Error(`Transaction confirmation timeout after ${timeout/1000} seconds`)), timeout);
-              });
-              
-              await Promise.race([confirmPromise, confirmTimeoutPromise]);
-              logger.info('Transaction confirmed', { signature }, 'sendInternal');
-              
-            } catch (confirmError) {
-              console.warn(`⚠️ Transaction confirmation failed:`, (confirmError as Error).message);
-              
-              // For split wallet payments, we need strict confirmation
-              // Don't accept transactions that haven't been confirmed
-              throw new Error(`Transaction confirmation failed: ${(confirmError as Error).message}. Transaction may have failed or is still pending.`);
-            }
-            
-            logger.info('Transaction successful on attempt', { attempt, signature }, 'sendInternal');
-            break; // Success, exit retry loop
-            
-          } catch (error) {
-            lastError = error;
-            console.warn(`⚠️ Transaction attempt ${attempt} failed:`, (error as Error).message);
-            
-            // Check if it's a blockhash expiration error
-            if ((error as Error).message.includes('block height exceeded') || (error as Error).message.includes('blockhash')) {
-              logger.info('Blockhash expired, retrying with fresh blockhash', null, 'sendInternal');
-            } else {
-              logger.info('Transaction failed for other reason, retrying', null, 'sendInternal');
-            }
-            
-            if (attempt === 3) {
-              // Last attempt failed
-              console.error('❌ All transaction attempts failed');
-              return {
-                success: false,
-                error: `Transaction failed after 3 attempts: ${(error as Error).message}`
-              };
-            }
-            
-            // Wait with exponential backoff before retrying
-            const backoffDelay = 1000 * Math.pow(2, attempt - 1); // 1s, 2s, 4s
-            logger.info('Waiting before retry', { backoffDelay }, 'sendInternal');
-            await new Promise(resolve => setTimeout(resolve, backoffDelay));
-          }
-        }
-      } catch (error) {
-        console.error('❌ Transaction sending failed:', error);
+        versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+        // Sign the versioned transaction with user keypair (only sign once)
+        versionedTransaction.sign([fromKeypair]);
+        logger.info('Transaction converted to VersionedTransaction and signed', {
+          userAddress: fromKeypair.publicKey.toBase58(),
+          feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+        }, 'InternalTransferService');
+      } catch (versionError) {
+        logger.error('Failed to convert transaction to VersionedTransaction', {
+          error: versionError,
+          errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+        }, 'InternalTransferService');
         return {
           success: false,
-          error: `Transaction failed: ${(error as Error).message}`
+          error: `Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`
         };
       }
 
-      // Ensure signature is defined
-      if (!signature) {
+      // Serialize the partially signed transaction
+      const serializedTransaction = versionedTransaction.serialize();
+              
+      // Ensure we have a proper Uint8Array
+      const txArray = serializedTransaction instanceof Uint8Array 
+        ? serializedTransaction 
+        : new Uint8Array(serializedTransaction);
+
+      logger.info('Transaction serialized, requesting company wallet signature', {
+        transactionSize: txArray.length,
+        transactionType: typeof serializedTransaction,
+        isUint8Array: txArray instanceof Uint8Array
+      }, 'InternalTransferService');
+
+      // SECURITY: Company wallet secret key is not available in client-side code
+      // All secret key operations must be performed on backend services via Firebase Functions
+      // This is a security requirement - secret keys should never be in client bundles
+      // The transaction will be signed with company wallet via Firebase Functions after user signs
+
+      // Use Firebase Function to add company wallet signature
+      let fullySignedTransaction: Uint8Array;
+      try {
+        fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+        logger.info('Company wallet signature added successfully', {
+          transactionSize: fullySignedTransaction.length
+        }, 'InternalTransferService');
+      } catch (signingError) {
+        logger.error('Failed to add company wallet signature', { 
+          error: signingError,
+          errorMessage: signingError instanceof Error ? signingError.message : String(signingError)
+        }, 'InternalTransferService');
         return {
           success: false,
-          error: 'Transaction failed - no signature received'
+          error: `Failed to sign transaction with company wallet: ${signingError instanceof Error ? signingError.message : String(signingError)}`
+        };
+      }
+
+      // Submit the fully signed transaction
+      let signature: string;
+      try {
+        logger.info('Submitting fully signed transaction', {
+          connectionEndpoint: (await optimizedTransactionUtils.getConnection()).rpcEndpoint,
+          commitment: getConfig().blockchain.commitment,
+          priority: params.priority || 'medium'
+        }, 'InternalTransferService');
+        
+        const result = await submitTransactionToBlockchain(fullySignedTransaction);
+        signature = result.signature;
+        
+        logger.info('Transaction submitted successfully', { signature }, 'InternalTransferService');
+      } catch (submissionError) {
+        logger.error('Transaction submission failed', { 
+          error: submissionError,
+          errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
+        }, 'InternalTransferService');
+        return {
+          success: false,
+          error: `Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`
         };
       }
 

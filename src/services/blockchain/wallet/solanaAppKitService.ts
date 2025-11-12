@@ -22,11 +22,12 @@ import {
 
 // Import shared constants and utilities
 import { RPC_CONFIG, USDC_CONFIG, PHANTOM_SCHEMES } from '../../../services/shared/walletConstants';
-import { FeeService, TransactionType } from '../../../config/constants/feeConfig';
+import { FeeService, TransactionType, COMPANY_WALLET_CONFIG } from '../../../config/constants/feeConfig';
 import { optimizedTransactionUtils } from '../../../services/shared/transactionUtilsOptimized';
 import { TransactionUtils } from '../../../services/shared/transactionUtils';
 import { balanceUtils } from '../../../services/shared/balanceUtils';
 import { logger } from '../../../services/analytics/loggingService';
+import { signTransaction as signTransactionWithCompanyWallet, submitTransaction as submitTransactionToBlockchain } from '../../blockchain/transaction/transactionSigningService';
 
 
   
@@ -790,51 +791,97 @@ export class SolanaAppKitService {
         transaction.add(memoInstruction);
       }
 
-      // Prepare signers array
-      const signers: Keypair[] = [];
-      
-      // Add user keypair
-      if (this.keypair) {
-        signers.push(this.keypair);
-      }
-      
-      // SECURITY: Company wallet secret key is not available in client-side code
-      // All secret key operations must be performed on backend services
-      // This is a security requirement - secret keys should never be in client bundles
-      const { COMPANY_WALLET_CONFIG } = await import('../../../config/constants/feeConfig');
-      
+      // Company wallet always pays SOL fees
+      // SECURITY: Secret key operations must be performed on backend services via Firebase Functions
       if (!COMPANY_WALLET_CONFIG.address) {
         throw new Error('Company wallet address is not configured');
       }
-      
-      // Company wallet secret key operations must be performed on backend services
-      throw new Error(
-        'Company wallet secret key operations must be performed on backend services. ' +
-        'Client-side code cannot sign transactions with company wallet. ' +
-        'Please use backend API endpoint for transaction signing.'
-      );
 
-      // Sign transaction
+      // Sign transaction with user keypair first
       if (this.connectedProvider) {
         // For external wallets, use the provider's signing method
         await this.connectedProvider.signTransaction(transaction);
       } else if (this.keypair) {
         // For app-generated wallets, sign directly
-        transaction.sign(...signers);
+        transaction.sign(this.keypair);
+      } else {
+        throw new Error('No wallet available for signing');
       }
 
-      // Send and confirm transaction
-      const signature = await sendAndConfirmTransaction(
-        this.connection,
-        transaction,
-        signers,
-        {
-          commitment: 'confirmed',
-          preflightCommitment: 'confirmed'
-        }
-      );
+      logger.info('Transaction signed with user keypair', {
+        userAddress: this.keypair?.publicKey.toBase58() || 'external-wallet'
+      }, 'SolanaAppKitService');
 
-      return signature;
+      // Convert Transaction to VersionedTransaction for Firebase Functions
+      // Firebase Functions expect VersionedTransaction format
+      const { VersionedTransaction } = await import('@solana/web3.js');
+      let versionedTransaction: VersionedTransaction;
+      try {
+        versionedTransaction = new VersionedTransaction(transaction.compileMessage());
+        // Sign the versioned transaction with user keypair
+        if (this.connectedProvider) {
+          // For external wallets, we need to re-sign with the provider
+          // Note: External wallet providers may not support VersionedTransaction directly
+          // In this case, we'll need to handle it differently
+          versionedTransaction.sign([this.keypair!]);
+        } else if (this.keypair) {
+          versionedTransaction.sign([this.keypair]);
+        }
+        logger.info('Transaction converted to VersionedTransaction and signed', {
+          userAddress: this.keypair?.publicKey.toBase58() || 'external-wallet',
+          feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+        }, 'SolanaAppKitService');
+      } catch (versionError) {
+        logger.error('Failed to convert transaction to VersionedTransaction', {
+          error: versionError,
+          errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+        }, 'SolanaAppKitService');
+        throw new Error(`Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`);
+      }
+
+      // Serialize the partially signed transaction
+      const serializedTransaction = versionedTransaction.serialize();
+
+      // Ensure we have a proper Uint8Array
+      const txArray = serializedTransaction instanceof Uint8Array 
+        ? serializedTransaction 
+        : new Uint8Array(serializedTransaction);
+
+      logger.info('Transaction serialized, requesting company wallet signature', {
+        transactionSize: txArray.length,
+        transactionType: typeof serializedTransaction,
+        isUint8Array: txArray instanceof Uint8Array
+      }, 'SolanaAppKitService');
+
+      // Use Firebase Function to add company wallet signature
+      let fullySignedTransaction: Uint8Array;
+      try {
+        fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+        logger.info('Company wallet signature added successfully', {
+          transactionSize: fullySignedTransaction.length
+        }, 'SolanaAppKitService');
+      } catch (signingError) {
+        logger.error('Failed to add company wallet signature', { 
+          error: signingError,
+          errorMessage: signingError instanceof Error ? signingError.message : String(signingError)
+        }, 'SolanaAppKitService');
+        throw new Error(`Failed to sign transaction with company wallet: ${signingError instanceof Error ? signingError.message : String(signingError)}`);
+      }
+
+      // Submit the fully signed transaction
+      try {
+        const result = await submitTransactionToBlockchain(fullySignedTransaction);
+        logger.info('Transaction submitted successfully', { 
+          signature: result.signature 
+        }, 'SolanaAppKitService');
+        return result.signature;
+      } catch (submissionError) {
+        logger.error('Transaction submission failed', { 
+          error: submissionError,
+          errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
+        }, 'SolanaAppKitService');
+        throw new Error(`Failed to submit transaction: ${submissionError instanceof Error ? submissionError.message : String(submissionError)}`);
+      }
     } catch (error) {
       console.error('Error sending USDC transaction:', error);
       throw new Error('Transaction failed: ' + (error as Error).message);

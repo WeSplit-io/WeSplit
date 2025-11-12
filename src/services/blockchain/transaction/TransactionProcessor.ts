@@ -10,6 +10,7 @@ import {
   LAMPORTS_PER_SOL,
   SystemProgram,
   Transaction,
+  VersionedTransaction,
   TransactionInstruction,
   ComputeBudgetProgram
 } from '@solana/web3.js';
@@ -23,11 +24,12 @@ import {
 import { USDC_CONFIG } from '../../shared/walletConstants';
 import { getConfig } from '../../../config/unified';
 import { TRANSACTION_CONFIG } from '../../../config/constants/transactionConfig';  
-import { FeeService } from '../../../config/constants/feeConfig';
+import { FeeService, COMPANY_WALLET_CONFIG } from '../../../config/constants/feeConfig';
 import { TransactionUtils } from '../../shared/transactionUtils';
 import { optimizedTransactionUtils } from '../../shared/transactionUtilsOptimized';
 import { logger } from '../../analytics/loggingService';
 import { TransactionParams, TransactionResult } from './types';
+import { signTransaction as signTransactionWithCompanyWallet, submitTransaction as submitTransactionToBlockchain } from './transactionSigningService';
 
 export class TransactionProcessor {
   private connection: Connection;
@@ -144,7 +146,19 @@ export class TransactionProcessor {
       }
 
       // Get recent blockhash
-      const blockhash = await TransactionUtils.getLatestBlockhashWithRetry(this.connection, 'confirmed');
+      const blockhashResult = await TransactionUtils.getLatestBlockhashWithRetry(this.connection, 'confirmed');
+      const blockhash = typeof blockhashResult === 'string' ? blockhashResult : blockhashResult.blockhash;
+      
+      // Validate blockhash is a string
+      if (!blockhash || typeof blockhash !== 'string') {
+        throw new Error(`Invalid blockhash: expected string, got ${typeof blockhash}`);
+      }
+      
+      logger.info('Got recent blockhash', {
+        blockhash: blockhash.substring(0, 8) + '...',
+        blockhashType: typeof blockhash,
+        blockhashLength: blockhash.length
+      }, 'TransactionProcessor');
       
       // Create the transaction with proper setup
       const transaction = new Transaction({
@@ -232,47 +246,176 @@ export class TransactionProcessor {
 
       // Add memo if provided
       if (params.memo) {
+        // Ensure memo is a string
+        const memoString = typeof params.memo === 'string' ? params.memo : String(params.memo);
+        if (memoString) {
         transaction.add(
           new TransactionInstruction({
             keys: [],
             programId: new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'),
-            data: Buffer.from(params.memo, 'utf8'),
+              data: Buffer.from(memoString, 'utf8'),
           })
         );
+        }
       }
       
-      // Prepare signers array
-      const signers: Keypair[] = [keypair];
-      
-      // SECURITY: Company wallet secret key is not available in client-side code
-      // All secret key operations must be performed on backend services
-      // This is a security requirement - secret keys should never be in client bundles
-      const { COMPANY_WALLET_CONFIG } = await import('../../../config/constants/feeConfig');
-      
+      // Company wallet always pays SOL fees
+      // SECURITY: Secret key operations must be performed on backend services via Firebase Functions
       if (!COMPANY_WALLET_CONFIG.address) {
         throw new Error('Company wallet address is not configured');
       }
-      
-      // Company wallet secret key operations must be performed on backend services
-      throw new Error(
-        'Company wallet secret key operations must be performed on backend services. ' +
-        'Client-side code cannot sign transactions with company wallet. ' +
-        'Please use backend API endpoint for transaction signing.'
-      );
 
-      // Send transaction with retry logic and timeout
+      logger.info('Transaction ready for signing', {
+        signerPublicKey: keypair.publicKey.toBase58(),
+        feePayer: transaction.feePayer?.toBase58(),
+        instructionsCount: transaction.instructions.length,
+        hasRecentBlockhash: !!transaction.recentBlockhash
+      }, 'TransactionProcessor');
+
+      // Validate transaction has recent blockhash before signing
+      if (!transaction.recentBlockhash) {
+        throw new Error('Transaction missing recent blockhash');
+      }
+
+      // Convert Transaction to VersionedTransaction for Firebase Functions
+      // Firebase Functions expect VersionedTransaction format
+      // NOTE: We don't sign the Transaction object first - we'll sign the VersionedTransaction directly
+      // This avoids double signing and ensures clean signature handling
+      let versionedTransaction: VersionedTransaction;
+      try {
+        // Compile message and validate it's not null/undefined
+        const compiledMessage = transaction.compileMessage();
+        if (!compiledMessage) {
+          throw new Error('Failed to compile transaction message');
+        }
+        
+        logger.info('Transaction message compiled successfully', {
+          messageType: compiledMessage.constructor.name,
+          hasMessage: !!compiledMessage
+        }, 'TransactionProcessor');
+        
+        versionedTransaction = new VersionedTransaction(compiledMessage);
+        // Sign the versioned transaction with user keypair (only sign once)
+        versionedTransaction.sign([keypair]);
+        logger.info('Transaction converted to VersionedTransaction and signed', {
+          userAddress: keypair.publicKey.toBase58(),
+          feePayer: versionedTransaction.message.staticAccountKeys[0]?.toBase58()
+        }, 'TransactionProcessor');
+      } catch (versionError) {
+        logger.error('Failed to convert transaction to VersionedTransaction', {
+          error: versionError,
+          errorMessage: versionError instanceof Error ? versionError.message : String(versionError)
+        }, 'TransactionProcessor');
+        throw new Error(`Failed to convert transaction to VersionedTransaction: ${versionError instanceof Error ? versionError.message : String(versionError)}`);
+      }
+
+      // Serialize the partially signed transaction
+      let serializedTransaction: Uint8Array | Buffer;
+      try {
+        serializedTransaction = versionedTransaction.serialize();
+        logger.info('Transaction serialized successfully', {
+          serializedType: typeof serializedTransaction,
+          isUint8Array: serializedTransaction instanceof Uint8Array,
+          isBuffer: serializedTransaction instanceof Buffer,
+          hasLength: 'length' in serializedTransaction,
+          length: (serializedTransaction as any).length
+        }, 'TransactionProcessor');
+      } catch (serializeError) {
+        logger.error('Failed to serialize transaction', {
+          error: serializeError,
+          errorMessage: serializeError instanceof Error ? serializeError.message : String(serializeError)
+        }, 'TransactionProcessor');
+        throw new Error(`Failed to serialize transaction: ${serializeError instanceof Error ? serializeError.message : String(serializeError)}`);
+      }
+
+      // Ensure we have a proper Uint8Array
+      let txArray: Uint8Array;
+      try {
+        if (serializedTransaction instanceof Uint8Array) {
+          txArray = serializedTransaction;
+        } else if (serializedTransaction instanceof Buffer) {
+          // Convert Buffer to Uint8Array
+          txArray = new Uint8Array(serializedTransaction);
+        } else if (Array.isArray(serializedTransaction)) {
+          txArray = new Uint8Array(serializedTransaction);
+        } else if (serializedTransaction instanceof ArrayBuffer) {
+          txArray = new Uint8Array(serializedTransaction);
+          } else {
+          throw new Error(`Invalid serialized transaction type: ${typeof serializedTransaction}. Expected Uint8Array or Buffer.`);
+        }
+
+        logger.info('Transaction converted to Uint8Array', {
+          txArrayLength: txArray.length,
+          txArrayType: typeof txArray,
+          isUint8Array: txArray instanceof Uint8Array
+        }, 'TransactionProcessor');
+      } catch (conversionError) {
+        logger.error('Failed to convert serialized transaction to Uint8Array', {
+          error: conversionError,
+          errorMessage: conversionError instanceof Error ? conversionError.message : String(conversionError),
+          serializedType: typeof serializedTransaction
+        }, 'TransactionProcessor');
+        throw new Error(`Failed to convert transaction to Uint8Array: ${conversionError instanceof Error ? conversionError.message : String(conversionError)}`);
+      }
+
+      logger.info('Transaction ready for Firebase Function', {
+        transactionSize: txArray.length,
+        transactionType: typeof txArray,
+        isUint8Array: txArray instanceof Uint8Array,
+        txArrayConstructor: txArray.constructor.name,
+        firstBytes: Array.from(txArray.slice(0, 10))
+      }, 'TransactionProcessor');
+
+      // Use Firebase Function to add company wallet signature
+      let fullySignedTransaction: Uint8Array;
+      try {
+        logger.info('Calling signTransactionWithCompanyWallet', {
+          txArrayLength: txArray.length,
+          txArrayType: typeof txArray
+        }, 'TransactionProcessor');
+        fullySignedTransaction = await signTransactionWithCompanyWallet(txArray);
+        logger.info('Company wallet signature added successfully', {
+          transactionSize: fullySignedTransaction.length
+        }, 'TransactionProcessor');
+      } catch (signingError) {
+        logger.error('Failed to add company wallet signature', { 
+          error: signingError,
+          errorMessage: signingError instanceof Error ? signingError.message : String(signingError),
+          errorName: signingError instanceof Error ? signingError.name : typeof signingError,
+          errorStack: signingError instanceof Error ? signingError.stack : undefined,
+          txArrayLength: txArray.length,
+          txArrayType: typeof txArray,
+          isUint8Array: txArray instanceof Uint8Array
+        }, 'TransactionProcessor');
+        
+        // Re-throw with more context
+        const errorMessage = signingError instanceof Error ? signingError.message : String(signingError);
+        throw new Error(`Failed to sign transaction with company wallet: ${errorMessage}`);
+      }
+
+      // Submit the fully signed transaction
       let signature: string;
       try {
-        signature = await Promise.race([
-          optimizedTransactionUtils.sendTransactionWithRetry(
-            transaction,
-            signers,
-            priority as 'low' | 'medium' | 'high'
-          ),
-          new Promise<string>((_, reject) => 
-            setTimeout(() => reject(new Error('Transaction send timeout after 30 seconds')), 30000)
-          )
-        ]);
+        const result = await submitTransactionToBlockchain(fullySignedTransaction);
+        signature = result.signature;
+        logger.info('Transaction submitted successfully', { signature }, 'TransactionProcessor');
+      } catch (submissionError) {
+        logger.error('Transaction submission failed', { 
+          error: submissionError,
+          errorMessage: submissionError instanceof Error ? submissionError.message : String(submissionError)
+        }, 'TransactionProcessor');
+        throw submissionError;
+      }
+
+      // Confirm transaction with optimized timeout handling
+      try {
+        const confirmed = await optimizedTransactionUtils.confirmTransactionWithTimeout(signature);
+        if (!confirmed) {
+          logger.warn('Transaction confirmation timed out, but transaction was sent', { 
+            signature,
+            note: 'Transaction may still be processing on the blockchain'
+          }, 'TransactionProcessor');
+        }
         
         logger.info('Transaction sent successfully', {
           signature,
@@ -280,12 +423,12 @@ export class TransactionProcessor {
           priority
         }, 'TransactionProcessor');
       } catch (sendError) {
-        logger.error('Transaction send failed', {
+        logger.error('Transaction confirmation failed', {
           error: sendError instanceof Error ? sendError.message : String(sendError),
           transactionType,
           priority
         }, 'TransactionProcessor');
-        throw sendError;
+        // Don't throw - transaction was already submitted
       }
       
       // Quick confirmation check - if it takes too long, just proceed

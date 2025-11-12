@@ -12,10 +12,11 @@
     "logs": "firebase functions:log"
   },
   "engines": {
-    "node": "18"
+    "node": "20"
   },
   "dependencies": {
     "@moonpay/react-native-moonpay-sdk": "^1.1.4",
+    "@solana/web3.js": "^1.95.4",
     "firebase-admin": "^11.11.1",
     "firebase-functions": "^4.8.1",
     "nodemailer": "^6.10.1",

@@ -186,5 +186,51 @@ export const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.5,
   },
+
+  /** ================================ Banner Styles ================================ */
+  ocrSuccessBanner: {
+    padding: spacing.md,
+    backgroundColor: colors.green + '20',
+    marginBottom: spacing.sm,
+    borderRadius: spacing.radiusSm,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
+  ocrSuccessText: {
+    color: colors.green,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  confidenceWarningBanner: {
+    padding: spacing.md,
+    backgroundColor: colors.error + '20',
+    marginBottom: spacing.sm,
+    borderRadius: spacing.radiusSm,
+    marginHorizontal: spacing.md,
+  },
+  confidenceWarningText: {
+    color: colors.error,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  validationWarningBanner: {
+    padding: spacing.md,
+    backgroundColor: colors.error + '20',
+    marginBottom: spacing.sm,
+    borderRadius: spacing.radiusSm,
+    marginHorizontal: spacing.md,
+  },
+  validationWarningTitle: {
+    color: colors.error,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.xs,
+  },
+  validationWarningText: {
+    color: colors.error,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.regular,
+    marginTop: spacing.xs,
+  },
 });
 

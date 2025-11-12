@@ -48,10 +48,12 @@ export const SOLANA_CONFIG = (() => {
 })();
 
 // MoonPay configuration
+// SECURITY: Secret keys are NOT stored in client-side code
+// Secret keys should only be used on backend services
 export const MOONPAY_CONFIG = {
   apiKey: process.env.MOONPAY_API_KEY,
-  secretKey: process.env.MOONPAY_SECRET_KEY,
-  webhookSecret: process.env.MOONPAY_WEBHOOK_SECRET,
+  // secretKey removed - must be handled by backend services only
+  // webhookSecret removed - must be handled by backend services only
   publicApiKey: process.env.EXPO_PUBLIC_MOONPAY_API_KEY,
 };
 

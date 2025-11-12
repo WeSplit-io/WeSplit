@@ -68,6 +68,16 @@ export interface ProcessedBillData {
   items: BillItem[];
   participants: BillParticipant[];
   settings?: BillSettings;
+  // OCR-extracted additional data
+  merchantPhone?: string; // Merchant phone number from receipt
+  receiptNumber?: string; // Receipt number from OCR
+  // Validation warnings (optional, for user feedback)
+  validationWarnings?: {
+    itemsSumMismatch?: boolean; // Items sum doesn't match total
+    subtotalTaxMismatch?: boolean; // Subtotal + tax doesn't match total
+  };
+  // OCR metadata
+  ocrCategory?: string; // Category extracted by OCR
 }
 
 export interface OCRProcessingResult {

@@ -108,8 +108,8 @@ export const useSplitDetails = ({ routeParams, currentUser: _currentUser }: UseS
           time: new Date(splitData.createdAt).toLocaleTimeString(),
           currency: splitData.currency,
           totalAmount: splitData.totalAmount,
-          subtotal: splitData.totalAmount * 0.9, // Estimate
-          tax: splitData.totalAmount * 0.1, // Estimate
+          subtotal: splitData.subtotal ?? splitData.totalAmount * 0.9, // Use actual or estimate
+          tax: splitData.tax ?? splitData.totalAmount * 0.1, // Use actual or estimate
           items: splitData.items || [],
           participants: splitData.participants || [],
           settings: {
@@ -265,8 +265,8 @@ export const useSplitDetails = ({ routeParams, currentUser: _currentUser }: UseS
                 time: new Date(update.split.createdAt).toLocaleTimeString(),
                 currency: update.split.currency,
                 totalAmount: update.split.totalAmount,
-                subtotal: update.split.totalAmount * 0.9, // Estimate
-                tax: update.split.totalAmount * 0.1, // Estimate
+                subtotal: update.split.subtotal ?? update.split.totalAmount * 0.9, // Use actual or estimate
+                tax: update.split.tax ?? update.split.totalAmount * 0.1, // Use actual or estimate
                 items: update.split.items || [],
                 participants: update.participants,
                 settings: {

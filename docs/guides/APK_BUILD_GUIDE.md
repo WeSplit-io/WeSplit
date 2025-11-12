@@ -30,8 +30,9 @@ eas secret:create --scope project --name EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID --v
 eas secret:create --scope project --name EXPO_PUBLIC_HELIUS_API_KEY --value "your-helius-api-key"
 
 # Company Wallet Configuration
+# SECURITY: Secret key is NOT stored in client-side code
+# EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY removed - must be handled by backend services only
 eas secret:create --scope project --name EXPO_PUBLIC_COMPANY_WALLET_ADDRESS --value "your-wallet-address"
-eas secret:create --scope project --name EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY --value "your-wallet-secret-key"
 
 # OAuth Configuration
 eas secret:create --scope project --name EXPO_PUBLIC_GOOGLE_CLIENT_ID --value "your-google-client-id"
@@ -192,7 +193,7 @@ npm run validate:env
 | `EXPO_PUBLIC_FIREBASE_PROJECT_ID` | Firebase project ID | `wesplit-35186` |
 | `EXPO_PUBLIC_HELIUS_API_KEY` | Helius RPC API key | `your-helius-key` |
 | `EXPO_PUBLIC_COMPANY_WALLET_ADDRESS` | Company wallet address | `9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM` |
-| `EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY` | Company wallet secret | `[123,45,67,...]` |
+| `EXPO_PUBLIC_COMPANY_WALLET_SECRET_KEY` | **REMOVED** - Secret key must be handled by backend services only | N/A |
 
 ### Optional Variables
 

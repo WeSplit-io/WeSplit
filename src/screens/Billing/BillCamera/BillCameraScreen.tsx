@@ -31,9 +31,9 @@ const BillCameraScreen: React.FC<BillCameraScreenProps> = ({ navigation }) => {
   const cameraRef = useRef<CameraView>(null);
   
   const [permission, requestPermission] = useCameraPermissions();
-  // Camera type and flash mode state - not currently used but may be needed for future camera controls
-  // const [cameraType, setCameraType] = useState<'back' | 'front'>('back');
-  // const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
+  // Camera type and flash mode state - defaults to back camera and flash off
+  const [cameraType, setCameraType] = useState<'back' | 'front'>('back');
+  const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
   const [isCapturing, setIsCapturing] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
 

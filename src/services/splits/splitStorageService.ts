@@ -63,6 +63,10 @@ export interface Split {
   updatedAt: string;
   completedAt?: string;
   firebaseDocId?: string;
+  // OCR-extracted data
+  subtotal?: number; // Subtotal from receipt (before tax)
+  tax?: number; // Tax amount from receipt
+  receiptNumber?: string; // Receipt number from OCR
   // Wallet information
   walletId?: string;
   walletAddress?: string;

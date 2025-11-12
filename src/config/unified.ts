@@ -208,7 +208,7 @@ export function getUnifiedConfig(): UnifiedConfig {
     
     moonpay: {
       apiKey: getEnvVar('MOONPAY_API_KEY'),
-      secretKey: getEnvVar('MOONPAY_SECRET_KEY'),
+      // SECURITY: secretKey removed - must be handled by backend services only
       baseUrl: extra.MOONPAY_BASE_URL || 'https://buy-sandbox.moonpay.com',
       widgetUrl: extra.MOONPAY_WIDGET_URL || 'https://buy-sandbox.moonpay.com',
     },
